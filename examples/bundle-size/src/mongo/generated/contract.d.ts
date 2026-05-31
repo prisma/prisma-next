@@ -10,6 +10,7 @@ import type {
 } from '@prisma-next/mongo-contract';
 import type {
   Contract as ContractType,
+  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -17,10 +18,10 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e76437adce58a82f595cd7f493cd976de749c10bcd10c59428b57c5cc4f1d085'>;
+  StorageHashBase<'sha256:a58dadc7b7eec01c91b82c7bc6479789b531866f54ed834429d78d975cc13537'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
+  ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
 
 export type CodecTypes = MongoCodecTypes;
 

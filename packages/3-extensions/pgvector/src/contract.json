@@ -2,18 +2,12 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {},
-  "models": {},
   "domain": {
-    "__unbound__": {
-      "types": {
-        "vector": {
-          "codecId": "pg/vector@1",
-          "kind": "codec-instance",
-          "nativeType": "vector",
-          "typeParams": {}
-        }
+    "namespaces": {
+      "__unbound__": {
+        "models": {}
       }
     }
   },
@@ -25,7 +19,7 @@
         "tables": {}
       }
     },
-    "storageHash": "sha256:06733db8971afcf2fb373dcd1278e801e9e1e083d6f07d07bc7479e143c938e3",
+    "storageHash": "sha256:192ac515d804995e7d81598000566a4359e1ad2c0b2ec16f8d324ab90e2407bc",
     "types": {
       "vector": {
         "codecId": "pg/vector@1",

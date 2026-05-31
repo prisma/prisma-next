@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "comment": {
       "model": "Comment",
@@ -33,611 +33,617 @@
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "Comment": {
-      "fields": {
-        "content": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "postId": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "updatedAt": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "post": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": [
-              "postId"
-            ],
-            "targetFields": [
-              "id"
-            ]
-          },
-          "to": {
-            "model": "Post",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "content": {
-            "column": "content"
-          },
-          "createdAt": {
-            "column": "created_at"
-          },
-          "id": {
-            "column": "id"
-          },
-          "postId": {
-            "column": "postId"
-          },
-          "updatedAt": {
-            "column": "update_at"
-          }
-        },
-        "table": "comment"
-      }
-    },
-    "Embedding": {
-      "fields": {
-        "embedding": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/vector@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 1536
-            }
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "profile": {
-          "nullable": false,
-          "type": {
-            "codecId": "arktype/json@1",
-            "kind": "scalar",
-            "typeParams": {
-              "expression": "{ age: number, name: string }",
-              "jsonIr": {
-                "domain": "object",
-                "required": [
-                  {
-                    "key": "age",
-                    "value": "number"
-                  },
-                  {
-                    "key": "name",
-                    "value": "string"
-                  }
-                ]
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "Comment": {
+            "fields": {
+              "content": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "postId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
               }
+            },
+            "relations": {
+              "post": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "postId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "content": {
+                  "column": "content"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "postId": {
+                  "column": "postId"
+                },
+                "updatedAt": {
+                  "column": "update_at"
+                }
+              },
+              "table": "comment"
+            }
+          },
+          "Embedding": {
+            "fields": {
+              "embedding": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/vector@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 1536
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "profile": {
+                "nullable": false,
+                "type": {
+                  "codecId": "arktype/json@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "expression": "{ age: number, name: string }",
+                    "jsonIr": {
+                      "domain": "object",
+                      "required": [
+                        {
+                          "key": "age",
+                          "value": "number"
+                        },
+                        {
+                          "key": "name",
+                          "value": "string"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "embedding": {
+                  "column": "embedding"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "profile": {
+                  "column": "profile"
+                }
+              },
+              "table": "embedding"
+            }
+          },
+          "Event": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "scheduledAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "scheduledAt": {
+                  "column": "scheduled_at"
+                }
+              },
+              "table": "event"
+            }
+          },
+          "LiteralDefaults": {
+            "fields": {
+              "active": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "bigCount": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int8@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "label": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "metadata": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "rating": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "score": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "tags": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "active": {
+                  "column": "active"
+                },
+                "bigCount": {
+                  "column": "big_count"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "label": {
+                  "column": "label"
+                },
+                "metadata": {
+                  "column": "metadata"
+                },
+                "rating": {
+                  "column": "rating"
+                },
+                "score": {
+                  "column": "score"
+                },
+                "tags": {
+                  "column": "tags"
+                }
+              },
+              "table": "literal_defaults"
+            }
+          },
+          "ParamTypes": {
+            "fields": {
+              "bits": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/varbit@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 12
+                  }
+                }
+              },
+              "code": {
+                "nullable": true,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 16
+                  }
+                }
+              },
+              "createdAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "duration": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/interval@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 6
+                  }
+                }
+              },
+              "flags": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/bit@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 8
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": true,
+                "type": {
+                  "codecId": "sql/varchar@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 255
+                  }
+                }
+              },
+              "price": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/numeric@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 10,
+                    "scale": 2
+                  }
+                }
+              },
+              "startsAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/time@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 2
+                  }
+                }
+              },
+              "startsAtTz": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timetz@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 2
+                  }
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "bits": {
+                  "column": "bits"
+                },
+                "code": {
+                  "column": "code"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "duration": {
+                  "column": "duration"
+                },
+                "flags": {
+                  "column": "flags"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "price": {
+                  "column": "price"
+                },
+                "startsAt": {
+                  "column": "starts_at"
+                },
+                "startsAtTz": {
+                  "column": "starts_at_tz"
+                }
+              },
+              "table": "param_types"
+            }
+          },
+          "Post": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "meta": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
+              "published": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "author": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "__unbound__"
+                }
+              },
+              "comments": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "postId"
+                  ]
+                },
+                "to": {
+                  "model": "Comment",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "meta": {
+                  "column": "meta"
+                },
+                "published": {
+                  "column": "published"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "updatedAt": {
+                  "column": "update_at"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "table": "post"
+            }
+          },
+          "User": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/varchar@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 255
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "profile": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "profile": {
+                  "column": "profile"
+                },
+                "updatedAt": {
+                  "column": "update_at"
+                }
+              },
+              "table": "user"
             }
           }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "embedding": {
-            "column": "embedding"
-          },
-          "id": {
-            "column": "id"
-          },
-          "profile": {
-            "column": "profile"
-          }
-        },
-        "table": "embedding"
-      }
-    },
-    "Event": {
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
-            }
-          }
-        },
-        "name": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "scheduledAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "created_at"
-          },
-          "id": {
-            "column": "id"
-          },
-          "name": {
-            "column": "name"
-          },
-          "scheduledAt": {
-            "column": "scheduled_at"
-          }
-        },
-        "table": "event"
-      }
-    },
-    "LiteralDefaults": {
-      "fields": {
-        "active": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/bool@1",
-            "kind": "scalar"
-          }
-        },
-        "bigCount": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int8@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "label": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "metadata": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/jsonb@1",
-            "kind": "scalar"
-          }
-        },
-        "rating": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/float8@1",
-            "kind": "scalar"
-          }
-        },
-        "score": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "tags": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/jsonb@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "active": {
-            "column": "active"
-          },
-          "bigCount": {
-            "column": "big_count"
-          },
-          "id": {
-            "column": "id"
-          },
-          "label": {
-            "column": "label"
-          },
-          "metadata": {
-            "column": "metadata"
-          },
-          "rating": {
-            "column": "rating"
-          },
-          "score": {
-            "column": "score"
-          },
-          "tags": {
-            "column": "tags"
-          }
-        },
-        "table": "literal_defaults"
-      }
-    },
-    "ParamTypes": {
-      "fields": {
-        "bits": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/varbit@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 12
-            }
-          }
-        },
-        "code": {
-          "nullable": true,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 16
-            }
-          }
-        },
-        "createdAt": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar",
-            "typeParams": {
-              "precision": 3
-            }
-          }
-        },
-        "duration": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/interval@1",
-            "kind": "scalar",
-            "typeParams": {
-              "precision": 6
-            }
-          }
-        },
-        "flags": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/bit@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 8
-            }
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "name": {
-          "nullable": true,
-          "type": {
-            "codecId": "sql/varchar@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 255
-            }
-          }
-        },
-        "price": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/numeric@1",
-            "kind": "scalar",
-            "typeParams": {
-              "precision": 10,
-              "scale": 2
-            }
-          }
-        },
-        "startsAt": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/time@1",
-            "kind": "scalar",
-            "typeParams": {
-              "precision": 2
-            }
-          }
-        },
-        "startsAtTz": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/timetz@1",
-            "kind": "scalar",
-            "typeParams": {
-              "precision": 2
-            }
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "bits": {
-            "column": "bits"
-          },
-          "code": {
-            "column": "code"
-          },
-          "createdAt": {
-            "column": "created_at"
-          },
-          "duration": {
-            "column": "duration"
-          },
-          "flags": {
-            "column": "flags"
-          },
-          "id": {
-            "column": "id"
-          },
-          "name": {
-            "column": "name"
-          },
-          "price": {
-            "column": "price"
-          },
-          "startsAt": {
-            "column": "starts_at"
-          },
-          "startsAtTz": {
-            "column": "starts_at_tz"
-          }
-        },
-        "table": "param_types"
-      }
-    },
-    "Post": {
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "meta": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/json@1",
-            "kind": "scalar"
-          }
-        },
-        "published": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/bool@1",
-            "kind": "scalar"
-          }
-        },
-        "title": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "updatedAt": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "userId": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "author": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": [
-              "userId"
-            ],
-            "targetFields": [
-              "id"
-            ]
-          },
-          "to": {
-            "model": "User",
-            "namespace": "__unbound__"
-          }
-        },
-        "comments": {
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "postId"
-            ]
-          },
-          "to": {
-            "model": "Comment",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "created_at"
-          },
-          "id": {
-            "column": "id"
-          },
-          "meta": {
-            "column": "meta"
-          },
-          "published": {
-            "column": "published"
-          },
-          "title": {
-            "column": "title"
-          },
-          "updatedAt": {
-            "column": "update_at"
-          },
-          "userId": {
-            "column": "userId"
-          }
-        },
-        "table": "post"
-      }
-    },
-    "User": {
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/varchar@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 255
-            }
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "profile": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/jsonb@1",
-            "kind": "scalar"
-          }
-        },
-        "updatedAt": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "posts": {
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "userId"
-            ]
-          },
-          "to": {
-            "model": "Post",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "created_at"
-          },
-          "email": {
-            "column": "email"
-          },
-          "id": {
-            "column": "id"
-          },
-          "profile": {
-            "column": "profile"
-          },
-          "updatedAt": {
-            "column": "update_at"
-          }
-        },
-        "table": "user"
       }
     }
   },
@@ -1081,10 +1087,10 @@
         }
       }
     },
-    "storageHash": "sha256:c01040e095a1fe5dd776c2d5afe4a7767c506e044e96ecd46bfa369a75a13733"
+    "storageHash": "sha256:2798d47330f6b3372cb0adf9d2d371ee5f26f973a1baa770326b4a089faec385"
   },
   "execution": {
-    "executionHash": "sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27",
+    "executionHash": "sha256:cee87ec002ede0c352cdf215e9e129a540bebd95555057beaa785c7dfadb95ea",
     "mutations": {
       "defaults": [
         {

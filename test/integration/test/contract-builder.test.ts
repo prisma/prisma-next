@@ -5,6 +5,7 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
@@ -69,7 +70,7 @@ describe('builder integration', () => {
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
 
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
-    const userModel = contract.models.User;
+    const userModel = contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User;
     expect(userModel).toMatchObject({
       storage: {
         table: 'user',
@@ -109,17 +110,27 @@ describe('builder integration', () => {
     expectTypeOf(userTableType.columns.createdAt.nullable).toEqualTypeOf<false>();
 
     // Verify model name is literal 'User', not string
-    expectTypeOf(contract.models).toHaveProperty('User');
+    expectTypeOf(contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models).toHaveProperty(
+      'User',
+    );
 
     // Verify model storage table is literal 'user'
-    expectTypeOf(contract.models.User.storage.table).toEqualTypeOf<'user'>();
+    expectTypeOf(
+      contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.storage.table,
+    ).toEqualTypeOf<'user'>();
 
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
 
     // Verify model field names are literal types
-    expectTypeOf(contract.models.User.fields).toHaveProperty('id');
-    expectTypeOf(contract.models.User.fields).toHaveProperty('email');
-    expectTypeOf(contract.models.User.fields).toHaveProperty('createdAt');
+    expectTypeOf(
+      contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.fields,
+    ).toHaveProperty('id');
+    expectTypeOf(
+      contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.fields,
+    ).toHaveProperty('email');
+    expectTypeOf(
+      contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.fields,
+    ).toHaveProperty('createdAt');
   });
 
   it('contract can be validated via the SPI serializer', () => {
@@ -262,8 +273,10 @@ describe('builder integration', () => {
       storage: { table: string; fields: Record<string, unknown> };
       fields: Record<string, unknown>;
     };
-    const builderUserModel = builderContract.models.User as unknown as ModelShape;
-    const fixtureUserModel = fixtureContract.models.User as unknown as ModelShape;
+    const builderUserModel = builderContract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models
+      .User as unknown as ModelShape;
+    const fixtureUserModel = fixtureContract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models
+      .User as unknown as ModelShape;
     expect(builderUserModel.storage.table).toBe(fixtureUserModel.storage.table);
     expect(Object.keys(builderUserModel.fields).sort()).toEqual(
       Object.keys(fixtureUserModel.fields).sort(),
@@ -286,11 +299,21 @@ describe('builder integration', () => {
     );
 
     // Verify model types match
-    expectTypeOf(builderContract.models).toHaveProperty('User');
-    expectTypeOf(builderContract.models.User.storage.table).toEqualTypeOf<'user'>();
-    expectTypeOf(builderContract.models.User.fields).toHaveProperty('id');
-    expectTypeOf(builderContract.models.User.fields).toHaveProperty('email');
-    expectTypeOf(builderContract.models.User.fields).toHaveProperty('createdAt');
+    expectTypeOf(
+      builderContract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models,
+    ).toHaveProperty('User');
+    expectTypeOf(
+      builderContract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.storage.table,
+    ).toEqualTypeOf<'user'>();
+    expectTypeOf(
+      builderContract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.fields,
+    ).toHaveProperty('id');
+    expectTypeOf(
+      builderContract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.fields,
+    ).toHaveProperty('email');
+    expectTypeOf(
+      builderContract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.fields,
+    ).toHaveProperty('createdAt');
   });
 
   it('supports type option with column-type constants', () => {
@@ -376,7 +399,10 @@ describe('builder integration', () => {
         on: { localFields: readonly string[]; targetFields: readonly string[] };
       };
       type ModelShape = { relations: Record<string, RelShape> };
-      const models = contract.models as Record<string, ModelShape>;
+      const models = contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models as Record<
+        string,
+        ModelShape
+      >;
       const userRels = models['User']!.relations;
       const postRels = models['Post']!.relations;
       expect(userRels).toBeDefined();
@@ -442,7 +468,10 @@ describe('builder integration', () => {
         models: { User, Role, UserRole },
       });
 
-      const models = contract.models as Record<string, { relations: Record<string, unknown> }>;
+      const models = contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models as Record<
+        string,
+        { relations: Record<string, unknown> }
+      >;
       expect(models['User']?.relations).toMatchObject({
         roles: {
           to: { namespace: '__unbound__', model: 'Role' },

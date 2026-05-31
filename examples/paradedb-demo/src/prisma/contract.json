@@ -2,62 +2,68 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "item": {
       "model": "Item",
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "Item": {
-      "fields": {
-        "category": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "description": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "rating": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "Item": {
+            "fields": {
+              "category": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "description": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "rating": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "category": {
+                  "column": "category"
+                },
+                "description": {
+                  "column": "description"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "rating": {
+                  "column": "rating"
+                }
+              },
+              "table": "item"
+            }
           }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "category": {
-            "column": "category"
-          },
-          "description": {
-            "column": "description"
-          },
-          "id": {
-            "column": "id"
-          },
-          "rating": {
-            "column": "rating"
-          }
-        },
-        "table": "item"
       }
     }
   },
@@ -116,7 +122,7 @@
         }
       }
     },
-    "storageHash": "sha256:3e50138f416ab435ac8933c9d2ddcb725f486464d13054a8100f17f06d97f970"
+    "storageHash": "sha256:e30e4cc25f02e7950826a8dd4ac8b8128657e556ce71d1646b454491ed8f06b8"
   },
   "capabilities": {
     "postgres": {

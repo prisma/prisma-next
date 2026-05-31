@@ -23,6 +23,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
+  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -30,11 +31,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4c8df727b4bc8b1c76ea8ecf452785f537e8e80fa6d66e271262e81bd4bd232c'>;
+  StorageHashBase<'sha256:4e6deb4de195c3b41a8510b03de51f6cf28b0831db145db9520bfa3ba66ab779'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:63d6acb216ecdc40b22f2e9d59e179ccec2d77cdc9ac3d6711a363046d02660e'>;
+  ExecutionHashBase<'sha256:13b32dc5b41ba6f7d635fefd3a3fdc581490a54d10a654f9ea323638ad66c726'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
+  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -142,4 +143,4 @@ type ContractBase = Omit<
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Namespaces = Contract['storage']['namespaces'];
-export type Models = Contract['models'];
+export type Models = ContractModelsMap<Contract>;

@@ -2,32 +2,38 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "user": {
       "model": "User",
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "User": {
-      "fields": {
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "User": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                }
+              },
+              "table": "user"
+            }
           }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "id": {
-            "column": "id"
-          }
-        },
-        "table": "user"
       }
     }
   },
@@ -54,10 +60,10 @@
         }
       }
     },
-    "storageHash": "sha256:6764054ee730ad25f73bf02601c20f277c697af7d97fcd328ed820413b8d18a0"
+    "storageHash": "sha256:00195618b5bc3eb29e83caaf6148fae09438c6b84668413a903913813fdbca51"
   },
   "execution": {
-    "executionHash": "sha256:91b2baa0b7cc5262f4706a2deb109734404c5edc7873bb666525f077278adce1",
+    "executionHash": "sha256:28ad2f03f8da50b42cff2553077afb5a85e9e340c32f0cf86564d0b6712ffe41",
     "mutations": {
       "defaults": [
         {

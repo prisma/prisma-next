@@ -1,6 +1,12 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+
+function modelsOf(ir: Contract): Record<string, unknown> {
+  return ir.domain.namespaces[UNBOUND_NAMESPACE_ID]!.models;
+}
+
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
@@ -83,7 +89,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(ir.models['Task']).toMatchObject({
+      expect(modelsOf(ir)['Task']).toMatchObject({
         discriminator: { field: 'type' },
         variants: { Bug: { value: 'bug' } },
       });
@@ -107,7 +113,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(ir.models['Bug']).toMatchObject({ base: crossRef('Task') });
+      expect(modelsOf(ir)['Bug']).toMatchObject({ base: crossRef('Task') });
     });
 
     it('variant inherits base collection (single-collection)', () => {
@@ -129,7 +135,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(ir.models['Bug']?.storage).toMatchObject({ collection: 'tasks' });
+      expect(modelsOf(ir)['Bug']?.storage).toMatchObject({ collection: 'tasks' });
     });
 
     it('assembles multiple variants on the base', () => {
@@ -157,15 +163,15 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(ir.models['Task']).toMatchObject({
+      expect(modelsOf(ir)['Task']).toMatchObject({
         discriminator: { field: 'type' },
         variants: {
           Bug: { value: 'bug' },
           Feature: { value: 'feature' },
         },
       });
-      expect(ir.models['Bug']).toMatchObject({ base: crossRef('Task') });
-      expect(ir.models['Feature']).toMatchObject({ base: crossRef('Task') });
+      expect(modelsOf(ir)['Bug']).toMatchObject({ base: crossRef('Task') });
+      expect(modelsOf(ir)['Feature']).toMatchObject({ base: crossRef('Task') });
     });
 
     it('variants are not included in roots', () => {

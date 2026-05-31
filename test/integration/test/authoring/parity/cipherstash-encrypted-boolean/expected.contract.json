@@ -2,45 +2,51 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "user": {
       "model": "User",
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "User": {
-      "fields": {
-        "emailVerified": {
-          "nullable": false,
-          "type": {
-            "codecId": "cipherstash/boolean@1",
-            "kind": "scalar",
-            "typeParams": {
-              "equality": true
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "User": {
+            "fields": {
+              "emailVerified": {
+                "nullable": false,
+                "type": {
+                  "codecId": "cipherstash/boolean@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "equality": true
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "emailVerified": {
+                  "column": "emailVerified"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "table": "user"
             }
           }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "emailVerified": {
-            "column": "emailVerified"
-          },
-          "id": {
-            "column": "id"
-          }
-        },
-        "table": "user"
       }
     }
   },
@@ -75,7 +81,7 @@
         }
       }
     },
-    "storageHash": "sha256:bb3360cc55ef940de7380342ae8d961c8b577ebb128cfbb105e783ff5a4b63ff"
+    "storageHash": "sha256:7e75662ae1d929a111c7b9fb996fd5767a17f805b946c7cb461c97a955952c26"
   },
   "capabilities": {
     "postgres": {

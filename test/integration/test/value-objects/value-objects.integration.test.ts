@@ -1,4 +1,9 @@
-import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import {
+  type ContractField,
+  type ContractValueObject,
+  contractModels,
+  contractValueObjects,
+} from '@prisma-next/contract/types';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
@@ -86,10 +91,11 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
     if (!result.ok) throw new Error(`Interpretation failed: ${result.failure.summary}`);
 
     const contract = result.value;
-    expect(contract.valueObjects).toBeDefined();
-    expect(contract.valueObjects!['Address']).toBeDefined();
+    const unboundDomain = contract.domain.namespaces.__unbound__!;
+    expect(unboundDomain.valueObjects).toBeDefined();
+    expect(unboundDomain.valueObjects!['Address']).toBeDefined();
 
-    const userFields = contract.models['User']!.fields as Record<string, ContractField>;
+    const userFields = unboundDomain.models['User']!.fields as Record<string, ContractField>;
     expect(userFields['homeAddress']!.type.kind).toBe('valueObject');
 
     const validated = { contract: new MongoContractSerializer().deserializeContract(contract) };
@@ -179,16 +185,17 @@ describe('value objects: end-to-end SQL pipeline', () => {
     if (!result.ok) throw new Error(`Interpretation failed: ${result.failure.summary}`);
 
     const contract = result.value;
-    expect(contract.valueObjects).toBeDefined();
-    expect(contract.valueObjects!['Address']).toBeDefined();
+    const unboundDomain = contract.domain.namespaces.__unbound__!;
+    expect(unboundDomain.valueObjects).toBeDefined();
+    expect(unboundDomain.valueObjects!['Address']).toBeDefined();
 
-    const addressVo = contract.valueObjects!['Address'] as ContractValueObject;
+    const addressVo = unboundDomain.valueObjects!['Address'] as ContractValueObject;
     const voFields = addressVo.fields;
     expect(voFields['street']).toBeDefined();
     expect(voFields['city']).toBeDefined();
     expect(voFields['zip']).toBeDefined();
 
-    const userFields = contract.models['User']!.fields as Record<string, ContractField>;
+    const userFields = unboundDomain.models['User']!.fields as Record<string, ContractField>;
     const homeAddressField = userFields['homeAddress']!;
     expect(homeAddressField.type).toEqual({ kind: 'valueObject', name: 'Address' });
     expect(homeAddressField.nullable).toBe(false);
@@ -235,8 +242,8 @@ type Metadata {
     expect(sqlResult.ok).toBe(true);
     if (!mongoResult.ok || !sqlResult.ok) return;
 
-    const mongoVos = mongoResult.value.valueObjects!;
-    const sqlVos = sqlResult.value.valueObjects!;
+    const mongoVos = contractValueObjects(mongoResult.value)!;
+    const sqlVos = contractValueObjects(sqlResult.value)!;
 
     expect(Object.keys(mongoVos)).toEqual(Object.keys(sqlVos));
 
@@ -251,11 +258,14 @@ type Metadata {
       expect(mongoField.nullable).toBe(sqlField.nullable);
     }
 
-    const mongoItemFields = mongoResult.value.models['Item']!.fields as Record<
+    const mongoItemFields = contractModels(mongoResult.value)['Item']!.fields as Record<
       string,
       ContractField
     >;
-    const sqlItemFields = sqlResult.value.models['Item']!.fields as Record<string, ContractField>;
+    const sqlItemFields = contractModels(sqlResult.value)['Item']!.fields as Record<
+      string,
+      ContractField
+    >;
 
     expect(mongoItemFields['meta']!.type).toEqual({ kind: 'valueObject', name: 'Metadata' });
     expect(sqlItemFields['meta']!.type).toEqual({ kind: 'valueObject', name: 'Metadata' });
@@ -299,15 +309,13 @@ type Address {
     expect(sqlResult.ok).toBe(true);
     if (!mongoResult.ok || !sqlResult.ok) return;
 
-    expect(Object.keys(mongoResult.value.valueObjects!).sort()).toEqual(
-      Object.keys(sqlResult.value.valueObjects!).sort(),
+    expect(Object.keys(contractValueObjects(mongoResult.value)!).sort()).toEqual(
+      Object.keys(contractValueObjects(sqlResult.value)!).sort(),
     );
 
-    const mongoShipping = mongoResult.value.valueObjects!['ShippingInfo']!.fields as Record<
-      string,
-      ContractField
-    >;
-    const sqlShipping = sqlResult.value.valueObjects!['ShippingInfo']!.fields as Record<
+    const mongoShipping = contractValueObjects(mongoResult.value)!['ShippingInfo']!
+      .fields as Record<string, ContractField>;
+    const sqlShipping = contractValueObjects(sqlResult.value)!['ShippingInfo']!.fields as Record<
       string,
       ContractField
     >;

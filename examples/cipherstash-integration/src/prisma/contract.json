@@ -2,115 +2,121 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "users": {
       "model": "User",
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "User": {
-      "fields": {
-        "accountId": {
-          "nullable": false,
-          "type": {
-            "codecId": "cipherstash/bigint@1",
-            "kind": "scalar",
-            "typeParams": {
-              "equality": true,
-              "orderAndRange": true
-            }
-          }
-        },
-        "birthday": {
-          "nullable": false,
-          "type": {
-            "codecId": "cipherstash/date@1",
-            "kind": "scalar",
-            "typeParams": {
-              "equality": true,
-              "orderAndRange": true
-            }
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "cipherstash/string@1",
-            "kind": "scalar",
-            "typeParams": {
-              "equality": true,
-              "freeTextSearch": true,
-              "orderAndRange": true
-            }
-          }
-        },
-        "emailVerified": {
-          "nullable": false,
-          "type": {
-            "codecId": "cipherstash/boolean@1",
-            "kind": "scalar",
-            "typeParams": {
-              "equality": true
-            }
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "preferences": {
-          "nullable": false,
-          "type": {
-            "codecId": "cipherstash/json@1",
-            "kind": "scalar",
-            "typeParams": {
-              "searchableJson": true
-            }
-          }
-        },
-        "salary": {
-          "nullable": false,
-          "type": {
-            "codecId": "cipherstash/double@1",
-            "kind": "scalar",
-            "typeParams": {
-              "equality": true,
-              "orderAndRange": true
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "User": {
+            "fields": {
+              "accountId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "cipherstash/bigint@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "equality": true,
+                    "orderAndRange": true
+                  }
+                }
+              },
+              "birthday": {
+                "nullable": false,
+                "type": {
+                  "codecId": "cipherstash/date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "equality": true,
+                    "orderAndRange": true
+                  }
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "cipherstash/string@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "equality": true,
+                    "freeTextSearch": true,
+                    "orderAndRange": true
+                  }
+                }
+              },
+              "emailVerified": {
+                "nullable": false,
+                "type": {
+                  "codecId": "cipherstash/boolean@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "equality": true
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "preferences": {
+                "nullable": false,
+                "type": {
+                  "codecId": "cipherstash/json@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "searchableJson": true
+                  }
+                }
+              },
+              "salary": {
+                "nullable": false,
+                "type": {
+                  "codecId": "cipherstash/double@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "equality": true,
+                    "orderAndRange": true
+                  }
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "accountId": {
+                  "column": "accountid"
+                },
+                "birthday": {
+                  "column": "birthday"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "emailVerified": {
+                  "column": "emailverified"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "preferences": {
+                  "column": "preferences"
+                },
+                "salary": {
+                  "column": "salary"
+                }
+              },
+              "table": "users"
             }
           }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "accountId": {
-            "column": "accountid"
-          },
-          "birthday": {
-            "column": "birthday"
-          },
-          "email": {
-            "column": "email"
-          },
-          "emailVerified": {
-            "column": "emailverified"
-          },
-          "id": {
-            "column": "id"
-          },
-          "preferences": {
-            "column": "preferences"
-          },
-          "salary": {
-            "column": "salary"
-          }
-        },
-        "table": "users"
       }
     }
   },
@@ -193,7 +199,7 @@
         }
       }
     },
-    "storageHash": "sha256:904fa8a2fad61c89714ac8144d9244f8f0dd9827d45555f2f09d571d46f9d22d"
+    "storageHash": "sha256:54398f094e030822dc6f48fc4d423777a8257e5ead12467a41a074777f9b0bd5"
   },
   "capabilities": {
     "postgres": {

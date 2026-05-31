@@ -45,7 +45,7 @@ describe('MongoContractSerializerBase', () => {
       const result = serializer.deserializeContract(json);
 
       expect(result.contract.targetFamily).toBe('mongo');
-      expect(result.contract.models['Item']).toBeDefined();
+      expect(result.contract.domain.namespaces.__unbound__!.models['Item']).toBeDefined();
     });
 
     it('rejects non-Mongo targetFamily', () => {

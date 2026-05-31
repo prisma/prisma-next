@@ -72,8 +72,16 @@ interface MongoModel {
   readonly storage: Record<string, unknown>;
 }
 
-function model(ir: { models: Record<string, unknown> }, name: string): MongoModel {
-  return ir.models[name] as MongoModel;
+function modelsOf(ir: Contract): Record<string, unknown> {
+  return ir.domain.namespaces[UNBOUND_NAMESPACE_ID]!.models;
+}
+
+function valueObjectsOf(ir: Contract): Record<string, unknown> | undefined {
+  return ir.domain.namespaces[UNBOUND_NAMESPACE_ID]!.valueObjects;
+}
+
+function model(ir: Contract, name: string): MongoModel {
+  return modelsOf(ir)[name] as MongoModel;
 }
 
 function interpret(
@@ -121,7 +129,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['Item']).toMatchObject({
+      expect(modelsOf(ir)['Item']).toMatchObject({
         fields: {
           _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
           name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
@@ -174,7 +182,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         },
       );
 
-      expect(ir.models['Item']).toMatchObject({
+      expect(modelsOf(ir)['Item']).toMatchObject({
         fields: {
           _id: { type: { kind: 'scalar', codecId: 'custom/oid@2' }, nullable: false },
           name: { type: { kind: 'scalar', codecId: 'custom/text@2' }, nullable: false },
@@ -190,7 +198,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['Item']).toMatchObject({
+      expect(modelsOf(ir)['Item']).toMatchObject({
         fields: {
           tags: {
             type: { kind: 'scalar', codecId: 'mongo/string@1' },
@@ -230,7 +238,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['UserProfile']).toMatchObject({
+      expect(modelsOf(ir)['UserProfile']).toMatchObject({
         storage: { collection: 'userProfile' },
       });
       expect(ir.storage).toMatchObject({
@@ -251,7 +259,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['User']).toMatchObject({
+      expect(modelsOf(ir)['User']).toMatchObject({
         storage: { collection: 'users' },
       });
       expect(ir.storage).toMatchObject({
@@ -299,7 +307,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['Item']).toMatchObject({
+      expect(modelsOf(ir)['Item']).toMatchObject({
         fields: {
           bio: { nullable: true },
         },
@@ -314,7 +322,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['Item']).toMatchObject({
+      expect(modelsOf(ir)['Item']).toMatchObject({
         fields: {
           name: { nullable: false },
         },
@@ -552,7 +560,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['Item']).toBeDefined();
+      expect(modelsOf(ir)['Item']).toBeDefined();
     });
   });
 
@@ -565,7 +573,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['Item']).toBeDefined();
+      expect(modelsOf(ir)['Item']).toBeDefined();
     });
 
     it('accepts a field literally named _id of type ObjectId', () => {
@@ -576,7 +584,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['Item']).toBeDefined();
+      expect(modelsOf(ir)['Item']).toBeDefined();
     });
 
     it('rejects an @id ObjectId that is not mapped to _id', () => {
@@ -631,7 +639,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['Article']).toBeDefined();
+      expect(modelsOf(ir)['Article']).toBeDefined();
     });
 
     it('keeps the emitted _id objectId property through canonicalization', () => {
@@ -746,7 +754,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.valueObjects).toEqual({
+      expect(valueObjectsOf(ir)).toEqual({
         Address: {
           fields: {
             street: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
@@ -770,7 +778,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['User']).toMatchObject({
+      expect(modelsOf(ir)['User']).toMatchObject({
         fields: {
           homeAddress: { type: { kind: 'valueObject', name: 'Address' }, nullable: true },
         },
@@ -790,7 +798,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir.models['User']).toMatchObject({
+      expect(modelsOf(ir)['User']).toMatchObject({
         fields: {
           addresses: {
             type: { kind: 'valueObject', name: 'Address' },
@@ -825,7 +833,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         },
       );
 
-      expect(ir.valueObjects).toEqual({
+      expect(valueObjectsOf(ir)).toEqual({
         GeoPoint: {
           fields: {
             lat: { type: { kind: 'scalar', codecId: 'mongo/double@1' }, nullable: false },
@@ -849,7 +857,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `);
 
-      expect(ir).not.toHaveProperty('valueObjects');
+      expect(valueObjectsOf(ir)).toBeUndefined();
     });
   });
 
@@ -884,39 +892,54 @@ describe('interpretPslDocumentToMongoContract', () => {
           users: crossRef('User'),
           posts: crossRef('Post'),
         },
-        models: {
-          User: {
-            fields: {
-              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
-              name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
-              email: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
-              bio: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: true },
-            },
-            relations: {
-              posts: {
-                to: crossRef('Post'),
-                cardinality: '1:N',
-                on: { localFields: ['_id'], targetFields: ['authorId'] },
+        domain: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              models: {
+                User: {
+                  fields: {
+                    _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+                    name: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+                    email: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+                    bio: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: true },
+                  },
+                  relations: {
+                    posts: {
+                      to: crossRef('Post'),
+                      cardinality: '1:N',
+                      on: { localFields: ['_id'], targetFields: ['authorId'] },
+                    },
+                  },
+                  storage: { collection: 'users' },
+                },
+                Post: {
+                  fields: {
+                    _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+                    title: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
+                    content: {
+                      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+                      nullable: false,
+                    },
+                    authorId: {
+                      type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
+                      nullable: false,
+                    },
+                    createdAt: {
+                      type: { kind: 'scalar', codecId: 'mongo/date@1' },
+                      nullable: false,
+                    },
+                  },
+                  relations: {
+                    author: {
+                      to: crossRef('User'),
+                      cardinality: 'N:1',
+                      on: { localFields: ['authorId'], targetFields: ['_id'] },
+                    },
+                  },
+                  storage: { collection: 'posts' },
+                },
               },
             },
-            storage: { collection: 'users' },
-          },
-          Post: {
-            fields: {
-              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
-              title: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
-              content: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
-              authorId: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
-              createdAt: { type: { kind: 'scalar', codecId: 'mongo/date@1' }, nullable: false },
-            },
-            relations: {
-              author: {
-                to: crossRef('User'),
-                cardinality: 'N:1',
-                on: { localFields: ['authorId'], targetFields: ['_id'] },
-              },
-            },
-            storage: { collection: 'posts' },
           },
         },
         storage: new MongoStorage({
@@ -1846,7 +1869,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           name String
         }
       `);
-      expect(ir.models['Item']).toBeDefined();
+      expect(modelsOf(ir)['Item']).toBeDefined();
     });
   });
 
@@ -1925,7 +1948,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.models['User']).toBeDefined();
+      expect(modelsOf(result.value)['User']).toBeDefined();
     });
   });
 });

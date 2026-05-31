@@ -12,7 +12,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
-import { getTestContext, getTestContract } from './helpers';
+import { getTestContext, getTestContract, withPatchedDomainModels } from './helpers';
 import { unboundTables } from './unbound-tables';
 
 describe('filters', () => {
@@ -195,17 +195,14 @@ describe('filters', () => {
       }),
     ).toEqual(BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('alice@example.com')));
 
-    const withoutStorageFields = {
-      ...contract,
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          fields: {},
-          storage: { table: 'users' },
-        },
+    const withoutStorageFields = withPatchedDomainModels(contract, (models) => ({
+      ...models,
+      User: {
+        ...(models['User'] as Record<string, unknown>),
+        fields: {},
+        storage: { table: 'users' },
       },
-    } as typeof contract;
+    }));
 
     expect(
       shorthandToWhereExpr({ ...context, contract: withoutStorageFields } as never, 'User', {

@@ -2,46 +2,52 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "user": {
       "model": "User",
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "User": {
-      "fields": {
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "salary": {
-          "nullable": false,
-          "type": {
-            "codecId": "cipherstash/double@1",
-            "kind": "scalar",
-            "typeParams": {
-              "equality": true,
-              "orderAndRange": true
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "User": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "salary": {
+                "nullable": false,
+                "type": {
+                  "codecId": "cipherstash/double@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "equality": true,
+                    "orderAndRange": true
+                  }
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "salary": {
+                  "column": "salary"
+                }
+              },
+              "table": "user"
             }
           }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "id": {
-            "column": "id"
-          },
-          "salary": {
-            "column": "salary"
-          }
-        },
-        "table": "user"
       }
     }
   },
@@ -77,7 +83,7 @@
         }
       }
     },
-    "storageHash": "sha256:cb02d8912705f7d58c2764b1eab07574d5da2a33987fd18070fcc9c0c6ad4694"
+    "storageHash": "sha256:5b301edc43c380f678aadc3c20bd91c0ec39eba13f61a3b9ebce51f08939fae6"
   },
   "capabilities": {
     "postgres": {

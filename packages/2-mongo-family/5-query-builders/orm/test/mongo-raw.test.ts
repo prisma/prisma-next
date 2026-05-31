@@ -1,3 +1,4 @@
+import { normalizeLegacyDomainRoot } from '@prisma-next/contract/types';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { RawMongoCommand } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
@@ -6,7 +7,9 @@ import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/
 import { mongoRaw } from '../src/mongo-raw';
 
 // JSON import loses literal types; typed Contract .d.ts is the source of truth
-const contract = ormContractJson as unknown as Contract;
+const contract = normalizeLegacyDomainRoot(
+  ormContractJson as Record<string, unknown>,
+) as unknown as Contract;
 
 describe('mongoRaw', () => {
   const raw = mongoRaw({ contract });

@@ -26,7 +26,9 @@ const tagId = (s: string): TagId => s as unknown as TagId;
 function buildTagWithUpdatedAtContract(): TestContract {
   const contract = structuredClone(withReturningCapability(getTestContract()));
 
-  const tagModel = contract.models['Tag'] as Record<string, unknown> | undefined;
+  const tagModel = contract.domain.namespaces.__unbound__!.models['Tag'] as
+    | Record<string, unknown>
+    | undefined;
   if (!tagModel) {
     throw new Error('Test contract is missing the Tag model');
   }
