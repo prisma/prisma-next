@@ -157,7 +157,12 @@ export function createMigrationGraphCommand(): Command {
               ...(activeRef !== undefined ? { activeRefName: activeRef.name } : {}),
               colorize: flags.color !== false,
             });
-            ui.log(treeOutput);
+            // Emit the rendered tree to stdout like `migration list --graph`,
+            // not through clack's `log.message` rail: the graph is the command's
+            // result (and its own box-drawing is the only vertical structure it
+            // should carry), not a status line that needs the prompt gutter.
+            ui.output(treeOutput);
+            ui.output(`\n${graphResult.summary}`);
           } else {
             const renderInput = migrationGraphToRenderInput({
               graph: graphResult.graph,
@@ -174,8 +179,8 @@ export function createMigrationGraphCommand(): Command {
               colorize: flags.color !== false,
             });
             ui.log(graphOutput);
+            ui.log(`\n${graphResult.summary}`);
           }
-          ui.log(`\n${graphResult.summary}`);
         }
       });
       process.exit(exitCode);
