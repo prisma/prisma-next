@@ -1,3 +1,4 @@
+import { DomainNamespaceResolutionError } from './contract-validation-error';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
 
 export const UNBOUND_DOMAIN_NAMESPACE_ID = '__unbound__' as const;
@@ -26,13 +27,6 @@ export interface ApplicationDomain<
 export type ContractWithDomain = {
   readonly domain: ApplicationDomain;
 };
-
-export class DomainNamespaceResolutionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DomainNamespaceResolutionError';
-  }
-}
 
 export function resolveSingleDomainNamespaceId(
   domain: ApplicationDomain,

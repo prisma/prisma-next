@@ -4,6 +4,7 @@ export type {
   ContractModelsMap,
   ContractValueObjectsMap,
 } from '../contract-types';
+export { DomainNamespaceResolutionError } from '../contract-validation-error';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
 export type {
@@ -14,7 +15,6 @@ export type {
 export {
   contractModels,
   contractValueObjects,
-  DomainNamespaceResolutionError,
   resolveSingleDomainNamespaceId,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '../domain-envelope';
