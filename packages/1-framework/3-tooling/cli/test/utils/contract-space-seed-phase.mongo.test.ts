@@ -43,7 +43,13 @@ interface MongoShapedExtensionContract {
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
   readonly roots: Record<string, never>;
-  readonly models: Record<string, never>;
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: Record<string, never>;
+      };
+    };
+  };
   readonly storage: {
     readonly namespaces: {
       readonly __unbound__: {
@@ -73,7 +79,7 @@ function buildMongoExtensionContract(): MongoShapedExtensionContract {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: {},
-    models: {},
+    domain: { namespaces: { __unbound__: { models: {} } } },
     storage: {
       namespaces: {
         __unbound__: {

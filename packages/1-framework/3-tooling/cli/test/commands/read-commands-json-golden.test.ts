@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { buildDomainPlaneFromFlat } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
@@ -133,7 +134,7 @@ async function writeEndContract(packageDir: string, storageHash: string): Promis
     target: TARGET,
     profileHash: `sha256:${'p'.repeat(64)}`,
     storage: { storageHash },
-    models: {},
+    domain: buildDomainPlaneFromFlat({ models: {} }),
     roots: {},
   };
   await writeFile(join(packageDir, 'end-contract.json'), `${JSON.stringify(contract, null, 2)}\n`);

@@ -9,8 +9,9 @@
 
 import { contractModels } from '@prisma-next/contract/types';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
+import type { Contract, Models } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 
 describe('demo contract visualization DX', () => {
@@ -33,7 +34,7 @@ describe('demo contract visualization DX', () => {
   it('validated contract exposes model storage field mappings', () => {
     const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
-    const models = contractModels(contract);
+    const models = contractModels(contract) as Models;
     expect(models.User.storage.table).toBe('user');
     expect(models.User.storage.fields.email.column).toBe('email');
     expect(models.Post.storage.fields.userId.column).toBe('userId');
@@ -56,7 +57,10 @@ describe('demo contract visualization DX', () => {
     const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
     for (const [, model] of Object.entries(contractModels(contract))) {
-      const m = model as Record<string, unknown>;
+      const m = blindCast<
+        Record<string, unknown>,
+        'contract model entries are plain records in render traversal'
+      >(model);
       expect(m['storage']).toBeDefined();
       expect(m['fields']).toBeDefined();
       expect(m['relations']).toBeDefined();
