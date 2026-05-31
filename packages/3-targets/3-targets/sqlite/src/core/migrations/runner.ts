@@ -26,8 +26,6 @@ import type { SqlitePlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
   buildWriteMarkerStatements,
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
   MARKER_TABLE_NAME,
   readMarkerStatement,
   type SqlStatement,
@@ -364,8 +362,10 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     if (!legacyDetection.ok) {
       return legacyDetection;
     }
-    await this.executeStatement(driver, ensureMarkerTableStatement);
-    await this.executeStatement(driver, ensureLedgerTableStatement);
+    for (const ast of this.family.ensureControlTableAsts()) {
+      const { sql, params } = this.family.lowerAst(ast, { contract: undefined });
+      if (sql.length > 0) await driver.query(sql, params);
+    }
     return okVoid();
   }
 

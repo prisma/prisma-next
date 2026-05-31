@@ -72,7 +72,7 @@ describe('family instance sign', () => {
       await withClient(connectionString, async (client) => {
         // Clean up any existing marker
         await client.query('drop table if exists prisma_contract.marker');
-        await client.query('drop schema if exists prisma_contract');
+        await client.query('drop schema if exists prisma_contract cascade');
         // Create schema and table
         await executeStatement(client, ensureSchemaStatement);
         await executeStatement(client, ensureTableStatement);
@@ -151,7 +151,7 @@ describe('family instance sign', () => {
       await withClient(connectionString, async (client) => {
         // Clean up any existing marker
         await client.query('drop table if exists prisma_contract.marker');
-        await client.query('drop schema if exists prisma_contract');
+        await client.query('drop schema if exists prisma_contract cascade');
         // Create schema and table
         await executeStatement(client, ensureSchemaStatement);
         await executeStatement(client, ensureTableStatement);
@@ -291,7 +291,7 @@ describe('family instance sign', () => {
       await withClient(connectionString, async (client) => {
         // Clean up any existing marker
         await client.query('drop table if exists prisma_contract.marker');
-        await client.query('drop schema if exists prisma_contract');
+        await client.query('drop schema if exists prisma_contract cascade');
         // Create schema and table
         await executeStatement(client, ensureSchemaStatement);
         await executeStatement(client, ensureTableStatement);

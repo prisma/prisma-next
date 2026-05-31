@@ -97,3 +97,17 @@ describe('SQLite DDL lowering — byte-equality with bootstrap constants', () =>
     expect(runtimeAdapter.lower(ledgerTableAst, { contract }).params).toEqual([]);
   });
 });
+
+describe('SQLite control adapter — ensureControlTableAsts routed bootstrap', () => {
+  it('returns marker + ledger nodes with no schema node', () => {
+    const asts = controlAdapter.ensureControlTableAsts();
+    expect(asts.map((ast) => ast.kind)).toEqual(['create-table', 'create-table']);
+  });
+
+  it('lowers the routed bootstrap byte-equal to the existing constants', () => {
+    const sql = controlAdapter
+      .ensureControlTableAsts()
+      .map((ast) => controlAdapter.lower(ast, { contract }).sql);
+    expect(sql).toEqual([ensureMarkerTableStatement.sql, ensureLedgerTableStatement.sql]);
+  });
+});

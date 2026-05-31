@@ -121,6 +121,14 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * emit.
    */
   lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement;
+
+  /**
+   * DDL to ensure the control tables exist (schema where applicable + marker +
+   * ledger), target-flavored. The "Postgres needs a schema, SQLite doesn't"
+   * knowledge lives here so consumers can route the bootstrap uniformly without
+   * branching on target.
+   */
+  ensureControlTableAsts(): readonly AnyQueryAst[];
 }
 
 /**

@@ -1,6 +1,10 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
-import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import {
+  buildLedgerTableAst,
+  buildMarkerTableAst,
+  type SqlControlAdapter,
+} from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
@@ -14,6 +18,7 @@ import type {
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
+import { createSchema } from '@prisma-next/sql-relational-core/contract-free';
 import type {
   PrimaryKey,
   SqlColumnIR,
@@ -109,6 +114,18 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
     return renderLoweredSql(ast, context.contract as PostgresContract, this.codecLookup);
+  }
+
+  /**
+   * Postgres namespaces the control tables under the `prisma_contract` schema,
+   * so the bootstrap creates that schema before the marker and ledger tables.
+   */
+  ensureControlTableAsts(): readonly AnyQueryAst[] {
+    return [
+      createSchema('prisma_contract', { ifNotExists: true }),
+      buildMarkerTableAst('prisma_contract.marker'),
+      buildLedgerTableAst('prisma_contract.ledger'),
+    ];
   }
 
   /**

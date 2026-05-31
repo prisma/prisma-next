@@ -27,9 +27,6 @@ import type { PostgresPlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
   buildMergeMarkerStatements,
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
-  ensurePrismaContractSchemaStatement,
   type SqlStatement,
 } from './statement-builders';
 
@@ -325,17 +322,20 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
-    await this.executeStatement(driver, ensurePrismaContractSchemaStatement);
     // Pre-1.0 zero-range guardrail: detect a pre-cleanup single-row
     // marker table (no `space` column) and surface a structured failure
     // rather than silently auto-migrating it to the per-space shape.
-    // See `specs/framework-mechanism.spec.md § 2`.
+    // See `specs/framework-mechanism.spec.md § 2`. A legacy database already
+    // carries the `prisma_contract` schema, so the probe runs correctly ahead
+    // of the (idempotent) bootstrap DDL.
     const legacyDetection = await this.detectLegacyMarkerShape(driver);
     if (!legacyDetection.ok) {
       return legacyDetection;
     }
-    await this.executeStatement(driver, ensureMarkerTableStatement);
-    await this.executeStatement(driver, ensureLedgerTableStatement);
+    for (const ast of this.family.ensureControlTableAsts()) {
+      const { sql, params } = this.family.lowerAst(ast, { contract: undefined });
+      if (sql.length > 0) await driver.query(sql, params);
+    }
     return okVoid();
   }
 

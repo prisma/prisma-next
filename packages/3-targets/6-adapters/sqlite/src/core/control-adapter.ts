@@ -1,6 +1,10 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
-import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import {
+  buildLedgerTableAst,
+  buildMarkerTableAst,
+  type SqlControlAdapter,
+} from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import {
   APP_SPACE_ID,
@@ -111,6 +115,14 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    */
   lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
     return renderLoweredSql(ast, context.contract as SqliteContract);
+  }
+
+  /**
+   * SQLite has no schema namespace, so the bootstrap is just the two control
+   * tables (unqualified). No `createSchema` node.
+   */
+  ensureControlTableAsts(): readonly AnyQueryAst[] {
+    return [buildMarkerTableAst('_prisma_marker'), buildLedgerTableAst('_prisma_ledger')];
   }
 
   /**

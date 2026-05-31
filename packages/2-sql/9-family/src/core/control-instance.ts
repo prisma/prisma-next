@@ -34,11 +34,7 @@ import type {
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
-import {
-  ensureSchemaStatement,
-  ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
+import { writeContractMarker } from '@prisma-next/sql-runtime';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -243,6 +239,14 @@ export interface SqlControlFamilyInstance
 
   lowerAst(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement;
 
+  /**
+   * Target-flavored bootstrap DDL for the control tables, delegated to the
+   * target's control adapter. Consumers route over this list and lower each
+   * node uniformly (the empty-`sql` result of SQLite's no-op schema node is
+   * skipped by the caller).
+   */
+  ensureControlTableAsts(): readonly AnyQueryAst[];
+
   toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview;
 }
 
@@ -261,7 +265,9 @@ function isSqlControlAdapter<TTargetId extends string>(
     'readAllMarkers' in value &&
     typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
     'lower' in value &&
-    typeof (value as { lower: unknown }).lower === 'function'
+    typeof (value as { lower: unknown }).lower === 'function' &&
+    'ensureControlTableAsts' in value &&
+    typeof (value as { ensureControlTableAsts: unknown }).ensureControlTableAsts === 'function'
   );
 }
 
@@ -561,10 +567,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           : contractStorageHash;
       const contractTarget = contract.target;
 
-      await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
-      await driver.query(ensureTableStatement.sql, ensureTableStatement.params);
+      const controlAdapter = getControlAdapter();
+      for (const ast of controlAdapter.ensureControlTableAsts()) {
+        const { sql, params } = controlAdapter.lower(ast, { contract });
+        if (sql.length > 0) await driver.query(sql, params);
+      }
 
-      const existingMarker = await getControlAdapter().readMarker(driver, APP_SPACE_ID);
+      const existingMarker = await controlAdapter.readMarker(driver, APP_SPACE_ID);
 
       let markerCreated = false;
       let markerUpdated = false;
@@ -664,6 +673,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
     lowerAst(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
       return getControlAdapter().lower(ast, context);
+    },
+
+    ensureControlTableAsts(): readonly AnyQueryAst[] {
+      return getControlAdapter().ensureControlTableAsts();
     },
 
     toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {

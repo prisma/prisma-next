@@ -106,3 +106,21 @@ describe('Postgres DDL lowering — byte-equality with bootstrap constants', () 
     ).toEqual([]);
   });
 });
+
+describe('Postgres control adapter — ensureControlTableAsts routed bootstrap', () => {
+  it('returns schema + marker + ledger nodes', () => {
+    const asts = controlAdapter.ensureControlTableAsts();
+    expect(asts.map((ast) => ast.kind)).toEqual(['create-schema', 'create-table', 'create-table']);
+  });
+
+  it('lowers the routed bootstrap byte-equal to the existing constants', () => {
+    const sql = controlAdapter
+      .ensureControlTableAsts()
+      .map((ast) => controlAdapter.lower(ast, { contract }).sql);
+    expect(sql).toEqual([
+      ensurePrismaContractSchemaStatement.sql,
+      ensureMarkerTableStatement.sql,
+      ensureLedgerTableStatement.sql,
+    ]);
+  });
+});
