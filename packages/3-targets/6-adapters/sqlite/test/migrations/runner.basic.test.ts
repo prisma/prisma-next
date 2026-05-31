@@ -41,17 +41,24 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
     if (result.kind !== 'success') throw new Error('expected planner success');
 
     const executeResult = await runner.execute({
-      plan: result.plan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: result.plan.spaceId ?? APP_SPACE_ID,
+
+          plan: result.plan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
     if (!executeResult.ok) {
       throw new Error(formatRunnerFailure(executeResult.failure));
     }
-    expect(executeResult.value).toMatchObject({
+    expect(executeResult.value.perSpaceResults[0]?.value).toMatchObject({
       operationsPlanned: result.plan.operations.length,
       operationsExecuted: result.plan.operations.length,
     });
@@ -95,12 +102,19 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
     });
     if (initialPlan.kind !== 'success') throw new Error('expected initial planner success');
     const firstResult = await runner.execute({
-      plan: initialPlan.plan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
+
+          plan: initialPlan.plan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
     if (!firstResult.ok) throw new Error(formatRunnerFailure(firstResult.failure));
 
@@ -114,15 +128,22 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
     });
 
     const emptyPlanResult = await runner.execute({
-      plan: emptyPlan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: emptyPlan.spaceId ?? APP_SPACE_ID,
+
+          plan: emptyPlan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
     if (!emptyPlanResult.ok) throw new Error(formatRunnerFailure(emptyPlanResult.failure));
-    expect(emptyPlanResult.value).toMatchObject({
+    expect(emptyPlanResult.value.perSpaceResults[0]?.value).toMatchObject({
       operationsPlanned: 0,
       operationsExecuted: 0,
     });
