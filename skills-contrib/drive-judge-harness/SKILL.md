@@ -34,6 +34,9 @@ builds the k=N A/B loop on top of.
   dynamic import reached solely on the live path.
 - `validate-parser.ts` — validates `drive-diagnose-run/posthoc.ts` over a
   transcript corpus, tallying reconstruction confidence (clears TML-2728).
+- `judge/` — the bespoke-minimal LLM judge (TML-2736). Grades one Drive run
+  from its diff + acceptance set + trace excerpts and emits the `intent`
+  correctness component the scorecard already reads. See § The LLM judge below.
 
 ## The live-execution gate (safety property)
 
@@ -99,6 +102,94 @@ the harness records the totals in the **run manifest** beside the trace. When th
 trace via the emitter. The spawned orchestrator self-instruments its Drive
 methodology events into `--trace-file` via `drive-record-traces`; the harness
 owns only the token manifest.
+
+## The LLM judge (`judge/`)
+
+A bespoke-minimal grader that turns the run's artifacts (diff + golden
+`acceptance.md` + relevant `trace.jsonl` excerpts) into the `intent`
+correctness component the scorecard reads. Four pieces, all mock-friendly:
+
+- `judge/judge-model.ts` — the `JudgeModel` interface (`grade(prompt) ->
+  Promise<string>`), injected into every prompt-set module. Tests pass a mock
+  that returns canned structured text; no real-dollar call happens in tests /
+  typecheck / lint / CI.
+- `judge/judge-model-sdk.ts` — the live `@cursor/sdk` adapter. Pins a
+  cross-family judge model id (default `gpt-5.5` against today's Claude
+  orchestrator) and **rejects a same-family judge id at construction** — so a
+  same-family grading mistake fails fast, before any SDK call. The SDK is
+  loaded lazily inside `grade()` so module load stays green without
+  `@cursor/sdk` installed and without `CURSOR_API_KEY`.
+- `judge/rubric-correctness.ts` — renders the requirements + intent rubric and
+  parses an arktype-validated `{intent: "pass"|"fail", reasons: string[]}`.
+  Requirements (acceptance criteria) are folded into the single `intent`
+  component the schema carries — mechanical and QA stay gate-sourced.
+- `judge/classify-failure.ts` / `judge/classify-operator.ts` — diagnostic
+  classifiers (F1–F15 + scope-trap + qa-coverage-gap; five operator-turn
+  buckets). Feed the auto-retro surface; don't gate the scorecard.
+- `judge/emit-correctness.ts` — the merge-preserving emission helper. See §
+  The `correctness-recorded` merge rule below.
+- `judge/calibration.ts` + `judge/calibration/labels.md` — judge-vs-human
+  agreement tally with the **≥0.80** gate. The corpus is currently empty; the
+  actual calibration run is **parked** (see § Parked calibration).
+
+### Fail-to-null invariant
+
+A malformed model response **never** silently becomes a `pass`. Each prompt
+set's parser falls back to its safe-null verdict:
+
+- rubric → `{intent: null, reasons: [...]}` (→ scorecard `not-computable`,
+  naming `intent` as the missing input)
+- failure-mode classifier → `{failureModes: [], reasons: [...]}`
+- operator-turn classifier → `{bucket: null, reasons: [...]}`
+
+### The `correctness-recorded` merge rule
+
+The scorecard is **last-write-wins per `project_run_id` on the whole
+`{mechanical, qa, intent}` triple** — a `correctness-recorded` event replaces
+the triple, it does not merge components. So the judge cannot emit
+`{mechanical: null, qa: null, intent: <verdict>}` without clobbering any
+`mechanical` or `qa` already recorded by the validation gates / QA run.
+
+`judge/emit-correctness.ts` solves this:
+
+1. `mergedCorrectnessPayload(events, projectRunId, intent)` reads the run's
+   latest `correctness-recorded` event and returns a merged triple that
+   preserves the prior `mechanical` and `qa` while filling `intent` with the
+   judge's verdict.
+2. `emitMergedCorrectness(...)` computes the merged payload and appends one
+   line through the deterministic emitter
+   (`drive-record-traces/emit.ts`) — fail-closed, schema-validated.
+
+End-to-end test pins the invariant: a prior `mechanical:pass + qa:pass`
+survives the judge's emission, and `computeScorecard` reads the run as
+`correct`. A `null` intent verdict (malformed model output) preserves prior
+components and leaves the run `not-computable` with `intent` named as the
+missing input.
+
+### Cross-family grading requirement
+
+The judge model is a pinned **per-experiment parameter** and **must be
+cross-family from the orchestrator under test** — same-family grading
+inflates agreement without measuring real correctness. Today's orchestrator is
+Claude, so the default judge id is `gpt-5.5`. The SDK adapter's
+synchronous family-check refuses a same-family pairing at construction; the
+runtime cannot reach the SDK without clearing the guard.
+
+### Parked calibration
+
+The judge's `intent` signal is trusted only after it clears **≥0.80 exact
+agreement** against held-out human labels on the instrumented-run corpus.
+This slice ships the machinery — `agreementRate` + the 0.80 gate + the
+`labels.md` corpus store — but **does not run the calibration**:
+
+- The corpus needs ~10–20 instrumented runs.
+- Run production is gated on operator approval of real-dollar model spend.
+- Until the corpus exists, every judge emission is honest but **uncalibrated**;
+  the project-DoD calibration item stays unchecked.
+
+When the corpus exists, calibration is a one-shot run against the locked
+prompt set; the gate moves the project-DoD item to checked, and drift
+monitoring re-runs the same gate periodically.
 
 ## Relationship to the rest of the cluster
 

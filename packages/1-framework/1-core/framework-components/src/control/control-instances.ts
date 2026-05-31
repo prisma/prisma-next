@@ -65,12 +65,12 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
    * table itself is missing).
    *
    * `space` is required at every call site so the type system surfaces
-   * every place that needs to thread the value: callers in single-app
+   * every place that needs to thread the value: callers in app-only
    * paths pass {@link import('./control-spaces').APP_SPACE_ID}
    * (`'app'`); per-extension callers pass the extension's space id.
    * Defaulting at the family-interface level was a silent bug door —
-   * it let multi-space-aware callers forget to pass `space` and
-   * collapse onto the app's marker row.
+   * it let callers forget to pass `space` and collapse onto the app's
+   * marker row.
    *
    * Families whose underlying storage doesn't yet support per-space
    * markers (Mongo, today) accept `space` for interface conformance and

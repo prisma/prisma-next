@@ -69,15 +69,21 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     });
 
     const result = await runner.execute({
-      plan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: APP_SPACE_ID,
+          plan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
     if (!result.ok) throw new Error(formatRunnerFailure(result.failure));
-    expect(result.value).toMatchObject({
+    expect(result.value.perSpaceResults[0]?.value).toMatchObject({
       operationsPlanned: 1,
       operationsExecuted: 0,
     });
@@ -118,12 +124,18 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       providedInvariants: [],
     });
     const initResult = await runner.execute({
-      plan: initPlan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: initPlan.spaceId ?? APP_SPACE_ID,
+          plan: initPlan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
     if (!initResult.ok) throw new Error(formatRunnerFailure(initResult.failure));
 
@@ -145,15 +157,21 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       providedInvariants: [],
     });
     const result = await runner.execute({
-      plan: noOpPlan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: noOpPlan.spaceId ?? APP_SPACE_ID,
+          plan: noOpPlan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
     if (!result.ok) throw new Error(formatRunnerFailure(result.failure));
-    expect(result.value).toMatchObject({
+    expect(result.value.perSpaceResults[0]?.value).toMatchObject({
       operationsPlanned: 0,
       operationsExecuted: 0,
     });
@@ -190,12 +208,18 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       providedInvariants: [],
     });
     const initResult = await runner.execute({
-      plan: initPlan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: initPlan.spaceId ?? APP_SPACE_ID,
+          plan: initPlan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
     if (!initResult.ok) throw new Error(formatRunnerFailure(initResult.failure));
 
@@ -231,15 +255,21 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     });
 
     const result = await runner.execute({
-      plan: selfEdgePlan,
-      driver,
-      destinationContract: contract,
-      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
-      frameworkComponents,
-      strictVerification: false,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: selfEdgePlan.spaceId ?? APP_SPACE_ID,
+          plan: selfEdgePlan,
+          driver,
+          destinationContract: contract,
+          policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
     if (!result.ok) throw new Error(formatRunnerFailure(result.failure));
-    expect(result.value).toMatchObject({
+    expect(result.value.perSpaceResults[0]?.value).toMatchObject({
       operationsPlanned: 1,
       operationsExecuted: 1,
     });

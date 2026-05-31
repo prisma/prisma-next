@@ -1,10 +1,11 @@
 import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
-import sqlFamilyDescriptor, {
-  createMigrationPlan,
-  type SqlMigrationRunnerFailure,
-} from '@prisma-next/family-sql/control';
-import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
+import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
+import {
+  APP_SPACE_ID,
+  createControlStack,
+  type MigrationRunnerFailure,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -141,7 +142,7 @@ export async function createDriver(connectionString: string): Promise<PostgresCo
  * Formats a runner failure into a human-readable string for test error messages.
  * Includes code, summary, why, and meta (with issues) for easy debugging.
  */
-export function formatRunnerFailure(failure: SqlMigrationRunnerFailure): string {
+export function formatRunnerFailure(failure: MigrationRunnerFailure): string {
   const parts = [`[${failure.code}] ${failure.summary}`];
   if (failure.why) {
     parts.push(`  why: ${failure.why}`);

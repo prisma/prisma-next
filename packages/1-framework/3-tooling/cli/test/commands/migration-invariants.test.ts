@@ -315,7 +315,7 @@ describe('migrate / migration status — invariant-routing pre-checks', {
     // on-disk migration must be folded into the "known" set so
     // UNKNOWN_INVARIANT is *not* surfaced. Apply itself may go on
     // to fail downstream (the mock environment doesn't wire a
-    // full multi-space runner) — the assertion is on the absence
+    // full runner) — the assertion is on the absence
     // of the misleading diagnostic, not on the apply outcome.
     expect(consoleErrors.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
     expect(consoleOutput.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');

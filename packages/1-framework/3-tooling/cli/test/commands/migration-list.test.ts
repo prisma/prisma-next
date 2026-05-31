@@ -34,7 +34,7 @@ import { createTerminalUI } from '../../src/utils/terminal-ui';
  *
  * Human output is verified by piping the result through
  * {@link renderMigrationList} (the same renderer the CLI shell uses) —
- * the byte-for-byte spec-fixture and multi-space tests pin the
+ * the byte-for-byte spec-fixture and cross-space tests pin the
  * end-to-end string the user sees. JSON-shape tests inspect the raw
  * result. The structured `MIGRATION.SPACE_NOT_FOUND` error is asserted
  * via `result.failure.toEnvelope()` — no command-builder needed.
@@ -195,7 +195,7 @@ function renderGraphListed(
 }
 
 describe('runMigrationList — slice-spec worked example', () => {
-  it('renders the slice-spec worked example byte-for-byte (single space)', async () => {
+  it('renders the slice-spec worked example byte-for-byte (one space)', async () => {
     const { migrationsRoot } = await setupFixture();
 
     // Five-row spec example (slice spec § Per-line shape):
@@ -655,7 +655,7 @@ describe('runMigrationList — --space flag', () => {
 });
 
 describe('runMigrationList — JSON output shape', () => {
-  it('JSON output is unconditionally grouped by contract space (single-space)', async () => {
+  it('JSON output is unconditionally grouped by contract space (one space)', async () => {
     const { migrationsRoot } = await setupFixture();
 
     await writePackage(migrationsRoot, {
@@ -707,7 +707,7 @@ describe('runMigrationList — JSON output shape', () => {
     expect(typeof latest.createdAt).toBe('string');
   });
 
-  it('JSON output is unconditionally grouped by contract space (multi-space)', async () => {
+  it('JSON output is unconditionally grouped by contract space (multiple spaces)', async () => {
     const { migrationsRoot } = await setupFixture();
 
     await writePackage(migrationsRoot, {
@@ -1034,7 +1034,7 @@ describe('migration list --graph human output', () => {
     expect(graph).toContain('o   fffffff');
   });
 
-  it('renders multi-space graph blocks with headings and summary', async () => {
+  it('renders graph blocks for multiple spaces with headings and summary', async () => {
     const { migrationsRoot } = await setupFixture();
     await writePackage(migrationsRoot, {
       spaceId: 'app',

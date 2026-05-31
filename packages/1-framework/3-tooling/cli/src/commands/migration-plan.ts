@@ -186,7 +186,7 @@ export interface MigrationPlanResult {
    *
    * Surfacing these in the result (rather than only via `ui.step` log
    * lines) makes the cross-space side effect explicit to JSON consumers
-   * and the success-summary renderer — the same multi-space side effect
+   * and the success-summary renderer — the same cross-space side effect
    * that `migrate` will replay.
    */
   readonly emittedExtensionDirs: readonly { readonly spaceId: string; readonly dirName: string }[];

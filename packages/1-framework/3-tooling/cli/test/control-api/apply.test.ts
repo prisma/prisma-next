@@ -2,21 +2,18 @@ import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   MigrationPlan,
-  MultiSpaceRunnerResult,
+  MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import type {
-  AggregatePerSpacePlan,
   ContractSpaceAggregate,
   ContractSpaceMember,
+  PerSpacePlan,
 } from '@prisma-next/migration-tools/aggregate';
 import { createContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  type AggregateApplyAction,
-  applyAggregate,
-} from '../../src/control-api/operations/apply-aggregate';
+import { type ApplyAction, applyMigration } from '../../src/control-api/operations/apply';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 
 const APP_HASH = `sha256:${'a'.repeat(64)}`;
@@ -50,7 +47,7 @@ function makeAggregate(): ContractSpaceAggregate {
   });
 }
 
-function makePerSpacePlan(): AggregatePerSpacePlan {
+function makePerSpacePlan(): PerSpacePlan {
   const plan: MigrationPlan = {
     targetId: 'postgres',
     spaceId: 'app',
@@ -66,7 +63,7 @@ function makePerSpacePlan(): AggregatePerSpacePlan {
     strategy: 'graph-walk',
     migrationEdges: [],
     pathDecision: undefined,
-  } as unknown as AggregatePerSpacePlan;
+  } as unknown as PerSpacePlan;
 }
 
 function makeMigrations(): TargetMigrationsCapability<
@@ -74,13 +71,12 @@ function makeMigrations(): TargetMigrationsCapability<
   'postgres',
   ControlFamilyInstance<'sql', unknown>
 > {
-  const runnerResult: MultiSpaceRunnerResult = ok({
+  const runnerResult: MigrationRunnerResult = ok({
     perSpaceResults: [{ space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } }],
-  }) as unknown as MultiSpaceRunnerResult;
+  });
   return {
     createRunner: () => ({
-      execute: vi.fn(),
-      executeAcrossSpaces: async () => runnerResult,
+      execute: async () => runnerResult,
     }),
   } as unknown as TargetMigrationsCapability<
     'sql',
@@ -89,12 +85,12 @@ function makeMigrations(): TargetMigrationsCapability<
   >;
 }
 
-async function runWithAction(action: AggregateApplyAction): Promise<ControlProgressEvent[]> {
+async function runWithAction(action: ApplyAction): Promise<ControlProgressEvent[]> {
   const events: ControlProgressEvent[] = [];
   const aggregate = makeAggregate();
   const perSpacePlans = new Map([['app', makePerSpacePlan()]]);
 
-  await applyAggregate<'sql', 'postgres'>({
+  await applyMigration<'sql', 'postgres'>({
     aggregate,
     perSpacePlans,
     applyOrder: ['app'],
@@ -109,7 +105,7 @@ async function runWithAction(action: AggregateApplyAction): Promise<ControlProgr
   return events;
 }
 
-describe('applyAggregate apply span label', () => {
+describe('applyMigration apply span label', () => {
   it('emits the `dbInit` label for action=dbInit', async () => {
     const events = await runWithAction('dbInit');
     const start = events.find((e) => e.kind === 'spanStart' && e.spanId === 'apply');

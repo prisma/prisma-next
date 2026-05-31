@@ -12,12 +12,9 @@ import type {
 import { contractToMongoSchemaIR } from '@prisma-next/family-mongo/control';
 import type {
   MigrationRunner,
+  MigrationRunnerPerSpaceOptions,
+  MigrationRunnerPerSpaceSuccessValue,
   MigrationRunnerResult,
-  MigrationRunnerSuccessValue,
-  MultiSpaceCapableRunner,
-  MultiSpaceRunnerFailure,
-  MultiSpaceRunnerPerSpaceOptions,
-  MultiSpaceRunnerResult,
 } from '@prisma-next/framework-components/control';
 import {
   createContractSpaceMember,
@@ -65,7 +62,7 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         runnerOptions: Omit<MongoMigrationRunnerExecuteOptions, 'destinationContract'> & {
           readonly destinationContract: unknown;
         },
-      ): Promise<MigrationRunnerResult> => {
+      ) => {
         cachedDeps ??= createMongoRunnerDeps(
           driver,
           MongoDriverImpl.fromDb(extractDb(driver)),
@@ -84,67 +81,63 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         });
       };
 
-      const runner: MigrationRunner<'mongo', 'mongo'> & MultiSpaceCapableRunner<'mongo', 'mongo'> =
-        {
-          async execute(options) {
-            const { driver, ...runnerOptions } = options;
-            return runMongo(driver, runnerOptions);
-          },
-          // Mongo cannot wrap DDL ops in a session transaction (createCollection,
-          // createIndex, collMod, setValidation all bypass transactions even on
-          // replica sets), so the cross-space envelope is *resumable* rather than
-          // transactional. Per-space-internal verify-gated marker atomicity
-          // already lives in `runner.execute`: ops apply, schema is introspected
-          // and verified, and the marker advances only on verify-pass. This loop
-          // composes that guarantee across spaces — earlier-advanced markers are
-          // not rolled back when a later space fails. Re-running reads each
-          // marker, finds spaces 1..N−1 at-head (no-op skip), retries N onward.
-          //
-          // Per-space verify is sliced via `projectSchemaToSpace`: the live DB
-          // holds collections owned by sibling spaces, but each space's verify
-          // only sees the slice that space's contract actually claims. Without
-          // the projection an aggregate of two spaces could not pass strict
-          // verify (every other-space collection would look like an extra).
-          //
-          // See `docs/architecture docs/subsystems/10. MongoDB Family.md` §
-          // Contract spaces and ADR 212 — Contract spaces.
-          async executeAcrossSpaces({ driver, perSpaceOptions }): Promise<MultiSpaceRunnerResult> {
-            const members = perSpaceOptions.map(toSpaceMember);
-            const perSpaceResults: Array<{
-              space: string;
-              value: MigrationRunnerSuccessValue;
-            }> = [];
-            for (let i = 0; i < perSpaceOptions.length; i++) {
-              const spaceOptions = perSpaceOptions[i];
-              if (!spaceOptions) continue;
-              const member = members[i];
-              if (!member) continue;
-              const others = members.filter((_, j) => j !== i);
-              const projectSchema = (schema: MongoSchemaIR): MongoSchemaIR => {
-                // `projectSchemaToSpace` returns a plain object
-                // `{...schemaIR, collections: prunedArray}` (not a
-                // `MongoSchemaIR` instance), so the descriptor rewraps
-                // the pruned collections into a fresh `MongoSchemaIR`
-                // before handing it to `verifyMongoSchema` (which
-                // depends on the class's `collectionNames` /
-                // `collection(name)` accessors).
-                const projected = projectSchemaToSpace(schema, member, others) as {
-                  readonly collections: ReadonlyArray<MongoSchemaCollection>;
-                };
-                return new MongoSchemaIR(projected.collections);
+      const runner: MigrationRunner<'mongo', 'mongo'> = {
+        // Mongo cannot wrap DDL ops in a session transaction (createCollection,
+        // createIndex, collMod, setValidation all bypass transactions even on
+        // replica sets), so the cross-space envelope is *resumable* rather than
+        // transactional. Per-space-internal verify-gated marker atomicity
+        // already lives in `MongoMigrationRunner.execute`: ops apply, schema is
+        // introspected and verified, and the marker advances only on verify-pass.
+        // This loop composes that guarantee across spaces — earlier-advanced
+        // markers are not rolled back when a later space fails. Re-running reads
+        // each marker, finds spaces 1..N−1 at-head (no-op skip), retries N onward.
+        //
+        // Per-space verify is sliced via `projectSchemaToSpace`: the live DB
+        // holds collections owned by sibling spaces, but each space's verify
+        // only sees the slice that space's contract actually claims. Without
+        // the projection an aggregate of two spaces could not pass strict
+        // verify (every other-space collection would look like an extra).
+        //
+        // See `docs/architecture docs/subsystems/10. MongoDB Family.md` §
+        // Contract spaces and ADR 212 — Contract spaces.
+        async execute({ driver, perSpaceOptions }): Promise<MigrationRunnerResult> {
+          const members = perSpaceOptions.map(toSpaceMember);
+          const perSpaceResults: Array<{
+            space: string;
+            value: MigrationRunnerPerSpaceSuccessValue;
+          }> = [];
+          for (let i = 0; i < perSpaceOptions.length; i++) {
+            const spaceOptions = perSpaceOptions[i];
+            if (!spaceOptions) continue;
+            const member = members[i];
+            if (!member) continue;
+            const others = members.filter((_, j) => j !== i);
+            const projectSchema = (schema: MongoSchemaIR): MongoSchemaIR => {
+              // `projectSchemaToSpace` returns a plain object
+              // `{...schemaIR, collections: prunedArray}` (not a
+              // `MongoSchemaIR` instance), so the descriptor rewraps
+              // the pruned collections into a fresh `MongoSchemaIR`
+              // before handing it to `verifyMongoSchema` (which
+              // depends on the class's `collectionNames` /
+              // `collection(name)` accessors).
+              const projected = projectSchemaToSpace(schema, member, others) as {
+                readonly collections: ReadonlyArray<MongoSchemaCollection>;
               };
-              const result = await runMongo(driver, { ...spaceOptions, projectSchema });
-              if (!result.ok) {
-                return notOk<MultiSpaceRunnerFailure>({
-                  ...result.failure,
-                  failingSpace: spaceOptions.space,
-                });
-              }
-              perSpaceResults.push({ space: spaceOptions.space, value: result.value });
+              return new MongoSchemaIR(projected.collections);
+            };
+            const { space, ...runnerOptions } = spaceOptions;
+            const result = await runMongo(driver, { ...runnerOptions, projectSchema });
+            if (!result.ok) {
+              return notOk({
+                ...result.failure,
+                failingSpace: space,
+              });
             }
-            return ok({ perSpaceResults });
-          },
-        };
+            perSpaceResults.push({ space, value: result.value });
+          }
+          return ok({ perSpaceResults });
+        },
+      };
       return runner;
     },
     contractToSchema(contract: Contract | null) {
@@ -162,7 +155,7 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
  * `contract()`; migration graph state is empty because the runner
  * consumes the destination contract directly.
  */
-function toSpaceMember(opts: MultiSpaceRunnerPerSpaceOptions<'mongo', 'mongo'>) {
+function toSpaceMember(opts: MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>) {
   const contract = blindCast<Contract, 'destinationContract validated at aggregate boundary'>(
     opts.destinationContract,
   );

@@ -7,7 +7,7 @@ import type {
   MigrationPlannerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
-import type { AggregatePerSpacePlan } from '../planner-types';
+import type { PerSpacePlan } from '../planner-types';
 import { projectSchemaToSpace } from '../project-schema-to-space';
 import type { ContractSpaceMember } from '../types';
 
@@ -27,7 +27,7 @@ export interface SynthStrategyInputs<TFamilyId extends string, TTargetId extends
 }
 
 export type SynthStrategyOutcome =
-  | { readonly kind: 'ok'; readonly result: AggregatePerSpacePlan }
+  | { readonly kind: 'ok'; readonly result: PerSpacePlan }
   | { readonly kind: 'failure'; readonly conflicts: readonly MigrationPlannerConflict[] };
 
 /**

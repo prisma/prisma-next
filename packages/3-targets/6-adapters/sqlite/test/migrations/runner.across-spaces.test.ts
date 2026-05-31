@@ -124,7 +124,7 @@ function buildAppPlan() {
   });
 }
 
-describe('SqliteMigrationRunner.executeAcrossSpaces', {
+describe('SqliteMigrationRunner.execute', {
   timeout: timeouts.databaseOperation,
 }, () => {
   let testDb: TestDatabase;
@@ -138,7 +138,7 @@ describe('SqliteMigrationRunner.executeAcrossSpaces', {
     const { driver } = testDb;
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
 
-    const result = await runner.executeAcrossSpaces({
+    const result = await runner.execute({
       driver,
       perSpaceOptions: [
         {
@@ -193,7 +193,7 @@ describe('SqliteMigrationRunner.executeAcrossSpaces', {
     const { driver } = testDb;
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
 
-    const result = await runner.executeAcrossSpaces({
+    const result = await runner.execute({
       driver,
       perSpaceOptions: [
         {
@@ -250,7 +250,7 @@ describe('SqliteMigrationRunner.executeAcrossSpaces', {
     const { driver } = testDb;
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
 
-    const result = await runner.executeAcrossSpaces({
+    const result = await runner.execute({
       driver,
       perSpaceOptions: [],
     });

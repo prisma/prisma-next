@@ -7,12 +7,12 @@ import { projectSchemaToSpace } from './project-schema-to-space';
 import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
 
 /**
- * Caller policy for the aggregate verifier. Today's only knob is
+ * Caller policy for the verifier. Today's only knob is
  * `mode`: `strict` treats orphan elements (live tables not claimed by
  * any aggregate member) as errors; `lenient` treats them as
  * informational. Maps directly to `db verify --strict`.
  */
-export interface AggregateVerifierInput<TSchemaResult> {
+export interface VerifierInput<TSchemaResult> {
   readonly aggregate: ContractSpaceAggregate;
   readonly markersBySpaceId: ReadonlyMap<string, ContractMarkerRecordLike | null>;
   readonly schemaIntrospection: unknown;
@@ -20,7 +20,7 @@ export interface AggregateVerifierInput<TSchemaResult> {
   /**
    * Caller-supplied per-space schema verifier. The CLI wires this to
    * the family's `verifySqlSchema` (SQL) / equivalent (other
-   * families). The aggregate verifier projects the schema to the
+   * families). The verifier projects the schema to the
    * member's slice via {@link projectSchemaToSpace} before invoking
    * the callback, so single-contract semantics are preserved.
    *
@@ -62,7 +62,7 @@ export interface MarkerCheckSection {
 
 /**
  * A live storage element (today: a top-level table) not claimed by any
- * member of the aggregate. The aggregate verifier always reports these;
+ * member of the aggregate. The verifier always reports these;
  * the caller decides what to do — `db verify --strict` treats them as
  * errors, the lenient default treats them as informational.
  *
@@ -81,20 +81,17 @@ export interface SchemaCheckSection<TSchemaResult> {
   readonly orphanElements: readonly OrphanElement[];
 }
 
-export interface AggregateVerifierSuccess<TSchemaResult> {
+export interface VerifierSuccess<TSchemaResult> {
   readonly markerCheck: MarkerCheckSection;
   readonly schemaCheck: SchemaCheckSection<TSchemaResult>;
 }
 
-export type AggregateVerifierError = {
+export type VerifierError = {
   readonly kind: 'introspectionFailure';
   readonly detail: string;
 };
 
-export type AggregateVerifierOutput<TSchemaResult> = Result<
-  AggregateVerifierSuccess<TSchemaResult>,
-  AggregateVerifierError
->;
+export type VerifierOutput<TSchemaResult> = Result<VerifierSuccess<TSchemaResult>, VerifierError>;
 
 /**
  * Verify a {@link ContractSpaceAggregate} against the live database
@@ -118,11 +115,11 @@ export type AggregateVerifierOutput<TSchemaResult> = Result<
  * Pure synchronous function; no I/O. The caller (CLI) gathers
  * `markersBySpaceId` and `schemaIntrospection` ahead of the call.
  */
-export function verifyAggregate<TSchemaResult>(
-  input: AggregateVerifierInput<TSchemaResult>,
-): AggregateVerifierOutput<TSchemaResult> {
+export function verifyMigration<TSchemaResult>(
+  input: VerifierInput<TSchemaResult>,
+): VerifierOutput<TSchemaResult> {
   try {
-    return runVerifyAggregate(input);
+    return runVerifyMigration(input);
   } catch (error) {
     return notOk({
       kind: 'introspectionFailure',
@@ -131,9 +128,9 @@ export function verifyAggregate<TSchemaResult>(
   }
 }
 
-function runVerifyAggregate<TSchemaResult>(
-  input: AggregateVerifierInput<TSchemaResult>,
-): AggregateVerifierOutput<TSchemaResult> {
+function runVerifyMigration<TSchemaResult>(
+  input: VerifierInput<TSchemaResult>,
+): VerifierOutput<TSchemaResult> {
   const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForMember } = input;
   const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
   const memberSpaceIds = new Set(allMembers.map((m) => m.spaceId));

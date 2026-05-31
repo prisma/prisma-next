@@ -149,7 +149,7 @@ describe('renderMigrationListWithStyle', () => {
     expect(styled).toBe(expected);
   });
 
-  it('styles the multi-space heading and per-space rows with the correct palette', () => {
+  it('styles the cross-space heading and per-space rows with the correct palette', () => {
     const r = result(
       [
         {

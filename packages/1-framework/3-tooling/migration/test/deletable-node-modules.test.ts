@@ -31,7 +31,7 @@ import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadContractSpaceAggregate } from '../src/aggregate/loader';
-import { verifyAggregate } from '../src/aggregate/verifier';
+import { verifyMigration } from '../src/aggregate/verifier';
 import { concatenateSpaceApplyInputs } from '../src/concatenate-space-apply-inputs';
 import {
   type ContractSpaceHeadRecord,
@@ -274,7 +274,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     // Verifier runs without descriptor access — schemaIntrospection and
     // markerRows would in production come from the live DB; here a
     // synthetic shape exercises the pipeline.
-    const verifyResult = verifyAggregate({
+    const verifyResult = verifyMigration({
       aggregate,
       markersBySpaceId: new Map(),
       schemaIntrospection: { tables: { user: { columns: {} }, test_box: { columns: {} } } },

@@ -4,11 +4,12 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
-import sqlFamilyDescriptor, {
-  createMigrationPlan,
-  type SqlMigrationRunnerFailure,
-} from '@prisma-next/family-sql/control';
-import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
+import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
+import {
+  APP_SPACE_ID,
+  createControlStack,
+  type MigrationRunnerFailure,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -158,7 +159,7 @@ export async function executeStatement(
   await driver.query(statement.sql);
 }
 
-export function formatRunnerFailure(failure: SqlMigrationRunnerFailure): string {
+export function formatRunnerFailure(failure: MigrationRunnerFailure): string {
   const parts = [`[${failure.code}] ${failure.summary}`];
   if (failure.why) {
     parts.push(`  why: ${failure.why}`);

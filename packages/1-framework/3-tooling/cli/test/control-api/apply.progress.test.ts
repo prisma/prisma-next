@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { progressLabelForAction } from '../../src/control-api/operations/apply-aggregate';
+import { progressLabelForAction } from '../../src/control-api/operations/apply';
 
 describe('progressLabelForAction', () => {
   it('returns an init-specific label for dbInit', () => {

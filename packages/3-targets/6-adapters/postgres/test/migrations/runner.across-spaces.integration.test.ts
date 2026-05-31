@@ -92,7 +92,7 @@ function buildFailingAppPlan() {
   });
 }
 
-describe.sequential('PostgresMigrationRunner.executeAcrossSpaces', () => {
+describe.sequential('PostgresMigrationRunner.execute', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;
   let driver: PostgresControlDriver | undefined;
 
@@ -123,7 +123,7 @@ describe.sequential('PostgresMigrationRunner.executeAcrossSpaces', () => {
   }, async () => {
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
 
-    const result = await runner.executeAcrossSpaces({
+    const result = await runner.execute({
       driver: driver!,
       perSpaceOptions: [
         {
@@ -178,7 +178,7 @@ describe.sequential('PostgresMigrationRunner.executeAcrossSpaces', () => {
   }, async () => {
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
 
-    const result = await runner.executeAcrossSpaces({
+    const result = await runner.execute({
       driver: driver!,
       perSpaceOptions: [
         {

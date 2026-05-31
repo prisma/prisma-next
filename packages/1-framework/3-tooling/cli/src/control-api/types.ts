@@ -245,7 +245,7 @@ export interface DbUpdateOptions {
  * Options for the dbVerify operation.
  *
  * Drives the loader → aggregate-verifier pipeline. `strict` maps to
- * `verifyAggregate({ mode: 'strict' | 'lenient' })`; `skipSchema`
+ * `verifyMigration({ mode: 'strict' | 'lenient' })`; `skipSchema`
  * mirrors the `--marker-only` CLI flag and short-circuits the schema
  * portion of the verifier.
  */
@@ -326,7 +326,7 @@ export interface EmitOptions {
  * to the user instead of being collapsed into a single ambiguous
  * top-level hash.
  */
-export interface AggregatePerSpaceExecutionEntry {
+export interface PerSpaceExecutionEntry {
   readonly spaceId: string;
   /** `'app'` for the application's contract space; `'extension'` for any extension space. */
   readonly kind: 'app' | 'extension';
@@ -387,9 +387,9 @@ export interface DbInitSuccess {
    * alphabetically, then app). Present whenever the aggregate flow
    * produced one — both `mode: 'plan'` and `mode: 'apply'`.
    *
-   * See {@link AggregatePerSpaceExecutionEntry}.
+   * See {@link PerSpaceExecutionEntry}.
    */
-  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly summary: string;
 }
 
@@ -457,9 +457,9 @@ export interface DbUpdateSuccess {
   };
   /**
    * Per-space breakdown in canonical schedule order (extensions
-   * alphabetically, then app). See {@link AggregatePerSpaceExecutionEntry}.
+   * alphabetically, then app). See {@link PerSpaceExecutionEntry}.
    */
-  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly summary: string;
 }
 
@@ -538,7 +538,7 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
  * contract-space aggregate, reading per-space marker rows from the
  * live database, plotting per-space paths via `graphWalkStrategy`
  * (replay-only — no synth, no introspection), and dispatching
- * through the shared `applyAggregate` primitive. The CLI command
+ * through the shared `applyMigration` primitive. The CLI command
  * just resolves the descriptor surface (config, refs, contract
  * envelope, app-space migration packages) and hands the inputs in.
  */
@@ -581,7 +581,7 @@ export interface MigrationApplyOptions {
  * aggregate's app packages; the operation hands it through to the
  * framework-neutral aggregate loader's `appMigrationPackages` slot.
  *
- * (Originally named `MigrationApplyStep` for the legacy single-space
+ * (Originally named `MigrationApplyStep` for the earlier app-only
  * apply path; the name is kept for compatibility with existing CLI
  * callers and tests.)
  */
@@ -605,8 +605,8 @@ export interface MigrationApplyStep {
  */
 /**
  * One entry per authored migration package applied. Preserves the
- * single-space `migrationsApplied` count semantics (each entry is
- * one migration directory) so `applied.length === migrationsApplied`.
+ * `migrationsApplied` count semantics (each entry is one migration
+ * directory) so `applied.length === migrationsApplied`.
  *
  * Per-space aggregate detail (markers, ops grouped by space) lives
  * on `perSpace[]`; this list is the per-edge view.
@@ -621,16 +621,15 @@ export interface MigrationApplyAppliedEntry {
 }
 
 /**
- * Successful migrationApply result. Carries both the legacy
- * single-space fields (`markerHash` is the **app member's** post-apply
- * marker, surfaced for back-compat with single-space callers) and the
+ * Successful migrationApply result. Carries both the top-level fields
+ * (`markerHash` is the **app member's** post-apply marker) and the
  * per-space breakdown (`perSpace` — markers / operations in canonical
  * schedule order).
  */
 /**
  * Path-decision summary for the **app member** post-apply. Surfaced
- * for back-compat with single-space callers (and the cli-journeys
- * suite, which inspects `requiredInvariants`/`satisfiedInvariants`/
+ * at the top level (and consumed by the cli-journeys suite, which
+ * inspects `requiredInvariants`/`satisfiedInvariants`/
  * `selectedPath` to validate invariant routing).
  *
  * Per-space path decisions for extension members are not surfaced —
@@ -660,10 +659,10 @@ export interface MigrationApplySuccess {
   readonly summary: string;
   /**
    * Per-space breakdown in canonical schedule order (extensions
-   * alphabetically, then app). See {@link AggregatePerSpaceExecutionEntry}.
+   * alphabetically, then app). See {@link PerSpaceExecutionEntry}.
    * Always present for the aggregate-walking operation.
    */
-  readonly perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace: ReadonlyArray<PerSpaceExecutionEntry>;
   /**
    * Path-decision data for the app member. Present whenever the
    * graph-walk strategy ran for the app (i.e. always for the

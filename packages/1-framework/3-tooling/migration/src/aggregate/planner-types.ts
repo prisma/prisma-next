@@ -14,7 +14,7 @@ import type { ContractMarkerRecordLike } from './marker-types';
 import type { ContractSpaceAggregate } from './types';
 
 /**
- * Caller-provided policy for {@link planAggregate}. Today this carries
+ * Caller-provided policy for {@link planMigration}. Today this carries
  * just one knob:
  *
  * - `ignoreGraphFor`: `Set<spaceId>`. For listed members, the planner
@@ -55,7 +55,7 @@ export interface AggregateCurrentDBState {
 }
 
 /**
- * Inputs to {@link planAggregate}.
+ * Inputs to {@link planMigration}.
  *
  * The planner is target-agnostic but family-aware: per-member synth
  * delegates to the family's `createPlanner(familyInstance).plan(...)`,
@@ -64,11 +64,11 @@ export interface AggregateCurrentDBState {
  * threaded through. (`frameworkComponents` is passed verbatim into
  * `planner.plan(...)` per ADR 212; the planner does not interpret it.)
  *
- * The aggregate planner does **not** receive a `targetId` separately —
+ * The planner does **not** receive a `targetId` separately —
  * it reads `aggregate.targetId` and stamps it onto every emitted
  * `MigrationPlan` from construction. No placeholder, no patch step.
  */
-export interface AggregatePlannerInput<TFamilyId extends string, TTargetId extends string> {
+export interface PlannerInput<TFamilyId extends string, TTargetId extends string> {
   readonly aggregate: ContractSpaceAggregate;
   readonly currentDBState: AggregateCurrentDBState;
   readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
@@ -83,7 +83,7 @@ export interface AggregatePlannerInput<TFamilyId extends string, TTargetId exten
 }
 
 /**
- * Per-member output of the aggregate planner. The runner ingests this
+ * Per-member output of the planner. The runner ingests this
  * shape directly via a thin `toRunnerInput` adapter at the CLI.
  *
  * - `plan`: ready-to-execute `MigrationPlan` with `targetId` already
@@ -99,8 +99,8 @@ export interface AggregatePlannerInput<TFamilyId extends string, TTargetId exten
 /**
  * Per-edge metadata for the chain assembled by the graph-walk
  * strategy. Lets `migrate` surface a per-migration `applied[]`
- * entry (preserving the single-space `migrationsApplied` count
- * semantics) without re-walking the graph.
+ * entry (preserving the `migrationsApplied` count semantics) without
+ * re-walking the graph.
  *
  * `synth`-produced plans leave this absent — synthesised plans don't
  * have authored edges to surface.
@@ -113,7 +113,7 @@ export interface AggregateMigrationEdgeRef {
   readonly operationCount: number;
 }
 
-export interface AggregatePerSpacePlan {
+export interface PerSpacePlan {
   readonly plan: MigrationPlan;
   readonly displayOps: readonly MigrationPlanOperation[];
   readonly destinationContract: Contract;
@@ -136,13 +136,13 @@ export interface AggregatePerSpacePlan {
   readonly pathDecision?: PathDecision;
 }
 
-export interface AggregatePlannerSuccess {
-  readonly perSpace: ReadonlyMap<string, AggregatePerSpacePlan>;
+export interface PlannerSuccess {
+  readonly perSpace: ReadonlyMap<string, PerSpacePlan>;
   /**
    * `applyOrder` is the order the runner must walk per-space inputs.
    * Mirrors the existing `concatenateSpaceApplyInputs` convention:
    * extensions alphabetically by `spaceId`, then the app. Tests assert
-   * on `MultiSpaceRunnerFailure.failingSpace`, which is positional in
+   * on `MigrationRunnerFailure.failingSpace`, which is positional in
    * the runner's input array — preserving the literal ordering keeps
    * `failingSpace` attribution byte-for-byte.
    */
@@ -150,11 +150,11 @@ export interface AggregatePlannerSuccess {
 }
 
 /**
- * Discriminated failure variants for {@link planAggregate}. Each
+ * Discriminated failure variants for {@link planMigration}. Each
  * variant short-circuits the plan; per-member errors carry the
  * `spaceId` so the CLI can surface a precise envelope.
  */
-export type AggregatePlannerError =
+export type PlannerError =
   | { readonly kind: 'extensionPathUnreachable'; readonly spaceId: string; readonly target: string }
   | {
       readonly kind: 'extensionPathUnsatisfiable';
@@ -168,4 +168,4 @@ export type AggregatePlannerError =
     }
   | { readonly kind: 'policyConflict'; readonly spaceId: string; readonly detail: string };
 
-export type AggregatePlannerOutput = Result<AggregatePlannerSuccess, AggregatePlannerError>;
+export type PlannerOutput = Result<PlannerSuccess, PlannerError>;

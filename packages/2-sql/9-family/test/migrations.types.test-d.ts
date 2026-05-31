@@ -16,7 +16,7 @@ import type {
   MigrationPlannerConflict,
   MigrationPlanOperation,
   MigrationRunnerFailure,
-  MigrationRunnerSuccessValue,
+  MigrationRunnerPerSpaceSuccessValue,
 } from '@prisma-next/framework-components/control';
 import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import { expectTypeOf } from 'vitest';
@@ -49,10 +49,10 @@ expectTypeOf<SqlPlannerConflict['summary']>().toExtend<MigrationPlannerConflict[
 
 // Test that SqlMigrationRunnerSuccessValue has the required core fields
 expectTypeOf<SqlMigrationRunnerSuccessValue['operationsPlanned']>().toExtend<
-  MigrationRunnerSuccessValue['operationsPlanned']
+  MigrationRunnerPerSpaceSuccessValue['operationsPlanned']
 >();
 expectTypeOf<SqlMigrationRunnerSuccessValue['operationsExecuted']>().toExtend<
-  MigrationRunnerSuccessValue['operationsExecuted']
+  MigrationRunnerPerSpaceSuccessValue['operationsExecuted']
 >();
 
 // Test that SqlMigrationRunnerFailure has the required core fields

@@ -8,8 +8,7 @@ import {
 import {
   APP_SPACE_ID,
   hasMigrations,
-  hasMultiSpaceRunner,
-  type MultiSpaceRunnerPerSpaceOptions,
+  type MigrationRunnerPerSpaceOptions,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
@@ -54,7 +53,7 @@ const ALL_POLICY = {
 
 const EXT_SPACE = 'cipherstash';
 
-type PerSpaceOptions = MultiSpaceRunnerPerSpaceOptions<'mongo', 'mongo'>;
+type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>;
 
 function appContract(): MongoContract {
   return {
@@ -189,7 +188,7 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
     await db.dropDatabase();
   });
 
-  it('runs rehydrated multi-space aggregate without consulting codec runtime instances', async () => {
+  it('runs a rehydrated aggregate across spaces without consulting codec runtime instances', async () => {
     // Family stack carries NO codec runtime instances — empty
     // `controlStack` means no `extensionPacks`, no codec
     // descriptors, nothing for the runner to consult. If the runner
@@ -200,7 +199,6 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
     );
     if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations capability');
     const runner = mongoTargetDescriptor.migrations.createRunner(family);
-    if (!hasMultiSpaceRunner(runner)) throw new Error('expected multi-space-capable runner');
 
     const app = appContract();
     const ext = extContract();
@@ -238,7 +236,7 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
         },
       ];
 
-      const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
+      const result = await runner.execute({ driver, perSpaceOptions });
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('unreachable');
