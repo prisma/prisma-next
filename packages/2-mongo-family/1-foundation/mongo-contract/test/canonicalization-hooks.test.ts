@@ -8,7 +8,6 @@ describe('mongoContractCanonicalizationHooks.shouldPreserveEmpty', () => {
     expect(
       shouldPreserveEmpty([
         'storage',
-        'namespaces',
         'app',
         'collections',
         'users',
@@ -23,7 +22,6 @@ describe('mongoContractCanonicalizationHooks.shouldPreserveEmpty', () => {
     expect(
       shouldPreserveEmpty([
         'storage',
-        'namespaces',
         'app',
         'collections',
         'users',
@@ -40,7 +38,6 @@ describe('mongoContractCanonicalizationHooks.shouldPreserveEmpty', () => {
     expect(
       shouldPreserveEmpty([
         'storage',
-        'namespaces',
         'app',
         'collections',
         'events',
@@ -54,10 +51,10 @@ describe('mongoContractCanonicalizationHooks.shouldPreserveEmpty', () => {
   });
 
   it('preserves the empty collections slot', () => {
-    expect(shouldPreserveEmpty(['storage', 'namespaces', 'app', 'collections'])).toBe(true);
+    expect(shouldPreserveEmpty(['storage', 'app', 'collections'])).toBe(true);
   });
 
   it('does not preserve unrelated empty defaults', () => {
-    expect(shouldPreserveEmpty(['storage', 'namespaces', 'app', 'somethingElse'])).toBe(false);
+    expect(shouldPreserveEmpty(['storage', 'app', 'somethingElse'])).toBe(false);
   });
 });
