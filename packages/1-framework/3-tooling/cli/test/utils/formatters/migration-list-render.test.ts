@@ -412,7 +412,7 @@ describe('renderMigrationList', () => {
     `);
   });
 
-  it('renders multi-space output with headings and indent', () => {
+  it('renders output for multiple spaces with headings and indent', () => {
     const output = renderListed(
       result(
         [
@@ -458,7 +458,7 @@ describe('renderMigrationList', () => {
     `);
   });
 
-  it('suppresses heading for single-space output', () => {
+  it('suppresses heading for one-space output', () => {
     const output = renderListed(
       result(
         [
@@ -545,7 +545,7 @@ describe('renderMigrationList', () => {
     expect(output).toBe(expected);
   });
 
-  it('renders empty state for multi-space with per-space headings', () => {
+  it('renders empty state for multiple spaces with per-space headings', () => {
     const output = renderListed(
       result(
         [

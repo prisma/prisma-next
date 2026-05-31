@@ -98,20 +98,26 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
       });
 
       const result = await runner.execute({
-        plan: planWithFailingChecks,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        executionChecks: {
-          prechecks: false,
-          postchecks: false,
-        },
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithFailingChecks.spaceId ?? APP_SPACE_ID,
+            plan: planWithFailingChecks,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            executionChecks: {
+              prechecks: false,
+              postchecks: false,
+            },
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value).toMatchObject({
+        expect(result.value.perSpaceResults[0]?.value).toMatchObject({
           operationsPlanned: 1,
           operationsExecuted: 1,
         });
@@ -174,14 +180,20 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
       });
 
       const result = await runner.execute({
-        plan: planWithPreSatisfiedPostcheck,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        executionChecks: {
-          idempotencyChecks: false,
-        },
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithPreSatisfiedPostcheck.spaceId ?? APP_SPACE_ID,
+            plan: planWithPreSatisfiedPostcheck,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            executionChecks: {
+              idempotencyChecks: false,
+            },
+            frameworkComponents,
+          },
+        ],
       });
 
       // Should fail because execute step fails (idempotency probe was skipped)

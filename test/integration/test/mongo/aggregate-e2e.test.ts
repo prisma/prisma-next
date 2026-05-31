@@ -13,8 +13,7 @@ import {
   APP_SPACE_ID,
   createControlStack,
   hasMigrations,
-  hasMultiSpaceRunner,
-  type MultiSpaceRunnerPerSpaceOptions,
+  type MigrationRunnerPerSpaceOptions,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
@@ -41,10 +40,10 @@ import mongoTestContractSpaceExtensionDescriptor from '../contract-space-fixture
  * sourced from `contract-space-fixture-mongo`, drives it through the
  * per-space runner, and asserts:
  *
- * - Happy path: `executeAcrossSpaces` applies app and extension plans
+ * - Happy path: `execute` applies app and extension plans
  *   in caller order against a live `MongoMemoryReplSet`; both markers
  *   advance to their pinned hashes; per-space strict schema verify
- *   (the default, run inside `executeAcrossSpaces` after each apply)
+ *   (the default, run inside `execute` after each apply)
  *   passes.
  * - Failure isolation: after the happy path, dropping the fixture's
  *   unique index on the live `test_audit_event` collection makes the
@@ -58,7 +57,7 @@ const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };
 
-type PerSpaceOptions = MultiSpaceRunnerPerSpaceOptions<'mongo', 'mongo'>;
+type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>;
 
 const extContract: MongoContract =
   mongoTestContractSpaceExtensionDescriptor.contractSpace!.contractJson;
@@ -136,11 +135,9 @@ function createInstance() {
 
 function makeRunner() {
   if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations capability');
-  const runner = mongoTargetDescriptor.migrations.createRunner(
+  return mongoTargetDescriptor.migrations.createRunner(
     createMongoFamilyInstance({} as unknown as Parameters<typeof createMongoFamilyInstance>[0]),
   );
-  if (!hasMultiSpaceRunner(runner)) throw new Error('expected multi-space-capable runner');
-  return runner;
 }
 
 describe('Mongo contract-space aggregate e2e', {
@@ -213,7 +210,7 @@ describe('Mongo contract-space aggregate e2e', {
         },
       ];
 
-      const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
+      const result = await runner.execute({ driver, perSpaceOptions });
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('unreachable');
@@ -248,7 +245,7 @@ describe('Mongo contract-space aggregate e2e', {
 
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
     try {
-      const result = await runner.executeAcrossSpaces({
+      const result = await runner.execute({
         driver,
         perSpaceOptions: [
           {
@@ -302,7 +299,7 @@ describe('Mongo contract-space aggregate e2e', {
       //
       // Non-strict: `instance.schemaVerify` walks the whole live DB
       // at this surface (no per-space projection — that is the
-      // multi-space runner's job, exercised in the happy path
+      // runner's job, exercised in the happy path
       // above). Sibling app-owned collections would otherwise
       // surface as strict-mode extras; non-strict elides those
       // warnings while genuine drift on a contract-declared index

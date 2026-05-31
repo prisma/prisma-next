@@ -38,7 +38,7 @@ describe('executeDbInit progress emission', () => {
         }),
       }),
       createRunner: () => ({
-        executeAcrossSpaces: async () =>
+        execute: async () =>
           ok({
             perSpaceResults: [
               { space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } },
@@ -120,7 +120,7 @@ describe('executeDbInit progress emission', () => {
         }),
       }),
       createRunner: () => ({
-        executeAcrossSpaces: async () =>
+        execute: async () =>
           ok({
             perSpaceResults: [
               {
@@ -190,7 +190,7 @@ describe('executeDbInit progress emission', () => {
         }),
       }),
       createRunner: () => ({
-        executeAcrossSpaces: async () =>
+        execute: async () =>
           ok({
             perSpaceResults: [
               { space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } },

@@ -1,8 +1,9 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import { type MongoCodecRegistry, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
-import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoDriver, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   MongoExecutionContext,
@@ -32,23 +33,28 @@ function createPlan(overrides?: Partial<MongoQueryPlan>): MongoQueryPlan {
 interface RecordingAdapter {
   adapter: MongoAdapter;
   observed: Array<CodecCallContext>;
-  callCount: { current: number };
+  resolveCallCount: { current: number };
 }
 
 function recordingAdapter(): RecordingAdapter {
   const observed: Array<CodecCallContext> = [];
-  const callCount = { current: 0 };
+  const resolveCallCount = { current: 0 };
   const adapter = {
-    lower: vi.fn(async (plan: MongoQueryPlan, ctx: CodecCallContext) => {
-      callCount.current += 1;
-      observed.push(ctx);
-      return {
+    lower: vi.fn(),
+    structuralLower: vi.fn(
+      (plan: MongoQueryPlan): MongoLoweredDraft => ({
+        kind: 'rawAggregate',
         collection: plan.collection,
-        command: plan.command,
-      };
+        pipeline: [],
+      }),
+    ),
+    resolveParams: vi.fn(async (_draft: MongoLoweredDraft, ctx: CodecCallContext) => {
+      resolveCallCount.current += 1;
+      observed.push(ctx);
+      return {} as unknown as AnyMongoWireCommand;
     }),
   } as unknown as MongoAdapter;
-  return { adapter, observed, callCount };
+  return { adapter, observed, resolveCallCount };
 }
 
 function makeContext(adapter: MongoAdapter): MongoExecutionContext {
@@ -57,6 +63,8 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     familyId: 'mongo',
     targetId: 'mongo',
     lower: adapter.lower.bind(adapter),
+    structuralLower: adapter.structuralLower.bind(adapter),
+    resolveParams: adapter.resolveParams.bind(adapter),
   };
   const target: MongoRuntimeTargetDescriptor<'mongo'> = {
     kind: 'target',
@@ -132,7 +140,7 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
     expect(observed[1]?.signal).toBeUndefined();
   });
 
-  it('threads { signal } through execute → lower → adapter.lower as a CodecCallContext (signal identity preserved)', async () => {
+  it('threads { signal } through execute → resolveParams as a CodecCallContext (signal identity preserved)', async () => {
     const { adapter, observed } = recordingAdapter();
     const runtime = createMongoRuntime({
       context: makeContext(adapter),
@@ -147,8 +155,8 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
     expect(observed[0]?.signal).toBe(controller.signal);
   });
 
-  it('already-aborted signal at execute() entry rejects with RUNTIME.ABORTED { phase: stream } before any work (no adapter.lower, no driver.execute)', async () => {
-    const { adapter, callCount } = recordingAdapter();
+  it('already-aborted signal at execute() entry rejects with RUNTIME.ABORTED { phase: stream } before structuralLower or driver.execute', async () => {
+    const { adapter, resolveCallCount } = recordingAdapter();
     const driver = rowsDriver([{ _id: '1' }]);
     const runtime = createMongoRuntime({
       context: makeContext(adapter),
@@ -166,8 +174,9 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
       details: { phase: 'stream' },
       cause: reason,
     });
-    expect(callCount.current).toBe(0);
-    expect(adapter.lower).not.toHaveBeenCalled();
+    expect(resolveCallCount.current).toBe(0);
+    expect(adapter.structuralLower).not.toHaveBeenCalled();
+    expect(adapter.resolveParams).not.toHaveBeenCalled();
     expect(
       (driver as unknown as { execute: { mock: { calls: unknown[] } } }).execute.mock.calls,
     ).toHaveLength(0);

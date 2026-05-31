@@ -190,10 +190,9 @@ export interface MigrationStatusResult {
    * migrations directory) where the existing diagnostics already
    * surface the failure.
    *
-   * The legacy top-level fields (`migrations`, `markerHash`,
-   * `targetHash`, `pathDecision`, …) describe the **app member**
-   * specifically — back-compat with single-space callers. Per-space
-   * detail for extension members lives only on this list.
+   * The top-level fields (`migrations`, `markerHash`, `targetHash`,
+   * `pathDecision`, …) describe the **app member** specifically.
+   * Per-space detail for extension members lives only on this list.
    */
   readonly spaces?: readonly MigrationStatusSpaceEntry[];
   /** Cross-space pending-migration total (sum of `spaces[].pendingCount`). Present when `spaces` is. */
@@ -430,13 +429,12 @@ function resolveDisplayChain(
 /**
  * Build the aggregate enumeration of contract spaces for the status
  * output. Loads the aggregate from disk (lossy on failure — extension
- * spaces are simply omitted, the existing single-space app behaviour
- * keeps working), reads per-space marker rows when online, and uses
+ * spaces are simply omitted, the app member's output keeps working),
+ * reads per-space marker rows when online, and uses
  * {@link graphWalkStrategy} to compute each space's pending count.
  *
- * Sub-spec § `migration status` semantics — the aggregate-walking
- * version reports per-space marker + pending state alongside the
- * cross-space totals.
+ * The aggregate-walking status reports per-space marker + pending
+ * state alongside the cross-space totals.
  */
 export async function loadAggregateStatusSpaces(args: {
   readonly aggregate: ContractSpaceAggregate;
@@ -452,8 +450,7 @@ export async function loadAggregateStatusSpaces(args: {
   ) {
     // Full integrity refusal (drift, layout violation, etc.) — surfacing
     // it as a status diagnostic would duplicate `migration plan`'s job.
-    // The single-space app pipeline still runs; extensions are simply
-    // not enumerated.
+    // The app pipeline still runs; extensions are simply not enumerated.
     return [];
   }
   const aggregate = args.aggregate;
@@ -795,8 +792,8 @@ async function executeMigrationStatusCommand(
       mode = 'online';
       // Read every space's marker so the aggregate enumeration can
       // surface per-space marker state. `readAllMarkers` mirrors what
-      // `db init` / `db update` already use to drive the multi-space
-      // planner; here it powers the aggregate status output.
+      // `db init` / `db update` already use to drive the planner;
+      // here it powers the aggregate status output.
       //
       // Probe for the method first so we only swallow the
       // unsupported-method case: older family instances may not
@@ -1258,7 +1255,7 @@ export function formatStatusSummary(result: MigrationStatusResult, colorize: boo
   }
 
   // Per-space section. Suppressed when there's no extension space —
-  // the legacy single-space output already covers the app member.
+  // the top-level output already covers the app member.
   // When extensions exist, render every space (including the app)
   // for consistency, plus a cross-space pending total + apply hint.
   if (result.spaces?.some((s) => s.kind === 'extension')) {

@@ -209,7 +209,7 @@ Used in `gotchas.md` (or the matching per-product file).
 **Filed upstream:** [TML-XXXX](https://linear.app/prisma-company/issue/TML-XXXX) — *"<ticket title>"*
 **Product:** Prisma Next | Prisma Compute | Prisma Postgres
 **Version:** <package version, CLI version, or commit SHA>
-**First hit:** <one-line context, e.g. "writing the cipherstash extension", or "examples/prisma-next-demo migration plan">
+**First hit:** <one-line context, e.g. "authoring a new extension pack", or "examples/prisma-next-demo migration plan">
 **Cost:** <only if material — "20 minutes of brownout", "3 hours debugging", etc. Skip if <30 min.>
 
 **Symptom.** <quoted error / log line / observed behaviour, verbatim where possible>

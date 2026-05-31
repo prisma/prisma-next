@@ -7,10 +7,10 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
-  type AggregateVerifierOutput,
   type ContractSpaceMember,
   requireHeadRef,
-  verifyAggregate,
+  type VerifierOutput,
+  verifyMigration,
 } from '@prisma-next/migration-tools/aggregate';
 import { castAs } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -84,7 +84,7 @@ export type ExecuteDbVerifyResult = Result<ExecuteDbVerifySuccess, CliStructured
  *    structured CLI error.
  * 2. **Read DB state**: marker rows + (when `skipSchema` is `false`)
  *    schema introspection.
- * 3. **Verify**: {@link verifyAggregate} returns per-space
+ * 3. **Verify**: {@link verifyMigration} returns per-space
  *    `markerCheck` + per-space pre-projected `schemaCheck` (closes F23).
  *    Marker mismatches map to `CliStructuredError` (code `5002`) so
  *    callers (CLI command) can render and exit. Schema results are
@@ -104,7 +104,7 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
     : await runIntrospection({ driver, familyInstance, onProgress });
 
   emitVerifySpan(onProgress, 'spanStart');
-  const verifyResult = verifyAggregate({
+  const verifyResult = verifyMigration({
     aggregate,
     markersBySpaceId,
     schemaIntrospection,
@@ -208,12 +208,12 @@ function emitVerifySpan(
 }
 
 /**
- * Map an {@link AggregateVerifierOutput} to the operation's
+ * Map an {@link VerifierOutput} to the operation's
  * {@link ExecuteDbVerifyResult}, applying the `skipMarker` policy used
  * by the CLI's `--schema-only` mode.
  */
 function finaliseVerifyResult(args: {
-  verifyResult: AggregateVerifierOutput<VerifyDatabaseSchemaResult>;
+  verifyResult: VerifierOutput<VerifyDatabaseSchemaResult>;
   aggregate: {
     readonly app: { readonly spaceId: string };
     readonly extensions: ReadonlyArray<{ readonly spaceId: string }>;

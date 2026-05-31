@@ -44,11 +44,17 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     });
 
     const result = await runner.execute({
-      plan: emptyPlan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: emptyPlan.spaceId ?? APP_SPACE_ID,
+          plan: emptyPlan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);
@@ -65,11 +71,17 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     const failingPlan = createFailingPlan();
 
     const result = await runner.execute({
-      plan: failingPlan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: failingPlan.spaceId ?? APP_SPACE_ID,
+          plan: failingPlan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);
@@ -111,11 +123,17 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     });
 
     const result = await runner.execute({
-      plan: emptyPlan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: emptyPlan.spaceId ?? APP_SPACE_ID,
+          plan: emptyPlan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);
@@ -172,11 +190,17 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     });
 
     const result = await runner.execute({
-      plan: planWithFailingPostcheck,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: planWithFailingPostcheck.spaceId ?? APP_SPACE_ID,
+          plan: planWithFailingPostcheck,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);
@@ -224,11 +248,17 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     });
 
     const result = await runner.execute({
-      plan: planWithInvalidSql,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: planWithInvalidSql.spaceId ?? APP_SPACE_ID,
+          plan: planWithInvalidSql,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);
@@ -273,11 +303,17 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     });
 
     const result = await runner.execute({
-      plan: emptyPlan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: emptyPlan.spaceId ?? APP_SPACE_ID,
+          plan: emptyPlan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);
@@ -315,11 +351,17 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     });
 
     const result = await runner.execute({
-      plan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: APP_SPACE_ID,
+          plan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);
@@ -364,11 +406,17 @@ describe('SqliteMigrationRunner - Policy Violations', () => {
     });
 
     const result = await runner.execute({
-      plan: planWithPolicyViolation,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: planWithPolicyViolation.spaceId ?? APP_SPACE_ID,
+          plan: planWithPolicyViolation,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);

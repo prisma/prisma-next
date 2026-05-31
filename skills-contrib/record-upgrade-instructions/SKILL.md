@@ -139,8 +139,8 @@ This skill also does not enforce the exact-pin rule for extensions — that is `
 
 A PR refactors types in `@prisma-next/migration-tools`. After running `pnpm typecheck`:
 
-- `packages/3-extensions/cipherstash` is red — the extension consumes `MigrationMetadata` and the type shape changed. You fix the extension's source until tests are green.
-- `examples/cipherstash-integration` is red as a downstream consequence of the extension change. You fix the example until tests are green.
+- `packages/3-extensions/pgvector` is red — the extension consumes `MigrationMetadata` and the type shape changed. You fix the extension's source until tests are green.
+- `examples/multi-extension-monorepo` is red as a downstream consequence of the extension change. You fix the example until tests are green.
 
 Both substrates are touched → both skill packages need entries.
 

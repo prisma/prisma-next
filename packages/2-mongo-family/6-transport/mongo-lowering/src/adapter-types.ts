@@ -2,24 +2,153 @@ import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 
+/**
+ * Intermediate state produced by structural lowering. `MongoParamRef` leaves
+ * remain in place — they have not yet been resolved through codecs. The
+ * runtime defers value resolution past the `beforeExecute` middleware chain
+ * so middleware can walk and rewrite `MongoParamRef` nodes before encoding.
+ *
+ * All document/filter/update slots that may carry `MongoParamRef` nodes are
+ * typed as `Record<string, unknown>` to allow heterogeneous values. Raw
+ * command variants carry already-resolved `Record<string, unknown>` values
+ * and pass through unchanged.
+ */
+export type MongoLoweredDraft =
+  | {
+      readonly kind: 'insertOne';
+      readonly collection: string;
+      readonly document: Record<string, unknown>;
+    }
+  | {
+      readonly kind: 'insertMany';
+      readonly collection: string;
+      readonly documents: ReadonlyArray<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: 'updateOne';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+      readonly update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>;
+      readonly upsert: boolean | undefined;
+    }
+  | {
+      readonly kind: 'updateMany';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+      readonly update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>;
+      readonly upsert: boolean | undefined;
+    }
+  | {
+      readonly kind: 'deleteOne';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+    }
+  | {
+      readonly kind: 'deleteMany';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+    }
+  | {
+      readonly kind: 'findOneAndUpdate';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+      readonly update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>;
+      readonly upsert: boolean | undefined;
+      readonly sort: Record<string, 1 | -1> | undefined;
+      readonly returnDocument: 'before' | 'after' | undefined;
+    }
+  | {
+      readonly kind: 'findOneAndDelete';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+      readonly sort: Record<string, 1 | -1> | undefined;
+    }
+  | {
+      readonly kind: 'aggregate';
+      readonly collection: string;
+      readonly pipeline: ReadonlyArray<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: 'rawInsertOne';
+      readonly collection: string;
+      readonly document: Record<string, unknown>;
+    }
+  | {
+      readonly kind: 'rawInsertMany';
+      readonly collection: string;
+      readonly documents: ReadonlyArray<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: 'rawUpdateOne';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+      readonly update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: 'rawUpdateMany';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+      readonly update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: 'rawDeleteOne';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+    }
+  | {
+      readonly kind: 'rawDeleteMany';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+    }
+  | {
+      readonly kind: 'rawFindOneAndUpdate';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+      readonly update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>;
+      readonly upsert: boolean;
+      readonly sort: Record<string, 1 | -1> | undefined;
+      readonly returnDocument: 'before' | 'after' | undefined;
+    }
+  | {
+      readonly kind: 'rawFindOneAndDelete';
+      readonly collection: string;
+      readonly filter: Record<string, unknown>;
+      readonly sort: Record<string, 1 | -1> | undefined;
+    }
+  | {
+      readonly kind: 'rawAggregate';
+      readonly collection: string;
+      readonly pipeline: ReadonlyArray<Record<string, unknown>>;
+    };
+
 export interface MongoAdapter {
   /**
    * Lower a `MongoQueryPlan` to a driver-ready wire command.
    *
-   * `ctx` carries the per-`runtime.execute()` context — today just an
-   * `AbortSignal` for cooperative cancellation. The runtime allocates one
-   * ctx per execute and threads the same reference through
-   * `lower → resolveValue → codec.encode`, so codec authors observe
-   * **signal identity** across the whole encode dispatch. The `signal`
-   * field inside the ctx may be `undefined`, but the ctx object itself
-   * is always present.
-   *
-   * Implementations are expected to:
-   * - Pass `ctx` through to every `resolveValue` call so the per-level
-   *   `Promise.all` race can observe the signal.
-   * - Surface `RUNTIME.ABORTED { phase: 'encode' }` (via `runtimeAborted`)
-   *   from inside `resolveValue` when the signal aborts mid-flight; no
-   *   adapter-level abort handling is required beyond ctx forwarding.
+   * Equivalent to `resolveParams(structuralLower(plan), ctx)`. Preserved for
+   * callers that do not need the two-phase split.
    */
   lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
+
+  /**
+   * Phase 1 of the two-phase lowering pipeline.
+   *
+   * Transforms the plan's command AST into the lowered wire shape **without**
+   * calling `resolveValue` on any `MongoParamRef` leaf. All filter predicates,
+   * document fields, and pipeline stage values that carry `MongoParamRef`
+   * nodes are preserved in the returned `MongoLoweredDraft` so that the
+   * `beforeExecute` middleware chain can inspect and rewrite them before
+   * encoding runs. Synchronous — no I/O or codec calls.
+   */
+  structuralLower(plan: MongoQueryPlan): MongoLoweredDraft;
+
+  /**
+   * Phase 2 of the two-phase lowering pipeline.
+   *
+   * Walks the `MongoLoweredDraft` produced by `structuralLower`, resolves
+   * every `MongoParamRef` leaf through the codec registry, and constructs the
+   * frozen `AnyMongoWireCommand` ready for the driver. The same abort-signal
+   * forwarding and `RUNTIME.ABORTED` surface contract as `lower` applies.
+   */
+  resolveParams(draft: MongoLoweredDraft, ctx: CodecCallContext): Promise<AnyMongoWireCommand>;
 }

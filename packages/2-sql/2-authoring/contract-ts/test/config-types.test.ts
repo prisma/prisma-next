@@ -2,10 +2,20 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
+import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
-import { typescriptContract, typescriptContractFromPath } from '../src/config-types';
+import { emptyContract, typescriptContract, typescriptContractFromPath } from '../src/config-types';
+
+const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+};
 
 const stubContext: ContractSourceContext = {
   composedExtensionPacks: [],
@@ -114,4 +124,37 @@ describe('typescriptContract', () => {
     },
     timeouts.typeScriptCompilation,
   );
+});
+
+describe('emptyContract', () => {
+  it('loads an empty SQL contract for the target', async () => {
+    const config = emptyContract({ target: postgresTargetPack });
+    const result = await config.source.load(stubContext);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const contract = result.value;
+    expect(contract.models).toEqual({});
+    expect(contract.targetFamily).toBe('sql');
+    expect(contract.target).toBe('postgres');
+    expect(contract.extensionPacks).toEqual({});
+    expect(contract.capabilities).toEqual({});
+    const unboundNamespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID] as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(unboundNamespace['tables']).toEqual({});
+  });
+
+  it('sets output when passed and omits it otherwise', () => {
+    const withOutput = emptyContract({
+      target: postgresTargetPack,
+      output: 'src/contract.json',
+    });
+    expect(withOutput.output).toBe('src/contract.json');
+
+    const withoutOutput = emptyContract({ target: postgresTargetPack });
+    expect(withoutOutput.output).toBeUndefined();
+  });
 });

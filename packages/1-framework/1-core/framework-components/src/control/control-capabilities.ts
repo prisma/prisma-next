@@ -1,11 +1,6 @@
 import type { ControlTargetDescriptor } from './control-descriptors';
 import type { ControlFamilyInstance } from './control-instances';
-import type {
-  MigrationPlanOperation,
-  MigrationRunner,
-  MultiSpaceCapableRunner,
-  TargetMigrationsCapability,
-} from './control-migration-types';
+import type { MigrationPlanOperation, TargetMigrationsCapability } from './control-migration-types';
 import type { OperationPreview } from './control-operation-preview';
 import type { CoreSchemaView } from './control-schema-view';
 import type { PslDocumentAst } from './psl-ast';
@@ -72,25 +67,5 @@ export function hasOperationPreview<TFamilyId extends string, TSchemaIR>(
   return (
     'toOperationPreview' in instance &&
     typeof (instance as Record<string, unknown>)['toOperationPreview'] === 'function'
-  );
-}
-
-/**
- * Capability declaring that a runner can apply per-space plans inside a
- * single outer transaction. The SQL family (`SqlMigrationRunner`) implements
- * this with a true outer transaction. The Mongo family implements a
- * degenerate single-space shim (Mongo per-space is a non-goal per the
- * extension-contract-spaces project spec — TML-2397).
- *
- * The CLI's shared `applyAggregate` primitive uses this guard so that
- * `db init` / `db update` / `migrate` route uniformly through one
- * dispatch path regardless of family.
- */
-export function hasMultiSpaceRunner<TFamilyId extends string, TTargetId extends string>(
-  runner: MigrationRunner<TFamilyId, TTargetId>,
-): runner is MigrationRunner<TFamilyId, TTargetId> & MultiSpaceCapableRunner<TFamilyId, TTargetId> {
-  return (
-    'executeAcrossSpaces' in runner &&
-    typeof (runner as Record<string, unknown>)['executeAcrossSpaces'] === 'function'
   );
 }

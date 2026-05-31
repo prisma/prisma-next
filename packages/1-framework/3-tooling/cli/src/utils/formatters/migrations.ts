@@ -1,7 +1,7 @@
 import type { OperationPreview } from '@prisma-next/framework-components/control';
 import { cyan, green, yellow } from 'colorette';
 
-import type { AggregatePerSpaceExecutionEntry } from '../../control-api/types';
+import type { PerSpaceExecutionEntry } from '../../control-api/types';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
@@ -79,9 +79,9 @@ export interface MigrationCommandResult {
    * (extensions alphabetically, then app). Surfaces per-space markers
    * and the ops grouped by space, so the CLI summary can name which
    * space each op and marker belongs to instead of flattening them
-   * into a single ambiguous list. See {@link AggregatePerSpaceExecutionEntry}.
+   * into a single ambiguous list. See {@link PerSpaceExecutionEntry}.
    */
-  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
   readonly plannedAdvanceRef?: { readonly name: string; readonly hash: string } | null;
   readonly summary: string;
@@ -101,7 +101,7 @@ export interface MigrationCommandResult {
  * entirely (no marker has been written yet).
  */
 export function formatPerSpaceBlock(
-  perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>,
+  perSpace: ReadonlyArray<PerSpaceExecutionEntry>,
   mode: 'plan' | 'apply',
   useColor: boolean,
 ): readonly string[] {
@@ -182,7 +182,7 @@ export function formatMigrationPlanOutput(
       );
     }
   } else if (result.plan?.operations && result.plan.operations.length > 0) {
-    // Single-space fallback (no aggregate breakdown). Same flat tree
+    // App-only / no-aggregate-breakdown fallback. Same flat tree
     // we've always rendered.
     lines.push(`${formatDimText('│')}`);
     for (let i = 0; i < result.plan.operations.length; i++) {
@@ -267,7 +267,7 @@ export interface MigrationApplyCommandOutputResult {
    * alphabetically, then app). Always present for the aggregate-walking
    * `migrate` command.
    */
-  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
+  readonly perSpace: readonly PerSpaceExecutionEntry[];
   readonly timings?: {
     readonly total: number;
   };
@@ -441,8 +441,8 @@ export function formatMigrationApplyOutput(
         ),
       );
     } else if (result.marker) {
-      // Single-space fallback (no aggregate breakdown surfaced — e.g.
-      // older callers / non-aggregate code paths). The label is
+      // App-only / no-aggregate-breakdown fallback (e.g. older callers
+      // / non-aggregate code paths). The label is
       // `App-space marker` (not `Signature`) so that when only one
       // marker is observable we still name what it covers explicitly.
       lines.push(`${formatDimText(`  App-space marker: ${result.marker.storageHash}`)}`);

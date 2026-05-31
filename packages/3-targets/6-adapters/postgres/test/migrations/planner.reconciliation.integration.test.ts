@@ -76,11 +76,17 @@ async function applyBaseline(
     throw new Error(`baseline planner failed: ${JSON.stringify(result)}`);
   }
   const executeResult = await runner.execute({
-    plan: result.plan,
-    driver,
-    destinationContract: contract,
-    policy: INIT_ADDITIVE_POLICY,
-    frameworkComponents,
+    driver: driver!,
+    perSpaceOptions: [
+      {
+        space: result.plan.spaceId ?? APP_SPACE_ID,
+        plan: result.plan,
+        driver,
+        destinationContract: contract,
+        policy: INIT_ADDITIVE_POLICY,
+        frameworkComponents,
+      },
+    ],
   });
   if (!executeResult.ok) {
     throw new Error(`baseline runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
@@ -110,11 +116,17 @@ async function planAndExecute(
   }
   const runner = postgresTargetDescriptor.createRunner(familyInstance);
   const executeResult = await runner.execute({
-    plan: planResult.plan,
-    driver,
-    destinationContract: contract,
-    policy: RECONCILIATION_POLICY,
-    frameworkComponents,
+    driver: driver!,
+    perSpaceOptions: [
+      {
+        space: planResult.plan.spaceId ?? APP_SPACE_ID,
+        plan: planResult.plan,
+        driver,
+        destinationContract: contract,
+        policy: RECONCILIATION_POLICY,
+        frameworkComponents,
+      },
+    ],
   });
   if (!executeResult.ok) {
     throw new Error(`runner failed:\n${formatRunnerFailure(executeResult.failure)}`);

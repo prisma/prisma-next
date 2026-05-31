@@ -1,7 +1,6 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
-  MultiSpaceRunnerResult,
   SqlControlFamilyInstance,
   SqlMigrationPlanContractInfo,
   SqlMigrationPlanOperation,
@@ -15,7 +14,10 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { type ContractMarkerRow, parseContractMarkerRow } from '@prisma-next/family-sql/verify';
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type {
+  ControlDriverInstance,
+  MigrationRunnerResult,
+} from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -42,63 +44,11 @@ export function createSqliteMigrationRunner(
 class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetails> {
   constructor(private readonly family: SqlControlFamilyInstance) {}
 
-  async execute(
-    options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
-  ): Promise<SqlMigrationRunnerResult> {
-    const driver = options.driver;
-
-    const destinationCheck = this.ensurePlanMatchesDestinationContract(
-      options.plan.destination,
-      options.destinationContract,
-    );
-    if (!destinationCheck.ok) return destinationCheck;
-
-    const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
-    if (!policyCheck.ok) return policyCheck;
-
-    // SQLite recreate-table drops and rebuilds the table. If foreign_keys is ON,
-    // dropping a referenced parent cascade-deletes child rows; we must disable FK
-    // enforcement for the duration of the migration and validate integrity before
-    // committing. PRAGMA foreign_keys is a no-op inside a transaction, so toggle
-    // around BEGIN/COMMIT.
-    const fkWasEnabled = await this.readForeignKeysEnabled(driver);
-    if (fkWasEnabled) {
-      await driver.query('PRAGMA foreign_keys = OFF');
-    }
-
-    try {
-      await this.beginExclusiveTransaction(driver);
-      let committed = false;
-      try {
-        const result = await this.executeOnConnection(options);
-        if (!result.ok) return result;
-
-        if (fkWasEnabled) {
-          const fkIntegrityCheck = await this.verifyForeignKeyIntegrity(driver);
-          if (!fkIntegrityCheck.ok) return fkIntegrityCheck;
-        }
-
-        await this.commitTransaction(driver);
-        committed = true;
-        return result;
-      } finally {
-        if (!committed) {
-          await this.rollbackTransaction(driver);
-        }
-      }
-    } finally {
-      if (fkWasEnabled) {
-        await driver.query('PRAGMA foreign_keys = ON');
-      }
-    }
-  }
-
   /**
    * Apply the plan against an already-open connection without managing
-   * the transaction lifecycle. The caller owns BEGIN/COMMIT/ROLLBACK
-   * and any connection-level setup (FK pragma toggle, FK integrity
-   * check). Used by the per-space runner orchestration to fan out
-   * across contract spaces inside one outer transaction.
+   * the transaction lifecycle. The caller ({@link SqliteMigrationRunner.execute})
+   * owns BEGIN/COMMIT/ROLLBACK and any connection-level setup (FK pragma
+   * toggle, FK integrity check).
    */
   async executeOnConnection(
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
@@ -186,12 +136,12 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     });
   }
 
-  async executeAcrossSpaces(options: {
+  async execute(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly perSpaceOptions: ReadonlyArray<
       SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>
     >;
-  }): Promise<MultiSpaceRunnerResult> {
+  }): Promise<MigrationRunnerResult> {
     const driver = options.driver;
     const perSpaceOptions = options.perSpaceOptions;
 
@@ -200,7 +150,8 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     }
 
     // FK pragma toggle and the FK integrity check both span the outer
-    // transaction — see `execute(...)` for the full rationale.
+    // transaction: PRAGMA foreign_keys is a no-op inside a transaction, so the
+    // toggle has to wrap BEGIN/COMMIT.
     const fkWasEnabled = await this.readForeignKeysEnabled(driver);
     if (fkWasEnabled) {
       await driver.query('PRAGMA foreign_keys = OFF');

@@ -53,14 +53,14 @@ Rules:
 - No period at the end.
 - Aim for under 70 characters total. Optimise for **information density**, not raw character count — a slightly longer title that names the concrete deliverable is better than a short abstract one.
 - The title must convey **what concrete thing changed**, not just an abstract scope. A teammate scanning a list of PR titles should be able to tell what this PR delivers without opening it.
-  - Bad: `TML-2375: expand encrypted type and operator surface` (abstract)
-  - Good: `TML-2375: 5 new cipherstash codecs + EQL operator surface` (concrete)
+  - Bad: `TML-2375: expand pgvector type and operator surface` (abstract)
+  - Good: `TML-2375: 5 new pgvector operator descriptors + HNSW index support` (concrete)
 - If the change spans multiple packages or layers, name the headline package or capability, not all of them. Secondary scopes belong in the body.
 
 Examples:
 - `TML-1859: add text codec support to sql-runtime`
 - `TML-2104: handle null in jsonb columns (postgres adapter)`
-- `TML-2375: 5 new cipherstash codecs + EQL operator surface`
+- `TML-2375: 5 new pgvector operator descriptors + HNSW index support`
 - `TML-2456: split contract emission into two phases`
 
 ### Step 4: Compose the PR Description

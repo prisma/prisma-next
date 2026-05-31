@@ -14,13 +14,13 @@ export type { ContractMarkerRecordLike } from '../aggregate/marker-types';
 export {
   type AggregateCurrentDBState,
   type AggregateMigrationEdgeRef,
-  type AggregatePerSpacePlan,
-  type AggregatePlannerError,
-  type AggregatePlannerInput,
-  type AggregatePlannerOutput,
-  type AggregatePlannerSuccess,
   type CallerPolicy,
-  planAggregate,
+  type PerSpacePlan,
+  type PlannerError,
+  type PlannerInput,
+  type PlannerOutput,
+  type PlannerSuccess,
+  planMigration,
 } from '../aggregate/planner';
 export { projectSchemaToSpace } from '../aggregate/project-schema-to-space';
 export {
@@ -35,15 +35,15 @@ export type {
   ContractSpaceMember,
 } from '../aggregate/types';
 export {
-  type AggregateVerifierError,
-  type AggregateVerifierInput,
-  type AggregateVerifierOutput,
-  type AggregateVerifierSuccess,
   type MarkerCheckResult,
   type MarkerCheckSection,
   type OrphanElement,
   type SchemaCheckSection,
-  verifyAggregate,
+  type VerifierError,
+  type VerifierInput,
+  type VerifierOutput,
+  type VerifierSuccess,
+  verifyMigration,
 } from '../aggregate/verifier';
 export type {
   DeclaredExtensionEntry,

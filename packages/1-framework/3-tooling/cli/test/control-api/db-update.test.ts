@@ -3,7 +3,7 @@ import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   MigrationPlannerResult,
-  MultiSpaceRunnerResult,
+  MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -52,8 +52,8 @@ function createMockFamilyInstance(overrides?: {
 
 function createMockMigrations(overrides?: {
   planResult?: MigrationPlannerResult;
-  runnerResult?: MultiSpaceRunnerResult;
-  executeAcrossSpacesSpy?: ReturnType<typeof vi.fn>;
+  runnerResult?: MigrationRunnerResult;
+  executeSpy?: ReturnType<typeof vi.fn>;
 }) {
   const planResult: MigrationPlannerResult = overrides?.planResult ?? {
     kind: 'success',
@@ -74,7 +74,7 @@ function createMockMigrations(overrides?: {
   };
 
   const opsExecuted = overrides?.runnerResult ?? null;
-  const runnerResult: MultiSpaceRunnerResult =
+  const runnerResult: MigrationRunnerResult =
     opsExecuted ??
     ok({
       perSpaceResults: [
@@ -90,16 +90,14 @@ function createMockMigrations(overrides?: {
       ],
     });
 
-  const executeAcrossSpaces =
-    overrides?.executeAcrossSpacesSpy ?? vi.fn().mockResolvedValue(runnerResult);
+  const execute = overrides?.executeSpy ?? vi.fn().mockResolvedValue(runnerResult);
 
   return {
     createPlanner: () => ({
       plan: vi.fn().mockReturnValue(planResult),
     }),
     createRunner: () => ({
-      execute: vi.fn(),
-      executeAcrossSpaces,
+      execute,
     }),
   } as unknown as TargetMigrationsCapability<
     'sql',
@@ -168,7 +166,7 @@ describe('executeDbUpdate', () => {
   });
 
   it('returns plan result without invoking runner in plan mode', async () => {
-    const executeAcrossSpaces = vi.fn();
+    const execute = vi.fn();
     const migrations = createMockMigrations({
       planResult: {
         kind: 'success',
@@ -187,7 +185,7 @@ describe('executeDbUpdate', () => {
           },
         },
       },
-      executeAcrossSpacesSpy: executeAcrossSpaces,
+      executeSpy: execute,
     });
 
     const result = await executeDbUpdate({
@@ -221,7 +219,7 @@ describe('executeDbUpdate', () => {
       expect(result.value.execution).toBeUndefined();
       expect(result.value.marker).toBeUndefined();
     }
-    expect(executeAcrossSpaces).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('returns RUNNER_FAILED when runner rejects apply', async () => {
@@ -354,7 +352,7 @@ describe('executeDbUpdate', () => {
   });
 
   it('returns plan with 0 operations when database already matches contract in plan mode', async () => {
-    const executeAcrossSpaces = vi.fn();
+    const execute = vi.fn();
     const migrations = createMockMigrations({
       planResult: {
         kind: 'success',
@@ -367,7 +365,7 @@ describe('executeDbUpdate', () => {
           },
         },
       },
-      executeAcrossSpacesSpy: executeAcrossSpaces,
+      executeSpy: execute,
     });
 
     const result = await executeDbUpdate({
@@ -398,7 +396,7 @@ describe('executeDbUpdate', () => {
       expect(result.value.plan.operations).toHaveLength(0);
       expect(result.value.summary).toContain('Planned 0');
     }
-    expect(executeAcrossSpaces).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('allows additive, widening, and destructive operation classes', async () => {
@@ -414,8 +412,7 @@ describe('executeDbUpdate', () => {
     const migrations = {
       createPlanner: () => ({ plan: planFn }),
       createRunner: () => ({
-        execute: vi.fn(),
-        executeAcrossSpaces: vi.fn().mockResolvedValue(
+        execute: vi.fn().mockResolvedValue(
           ok({
             perSpaceResults: [
               { space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } },
@@ -559,7 +556,7 @@ describe('executeDbUpdate', () => {
   });
 
   it('does not disable runner execution checks in apply mode (ADR 038 idempotent replay)', async () => {
-    const executeAcrossSpaces = vi.fn().mockResolvedValue(
+    const execute = vi.fn().mockResolvedValue(
       ok({
         perSpaceResults: [{ space: 'app', value: { operationsPlanned: 1, operationsExecuted: 1 } }],
       }),
@@ -582,8 +579,7 @@ describe('executeDbUpdate', () => {
         }),
       }),
       createRunner: () => ({
-        execute: vi.fn(),
-        executeAcrossSpaces,
+        execute,
       }),
     } as unknown as TargetMigrationsCapability<
       'sql',
@@ -604,8 +600,8 @@ describe('executeDbUpdate', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(executeAcrossSpaces).toHaveBeenCalledTimes(1);
-    const callArg = executeAcrossSpaces.mock.calls[0]?.[0] as unknown as {
+    expect(execute).toHaveBeenCalledTimes(1);
+    const callArg = execute.mock.calls[0]?.[0] as unknown as {
       perSpaceOptions: ReadonlyArray<{ executionChecks?: unknown }>;
     };
     expect(callArg).toBeDefined();

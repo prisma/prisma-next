@@ -63,15 +63,21 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
       }
 
       const executeResult = await runner.execute({
-        plan: result.plan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: result.plan.spaceId ?? APP_SPACE_ID,
+            plan: result.plan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
       expect(executeResult.ok).toBe(true);
       if (executeResult.ok) {
-        expect(executeResult.value).toMatchObject({
+        expect(executeResult.value.perSpaceResults[0]?.value).toMatchObject({
           operationsPlanned: result.plan.operations.length,
           operationsExecuted: result.plan.operations.length,
         });
@@ -120,11 +126,17 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         throw new Error('expected initial planner success');
       }
       await runner.execute({
-        plan: initialPlan.plan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
+            plan: initialPlan.plan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -137,15 +149,21 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
       });
 
       const emptyPlanResult = await runner.execute({
-        plan: emptyPlan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: emptyPlan.spaceId ?? APP_SPACE_ID,
+            plan: emptyPlan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
       expect(emptyPlanResult.ok).toBe(true);
       if (emptyPlanResult.ok) {
-        expect(emptyPlanResult.value).toMatchObject({
+        expect(emptyPlanResult.value.perSpaceResults[0]?.value).toMatchObject({
           operationsPlanned: 0,
           operationsExecuted: 0,
         });

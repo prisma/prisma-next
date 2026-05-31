@@ -46,7 +46,7 @@ The per-extension-space overhead is dominated by the extra `readFile` of `refs/h
 
 ## Reading the percentages honestly
 
-The benchmark reports a relative delta of "≈ +200 %" between scenarios. **Do not interpret that as a budget violation.** The denominator is sub-millisecond synthetic work (one `readdir`); doubling something tiny is still tiny. The "< 5 %" budget was written against the total wall-clock of `emit + dbInit` end-to-end, which in practice runs in hundreds of milliseconds to seconds (PGlite startup + DDL roundtrips for the cipherstash / pgvector extensions involve `CREATE EXTENSION`, schema creation, index creation, and optional EQL bundle install).
+The benchmark reports a relative delta of "≈ +200 %" between scenarios. **Do not interpret that as a budget violation.** The denominator is sub-millisecond synthetic work (one `readdir`); doubling something tiny is still tiny. The "< 5 %" budget was written against the total wall-clock of `emit + dbInit` end-to-end, which in practice runs in hundreds of milliseconds to seconds (PGlite startup + DDL roundtrips for extensions like pgvector involve `CREATE EXTENSION`, schema creation, and index creation).
 
 A single extra `readFile` adding ~60 µs is well inside any reasonable interpretation of the 5 % budget for a multi-hundred-millisecond `dbInit`.
 
@@ -54,7 +54,7 @@ A single extra `readFile` adding ~60 µs is well inside any reasonable interpret
 
 ## Limitations
 
-- **Synthetic project layout.** The benchmark constructs a tiny pinned-space directory with a stub `refs/head.json`; real cipherstash / pgvector projects ship slightly larger pinned `contract.json` files. We don't expect this to change the picture — the IO path measured (`readFile` of a few-hundred-byte JSON file) is the same shape as production.
+- **Synthetic project layout.** The benchmark constructs a tiny pinned-space directory with a stub `refs/head.json`; real extension projects (e.g. pgvector) ship slightly larger pinned `contract.json` files. We don't expect this to change the picture — the IO path measured (`readFile` of a few-hundred-byte JSON file) is the same shape as production.
 - **Framework-only scope.** As described above, we deliberately do not run the full `emit + dbInit` end-to-end through PGlite. The framework is the layer that scales with extension count; the database operations are the same regardless of how the schema arrived (they would be identical whether authored as `databaseDependencies` or as a contract space).
 - **One-shot capture.** The script lives under `wip/perf/` rather than a committed `bench/` directory because we have no convention for permanent perf benches in this repo and no CI gate consumes it. If we add such a convention in future, this bench is small enough to re-home easily — it imports framework helpers via the package's source path.
 

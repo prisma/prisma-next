@@ -11,6 +11,7 @@ import type {
 } from '@prisma-next/mongo-query-ast/execution';
 import { isExprArray, isRecordArgs } from '@prisma-next/mongo-query-ast/execution';
 import type { Document } from '@prisma-next/mongo-value';
+import { blindCast } from '@prisma-next/utils/casts';
 import { resolveValue } from './resolve-value';
 
 // Biome flags `{ then: ... }` as a thenable object (noThenProperty). Build via Object.fromEntries to avoid.
@@ -138,6 +139,36 @@ export function lowerAggExpr(expr: MongoAggExpr): unknown {
   return expr.accept(aggExprLoweringVisitor);
 }
 
+/**
+ * Structural phase of filter lowering: transforms the filter AST into a
+ * plain object without resolving any `MongoParamRef` leaves. Field filter
+ * values remain as `MongoValue` (which includes `MongoParamRef`), so the
+ * returned document can be passed to `resolveDraftDoc` in the resolve phase.
+ * Synchronous — no codec calls.
+ */
+export function structuralLowerFilter(filter: MongoFilterExpr): Record<string, unknown> {
+  switch (filter.kind) {
+    case 'field':
+      return { [filter.field]: { [filter.op]: filter.value } };
+    case 'and':
+      return { $and: filter.exprs.map((e) => structuralLowerFilter(e)) };
+    case 'or':
+      return { $or: filter.exprs.map((e) => structuralLowerFilter(e)) };
+    case 'not':
+      return { $nor: [structuralLowerFilter(filter.expr)] };
+    case 'exists':
+      return { [filter.field]: { $exists: filter.exists } };
+    case 'expr':
+      return { $expr: lowerAggExpr(filter.aggExpr) };
+    default: {
+      const _exhaustive: never = filter;
+      throw new Error(
+        `Unhandled filter kind: ${blindCast<MongoFilterExpr, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
+    }
+  }
+}
+
 export async function lowerFilter(
   filter: MongoFilterExpr,
   codecs: MongoCodecRegistry,
@@ -158,13 +189,21 @@ export async function lowerFilter(
       return { $expr: lowerAggExpr(filter.aggExpr) };
     default: {
       const _exhaustive: never = filter;
-      throw new Error(`Unhandled filter kind: ${(_exhaustive as MongoFilterExpr).kind}`);
+      throw new Error(
+        `Unhandled filter kind: ${blindCast<MongoFilterExpr, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
     }
   }
 }
 
 function isAggExprNode(value: object): value is MongoAggExpr {
   return 'accept' in value && typeof value.accept === 'function';
+}
+
+function isAggExprArray(
+  val: MongoAggExpr | ReadonlyArray<MongoAggExpr>,
+): val is ReadonlyArray<MongoAggExpr> {
+  return Array.isArray(val);
 }
 
 function lowerGroupId(groupId: MongoGroupId): unknown {
@@ -178,10 +217,10 @@ function lowerExprRecord(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(fields)) {
-    if (Array.isArray(val)) {
-      result[key] = val.map((v: MongoAggExpr) => lowerAggExpr(v));
+    if (isAggExprArray(val)) {
+      result[key] = val.map((v) => lowerAggExpr(v));
     } else {
-      result[key] = lowerAggExpr(val as MongoAggExpr);
+      result[key] = lowerAggExpr(val);
     }
   }
   return result;
@@ -417,7 +456,9 @@ export async function lowerStage(
     }
     default: {
       const _exhaustive: never = stage;
-      throw new Error(`Unhandled stage kind: ${(_exhaustive as MongoPipelineStage).kind}`);
+      throw new Error(
+        `Unhandled stage kind: ${blindCast<MongoPipelineStage, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
     }
   }
 }
@@ -428,4 +469,219 @@ export async function lowerPipeline(
   ctx: CodecCallContext,
 ): Promise<Array<Record<string, unknown>>> {
   return Promise.all(stages.map((s) => lowerStage(s, codecs, ctx)));
+}
+
+/**
+ * Structural phase of stage lowering: mirrors `lowerStage` but defers all
+ * `MongoParamRef` resolution. Filter sub-documents within stages (e.g.
+ * `$match`, `$geoNear.query`, `$graphLookup.restrictSearchWithMatch`) are
+ * produced by `structuralLowerFilter` and therefore retain `MongoParamRef`
+ * leaves. Sub-pipelines (e.g. `$lookup.pipeline`, `$facet.*`) recurse via
+ * `structuralLowerPipeline`. Synchronous — no codec calls.
+ */
+export function structuralLowerStage(stage: MongoPipelineStage): Record<string, unknown> {
+  switch (stage.kind) {
+    case 'match':
+      return { $match: structuralLowerFilter(stage.filter) };
+    case 'project': {
+      const projection: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(stage.projection)) {
+        projection[key] = lowerProjectionValue(val);
+      }
+      return { $project: projection };
+    }
+    case 'sort':
+      return { $sort: { ...stage.sort } };
+    case 'limit':
+      return { $limit: stage.limit };
+    case 'skip':
+      return { $skip: stage.skip };
+    case 'lookup': {
+      const lookup: Record<string, unknown> = {
+        from: stage.from,
+        as: stage.as,
+      };
+      if (stage.localField !== undefined) lookup['localField'] = stage.localField;
+      if (stage.foreignField !== undefined) lookup['foreignField'] = stage.foreignField;
+      if (stage.pipeline) {
+        lookup['pipeline'] = structuralLowerPipeline(stage.pipeline);
+      }
+      if (stage.let_) {
+        lookup['let'] = lowerExprRecord(stage.let_);
+      }
+      return { $lookup: lookup };
+    }
+    case 'unwind': {
+      const unwind: Record<string, unknown> = {
+        path: stage.path,
+        preserveNullAndEmptyArrays: stage.preserveNullAndEmptyArrays,
+      };
+      if (stage.includeArrayIndex !== undefined) {
+        unwind['includeArrayIndex'] = stage.includeArrayIndex;
+      }
+      return { $unwind: unwind };
+    }
+    case 'group': {
+      const group: Record<string, unknown> = { _id: lowerGroupId(stage.groupId) };
+      for (const [key, acc] of Object.entries(stage.accumulators)) {
+        group[key] = lowerAggExpr(acc);
+      }
+      return { $group: group };
+    }
+    case 'addFields':
+      return { $addFields: lowerExprRecord(stage.fields) };
+    case 'replaceRoot':
+      return { $replaceRoot: { newRoot: lowerAggExpr(stage.newRoot) } };
+    case 'count':
+      return { $count: stage.field };
+    case 'sortByCount':
+      return { $sortByCount: lowerAggExpr(stage.expr) };
+    case 'sample':
+      return { $sample: { size: stage.size } };
+    case 'redact':
+      return { $redact: lowerAggExpr(stage.expr) };
+    case 'out':
+      return { $out: stage.db ? { db: stage.db, coll: stage.collection } : stage.collection };
+    case 'unionWith': {
+      const unionWith: Record<string, unknown> = { coll: stage.collection };
+      if (stage.pipeline) {
+        unionWith['pipeline'] = structuralLowerPipeline(stage.pipeline);
+      }
+      return { $unionWith: unionWith };
+    }
+    case 'bucket': {
+      const bucket: Record<string, unknown> = {
+        groupBy: lowerAggExpr(stage.groupBy),
+        boundaries: [...stage.boundaries],
+      };
+      if (stage.default_ !== undefined) bucket['default'] = stage.default_;
+      if (stage.output) bucket['output'] = lowerExprRecord(stage.output);
+      return { $bucket: bucket };
+    }
+    case 'bucketAuto': {
+      const bucketAuto: Record<string, unknown> = {
+        groupBy: lowerAggExpr(stage.groupBy),
+        buckets: stage.buckets,
+      };
+      if (stage.output) bucketAuto['output'] = lowerExprRecord(stage.output);
+      if (stage.granularity !== undefined) bucketAuto['granularity'] = stage.granularity;
+      return { $bucketAuto: bucketAuto };
+    }
+    case 'geoNear': {
+      const geoNear: Record<string, unknown> = {
+        near: stage.near,
+        distanceField: stage.distanceField,
+      };
+      if (stage.spherical !== undefined) geoNear['spherical'] = stage.spherical;
+      if (stage.maxDistance !== undefined) geoNear['maxDistance'] = stage.maxDistance;
+      if (stage.minDistance !== undefined) geoNear['minDistance'] = stage.minDistance;
+      if (stage.query) geoNear['query'] = structuralLowerFilter(stage.query);
+      if (stage.key !== undefined) geoNear['key'] = stage.key;
+      if (stage.distanceMultiplier !== undefined)
+        geoNear['distanceMultiplier'] = stage.distanceMultiplier;
+      if (stage.includeLocs !== undefined) geoNear['includeLocs'] = stage.includeLocs;
+      return { $geoNear: geoNear };
+    }
+    case 'facet': {
+      const facet: Record<string, unknown> = {};
+      for (const [key, pipeline] of Object.entries(stage.facets)) {
+        facet[key] = structuralLowerPipeline(pipeline);
+      }
+      return { $facet: facet };
+    }
+    case 'graphLookup': {
+      const graphLookup: Record<string, unknown> = {
+        from: stage.from,
+        startWith: lowerAggExpr(stage.startWith),
+        connectFromField: stage.connectFromField,
+        connectToField: stage.connectToField,
+        as: stage.as,
+      };
+      if (stage.maxDepth !== undefined) graphLookup['maxDepth'] = stage.maxDepth;
+      if (stage.depthField !== undefined) graphLookup['depthField'] = stage.depthField;
+      if (stage.restrictSearchWithMatch)
+        graphLookup['restrictSearchWithMatch'] = structuralLowerFilter(
+          stage.restrictSearchWithMatch,
+        );
+      return { $graphLookup: graphLookup };
+    }
+    case 'merge': {
+      const merge: Record<string, unknown> = { into: stage.into };
+      if (stage.on !== undefined) merge['on'] = stage.on;
+      if (stage.whenMatched !== undefined) {
+        merge['whenMatched'] = Array.isArray(stage.whenMatched)
+          ? structuralLowerPipeline(stage.whenMatched)
+          : stage.whenMatched;
+      }
+      if (stage.whenNotMatched !== undefined) merge['whenNotMatched'] = stage.whenNotMatched;
+      return { $merge: merge };
+    }
+    case 'setWindowFields': {
+      const swf: Record<string, unknown> = {};
+      if (stage.partitionBy) swf['partitionBy'] = lowerAggExpr(stage.partitionBy);
+      if (stage.sortBy) swf['sortBy'] = { ...stage.sortBy };
+      const output: Record<string, unknown> = {};
+      for (const [key, wf] of Object.entries(stage.output)) {
+        output[key] = lowerWindowField(wf);
+      }
+      swf['output'] = output;
+      return { $setWindowFields: swf };
+    }
+    case 'densify': {
+      const densify: Record<string, unknown> = {
+        field: stage.field,
+        range: { ...stage.range },
+      };
+      if (stage.partitionByFields) densify['partitionByFields'] = [...stage.partitionByFields];
+      return { $densify: densify };
+    }
+    case 'fill': {
+      const fill: Record<string, unknown> = {};
+      if (stage.partitionBy) fill['partitionBy'] = lowerAggExpr(stage.partitionBy);
+      if (stage.partitionByFields) fill['partitionByFields'] = [...stage.partitionByFields];
+      if (stage.sortBy) fill['sortBy'] = { ...stage.sortBy };
+      const output: Record<string, unknown> = {};
+      for (const [key, fo] of Object.entries(stage.output)) {
+        const entry: Record<string, unknown> = {};
+        if (fo.method !== undefined) entry['method'] = fo.method;
+        if (fo.value !== undefined) entry['value'] = lowerAggExpr(fo.value);
+        output[key] = entry;
+      }
+      fill['output'] = output;
+      return { $fill: fill };
+    }
+    case 'search': {
+      const search: Record<string, unknown> = { ...stage.config };
+      if (stage.index !== undefined) search['index'] = stage.index;
+      return { $search: search };
+    }
+    case 'searchMeta': {
+      const searchMeta: Record<string, unknown> = { ...stage.config };
+      if (stage.index !== undefined) searchMeta['index'] = stage.index;
+      return { $searchMeta: searchMeta };
+    }
+    case 'vectorSearch': {
+      const vs: Record<string, unknown> = {
+        index: stage.index,
+        path: stage.path,
+        queryVector: [...stage.queryVector],
+        numCandidates: stage.numCandidates,
+        limit: stage.limit,
+      };
+      if (stage.filter) vs['filter'] = { ...stage.filter };
+      return { $vectorSearch: vs };
+    }
+    default: {
+      const _exhaustive: never = stage;
+      throw new Error(
+        `Unhandled stage kind: ${blindCast<MongoPipelineStage, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
+    }
+  }
+}
+
+export function structuralLowerPipeline(
+  stages: ReadonlyArray<MongoPipelineStage>,
+): Array<Record<string, unknown>> {
+  return stages.map((s) => structuralLowerStage(s));
 }

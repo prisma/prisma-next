@@ -96,15 +96,21 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
       });
 
       const postcheckPreSatisfiedResult = await runner.execute({
-        plan: planWithPreSatisfiedPostcheck,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithPreSatisfiedPostcheck.spaceId ?? APP_SPACE_ID,
+            plan: planWithPreSatisfiedPostcheck,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
       expect(postcheckPreSatisfiedResult.ok).toBe(true);
       if (postcheckPreSatisfiedResult.ok) {
-        expect(postcheckPreSatisfiedResult.value).toMatchObject({
+        expect(postcheckPreSatisfiedResult.value.perSpaceResults[0]?.value).toMatchObject({
           operationsPlanned: 1,
           operationsExecuted: 0,
         });
@@ -184,11 +190,17 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
       });
 
       const postcheckPreSatisfiedResult = await runner.execute({
-        plan: planWithPreSatisfiedPostcheck,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithPreSatisfiedPostcheck.spaceId ?? APP_SPACE_ID,
+            plan: planWithPreSatisfiedPostcheck,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
       expect(postcheckPreSatisfiedResult.ok).toBe(true);
 
@@ -250,11 +262,17 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         throw new Error('expected initial planner success');
       }
       await runner.execute({
-        plan: initialPlan.plan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
+            plan: initialPlan.plan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       // Snapshot ledger count after the init apply.
@@ -277,15 +295,21 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
       });
 
       const result = await runner.execute({
-        plan: noOpSelfEdgePlan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: noOpSelfEdgePlan.spaceId ?? APP_SPACE_ID,
+            plan: noOpSelfEdgePlan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value).toMatchObject({
+        expect(result.value.perSpaceResults[0]?.value).toMatchObject({
           operationsPlanned: 0,
           operationsExecuted: 0,
         });
@@ -324,11 +348,17 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         throw new Error('expected initial planner success');
       }
       await runner.execute({
-        plan: initialPlan.plan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
+            plan: initialPlan.plan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       // Self-edge plan: origin === destination, single op with a side-effect
@@ -369,18 +399,24 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
       });
 
       const result = await runner.execute({
-        plan: selfEdgePlan,
         driver: driver!,
-        destinationContract: contract,
-        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
-        frameworkComponents,
-        // Side-effect uses a synthetic table outside the contract; relax
-        // schema verification so the post-execute drift check doesn't fail.
-        strictVerification: false,
+        perSpaceOptions: [
+          {
+            space: selfEdgePlan.spaceId ?? APP_SPACE_ID,
+            plan: selfEdgePlan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+            frameworkComponents,
+            // Side-effect uses a synthetic table outside the contract; relax
+            // schema verification so the post-execute drift check doesn't fail.
+            strictVerification: false,
+          },
+        ],
       });
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value).toMatchObject({
+        expect(result.value.perSpaceResults[0]?.value).toMatchObject({
           operationsPlanned: 1,
           operationsExecuted: 1,
         });

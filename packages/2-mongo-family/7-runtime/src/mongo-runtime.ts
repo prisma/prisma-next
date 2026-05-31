@@ -11,12 +11,18 @@ import {
 } from '@prisma-next/framework-components/runtime';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeMongoRow } from './codecs/decoding';
 import { computeMongoContentHash } from './content-hash';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
 import type { MongoCodecLookup, MongoExecutionContext } from './mongo-execution-stack';
 import type { MongoMiddleware, MongoMiddlewareContext } from './mongo-middleware';
+import {
+  createMongoParamRefMutator,
+  type MongoParamRefMutator,
+  type MongoParamRefMutatorInternal,
+} from './param-ref-mutator';
 
 function noop() {}
 
@@ -89,7 +95,12 @@ class MongoRuntimeImpl
       log: { info: noop, warn: noop, error: noop },
       // ctx is only invoked by runWithMiddleware with execs this runtime lowered;
       // the framework parameter type is the cross-family base.
-      contentHash: (exec) => computeMongoContentHash(exec as MongoExecutionPlan),
+      contentHash: (exec) =>
+        computeMongoContentHash(
+          blindCast<MongoExecutionPlan, 'runWithMiddleware passes execs this runtime lowered'>(
+            exec,
+          ),
+        ),
       // When MongoRuntimeImpl grows connection()/transaction() surfaces,
       // derive a scope-narrowed ctx per call (mirror
       // SqlRuntimeImpl#executeAgainstQueryable in `sql-runtime.ts`).
@@ -110,6 +121,7 @@ class MongoRuntimeImpl
     this.#codecs = options.context.codecs;
   }
 
+  /* v8 ignore start -- one-phase lower satisfies RuntimeCore; execute uses structuralLower + resolveParams */
   protected override async lower(
     plan: MongoQueryPlan,
     ctx: CodecCallContext,
@@ -120,6 +132,7 @@ class MongoRuntimeImpl
       ...ifDefined('resultShape', plan.resultShape),
     };
   }
+  /* v8 ignore stop */
 
   protected override runDriver(exec: MongoExecutionPlan): AsyncIterable<Record<string, unknown>> {
     return this.#driver.execute<Record<string, unknown>>(exec.command);
@@ -146,8 +159,51 @@ class MongoRuntimeImpl
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
       const compiled = await self.runBeforeCompile(plan);
-      const exec = await self.lower(compiled, codecCtx);
-      await runBeforeExecuteChain<MongoExecutionPlan>(exec, self.middleware, execCtx);
+
+      // Phase 1: structural lower — transforms the AST but leaves MongoParamRef
+      // nodes in place so middleware can inspect and rewrite them before
+      // codec resolution.
+      const draft = self.#adapter.structuralLower(compiled);
+      const mutator: MongoParamRefMutatorInternal = createMongoParamRefMutator(draft);
+
+      // Build the plan view for the beforeExecute chain. Middleware accesses
+      // plan.meta and the mutator's entries(); plan.command carries the
+      // unresolved draft at this stage.
+      // The cast is necessary because MongoExecutionPlan.command is typed as
+      // AnyMongoWireCommand (the post-resolution shape). No beforeExecute
+      // middleware reads plan.command structurally — params are observed via
+      // the mutator's entries(). The cast is narrowed to the command slot
+      // only so no whole-object information is lost.
+      const draftExec: MongoExecutionPlan = {
+        meta: compiled.meta,
+        ...ifDefined('resultShape', compiled.resultShape),
+        command: blindCast<
+          MongoExecutionPlan['command'],
+          'MongoLoweredDraft held in command slot for the beforeExecute view; resolveParams runs after the chain'
+        >(draft),
+      };
+
+      await runBeforeExecuteChain<MongoExecutionPlan, MongoParamRefMutator>(
+        draftExec,
+        self.middleware,
+        execCtx,
+        mutator,
+      );
+
+      // Phase 2: resolve params — converts the (possibly mutated) draft into
+      // a frozen wire command. currentDraft() returns the original draft by
+      // reference when no middleware called replaceValue/replaceValues (fast path).
+      const resolvedCommand = await self.#adapter.resolveParams(mutator.currentDraft(), codecCtx);
+      const exec: MongoExecutionPlan = {
+        meta: compiled.meta,
+        ...ifDefined('resultShape', compiled.resultShape),
+        command: resolvedCommand,
+      };
+
+      // Phase 3: driver pipeline — runWithMiddleware and decodeMongoRow both
+      // receive the fully resolved exec. computeMongoContentHash (called via
+      // ctx.contentHash during intercept/afterExecute) therefore hashes the
+      // resolved command; no MongoParamRef instance reaches canonicalStringify.
       const stream = runWithMiddleware<MongoExecutionPlan, Record<string, unknown>>(
         exec,
         self.middleware,
@@ -156,13 +212,14 @@ class MongoRuntimeImpl
       );
       for await (const rawRow of stream) {
         if (exec.resultShape === undefined) {
-          yield rawRow as Row;
+          yield blindCast<Row, 'driver row matches plan _row phantom when resultShape is absent'>(
+            rawRow,
+          );
         } else {
           // Source the collection from the lowered exec rather than the
-          // pre-lowering plan: a `runBeforeCompile` middleware is allowed to
-          // rewrite collection names during compilation, and the wire
-          // command carried by `exec` is always authoritative for what just
-          // ran.
+          // pre-lowering plan: a runBeforeCompile middleware is allowed to
+          // rewrite collection names during compilation, and the wire command
+          // carried by exec is always authoritative for what just ran.
           const decoded = await decodeMongoRow(
             rawRow,
             exec.resultShape,
@@ -170,7 +227,7 @@ class MongoRuntimeImpl
             exec.command.collection,
             codecCtx,
           );
-          yield decoded as Row;
+          yield blindCast<Row, 'decodeMongoRow output matches plan _row phantom'>(decoded);
         }
       }
     };

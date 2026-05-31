@@ -44,8 +44,7 @@ describe('executeDbInit', () => {
     const migrations = {
       createPlanner: () => ({ plan: planFn }),
       createRunner: () => ({
-        execute: vi.fn(),
-        executeAcrossSpaces: vi.fn().mockResolvedValue(
+        execute: vi.fn().mockResolvedValue(
           ok({
             perSpaceResults: [
               { space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } },

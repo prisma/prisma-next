@@ -6,16 +6,14 @@ import { integerColumn, textColumn } from '@prisma-next/adapter-sqlite/column-ty
 import sqliteAdapterDescriptor, { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
 import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
-import sqlFamilyDescriptor, {
-  INIT_ADDITIVE_POLICY,
-  type SqlMigrationRunnerFailure,
-} from '@prisma-next/family-sql/control';
+import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import {
   APP_SPACE_ID,
   createControlStack,
   type MigrationOperationPolicy,
+  type MigrationRunnerFailure,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -98,7 +96,7 @@ export interface MigrationResult {
   readonly plannedOperationIds: readonly string[];
 }
 
-function formatFailure(f: SqlMigrationRunnerFailure): string {
+function formatFailure(f: MigrationRunnerFailure): string {
   const parts = [`[${f.code}] ${f.summary}`];
   if (f.why) parts.push(`  why: ${f.why}`);
   const issues = f.meta?.['issues'];
@@ -135,12 +133,18 @@ export async function applyMigration(
       });
       if (r.kind !== 'success') throw new Error('Origin planner failed');
       const run = await runner.execute({
-        plan: r.plan,
         driver,
-        destinationContract: options.origin,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents: fw,
-        strictVerification: false,
+        perSpaceOptions: [
+          {
+            space: APP_SPACE_ID,
+            plan: r.plan,
+            driver,
+            destinationContract: options.origin,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents: fw,
+            strictVerification: false,
+          },
+        ],
       });
       if (!run.ok) throw new Error(`Origin runner failed: ${formatFailure(run.failure)}`);
       currentSchema = await adapter.introspect(driver);
@@ -161,12 +165,18 @@ export async function applyMigration(
       );
     }
     const runResult = await runner.execute({
-      plan: planResult.plan,
       driver,
-      destinationContract: options.destination,
-      policy,
-      frameworkComponents: fw,
-      strictVerification: false,
+      perSpaceOptions: [
+        {
+          space: APP_SPACE_ID,
+          plan: planResult.plan,
+          driver,
+          destinationContract: options.destination,
+          policy,
+          frameworkComponents: fw,
+          strictVerification: false,
+        },
+      ],
     });
     if (!runResult.ok)
       throw new Error(`Destination runner failed: ${formatFailure(runResult.failure)}`);
@@ -194,7 +204,7 @@ export async function applyMigration(
     await runAssertions({
       driver,
       schema: { ...freshSchema, tables: userTables },
-      operationsExecuted: runResult.value.operationsExecuted,
+      operationsExecuted: runResult.value.perSpaceResults[0]?.value.operationsExecuted ?? 0,
       plannedOperationIds: planResult.plan.operations.map((op) => op.id),
     });
   } finally {

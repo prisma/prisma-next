@@ -1,11 +1,6 @@
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
-import type {
-  AggregatePerSpacePlan,
-  AggregatePlannerError,
-  AggregatePlannerInput,
-  AggregatePlannerOutput,
-} from './planner-types';
+import type { PerSpacePlan, PlannerError, PlannerInput, PlannerOutput } from './planner-types';
 import { graphWalkStrategy } from './strategies/graph-walk';
 import { synthStrategy } from './strategies/synth';
 import type { ContractSpaceMember } from './types';
@@ -13,12 +8,12 @@ import type { ContractSpaceMember } from './types';
 export type {
   AggregateCurrentDBState,
   AggregateMigrationEdgeRef,
-  AggregatePerSpacePlan,
-  AggregatePlannerError,
-  AggregatePlannerInput,
-  AggregatePlannerOutput,
-  AggregatePlannerSuccess,
   CallerPolicy,
+  PerSpacePlan,
+  PlannerError,
+  PlannerInput,
+  PlannerOutput,
+  PlannerSuccess,
 } from './planner-types';
 
 /**
@@ -38,18 +33,18 @@ export type {
  * Output `applyOrder` is `[...aggregate.extensions.map(spaceId), aggregate.app.spaceId]`
  * — extensions alphabetical, then app — matching today's
  * `concatenateSpaceApplyInputs` ordering. This preserves
- * `MultiSpaceRunnerFailure.failingSpace` attribution byte-for-byte.
+ * `MigrationRunnerFailure.failingSpace` attribution byte-for-byte.
  *
  * Every emitted `MigrationPlan` has `targetId = aggregate.targetId`.
  * No placeholder cast; no patch step.
  */
-export async function planAggregate<TFamilyId extends string, TTargetId extends string>(
-  input: AggregatePlannerInput<TFamilyId, TTargetId>,
-): Promise<AggregatePlannerOutput> {
+export async function planMigration<TFamilyId extends string, TTargetId extends string>(
+  input: PlannerInput<TFamilyId, TTargetId>,
+): Promise<PlannerOutput> {
   const { aggregate, currentDBState, callerPolicy } = input;
   const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
 
-  const perSpace = new Map<string, AggregatePerSpacePlan>();
+  const perSpace = new Map<string, PerSpacePlan>();
 
   // Iterate in apply order so a per-member error short-circuits the
   // walk in the same order the runner would walk inputs.
@@ -67,7 +62,7 @@ export async function planAggregate<TFamilyId extends string, TTargetId extends 
     const invariantsRequired = headRef.invariants.length > 0;
 
     if (ignoreGraph && invariantsRequired) {
-      const conflict: AggregatePlannerError = {
+      const conflict: PlannerError = {
         kind: 'policyConflict',
         spaceId: member.spaceId,
         detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${member.spaceId}", but the member declares non-empty head-ref invariants (${headRef.invariants.join(', ')}). Synthesising a plan from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${member.spaceId}" from \`ignoreGraphFor\` or amend the on-disk head ref to declare zero invariants.`,

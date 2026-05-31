@@ -229,4 +229,53 @@ describe('migrate --to verifies against the target bundle contract', () => {
     expect(envelope.why).toContain(endContractRel);
     expect(mocks.migrationApply).not.toHaveBeenCalled();
   });
+
+  // Regression lock for TML-2478: the top-level `contract.json` read at the
+  // migrate command entry must return a structured `notOk` envelope, never
+  // throw past `handleResult`. (Distinct from the corrupt target-bundle
+  // `end-contract.json` case above, which is reached later via `contractAt`.)
+  it('reports file-not-found when the top-level contract.json is absent', async () => {
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+    const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-preflight-'));
+    tempDirs.push(cwd);
+    process.chdir(cwd);
+
+    const exitCode = await runAndCaptureExit(() =>
+      executeCommand(createMigrateCommand(), ['--json']),
+    );
+
+    expect(exitCode).not.toBe(0);
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
+      code?: string;
+      summary?: string;
+      where?: { path?: string };
+    };
+    expect(envelope.code).toBe('PN-CLI-4004');
+    expect(envelope.summary).toContain('File not found');
+    expect(envelope.where?.path).toContain('contract.json');
+    expect(mocks.migrationApply).not.toHaveBeenCalled();
+  });
+
+  it('reports contract validation failure when the top-level contract.json is unparseable', async () => {
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+    const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-preflight-'));
+    tempDirs.push(cwd);
+    await writeFile(join(cwd, 'contract.json'), '{ not json');
+    process.chdir(cwd);
+
+    const exitCode = await runAndCaptureExit(() =>
+      executeCommand(createMigrateCommand(), ['--json']),
+    );
+
+    expect(exitCode).not.toBe(0);
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
+      code?: string;
+      summary?: string;
+      where?: { path?: string };
+    };
+    expect(envelope.code).toBe('PN-CLI-4003');
+    expect(envelope.summary).toContain('Contract validation failed');
+    expect(envelope.where?.path).toContain('contract.json');
+    expect(mocks.migrationApply).not.toHaveBeenCalled();
+  });
 });

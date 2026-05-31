@@ -13,6 +13,12 @@ import type { TokenTotals } from './usage.ts';
 
 export type RunStatus = 'dry-run' | 'finished' | 'error' | 'startup-failed';
 
+export type DiffStat = {
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
+};
+
 export type RunManifest = {
   schema_version: '1';
   case_slug: string;
@@ -27,6 +33,15 @@ export type RunManifest = {
   started_at: string;
   finished_at: string | null;
   notes: string[];
+  // Pinned skill-bundle input fields — present only when produced by run-arm.
+  base_ref?: string;
+  base_sha?: string;
+  skill_bundle_ref?: string;
+  skill_bundle_sha?: string;
+  run_dir?: string;
+  collected_trace_paths?: string[];
+  diff_stat?: DiffStat;
+  materialized?: boolean;
 };
 
 /** Write the manifest as pretty-printed JSON with a trailing newline. Creates

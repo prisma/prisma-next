@@ -67,11 +67,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       });
 
       const result = await runner.execute({
-        plan: emptyPlan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: emptyPlan.spaceId ?? APP_SPACE_ID,
+            plan: emptyPlan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -90,11 +96,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       const failingPlan = createFailingPlan();
 
       const result = await runner.execute({
-        plan: failingPlan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: failingPlan.spaceId ?? APP_SPACE_ID,
+            plan: failingPlan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -138,11 +150,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       });
 
       const result = await runner.execute({
-        plan: emptyPlan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: emptyPlan.spaceId ?? APP_SPACE_ID,
+            plan: emptyPlan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -203,11 +221,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       });
 
       const result = await runner.execute({
-        plan: emptyPlan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: emptyPlan.spaceId ?? APP_SPACE_ID,
+            plan: emptyPlan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -275,11 +299,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       });
 
       const result = await runner.execute({
-        plan: invalidPlan,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: invalidPlan.spaceId ?? APP_SPACE_ID,
+            plan: invalidPlan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -340,11 +370,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       });
 
       const result = await runner.execute({
-        plan: planWithFailingPostcheck,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithFailingPostcheck.spaceId ?? APP_SPACE_ID,
+            plan: planWithFailingPostcheck,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -404,11 +440,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       });
 
       const result = await runner.execute({
-        plan: planWithInvalidSql,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithInvalidSql.spaceId ?? APP_SPACE_ID,
+            plan: planWithInvalidSql,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -487,11 +529,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       });
 
       const result = await runner.execute({
-        plan: planWithConstraintViolation,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithConstraintViolation.spaceId ?? APP_SPACE_ID,
+            plan: planWithConstraintViolation,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
