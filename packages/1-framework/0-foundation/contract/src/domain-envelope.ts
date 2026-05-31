@@ -62,10 +62,10 @@ export function resolveSingleDomainNamespaceId(domain: DomainPlane, namespaceId?
   return soleNamespaceId;
 }
 
-export function contractModels(
-  contract: ContractWithDomain,
+export function contractModels<TModels extends Record<string, ContractModelBase>>(
+  contract: { readonly domain: DomainPlane<TModels> },
   namespaceId?: string,
-): Record<string, ContractModelBase> {
+): TModels {
   const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
   const domainNamespace = contract.domain.namespaces[resolved];
   if (domainNamespace === undefined) {
@@ -76,8 +76,8 @@ export function contractModels(
   return domainNamespace.models;
 }
 
-export function contractValueObjects(
-  contract: ContractWithDomain,
+export function contractValueObjects<TModels extends Record<string, ContractModelBase>>(
+  contract: { readonly domain: DomainPlane<TModels> },
   namespaceId?: string,
 ): Record<string, ContractValueObject> | undefined {
   const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
