@@ -138,6 +138,8 @@ function renderCellPair(cell: StructuralCell): string {
       return '│ ';
     case 'arc-branch-corner':
       return '╮ ';
+    case 'arc-branch-tee':
+      return '┬─';
     case 'arc-land-corner':
       return '╯ ';
     case 'arc-crossing':
@@ -890,6 +892,69 @@ describe('buildMigrationGraphLayout', () => {
     );
   });
 
+  // A node-skipping rollback whose span nests strictly inside another's. The inner
+  // arc (lane 2) lands at `D` while the outer arc (lane 1) is still active there, so
+  // the landing bridge crosses the active lane as `┼` (`○◂┼─╯`) instead of overwriting
+  // it with a bare bridge. The outer arc lands at `E` adjacent (`○◂╯`).
+  it('routes a nested node-skipping rollback crossing the active outer lane on landing', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'E', 'fwd_init');
+    const fwdD = edge('E', 'D', 'fwd_d');
+    const fwdC = edge('D', 'C', 'fwd_c');
+    const fwdB = edge('C', 'B', 'fwd_b');
+    const fwdA = edge('B', 'A', 'fwd_a');
+    const rbOuter = edge('A', 'E', 'rb_outer');
+    const rbInner = edge('B', 'D', 'rb_inner');
+    const model = layout([init, fwdD, fwdC, fwdB, fwdA, rbOuter, rbInner]);
+
+    expect(renderLayout(model)).toBe(
+      [
+        '○─╮       A',
+        '│ │↓      rb_outer',
+        '│↑│       fwd_a',
+        '○─┼─╮     B',
+        '│ │ │↓    rb_inner',
+        '│↑│ │     fwd_b',
+        '○ │ │     C',
+        '│↑│ │     fwd_c',
+        '○◂┼─╯     D',
+        '│↑│       fwd_d',
+        '○◂╯       E',
+        '│↑        fwd_init',
+        '○         ∅',
+      ].join('\n'),
+    );
+  });
+
+  // Two node-skipping rollbacks teeing off the same source node (`A`). The shared
+  // tee row reads `○─┬─╮` — the inner lane is a `┬` junction, the outer a `╮`. Each
+  // arc runs its own back-lane down to its own landing; the shorter arc (lane 2,
+  // landing at `C`) crosses the still-active outer lane (`○◂┼─╯`) while the longer
+  // arc lands at `D` adjacent (`○◂╯`).
+  it('routes two co-sourced node-skipping rollbacks through a shared tee', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'D', 'fwd_init');
+    const fwdC = edge('D', 'C', 'fwd_c');
+    const fwdB = edge('C', 'B', 'fwd_b');
+    const fwdA = edge('B', 'A', 'fwd_a');
+    const rbToC = edge('A', 'C', 'rb_to_c');
+    const rbToD = edge('A', 'D', 'rb_to_d');
+    const model = layout([init, fwdC, fwdB, fwdA, rbToC, rbToD]);
+    expect(renderLayout(model)).toBe(
+      [
+        '○─┬─╮     A',
+        '│ │↓│     rb_to_d',
+        '│ │ │↓    rb_to_c',
+        '│↑│ │     fwd_a',
+        '○ │ │     B',
+        '│↑│ │     fwd_b',
+        '○◂┼─╯     C',
+        '│↑│       fwd_c',
+        '○◂╯       D',
+        '│↑        fwd_init',
+        '○         ∅',
+      ].join('\n'),
+    );
+  });
+
   it('uses structural cell roles without literal box-drawing characters', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
     const alice = edge('root', 'alice', 'alice_add_phone');
@@ -908,6 +973,7 @@ describe('buildMigrationGraphLayout', () => {
       'merge-tee',
       'merge-corner',
       'arc-branch-corner',
+      'arc-branch-tee',
       'arc-land-corner',
       'arc-crossing',
       'arc-land-bridge',
