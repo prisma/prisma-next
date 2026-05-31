@@ -1,7 +1,8 @@
 import {
   asNamespaceId,
-  buildDomainPlaneFromFlat,
   type ContractModelBase,
+  domainPlaneOf,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import {
   type DomainContractShape,
@@ -9,7 +10,7 @@ import {
 } from '@prisma-next/contract/validate-domain';
 import { describe, expect, it } from 'vitest';
 
-function crossRef(model: string, namespace = 'default') {
+function crossRef(model: string, namespace: string = UNBOUND_DOMAIN_NAMESPACE_ID) {
   return { namespace: asNamespaceId(namespace), model };
 }
 
@@ -43,7 +44,7 @@ function makeValidContract(overrides: Record<string, unknown> = {}): DomainContr
     domain:
       domainOverride !== undefined
         ? (domainOverride as DomainContractShape['domain'])
-        : buildDomainPlaneFromFlat({ models }),
+        : domainPlaneOf({ models }),
     ...rest,
   } as DomainContractShape;
 }

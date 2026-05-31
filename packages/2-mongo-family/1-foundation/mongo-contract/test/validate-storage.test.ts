@@ -1,13 +1,14 @@
 import {
   asNamespaceId,
-  buildDomainPlaneFromFlat,
   coreHash,
+  domainPlaneOf,
   profileHash,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 
-function crossRef(model: string, namespace = 'default') {
+function crossRef(model: string, namespace: string = UNBOUND_DOMAIN_NAMESPACE_ID) {
   return { namespace: asNamespaceId(namespace), model };
 }
 
@@ -51,7 +52,7 @@ function makeMinimalContract(overrides: MongoContractTestOverrides = {}): MongoC
     targetFamily: 'mongo',
     roots: { items: crossRef('Item') },
     storage: storageWithItemsCollections({ items: new MongoCollection() }),
-    domain: domain ?? buildDomainPlaneFromFlat({ models: models ?? defaultModels }),
+    domain: domain ?? domainPlaneOf({ models: models ?? defaultModels }),
     capabilities: {},
     extensionPacks: {},
     profileHash: profileHash('sha256:test'),

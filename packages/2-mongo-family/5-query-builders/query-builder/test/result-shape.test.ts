@@ -1,5 +1,5 @@
-import { normalizeLegacyDomainRoot } from '@prisma-next/contract/types';
 import { MongoFieldFilter, MongoProjectStage } from '@prisma-next/mongo-query-ast/execution';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { mongoQuery } from '../src/query';
 import {
@@ -13,9 +13,10 @@ describe('contractModelToMongoResultShape', () => {
   // Hand-authored fixture JSON; cast at the test-fixture seam (allowed by
   // `.cursor/rules/as-contract-cast-smell.mdc`). Production code crosses
   // the family `deserializeContract` seam instead.
-  const contract = normalizeLegacyDomainRoot(
-    testContractJson as Record<string, unknown>,
-  ) as unknown as TContract;
+  const contract = blindCast<
+    TContract,
+    'query-builder fixture JSON carries domain.namespaces envelope'
+  >(testContractJson);
 
   it('maps full Order model scalars to leaf shapes', () => {
     const model = contract.domain.namespaces.__unbound__!.models['Order'];

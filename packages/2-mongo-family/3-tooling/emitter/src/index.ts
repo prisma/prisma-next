@@ -1,4 +1,4 @@
-import { type Contract, type ContractModel, contractModels } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { Namespace } from '@prisma-next/framework-components/ir';
@@ -77,36 +77,42 @@ export const mongoEmission = {
   validateTypes(contract: Contract, _ctx: ValidationContext): void {
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
-    for (const [modelName, model] of Object.entries(contractModels(contract))) {
-      for (const [fieldName, field] of Object.entries(model.fields)) {
-        const fieldType = (
-          field as {
-            type?: {
-              kind: string;
-              codecId?: string;
-              members?: ReadonlyArray<{ kind: string; codecId?: string }>;
-            };
-          }
-        ).type;
-        if (!fieldType) continue;
+    for (const [namespaceId, domainNs] of Object.entries(contract.domain.namespaces)) {
+      const models = domainNs.models as Record<string, ContractModel>;
+      for (const [modelName, model] of Object.entries(models)) {
+        const qualifiedName = `${namespaceId}:${modelName}`;
+        for (const [fieldName, field] of Object.entries(model.fields)) {
+          const fieldType = (
+            field as {
+              type?: {
+                kind: string;
+                codecId?: string;
+                members?: ReadonlyArray<{ kind: string; codecId?: string }>;
+              };
+            }
+          ).type;
+          if (!fieldType) continue;
 
-        const scalarTypes: Array<{ codecId?: string }> =
-          fieldType.kind === 'scalar'
-            ? [fieldType]
-            : fieldType.kind === 'union' && fieldType.members
-              ? fieldType.members.filter((m) => m.kind === 'scalar')
-              : [];
+          const scalarTypes: Array<{ codecId?: string }> =
+            fieldType.kind === 'scalar'
+              ? [fieldType]
+              : fieldType.kind === 'union' && fieldType.members
+                ? fieldType.members.filter((m) => m.kind === 'scalar')
+                : [];
 
-        for (const scalarType of scalarTypes) {
-          const { codecId } = scalarType;
-          if (!codecId) {
-            throw new Error(`Field "${fieldName}" on model "${modelName}" is missing codecId`);
-          }
-          const match = codecId.match(typeIdRegex);
-          if (!match?.[1]) {
-            throw new Error(
-              `Field "${fieldName}" on model "${modelName}" has invalid codec ID format "${codecId}". Expected format: ns/name@version`,
-            );
+          for (const scalarType of scalarTypes) {
+            const { codecId } = scalarType;
+            if (!codecId) {
+              throw new Error(
+                `Field "${fieldName}" on model "${qualifiedName}" is missing codecId`,
+              );
+            }
+            const match = codecId.match(typeIdRegex);
+            if (!match?.[1]) {
+              throw new Error(
+                `Field "${fieldName}" on model "${qualifiedName}" has invalid codec ID format "${codecId}". Expected format: ns/name@version`,
+              );
+            }
           }
         }
       }
@@ -132,83 +138,86 @@ export const mongoEmission = {
       }
     }
 
-    const models = contractModels(contract);
-    if (!models || Object.keys(models).length === 0) return;
+    for (const [namespaceId, domainNs] of Object.entries(contract.domain.namespaces)) {
+      const models = domainNs.models as Record<string, ContractModel>;
+      if (Object.keys(models).length === 0) continue;
 
-    for (const [modelName, model] of Object.entries(models)) {
-      if (!model.fields || typeof model.fields !== 'object') {
-        throw new Error(`Model "${modelName}" is missing required field "fields"`);
-      }
-      if (!model.relations || typeof model.relations !== 'object') {
-        throw new Error(
-          `Model "${modelName}" is missing required field "relations" (must be an object)`,
-        );
-      }
-      if (!model.storage || typeof model.storage !== 'object') {
-        throw new Error(
-          `Model "${modelName}" is missing required field "storage" (must be an object)`,
-        );
-      }
-
-      const collectionValue = model.storage['collection'];
-      const collection = typeof collectionValue === 'string' ? collectionValue : undefined;
-
-      if (model.owner) {
-        if (collection) {
+      for (const [modelName, model] of Object.entries(models)) {
+        const qualifiedName = `${namespaceId}:${modelName}`;
+        if (!model.fields || typeof model.fields !== 'object') {
+          throw new Error(`Model "${qualifiedName}" is missing required field "fields"`);
+        }
+        if (!model.relations || typeof model.relations !== 'object') {
           throw new Error(
-            `Owned model "${modelName}" must not have storage.collection (embedded models are stored within their owner)`,
+            `Model "${qualifiedName}" is missing required field "relations" (must be an object)`,
           );
         }
-        if (!models[model.owner]) {
+        if (!model.storage || typeof model.storage !== 'object') {
           throw new Error(
-            `Model "${modelName}" declares owner "${model.owner}" which does not exist in models`,
+            `Model "${qualifiedName}" is missing required field "storage" (must be an object)`,
           );
         }
-      } else if (collection) {
-        if (!collectionNames.has(collection)) {
-          throw new Error(
-            `Model "${modelName}" references collection "${collection}" which is not in storage.namespaces[..].collections`,
-          );
-        }
-      }
 
-      if (model.base) {
-        const baseModel = models[model.base.model];
-        if (!baseModel) {
-          throw new Error(
-            `Model "${modelName}" declares base "${model.base.model}" which does not exist in models`,
-          );
-        }
-        const variantCollection = collection;
-        const baseCollection = baseModel.storage['collection'] as string | undefined;
-        if (variantCollection !== baseCollection) {
-          throw new Error(
-            `Variant "${modelName}" must share its base's collection ("${baseCollection ?? '(none)'}"), but has "${variantCollection ?? '(none)'}"`,
-          );
-        }
-      }
+        const collectionValue = model.storage['collection'];
+        const collection = typeof collectionValue === 'string' ? collectionValue : undefined;
 
-      const storageRelations = model.storage['relations'] as Record<string, unknown> | undefined;
-      if (storageRelations) {
-        for (const relName of Object.keys(storageRelations)) {
-          if (!model.relations[relName]) {
+        if (model.owner) {
+          if (collection) {
             throw new Error(
-              `Model "${modelName}" has storage.relations.${relName} but no matching domain-level relation`,
+              `Owned model "${qualifiedName}" must not have storage.collection (embedded models are stored within their owner)`,
+            );
+          }
+          if (!models[model.owner]) {
+            throw new Error(
+              `Model "${qualifiedName}" declares owner "${model.owner}" which does not exist in models`,
+            );
+          }
+        } else if (collection) {
+          if (!collectionNames.has(collection)) {
+            throw new Error(
+              `Model "${qualifiedName}" references collection "${collection}" which is not in storage.namespaces[..].collections`,
             );
           }
         }
-      }
 
-      for (const [relName, rel] of Object.entries(model.relations)) {
-        const relObj = rel as Record<string, unknown>;
-        const targetRef = relObj['to'] as { readonly model?: string } | undefined;
-        const targetModelName = targetRef?.model;
-        if (targetModelName) {
-          const targetModel = models[targetModelName];
-          if (targetModel?.owner === modelName && !storageRelations?.[relName]) {
+        if (model.base) {
+          const baseModel = models[model.base.model];
+          if (!baseModel) {
             throw new Error(
-              `Model "${modelName}" has embed relation "${relName}" to owned model "${targetModelName}" but no matching storage.relations entry`,
+              `Model "${qualifiedName}" declares base "${model.base.namespace}:${model.base.model}" which does not exist in models`,
             );
+          }
+          const variantCollection = collection;
+          const baseCollection = baseModel.storage['collection'] as string | undefined;
+          if (variantCollection !== baseCollection) {
+            throw new Error(
+              `Variant "${qualifiedName}" must share its base's collection ("${baseCollection ?? '(none)'}"), but has "${variantCollection ?? '(none)'}"`,
+            );
+          }
+        }
+
+        const storageRelations = model.storage['relations'] as Record<string, unknown> | undefined;
+        if (storageRelations) {
+          for (const relName of Object.keys(storageRelations)) {
+            if (!model.relations[relName]) {
+              throw new Error(
+                `Model "${qualifiedName}" has storage.relations.${relName} but no matching domain-level relation`,
+              );
+            }
+          }
+        }
+
+        for (const [relName, rel] of Object.entries(model.relations)) {
+          const relObj = rel as Record<string, unknown>;
+          const targetRef = relObj['to'] as { readonly model?: string } | undefined;
+          const targetModelName = targetRef?.model;
+          if (targetModelName) {
+            const targetModel = models[targetModelName];
+            if (targetModel?.owner === modelName && !storageRelations?.[relName]) {
+              throw new Error(
+                `Model "${qualifiedName}" has embed relation "${relName}" to owned model "${targetModelName}" but no matching storage.relations entry`,
+              );
+            }
           }
         }
       }

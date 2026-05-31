@@ -1,4 +1,4 @@
-import { normalizeLegacyDomainRoot, type PlanMeta } from '@prisma-next/contract/types';
+import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -6,6 +6,7 @@ import type {
   RootModelName,
 } from '@prisma-next/mongo-contract';
 import type { AnyMongoCommand, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { blindCast } from '@prisma-next/utils/casts';
 import { asMongoContract, type CollectionHandle, createCollectionHandle } from './state-classes';
 
 /**
@@ -31,9 +32,10 @@ export interface QueryRoot<
 export function mongoQuery<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
 >(options: { contractJson: unknown }): QueryRoot<TContract> {
-  const contract = normalizeLegacyDomainRoot(
-    options.contractJson as Record<string, unknown>,
-  ) as TContract;
+  const contract = blindCast<
+    TContract,
+    'mongoQuery accepts validated contract JSON with domain.namespaces'
+  >(options.contractJson);
   return {
     from<K extends keyof TContract['roots'] & string>(rootName: K) {
       return createCollectionHandle(contract, rootName);
