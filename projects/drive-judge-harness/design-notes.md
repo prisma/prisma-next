@@ -35,6 +35,20 @@ Three prompt sets, judge model cross-family from the orchestrator under test (ha
 
 Golden-case library (5–10 canonical briefs with co-located acceptance sets) + SDK-spawned runs with pinned models. Produces the instrumented-run corpus the judge calibrates against, and grows into the k=N A/B engine that compares two skill versions and gates CI on regressions.
 
+### Run setup (skill injection)
+
+The skill bundle that drove a run is a **first-class, pinned run input** — a peer of `model` and `(brief, base)`, not an ambient property of the operator's working tree. A run's quality is a function of the skill version under test, so to measure a skill change (or to replay a golden case reproducibly) the harness must execute the orchestrator against a known code state with a **specified** skill bundle materialized into that checkout.
+
+The shape:
+
+- **Two distinct inputs that coincide today.** _repo-under-test_ (the codebase the orchestrator changes — prisma-next at a base ref) and _skill-bundle-under-test_ (the drive-\* skills + rules driving it). They are the same repo today; the design names them apart so the eventual move of the skills to their own host repo costs no rework.
+- **A skill bundle is a git ref**, not an ad-hoc file copy: a commit/branch/tag whose canonical homes (`skills-contrib/`, `.agents/rules/`, `AGENTS.md`/`CLAUDE.md`) define the bundle. Materialization is exactly what the repo's `prepare` hook already does (`skills add` + `sync-agent-rules`) — the harness does not reinvent it.
+- **`prepare-run` isolates, overlays, materializes.** It creates an isolated checkout of the repo-under-test at the pinned base, overlays the bundle's canonical-home dirs, and runs the `prepare` hook so the gitignored trees (`.cursor/`, `.claude/`, `.agents/skills/`) exist. The materialized trees being gitignored is _why_ every run needs this — even a run against current `main`.
+- **Traces are collected post-hoc from the isolated checkout**, not pinned a priori. The spawned orchestrator emits per the standard `drive-record-traces` protocol (path resolved from its own session/project context inside the checkout); after the run, the harness scans the checkout for emitted `trace.jsonl` (schema-validated, matched to the spawned run) plus the git diff. This keeps `emit.ts` and the emission protocol untouched; an env-pinned destination is the recorded escape hatch if post-hoc matching proves ambiguous.
+- **Only instrumented bundles produce traces.** A bundle predating the `drive-record-traces` wiring yields an untraced run; the harness records that and falls back to slice 2's post-hoc parser. Historical replay overlays the _current_ (instrumented) bundle onto a historical base, accepting that an old base may not materialize against the current toolchain — an un-materializable case is simply not replayable.
+
+This is the run-production foundation under both corpus generation and the A/B engine: an A/B arm is exactly `(brief+base, model, skill-bundle)` with one axis varied.
+
 ### Corpus-gating
 
 The single hardest sequencing constraint: judge calibration needs ~10–20 instrumented runs, which only exist once the harness runs the golden cases. This forces harness-before-judge and is why the honest `not computable` scorecard must ship first.
