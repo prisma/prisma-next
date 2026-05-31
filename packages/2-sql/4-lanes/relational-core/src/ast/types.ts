@@ -1821,6 +1821,137 @@ export class DeleteAst extends QueryAst {
 }
 
 /**
+ * Dialect-neutral column type used in {@link CreateTableColumn}.
+ *
+ * Renderers map these to dialect-specific SQL types:
+ * - `text` → `text` (Postgres) / `TEXT` (SQLite)
+ * - `text-array` → `text[]` (Postgres) / `TEXT` (SQLite, stored as JSON)
+ * - `jsonb` → `jsonb` (Postgres) / `TEXT` (SQLite, stored as JSON)
+ * - `int` → `int` (Postgres) / `INTEGER` (SQLite)
+ * - `bigserial` → `bigserial` (Postgres) / `INTEGER` with AUTOINCREMENT (SQLite)
+ * - `timestamptz` → `timestamptz` (Postgres) / `TEXT` (SQLite, ISO-8601)
+ */
+export type ColumnType = 'text' | 'text-array' | 'jsonb' | 'int' | 'bigserial' | 'timestamptz';
+
+/**
+ * Dialect-neutral column default intent used in {@link CreateTableColumn}.
+ *
+ * - `literal` — a SQL literal baked into the DDL (e.g. `'app'`, `'{}'`, `'[]'`).
+ *   Renderers emit it as-is; no dialect adjustment needed.
+ * - `now` — current-timestamp default. Postgres renders `now()`;
+ *   SQLite renders `(datetime('now'))`.
+ */
+export type ColumnDefault =
+  | { readonly kind: 'literal'; readonly value: string }
+  | { readonly kind: 'now' };
+
+/**
+ * Descriptor for a single column in a {@link CreateTableAst} node.
+ *
+ * Carries exactly the information needed to express the control-table
+ * (marker + ledger) column shapes; not a general CREATE TABLE grammar.
+ */
+export interface CreateTableColumn {
+  readonly name: string;
+  readonly type: ColumnType;
+  readonly primaryKey?: boolean;
+  readonly notNull?: boolean;
+  readonly default?: ColumnDefault;
+}
+
+/**
+ * DDL AST node for `CREATE SCHEMA [IF NOT EXISTS] <name>`.
+ *
+ * Bootstrap DDL has no parameters — `collectParamRefs()` always returns `[]`.
+ * `rewrite` is identity (no sub-expressions to rewrite).
+ */
+export class CreateSchemaAst extends QueryAst {
+  readonly kind = 'create-schema' as const;
+  readonly name: string;
+  readonly ifNotExists: boolean;
+
+  constructor(name: string, ifNotExists: boolean) {
+    super();
+    this.name = name;
+    this.ifNotExists = ifNotExists;
+    this.freeze();
+  }
+
+  static of(name: string, ifNotExists = false): CreateSchemaAst {
+    return new CreateSchemaAst(name, ifNotExists);
+  }
+
+  rewrite(_rewriter: AstRewriter): this {
+    return this;
+  }
+
+  override collectParamRefs(): AnyParamRef[] {
+    return [];
+  }
+
+  override toQueryAst(): AnyQueryAst {
+    return this;
+  }
+}
+
+/**
+ * DDL AST node for `CREATE TABLE [IF NOT EXISTS] <table> (<columns>)`.
+ *
+ * Only models the column shapes needed for the control tables (marker +
+ * ledger). Bootstrap DDL has no parameters — `collectParamRefs()` always
+ * returns `[]`. `rewrite` is identity (no sub-expressions to rewrite).
+ */
+export class CreateTableAst extends QueryAst {
+  readonly kind = 'create-table' as const;
+  readonly table: { readonly schema?: string; readonly name: string };
+  readonly ifNotExists: boolean;
+  readonly columns: ReadonlyArray<CreateTableColumn>;
+
+  constructor(
+    table: { schema?: string; name: string },
+    columns: readonly CreateTableColumn[],
+    ifNotExists: boolean,
+  ) {
+    super();
+    this.table = Object.freeze(
+      table.schema !== undefined
+        ? { schema: table.schema, name: table.name }
+        : { name: table.name },
+    );
+    this.ifNotExists = ifNotExists;
+    this.columns = Object.freeze(
+      columns.map((c) => {
+        const d = c.default !== undefined ? Object.freeze({ ...c.default }) : undefined;
+        return Object.freeze(
+          d !== undefined ? { ...c, default: d } : { ...c },
+        ) as CreateTableColumn;
+      }),
+    );
+    this.freeze();
+  }
+
+  static of(
+    table: { schema?: string; name: string },
+    columns: readonly CreateTableColumn[],
+    opts?: { ifNotExists?: boolean },
+  ): CreateTableAst {
+    return new CreateTableAst(table, columns, opts?.ifNotExists ?? false);
+  }
+
+  rewrite(_rewriter: AstRewriter): this {
+    return this;
+  }
+
+  override collectParamRefs(): AnyParamRef[] {
+    return [];
+  }
+
+  override toQueryAst(): AnyQueryAst {
+    return this;
+  }
+}
+
+/**
  * Raw-SQL query AST node carrying interpolated parameter / expression nodes
  * embedded inside literal SQL fragments.
  *
@@ -1873,7 +2004,14 @@ export class RawSqlExpr extends QueryAst {
   }
 }
 
-export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst | RawSqlExpr;
+export type AnyQueryAst =
+  | SelectAst
+  | InsertAst
+  | UpdateAst
+  | DeleteAst
+  | RawSqlExpr
+  | CreateSchemaAst
+  | CreateTableAst;
 export type AnyFromSource = TableSource | DerivedTableSource;
 export type AnyExpression =
   | ColumnRef
@@ -1906,6 +2044,8 @@ export const queryAstKinds: ReadonlySet<string> = new Set<AnyQueryAst['kind']>([
   'update',
   'delete',
   'raw-sql',
+  'create-schema',
+  'create-table',
 ]);
 export const whereExprKinds: ReadonlySet<string> = new Set<AnyExpression['kind']>([
   'binary',
