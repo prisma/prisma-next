@@ -1,4 +1,3 @@
-import { applicationDomainOf } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   AggregateExpr,
@@ -28,6 +27,7 @@ import {
   UpdateAst,
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { litParams } from '@prisma-next/test-utils/lowered-params';
 import { describe, expect, it } from 'vitest';
 import { createSqliteAdapter } from '../src/core/adapter';

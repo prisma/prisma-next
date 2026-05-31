@@ -1,5 +1,5 @@
 import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
-import { applicationDomainOf, coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
@@ -17,7 +17,7 @@ import {
   MongoMigrationRunner,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
-import { timeouts } from '@prisma-next/test-utils';
+import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';

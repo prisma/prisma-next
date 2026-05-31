@@ -8,6 +8,7 @@ function crossRef(model: string, namespace = 'default') {
 
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { applicationDomainOf } from '../../../../../test/utils/src/application-domain-of';
 import {
   type CanonicalizeContractOptions,
   canonicalizeContract as canonicalizeContractRaw,
@@ -17,7 +18,6 @@ import {
 import { createPreserveEmptyPredicate, type PathPattern } from '../src/canonicalization-path-match';
 import { createStorageSort, type NamedArraySortTarget } from '../src/canonicalization-storage-sort';
 import type { Contract } from '../src/contract-types';
-import { applicationDomainOf } from '../src/domain-envelope';
 import type { ContractModelBase, ContractValueObject } from '../src/domain-types';
 import { coreHash, profileHash } from '../src/types';
 

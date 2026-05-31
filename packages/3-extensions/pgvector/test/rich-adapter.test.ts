@@ -1,5 +1,4 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import { applicationDomainOf } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -24,6 +23,7 @@ import {
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorRuntime from '../src/exports/runtime';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';

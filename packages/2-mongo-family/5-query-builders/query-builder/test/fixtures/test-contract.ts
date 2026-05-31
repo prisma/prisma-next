@@ -1,5 +1,9 @@
-import type { CrossReference, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
-import { crossRef } from '@prisma-next/contract/types';
+import {
+  type CrossReference,
+  crossRef,
+  type ProfileHashBase,
+  type StorageHashBase,
+} from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,

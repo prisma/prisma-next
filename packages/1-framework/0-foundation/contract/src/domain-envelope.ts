@@ -1,4 +1,3 @@
-import { blindCast } from '@prisma-next/utils/casts';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
 
 export const UNBOUND_DOMAIN_NAMESPACE_ID = '__unbound__' as const;
@@ -91,23 +90,4 @@ export function contractValueObjects<TModels extends Record<string, ContractMode
     );
   }
   return domainNamespace.valueObjects;
-}
-
-export function applicationDomainOf<TModels extends Record<string, ContractModelBase>>(params: {
-  readonly models?: TModels;
-  readonly valueObjects?: Record<string, ContractValueObject>;
-  readonly namespaceId?: string;
-}): ApplicationDomain<TModels> {
-  const namespaceId = params.namespaceId ?? UNBOUND_DOMAIN_NAMESPACE_ID;
-  const models =
-    params.models ??
-    blindCast<TModels, 'default empty models when applicationDomainOf omits models'>({});
-  return {
-    namespaces: {
-      [namespaceId]: {
-        models,
-        ...(params.valueObjects !== undefined ? { valueObjects: params.valueObjects } : {}),
-      },
-    },
-  };
 }

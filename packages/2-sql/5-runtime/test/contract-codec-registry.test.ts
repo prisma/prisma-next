@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { applicationDomainOf, coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecDescriptor,
   CodecInstanceContext,
@@ -7,6 +7,7 @@ import type {
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type {

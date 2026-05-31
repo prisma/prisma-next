@@ -2,12 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import {
-  applicationDomainOf,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
 import {
@@ -21,6 +16,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import type { SqlStatement } from '@prisma-next/target-sqlite/statement-builders';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import sqliteAdapterDescriptor from '../../../src/exports/control';
 
 export const contract: Contract<SqlStorage> = {

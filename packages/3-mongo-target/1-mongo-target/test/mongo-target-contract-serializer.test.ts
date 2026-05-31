@@ -1,4 +1,4 @@
-import { applicationDomainOf, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
+import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollationOptions,
@@ -8,6 +8,7 @@ import {
   MongoStorage,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { MongoTargetContractSerializer } from '../src/core/mongo-target-contract-serializer';
 import { MongoTargetUnboundDatabase } from '../src/core/mongo-target-database';

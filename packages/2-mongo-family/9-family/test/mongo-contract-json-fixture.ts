@@ -1,10 +1,11 @@
 import {
-  applicationDomainOf,
   type ContractModelBase,
   crossRef,
+  profileHash,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 
 export function mongoContractJson(params: {
   readonly models?: Record<string, ContractModelBase>;

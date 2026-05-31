@@ -1,16 +1,16 @@
 import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
-import type {
-  ContractEmbedRelation,
-  ContractField,
-  ContractFieldType,
-  ContractModelsMap,
-  ContractReferenceRelation,
-  ContractValueObject,
-  CrossReference,
-  ProfileHashBase,
-  StorageHashBase,
+import {
+  type ContractEmbedRelation,
+  type ContractField,
+  type ContractFieldType,
+  type ContractModelsMap,
+  type ContractReferenceRelation,
+  type ContractValueObject,
+  type CrossReference,
+  crossRef,
+  type ProfileHashBase,
+  type StorageHashBase,
 } from '@prisma-next/contract/types';
-import { crossRef } from '@prisma-next/contract/types';
 import {
   createEntityHelpersFromNamespace,
   type EntityHelpersFromNamespace,

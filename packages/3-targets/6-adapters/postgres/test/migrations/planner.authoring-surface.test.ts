@@ -1,9 +1,4 @@
-import {
-  applicationDomainOf,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   contractToSchemaIR as contractToSchemaIRImpl,
   extractCodecControlHooks,
@@ -19,6 +14,7 @@ import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor, {
   postgresRenderDefault,
 } from '@prisma-next/target-postgres/control';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import postgresAdapterDescriptor from '../../src/exports/control';
 

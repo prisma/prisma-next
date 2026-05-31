@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { applicationDomainOf, coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
@@ -14,6 +14,7 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {

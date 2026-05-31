@@ -1,11 +1,11 @@
 import { canonicalizeContractToObject } from '@prisma-next/contract/hashing';
-import type {
-  Contract,
-  ContractField,
-  ContractReferenceRelation,
-  StorageHashBase,
+import {
+  type Contract,
+  type ContractField,
+  type ContractReferenceRelation,
+  crossRef,
+  type StorageHashBase,
 } from '@prisma-next/contract/types';
-import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {

@@ -1,11 +1,12 @@
 import {
-  applicationDomainOf,
   type Contract,
   type ContractModelBase,
   type ContractValueObject,
+  profileHash,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 
 export function namespacedMongoStorageFromCollections(
   collections: Record<string, unknown>,

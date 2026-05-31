@@ -1,4 +1,4 @@
-import { applicationDomainOf, type Contract } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import {
   type ContractSpaceMember,
@@ -9,6 +9,7 @@ import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { ContractIR, Refs } from '@prisma-next/migration-tools/refs';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertFromIsGraphNode,

@@ -1,8 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { applicationDomainOf, coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { SqlFamilyAdapter } from '../src/sql-family-adapter';
 import { stubAst } from './utils';

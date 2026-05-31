@@ -1,11 +1,11 @@
 import {
-  applicationDomainOf,
   asNamespaceId,
   coreHash,
   profileHash,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 function crossRef(model: string, namespace: string = UNBOUND_DOMAIN_NAMESPACE_ID) {

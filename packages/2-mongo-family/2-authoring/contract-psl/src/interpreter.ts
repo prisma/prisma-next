@@ -3,14 +3,14 @@ import type {
   ContractSourceDiagnostics,
 } from '@prisma-next/config/config-types';
 import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
-import type {
-  Contract,
-  ContractField,
-  ContractReferenceRelation,
-  ContractValueObject,
-  CrossReference,
+import {
+  type Contract,
+  type ContractField,
+  type ContractReferenceRelation,
+  type ContractValueObject,
+  type CrossReference,
+  crossRef,
 } from '@prisma-next/contract/types';
-import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {

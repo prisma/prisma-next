@@ -2,7 +2,8 @@ import mongoAdapterDescriptor, {
   createMongoControlDriver,
   initMarker,
 } from '@prisma-next/adapter-mongo/control';
-import { applicationDomainOf, coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
@@ -10,7 +11,7 @@ import {
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
 import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
-import { timeouts } from '@prisma-next/test-utils';
+import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';

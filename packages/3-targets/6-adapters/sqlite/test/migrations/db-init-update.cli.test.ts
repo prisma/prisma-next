@@ -1,11 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import { executeDbInit, executeDbUpdate } from '@prisma-next/cli/control-api';
-import {
-  applicationDomainOf,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   SqlControlExtensionDescriptor,
@@ -21,7 +16,7 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import { timeouts } from '@prisma-next/test-utils';
+import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import {

@@ -1,11 +1,6 @@
-import {
-  applicationDomainOf,
-  type Contract,
-  coreHash,
-  executionHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,

@@ -1,12 +1,21 @@
-import { timeouts } from '@prisma-next/test-utils';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
+const testTimeout = (Number.parseFloat(process.env['TEST_TIMEOUT_MULTIPLIER'] ?? '1') || 1) * 500;
+
+const contractTypesEntry = fileURLToPath(new URL('./src/exports/types.ts', import.meta.url));
+
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@prisma-next/contract/types': contractTypesEntry,
+    },
+  },
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: timeouts.default,
-    hookTimeout: timeouts.default,
+    testTimeout,
+    hookTimeout: testTimeout,
     typecheck: {
       include: ['test/**/*.test-d.ts'],
     },

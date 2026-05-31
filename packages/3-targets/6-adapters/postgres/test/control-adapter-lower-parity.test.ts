@@ -1,4 +1,3 @@
-import { applicationDomainOf } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   type AnyQueryAst,
@@ -15,6 +14,7 @@ import {
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { PostgresContract } from '../src/core/types';
 import {

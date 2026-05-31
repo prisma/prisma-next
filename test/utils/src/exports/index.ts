@@ -1,6 +1,7 @@
 import { type ServerOptions, startPrismaDevServer } from '@prisma/dev';
 import { Client } from 'pg';
 
+export * from '../application-domain-of';
 export * from '../column-descriptors';
 export * from '../lowered-params';
 export * from '../operation-descriptors';

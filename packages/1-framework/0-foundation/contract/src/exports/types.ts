@@ -12,7 +12,6 @@ export type {
   ContractWithDomain,
 } from '../domain-envelope';
 export {
-  applicationDomainOf,
   contractModels,
   contractValueObjects,
   DomainNamespaceResolutionError,

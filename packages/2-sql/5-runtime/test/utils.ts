@@ -1,5 +1,4 @@
 import {
-  applicationDomainOf,
   type Contract,
   type ContractModelBase,
   coreHash,
@@ -37,7 +36,7 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { SelectAst as SelectAstCtor, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
+import { applicationDomainOf, collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { SqlStatement } from '../src/exports';
 import {

@@ -1,5 +1,4 @@
 import {
-  applicationDomainOf,
   asNamespaceId,
   type ColumnDefaultLiteralInputValue,
   type Contract,
@@ -20,6 +19,7 @@ import {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 

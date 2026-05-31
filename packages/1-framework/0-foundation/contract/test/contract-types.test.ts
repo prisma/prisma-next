@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { applicationDomainOf } from '../../../../../test/utils/src/application-domain-of';
 import { asNamespaceId } from '../src/namespace-id';
 
 function crossRef(model: string, namespace = 'default') {
@@ -6,7 +7,7 @@ function crossRef(model: string, namespace = 'default') {
 }
 
 import type { Contract } from '../src/contract-types';
-import { applicationDomainOf, contractModels } from '../src/domain-envelope';
+import { contractModels } from '../src/domain-envelope';
 import type { ContractModel } from '../src/domain-types';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '../src/types';
 

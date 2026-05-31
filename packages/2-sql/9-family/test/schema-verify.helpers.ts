@@ -3,7 +3,6 @@
  */
 
 import {
-  applicationDomainOf,
   asNamespaceId,
   type ColumnDefault,
   type Contract,
@@ -25,6 +24,7 @@ import type {
   SqlSchemaIR,
   SqlTableIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migrations/types';
 

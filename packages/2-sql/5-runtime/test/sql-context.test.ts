@@ -1,10 +1,4 @@
-import {
-  applicationDomainOf,
-  type Contract,
-  coreHash,
-  executionHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import { mergeCapabilityMatrices } from '@prisma-next/framework-components/components';
 import type { RuntimeDriverDescriptor } from '@prisma-next/framework-components/execution';
 import {
@@ -14,6 +8,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
