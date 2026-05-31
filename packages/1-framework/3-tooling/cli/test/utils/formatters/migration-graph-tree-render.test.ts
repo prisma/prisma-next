@@ -75,7 +75,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
         '│↑  init                 ∅ → ef9de27',
-        '○   ∅',
+        '∅',
       ].join('\n'),
     );
   });
@@ -98,7 +98,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
         '│↑  init                 ∅ → ef9de27',
-        '○   ∅',
+        '∅',
       ].join('\n'),
     );
   });
@@ -122,7 +122,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27              (prod, db)',
         '│↑  init                 ∅ → ef9de27',
-        '○   ∅',
+        '∅',
       ].join('\n'),
     );
   });
@@ -146,7 +146,7 @@ describe('renderMigrationGraphTree', () => {
         '├─╯',
         '○   ef9de27',
         '│↑  init                 ∅ → ef9de27',
-        '○   ∅',
+        '∅',
       ].join('\n'),
     );
   });
@@ -175,7 +175,7 @@ describe('renderMigrationGraphTree', () => {
         '├─┴─╯',
         '○   ef9de27',
         '│↑  init                 ∅ → ef9de27',
-        '○   ∅',
+        '∅',
       ].join('\n'),
     );
   });
@@ -199,7 +199,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  │     add_phone           ef9de27 → 73e3abe',
         '○◂──╯     ef9de27',
         '│↑        init                ∅ → ef9de27',
-        '○         ∅',
+        '∅',
       ].join('\n'),
     );
   });
@@ -220,7 +220,7 @@ describe('renderMigrationGraphTree', () => {
         '│↓  rollback_phone       73e3abe → ef9de27',
         '○   ef9de27',
         '│↑  init                 ∅ → ef9de27',
-        '○   ∅',
+        '∅',
       ].join('\n'),
     );
   });
@@ -236,7 +236,7 @@ describe('renderMigrationGraphTree', () => {
         '│⟲  noop                 aaaaaaa → aaaaaaa',
         '○   aaaaaaa',
         '│↑  init                 ∅ → aaaaaaa',
-        '○   ∅',
+        '∅',
       ].join('\n'),
     );
   });
@@ -281,7 +281,7 @@ describe('renderMigrationGraphTree', () => {
       ├─╯
       ○   ef9de27
       │↑  init                 ∅ → ef9de27
-      ○   ∅"
+      ∅"
     `);
   });
 });
@@ -295,7 +295,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
       |^  init                 - -> ef9de27
-      *   -"
+      -"
     `);
   });
 
@@ -316,7 +316,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
       |^  init                 - -> ef9de27
-      *   -"
+      -"
     `);
   });
 
@@ -338,7 +338,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27              (prod, db)
       |^  init                 - -> ef9de27
-      *   -"
+      -"
     `);
   });
 
@@ -360,7 +360,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       +-/
       *   ef9de27
       |^  init                 - -> ef9de27
-      *   -"
+      -"
     `);
   });
 
@@ -389,7 +389,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       +-+-/
       *   ef9de27
       |^  init                 - -> ef9de27
-      *   -"
+      -"
     `);
   });
 
@@ -413,7 +413,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  |     add_phone           ef9de27 -> 73e3abe
       *<--/     ef9de27
       |^        init                - -> ef9de27
-      *         -"
+      -"
     `);
   });
 
@@ -432,7 +432,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |v  rollback_phone       73e3abe -> ef9de27
       *   ef9de27
       |^  init                 - -> ef9de27
-      *   -"
+      -"
     `);
   });
 
@@ -446,7 +446,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |@  noop                 aaaaaaa -> aaaaaaa
       *   aaaaaaa
       |^  init                 - -> aaaaaaa
-      *   -"
+      -"
     `);
   });
 
@@ -490,7 +490,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       +-/
       *   ef9de27
       |^  init                 - -> ef9de27
-      *   -"
+      -"
     `);
   });
 });
