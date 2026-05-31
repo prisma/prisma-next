@@ -827,26 +827,57 @@ describe('buildMigrationGraphLayout', () => {
     );
   });
 
-  it('renders a node-skipping rollback as a single lane', () => {
+  // Locked target for the routed-back-arc feature (`mockups.md` § routed arcs). A
+  // node-skipping rollback tees off its source node (`○─╮`), runs a back-lane down
+  // past the intervening node, and lands in its target (`○◂╯`). The rollback row sits
+  // immediately below its source so the tee connects. `it.fails` until routing lands;
+  // the implementer flips this to `it` once the layout produces the arc.
+  it.fails('routes a node-skipping rollback as a back-arc per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
     const addPhone = edge('aaa', 'bbb', 'add_phone');
     const addBio = edge('bbb', 'ccc', 'add_bio');
     const rollbackSkip = edge('ccc', 'aaa', 'rollback_skip');
     const modelSkip = layout([init, addPhone, addBio, rollbackSkip]);
 
-    // Single lane, no phantom. The routed back-arc for a node-skipping rollback
-    // (`mockups.md` § routed arcs) is a separate deferred feature that will further change
-    // this fixture; the lane stays single until then.
     expect(renderLayout(modelSkip)).toBe(
       [
-        '○     ccc',
-        '│↑    add_bio',
-        '│↓    rollback_skip',
-        '○     bbb',
-        '│↑    add_phone',
-        '○     aaa',
-        '│↑    init',
-        '○     ∅',
+        '○─╮     ccc',
+        '│ │↓    rollback_skip',
+        '│↑│     add_bio',
+        '○ │     bbb',
+        '│↑│     add_phone',
+        '○◂╯     aaa',
+        '│↑      init',
+        '○       ∅',
+      ].join('\n'),
+    );
+  });
+
+  // Two overlapping node-skipping rollbacks take adjacent back-lanes; the second arc's
+  // tee crosses the first arc's lane (`┼`), and its landing crosses the (now-closed)
+  // first lane horizontally (`○◂──╯`). Mirrors `mockups.md § skip-rollback` exactly.
+  it.fails('routes two overlapping node-skipping rollbacks per mockup', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addBio = edge('73e3abe', '3ee5d20', 'add_bio');
+    const addPosts = edge('3ee5d20', 'a94b7b4', 'add_posts');
+    const rollbackToPhone = edge('a94b7b4', '73e3abe', 'rollback_to_phone');
+    const rollbackToInit = edge('3ee5d20', 'ef9de27', 'rollback_to_init');
+    const model = layout([init, addPhone, addBio, addPosts, rollbackToPhone, rollbackToInit]);
+
+    expect(renderLayout(model)).toBe(
+      [
+        '○─╮       a94b7b4',
+        '│ │↓      rollback_to_phone',
+        '│↑│       add_posts',
+        '○─┼─╮     3ee5d20',
+        '│ │ │↓    rollback_to_init',
+        '│↑│ │     add_bio',
+        '○◂╯ │     73e3abe',
+        '│↑  │     add_phone',
+        '○◂──╯     ef9de27',
+        '│↑        init',
+        '○         ∅',
       ].join('\n'),
     );
   });
