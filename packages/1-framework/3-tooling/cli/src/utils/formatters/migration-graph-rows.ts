@@ -28,9 +28,9 @@ export interface ClassifiedEdge {
  * `nodes` is the vertical ordering of contract nodes: index 0 is the topmost
  * row (the tip), the last non-null entry is the bottommost root. `null`
  * sentinels separate disjoint components (the blank row in the rendered
- * output). Ordering within each component is deterministic: DFS post-order
- * from forward roots, with dirName-descending neighbour order as the tie-
- * break — the same order the Tier-2 topology pass uses.
+ * output). Ordering within each component is deterministic: longest forward-
+ * path rank from forward roots (tips at rank max, roots at 0), with lex-
+ * ascending tie-break among same-rank siblings.
  *
  * `edges` carries every classified migration. `edgesByFrom` and `edgesByTo`
  * are pre-built lookup maps for the column allocator.
@@ -130,50 +130,16 @@ function weaklyConnectedComponents(graph: MigrationGraph): readonly ReadonlySet<
 }
 
 // ---------------------------------------------------------------------------
-// Post-order DFS node ordering within a component
+// Longest forward-path node ordering within a component
 // ---------------------------------------------------------------------------
 
-/**
- * DFS post-order traversal over FORWARD edges only, starting from the
- * forward-root nodes within `componentNodes`. Returns nodes tip-first
- * (index 0 = tip, last = root), matching the display orientation.
- *
- * Neighbour traversal order: outgoing forward edges sorted by dirName
- * descending — the same tie-break used by the topology classifier. This
- * ensures the node ordering is stable across runs and consistent with Tier-2.
- */
-function postOrderNodes(
+function forwardRootsInComponent(
   componentNodes: ReadonlySet<string>,
   topology: MigrationListGraphTopology,
-  graph: MigrationGraph,
 ): readonly string[] {
-  // Build forward-only adjacency for this component
-  const forwardOut = new Map<string, { to: string; dirName: string }[]>();
-
-  for (const node of componentNodes) {
-    forwardOut.set(node, []);
-  }
-
-  for (const edges of graph.forwardChain.values()) {
-    for (const edge of edges) {
-      if (!componentNodes.has(edge.from) || !componentNodes.has(edge.to)) continue;
-      if (edge.from === edge.to) continue; // self-edges don't affect node order
-      if (topology.kindByMigrationHash.get(edge.migrationHash) !== 'forward') continue;
-      const bucket = forwardOut.get(edge.from);
-      if (bucket) bucket.push({ to: edge.to, dirName: edge.dirName });
-    }
-  }
-
-  // Sort outgoing edges: dirName descending (same as topology classifier)
-  for (const bucket of forwardOut.values()) {
-    bucket.sort((a, b) => b.dirName.localeCompare(a.dirName));
-  }
-
-  // Forward roots: nodes with forward in-degree 0 within this component
   const roots: string[] = [];
   for (const node of componentNodes) {
-    const inDeg = topology.forwardInDegree.get(node) ?? 0;
-    if (inDeg === 0) {
+    if ((topology.forwardInDegree.get(node) ?? 0) === 0) {
       roots.push(node);
     }
   }
@@ -182,85 +148,83 @@ function postOrderNodes(
     if (b === EMPTY_CONTRACT_HASH) return 1;
     return a.localeCompare(b);
   });
+  if (roots.length > 0) return roots;
 
-  // Fallback for pure cycles: all nodes have forward in-degree > 0
-  if (roots.length === 0) {
-    roots.push(
-      ...[...componentNodes].sort((a, b) => {
-        if (a === EMPTY_CONTRACT_HASH) return -1;
-        if (b === EMPTY_CONTRACT_HASH) return 1;
-        return a.localeCompare(b);
-      }),
-    );
-  }
+  return [...componentNodes].sort((a, b) => {
+    if (a === EMPTY_CONTRACT_HASH) return -1;
+    if (b === EMPTY_CONTRACT_HASH) return 1;
+    return a.localeCompare(b);
+  });
+}
 
-  // Iterative DFS with post-order collection
-  const WHITE = 0;
-  const GRAY = 1;
-  const BLACK = 2;
-  const color = new Map<string, number>();
+function compareNodesTipsFirst(a: string, b: string, rank: ReadonlyMap<string, number>): number {
+  const rankA = rank.get(a) ?? 0;
+  const rankB = rank.get(b) ?? 0;
+  if (rankA !== rankB) return rankB - rankA;
+  if (a === EMPTY_CONTRACT_HASH) return 1;
+  if (b === EMPTY_CONTRACT_HASH) return -1;
+  return a.localeCompare(b);
+}
+
+/**
+ * Layer nodes by longest forward-path rank from forward roots within the
+ * component. Rank 0 is the root (bottom row); the maximum rank is the tip
+ * (top row). Emits rank-descending with lex-ascending tie-break among siblings
+ * at the same rank — stable across edge-insertion order and correct under
+ * diamonds, cross-links, and rollbacks.
+ */
+function layerNodesByLongestForwardPath(
+  componentNodes: ReadonlySet<string>,
+  topology: MigrationListGraphTopology,
+  graph: MigrationGraph,
+): readonly string[] {
+  const forwardOut = new Map<string, string[]>();
+
   for (const node of componentNodes) {
-    color.set(node, WHITE);
+    forwardOut.set(node, []);
   }
 
-  interface Frame {
-    node: string;
-    outgoing: readonly { to: string; dirName: string }[];
-    index: number;
-  }
-
-  const stack: Frame[] = [];
-  const postOrder: string[] = [];
-
-  function pushFrame(node: string): void {
-    color.set(node, GRAY);
-    stack.push({ node, outgoing: forwardOut.get(node) ?? [], index: 0 });
-  }
-
-  function runDfsFrom(root: string): void {
-    if (color.get(root) !== WHITE) return;
-    pushFrame(root);
-
-    while (stack.length > 0) {
-      const frame = stack[stack.length - 1];
-      if (frame === undefined) break;
-
-      if (frame.index >= frame.outgoing.length) {
-        color.set(frame.node, BLACK);
-        postOrder.push(frame.node);
-        stack.pop();
-        continue;
-      }
-
-      const { to } = frame.outgoing[frame.index] ?? { to: '' };
-      frame.index += 1;
-      if (!to) continue;
-
-      const vColor = color.get(to);
-      if (vColor === WHITE) {
-        pushFrame(to);
-      }
-      // GRAY/BLACK nodes are already scheduled or done; skip to avoid revisiting
+  for (const edges of graph.forwardChain.values()) {
+    for (const edge of edges) {
+      if (!componentNodes.has(edge.from) || !componentNodes.has(edge.to)) continue;
+      if (edge.from === edge.to) continue;
+      if (topology.kindByMigrationHash.get(edge.migrationHash) !== 'forward') continue;
+      const bucket = forwardOut.get(edge.from);
+      if (bucket) bucket.push(edge.to);
     }
   }
 
+  const roots = forwardRootsInComponent(componentNodes, topology);
+  const rank = new Map<string, number>();
   for (const root of roots) {
-    runDfsFrom(root);
+    rank.set(root, 0);
   }
 
-  // Any remaining WHITE nodes (unreachable via forward edges — e.g. nodes that
-  // only appear as rollback sources) get appended in lex order
-  const remainingWhite = [...componentNodes]
-    .filter((n) => color.get(n) === WHITE)
-    .sort((a, b) => a.localeCompare(b));
-  for (const root of remainingWhite) {
-    runDfsFrom(root);
+  const maxPasses = componentNodes.size;
+  for (let pass = 0; pass < maxPasses; pass++) {
+    let changed = false;
+    for (const node of componentNodes) {
+      const base = rank.get(node);
+      if (base === undefined) continue;
+      for (const to of forwardOut.get(node) ?? []) {
+        const next = base + 1;
+        const prev = rank.get(to) ?? -1;
+        if (next > prev) {
+          rank.set(to, next);
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
   }
 
-  // DFS post-order: nodes are pushed when their subtree is exhausted.
-  // For a forward chain root → A → B, B is pushed first (tip), root last.
-  // This is already tips-first, which is the display orientation we want.
-  return postOrder;
+  for (const node of componentNodes) {
+    if (!rank.has(node)) {
+      rank.set(node, 0);
+    }
+  }
+
+  return [...componentNodes].sort((a, b) => compareNodesTipsFirst(a, b, rank));
 }
 
 // ---------------------------------------------------------------------------
@@ -347,13 +311,13 @@ export function buildMigrationGraphRows(
   // 3. Find weakly-connected components (ordered: EMPTY first, then lex)
   const components = weaklyConnectedComponents(graph);
 
-  // 4. Compute post-order node sequence for each component, separate with null
+  // 4. Layer nodes by longest forward path per component, separate with null
   const nodes: (string | null)[] = [];
   for (let i = 0; i < components.length; i++) {
     if (i > 0) nodes.push(null);
     const component = components[i];
     if (component === undefined) continue;
-    const ordered = postOrderNodes(component, topology, graph);
+    const ordered = layerNodesByLongestForwardPath(component, topology, graph);
     for (const node of ordered) {
       nodes.push(node);
     }
