@@ -139,6 +139,14 @@ function isMarginalForwardEdge(
   return toWith > fromDepth;
 }
 
+// The first branch is the load-bearing one: a forward edge `from → to` is a
+// disguised node-skipping rollback when, after removing it, `to` can still
+// reach `from` and `from` sits strictly deeper than `to + 1` (a longer path
+// already connects them). This branch fires on every cycle-closing edge, and
+// the caller peels exactly one edge (dirName-max) per iteration before
+// recomputing — so cycles are broken deterministically regardless of edge
+// order. `isMarginalForwardEdge` is only a fallback for the residual case and
+// is reached only while the candidate set is still cyclic.
 function shouldPeelForwardEdge(
   nodes: ReadonlySet<string>,
   candidates: readonly NormalizedEdge[],

@@ -704,7 +704,8 @@ function applySkipRollbackRouting(
         const occupied =
           existing !== undefined &&
           existing.kind !== 'empty' &&
-          existing.kind !== 'horizontal-pass';
+          existing.kind !== 'horizontal-pass' &&
+          existing.kind !== 'arc-land-bridge';
         const crossed =
           occupied ||
           routes.some(

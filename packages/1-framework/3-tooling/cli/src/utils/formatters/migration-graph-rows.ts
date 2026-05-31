@@ -278,7 +278,8 @@ export function buildMigrationGraphRows(
     return detached !== undefined ? { ...emptyModel, nodes: [detached] } : emptyModel;
   }
 
-  // 1. Classify all edges (shared DFS, same algorithm as Tier-2)
+  // 1. Classify all edges (shared classifier: DFS plus a peel pass that demotes
+  //    node-skipping rollbacks, so the forward subgraph is acyclic)
   const topology = classifyMigrationGraphTopology(graph);
 
   // 2. Build classified edge list
