@@ -202,13 +202,13 @@ describe('side-by-side contract examples', () => {
         users: { namespace: '__unbound__', model: 'User' },
       });
       expect(
-        validatedContract.domain.namespaces.__unbound__!.models['User']?.relations['posts'],
+        validatedContract.domain.namespaces['__unbound__']!.models['User']?.relations['posts'],
       ).toMatchObject({
         cardinality: '1:N',
         to: { namespace: '__unbound__', model: 'Post' },
       });
       expect(
-        validatedContract.domain.namespaces.__unbound__!.models['Post']?.relations['author'],
+        validatedContract.domain.namespaces['__unbound__']!.models['Post']?.relations['author'],
       ).toMatchObject({
         cardinality: 'N:1',
         to: { namespace: '__unbound__', model: 'User' },
@@ -314,7 +314,7 @@ describe('side-by-side contract examples', () => {
         users: { namespace: '__unbound__', model: 'User' },
       });
       expect(
-        validatedContract.contract.domain.namespaces.__unbound__!.models['User']?.relations[
+        validatedContract.contract.domain.namespaces['__unbound__']!.models['User']?.relations[
           'posts'
         ],
       ).toMatchObject({
@@ -326,7 +326,7 @@ describe('side-by-side contract examples', () => {
         },
       });
       expect(
-        validatedContract.contract.domain.namespaces.__unbound__!.models['Post']?.relations[
+        validatedContract.contract.domain.namespaces['__unbound__']!.models['Post']?.relations[
           'author'
         ],
       ).toMatchObject({
@@ -363,23 +363,24 @@ describe('side-by-side contract examples', () => {
       postgresContractJson['domain'] as {
         namespaces: Record<string, { models: Record<string, unknown> }>;
       }
-    ).namespaces.__unbound__!.models;
+    ).namespaces['__unbound__']!.models;
     const mongoModels = (
       mongoContractJson['domain'] as {
         namespaces: Record<string, { models: Record<string, unknown> }>;
       }
-    ).namespaces.__unbound__!.models;
+    ).namespaces['__unbound__']!.models;
 
-    expect(postgresModels['User']?.['relations']).toMatchObject({
+    type SideBySideModel = { relations?: Record<string, unknown> };
+    expect((postgresModels['User'] as SideBySideModel | undefined)?.relations).toMatchObject({
       posts: { cardinality: '1:N', to: { namespace: '__unbound__', model: 'Post' } },
     });
-    expect(mongoModels['User']?.['relations']).toMatchObject({
+    expect((mongoModels['User'] as SideBySideModel | undefined)?.relations).toMatchObject({
       posts: { cardinality: '1:N', to: { namespace: '__unbound__', model: 'Post' } },
     });
-    expect(postgresModels['Post']?.['relations']).toMatchObject({
+    expect((postgresModels['Post'] as SideBySideModel | undefined)?.relations).toMatchObject({
       author: { cardinality: 'N:1', to: { namespace: '__unbound__', model: 'User' } },
     });
-    expect(mongoModels['Post']?.['relations']).toMatchObject({
+    expect((mongoModels['Post'] as SideBySideModel | undefined)?.relations).toMatchObject({
       author: { cardinality: 'N:1', to: { namespace: '__unbound__', model: 'User' } },
     });
   });

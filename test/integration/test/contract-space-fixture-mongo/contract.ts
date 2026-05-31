@@ -73,7 +73,13 @@ export const mongoTestContractSpaceContract: MongoContract = {
   target: TARGET,
   targetFamily: TARGET_FAMILY,
   roots: {},
-  models: {},
+  domain: {
+    namespaces: {
+      __unbound__: {
+        models: {},
+      },
+    },
+  },
   capabilities: {},
   extensionPacks: {},
   meta: {},

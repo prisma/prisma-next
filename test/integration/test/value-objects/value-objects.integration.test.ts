@@ -3,6 +3,7 @@ import {
   type ContractValueObject,
   contractModels,
   contractValueObjects,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -91,7 +92,7 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
     if (!result.ok) throw new Error(`Interpretation failed: ${result.failure.summary}`);
 
     const contract = result.value;
-    const unboundDomain = contract.domain.namespaces.__unbound__!;
+    const unboundDomain = contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!;
     expect(unboundDomain.valueObjects).toBeDefined();
     expect(unboundDomain.valueObjects!['Address']).toBeDefined();
 
@@ -103,12 +104,13 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
     const userCollection = orm['user']!;
 
+    type CreateUser = Parameters<typeof userCollection.create>[0];
     const created = await userCollection.create({
       name: 'Alice',
       email: 'alice@example.com',
       homeAddress: { street: '123 Main St', city: 'Springfield', zip: '62701' },
       tags: ['admin', 'active'],
-    });
+    } as unknown as CreateUser);
 
     expect(created).toMatchObject({
       name: 'Alice',
@@ -133,17 +135,18 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
     const userCollection = orm['user']!;
 
+    type CreateUser = Parameters<typeof userCollection.create>[0];
     await userCollection.create({
       name: 'Bob',
       email: 'bob@example.com',
       homeAddress: { street: '456 Oak Ave', city: 'Shelbyville', zip: '12345' },
       tags: [],
-    });
+    } as unknown as CreateUser);
 
     const { MongoFieldFilter } = await import('@prisma-next/mongo-query-ast/execution');
-    const updated = await userCollection
-      .where(MongoFieldFilter.eq('name', 'Bob'))
-      .update({ homeAddress: { street: '789 Pine Rd', city: 'Capital City', zip: '99999' } });
+    const updated = await userCollection.where(MongoFieldFilter.eq('name', 'Bob')).update({
+      homeAddress: { street: '789 Pine Rd', city: 'Capital City', zip: '99999' },
+    } as unknown as Parameters<ReturnType<typeof userCollection.where>['update']>[0]);
 
     expect(updated).toMatchObject({
       name: 'Bob',
@@ -171,7 +174,9 @@ type Address {
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
     const userCollection = orm['user']!;
 
-    await userCollection.create({ name: 'NoAddr', address: null });
+    await userCollection.create({ name: 'NoAddr', address: null } as unknown as Parameters<
+      typeof userCollection.create
+    >[0]);
     const users = await userCollection.all();
     expect(users).toHaveLength(1);
     expect(users[0]!['address']).toBeNull();
@@ -185,7 +190,7 @@ describe('value objects: end-to-end SQL pipeline', () => {
     if (!result.ok) throw new Error(`Interpretation failed: ${result.failure.summary}`);
 
     const contract = result.value;
-    const unboundDomain = contract.domain.namespaces.__unbound__!;
+    const unboundDomain = contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!;
     expect(unboundDomain.valueObjects).toBeDefined();
     expect(unboundDomain.valueObjects!['Address']).toBeDefined();
 

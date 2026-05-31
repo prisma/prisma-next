@@ -1,5 +1,10 @@
 import { readAllMarkers, readMarker } from '@prisma-next/adapter-mongo/control';
-import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  coreHash,
+  crossRef,
+  profileHash,
+} from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
   contractToMongoSchemaIR,
@@ -51,24 +56,26 @@ function buildAppContract(): MongoContract {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: { users: crossRef('User'), posts: crossRef('Post') },
-    models: {
-      User: {
-        fields: {
-          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
-          email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+    domain: buildDomainPlaneFromFlat({
+      models: {
+        User: {
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+            email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
+          relations: {},
+          storage: { collection: 'users' },
         },
-        relations: {},
-        storage: { collection: 'users' },
-      },
-      Post: {
-        fields: {
-          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
-          slug: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        Post: {
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+            slug: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
+          relations: {},
+          storage: { collection: 'posts' },
         },
-        relations: {},
-        storage: { collection: 'posts' },
       },
-    },
+    }),
     storage: {
       namespaces: {
         __unbound__: {
@@ -120,16 +127,18 @@ function buildAppContractMissingPosts(): MongoContract {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: { users: crossRef('User') },
-    models: {
-      User: {
-        fields: {
-          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
-          email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+    domain: buildDomainPlaneFromFlat({
+      models: {
+        User: {
+          fields: {
+            _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+            email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+          },
+          relations: {},
+          storage: { collection: 'users' },
         },
-        relations: {},
-        storage: { collection: 'users' },
       },
-    },
+    }),
     storage: {
       namespaces: {
         __unbound__: {
@@ -163,7 +172,7 @@ function buildExtContract(): MongoContract {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: {},
-    models: {},
+    domain: buildDomainPlaneFromFlat({ models: {} }),
     storage: {
       namespaces: {
         __unbound__: {

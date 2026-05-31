@@ -2,7 +2,12 @@ import mongoAdapterDescriptor, {
   createMongoControlDriver,
   initMarker,
 } from '@prisma-next/adapter-mongo/control';
-import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  coreHash,
+  crossRef,
+  profileHash,
+} from '@prisma-next/contract/types';
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
@@ -19,16 +24,18 @@ const baseContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { users: crossRef('User') },
-  models: {
-    User: {
-      fields: {
-        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
-        email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+  domain: buildDomainPlaneFromFlat({
+    models: {
+      User: {
+        fields: {
+          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        },
+        relations: {},
+        storage: { collection: 'users' },
       },
-      relations: {},
-      storage: { collection: 'users' },
     },
-  },
+  }),
   storage: {
     namespaces: {
       __unbound__: {

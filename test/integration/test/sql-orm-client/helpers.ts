@@ -71,10 +71,22 @@ export function withPatchedDomainModels<T extends FrameworkContract<SqlStorage>>
   } as T;
 }
 
+type MutableDomainModel = {
+  fields: Record<string, unknown>;
+  relations: Record<string, unknown>;
+  storage: Record<string, unknown>;
+  discriminator?: { field: string };
+  variants?: Record<string, { value: string }>;
+  base?: string;
+};
+
 function unboundDomainModels(raw: {
   domain: { namespaces: Record<string, { models: Record<string, unknown> }> };
-}): Record<string, unknown> {
-  return raw.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models;
+}): Record<string, MutableDomainModel> {
+  return raw.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models as Record<
+    string,
+    MutableDomainModel
+  >;
 }
 
 const testContext: ExecutionContext<TestContract> = createExecutionContext({
@@ -110,7 +122,7 @@ export function buildMixedPolyContract(): TestContract {
   const raw = JSON.parse(JSON.stringify(getTestContract()));
 
   const domainModels = unboundDomainModels(raw);
-  domainModels.Task = {
+  domainModels['Task'] = {
     fields: {
       id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
       title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
@@ -125,14 +137,14 @@ export function buildMixedPolyContract(): TestContract {
     variants: { Bug: { value: 'bug' }, Feature: { value: 'feature' } },
   };
 
-  domainModels.Bug = {
+  domainModels['Bug'] = {
     fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
     base: 'Task',
   };
 
-  domainModels.Feature = {
+  domainModels['Feature'] = {
     fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
     relations: {},
     storage: { table: 'features', fields: { priority: { column: 'priority' } } },
@@ -176,25 +188,28 @@ export function buildStiPolyContract(): TestContract {
   const raw = JSON.parse(JSON.stringify(getTestContract()));
   const domainModels = unboundDomainModels(raw);
 
-  domainModels.User.fields.kind = {
+  const userModel = domainModels['User']!;
+  userModel.fields['kind'] = {
     nullable: false,
     type: { kind: 'scalar', codecId: 'pg/text@1' },
   };
-  domainModels.User.storage.fields.kind = { column: 'kind' };
-  domainModels.User.discriminator = { field: 'kind' };
-  domainModels.User.variants = {
+  (userModel.storage as { fields: Record<string, { column: string }> }).fields['kind'] = {
+    column: 'kind',
+  };
+  userModel.discriminator = { field: 'kind' };
+  userModel.variants = {
     Admin: { value: 'admin' },
     Regular: { value: 'regular' },
   };
 
-  domainModels.Admin = {
+  domainModels['Admin'] = {
     fields: { role: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'users', fields: { role: { column: 'role' } } },
     base: 'User',
   };
 
-  domainModels.Regular = {
+  domainModels['Regular'] = {
     fields: { plan: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'users', fields: { plan: { column: 'plan' } } },

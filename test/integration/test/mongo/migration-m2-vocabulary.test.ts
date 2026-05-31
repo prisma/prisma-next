@@ -1,5 +1,10 @@
 import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
-import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  coreHash,
+  crossRef,
+  profileHash,
+} from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
@@ -45,21 +50,23 @@ function makeContract(
     target: 'mongo',
     targetFamily: 'mongo',
     roots: Object.fromEntries(Object.keys(collections).map((c) => [c, crossRef(c)])),
-    models: Object.fromEntries(
-      Object.keys(collections).map((c) => [
-        c,
-        {
-          fields: {
-            _id: {
-              nullable: false,
-              type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+    domain: buildDomainPlaneFromFlat({
+      models: Object.fromEntries(
+        Object.keys(collections).map((c) => [
+          c,
+          {
+            fields: {
+              _id: {
+                nullable: false,
+                type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+              },
             },
+            relations: {},
+            storage: { collection: c },
           },
-          relations: {},
-          storage: { collection: c },
-        },
-      ]),
-    ),
+        ]),
+      ),
+    }),
     storage: {
       namespaces: {
         __unbound__: {
