@@ -37,7 +37,7 @@ Then re-invoke this skill before proceeding.
 This skill applies when the project **is** a Prisma Next extension. Heuristics:
 
 - `package.json` declares `@prisma-next/contract` (or another SPI package) under `dependencies` or `peerDependencies`, and
-- the package's `name` matches `^@.*/extension-` (the in-tree convention used by `@prisma-next/extension-cipherstash`, etc.), or
+- the package's `name` matches `^@.*/extension-` (the in-tree convention used by `@prisma-next/extension-pgvector`, etc.), or
 - the package is referenced as an `extensionPacks` entry from a sibling app's `prisma-next.config.ts` in the same monorepo.
 
 If the project additionally consumes Prisma Next from its own app code, install the `prisma-next-upgrade` skill (`pnpm dlx skills add prisma/prisma-next/skills/upgrade --all`) and run the user flow first, then this flow in the same session.

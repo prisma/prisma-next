@@ -151,11 +151,11 @@ describe('check-upgrade-coverage — coverage rule (publish style: prev.minor < 
 
   it('fails when the diff touches packages/3-extensions/ but the extension-skill directory is absent', () => {
     writePackageJson('0.6.0');
-    writeRepoFile('packages/3-extensions/cipherstash/src/main.ts', 'export const a = 1;\n');
+    writeRepoFile('packages/3-extensions/pgvector/src/main.ts', 'export const a = 1;\n');
     commitAll('prev');
     const prev = git('rev-parse', 'HEAD');
     writePackageJson('0.7.0');
-    writeRepoFile('packages/3-extensions/cipherstash/src/main.ts', 'export const a = 2;\n');
+    writeRepoFile('packages/3-extensions/pgvector/src/main.ts', 'export const a = 2;\n');
     commitAll('head');
     const result = runScript(['--prev', prev, '--head', 'HEAD']);
     assert.notEqual(result.status, 0);
@@ -168,12 +168,12 @@ describe('check-upgrade-coverage — coverage rule (publish style: prev.minor < 
   it('requires both directories when both substrates change; passes once both are present', () => {
     writePackageJson('0.6.0');
     writeRepoFile('examples/demo/src/main.ts', 'a\n');
-    writeRepoFile('packages/3-extensions/cipherstash/src/main.ts', 'a\n');
+    writeRepoFile('packages/3-extensions/pgvector/src/main.ts', 'a\n');
     commitAll('prev');
     const prev = git('rev-parse', 'HEAD');
     writePackageJson('0.7.0');
     writeRepoFile('examples/demo/src/main.ts', 'b\n');
-    writeRepoFile('packages/3-extensions/cipherstash/src/main.ts', 'b\n');
+    writeRepoFile('packages/3-extensions/pgvector/src/main.ts', 'b\n');
     commitAll('head-broken');
 
     // Neither directory present → both missing.

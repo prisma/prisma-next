@@ -150,7 +150,7 @@ function setupExtensionJourney(
     `import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import cipherstash from '@prisma-next/extension-cipherstash/control';
+import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
 import { contract } from './contract';
@@ -160,7 +160,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [cipherstash],
+  extensionPacks: [pgvector],
   contract: {
     source: {
       load: async () => ({ ok: true as const, value: contract }),
@@ -433,7 +433,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'auto-baseline with extension pack seeds extension space separately from app bundles',
+      'auto-baseline with extension pack seeds extension space separately from app bundles (pgvector)',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const ctx = setupExtensionJourney(connectionString, createTempDir);
@@ -445,7 +445,7 @@ withTempDir(({ createTempDir }) => {
             plan,
           );
           expect(planJson.emittedExtensionDirs?.length).toBeGreaterThan(0);
-          expect(existsSync(join(ctx.testDir, 'migrations', 'cipherstash'))).toBe(true);
+          expect(existsSync(join(ctx.testDir, 'migrations', 'pgvector'))).toBe(true);
           expect(listAppMigrationBundleDirs(ctx)).toHaveLength(1);
         });
       },

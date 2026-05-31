@@ -230,7 +230,7 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 - **Contract space** — a `(contract.json, migrations, headRef)` triple owned by exactly one contributor. The application owns one space (`'app'`); each schema-contributing extension owns one. Spaces are disjoint on disk; they integrate only via the live database.
 - **Space-id** — identifier for a contract space. `[a-z][a-z0-9_-]{0,63}`. `'app'` is reserved for the application.
 - **App-space** — the application's contract space.
-- **Extension-space** — a contract space owned by an installed extension (e.g. `cipherstash`, `pgvector`).
+- **Extension-space** — a contract space owned by an installed extension (e.g. `pgvector`, `paradedb`).
 - **Pinned per-space artifacts** — the framework-owned on-disk mirror of each loaded extension's `contractSpace` (`migrations/<space-id>/{contract.json, contract.d.ts, refs/, <migration dirs>}`). Execution-time and verify-time read *only* the pinned files, never the extension's descriptor module.
 - **Descriptor** — the runtime/control descriptor of an extension. Carries `contractSpace` when the extension contributes schema.
 

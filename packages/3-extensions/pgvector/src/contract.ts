@@ -21,9 +21,8 @@
  * pgvector's space contribution and so the pinned `contract.json` on
  * disk is materially distinct from an empty space.
  *
- * Unlike CipherStash's deferred typed objects (composite types /
- * domains / enums — IR vocabulary deferral, see
- * `packages/3-extensions/cipherstash/src/contract.prisma`),
+ * Unlike extensions that defer typed objects (composite types /
+ * domains / enums) beyond the current IR vocabulary,
  * pgvector's `vector` IS representable in today's IR via
  * {@link StorageTypeInstance}.
  *

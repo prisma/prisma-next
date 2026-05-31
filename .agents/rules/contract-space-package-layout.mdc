@@ -24,7 +24,8 @@ applications) uses the **same** on-disk shape:
 │       ├── end-contract.d.ts
 │       └── migration.ts
 └── src/
-    ├── contract.prisma              ← PSL source (preferred; TS fallback noted below)
+    ├── contract.prisma              ← PSL source when the space has app-visible schema (preferred; exceptions below)
+    ├── contract.ts                  ← optional TS source (narrow exception)
     ├── contract.json                ← emitted (do not edit)
     ├── contract.d.ts                ← emitted (do not edit)
     └── exports/control.ts           ← descriptor; JSON-imports the artefacts
@@ -35,18 +36,10 @@ applications) uses the **same** on-disk shape:
 
 ## Rules (these are the spots where mistakes recur)
 
-- **Author contracts in PSL (`src/contract.prisma`)**, not TypeScript.
-  PSL is the canonical authoring surface — it reads as a schema (not as
-  builder calls), interoperates with brownfield Prisma schemas, and
-  keeps the contract decoupled from the workspace's TS type system.
-  Wire it with
-  `prismaContract('./src/contract.prisma', { output: 'src/contract.json', target })`.
-  The narrow exception is contracts that need to declare typed objects
-  the PSL surface doesn't yet express (e.g. parameterised
-  `storage.types` base-type registrations like pgvector's `vector` —
-  `types {}` blocks instantiate, they don't register). Such packages
-  may use `src/contract.ts` + `typescriptContract(contract, 'src/contract.json')`,
-  with a comment in the contract source naming the missing PSL surface.
+- **Pick the contract source by what the space contributes.** Three cases, each wired in `prisma-next.config.ts`:
+  - *App-visible schema* (models, storage types, namespaces) → author PSL in `src/contract.prisma`; wire `prismaContract('./src/contract.prisma', { output: 'src/contract.json', target })`. PSL is the canonical authoring surface: it reads as a schema (not as builder calls), interoperates with brownfield Prisma schemas, and keeps the contract decoupled from the workspace's TS type system.
+  - *Migrations only* — installs invariants (e.g. a Postgres extension) but ships no tables or native types → omit the contract source entirely; wire `emptyContract({ output: 'src/contract.json', target })`. Example: `@prisma-next/extension-paradedb`.
+  - *Typed objects PSL can't yet express* (e.g. pgvector's parameterised `vector` registration under `storage.types`) → keep `src/contract.ts`; wire `typescriptContract(contract, 'src/contract.json')`, with a comment in the source naming the missing PSL surface.
 - **No `<space-id>` subdirectory inside `migrations/`.** A package owns
   exactly one contract space, so the `<space-id>` directory adds no
   information. Migration directories sit *directly* under `migrations/`,
