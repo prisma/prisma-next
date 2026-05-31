@@ -38,5 +38,6 @@ This directory contains the primary documentation for the repository.
 - [Governance](./oss/governance.md) — maintainer team, decision-making, DCO basis
 - [Supply chain](./oss/supply-chain.md) — license validation, NOTICE audit, npm provenance, Dependabot cooldown
 - [Versioning](./oss/versioning.md) — source of truth, lockstep, dist-tag convention, release procedure
+- [Supported Versions](./Supported%20Versions.md) — minimum Node, TypeScript, PostgreSQL, MongoDB, Bun, Deno versions
 - [Telemetry](./Telemetry.md) — what the CLI collects, the user-level config file, env-var opt-outs, the `init` consent prompt, agent detection
 
