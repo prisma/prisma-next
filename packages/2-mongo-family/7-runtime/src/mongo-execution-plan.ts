@@ -7,8 +7,8 @@ import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
  * that a Mongo driver can run.
  *
  * The plan carries:
- * - `command` — the wire command (e.g. `InsertOneWireCommand`,
- *   `AggregateWireCommand`) produced by `MongoAdapter.lower(plan)`
+ * - `command` — dual lifecycle (see field JSDoc): unresolved draft during
+ *   `beforeExecute`, frozen wire command afterward
  * - `meta` — family-agnostic plan metadata (target, lane, hashes, ...)
  * - `_row` — phantom row type, propagated from the originating
  *   `MongoQueryPlan`
@@ -23,6 +23,14 @@ import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
  * cannot depend on.
  */
 export interface MongoExecutionPlan<Row = unknown> extends ExecutionPlan<Row> {
+  /**
+   * Lowered command payload. **Lifecycle:** during `beforeExecute` this slot
+   * holds the unresolved `MongoLoweredDraft` (plain object, `MongoParamRef`
+   * leaves intact). After `resolveParams` and in later middleware hooks
+   * (`afterExecute`, `onRow`, intercept-after-resolve) it is the frozen wire
+   * command (`InsertOneWireCommand`, `AggregateWireCommand`, …). Do not read
+   * `command` structurally in `beforeExecute` — use the `params` mutator.
+   */
   readonly command: AnyMongoWireCommand;
   readonly resultShape?: MongoResultShape;
 }
