@@ -44,10 +44,14 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@prisma-next/adapter-postgres": "workspace:0.11.0"
+    "@prisma-next/adapter-postgres": "workspace:0.11.0",
+    "typescript": ">=5.9"
   },
   "peerDependenciesMeta": {
     "@prisma-next/adapter-postgres": {
+      "optional": true
+    },
+    "typescript": {
       "optional": true
     }
   },
