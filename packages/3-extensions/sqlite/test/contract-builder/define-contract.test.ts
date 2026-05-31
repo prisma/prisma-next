@@ -23,7 +23,7 @@ describe('sqlite defineContract wrap', () => {
     }));
     expect(result.target).toBe('sqlite');
     expect(result.targetFamily).toBe('sql');
-    expect(contractModels(result).Foo).toBeDefined();
+    expect(contractModels(result)['Foo']).toBeDefined();
   });
 
   it('accepts extensionPacks: undefined', () => {
@@ -37,6 +37,6 @@ describe('sqlite defineContract wrap', () => {
         Bar: model('Bar', { fields: { id: field.column(textColumn).id() } }),
       },
     });
-    expect(contractModels(result).Bar).toBeDefined();
+    expect(contractModels(result)['Bar']).toBeDefined();
   });
 });

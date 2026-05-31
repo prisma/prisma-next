@@ -17,7 +17,7 @@ describe('mongo defineContract wrap', () => {
     }));
     expect(result.target).toBe('mongo');
     expect(result.targetFamily).toBe('mongo');
-    expect(contractModels(result).Foo).toBeDefined();
+    expect(contractModels(result)['Foo']).toBeDefined();
   });
 
   it('accepts extensionPacks: undefined', () => {
@@ -31,6 +31,6 @@ describe('mongo defineContract wrap', () => {
         Bar: model('Bar', { fields: { id: field.objectId() } }),
       },
     });
-    expect(contractModels(result).Bar).toBeDefined();
+    expect(contractModels(result)['Bar']).toBeDefined();
   });
 });
