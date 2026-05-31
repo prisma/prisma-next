@@ -114,7 +114,7 @@ gap between the `(contract)` row and the `(db)` row.
 ```
 ○   a94b7b4              (main, contract)
 │↑  add_posts            ef9de27 → a94b7b4
-○   ef9de27              (db, prod)
+○   ef9de27              (prod, db)
 │↑  init                 ∅ → ef9de27
 ○   ∅
 ```
@@ -174,7 +174,7 @@ plain `↓` rows — no arc. This mirrors forward `↑` exactly (same as `pure c
 `73e3abe` to its parent `6656a6e`, but it's one continuous lane carrying one `↑`.
 
 ```
-○     3b2d98d
+○   3b2d98d
 ├─┐
 │↑│   merge_alice        73e3abe → 3b2d98d
 │ │↑  merge_bob          6656a6e → 3b2d98d
@@ -194,7 +194,7 @@ plain `↓` rows — no arc. This mirrors forward `↑` exactly (same as `pure c
 upper one — one row, both jobs.
 
 ```
-○     cd5c15b
+○   cd5c15b
 ├─┐
 │↑│   merge_2a           0276f92 → cd5c15b
 │ │↑  merge_2b           a94b7b4 → cd5c15b
@@ -203,7 +203,7 @@ upper one — one row, both jobs.
 │ ○   a94b7b4
 │ │↑  add_posts_branch   3b2d98d → a94b7b4
 ├─┘
-○     3b2d98d
+○   3b2d98d
 ├─┐
 │↑│   merge_1a           73e3abe → 3b2d98d
 │ │↑  merge_1b           6656a6e → 3b2d98d
@@ -222,7 +222,7 @@ upper one — one row, both jobs.
 The arrow-in-lane carries the three merge rows and three add rows with no colour.
 
 ```
-○       3116048
+○   3116048
 ├─┬─╮
 │↑│ │   merge_phone      73e3abe → 3116048
 │ │↑│   merge_posts      a94b7b4 → 3116048
