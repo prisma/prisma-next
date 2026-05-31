@@ -1,9 +1,4 @@
-import {
-  buildDomainPlaneFromFlat,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import {
   contractToSchemaIR as contractToSchemaIRImpl,
   extractCodecControlHooks,
@@ -41,7 +36,7 @@ function createEmptyContract(): Contract<SqlStorage> {
       },
     }),
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

@@ -1,9 +1,4 @@
-import {
-  buildDomainPlaneFromFlat,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -36,7 +31,7 @@ function makeContract(
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

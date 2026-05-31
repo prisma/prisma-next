@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { buildDomainPlaneFromFlat, coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
@@ -12,7 +12,7 @@ const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
   profileHash: profileHash('sha256:test-hash'),
-  domain: buildDomainPlaneFromFlat({ models: {} }),
+  domain: domainPlaneOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test-hash'),

@@ -1,5 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { buildDomainPlaneFromFlat, type Contract } from '@prisma-next/contract/types';
+import { type Contract, domainPlaneOf } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import { extractQueryOperationTypeImports } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -13,7 +13,7 @@ describe('emitter + postgres adapter descriptor', () => {
       target: 'postgres',
       targetFamily: 'sql',
       roots: {},
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       storage: {
         storageHash: 'storage:sha256:test' as never,
         namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },

@@ -1,9 +1,4 @@
-import {
-  buildDomainPlaneFromFlat,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
@@ -98,7 +93,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
       }),
       roots: {},
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -169,7 +164,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
       }),
       roots: {},
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -269,7 +264,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
       }),
       roots: {},
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -336,7 +331,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
       }),
       roots: {},
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -401,7 +396,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
       }),
       roots: {},
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},

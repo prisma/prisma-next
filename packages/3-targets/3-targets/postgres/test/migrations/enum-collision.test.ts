@@ -1,9 +1,4 @@
-import {
-  buildDomainPlaneFromFlat,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
@@ -11,7 +6,6 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry, StorageTableInput } from '@prisma-next/sql-contract/types';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { PG_ENUM_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
 import { describe, expect, it } from 'vitest';
 import { enumStorageCompoundKey } from '../../src/core/migrations/enum-planning';
 import { planIssues } from '../../src/core/migrations/issue-planner';
@@ -23,6 +17,7 @@ import {
 } from '../../src/core/migrations/op-factory-call';
 import { nativeEnumPlanCallStrategy } from '../../src/core/migrations/planner-strategies';
 import { PostgresSchema, PostgresUnboundSchema } from '../../src/core/postgres-schema';
+import { PG_ENUM_CODEC_ID } from '../../src/exports/codec-ids';
 import { PostgresEnumType } from '../../src/exports/types';
 
 const defaultCtx = {
@@ -68,7 +63,7 @@ function makeCollisionContract(
       },
     }),
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -320,7 +315,7 @@ describe('enum namespace collision planning', () => {
           },
         }),
         roots: {},
-        domain: buildDomainPlaneFromFlat({ models: {} }),
+        domain: domainPlaneOf({ models: {} }),
         capabilities: {},
         extensionPacks: {},
         meta: {},

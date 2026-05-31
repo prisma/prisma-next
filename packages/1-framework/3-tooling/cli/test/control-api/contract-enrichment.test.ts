@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { buildDomainPlaneFromFlat, coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { enrichContract } from '../../src/control-api/contract-enrichment';
@@ -9,7 +9,7 @@ function makeIR(overrides?: Partial<Contract>): Contract {
     targetFamily: 'sql',
     target: 'postgres',
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     storage: { storageHash: coreHash('sha256:test'), namespaces: {} },
     extensionPacks: {},
     capabilities: {},

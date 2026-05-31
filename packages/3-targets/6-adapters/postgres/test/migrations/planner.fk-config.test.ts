@@ -1,8 +1,8 @@
 import {
   asNamespaceId,
-  buildDomainPlaneFromFlat,
   type Contract,
   coreHash,
+  domainPlaneOf,
   profileHash,
 } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
@@ -69,7 +69,7 @@ function createFkTestContract(fkConfig: {
       },
     }),
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

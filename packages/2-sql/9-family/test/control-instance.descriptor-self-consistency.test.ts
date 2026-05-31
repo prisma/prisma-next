@@ -1,10 +1,5 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
-import {
-  buildDomainPlaneFromFlat,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import type {
   ContractSpace,
   ControlFamilyDescriptor,
@@ -61,7 +56,7 @@ function buildContract(): Contract<SqlStorage> {
     target: TARGET,
     targetFamily: TARGET_FAMILY,
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

@@ -1,9 +1,4 @@
-import {
-  buildDomainPlaneFromFlat,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -56,7 +51,7 @@ const contractWithEnum: Contract<SqlStorage> = {
     },
   }),
   roots: {},
-  domain: buildDomainPlaneFromFlat({ models: {} }),
+  domain: domainPlaneOf({ models: {} }),
   capabilities: {},
   extensionPacks: {},
   meta: {},

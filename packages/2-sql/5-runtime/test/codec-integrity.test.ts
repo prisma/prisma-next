@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { buildDomainPlaneFromFlat, coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -145,7 +145,7 @@ describe('createExecutionContext — column codec integrity', () => {
       targetFamily: 'sql',
       target: 'postgres',
       profileHash: profileHash('sha256:test'),
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       roots: {},
       storage,
       extensionPacks: {},
@@ -302,7 +302,7 @@ describe('createExecutionContext — column codec integrity', () => {
       targetFamily: 'sql',
       target: 'postgres',
       profileHash: profileHash('sha256:test'),
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       roots: {},
       storage,
       extensionPacks: {},

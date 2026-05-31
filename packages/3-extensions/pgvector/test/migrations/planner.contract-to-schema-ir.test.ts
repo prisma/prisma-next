@@ -1,9 +1,9 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import {
   asNamespaceId,
-  buildDomainPlaneFromFlat,
   type Contract,
   coreHash,
+  domainPlaneOf,
   profileHash,
 } from '@prisma-next/contract/types';
 import type {
@@ -80,7 +80,7 @@ function createTestContract(
         ? storage
         : new SqlStorage({ ...storage, storageHash: storageHashValue }),
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -803,7 +803,7 @@ function createDemoContract(
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({ ...storage, storageHash: storageHashValue }),
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     capabilities: {},
     extensionPacks: { pgvector: {} },
     meta: {},

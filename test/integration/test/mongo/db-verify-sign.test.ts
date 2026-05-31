@@ -2,12 +2,7 @@ import mongoAdapterDescriptor, {
   createMongoControlDriver,
   initMarker,
 } from '@prisma-next/adapter-mongo/control';
-import {
-  buildDomainPlaneFromFlat,
-  coreHash,
-  crossRef,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { coreHash, crossRef, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
@@ -24,7 +19,7 @@ const baseContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { users: crossRef('User') },
-  domain: buildDomainPlaneFromFlat({
+  domain: domainPlaneOf({
     models: {
       User: {
         fields: {

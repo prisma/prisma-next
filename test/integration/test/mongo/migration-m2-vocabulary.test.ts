@@ -1,10 +1,5 @@
 import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
-import {
-  buildDomainPlaneFromFlat,
-  coreHash,
-  crossRef,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { coreHash, crossRef, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
@@ -50,7 +45,7 @@ function makeContract(
     target: 'mongo',
     targetFamily: 'mongo',
     roots: Object.fromEntries(Object.keys(collections).map((c) => [c, crossRef(c)])),
-    domain: buildDomainPlaneFromFlat({
+    domain: domainPlaneOf({
       models: Object.fromEntries(
         Object.keys(collections).map((c) => [
           c,

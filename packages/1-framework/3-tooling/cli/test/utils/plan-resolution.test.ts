@@ -1,4 +1,4 @@
-import { buildDomainPlaneFromFlat, type Contract } from '@prisma-next/contract/types';
+import { type Contract, domainPlaneOf } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import {
   type ContractSpaceMember,
@@ -50,7 +50,7 @@ function sampleContractIR(storageHash: string): ContractIR {
       target: 'postgres',
       profileHash: `sha256:${'p'.repeat(64)}`,
       storage: { storageHash },
-      domain: buildDomainPlaneFromFlat({ models: {} }),
+      domain: domainPlaneOf({ models: {} }),
       roots: {},
     },
     contractDts: 'export type Contract = unknown;\n',

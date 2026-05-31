@@ -1,4 +1,4 @@
-import { buildDomainPlaneFromFlat } from '@prisma-next/contract/types';
+import { domainPlaneOf } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   AggregateExpr,
@@ -71,7 +71,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  domain: buildDomainPlaneFromFlat({ models: {} }),
+  domain: domainPlaneOf({ models: {} }),
 }) as SqliteContract;
 
 describe('SQLite adapter', () => {

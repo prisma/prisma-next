@@ -1,4 +1,4 @@
-import { buildDomainPlaneFromFlat } from '@prisma-next/contract/types';
+import { domainPlaneOf } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   AndExpr,
@@ -61,7 +61,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  domain: buildDomainPlaneFromFlat({ models: {} }),
+  domain: domainPlaneOf({ models: {} }),
 }) as PostgresContract;
 
 describe('Postgres adapter join rendering', () => {

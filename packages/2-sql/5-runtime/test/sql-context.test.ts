@@ -1,7 +1,7 @@
 import {
-  buildDomainPlaneFromFlat,
   type Contract,
   coreHash,
+  domainPlaneOf,
   executionHash,
   profileHash,
 } from '@prisma-next/contract/types';
@@ -35,7 +35,7 @@ const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
   profileHash: profileHash('sha256:test'),
-  domain: buildDomainPlaneFromFlat({ models: {} }),
+  domain: domainPlaneOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),

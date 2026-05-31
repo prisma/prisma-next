@@ -54,12 +54,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { executeDbInit } from '@prisma-next/cli/control-api';
-import {
-  buildDomainPlaneFromFlat,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import pgvectorExtensionDescriptor from '@prisma-next/extension-pgvector/control';
 import sqlFamilyDescriptor, {
@@ -168,7 +163,7 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
       },
     },
     roots: {},
-    domain: buildDomainPlaneFromFlat({ models: {} }),
+    domain: domainPlaneOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},
