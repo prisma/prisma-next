@@ -1,0 +1,57 @@
+# Release notes
+
+Every stable (`latest`) release ships a committed notes file at `docs/releases/v<version>.md`. Its contents **are** the GitHub Release body: the publish workflow runs `gh release create --notes-file docs/releases/v<version>.md`, so what you commit here is exactly what readers see on the [GitHub Releases](https://github.com/prisma/prisma-next/releases) page. There is **no auto-generated fallback** — a stable release with no notes file fails to publish rather than shipping flat, uncurated notes.
+
+## When the file must exist
+
+The notes file must be committed **before the release PR merges**. Two modes of the same gate enforce this — both implemented in [`scripts/check-release-notes.mjs`](../../scripts/check-release-notes.mjs) and wired into [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) and [`.github/workflows/publish.yml`](../../.github/workflows/publish.yml):
+
+- **PR mode** (`pnpm check:release-notes --mode pr`) runs on every PR. When a PR changes the root `package.json` `version` (a release bump), it fails unless the matching `docs/releases/v<version>.md` is present — so a release PR that forgot its notes is caught in review, not after merge.
+- **Publish mode** (`pnpm check:release-notes --mode publish`) runs in the publish workflow for `latest` builds only, immediately before the Release is created, and fails the publish if the file is missing. Dev/beta builds create no GitHub Release and are not gated.
+
+For now these files are **hand-authored**. A forthcoming `draft-release-notes` skill will draft them automatically from the merged PRs in a release; until then, write them by hand using the template below.
+
+## Authoring conventions
+
+- **Write for users, not maintainers.** The audience is someone upgrading their app, not the team that shipped the change. Do not carry internal `TML-NNNN:` issue prefixes — link the PR instead.
+- **Categorize** entries under the fixed section order below, and **omit any section that has no entries**.
+- **Lead with breaking changes** — they are what a reader scanning the notes most needs to see.
+- **Link PRs** (e.g. `(#1234)`) and **attribute contributors**, especially first-time ones.
+
+The section order is: **Breaking changes → Features → Fixes → New contributors**.
+
+1. **Breaking changes** — API removals or renames, semantic changes to existing APIs, contract-format changes. Say what the reader must *do*, not just what changed.
+2. **Features** — new capabilities.
+3. **Fixes** — bug fixes.
+4. **New contributors** — first-time contributors, with the PR that welcomed them.
+
+## Template
+
+Copy this into `docs/releases/v<version>.md` and fill it in, dropping any section with no entries:
+
+```md
+# v<version>
+
+<optional one- or two-sentence summary of the release's theme>
+
+## Breaking changes
+
+- **<short title>** — <what changed and what the reader must do>. (#<pr>)
+
+## Features
+
+- <new capability>. (#<pr>)
+
+## Fixes
+
+- <bug fix>. (#<pr>)
+
+## New contributors
+
+- @<handle> made their first contribution in #<pr>
+```
+
+## See also
+
+- [`CHANGELOG.md`](../../CHANGELOG.md) — the rolling, newest-first index; each release entry mirrors its per-release file here under a `## v<version>` header.
+- [`docs/oss/versioning.md`](../oss/versioning.md) — the version contract and the release procedure these notes are part of.

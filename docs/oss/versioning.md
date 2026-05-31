@@ -59,6 +59,7 @@ The publish workflow is **triggered by a change to the root `version`**: a push 
 A growing set of pre-publish gates run as part of the workflow:
 
 - **Dependency-specifier check** ([`pnpm check:publish-deps`](../../scripts/check-publish-deps.mjs)) — fails the publish if any resolved `package.json` would carry an unrewritten `workspace:*` or `catalog:` specifier into the registry.
+- **Release-notes presence check** ([`pnpm check:release-notes`](../../scripts/check-release-notes.mjs)) — fires for `latest` publishes only. The stable Release body is the committed [`docs/releases/v<version>.md`](../releases/README.md), published via `gh release create --notes-file`; this gate fails the publish when that file is missing. There is **no `--generate-notes` fallback**. A PR-mode variant runs in CI ([`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) and fails a release PR that bumps the root `version` without committing the matching notes file, so the omission is caught in review rather than at publish.
 - More gates will accumulate here as the upgrade-skill machinery lands (recipe-presence check fired on root version changes, etc.). The root-version-as-trigger model is the hook these checks plug into.
 
 ## Procedure: cut the next minor
@@ -66,7 +67,8 @@ A growing set of pre-publish gates run as part of the workflow:
 The release cadence is one PR per minor. A maintainer:
 
 1. **Runs the `publish-npm-version` skill** (see [`.agents/skills/publish-npm-version/SKILL.md`](../../.agents/skills/publish-npm-version/SKILL.md)). The skill creates a fresh worktree off `origin/main`, drives `pnpm bump-minor`, and opens a PR in the maintainer's name. Using a skill rather than a GitHub workflow ensures the PR carries real maintainer credentials so CI runs on it normally.
-2. **Reviews and merges the PR.** This is the gate where humans verify there are no in-flight breaking changes that need release-notes attention. The merge itself is the publish trigger: the resulting push to `main` carries the bumped root `version`, the publish workflow detects the change, and publishes `<version>` under dist-tag `latest` plus a matching GitHub Release. No separate dispatch step is required.
+2. **Authors the release notes.** The release PR must include a committed [`docs/releases/v<version>.md`](../releases/README.md); its contents become the GitHub Release body verbatim (`gh release create --notes-file`), so there is no auto-generated PR-title summary to fall back on. The PR-mode release-notes gate fails the PR if the file is missing, making notes authoring part of preparing the release. For now the file is hand-authored (see [`docs/releases/README.md`](../releases/README.md) for the template); a forthcoming skill will draft it from the release's merged PRs.
+3. **Reviews and merges the PR.** This is the gate where humans verify there are no in-flight breaking changes that need release-notes attention. The merge itself is the publish trigger: the resulting push to `main` carries the bumped root `version`, the publish workflow detects the change, and publishes `<version>` under dist-tag `latest` plus a matching GitHub Release whose body is the committed notes file. No separate dispatch step is required.
 
 If the publish needs to be re-run (transient registry failure, etc.), a maintainer can dispatch the [`Publish to npm`](../../.github/workflows/publish.yml) workflow from `main` with `dist-tag=latest` and `dry-run=false`; the workflow re-publishes the version currently committed at HEAD. This is the same path used to cut a hand-rolled `beta` (`dist-tag=beta`).
 
@@ -76,7 +78,8 @@ Patches are not part of the routine cadence and only apply to the **current** mi
 
 1. Land the fix as a small PR.
 2. On a follow-up PR, run `node scripts/set-version.ts <major>.<minor>.<patch+1>` to advance every workspace package to the patch version.
-3. Merge to `main`. The merge changes the root `version` and auto-publishes `latest` via the same path as a minor bump.
+3. On that same PR, author `docs/releases/v<major>.<minor>.<patch+1>.md`. The release-notes gate enforces a committed notes file for every `latest` release, patches included — a patch with no notes file fails the publish. A patch entry is usually short (a single **Fixes** item), but it is still the Release body.
+4. Merge to `main`. The merge changes the root `version` and auto-publishes `latest` via the same path as a minor bump.
 
 The skill is not used for patches because the bump shape is different (`patch+1`, not `minor+1`); the explicit `set-version.ts` invocation is the procedure.
 
