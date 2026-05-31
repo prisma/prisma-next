@@ -14,6 +14,7 @@ import type { ImportRequirement } from '@prisma-next/ts-render';
 import type { Result } from '@prisma-next/utils/result';
 import type { TargetBoundComponentDescriptor } from '../shared/framework-components';
 import type { ControlDriverInstance, ControlFamilyInstance } from './control-instances';
+import type { OperationContext } from './control-result-types';
 
 // ============================================================================
 // Migration Package Metadata
@@ -199,7 +200,7 @@ export interface MigrationPlan {
   /**
    * Contract space this plan applies to. Runners cross-check
    * `options.space` against `plan.spaceId` so the marker row gets keyed
-   * by the right space when applying via `executeAcrossSpaces`.
+   * by the right space when applying via {@link MigrationRunner.execute}.
    *
    * Optional for backward compatibility with single-space callers that
    * pre-date the contract-space aggregate; when present, runners
@@ -299,11 +300,23 @@ export type MigrationPlannerResult = MigrationPlannerSuccessResult | MigrationPl
 // ============================================================================
 
 /**
- * Success value for migration runner execution.
+ * Per-space success payload returned inside
+ * {@link MigrationRunnerSuccessValue.perSpaceResults}.
  */
-export interface MigrationRunnerSuccessValue {
+export interface MigrationRunnerPerSpaceSuccessValue {
   readonly operationsPlanned: number;
   readonly operationsExecuted: number;
+}
+
+/**
+ * Success value for migration runner execution across one or more contract
+ * spaces.
+ */
+export interface MigrationRunnerSuccessValue {
+  readonly perSpaceResults: ReadonlyArray<{
+    readonly space: string;
+    readonly value: MigrationRunnerPerSpaceSuccessValue;
+  }>;
 }
 
 /**
@@ -318,6 +331,11 @@ export interface MigrationRunnerFailure {
   readonly why?: string;
   /** Optional metadata for debugging and UX (e.g., schema issues, SQL state). */
   readonly meta?: Record<string, unknown>;
+  /**
+   * Identifier of the space whose plan caused the rollback when
+   * {@link MigrationRunner.execute} processes multiple spaces.
+   */
+  readonly failingSpace?: string;
 }
 
 /**
@@ -428,64 +446,20 @@ export interface MigrationPlanner<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface MigrationRunner<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> {
-  /**
-   * Execute a migration plan against the configured driver.
-   *
-   * The `plan` parameter is trusted input. Callers are responsible for
-   * upstream verification of the originating migration package — typically
-   * by obtaining the package via `readMigrationPackage` from
-   * `@prisma-next/migration-tools/io`, which performs hash-integrity checks
-   * at the load boundary. Runners do not re-verify the plan and assume the
-   * `(metadata, ops)` pair on disk has not been tampered with since emit.
-   */
-  execute(options: {
-    readonly plan: MigrationPlan;
-    readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
-    readonly destinationContract: unknown;
-    readonly policy: MigrationOperationPolicy;
-    readonly callbacks?: {
-      onOperationStart?(op: MigrationPlanOperation): void;
-      onOperationComplete?(op: MigrationPlanOperation): void;
-    };
-    /**
-     * Execution-time checks configuration.
-     * All checks default to `true` (enabled) when omitted.
-     */
-    readonly executionChecks?: MigrationRunnerExecutionChecks;
-    /**
-     * Active framework components participating in this composition.
-     * Families/targets can interpret this list to derive family-specific metadata.
-     * All components must have matching familyId and targetId.
-     */
-    readonly frameworkComponents: ReadonlyArray<
-      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
-    >;
-  }): Promise<MigrationRunnerResult>;
-}
-
-// ============================================================================
-// Multi-space runner protocol (extension contract spaces, TML-2397)
-// ============================================================================
-
 /**
- * Per-space input for {@link MultiSpaceCapableRunner.executeAcrossSpaces}.
+ * Per-space input for {@link MigrationRunner.execute}.
  *
- * Mirrors the single-space `MigrationRunner.execute` options, extended with a
- * required `space` identifier. Each entry's `driver` must reference the same
- * connection the outer transaction is opened on (typically the same value as
- * the top-level `driver` on `executeAcrossSpaces`).
+ * Each entry's `driver` must reference the same connection the outer
+ * transaction is opened on (typically the same value as the top-level
+ * `driver` on `execute`). A single-space apply passes a one-element
+ * `perSpaceOptions` list.
  *
  * Family-specific runners (e.g. the SQL family's `SqlMigrationRunner`) define
  * a richer per-space option shape that is structurally compatible with this
- * one — additional optional fields (e.g. SQL's `strictVerification`,
- * `schemaName`, `callbacks`) are tolerated by the underlying runner without
- * affecting cross-target wiring.
+ * one — additional optional fields (e.g. SQL's `schemaName`, `callbacks`) are
+ * tolerated by the underlying runner without affecting cross-target wiring.
  */
-export interface MultiSpaceRunnerPerSpaceOptions<
+export interface MigrationRunnerPerSpaceOptions<
   TFamilyId extends string = string,
   TTargetId extends string = string,
 > {
@@ -496,45 +470,40 @@ export interface MultiSpaceRunnerPerSpaceOptions<
   readonly policy: MigrationOperationPolicy;
   readonly executionChecks?: MigrationRunnerExecutionChecks;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+  /**
+   * When `false`, schema verification tolerates objects owned by sibling
+   * contract spaces. Aggregate apply passes `false` per space because each
+   * `destinationContract` describes only that space's slice.
+   */
+  readonly strictVerification?: boolean;
+  /**
+   * Paths and metadata forwarded to schema verification diagnostics.
+   */
+  readonly context?: OperationContext;
 }
 
-export interface MultiSpaceRunnerSuccessValue {
-  readonly perSpaceResults: ReadonlyArray<{
-    readonly space: string;
-    readonly value: MigrationRunnerSuccessValue;
-  }>;
-}
-
-export interface MultiSpaceRunnerFailure extends MigrationRunnerFailure {
-  /** Identifier of the space whose plan caused the rollback. */
-  readonly failingSpace: string;
-}
-
-export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiSpaceRunnerFailure>;
-
-/**
- * Optional capability for runners that can apply a list of per-space plans.
- * Atomicity semantics differ by family:
- *
- * - SQL (`SqlMigrationRunner`) opens one outer transaction across every
- *   space; a failure on any space rolls back every space's writes.
- * - Mongo (`mongoTargetDescriptor`) cannot wrap most DDL ops in a session
- *   transaction (TML-2408), so it iterates per-space without an outer
- *   transaction and relies on per-space-internal verify-gated marker
- *   atomicity. Earlier-advanced markers are not rolled back when a later
- *   space fails; re-running resumes from the failing space.
- *
- * The capability is declared at the framework layer so CLI utilities can
- * route through it without importing any specific family directly.
- */
-export interface MultiSpaceCapableRunner<
+export interface MigrationRunner<
   TFamilyId extends string = string,
   TTargetId extends string = string,
 > {
-  executeAcrossSpaces(options: {
+  /**
+   * Apply one or more per-space migration plans against the configured driver.
+   *
+   * Each plan is trusted input. Callers are responsible for upstream
+   * verification of the originating migration package — typically by
+   * obtaining the package via `readMigrationPackage` from
+   * `@prisma-next/migration-tools/io`, which performs hash-integrity checks
+   * at the load boundary. Runners do not re-verify plans and assume the
+   * `(metadata, ops)` pairs on disk have not been tampered with since emit.
+   *
+   * Atomicity semantics differ by family: SQL targets open one outer
+   * transaction across every space; Mongo iterates per-space without an
+   * outer transaction and relies on per-space verify-gated marker atomicity.
+   */
+  execute(options: {
     readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
-    readonly perSpaceOptions: ReadonlyArray<MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>>;
-  }): Promise<MultiSpaceRunnerResult>;
+    readonly perSpaceOptions: ReadonlyArray<MigrationRunnerPerSpaceOptions<TFamilyId, TTargetId>>;
+  }): Promise<MigrationRunnerResult>;
 }
 
 // ============================================================================

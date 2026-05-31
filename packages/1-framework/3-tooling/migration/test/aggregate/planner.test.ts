@@ -149,7 +149,7 @@ describe('planAggregate', () => {
     expect(result.ok).toBe(true);
     const success = result.assertOk();
     // Extension first, then app — matches concatenateSpaceApplyInputs
-    // ordering and preserves MultiSpaceRunnerFailure.failingSpace.
+    // ordering and preserves MigrationRunnerFailure.failingSpace.
     expect(success.applyOrder).toEqual(['cipherstash', 'app']);
     expect(success.perSpace.get('cipherstash')?.strategy).toBe('graph-walk');
     expect(success.perSpace.get('cipherstash')?.plan.destination.storageHash).toBe(headHash);

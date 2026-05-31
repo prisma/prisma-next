@@ -21,7 +21,7 @@ import { executeAggregateApply } from './db-apply-aggregate';
  * 2. The aggregate planner runs with `callerPolicy.ignoreGraphFor`
  *    locked to the app member — synth strategy for the app, graph-walk
  *    for every extension.
- * 3. The runner's `executeAcrossSpaces` applies the per-space plans
+ * 3. The runner's `execute` applies the per-space plans
  *    inside one outer transaction.
  *
  * `extensionPacks` mirrors `Config.extensionPacks` (descriptor list).

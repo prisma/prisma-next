@@ -10,7 +10,7 @@ import {
   type MigrationPlanOperation,
   type MigrationRunnerExecutionChecks,
   type MigrationRunnerFailure,
-  type MigrationRunnerResult,
+  type MigrationRunnerPerSpaceSuccessValue,
   type OperationContext,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -24,7 +24,7 @@ import type {
   MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import { notOk, ok } from '@prisma-next/utils/result';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { FilterEvaluator } from './filter-evaluator';
 import { deserializeMongoOps } from './mongo-ops-serializer';
 
@@ -50,7 +50,7 @@ export interface MongoMigrationRunnerExecuteOptions {
    * `verifyMongoSchema`, so per-space verification only sees the slice
    * the destination contract actually claims.
    *
-   * The descriptor's `executeAcrossSpaces` injects this callback,
+   * The target descriptor's aggregate `execute` injects this callback,
    * derived from the sibling spaces in the aggregate. Single-space
    * callers leave it unset and verify against the whole introspected
    * schema (the pre-aggregate behaviour).
@@ -58,11 +58,16 @@ export interface MongoMigrationRunnerExecuteOptions {
   readonly projectSchema?: (schema: MongoSchemaIR) => MongoSchemaIR;
 }
 
+export type MongoMigrationRunnerResult = Result<
+  MigrationRunnerPerSpaceSuccessValue,
+  MigrationRunnerFailure
+>;
+
 function runnerFailure(
   code: string,
   summary: string,
   opts?: { why?: string; meta?: Record<string, unknown> },
-): MigrationRunnerResult {
+): MongoMigrationRunnerResult {
   return notOk<MigrationRunnerFailure>({
     code,
     summary,
@@ -73,7 +78,7 @@ function runnerFailure(
 export class MongoMigrationRunner {
   constructor(private readonly deps: MongoRunnerDependencies) {}
 
-  async execute(options: MongoMigrationRunnerExecuteOptions): Promise<MigrationRunnerResult> {
+  async execute(options: MongoMigrationRunnerExecuteOptions): Promise<MongoMigrationRunnerResult> {
     const { commandExecutor, inspectionExecutor, adapter, driver, markerOps } = this.deps;
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
     // Plans produced by the contract-space-aware planner stamp `spaceId`
@@ -199,7 +204,7 @@ export class MongoMigrationRunner {
     if (!isNoOp) {
       const liveSchema = await this.deps.introspectSchema();
       // In a multi-space aggregate the live database holds collections
-      // owned by sibling spaces; the descriptor's `executeAcrossSpaces`
+      // owned by sibling spaces; the target descriptor's aggregate `execute`
       // injects a `projectSchema` that strips them so per-space verify
       // only checks the slice this contract claims. Single-space
       // callers leave the projection identity (no-op).
@@ -264,7 +269,7 @@ export class MongoMigrationRunner {
     runIdempotency: boolean,
     runPrechecks: boolean,
     runPostchecks: boolean,
-  ): Promise<{ executed: boolean; failure?: MigrationRunnerResult }> {
+  ): Promise<{ executed: boolean; failure?: MongoMigrationRunnerResult }> {
     if (runPostchecks && runIdempotency && op.postcheck.length > 0) {
       const allSatisfied = await this.evaluateDataTransformChecks(
         op.postcheck,
@@ -383,7 +388,7 @@ export class MongoMigrationRunner {
   private enforcePolicyCompatibility(
     policy: MigrationOperationPolicy,
     operations: readonly AnyMongoMigrationOperation[],
-  ): MigrationRunnerResult | undefined {
+  ): MongoMigrationRunnerResult | undefined {
     const allowedClasses = new Set(policy.allowedOperationClasses);
     for (const operation of operations) {
       if (!allowedClasses.has(operation.operationClass)) {
@@ -406,7 +411,7 @@ export class MongoMigrationRunner {
   private ensureMarkerCompatibility(
     marker: ContractMarkerRecord | null,
     plan: MigrationPlan,
-  ): MigrationRunnerResult | undefined {
+  ): MongoMigrationRunnerResult | undefined {
     const origin = plan.origin ?? null;
     if (!origin) {
       // No origin assertion on the plan — the caller has done its own

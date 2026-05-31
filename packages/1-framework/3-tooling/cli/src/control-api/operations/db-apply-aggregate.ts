@@ -88,7 +88,7 @@ export interface ExecuteAggregateApplyOptions<TFamilyId extends string, TTargetI
  *    is forced through synth (today's daily-driver behaviour); every
  *    extension member walks its on-disk graph.
  * 4. **Apply** (when `mode === 'apply'`): every per-space `MigrationPlan`
- *    feeds into the runner's `executeAcrossSpaces` — one outer
+ *    feeds into the runner's `execute` — one outer
  *    transaction across every space; failure on any space rolls back
  *    every space's writes.
  */

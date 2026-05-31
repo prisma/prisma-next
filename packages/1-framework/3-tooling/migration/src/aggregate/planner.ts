@@ -38,7 +38,7 @@ export type {
  * Output `applyOrder` is `[...aggregate.extensions.map(spaceId), aggregate.app.spaceId]`
  * — extensions alphabetical, then app — matching today's
  * `concatenateSpaceApplyInputs` ordering. This preserves
- * `MultiSpaceRunnerFailure.failingSpace` attribution byte-for-byte.
+ * `MigrationRunnerFailure.failingSpace` attribution byte-for-byte.
  *
  * Every emitted `MigrationPlan` has `targetId = aggregate.targetId`.
  * No placeholder cast; no patch step.

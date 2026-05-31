@@ -1,7 +1,6 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
-  MultiSpaceRunnerResult,
   SqlControlFamilyInstance,
   SqlMigrationPlanContractInfo,
   SqlMigrationPlanOperation,
@@ -14,7 +13,10 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type {
+  ControlDriverInstance,
+  MigrationRunnerResult,
+} from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -84,44 +86,9 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     private readonly config: RunnerConfig,
   ) {}
 
-  async execute(
-    options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
-  ): Promise<SqlMigrationRunnerResult> {
-    const driver = options.driver;
-
-    // Static checks fail fast before any transaction work — no point
-    // burning a BEGIN/ROLLBACK round-trip on a destination-contract
-    // mismatch the caller can fix locally.
-    const destinationCheck = this.ensurePlanMatchesDestinationContract(
-      options.plan.destination,
-      options.destinationContract,
-    );
-    if (!destinationCheck.ok) return destinationCheck;
-
-    const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
-    if (!policyCheck.ok) return policyCheck;
-
-    await this.beginTransaction(driver);
-    let committed = false;
-    try {
-      const result = await this.executeOnConnection(options);
-      if (!result.ok) {
-        return result;
-      }
-      await this.commitTransaction(driver);
-      committed = true;
-      return result;
-    } finally {
-      if (!committed) {
-        await this.rollbackTransaction(driver);
-      }
-    }
-  }
-
   /**
    * Body of the migration runner without transaction management. The
-   * caller (single-space `execute(...)` above, or the multi-space
-   * outer-tx orchestrator at the SQL family level) owns the
+   * caller ({@link PostgresMigrationRunner.execute}) owns the
    * `BEGIN`/`COMMIT`/`ROLLBACK` lifecycle.
    */
   async executeOnConnection(
@@ -217,12 +184,12 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     });
   }
 
-  async executeAcrossSpaces(options: {
+  async execute(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly perSpaceOptions: ReadonlyArray<
       SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>
     >;
-  }): Promise<MultiSpaceRunnerResult> {
+  }): Promise<MigrationRunnerResult> {
     const driver = options.driver;
     const perSpaceOptions = options.perSpaceOptions;
 

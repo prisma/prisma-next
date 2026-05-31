@@ -15,7 +15,8 @@ import type {
   MigrationPlanOperation,
   MigrationRunnerExecutionChecks,
   MigrationRunnerFailure,
-  MigrationRunnerSuccessValue,
+  MigrationRunnerPerSpaceSuccessValue,
+  MigrationRunnerResult,
   OperationContext,
   OpFactoryCall,
   SchemaIssue,
@@ -401,7 +402,7 @@ export interface SqlMigrationRunnerFailure extends MigrationRunnerFailure {
   readonly meta?: AnyRecord;
 }
 
-export interface SqlMigrationRunnerSuccessValue extends MigrationRunnerSuccessValue {}
+export interface SqlMigrationRunnerSuccessValue extends MigrationRunnerPerSpaceSuccessValue {}
 
 export type SqlMigrationRunnerResult = Result<
   SqlMigrationRunnerSuccessValue,
@@ -410,22 +411,29 @@ export type SqlMigrationRunnerResult = Result<
 
 export interface SqlMigrationRunner<TTargetDetails> {
   /**
-   * Apply a single migration plan, opening and managing its own
-   * transaction (and any target-specific connection-level setup, e.g.
-   * SQLite's `PRAGMA foreign_keys` toggle). Existing single-space
-   * callers route through here.
+   * Apply one or more per-space migration plans, opening and managing the
+   * outer transaction (and any target-specific connection-level setup, e.g.
+   * SQLite's `PRAGMA foreign_keys` toggle). A single-space apply passes a
+   * one-element `perSpaceOptions` list.
+   *
+   * The caller orders the input list (typically via the aggregate planner's
+   * `applyOrder`: extensions alphabetical, then app). A failure on any space
+   * rolls back every space's writes.
+   *
+   * Each entry must reference the same `driver` as the top-level `driver`
+   * (the connection the outer transaction is open on).
    */
-  execute(
-    options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
-  ): Promise<SqlMigrationRunnerResult>;
+  execute(options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly perSpaceOptions: ReadonlyArray<SqlMigrationRunnerExecuteOptions<TTargetDetails>>;
+  }): Promise<MigrationRunnerResult>;
 
   /**
    * Apply a single migration plan against an already-open connection
    * **without** opening a transaction. The caller is responsible for
    * wrapping the call (and any siblings) in `BEGIN` / `COMMIT` /
-   * `ROLLBACK`. Used by the per-space runner wiring to fan out across
-   * contract spaces inside one outer transaction so a mid-apply
-   * failure rolls back every space's writes.
+   * `ROLLBACK`. Used by {@link SqlMigrationRunner.execute} to fan out
+   * across contract spaces inside one outer transaction.
    *
    * Idempotent control-table setup (`prisma_contract.*`) and marker
    * writes use `options.space` to address the per-space marker row.
@@ -433,39 +441,7 @@ export interface SqlMigrationRunner<TTargetDetails> {
   executeOnConnection(
     options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
   ): Promise<SqlMigrationRunnerResult>;
-
-  /**
-   * Apply per-space plans across multiple contract spaces inside a
-   * single outer transaction. The caller orders the input list
-   * (typically via the aggregate planner's `applyOrder`: extensions
-   * alphabetical, then app); the runner is responsible for opening
-   * / committing the outer
-   * transaction (and any target-specific connection-level setup such
-   * as the SQLite FK pragma toggle). A failure on any space rolls
-   * back every space's writes.
-   *
-   * Each space's `SqlMigrationRunnerExecuteOptions` must reference the
-   * same `driver` (the connection the outer transaction is open on).
-   * Per-space marker writes use `options.space` to address the row.
-   */
-  executeAcrossSpaces(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
-    readonly perSpaceOptions: ReadonlyArray<SqlMigrationRunnerExecuteOptions<TTargetDetails>>;
-  }): Promise<MultiSpaceRunnerResult>;
 }
-
-export interface MultiSpaceRunnerSuccessValue {
-  readonly perSpaceResults: ReadonlyArray<{
-    readonly space: string;
-    readonly value: SqlMigrationRunnerSuccessValue;
-  }>;
-}
-
-export interface MultiSpaceRunnerFailure extends SqlMigrationRunnerFailure {
-  readonly failingSpace: string;
-}
-
-export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiSpaceRunnerFailure>;
 
 export interface SqlControlTargetDescriptor<
   TTargetId extends string,

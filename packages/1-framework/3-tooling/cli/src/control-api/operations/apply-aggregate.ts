@@ -3,18 +3,14 @@ import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   MigrationOperationPolicy,
-  MultiSpaceCapableRunner,
-  MultiSpaceRunnerPerSpaceOptions,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
-import { hasMultiSpaceRunner } from '@prisma-next/framework-components/control';
 import type {
   AggregatePerSpacePlan,
   ContractSpaceAggregate,
 } from '@prisma-next/migration-tools/aggregate';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { errorRunnerFailed } from '../../utils/cli-errors';
 import type { AggregatePerSpaceExecutionEntry, OnControlProgress } from '../types';
 
 /**
@@ -56,7 +52,7 @@ export interface ApplyAggregateInputs<TFamilyId extends string, TTargetId extend
   /**
    * Canonical schedule order — extensions alphabetically by `spaceId`,
    * then app. Mirrors {@link import('@prisma-next/migration-tools/concatenate-space-apply-inputs').concatenateSpaceApplyInputs}'s
-   * convention so `MultiSpaceRunnerFailure.failingSpace` attribution
+   * convention so `MigrationRunnerFailure.failingSpace` attribution
    * stays byte-for-byte stable across callers.
    */
   readonly applyOrder: readonly string[];
@@ -107,7 +103,7 @@ export type ApplyAggregateResult = Result<ApplyAggregateValue, AggregateApplyRun
  * Marker advancement is part of the runner's per-space transaction
  * (the SQL family runner writes the marker as the last step of each
  * space's transaction), so this primitive does not advance markers
- * separately — by the time `executeAcrossSpaces` returns ok, every
+ * separately — by the time `execute` returns ok, every
  * space's marker has been advanced to its plan's destination.
  *
  * Span emission (`spanStart 'apply'` / `spanEnd 'apply'`) is owned here
@@ -133,14 +129,6 @@ export async function applyAggregate<TFamilyId extends string, TTargetId extends
   const orderedResolutions = collectOrdered(applyOrder, perSpacePlans);
 
   const runner = migrations.createRunner(familyInstance);
-  if (!hasMultiSpaceRunner(runner)) {
-    throw errorRunnerFailed(
-      `Runner for target "${aggregate.targetId}" does not implement \`executeAcrossSpaces\``,
-      {
-        why: `${labelForAction(action)} requires multi-space-capable runners (today: every SQL family runner).`,
-      },
-    );
-  }
 
   onProgress?.({
     action,
@@ -149,26 +137,21 @@ export async function applyAggregate<TFamilyId extends string, TTargetId extends
     label: progressLabelForAction(action),
   });
 
-  const perSpaceOptions: MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[] =
-    orderedResolutions.map((r) => ({
-      space: r.spaceId,
-      plan: r.entry.plan,
-      driver,
-      destinationContract: r.entry.destinationContract,
-      policy,
-      frameworkComponents,
-      // Per-space post-apply schema verification is non-strict: each
-      // space's `destinationContract` describes only its own slice; a
-      // strict verifier would treat every other space's tables as
-      // `extras`. Tolerant mode still catches missing tables / columns.
-      // SQL family runners read `strictVerification` via structural
-      // typing.
-      strictVerification: false,
-    })) as MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[];
+  const perSpaceOptions = orderedResolutions.map((r) => ({
+    space: r.spaceId,
+    plan: r.entry.plan,
+    driver,
+    destinationContract: r.entry.destinationContract,
+    policy,
+    frameworkComponents,
+    // Per-space post-apply schema verification is non-strict: each
+    // space's `destinationContract` describes only its own slice; a
+    // strict verifier would treat every other space's tables as
+    // `extras`. Tolerant mode still catches missing tables / columns.
+    strictVerification: false,
+  }));
 
-  const runnerResult = await (
-    runner as MultiSpaceCapableRunner<TFamilyId, TTargetId>
-  ).executeAcrossSpaces({ driver, perSpaceOptions });
+  const runnerResult = await runner.execute({ driver, perSpaceOptions });
 
   if (!runnerResult.ok) {
     onProgress?.({ action, kind: 'spanEnd', spanId: APPLY_SPAN_ID, outcome: 'error' });
@@ -276,16 +259,5 @@ export function progressLabelForAction(action: AggregateApplyAction): string {
       return 'Updating database across spaces';
     case 'migrationApply':
       return 'Applying migration plan across spaces';
-  }
-}
-
-function labelForAction(action: AggregateApplyAction): string {
-  switch (action) {
-    case 'dbInit':
-      return 'db init';
-    case 'dbUpdate':
-      return 'db update';
-    case 'migrationApply':
-      return 'migrate';
   }
 }

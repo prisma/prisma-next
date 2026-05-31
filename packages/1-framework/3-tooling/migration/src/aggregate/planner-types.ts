@@ -142,7 +142,7 @@ export interface AggregatePlannerSuccess {
    * `applyOrder` is the order the runner must walk per-space inputs.
    * Mirrors the existing `concatenateSpaceApplyInputs` convention:
    * extensions alphabetically by `spaceId`, then the app. Tests assert
-   * on `MultiSpaceRunnerFailure.failingSpace`, which is positional in
+   * on `MigrationRunnerFailure.failingSpace`, which is positional in
    * the runner's input array — preserving the literal ordering keeps
    * `failingSpace` attribution byte-for-byte.
    */
