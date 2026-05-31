@@ -42,40 +42,39 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
-        "tables": {
-          "feature_flag": {
-            "columns": {
-              "enabled": {
-                "codecId": "pg/bool@1",
-                "nativeType": "bool",
-                "nullable": false
-              },
-              "key": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
+    "__unbound__": {
+      "id": "__unbound__",
+      "kind": "postgres-unbound-schema",
+      "tables": {
+        "feature_flag": {
+          "columns": {
+            "enabled": {
+              "codecId": "pg/bool@1",
+              "nativeType": "bool",
+              "nullable": false
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "key"
-              ]
-            },
-            "uniques": []
-          }
+            "key": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "key"
+            ]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:1a11ef0c4ef2dc0d6ae0663e65bf61113f980fee7f55e3dd828f65fe439a88cb"
+    "storageHash": "sha256:870ac003337d47265961f3a18e8001be890d2d86d2fe094576eeea4cde1f3a9d"
   },
   "capabilities": {
     "postgres": {
+      "distinctOn": true,
       "jsonAgg": true,
       "lateral": true,
       "limit": true,
@@ -85,6 +84,7 @@
     "sql": {
       "defaultInInsert": true,
       "enums": true,
+      "lateral": true,
       "returning": true
     }
   },
