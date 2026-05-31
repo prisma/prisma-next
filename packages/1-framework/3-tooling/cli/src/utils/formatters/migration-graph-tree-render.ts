@@ -110,6 +110,17 @@ function arrowForEdgeKind(
   return palette.edgeArrow[kind];
 }
 
+/**
+ * A node-marker glyph pair (`○◂`, `○─`, `*<`, `*-`) is the contract node
+ * marker (`○` / `*`) followed by an arc connector (`◂` / `─` / `<` / `-`).
+ * The marker is the signal and stays bright (`style.kind`); the connector is
+ * gutter and stays dim (`style.lane`) — consistent with the plain node marker,
+ * which is never dimmed.
+ */
+function renderNodeMarkerPair(pair: string, style: MigrationListStyler): string {
+  return style.kind(pair.slice(0, 1)) + style.lane(pair.slice(1));
+}
+
 function renderCellPair(
   cell: StructuralCell,
   style: MigrationListStyler,
@@ -117,17 +128,18 @@ function renderCellPair(
 ): string {
   switch (cell.kind) {
     case 'node':
-      if (cell.arcLand === true) return style.lane(palette.arcLand);
-      if (cell.arcTee === true) return style.lane(palette.arcTee);
-      return palette.node;
+      if (cell.arcLand === true) return renderNodeMarkerPair(palette.arcLand, style);
+      if (cell.arcTee === true) return renderNodeMarkerPair(palette.arcTee, style);
+      return style.kind(palette.node);
     case 'vertical-pass':
       return style.lane(palette.verticalPass);
     case 'edge-lane':
-      return style.lane(
-        cell.ownsLabel
-          ? `${palette.verticalPass.trimEnd()}${arrowForEdgeKind(cell.edgeKind, palette)}`
-          : palette.verticalPass,
-      );
+      // The lane stays dim; the direction arrow (↑ / ↓ / ⟲) is the signal and
+      // stays bright, like the contract-node marker.
+      return cell.ownsLabel
+        ? style.lane(palette.verticalPass.trimEnd()) +
+            style.kind(arrowForEdgeKind(cell.edgeKind, palette))
+        : style.lane(palette.verticalPass);
     case 'branch-tee':
       return style.lane(palette.branchTee);
     case 'merge-tee':
