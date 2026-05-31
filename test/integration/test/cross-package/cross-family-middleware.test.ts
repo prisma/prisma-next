@@ -119,11 +119,22 @@ class MockSqlRuntime extends RuntimeCore<MockSqlPlan, MockSqlExec, RuntimeMiddle
 }
 
 function createMockMongoAdapter(): MongoAdapter {
+  // Mirrors the real two-phase adapter: `structuralLower` produces a draft that
+  // keeps the command intact, and `resolveParams` turns that draft into the
+  // wire command. `lower` is retained as the composed one-shot equivalent.
+  const structuralLower = vi.fn((plan: MongoQueryPlan) => ({
+    kind: plan.command.kind,
+    collection: plan.collection,
+    command: plan.command,
+  }));
+  const resolveParams = vi.fn((draft: { collection: string; command: unknown }) => ({
+    collection: draft.collection,
+    command: draft.command,
+  }));
   return {
-    lower: vi.fn((plan: MongoQueryPlan) => ({
-      collection: plan.collection,
-      command: plan.command,
-    })),
+    structuralLower,
+    resolveParams,
+    lower: vi.fn((plan: MongoQueryPlan) => resolveParams(structuralLower(plan))),
   } as unknown as MongoAdapter;
 }
 
@@ -144,6 +155,8 @@ function mockAdapterDescriptor(adapter: MongoAdapter): MongoRuntimeAdapterDescri
       familyId: 'mongo',
       targetId: 'mongo',
       lower: adapter.lower.bind(adapter),
+      structuralLower: adapter.structuralLower.bind(adapter),
+      resolveParams: adapter.resolveParams.bind(adapter),
     }),
   };
 }
