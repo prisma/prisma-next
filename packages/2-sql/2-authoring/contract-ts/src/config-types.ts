@@ -1,9 +1,11 @@
 import { pathToFileURL } from 'node:url';
 import type { ContractConfig } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
+import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok } from '@prisma-next/utils/result';
 import { extname } from 'pathe';
+import { buildSqlContractFromDefinition } from './build-contract';
 
 /**
  * Derives the emit output path from the TS contract input so artefacts land
@@ -15,6 +17,18 @@ function defaultOutputFromContractPath(contractPath: string): string {
   const ext = extname(contractPath);
   if (ext.length === 0) return `${contractPath}.json`;
   return `${contractPath.slice(0, -ext.length)}.json`;
+}
+
+export function emptyContract(options: {
+  readonly output?: string;
+  readonly target: TargetPackRef<'sql', string>;
+}): ContractConfig {
+  return {
+    source: {
+      load: async () => ok(buildSqlContractFromDefinition({ target: options.target, models: [] })),
+    },
+    ...ifDefined('output', options.output),
+  };
 }
 
 export function typescriptContract(contract: Contract, output?: string): ContractConfig {
