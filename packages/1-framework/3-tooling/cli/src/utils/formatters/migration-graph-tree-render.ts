@@ -399,10 +399,15 @@ export function renderMigrationGraphTree(
 
     if (row.kind === 'node') {
       const contractHash = row.contractHash ?? EMPTY_CONTRACT_HASH;
-      const hashText =
-        contractHash === EMPTY_CONTRACT_HASH
-          ? palette.emptySource
-          : style.sourceHash(abbreviateHash(contractHash, hashLength, palette.emptySource));
+      if (contractHash === EMPTY_CONTRACT_HASH) {
+        const emptyGlyph = palette.emptySource.padEnd(2, ' ');
+        gutter = emptyGlyph + gutter.slice(2);
+        lines.push(gutter.replace(/\s+$/, ''));
+        continue;
+      }
+      const hashText = style.sourceHash(
+        abbreviateHash(contractHash, hashLength, palette.emptySource),
+      );
       const overlayNames = overlayNamesForContract(contractHash, opts);
       const overlayPad =
         overlayNames.length > 0
