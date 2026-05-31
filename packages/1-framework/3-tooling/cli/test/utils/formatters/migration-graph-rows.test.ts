@@ -1,11 +1,13 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { describe, expect, it } from 'vitest';
+import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migration-graph-layout';
 import {
   buildMigrationGraphRows,
   type ClassifiedEdge,
   type MigrationGraphRowModel,
 } from '../../../src/utils/formatters/migration-graph-rows';
+import { renderMigrationGraphTree } from '../../../src/utils/formatters/migration-graph-tree-render';
 import type { MigrationEdgeKind } from '../../../src/utils/formatters/migration-list-graph-topology';
 
 // ---------------------------------------------------------------------------
@@ -473,6 +475,118 @@ describe('buildMigrationGraphRows', () => {
 
       expect(order1).toEqual(order2);
       expect(order1).toEqual(order3);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Cross-links + back-edges must not derail the tips-at-top layering
+  // -------------------------------------------------------------------------
+
+  describe('layering under cross-links and back-edges', () => {
+    // A graph that combines, in one component: a diamond, a cross-link (a
+    // forward "shortcut" edge that skips the diamond), a post-diamond linear
+    // chain ending in a tip with a self-edge, an adjacent rollback, a
+    // node-skipping rollback, and a node-skipping rollback originating from a
+    // branch node. The forward shortcut and the back-edges must NOT pull a
+    // node below any of its forward descendants: every forward edge's `to`
+    // (the newer contract) must still render above its `from`. A DFS post-order
+    // violates this — the post-diamond chain sinks below the diamond and the
+    // tip lands mid-graph — so this pins the longest-path layering that keeps
+    // tips at the top and roots at the bottom regardless of shortcuts/back-edges.
+    function comprehensiveGraph(): MigrationGraph {
+      return graph([
+        edge(EMPTY_CONTRACT_HASH, '1111111', 'init'),
+        edge('1111111', '2222222', 'add_users'),
+        edge('2222222', '33aaaaa', 'alice_phone'),
+        edge('2222222', '33bbbbb', 'bob_avatar'),
+        edge('33aaaaa', '4444444', 'merge_alice'),
+        edge('33bbbbb', '4444444', 'merge_bob'),
+        // cross-link: forward shortcut skipping the diamond
+        edge('1111111', '4444444', 'fast_forward'),
+        edge('4444444', '5555555', 'add_posts'),
+        edge('5555555', '6666666', 'add_comments'),
+        // adjacent rollback
+        edge('6666666', '5555555', 'rollback_posts'),
+        // node-skipping rollback
+        edge('6666666', '2222222', 'rollback_users'),
+        // node-skipping rollback originating from a branch node
+        edge('33aaaaa', '1111111', 'rollback_alice'),
+        // tip + self-edge
+        edge('6666666', '7777777', 'hotfix'),
+        edge('7777777', '7777777', 'reapply_noop'),
+        // disjoint cyclic component
+        edge('c111111', 'c222222', 'experiment'),
+        edge('c222222', 'c111111', 'revert_experiment'),
+      ]);
+    }
+
+    it('keeps every forward edge tip-above-root despite a cross-link and branch back-edge', () => {
+      assertTipsBeforeRoots(buildMigrationGraphRows(comprehensiveGraph()));
+    });
+
+    it('keeps the post-diamond tip at the top and the empty root at the bottom of its component', () => {
+      const nodes = nodeOrder(buildMigrationGraphRows(comprehensiveGraph())).filter(
+        (n): n is string => n !== null,
+      );
+      const pos = (hash: string): number => nodes.indexOf(hash);
+
+      // The merge node sits above both diamond branches (the cross-link and
+      // the branch back-edge must not sink it below them).
+      expect(pos('4444444')).toBeLessThan(pos('33aaaaa'));
+      expect(pos('4444444')).toBeLessThan(pos('33bbbbb'));
+      // The post-diamond chain stays above the diamond.
+      expect(pos('7777777')).toBeLessThan(pos('4444444'));
+      expect(pos('6666666')).toBeLessThan(pos('4444444'));
+      expect(pos('5555555')).toBeLessThan(pos('4444444'));
+      // Tip at the very top of the main component; empty baseline at the bottom.
+      expect(pos('7777777')).toBe(0);
+      expect(pos(EMPTY_CONTRACT_HASH)).toBeGreaterThan(pos('1111111'));
+    });
+
+    // The full annotated-tree render of the same graph, so the layering is
+    // evaluable at a glance: tip (7777777) on top, empty root (∅) on the
+    // bottom, the merge (4444444) above its diamond branches, the cross-link
+    // (fast_forward) and both node-skipping rollbacks (rollback_users,
+    // rollback_alice) routed as back-arcs, and the disjoint cyclic component
+    // separated by a blank line.
+    it('renders the comprehensive graph as an annotated tree', () => {
+      const rows = buildMigrationGraphRows(comprehensiveGraph());
+      const layout = buildMigrationGraphLayout(rows);
+      expect(renderMigrationGraphTree(layout, { colorize: false })).toBe(
+        [
+          '│⟲            reapply_noop        7777777 → 7777777',
+          '○             7777777',
+          '│↑            hotfix              6666666 → 7777777',
+          '○─────╮       6666666',
+          '│     │↓      rollback_users      6666666 → 2222222',
+          '│↑    │       add_comments        5555555 → 6666666',
+          '│↓    │       rollback_posts      6666666 → 5555555',
+          '○     │       5555555',
+          '│↑    │       add_posts           4444444 → 5555555',
+          '○     │       4444444',
+          '├─┬─╮ │',
+          '│↑│ │ │       merge_alice         33aaaaa → 4444444',
+          '│ │↑│ │       merge_bob           33bbbbb → 4444444',
+          '│ │ │↑│       fast_forward        1111111 → 4444444',
+          '○─┼─┼─┼─╮     33aaaaa',
+          '│ │ │ │ │↓    rollback_alice      33aaaaa → 1111111',
+          '│↑│ │ │ │     alice_phone         2222222 → 33aaaaa',
+          '│ ○ │ │ │     33bbbbb',
+          '│ │↑│ │ │     bob_avatar          2222222 → 33bbbbb',
+          '├─╯ │ │ │',
+          '○◂──┼─╯ │     2222222',
+          '│↑  │   │     add_users           1111111 → 2222222',
+          '├───╯   │',
+          '○◂──────╯     1111111',
+          '│↑            init                ∅ → 1111111',
+          '○             ∅',
+          '',
+          '○             c222222',
+          '│↑            experiment          c111111 → c222222',
+          '│↓            revert_experiment   c222222 → c111111',
+          '○             c111111',
+        ].join('\n'),
+      );
     });
   });
 });

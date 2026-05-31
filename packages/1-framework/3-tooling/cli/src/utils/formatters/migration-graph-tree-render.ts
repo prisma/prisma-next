@@ -160,7 +160,7 @@ function renderConnectorRow(
   palette: MigrationGraphTreeGlyphPalette,
 ): string {
   const isMerge = row.kind === 'merge-connector';
-  if (row.cells.length === gridWidth) {
+  if (row.cells.length > 0) {
     let seenTee = false;
     let out = '';
     for (const cell of row.cells) {
@@ -188,6 +188,12 @@ function renderConnectorRow(
         default:
           out += '  ';
       }
+    }
+    // The cells array is sized to the grid width at emit time; a back-arc lane
+    // allocated by a later row can push the grid wider afterwards, so pad any
+    // trailing columns rather than dropping the lanes that pass through here.
+    for (let column = row.cells.length; column < gridWidth; column++) {
+      out += '  ';
     }
     return out;
   }
