@@ -107,11 +107,18 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
 
       // Execute the plan
       const executeResult = await runner.execute({
-        plan: planResult.plan,
         driver: driver!,
-        destinationContract: contractWithEnum,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planResult.plan.spaceId ?? APP_SPACE_ID,
+
+            plan: planResult.plan,
+            driver: driver!,
+            destinationContract: contractWithEnum,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(executeResult.ok).toBe(true);

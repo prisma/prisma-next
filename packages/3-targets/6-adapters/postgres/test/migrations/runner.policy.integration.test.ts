@@ -82,11 +82,18 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
       });
 
       const result = await runner.execute({
-        plan: planWithPolicyViolation,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithPolicyViolation.spaceId ?? APP_SPACE_ID,
+
+            plan: planWithPolicyViolation,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -147,11 +154,18 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
       });
 
       const result = await runner.execute({
-        plan: planWithDataOp,
         driver: driver!,
-        destinationContract: contract,
-        policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithDataOp.spaceId ?? APP_SPACE_ID,
+
+            plan: planWithDataOp,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
+            frameworkComponents,
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
@@ -222,11 +236,18 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
       };
 
       const result = await runner.execute({
-        plan: planWithDestructiveOp,
         driver: driver!,
-        destinationContract: contract,
-        policy: permissivePolicy,
-        frameworkComponents,
+        perSpaceOptions: [
+          {
+            space: planWithDestructiveOp.spaceId ?? APP_SPACE_ID,
+
+            plan: planWithDestructiveOp,
+            driver: driver!,
+            destinationContract: contract,
+            policy: permissivePolicy,
+            frameworkComponents,
+          },
+        ],
       });
 
       // With a permissive policy, the same plan succeeds

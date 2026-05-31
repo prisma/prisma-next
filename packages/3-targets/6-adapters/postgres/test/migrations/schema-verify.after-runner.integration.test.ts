@@ -83,11 +83,18 @@ describe.sequential('Schema verification after runner - integration', () => {
     }
 
     const executeResult = await runner.execute({
-      plan: result.plan,
       driver: d,
-      destinationContract: contractInput,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      perSpaceOptions: [
+        {
+          space: result.plan.spaceId ?? APP_SPACE_ID,
+
+          plan: result.plan,
+          driver: d,
+          destinationContract: contractInput,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
 
     if (!executeResult.ok) {

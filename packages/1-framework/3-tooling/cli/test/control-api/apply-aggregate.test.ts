@@ -2,7 +2,7 @@ import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   MigrationPlan,
-  MultiSpaceRunnerResult,
+  MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import type {
@@ -74,13 +74,12 @@ function makeMigrations(): TargetMigrationsCapability<
   'postgres',
   ControlFamilyInstance<'sql', unknown>
 > {
-  const runnerResult: MultiSpaceRunnerResult = ok({
+  const runnerResult: MigrationRunnerResult = ok({
     perSpaceResults: [{ space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } }],
-  }) as unknown as MultiSpaceRunnerResult;
+  });
   return {
     createRunner: () => ({
-      execute: vi.fn(),
-      executeAcrossSpaces: async () => runnerResult,
+      execute: async () => runnerResult,
     }),
   } as unknown as TargetMigrationsCapability<
     'sql',

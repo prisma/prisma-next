@@ -59,11 +59,18 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
     }
 
     const executeResult = await runner.execute({
-      plan: initialPlan.plan,
       driver: driver!,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
+      perSpaceOptions: [
+        {
+          space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
+
+          plan: initialPlan.plan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
     });
     if (!executeResult.ok) {
       throw new Error(`Runner failed:\n${formatRunnerFailure(executeResult.failure)}`);

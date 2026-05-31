@@ -715,10 +715,6 @@ describe('ControlClient progress emission', () => {
         createRunner: () => ({
           execute: async () => ({
             ok: true,
-            value: { operationsPlanned: 1, operationsExecuted: 1 },
-          }),
-          executeAcrossSpaces: async () => ({
-            ok: true,
             value: {
               perSpaceResults: [
                 { space: 'app', value: { operationsPlanned: 1, operationsExecuted: 1 } },
