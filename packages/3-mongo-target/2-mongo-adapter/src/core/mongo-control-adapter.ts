@@ -1,4 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
@@ -6,6 +6,7 @@ import { introspectSchema } from './introspect-schema';
 import {
   initMarker,
   readAllMarkers,
+  readLedger,
   readMarker,
   updateMarker,
   writeLedgerEntry,
@@ -73,6 +74,13 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
     },
   ): Promise<void> {
     await writeLedgerEntry(extractDb(driver), space, entry);
+  }
+
+  async readLedger(
+    driver: ControlDriverInstance<'mongo', 'mongo'>,
+    space: string,
+  ): Promise<readonly LedgerEntryRecord[]> {
+    return readLedger(extractDb(driver), space);
   }
 
   async introspectSchema(driver: ControlDriverInstance<'mongo', 'mongo'>): Promise<MongoSchemaIR> {

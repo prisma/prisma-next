@@ -1,3 +1,4 @@
+import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
@@ -6,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   initMarker,
   readAllMarkers,
+  readLedger,
   readMarker,
   updateMarker,
   writeLedgerEntry,
@@ -329,6 +331,106 @@ describe('updateMarker', () => {
     expect(updatedB).toBe(true);
     const marker = await readMarker(db, APP);
     expect(marker?.invariants).toEqual(['alpha', 'beta']);
+  });
+});
+
+type ExpectedLedgerEntry = Omit<LedgerEntryRecord, 'appliedAt'>;
+
+function expectReadLedger(
+  entries: readonly LedgerEntryRecord[],
+  expected: readonly ExpectedLedgerEntry[],
+): void {
+  expect(entries).toHaveLength(expected.length);
+  for (const entry of entries) {
+    expect(entry.appliedAt).toBeInstanceOf(Date);
+  }
+  expect(entries.map(({ appliedAt: _appliedAt, ...rest }) => rest)).toEqual(expected);
+}
+
+describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
+  it('returns an empty array when no ledger entries exist for the space', async () => {
+    expect(await readLedger(db, APP)).toEqual([]);
+  });
+
+  it('returns entries in insertion order with cross-target LedgerEntryRecord shape', async () => {
+    const hashA = 'sha256:ledger-mid-a';
+    const hashB = 'sha256:ledger-mid-b';
+    const destHash = 'sha256:ledger-dest';
+    await writeLedgerEntry(db, APP, {
+      edgeId: 'sha256:empty->sha256:ledger-mid-a',
+      from: 'sha256:empty',
+      to: hashA,
+      migrationName: '001_a',
+      migrationHash: 'sha256:mig-a',
+      operations: [{ id: 'edge.a' }],
+    });
+    await writeLedgerEntry(db, APP, {
+      edgeId: `${hashA}->${hashB}`,
+      from: hashA,
+      to: hashB,
+      migrationName: '002_b',
+      migrationHash: 'sha256:mig-b',
+      operations: [{ id: 'edge.b1' }, { id: 'edge.b2' }],
+    });
+    await writeLedgerEntry(db, APP, {
+      edgeId: `${hashB}->${destHash}`,
+      from: hashB,
+      to: destHash,
+      migrationName: '003_c',
+      migrationHash: 'sha256:mig-c',
+      operations: [{ id: 'edge.c' }],
+    });
+
+    const ledger = await readLedger(db, APP);
+    expectReadLedger(ledger, [
+      {
+        space: APP,
+        migrationName: '001_a',
+        migrationHash: 'sha256:mig-a',
+        from: null,
+        to: hashA,
+        operationCount: 1,
+      },
+      {
+        space: APP,
+        migrationName: '002_b',
+        migrationHash: 'sha256:mig-b',
+        from: hashA,
+        to: hashB,
+        operationCount: 2,
+      },
+      {
+        space: APP,
+        migrationName: '003_c',
+        migrationHash: 'sha256:mig-c',
+        from: hashB,
+        to: destHash,
+        operationCount: 1,
+      },
+    ]);
+  });
+
+  it('maps synth empty-string from to null', async () => {
+    await writeLedgerEntry(db, APP, {
+      edgeId: '->sha256:v1',
+      from: '',
+      to: 'sha256:v1',
+      migrationName: '',
+      migrationHash: 'sha256:v1',
+      operations: [],
+    });
+
+    const ledger = await readLedger(db, APP);
+    expectReadLedger(ledger, [
+      {
+        space: APP,
+        migrationName: '',
+        migrationHash: 'sha256:v1',
+        from: null,
+        to: 'sha256:v1',
+        operationCount: 0,
+      },
+    ]);
   });
 });
 

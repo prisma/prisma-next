@@ -2,7 +2,11 @@ import type {
   ContractSourceDiagnostics,
   ContractSourceProvider,
 } from '@prisma-next/config/config-types';
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -875,6 +879,13 @@ export interface ControlClient {
    * drift after a database connection has been established.
    */
   readAllMarkers(): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
+
+  /**
+   * Reads the per-migration ledger journal for `space` in apply order.
+   * Returns an empty array when the ledger store does not yet exist or
+   * has no rows for that space.
+   */
+  readLedger(space?: string): Promise<readonly LedgerEntryRecord[]>;
 
   /**
    * Applies pre-planned on-disk migrations to the database.

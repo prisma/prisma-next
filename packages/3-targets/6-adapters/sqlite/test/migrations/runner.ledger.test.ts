@@ -1,9 +1,11 @@
+import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
+import { SqliteControlAdapter } from '../../src/core/control-adapter';
 import {
   contract,
   createLedgerTestPlan,
@@ -28,6 +30,21 @@ interface LedgerRow {
   readonly operations: string;
 }
 
+const ledgerAdapter = new SqliteControlAdapter();
+
+type ExpectedLedgerEntry = Omit<LedgerEntryRecord, 'appliedAt'>;
+
+function expectReadLedger(
+  entries: readonly LedgerEntryRecord[],
+  expected: readonly ExpectedLedgerEntry[],
+): void {
+  expect(entries).toHaveLength(expected.length);
+  for (const entry of entries) {
+    expect(entry.appliedAt).toBeInstanceOf(Date);
+  }
+  expect(entries.map(({ appliedAt: _appliedAt, ...rest }) => rest)).toEqual(expected);
+}
+
 async function readLedgerRows(driver: TestDatabase['driver']): Promise<LedgerRow[]> {
   return (
     await driver.query<LedgerRow>(
@@ -50,6 +67,12 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
 
   afterEach(() => {
     testDb?.cleanup();
+  });
+
+  it('readLedger returns an empty array when the ledger table does not exist', async () => {
+    testDb = createTestDatabase();
+    const ledger = await ledgerAdapter.readLedger(testDb.driver, LEDGER_TEST_SPACE_ID);
+    expect(ledger).toEqual([]);
   });
 
   it('writes one ledger row for a single-edge apply with space, name, hash, from/to, and that edge ops', async () => {
@@ -118,6 +141,18 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     expect(parseNullableJsonColumn(rows[0]!.contract_json_after)).toMatchObject({
       storage: { storageHash: destHash },
     });
+
+    const ledger = await ledgerAdapter.readLedger(driver, LEDGER_TEST_SPACE_ID);
+    expectReadLedger(ledger, [
+      {
+        space: LEDGER_TEST_SPACE_ID,
+        migrationName: '001_single',
+        migrationHash: 'sha256:mig-single',
+        from: null,
+        to: destHash,
+        operationCount: 1,
+      },
+    ]);
   });
 
   it('writes N ledger rows in walk order for multi-edge apply with ops and contract_json on endpoints only', async () => {
@@ -258,6 +293,34 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     expect(parseNullableJsonColumn(rows[2]!.contract_json_after)).toMatchObject({
       storage: { storageHash: destHash },
     });
+
+    const ledger = await ledgerAdapter.readLedger(driver, LEDGER_TEST_SPACE_ID);
+    expectReadLedger(ledger, [
+      {
+        space: LEDGER_TEST_SPACE_ID,
+        migrationName: '001_a',
+        migrationHash: 'sha256:mig-a',
+        from: null,
+        to: hashA,
+        operationCount: 1,
+      },
+      {
+        space: LEDGER_TEST_SPACE_ID,
+        migrationName: '002_b',
+        migrationHash: 'sha256:mig-b',
+        from: hashA,
+        to: hashB,
+        operationCount: 2,
+      },
+      {
+        space: LEDGER_TEST_SPACE_ID,
+        migrationName: '003_c',
+        migrationHash: 'sha256:mig-c',
+        from: hashB,
+        to: destHash,
+        operationCount: 1,
+      },
+    ]);
   });
 
   it('writes one synthesised ledger row with space for synth apply without migrationEdges', async () => {

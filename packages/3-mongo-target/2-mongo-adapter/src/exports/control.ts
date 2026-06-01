@@ -5,6 +5,7 @@ export { introspectSchema } from '../core/introspect-schema';
 export {
   initMarker,
   readAllMarkers,
+  readLedger,
   readMarker,
   updateMarker,
   writeLedgerEntry,

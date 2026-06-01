@@ -60,6 +60,7 @@ export type {
   GeneratedValueSpec,
   JsonPrimitive,
   JsonValue,
+  LedgerEntryRecord,
   PlanMeta,
   ProfileHashBase,
   Source,
