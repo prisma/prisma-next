@@ -64,7 +64,7 @@
     "@cursor/sdk": "^1.0.15",
     "@prisma-next/tsconfig": "workspace:0.11.0",
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "^4.1.6",
+    "@vitest/coverage-v8": "^4.1.7",
     "arktype": "catalog:",
     "dependency-cruiser": "^17.4.0",
     "gray-matter": "catalog:",
