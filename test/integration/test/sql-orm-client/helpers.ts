@@ -1,12 +1,10 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import {
-  contractModels,
-  type Contract as FrameworkContract,
-  UNBOUND_DOMAIN_NAMESPACE_ID,
-} from '@prisma-next/contract/types';
+import { contractModels, type Contract as FrameworkContract } from '@prisma-next/contract/types';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+
+const POSTGRES_DEFAULT_NAMESPACE_ID = 'public' as const;
+
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
@@ -54,7 +52,7 @@ export function withPatchedDomainModels<T extends FrameworkContract<SqlStorage>>
   contract: T,
   patch: (models: Record<string, unknown>) => Record<string, unknown>,
 ): T {
-  const namespaceId = UNBOUND_DOMAIN_NAMESPACE_ID;
+  const namespaceId = POSTGRES_DEFAULT_NAMESPACE_ID;
   const namespace = contract.domain.namespaces[namespaceId]!;
   const models = contractModels(contract);
   return {
@@ -83,7 +81,7 @@ type MutableDomainModel = {
 function unboundDomainModels(raw: {
   domain: { namespaces: Record<string, { models: Record<string, unknown> }> };
 }): Record<string, MutableDomainModel> {
-  return raw.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models as Record<
+  return raw.domain.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID]!.models as Record<
     string,
     MutableDomainModel
   >;
@@ -151,7 +149,7 @@ export function buildMixedPolyContract(): TestContract {
     base: 'Task',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.tasks = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -164,7 +162,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.features = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -216,17 +214,17 @@ export function buildStiPolyContract(): TestContract {
     base: 'User',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.kind = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.role = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.plan = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,

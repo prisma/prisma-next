@@ -1,5 +1,6 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+
+const POSTGRES_DEFAULT_NAMESPACE_ID = 'public' as const;
 
 type StorageLike = {
   readonly namespaces: Readonly<
@@ -10,7 +11,7 @@ type StorageLike = {
 export function unboundTables(
   storage: StorageLike | SqlStorage,
 ): Readonly<Record<string, StorageTable>> {
-  return (storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables ?? {}) as Readonly<
+  return (storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID]?.tables ?? {}) as Readonly<
     Record<string, StorageTable>
   >;
 }
