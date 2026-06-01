@@ -9,7 +9,6 @@ import type {
 } from './migration-graph-layout';
 import type { ClassifiedEdge } from './migration-graph-rows';
 import {
-  abbreviateContractHash,
   MIGRATION_LIST_HASH_WIDTH,
   migrationListEmptySource,
   migrationListForwardArrow,
@@ -234,8 +233,8 @@ function abbreviateHash(hash: string, hashLength: number, emptySource: string): 
   if (hash === EMPTY_CONTRACT_HASH) {
     return emptySource;
   }
-  const abbreviated = abbreviateContractHash(hash);
-  return hashLength === MIGRATION_LIST_HASH_WIDTH ? abbreviated : abbreviated.slice(0, hashLength);
+  const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
+  return stripped.slice(0, hashLength);
 }
 
 const MIN_HASH_DATA_COLUMN = 25;
