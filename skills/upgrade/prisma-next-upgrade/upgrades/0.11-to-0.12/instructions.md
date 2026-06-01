@@ -39,6 +39,24 @@ changes:
         - '"kind": "mongo-database"'
       anyMatch: true
     script: ./re-emit-closed-mongo-contracts.ts
+  - id: public-default-namespace
+    summary: |
+      Un-namespaced Postgres models now emit under the `public` namespace instead of the `__unbound__` sentinel; explicit `namespace unbound { … }` in PSL still round-trips to `__unbound__`. Re-emit contract artefacts (`pnpm emit`, i.e. `prisma-next contract emit`) so `contract.json` / `contract.d.ts` pick up the new storage/domain namespace key (`__unbound__`/`postgres-unbound-schema` → `public`/`postgres-schema`). No hand-editing of emitted JSON is required when the PSL/TS contract source is unchanged.
+    detection:
+      glob: "**/contract.json"
+      contains:
+        - '"kind": "postgres-unbound-schema"'
+      anyMatch: true
+    script: ./re-emit-postgres-public-default.ts
+  - id: domain-plane-namespaced-contract
+    summary: |
+      `contract.models` / `contract.valueObjects` moved under `contract.domain.namespaces.<ns>` (symmetric domain plane). Re-emit contract artefacts (`pnpm emit`) so emitted JSON and `contract.d.ts` carry the namespaced domain envelope; generated types switch from `Contract['models']` to `ContractModelsMap<Contract>`.
+    detection:
+      glob: "**/contract.d.ts"
+      contains:
+        - "Contract['models']"
+      anyMatch: true
+    script: ./re-emit-domain-namespaced-contracts.ts
 ---
 
 # 0.11 → 0.12 — User upgrade instructions
@@ -267,3 +285,55 @@ Wire `-y` into your deploy pipeline only after you have reviewed the plan in a l
 ### Validation
 
 After re-emitting and applying, run `pnpm typecheck && pnpm test` (or your application's equivalent). Contract hash/type drift shows up immediately in TypeScript imports of `StorageHash`. At runtime, confirm `db verify` passes against the updated validators.
+
+## `public-default-namespace`
+
+Starting at the 0.12 release, un-namespaced Postgres models resolve to the `public` namespace id instead of falling back to the `__unbound__` sentinel. The emitted contract's default storage namespace key changes from `__unbound__` with `"kind": "postgres-unbound-schema"` to `public` with `"kind": "postgres-schema"`. Domain roots, FK `namespaceId` fields, and `contract.d.ts` namespace literals follow the same rename.
+
+Explicit opt-in to the sentinel remains available: `namespace unbound { … }` in PSL still round-trips to `__unbound__` on Postgres. Only contracts whose *default* namespace is still the old sentinel shape need this migration.
+
+### Re-emit Postgres contracts
+
+Run the colocated script from your project root:
+
+```bash
+pnpm exec tsx ./re-emit-postgres-public-default.ts
+```
+
+It finds every committed `contract.json` whose storage tree still carries `"kind": "postgres-unbound-schema"`, then runs `pnpm emit` (or `prisma-next contract emit`) in the matching contract space. Use `--check` to list spaces that still need re-emitting without writing files:
+
+```bash
+pnpm exec tsx ./re-emit-postgres-public-default.ts --check
+```
+
+### After re-emit
+
+If your database marker or migration head still references the old contract hash, plan and apply the resulting migration (`prisma-next db update --plan-only`, then `prisma-next db update -y` once reviewed). The schema ops are typically hash/metadata drift only when your PSL source did not change.
+
+### Validation
+
+After re-emitting, run `pnpm typecheck && pnpm test`. Inspect the `contract.json` diff: default models should sit under `storage.namespaces.public` and `domain.namespaces.public`, not `__unbound__`.
+
+## `domain-plane-namespaced-contract`
+
+Starting at the 0.12 release, the application plane is symmetric with storage: models and value objects live under `contract.domain.namespaces.<ns>` instead of flat `contract.models` / `contract.valueObjects` at the contract root (ADR 221). Emitted `contract.d.ts` exports `Models` via `ContractModelsMap<Contract>` rather than `Contract['models']`.
+
+### Re-emit your contracts
+
+Run the colocated script from your project root:
+
+```bash
+pnpm exec tsx ./re-emit-domain-namespaced-contracts.ts
+```
+
+It finds contract spaces whose on-disk artefacts still use the flat domain shape (JSON missing `domain.namespaces`, or `contract.d.ts` still referencing `Contract['models']`), then re-emits each space. Use `--check` for a dry-run:
+
+```bash
+pnpm exec tsx ./re-emit-domain-namespaced-contracts.ts --check
+```
+
+If you already re-emitted for `public-default-namespace` on 0.12, a single emit pass covers both transitions — run whichever entry's detection matches your tree.
+
+### Validation
+
+After re-emitting, run `pnpm typecheck && pnpm test`. The regenerated `contract.json` should carry a `domain.namespaces` envelope; `contract.d.ts` should export `Models = ContractModelsMap<Contract>`.
