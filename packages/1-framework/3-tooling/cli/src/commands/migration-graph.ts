@@ -97,6 +97,8 @@ export async function executeMigrationGraphCommand(
           glyphMode: ui.resolveGlyphMode(options.ascii === true),
         }),
       );
+      // Blank line separating the stderr key from the graph that follows on stdout.
+      ui.stderr('');
     }
   }
 

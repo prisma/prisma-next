@@ -701,9 +701,11 @@ describe('renderMigrationGraphLegend', () => {
   it('renders the unicode legend without color', () => {
     expect(renderMigrationGraphLegend({ colorize: false })).toMatchInlineSnapshot(`
       "Legend:
-        ○ contract node   ↑ forward   ↓ rollback   ⟲ self   ∅ empty / root
-        → from → to (data column)   (refs) node overlay incl. db / contract markers
-        lanes: colored by column"
+        ○ contract   ↑ forward   ↓ rollback
+        ⟲ migration without schema change
+        ∅ empty database (baseline)
+        (refs) db / contract markers
+        aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
 
@@ -712,26 +714,37 @@ describe('renderMigrationGraphLegend', () => {
       renderMigrationGraphLegend({ colorize: false, glyphMode: 'ascii' }),
     ).toMatchInlineSnapshot(`
       "Legend:
-        * contract node   ^ forward   v rollback   @ self   - empty / root
-        -> from -> to (data column)   (refs) node overlay incl. db / contract markers
-        lanes: colored by column"
+        * contract   ^ forward   v rollback
+        @ migration without schema change
+        - empty database (baseline)
+        (refs) db / contract markers
+        aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
 
-  it('includes the rotating lane-color cycle only when colorize is true', () => {
-    const colored = renderMigrationGraphLegend({ colorize: true });
-    for (const column of [0, 1, 2, 3, 4, 5]) {
-      expect(colored).toContain(laneColorForColumn(column)('│'));
-    }
+  it('emits zero ANSI when colorize is off; content is unchanged by the colorize gate', () => {
     const plain = renderMigrationGraphLegend({ colorize: false });
     expect(plain).not.toContain('\u001b[');
-    expect(plain).toContain('lanes: colored by column');
+    // The colorize gate only adds styling — the visible content is identical.
+    expect(stripAnsi(renderMigrationGraphLegend({ colorize: true }))).toBe(plain);
+  });
+
+  it('drops the old lane sample, data-column, and "node" wording', () => {
+    for (const colorize of [false, true]) {
+      const text = stripAnsi(renderMigrationGraphLegend({ colorize }));
+      expect(text).not.toContain('lanes');
+      expect(text).not.toContain('contract node');
+      expect(text).not.toContain('data column');
+      expect(text).not.toContain('node overlay');
+      expect(text).toContain('(refs) db / contract markers');
+      expect(text).toContain('migration from contract aaaaaa to bbbbbb');
+    }
   });
 
   it('honors the ASCII palette when color is on', () => {
     const colored = renderMigrationGraphLegend({ colorize: true, glyphMode: 'ascii' });
-    expect(stripAnsi(colored)).toContain('* contract node');
-    expect(stripAnsi(colored)).toContain('^ forward');
-    expect(colored).toContain(laneColorForColumn(0)('|'));
+    expect(stripAnsi(colored)).toContain('* contract   ^ forward   v rollback');
+    expect(stripAnsi(colored)).toContain('aaaaaa -> bbbbbb');
+    expect(stripAnsi(colored)).not.toContain('lanes');
   });
 });

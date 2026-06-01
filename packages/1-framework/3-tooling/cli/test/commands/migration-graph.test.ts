@@ -59,11 +59,18 @@ describe('migration graph legend stream split', () => {
     });
     const outputSpy = vi.spyOn(ui, 'output').mockImplementation(() => {});
 
+    // Mirror the command's invocation: the legend, then a trailing blank line
+    // separating the stderr key from the graph that follows on stdout.
     ui.stderr(renderMigrationGraphLegend({ colorize: false }));
+    ui.stderr('');
 
     const stderrText = stderr.join('\n');
     expect(stderrText).toContain('Legend:');
-    expect(stderrText).toContain('lanes: colored by column');
+    expect(stderrText).toContain('(refs) db / contract markers');
+    expect(stderrText).toContain('migration from contract aaaaaa to bbbbbb');
+    expect(stderrText).not.toContain('lanes');
+    // The trailing blank line is its own stderr write, producing visible separation.
+    expect(stderr.at(-1)).toBe('');
     expect(outputSpy).not.toHaveBeenCalled();
     stderrSpy.mockRestore();
     outputSpy.mockRestore();

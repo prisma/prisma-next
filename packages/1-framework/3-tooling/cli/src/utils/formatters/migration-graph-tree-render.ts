@@ -2,7 +2,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { bold, createColors } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
-import { LANE_COLOR_CYCLE, laneColorForColumn } from './migration-graph-lane-colors';
+import { laneColorForColumn } from './migration-graph-lane-colors';
 import type {
   MigrationGraphGridModel,
   MigrationGraphGridRow,
@@ -729,34 +729,27 @@ export interface RenderMigrationGraphLegendOptions {
 }
 
 /**
- * A compact key for the `--tree` visual language: the contract-node marker,
- * the in-lane direction arrows, the empty baseline, the data-column arrow, the
- * `(refs)` overlay (including the reserved `db` live-database and `contract`
- * working-schema markers), and — only when color is on — a sample of the
- * rotating per-column lane palette.
+ * A compact key for the `--tree` visual language: the contract marker, the
+ * in-lane direction arrows, the empty baseline, the `(refs)` overlay (including
+ * the reserved `db` live-database and `contract` working-schema markers), and a
+ * worked sample of the data-column `from → to` migration hash arrow.
  *
  * Honors the same glyph palette (unicode vs ASCII) and `colorize` gate as the
  * tree renderer, so the key matches whatever the graph itself drew and stays
- * pipe-safe (zero ANSI when color is off).
+ * pipe-safe (zero ANSI when color is off). The caller adds the trailing blank
+ * line that separates this stderr key from the graph on stdout.
  */
 export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptions): string {
   const palette = paletteFor(opts.glyphMode ?? 'unicode');
   const style = createAnsiMigrationListStyler({ useColor: opts.colorize });
   const node = palette.node.trimEnd();
-  const bar = palette.verticalPass.trimEnd();
-  const markers = [
-    `${style.kind(node)} contract node`,
-    `${style.kind(palette.edgeArrow.forward)} forward`,
-    `${style.kind(palette.edgeArrow.rollback)} rollback`,
-    `${style.kind(palette.edgeArrow.self)} self`,
-    `${style.glyph(palette.emptySource)} empty / root`,
-  ].join('   ');
-  const data = [
-    `${style.glyph(palette.forwardArrow)} from ${style.glyph(palette.forwardArrow)} to (data column)`,
-    `${style.refs(['refs'])} node overlay incl. ${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`,
-  ].join('   ');
-  const lanes = opts.colorize
-    ? `lanes: ${LANE_COLOR_CYCLE.map((color) => color(bar)).join(' ')} colored by column`
-    : 'lanes: colored by column';
-  return ['Legend:', `  ${markers}`, `  ${data}`, `  ${lanes}`].join('\n');
+  const sampleArrow = `${style.sourceHash('aaaaaa')} ${style.glyph(palette.forwardArrow)} ${style.destHash('bbbbbb')}`;
+  return [
+    'Legend:',
+    `  ${style.kind(node)} contract   ${style.kind(palette.edgeArrow.forward)} forward   ${style.kind(palette.edgeArrow.rollback)} rollback`,
+    `  ${style.kind(palette.edgeArrow.self)} migration without schema change`,
+    `  ${style.glyph(palette.emptySource)} empty database (baseline)`,
+    `  ${style.refs(['refs'])} ${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`,
+    `  ${sampleArrow}   migration from contract aaaaaa to bbbbbb`,
+  ].join('\n');
 }
