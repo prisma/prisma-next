@@ -1,4 +1,4 @@
-import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
+import { effectiveControl, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollationOptions,
@@ -175,6 +175,65 @@ describe('MongoTargetContractSerializer', () => {
       expect(items?.validator).toBeInstanceOf(MongoValidator);
       expect(items?.options).toBeInstanceOf(MongoCollectionOptions);
       expect(items?.options?.collation).toBeInstanceOf(MongoCollationOptions);
+    });
+
+    function makeMixedControlJson() {
+      return {
+        targetFamily: 'mongo' as const,
+        target: 'mongo',
+        profileHash: 'sha256:test',
+        defaultControl: 'tolerated' as const,
+        roots: {
+          items: { model: 'Item', namespace: UNBOUND_NAMESPACE_ID },
+          events: { model: 'Event', namespace: UNBOUND_NAMESPACE_ID },
+        },
+        storage: {
+          storageHash: 'sha256:test',
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              kind: 'mongo-database',
+              collections: {
+                items: { control: 'external' as const },
+                events: {},
+              },
+            },
+          },
+        },
+        domain: applicationDomainOf({
+          models: {
+            Item: {
+              fields: {
+                _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              },
+              relations: {},
+              storage: { collection: 'items' },
+            },
+            Event: {
+              fields: {
+                _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              },
+              relations: {},
+              storage: { collection: 'events' },
+            },
+          },
+          namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+        }),
+      };
+    }
+
+    it('preserves effective control per collection across serialize → deserialize', () => {
+      const serializer = new MongoTargetContractSerializer();
+      const contract = serializer.deserializeContract(makeMixedControlJson());
+      const reparsed = JSON.parse(JSON.stringify(serializer.serializeContract(contract)));
+
+      expect(reparsed.defaultControl).toBe('tolerated');
+
+      const collections = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].collections;
+      const def = reparsed.defaultControl;
+      expect(effectiveControl(collections.items.control, def)).toBe('external');
+      expect(effectiveControl(collections.events.control, def)).toBe('tolerated');
+      expect(collections.events).not.toHaveProperty('control');
     });
 
     it('serialise(deserialise(json)) produces canonically equivalent JSON', () => {
