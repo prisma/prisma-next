@@ -6,7 +6,7 @@ import { SqlStorage } from '../src/ir/sql-storage';
 import { StorageTable } from '../src/ir/storage-table';
 import { resolveStorageTable } from '../src/resolve-storage-table';
 
-function tableNamed(name: string): StorageTable {
+function tableNamed(_name: string): StorageTable {
   return new StorageTable({
     columns: {
       id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },

@@ -6,18 +6,15 @@ import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
  * Multi-namespace contracts must fail loudly rather than silently dropping namespaces.
  */
 export function assertSingleDomainNamespaceForEmission(domain: ApplicationDomain): string {
-  const namespaceIds = Object.keys(domain.namespaces);
-  if (namespaceIds.length === 0) {
-    throw new DomainNamespaceResolutionError('domain has no namespaces');
-  }
-  if (namespaceIds.length > 1) {
-    throw new DomainNamespaceResolutionError(
-      `expected exactly one domain namespace for contract.d.ts emission, found ${namespaceIds.length} (${namespaceIds.join(', ')})`,
-    );
-  }
-  const soleNamespaceId = namespaceIds[0];
+  const [soleNamespaceId, ...rest] = Object.keys(domain.namespaces);
   if (soleNamespaceId === undefined) {
     throw new DomainNamespaceResolutionError('domain has no namespaces');
+  }
+  if (rest.length > 0) {
+    const all = [soleNamespaceId, ...rest];
+    throw new DomainNamespaceResolutionError(
+      `expected exactly one domain namespace for contract.d.ts emission, found ${all.length} (${all.join(', ')})`,
+    );
   }
   return soleNamespaceId;
 }

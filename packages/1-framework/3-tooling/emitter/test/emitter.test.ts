@@ -341,9 +341,6 @@ describe('emitter', () => {
   it('threads resolveFieldTypeParams from emitter SPI through to field type maps', async () => {
     // The emitter wraps `emitter.resolveFieldTypeParams(name, field, model, contract)`
     // into a `(name, field) => …` adapter for `generateBothFieldTypesMaps`.
-    // The wrapper looks up the model in the contract and skips the
-    // delegated call when the model is missing — both branches need
-    // coverage so the wrapper logic stays correct as the SPI evolves.
     const ir = createTestContract({
       models: {
         User: {
@@ -454,6 +451,31 @@ describe('emitter', () => {
     expect(result.contractDts).toContain('export type FieldOutputTypes');
   });
 
+  it('emits value object clauses when the domain namespace declares value objects', async () => {
+    const ir = createTestContract({
+      storage: emptySqlStorage,
+      valueObjects: {
+        Address: {
+          fields: {
+            street: {
+              nullable: false,
+              type: { kind: 'scalar', codecId: 'pg/text@1' },
+            },
+          },
+        },
+      },
+    });
+
+    const options: EmitStackInput = {
+      codecTypeImports: [],
+      extensionIds: [],
+    };
+
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractDts).toContain('readonly valueObjects:');
+    expect(result.contractDts).toContain('export type AddressOutput');
+  });
+
   it('throws when domain has more than one namespace', () => {
     const contract = {
       ...createTestContract(),
@@ -470,6 +492,23 @@ describe('emitter', () => {
         profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
       }),
     ).toThrow(DomainNamespaceResolutionError);
+  });
+
+  it('throws when the sole namespace id has no namespace payload on the contract', () => {
+    const contract = {
+      ...createTestContract(),
+      domain: {
+        namespaces: {
+          public: undefined,
+        },
+      },
+    };
+    expect(() =>
+      generateContractDts(contract, mockSqlHook, [], {
+        storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
+        profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+      }),
+    ).toThrow('domain namespace "public" is not present on the contract');
   });
 
   it('emits execution clause when contract has execution section', async () => {

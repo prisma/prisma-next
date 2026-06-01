@@ -11,6 +11,14 @@ describe('assertSingleDomainNamespaceForEmission', () => {
     ).toBe('public');
   });
 
+  it('throws when the domain has no namespaces', () => {
+    expect(() =>
+      assertSingleDomainNamespaceForEmission({
+        namespaces: {},
+      }),
+    ).toThrow('domain has no namespaces');
+  });
+
   it('throws when more than one domain namespace is declared', () => {
     expect(() =>
       assertSingleDomainNamespaceForEmission({
@@ -19,6 +27,10 @@ describe('assertSingleDomainNamespaceForEmission', () => {
           public: { models: {} },
         },
       }),
-    ).toThrow(DomainNamespaceResolutionError);
+    ).toThrow(
+      new DomainNamespaceResolutionError(
+        'expected exactly one domain namespace for contract.d.ts emission, found 2 (auth, public)',
+      ),
+    );
   });
 });
