@@ -4,19 +4,19 @@
 
 Three sequential dispatches: foundation type + resolver, then a uniform fan-out of the field across the storage IR, then cross-target round-trip + no-churn verification.
 
-### Dispatch 1: foundation type, resolver, and contract default
+### Dispatch 1: foundation type, resolver, and contract-default field
 
-- **Outcome:** `ControlPolicy` and `effectiveControl(nodeControl, defaultControl)` exist in `@prisma-next/contract`; `Contract` carries `defaultControl?`; the foundation contract validator accepts `defaultControl`. Unit tests pin the resolver's precedence (`node → default → 'managed'`).
+- **Outcome:** `ControlPolicy` and `effectiveControl(nodeControl, defaultControl)` exist in `@prisma-next/contract`; `Contract` carries `defaultControl?: ControlPolicy` (type only). Unit tests pin the resolver's precedence (`node → default → 'managed'`).
 - **Builds on:** The spec's chosen design.
-- **Hands to:** The exported `ControlPolicy` type + `effectiveControl` resolver that every later dispatch and downstream slice imports, and the `defaultControl` contract field.
-- **Focus:** In — foundation type, pure resolver + its unit tests, the `Contract` field, the contract-level validator. Out — the per-node `control` field (Dispatch 2).
+- **Hands to:** The exported `ControlPolicy` type + `effectiveControl` resolver that every later dispatch and downstream slice imports, and the `defaultControl` field on `Contract`.
+- **Focus:** In — foundation type, the pure resolver + its unit tests, the `Contract` type field. Out — the per-node `control` field and **all** arktype validator wiring (Dispatch 2), which keeps this dispatch foundation-only (typecheck + unit test gate, no cross-package surface).
 
 ### Dispatch 2: fan `control?` out across every storage-plane node + validators
 
-- **Outcome:** SQL `StorageTable`/`StorageColumn`, the Mongo storage entity, and `PostgresEnumStorageEntry` each carry `control?: ControlPolicy` via the existing `declare readonly` + assign-if-defined idiom; each entity's arktype validator accepts `control`. A set value survives construction; an unset value is never assigned.
-- **Builds on:** Dispatch 1's `ControlPolicy` type.
+- **Outcome:** SQL `StorageTable`/`StorageColumn`, the Mongo storage entity, and `PostgresEnumStorageEntry` each carry `control?: ControlPolicy` via the existing `declare readonly` + assign-if-defined idiom; every affected arktype validator accepts `control`, and the contract-shape validator accepts `defaultControl`. A set value survives construction; an unset value is never assigned.
+- **Builds on:** Dispatch 1's `ControlPolicy` type + `Contract.defaultControl` field.
 - **Hands to:** Every storage-plane IR node carrying `control`, validated, with omit-when-default holding at the class level.
-- **Focus:** In — the uniform field addition + validator update across the named storage classes. Out — the resolver's consumers, and any round-trip/fixture verification (Dispatch 3).
+- **Focus:** In — the uniform field addition + all validator updates (per-node `control` and contract-level `defaultControl`) across the named classes. Out — the resolver's consumers, and any round-trip/fixture verification (Dispatch 3).
 
 ### Dispatch 3: cross-target round-trip + no-hash-churn verification
 
