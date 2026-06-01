@@ -21,4 +21,24 @@ describe('ast/order', () => {
     expect(rewritten.expr).toEqual(col('article', 'title'));
     expect(rewritten.dir).toBe('asc');
   });
+
+  it('reverses direction into a new frozen instance, preserving expr identity', () => {
+    const expr = col('user', 'id');
+    const asc = OrderByItem.asc(expr);
+    const reversed = asc.reverse();
+
+    expect(reversed.dir).toBe('desc');
+    expect(reversed.expr).toBe(expr);
+    expect(reversed).not.toBe(asc);
+    expect(asc.dir).toBe('asc');
+    expect(Object.isFrozen(reversed)).toBe(true);
+  });
+
+  it('round-trips a double reverse back to the original direction', () => {
+    const desc = OrderByItem.desc(col('post', 'title'));
+    const roundTrip = desc.reverse().reverse();
+
+    expect(roundTrip.dir).toBe('desc');
+    expect(roundTrip.expr).toBe(desc.expr);
+  });
 });

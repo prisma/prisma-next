@@ -1,3 +1,4 @@
+export { OrderByItem } from '@prisma-next/sql-relational-core/ast';
 export { Collection } from '../collection';
 export { all, and, not, or } from '../filters';
 export { GroupedCollection } from '../grouped-collection';
