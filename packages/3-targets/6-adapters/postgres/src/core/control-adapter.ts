@@ -1,4 +1,8 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
@@ -43,6 +47,38 @@ import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
 const POSTGRES_MARKER_TABLE = 'prisma_contract.marker';
+const POSTGRES_LEDGER_TABLE = 'prisma_contract.ledger';
+const EMPTY_ORIGIN_CORE_HASH = 'sha256:empty';
+
+function ledgerOriginFromStored(originCoreHash: string | null): string | null {
+  if (
+    originCoreHash === null ||
+    originCoreHash === '' ||
+    originCoreHash === EMPTY_ORIGIN_CORE_HASH
+  ) {
+    return null;
+  }
+  return originCoreHash;
+}
+
+function coerceLedgerAppliedAt(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+function operationCountFromStored(operations: unknown): number {
+  if (Array.isArray(operations)) {
+    return operations.length;
+  }
+  if (typeof operations === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(operations);
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+}
 
 /**
  * Postgres control plane adapter for control-plane operations like introspection.
@@ -234,6 +270,69 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       );
     }
     return rows;
+  }
+
+  /**
+   * Reads per-migration ledger rows for `space` from `prisma_contract.ledger`
+   * in apply order. Probes `information_schema.tables` first so a fresh
+   * database without the ledger table returns `[]` instead of raising
+   * "relation does not exist".
+   */
+  async readLedger(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    space: string,
+  ): Promise<readonly LedgerEntryRecord[]> {
+    const ledgerContext = { space, markerLocation: POSTGRES_LEDGER_TABLE };
+    const exists = await withMarkerReadErrorHandling(
+      () =>
+        driver.query(
+          `select 1
+       from information_schema.tables
+       where table_schema = $1 and table_name = $2`,
+          ['prisma_contract', 'ledger'],
+        ),
+      ledgerContext,
+    );
+    if (exists.rows.length === 0) {
+      return [];
+    }
+
+    const result = await withMarkerReadErrorHandling(
+      () =>
+        driver.query<{
+          space: string;
+          migration_name: string;
+          migration_hash: string;
+          origin_core_hash: string | null;
+          destination_core_hash: string;
+          operations: unknown;
+          created_at: Date | string;
+        }>(
+          `select
+         space,
+         migration_name,
+         migration_hash,
+         origin_core_hash,
+         destination_core_hash,
+         operations,
+         created_at
+       from prisma_contract.ledger
+       where space = $1
+       order by id`,
+          [space],
+        ),
+      ledgerContext,
+    );
+
+    return result.rows.map((row) => ({
+      space: row.space,
+      migrationName: row.migration_name,
+      migrationHash: row.migration_hash,
+      from: ledgerOriginFromStored(row.origin_core_hash),
+      to: row.destination_core_hash,
+      appliedAt: coerceLedgerAppliedAt(row.created_at),
+      operationCount: operationCountFromStored(row.operations),
+    }));
   }
 
   /**

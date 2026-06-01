@@ -1,4 +1,8 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
@@ -84,6 +88,8 @@ function isMongoControlAdapter(value: unknown): value is MongoControlAdapter<'mo
     typeof (value as { readMarker: unknown }).readMarker === 'function' &&
     'readAllMarkers' in value &&
     typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
+    'readLedger' in value &&
+    typeof (value as { readLedger: unknown }).readLedger === 'function' &&
     'introspectSchema' in value &&
     typeof (value as { introspectSchema: unknown }).introspectSchema === 'function'
   );
@@ -369,6 +375,10 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
 
     async readAllMarkers(options): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
       return getControlAdapter().readAllMarkers(asMongoDriver(options.driver));
+    },
+
+    async readLedger(options): Promise<readonly LedgerEntryRecord[]> {
+      return getControlAdapter().readLedger(asMongoDriver(options.driver), options.space);
     },
 
     async introspect(options): Promise<MongoSchemaIR> {

@@ -1,9 +1,11 @@
+import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
 import {
   contract,
   createDriver,
@@ -29,6 +31,21 @@ interface LedgerRow {
   readonly contract_json_before: unknown;
   readonly contract_json_after: unknown;
   readonly operations: unknown;
+}
+
+const ledgerAdapter = new PostgresControlAdapter();
+
+type ExpectedLedgerEntry = Omit<LedgerEntryRecord, 'appliedAt'>;
+
+function expectReadLedger(
+  entries: readonly LedgerEntryRecord[],
+  expected: readonly ExpectedLedgerEntry[],
+): void {
+  expect(entries).toHaveLength(expected.length);
+  for (const entry of entries) {
+    expect(entry.appliedAt).toBeInstanceOf(Date);
+  }
+  expect(entries.map(({ appliedAt: _appliedAt, ...rest }) => rest)).toEqual(expected);
 }
 
 async function readLedgerRows(driver: PostgresControlDriver): Promise<LedgerRow[]> {
@@ -64,6 +81,15 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
       await driver.close();
       driver = undefined;
     }
+  });
+
+  it('readLedger returns an empty array when the ledger table does not exist', {
+    timeout: testTimeout,
+  }, async () => {
+    const freshDriver = await createDriver(database.connectionString);
+    const ledger = await ledgerAdapter.readLedger(freshDriver, LEDGER_TEST_SPACE_ID);
+    expect(ledger).toEqual([]);
+    await freshDriver.close();
   });
 
   it('writes one ledger row for a single-edge apply with space, name, hash, from/to, and that edge ops', {
@@ -132,6 +158,18 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     expect(rows[0]!.contract_json_after).toMatchObject({
       storage: { storageHash: destHash },
     });
+
+    const ledger = await ledgerAdapter.readLedger(driver!, LEDGER_TEST_SPACE_ID);
+    expectReadLedger(ledger, [
+      {
+        space: LEDGER_TEST_SPACE_ID,
+        migrationName: '001_single',
+        migrationHash: 'sha256:mig-single',
+        from: null,
+        to: destHash,
+        operationCount: 1,
+      },
+    ]);
   });
 
   it('writes N ledger rows in walk order for multi-edge apply with ops and contract_json on endpoints only', {
@@ -270,6 +308,34 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     expect(rows[2]!.contract_json_after).toMatchObject({
       storage: { storageHash: destHash },
     });
+
+    const ledger = await ledgerAdapter.readLedger(driver!, LEDGER_TEST_SPACE_ID);
+    expectReadLedger(ledger, [
+      {
+        space: LEDGER_TEST_SPACE_ID,
+        migrationName: '001_a',
+        migrationHash: 'sha256:mig-a',
+        from: null,
+        to: hashA,
+        operationCount: 1,
+      },
+      {
+        space: LEDGER_TEST_SPACE_ID,
+        migrationName: '002_b',
+        migrationHash: 'sha256:mig-b',
+        from: hashA,
+        to: hashB,
+        operationCount: 2,
+      },
+      {
+        space: LEDGER_TEST_SPACE_ID,
+        migrationName: '003_c',
+        migrationHash: 'sha256:mig-c',
+        from: hashB,
+        to: destHash,
+        operationCount: 1,
+      },
+    ]);
   });
 
   it('writes one synthesised ledger row with space for synth apply without migrationEdges', {

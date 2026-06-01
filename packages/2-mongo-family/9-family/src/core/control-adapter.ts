@@ -1,4 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlAdapterInstance,
@@ -88,6 +88,15 @@ export interface MongoControlAdapter<TTarget extends string = string>
       readonly operations: readonly unknown[];
     },
   ): Promise<void>;
+
+  /**
+   * Reads the per-migration ledger journal for `space` in apply order.
+   * Returns an empty array when no ledger entries exist for that space.
+   */
+  readLedger(
+    driver: ControlDriverInstance<'mongo', TTarget>,
+    space: string,
+  ): Promise<readonly LedgerEntryRecord[]>;
 
   /**
    * Introspects the live database and returns a `MongoSchemaIR`.

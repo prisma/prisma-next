@@ -1,4 +1,8 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -260,6 +264,8 @@ function isSqlControlAdapter<TTargetId extends string>(
     typeof (value as { readMarker: unknown }).readMarker === 'function' &&
     'readAllMarkers' in value &&
     typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
+    'readLedger' in value &&
+    typeof (value as { readLedger: unknown }).readLedger === 'function' &&
     'lower' in value &&
     typeof (value as { lower: unknown }).lower === 'function'
   );
@@ -650,6 +656,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly driver: ControlDriverInstance<'sql', string>;
     }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
       return getControlAdapter().readAllMarkers(options.driver);
+    },
+    async readLedger(options: {
+      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly space: string;
+    }): Promise<readonly LedgerEntryRecord[]> {
+      return getControlAdapter().readLedger(options.driver, options.space);
     },
     async introspect(options: {
       readonly driver: ControlDriverInstance<'sql', string>;

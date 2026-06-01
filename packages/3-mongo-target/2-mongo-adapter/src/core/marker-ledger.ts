@@ -1,4 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import {
   RawAggregateCommand,
@@ -10,6 +10,15 @@ import type { Db, Document, UpdateFilter } from 'mongodb';
 
 const COLLECTION = '_prisma_migrations';
 const MONGO_MARKER_COLLECTION = `_prisma_migrations marker documents in ${COLLECTION}`;
+const MONGO_LEDGER_COLLECTION = `_prisma_migrations ledger documents in ${COLLECTION}`;
+const EMPTY_ORIGIN_HASH = 'sha256:empty';
+
+function ledgerOriginFromStored(from: string): string | null {
+  if (from === '' || from === EMPTY_ORIGIN_HASH) {
+    return null;
+  }
+  return from;
+}
 
 /**
  * Marker doc shape.
@@ -235,6 +244,56 @@ export async function updateMarker(
  * a synthetic ∅→head edge on first apply), so the ledger key is
  * `(space, edgeId)` — the doc carries `space` for partitioned reads.
  */
+/**
+ * Reads per-migration ledger entries for `space` in apply order. Returns
+ * `[]` when no ledger documents exist for that space yet.
+ */
+export async function readLedger(db: Db, space: string): Promise<readonly LedgerEntryRecord[]> {
+  const ledgerContext = { space, markerLocation: MONGO_LEDGER_COLLECTION };
+  const docs = await withMarkerReadErrorHandling(
+    () =>
+      executeAggregate(
+        db,
+        new RawAggregateCommand(COLLECTION, [
+          { $match: { type: 'ledger', space } },
+          { $sort: { _id: 1 } },
+        ]),
+      ),
+    ledgerContext,
+  );
+
+  return docs.map((doc) => {
+    const migrationName = doc['migrationName'];
+    const migrationHash = doc['migrationHash'];
+    const from = doc['from'];
+    const to = doc['to'];
+    const appliedAt = doc['appliedAt'];
+    const operations = doc['operations'];
+    if (typeof migrationName !== 'string' || typeof migrationHash !== 'string') {
+      throw new Error(`Invalid ledger doc on ${COLLECTION}: missing migration name or hash`);
+    }
+    if (typeof from !== 'string' || typeof to !== 'string') {
+      throw new Error(`Invalid ledger doc on ${COLLECTION}: missing from or to`);
+    }
+    const appliedAtDate =
+      appliedAt instanceof Date
+        ? appliedAt
+        : appliedAt !== undefined
+          ? new Date(String(appliedAt))
+          : new Date();
+    const opList = Array.isArray(operations) ? operations : [];
+    return {
+      space,
+      migrationName,
+      migrationHash,
+      from: ledgerOriginFromStored(from),
+      to,
+      appliedAt: appliedAtDate,
+      operationCount: opList.length,
+    };
+  });
+}
+
 export async function writeLedgerEntry(
   db: Db,
   space: string,

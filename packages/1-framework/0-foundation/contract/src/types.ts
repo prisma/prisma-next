@@ -243,3 +243,17 @@ export interface ContractMarkerRecord {
   readonly meta: Record<string, unknown>;
   readonly invariants: readonly string[];
 }
+
+/**
+ * One applied migration edge from the per-space ledger journal.
+ * Returned by `readLedger` in append (apply) order.
+ */
+export interface LedgerEntryRecord {
+  readonly space: string;
+  readonly migrationName: string;
+  readonly migrationHash: string;
+  readonly from: string | null;
+  readonly to: string;
+  readonly appliedAt: Date;
+  readonly operationCount: number;
+}

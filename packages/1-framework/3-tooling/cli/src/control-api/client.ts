@@ -1,4 +1,8 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import { emit as emitContractArtifacts } from '@prisma-next/emitter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -445,6 +449,11 @@ class ControlClientImpl implements ControlClient {
   async readAllMarkers(): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
     const { driver, familyInstance } = await this.ensureConnected();
     return familyInstance.readAllMarkers({ driver });
+  }
+
+  async readLedger(space = APP_SPACE_ID): Promise<readonly LedgerEntryRecord[]> {
+    const { driver, familyInstance } = await this.ensureConnected();
+    return familyInstance.readLedger({ driver, space });
   }
 
   async migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult> {
