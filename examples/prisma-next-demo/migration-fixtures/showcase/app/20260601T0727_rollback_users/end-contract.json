@@ -13,44 +13,39 @@
       "orderBy": true,
       "returning": true
     },
-    "sql": { "defaultInInsert": true, "enums": true, "lateral": true, "returning": true }
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true
+    }
   },
   "execution": {
     "executionHash": "sha256:726228fb3c6f3d975bc1d2c5847712e21289cc05635b1155e177fab93ca55b12",
     "mutations": {
       "defaults": [
         {
-          "onCreate": { "id": "uuidv4", "kind": "generator" },
-          "ref": { "column": "id", "table": "account" }
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "account"
+          }
         }
       ]
     }
   },
   "extensionPacks": {},
   "meta": {},
-  "models": {
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "roots": {
     "account": {
-      "fields": {
-        "email": { "nullable": false, "type": { "codecId": "pg/text@1", "kind": "scalar" } },
-        "id": {
-          "nullable": false,
-          "type": { "codecId": "sql/char@1", "kind": "scalar", "typeParams": { "length": 36 } }
-        },
-        "name": { "nullable": true, "type": { "codecId": "pg/text@1", "kind": "scalar" } }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "email": { "column": "email" },
-          "id": { "column": "id" },
-          "name": { "column": "name" }
-        },
-        "table": "account"
-      }
+      "model": "account",
+      "namespace": "__unbound__"
     }
   },
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
-  "roots": { "account": { "model": "account", "namespace": "__unbound__" } },
   "schemaVersion": "1",
   "storage": {
     "namespaces": {
@@ -60,18 +55,30 @@
         "tables": {
           "account": {
             "columns": {
-              "email": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false },
+              "email": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
               "id": {
                 "codecId": "sql/char@1",
                 "nativeType": "character",
                 "nullable": false,
-                "typeParams": { "length": 36 }
+                "typeParams": {
+                  "length": 36
+                }
               },
-              "name": { "codecId": "pg/text@1", "nativeType": "text", "nullable": true }
+              "name": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": true
+              }
             },
             "foreignKeys": [],
             "indexes": [],
-            "primaryKey": { "columns": ["id"] },
+            "primaryKey": {
+              "columns": ["id"]
+            },
             "uniques": []
           }
         }
@@ -80,5 +87,56 @@
     "storageHash": "sha256:419c09911c25cf9b97e60ee157c61a126accfa5f26f5cdb7954667c704f53753"
   },
   "target": "postgres",
-  "targetFamily": "sql"
+  "targetFamily": "sql",
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "account": {
+            "fields": {
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "name": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                }
+              },
+              "table": "account"
+            }
+          }
+        }
+      }
+    }
+  }
 }
