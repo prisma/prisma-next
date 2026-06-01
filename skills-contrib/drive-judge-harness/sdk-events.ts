@@ -7,8 +7,8 @@ import type { TurnUsage } from './usage.ts';
 // can be unit-tested with the SDK absent. The sole SDK importer remains
 // `sdk-adapter.ts`, which imports these utilities and wires them into the live path.
 //
-// Real shapes from @cursor/sdk@1.0.15 local runtime (confirmed via spike
-// 2026-05-31-sdk-token-usage-retrieval.md):
+// Real shapes from @cursor/sdk@1.0.15 local runtime (confirmed via a probe;
+// see KNOWN-ISSUES.md § 2):
 //
 //   stream status:    { type: "status",    agent_id, run_id, status }
 //   stream assistant: { type: "assistant", agent_id, run_id, message }

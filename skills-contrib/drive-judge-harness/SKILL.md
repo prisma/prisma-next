@@ -206,9 +206,8 @@ terminal result message carries cumulative `usage` + `total_cost_usd`, so a run
 records real `tokens` **and** `cost_usd` (plus `num_turns` and `wall_clock_ms`).
 On the secondary **cursor** runtime the *local* `@cursor/sdk` runtime emits no
 usage signal at all — nothing in its stream, run outcome, `getRun`/`V1Run` cloud
-query, or `analytics` surface carries token counts (confirmed by the spike at
-`projects/drive-judge-harness/spikes/2026-05-31-sdk-token-usage-retrieval.md`,
-and see KNOWN-ISSUES.md) — so cursor runs record `tokens: null` with a note, and
+query, or `analytics` surface carries token counts (see KNOWN-ISSUES.md § 2 for
+the probe findings) — so cursor runs record `tokens: null` with a note, and
 fall back to **`wall_clock_ms`** as the efficiency metric. `run-one-brief` reads
 `tokens` from the run outcome when the runtime provides them (claude), else
 accumulates per-turn usage (the cursor path), so both runtimes feed the same

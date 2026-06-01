@@ -187,7 +187,7 @@ export async function runOneBrief(
     const notes: string[] = [];
     if (outcome.status === 'finished' && tokens === null) {
       notes.push(
-        'tokens unavailable: @cursor/sdk local runtime emits no usage events (see spike 2026-05-31)',
+        'tokens unavailable: @cursor/sdk local runtime emits no usage events (see KNOWN-ISSUES.md)',
       );
     }
 

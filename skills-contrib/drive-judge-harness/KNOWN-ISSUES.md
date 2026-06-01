@@ -57,7 +57,7 @@ When upstream ships resolvable types, replace that structural view with the real
 
 Distinct from (and more fundamental than) the type-resolution gap above: even at **runtime**, the `@cursor/sdk` *local* runtime never emits a usage signal, so there is nothing to read regardless of types.
 
-Confirmed by a probe (spike `projects/drive-judge-harness/spikes/2026-05-31-sdk-token-usage-retrieval.md`) against `@cursor/sdk@1.0.15`:
+Confirmed by a probe against `@cursor/sdk@1.0.15`:
 
 - The local `run.stream()` yields only `status` and `assistant` messages — **no `turnEnded`/`usage` event** (that update is streamed only by the *cloud* runtime).
 - The `run.wait()` outcome (`{ id, status, result, model, durationMs }`) carries wall-clock but **no tokens**.
