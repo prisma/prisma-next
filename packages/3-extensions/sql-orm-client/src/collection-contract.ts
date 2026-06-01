@@ -197,6 +197,14 @@ export function getCompleteColumnToFieldMap(
   return cached;
 }
 
+interface ResolvedThrough {
+  readonly table: string;
+  readonly parentColumns: readonly string[];
+  readonly childColumns: readonly string[];
+  readonly targetColumns: readonly string[];
+  readonly requiredPayloadColumns: readonly string[];
+}
+
 interface ResolvedRelation {
   readonly to: string;
   readonly cardinality: RelationCardinalityTag | undefined;
@@ -204,6 +212,7 @@ interface ResolvedRelation {
     readonly localFields: readonly string[];
     readonly targetFields: readonly string[];
   };
+  readonly through?: ResolvedThrough;
 }
 
 export interface ResolvedIncludeRelation {
@@ -245,6 +254,46 @@ export function resolveIncludeRelation(
   };
 }
 
+function resolveThrough(
+  contract: Contract<SqlStorage>,
+  raw:
+    | { table?: unknown; parentColumns?: unknown; childColumns?: unknown; targetColumns?: unknown }
+    | undefined,
+): ResolvedThrough | undefined {
+  if (!raw) return undefined;
+  const { table, parentColumns, childColumns, targetColumns } = raw;
+  if (
+    typeof table !== 'string' ||
+    !Array.isArray(parentColumns) ||
+    !Array.isArray(childColumns) ||
+    !Array.isArray(targetColumns)
+  ) {
+    return undefined;
+  }
+
+  const fkColumnSet = new Set<string>([
+    ...(parentColumns as string[]),
+    ...(childColumns as string[]),
+  ]);
+  const junctionTable = unboundTable(contract, table);
+  const requiredPayloadColumns: string[] = [];
+  if (junctionTable) {
+    for (const [colName, col] of Object.entries(junctionTable.columns)) {
+      if (!fkColumnSet.has(colName) && !col.nullable && col.default === undefined) {
+        requiredPayloadColumns.push(colName);
+      }
+    }
+  }
+
+  return {
+    table,
+    parentColumns: parentColumns as readonly string[],
+    childColumns: childColumns as readonly string[],
+    targetColumns: targetColumns as readonly string[],
+    requiredPayloadColumns,
+  };
+}
+
 const modelRelationsCache = new WeakMap<object, Map<string, Record<string, ResolvedRelation>>>();
 
 export function resolveModelRelations(
@@ -270,6 +319,12 @@ export function resolveModelRelations(
       to?: CrossReference;
       cardinality?: unknown;
       on?: { localFields?: unknown; targetFields?: unknown };
+      through?: {
+        table?: unknown;
+        parentColumns?: unknown;
+        childColumns?: unknown;
+        targetColumns?: unknown;
+      };
     };
     const localFields = rel.on?.localFields;
     const targetFields = rel.on?.targetFields;
@@ -284,6 +339,8 @@ export function resolveModelRelations(
       continue;
     }
 
+    const through = resolveThrough(contract, rel.through);
+
     resolved[name] = {
       to: rel.to.model,
       cardinality: parseRelationCardinality(rel.cardinality),
@@ -291,6 +348,7 @@ export function resolveModelRelations(
         localFields: localFields as readonly string[],
         targetFields: targetFields as readonly string[],
       },
+      ...(through !== undefined ? { through } : {}),
     };
   }
 
