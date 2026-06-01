@@ -167,7 +167,7 @@ export function createMigrationGraphCommand(): Command {
               colorize: flags.color !== false,
               glyphMode: ui.resolveGlyphMode(options.ascii === true),
             });
-            // Emit the rendered tree to stdout like `migration list --graph`,
+            // Emit the rendered tree to stdout (same stream as flat `migration list`),
             // not through clack's `log.message` rail: the graph is the command's
             // result (and its own box-drawing is the only vertical structure it
             // should carry), not a status line that needs the prompt gutter.
