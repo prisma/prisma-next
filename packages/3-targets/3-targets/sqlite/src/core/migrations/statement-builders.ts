@@ -47,6 +47,9 @@ export const ensureLedgerTableStatement: SqlStatement = {
   sql: `CREATE TABLE IF NOT EXISTS _prisma_ledger (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    space TEXT NOT NULL,
+    migration_name TEXT NOT NULL,
+    migration_hash TEXT NOT NULL,
     origin_core_hash TEXT,
     origin_profile_hash TEXT,
     destination_core_hash TEXT NOT NULL,
@@ -167,6 +170,9 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
 }
 
 export interface LedgerInsertInput {
+  readonly space: string;
+  readonly migrationName: string;
+  readonly migrationHash: string;
   readonly originStorageHash?: string | null;
   readonly originProfileHash?: string | null;
   readonly destinationStorageHash: string;
@@ -179,6 +185,9 @@ export interface LedgerInsertInput {
 export function buildLedgerInsertStatement(input: LedgerInsertInput): SqlStatement {
   return {
     sql: `INSERT INTO _prisma_ledger (
+      space,
+      migration_name,
+      migration_hash,
       origin_core_hash,
       origin_profile_hash,
       destination_core_hash,
@@ -193,9 +202,15 @@ export function buildLedgerInsertStatement(input: LedgerInsertInput): SqlStateme
       ?,
       ?,
       ?,
+      ?,
+      ?,
+      ?,
       ?
     )`,
     params: [
+      input.space,
+      input.migrationName,
+      input.migrationHash,
       input.originStorageHash ?? null,
       input.originProfileHash ?? null,
       input.destinationStorageHash,

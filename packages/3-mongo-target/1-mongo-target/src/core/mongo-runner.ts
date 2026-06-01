@@ -13,6 +13,7 @@ import {
   type MigrationRunnerPerSpaceSuccessValue,
   type OperationContext,
 } from '@prisma-next/framework-components/control';
+import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
@@ -55,6 +56,11 @@ export interface MongoMigrationRunnerExecuteOptions {
    * leave it unset and verify against the whole introspected schema.
    */
   readonly projectSchema?: (schema: MongoSchemaIR) => MongoSchemaIR;
+  /**
+   * Per-edge breakdown from graph-walk planning. Consumed by the Mongo runner
+   * in a follow-up change; ignored until then so apply.ts can thread the field.
+   */
+  readonly migrationEdges?: readonly AggregateMigrationEdgeRef[];
 }
 
 export type MongoMigrationRunnerResult = Result<
