@@ -24,7 +24,7 @@ Run this skill when **all** of the following hold:
 
 - A stable (`latest`) release is being cut — the target version `$NEXT` is known (computed by `publish-npm-version` step 1, e.g. `0.12.0`).
 - You are in the `release/<version>` worktree checked out at the bump commit (HEAD carries the bumped root `version`).
-- `docs/releases/v$NEXT.md` does not exist yet (the slice-1 PR-mode gate, `pnpm check:release-notes --mode pr`, fails the release PR until it does).
+- `docs/releases/v$NEXT.md` does not exist yet (the PR-mode release-notes gate, `pnpm check:release-notes --mode pr`, fails the release PR until it does).
 
 Do **not** run it for `-dev.N` or `-beta.N` builds: those create no GitHub Release and are not gated. Do not run it to backfill notes for an already-shipped release — the convention starts from the first release cut after it landed.
 
@@ -175,7 +175,7 @@ Then **prepend** a `## v$NEXT` entry to [`CHANGELOG.md`](../../CHANGELOG.md), mi
 
 ### 9. Commit on the release branch
 
-Commit the notes file + CHANGELOG as their **own** commit on the `release/<version>` branch (keeping `publish-npm-version`'s `chore(release): bump` commit clean), so the notes ride in the bump PR diff and satisfy the slice-1 PR-mode gate. Use explicit staging and sign off:
+Commit the notes file + CHANGELOG as their **own** commit on the `release/<version>` branch (keeping `publish-npm-version`'s `chore(release): bump` commit clean), so the notes ride in the bump PR diff and satisfy the `check:release-notes` PR-mode gate. Use explicit staging and sign off:
 
 ```bash
 git add docs/releases/v$NEXT.md CHANGELOG.md
