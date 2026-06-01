@@ -52,6 +52,7 @@ interface JunctionThrough {
   readonly parentColumns: readonly string[];
   readonly childColumns: readonly string[];
   readonly targetColumns: readonly string[];
+  readonly requiredPayloadColumns: readonly string[];
 }
 
 interface RelationDefinition {
@@ -684,6 +685,13 @@ async function applyJunctionOwnedMutation(
   const parentPkValues = readJunctionParentValues(contract, parentModelName, relation, parentRow);
 
   if (mutation.kind === 'create') {
+    if (through.requiredPayloadColumns.length > 0) {
+      const cols = through.requiredPayloadColumns.map((c) => `\`${c}\``).join(', ');
+      throw new Error(
+        `Cannot nest \`create\` on relation \`${relation.relationName}\`: its junction \`${through.table}\` has required column(s) ${cols} the relation API can't populate. Use the \`${relation.relatedModelName}\` model directly or the SQL builder.`,
+      );
+    }
+
     for (const childInput of mutation.data) {
       const relatedRow = await insertSingleRow(
         scope,
@@ -1050,6 +1058,7 @@ function getRelationDefinitions(
           parentColumns: relation.through.parentColumns,
           childColumns: relation.through.childColumns,
           targetColumns: relation.through.targetColumns,
+          requiredPayloadColumns: relation.through.requiredPayloadColumns,
         }
       : undefined,
   }));

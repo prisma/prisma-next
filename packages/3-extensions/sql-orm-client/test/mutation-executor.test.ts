@@ -620,6 +620,107 @@ describe('mutation-executor', () => {
     ).rejects.toThrow(/disconnect\(\) is only supported in update\(\) nested mutations/);
   });
 
+  it('executeNestedCreateMutation() rejects M:N create when junction has required payload columns', async () => {
+    const contract = getTestContract();
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+
+    await expect(
+      executeNestedCreateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        modelName: 'User',
+        data: {
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          roles: (roles: { create: (rows: readonly Record<string, unknown>[]) => unknown }) =>
+            roles.create([{ id: 'admin' }]),
+        } as never,
+      }),
+    ).rejects.toThrow(
+      /Cannot nest `create` on relation `roles`: its junction `user_roles` has required column\(s\) `level`/,
+    );
+  });
+
+  it('executeNestedCreateMutation() allows connect on junction with required payload columns', async () => {
+    const contract = getTestContract();
+    const runtime = createMockRuntime();
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+      [{ id: 'admin' }],
+      [],
+    ]);
+
+    const created = await executeNestedCreateMutation({
+      context: { ...getTestContext(), contract },
+      runtime,
+      modelName: 'User',
+      data: {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        roles: (roles: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+          roles.connect({ id: 'admin' }),
+      } as never,
+    });
+
+    expect(created).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
+    const insert = findJunctionDml(runtime, 'insert', 'user_roles');
+    expect(insert.kind).toBe('insert');
+  });
+
+  it('executeNestedUpdateMutation() allows disconnect on junction with required payload columns', async () => {
+    const contract = getTestContract();
+    const runtime = createMockRuntime();
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+      [{ id: 'admin' }],
+      [],
+    ]);
+
+    await executeNestedUpdateMutation({
+      context: { ...getTestContext(), contract },
+      runtime,
+      modelName: 'User',
+      filters: [userIdFilter],
+      data: {
+        roles: (roles: { disconnect: (criteria: readonly Record<string, unknown>[]) => unknown }) =>
+          roles.disconnect([{ id: 'admin' }]),
+      } as never,
+    });
+
+    const del = findJunctionDml(runtime, 'delete', 'user_roles');
+    expect(del.kind).toBe('delete');
+  });
+
+  it('executeNestedCreateMutation() allows M:N create on pure junction (no required payload)', async () => {
+    const contract = getTestContract();
+    const runtime = createMockRuntime();
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+      [{ id: 'ts' }],
+      [],
+    ]);
+
+    const created = await executeNestedCreateMutation({
+      context: { ...getTestContext(), contract },
+      runtime,
+      modelName: 'User',
+      data: {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        tags: (tags: { create: (rows: readonly Record<string, unknown>[]) => unknown }) =>
+          tags.create([{ id: 'ts' }]),
+      } as never,
+    });
+
+    expect(created).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
+    const insert = findJunctionDml(runtime, 'insert', 'user_tags');
+    expect(insert.kind).toBe('insert');
+  });
+
   it('executeNestedCreateMutation() supports parent-owned nested create() payloads', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();
