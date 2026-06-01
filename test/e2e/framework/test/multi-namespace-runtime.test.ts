@@ -1,5 +1,5 @@
 /**
- * PDoD7 — multi-namespace Postgres contract queryable end-to-end (PGlite).
+ * Multi-namespace Postgres contract queryable end-to-end (PGlite).
  *
  * Proves runtime SQL qualification routes DML to the schema named on each
  * model's namespace coordinate (auth vs public), not only the default namespace.
@@ -137,7 +137,7 @@ function buildMultiNamespaceRuntimeContract(): Contract<SqlStorage> {
   } as unknown as Contract<SqlStorage>;
 }
 
-describe('multi-namespace runtime (PDoD7)', () => {
+describe('multi-namespace runtime', () => {
   it(
     'applies auth + public schemas and queries each namespace with qualified SQL',
     async () => {
