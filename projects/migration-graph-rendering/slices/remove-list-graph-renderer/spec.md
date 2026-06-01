@@ -72,7 +72,7 @@ One reviewer holds this in one sitting: it deletes one renderer and the single f
 ## References
 
 - Parent project: `projects/migration-graph-rendering/spec.md` (Tier-3 redesign — this slice's predecessor).
-- Linear issue: _to be filed (standalone, related to TML-2746 and TML-2748)._
+- Linear issue: [TML-2765](https://linear.app/prisma-company/issue/TML-2765) (standalone, related to TML-2746 and TML-2748).
 - Surfaces removed: `cli/src/utils/formatters/migration-list-graph-{render,layout}.ts` (+ tests/fixtures), `cli/src/commands/migration-list.ts` (`--graph`), `docs/reference/migration-list-graph-rendering.md`.
 - Surfaces kept: `migration-list-graph-topology.ts` (shared with `migration-graph-rows.ts`), flat `migration list`, the Tier-3 tree renderer.
 
