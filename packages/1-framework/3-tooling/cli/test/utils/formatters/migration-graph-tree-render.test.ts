@@ -501,6 +501,13 @@ describe('renderMigrationGraphTree (ASCII)', () => {
 });
 
 describe('renderMigrationGraphTree (lane colors)', () => {
+  function linearEdges(): readonly MigrationEdge[] {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addUsers = edge('ef9de27', '73e3abe', 'add_users');
+    const addPosts = edge('73e3abe', '6656a6e', 'add_posts');
+    return [init, addUsers, addPosts];
+  }
+
   function diamondEdges(): readonly MigrationEdge[] {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');
@@ -510,18 +517,43 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     return [init, alice, bob, mergeAlice, mergeBob];
   }
 
-  it('colors structural gutter glyphs by column index when colorize is true', () => {
-    const colored = tree(diamondEdges(), { colorize: true });
-    const verticalPass = '│ ';
-    const branchTee = '├─';
-    expect(colored).toContain(laneColorForColumn(0)(verticalPass));
-    expect(colored).toContain(laneColorForColumn(1)(verticalPass));
-    expect(laneColorForColumn(0)(verticalPass)).not.toBe(laneColorForColumn(1)(verticalPass));
-    expect(colored).toContain(laneColorForColumn(0)(branchTee));
-    expect(colored).toContain(laneColorForColumn(1)('╮'));
+  // Two node-skipping rollbacks whose back-lanes overlap, producing routed arcs
+  // (`◂` landings, `──` bridges, `╮`/`╯` corners) and an arc crossing (`┼`).
+  function skipArcEdges(): readonly MigrationEdge[] {
+    const init = edge(EMPTY_CONTRACT_HASH, 'aaaaaaa', 'init');
+    const s1 = edge('aaaaaaa', 'bbbbbbb', 'step_1');
+    const s2 = edge('bbbbbbb', 'ccccccc', 'step_2');
+    const s3 = edge('ccccccc', 'ddddddd', 'step_3');
+    const s4 = edge('ddddddd', 'eeeeeee', 'step_4');
+    const rollbackEtoA = edge('eeeeeee', 'aaaaaaa', 'rollback_e_to_a');
+    const rollbackDtoB = edge('ddddddd', 'bbbbbbb', 'rollback_d_to_b');
+    return [init, s1, s2, s3, s4, rollbackEtoA, rollbackDtoB];
+  }
+
+  it('renders a single-lane linear graph monochrome (column 0 neutral)', () => {
+    const colored = tree(linearEdges(), { colorize: true });
+    // Nothing to tell column 0 apart from: no palette hue is emitted at all.
+    for (const column of [1, 2, 3]) {
+      expect(colored).not.toContain(laneColorForColumn(column)('│'));
+      expect(colored).not.toContain(laneColorForColumn(column)('○'));
+    }
+    // The column-0 node marker renders without lane-color wrapping.
+    expect(colored.split('\n')[0]).toMatch(/^○/);
   });
 
-  it('rotates lane hues across three columns on a convergence fan', () => {
+  it('rotates the palette over columns ≥ 1 while column 0 stays neutral', () => {
+    const colored = tree(diamondEdges(), { colorize: true });
+    // Column 1 lanes/corners take a palette hue; adjacent columns differ.
+    expect(colored).toContain(laneColorForColumn(1)('│ '));
+    expect(colored).toContain(laneColorForColumn(1)('╮'));
+    expect(laneColorForColumn(1)('│')).not.toBe(laneColorForColumn(2)('│'));
+    // Column 0 is never palette-colored — its branch spine reads neutral.
+    expect(colored).not.toContain(laneColorForColumn(1)('├─'));
+    const connectorLine = colored.split('\n').find((line) => line.includes('├─'));
+    expect(connectorLine?.startsWith('├─')).toBe(true);
+  });
+
+  it('rotates distinct hues across three lanes on a convergence fan', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
     const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
@@ -533,9 +565,9 @@ describe('renderMigrationGraphTree (lane colors)', () => {
       [init, addPhone, addPosts, addAvatar, mergePhone, mergePosts, mergeAvatar],
       { colorize: true },
     );
-    const verticalPass = '│ ';
-    const hues = [0, 1, 2].map((column) => laneColorForColumn(column)(verticalPass));
-    expect(new Set(hues).size).toBe(3);
+    // Columns 1 and 2 take distinct rotating hues; column 0 stays neutral.
+    const hues = [1, 2].map((column) => laneColorForColumn(column)('│ '));
+    expect(new Set(hues).size).toBe(2);
     for (const hue of hues) {
       expect(colored).toContain(hue);
     }
@@ -548,13 +580,40 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(colored.split('\n').map(stripAnsi)).toEqual(plain.split('\n').map(stripAnsi));
   });
 
-  it('leaves node markers and direction arrows without lane-color wrapping', () => {
+  it('colors the contract node glyph by its lane while arrows stay bright', () => {
     const colored = tree(diamondEdges(), { colorize: true });
+    // A node sitting in column 1 takes its lane's hue.
+    const branchNodeLine = colored
+      .split('\n')
+      .find((line) => line.includes('6656a6e') && !line.includes('→'));
+    expect(branchNodeLine).toBeDefined();
+    expect(branchNodeLine).toContain(laneColorForColumn(1)('○ '));
+    // The column-0 node stays neutral (no palette wrapping).
     expect(colored.split('\n')[0]).toMatch(/^○/);
-    const mergeAliceLine = colored.split('\n').find((line) => line.includes('merge_alice'));
-    expect(mergeAliceLine).toBeDefined();
-    expect(mergeAliceLine).toContain(`${laneColorForColumn(0)('│')}↑`);
-    expect(mergeAliceLine).not.toContain(laneColorForColumn(0)('↑'));
+    // Direction arrows are never wrapped in a lane hue — they remain the signal.
+    expect(colored).not.toContain(laneColorForColumn(1)('↑'));
+    expect(colored).not.toContain(laneColorForColumn(2)('↑'));
+  });
+
+  it('colors a routed back-arc as one hue and leaves crossings neutral', () => {
+    const colored = tree(skipArcEdges(), { colorize: true });
+    const lines = colored.split('\n');
+    // Source-tee row: every horizontal bridge and the closing corner share the
+    // arc's owning back-lane hue (column 3) — not a per-column "rainbow".
+    const teeLine = lines.find((line) => line.includes('ccccccc') && line.includes('╮'));
+    expect(teeLine).toBeDefined();
+    expect(teeLine).toContain(laneColorForColumn(3)('──'));
+    expect(teeLine).toContain(laneColorForColumn(3)('╮ '));
+    expect(teeLine).not.toContain(laneColorForColumn(1)('──'));
+    expect(teeLine).not.toContain(laneColorForColumn(2)('──'));
+    // Landing row: the ◂ connector + ╯ corner follow the arc hue, the landing
+    // node ○ takes its own lane, and the crossing ┼ stays neutral.
+    const landLine = lines.find((line) => line.includes('ddddddd') && line.includes('◂'));
+    expect(landLine).toBeDefined();
+    expect(landLine).toContain(laneColorForColumn(1)('○'));
+    expect(landLine).toContain(laneColorForColumn(3)('◂'));
+    expect(landLine).toContain('┼');
+    expect(landLine).not.toContain(laneColorForColumn(2)('┼'));
   });
 });
 

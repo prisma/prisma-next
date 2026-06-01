@@ -13,7 +13,19 @@ export const LANE_COLOR_CYCLE: readonly LaneColorizer[] = [
   red,
 ];
 
+/**
+ * The hue for a gutter column. The leftmost lane (column 0) is **neutral** — it
+ * has nothing to be told apart from in the common single-lane linear case, so
+ * the renderer dims it rather than tinting it; the rotating palette is reserved
+ * for columns ≥ 1 (where a second lane exists to distinguish). Callers must dim
+ * column 0 themselves; this returns identity for it as a guard. A lane freed and
+ * reused by a later branch keeps its column's hue — coloring is by position, not
+ * branch identity, exactly like `git log --graph`.
+ */
 export function laneColorForColumn(column: number): LaneColorizer {
-  const colorizer = LANE_COLOR_CYCLE[column % LANE_COLOR_CYCLE.length];
+  if (column <= 0) {
+    return (text) => text;
+  }
+  const colorizer = LANE_COLOR_CYCLE[(column - 1) % LANE_COLOR_CYCLE.length];
   return colorizer ?? ((text) => text);
 }
