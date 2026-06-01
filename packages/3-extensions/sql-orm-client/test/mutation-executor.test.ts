@@ -626,35 +626,31 @@ describe('mutation-executor', () => {
         } as never,
       }),
     ).rejects.toThrow(
-      /Cannot nest `create` on relation `roles`: its junction `user_roles` has required column\(s\) `level`/,
+      /Cannot `create` on relation `roles`: its junction `user_roles` has required column\(s\) `level`/,
     );
   });
 
-  it('executeNestedCreateMutation() allows connect on junction with required payload columns', async () => {
+  it('executeNestedCreateMutation() rejects M:N connect when junction has required payload columns', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();
-    runtime.setNextResults([
-      [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
-      [{ id: 'admin' }],
-      [],
-    ]);
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
-    const created = await executeNestedCreateMutation({
-      context: { ...getTestContext(), contract },
-      runtime,
-      modelName: 'User',
-      data: {
-        id: 1,
-        name: 'Alice',
-        email: 'alice@example.com',
-        roles: (roles: { connect: (criterion: Record<string, unknown>) => unknown }) =>
-          roles.connect({ id: 'admin' }),
-      } as never,
-    });
-
-    expect(created).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
-    const insert = findJunctionDml(runtime, 'insert', 'user_roles');
-    expect(insert.kind).toBe('insert');
+    await expect(
+      executeNestedCreateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        modelName: 'User',
+        data: {
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          roles: (roles: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+            roles.connect({ id: 'admin' }),
+        } as never,
+      }),
+    ).rejects.toThrow(
+      /Cannot `connect` on relation `roles`: its junction `user_roles` has required column\(s\) `level`/,
+    );
   });
 
   it('executeNestedUpdateMutation() allows disconnect on junction with required payload columns', async () => {

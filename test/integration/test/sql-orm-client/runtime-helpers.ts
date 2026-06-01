@@ -51,6 +51,17 @@ interface SeedUserTag {
   tagId: string;
 }
 
+interface SeedRole {
+  id: string;
+  name: string;
+}
+
+interface SeedUserRole {
+  userId: number;
+  roleId: string;
+  level: number;
+}
+
 export interface PgIntegrationRuntime extends RuntimeQueryable {
   readonly executions: readonly SqlExecutionPlan[];
   query<Row extends Record<string, unknown> = Record<string, unknown>>(
@@ -178,6 +189,8 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
 
   await runtime.query('drop table if exists user_tags');
   await runtime.query('drop table if exists tags');
+  await runtime.query('drop table if exists user_roles');
+  await runtime.query('drop table if exists roles');
   await runtime.query('drop table if exists comments');
   await runtime.query('drop table if exists profiles');
   await runtime.query('drop table if exists posts');
@@ -233,6 +246,22 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
       note text,
       created_at text not null default now(),
       primary key (user_id, tag_id)
+    )
+  `);
+
+  await runtime.query(`
+    create table roles (
+      id text primary key,
+      name text not null unique
+    )
+  `);
+
+  await runtime.query(`
+    create table user_roles (
+      user_id integer not null,
+      role_id text not null,
+      level integer not null,
+      primary key (user_id, role_id)
     )
   `);
 }
@@ -310,6 +339,28 @@ export async function seedUserTags(
     await runtime.query('insert into user_tags (user_id, tag_id) values ($1, $2)', [
       ut.userId,
       ut.tagId,
+    ]);
+  }
+}
+
+export async function seedRoles(
+  runtime: PgIntegrationRuntime,
+  roles: readonly SeedRole[],
+): Promise<void> {
+  for (const role of roles) {
+    await runtime.query('insert into roles (id, name) values ($1, $2)', [role.id, role.name]);
+  }
+}
+
+export async function seedUserRoles(
+  runtime: PgIntegrationRuntime,
+  userRoles: readonly SeedUserRole[],
+): Promise<void> {
+  for (const ur of userRoles) {
+    await runtime.query('insert into user_roles (user_id, role_id, level) values ($1, $2, $3)', [
+      ur.userId,
+      ur.roleId,
+      ur.level,
     ]);
   }
 }

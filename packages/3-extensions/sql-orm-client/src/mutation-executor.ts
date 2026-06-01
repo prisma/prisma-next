@@ -596,14 +596,16 @@ async function applyJunctionOwnedMutation(
   const through = relation.through;
   const parentPkValues = readJunctionParentValues(contract, parentModelName, relation, parentRow);
 
-  if (mutation.kind === 'create') {
+  if (mutation.kind === 'create' || mutation.kind === 'connect') {
     if (through.requiredPayloadColumns.length > 0) {
       const cols = through.requiredPayloadColumns.map((c) => `\`${c}\``).join(', ');
       throw new Error(
-        `Cannot nest \`create\` on relation \`${relation.relationName}\`: its junction \`${through.table}\` has required column(s) ${cols} the relation API can't populate. Use the \`${relation.relatedModelName}\` model directly or the SQL builder.`,
+        `Cannot \`${mutation.kind}\` on relation \`${relation.relationName}\`: its junction \`${through.table}\` has required column(s) ${cols} the relation API can't populate. Use the \`${relation.relatedModelName}\` model directly or the SQL builder.`,
       );
     }
+  }
 
+  if (mutation.kind === 'create') {
     for (const childInput of mutation.data) {
       const relatedRow = await insertSingleRow(
         scope,
