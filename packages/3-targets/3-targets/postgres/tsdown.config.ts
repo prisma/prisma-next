@@ -7,6 +7,7 @@ export default defineConfig({
     'src/exports/codecs.ts',
     'src/exports/control.ts',
     'src/exports/data-transform.ts',
+    'src/exports/ddl.ts',
     'src/exports/default-normalizer.ts',
     'src/exports/enum-planning.ts',
     'src/exports/errors.ts',

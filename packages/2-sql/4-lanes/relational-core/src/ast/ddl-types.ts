@@ -1,3 +1,4 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { AnyParamRef } from './types';
 
 export interface DdlColumn {
@@ -5,58 +6,24 @@ export interface DdlColumn {
   readonly type: string;
   readonly notNull?: boolean;
   readonly primaryKey?: boolean;
+  readonly default?: ColumnDefault;
 }
 
-export interface DdlVisitor<R> {
-  createTable(node: CreateTable): R;
-}
-
-abstract class DdlNode {
+export abstract class DdlNode {
   abstract readonly kind: string;
 
   protected freeze(): void {
     Object.freeze(this);
   }
 
-  abstract accept<R>(visitor: DdlVisitor<R>): R;
-
   collectParamRefs(): AnyParamRef[] {
     return [];
   }
 }
 
-function freezeDdlColumns(columns: readonly DdlColumn[]): ReadonlyArray<DdlColumn> {
-  return Object.freeze(columns.map((column) => Object.freeze({ ...column })));
-}
+export const ddlAstKinds: ReadonlySet<string> = new Set(['create-table', 'create-schema']);
 
-export class CreateTable extends DdlNode {
-  readonly kind = 'create-table' as const;
-  readonly table: string;
-  readonly schema: string | undefined;
-  readonly columns: ReadonlyArray<DdlColumn>;
-
-  constructor(options: {
-    readonly table: string;
-    readonly schema?: string;
-    readonly columns: readonly DdlColumn[];
-  }) {
-    super();
-    this.table = options.table;
-    this.schema = options.schema;
-    this.columns = freezeDdlColumns(options.columns);
-    this.freeze();
-  }
-
-  override accept<R>(visitor: DdlVisitor<R>): R {
-    return visitor.createTable(this);
-  }
-}
-
-export type AnyDdlNode = CreateTable;
-
-export const ddlAstKinds: ReadonlySet<string> = new Set<AnyDdlNode['kind']>(['create-table']);
-
-export function isAnyDdlNode(value: unknown): value is AnyDdlNode {
+export function isAnyDdlNode(value: unknown): value is DdlNode {
   return (
     typeof value === 'object' &&
     value !== null &&

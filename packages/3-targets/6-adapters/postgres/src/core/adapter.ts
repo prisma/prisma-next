@@ -3,8 +3,8 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   type Adapter,
   type AdapterProfile,
-  type AnyDdlNode,
   type AnyQueryAst,
+  type DdlNode,
   isAnyDdlNode,
   type LowererContext,
   type MarkerReadResult,
@@ -56,7 +56,7 @@ class PostgresAdapterImpl
   }
 
   lower(
-    ast: AnyQueryAst | AnyDdlNode,
+    ast: AnyQueryAst | DdlNode,
     context: LowererContext<PostgresContract>,
   ): PostgresLoweredStatement {
     if (isAnyDdlNode(ast)) {

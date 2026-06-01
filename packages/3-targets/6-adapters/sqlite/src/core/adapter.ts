@@ -3,12 +3,12 @@ import {
   type Adapter,
   type AdapterProfile,
   type AggregateExpr,
-  type AnyDdlNode,
   type AnyExpression,
   type AnyFromSource,
   type AnyQueryAst,
   type BinaryExpr,
   type ColumnRef,
+  type DdlNode,
   type DeleteAst,
   type InsertAst,
   type InsertValue,
@@ -67,7 +67,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   }
 
   lower(
-    ast: AnyQueryAst | AnyDdlNode,
+    ast: AnyQueryAst | DdlNode,
     context: LowererContext<SqliteContract>,
   ): SqliteLoweredStatement {
     if (isAnyDdlNode(ast)) {
