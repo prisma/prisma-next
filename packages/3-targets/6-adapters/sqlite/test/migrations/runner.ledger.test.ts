@@ -28,6 +28,7 @@ interface LedgerRow {
   readonly contract_json_before: string | null;
   readonly contract_json_after: string | null;
   readonly operations: string;
+  readonly created_at: string;
 }
 
 const ledgerAdapter = new SqliteControlAdapter();
@@ -49,7 +50,7 @@ async function readLedgerRows(driver: TestDatabase['driver']): Promise<LedgerRow
   return (
     await driver.query<LedgerRow>(
       `SELECT space, migration_name, migration_hash, origin_core_hash, destination_core_hash,
-        contract_json_before, contract_json_after, operations
+        contract_json_before, contract_json_after, operations, created_at
        FROM _prisma_ledger ORDER BY id`,
     )
   ).rows;
@@ -153,6 +154,61 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
         operationCount: 1,
       },
     ]);
+    const storedCreatedAt = rows[0]!.created_at;
+    expect(storedCreatedAt.endsWith('Z')).toBe(true);
+    expect(ledger[0]!.appliedAt.getTime()).toBe(Date.parse(storedCreatedAt));
+  });
+
+  it('throws when migrationEdges operationCount sum does not match plan.operations length', async () => {
+    testDb = createTestDatabase();
+    const { driver } = testDb;
+    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+    const destHash = contract.storage.storageHash;
+    const edges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        migrationHash: 'sha256:mig-single',
+        dirName: '001_single',
+        from: EMPTY_CONTRACT_HASH,
+        to: destHash,
+        operationCount: 2,
+      },
+    ];
+    const plan = createLedgerTestPlan({
+      destinationHash: destHash,
+      operations: [
+        {
+          id: 'edge.single.op',
+          label: 'single edge op',
+          operationClass: 'additive',
+          target: {
+            id: 'sqlite',
+            details: { schema: 'main', objectType: 'table', name: 'user' },
+          },
+          precheck: [],
+          execute: [],
+          postcheck: [{ description: 'ok', sql: 'SELECT 1' }],
+        },
+      ],
+      migrationEdges: edges,
+    });
+
+    await expect(
+      runner.execute({
+        driver,
+        perSpaceOptions: [
+          {
+            space: LEDGER_TEST_SPACE_ID,
+            plan,
+            driver,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+            strictVerification: false,
+            migrationEdges: edges,
+          },
+        ],
+      }),
+    ).rejects.toThrow(/does not match sum of migrationEdges operationCount/);
   });
 
   it('writes N ledger rows in walk order for multi-edge apply with ops and contract_json on endpoints only', async () => {

@@ -46,7 +46,7 @@ export const ensureMarkerTableStatement: SqlStatement = {
 export const ensureLedgerTableStatement: SqlStatement = {
   sql: `CREATE TABLE IF NOT EXISTS _prisma_ledger (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     space TEXT NOT NULL,
     migration_name TEXT NOT NULL,
     migration_hash TEXT NOT NULL,

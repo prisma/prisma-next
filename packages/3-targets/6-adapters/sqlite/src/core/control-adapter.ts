@@ -1,6 +1,11 @@
 import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import {
+  coerceLedgerAppliedAt,
+  ledgerOriginFromStored,
+  operationCountFromStored,
+} from '@prisma-next/family-sql/ledger-read';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import {
   APP_SPACE_ID,
@@ -29,37 +34,6 @@ import type { SqliteContract } from './types';
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';
 const SQLITE_LEDGER_TABLE = '_prisma_ledger';
-const EMPTY_ORIGIN_CORE_HASH = 'sha256:empty';
-
-function ledgerOriginFromStored(originCoreHash: string | null): string | null {
-  if (
-    originCoreHash === null ||
-    originCoreHash === '' ||
-    originCoreHash === EMPTY_ORIGIN_CORE_HASH
-  ) {
-    return null;
-  }
-  return originCoreHash;
-}
-
-function coerceLedgerAppliedAt(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
-}
-
-function operationCountFromStored(operations: unknown): number {
-  if (Array.isArray(operations)) {
-    return operations.length;
-  }
-  if (typeof operations === 'string') {
-    try {
-      const parsed: unknown = JSON.parse(operations);
-      return Array.isArray(parsed) ? parsed.length : 0;
-    } catch {
-      return 0;
-    }
-  }
-  return 0;
-}
 
 /**
  * SQLite stores arrays as JSON-encoded TEXT (no native array type), so the

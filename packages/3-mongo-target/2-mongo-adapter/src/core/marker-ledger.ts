@@ -262,27 +262,28 @@ export async function readLedger(db: Db, space: string): Promise<readonly Ledger
     ledgerContext,
   );
 
-  return docs.map((doc) => {
+  const entries: LedgerEntryRecord[] = [];
+  for (const doc of docs) {
     const migrationName = doc['migrationName'];
     const migrationHash = doc['migrationHash'];
     const from = doc['from'];
     const to = doc['to'];
-    const appliedAt = doc['appliedAt'];
-    const operations = doc['operations'];
     if (typeof migrationName !== 'string' || typeof migrationHash !== 'string') {
-      throw new Error(`Invalid ledger doc on ${COLLECTION}: missing migration name or hash`);
+      continue;
     }
     if (typeof from !== 'string' || typeof to !== 'string') {
-      throw new Error(`Invalid ledger doc on ${COLLECTION}: missing from or to`);
+      continue;
     }
+    const appliedAt = doc['appliedAt'];
     const appliedAtDate =
       appliedAt instanceof Date
         ? appliedAt
         : appliedAt !== undefined
           ? new Date(String(appliedAt))
           : new Date();
+    const operations = doc['operations'];
     const opList = Array.isArray(operations) ? operations : [];
-    return {
+    entries.push({
       space,
       migrationName,
       migrationHash,
@@ -290,8 +291,9 @@ export async function readLedger(db: Db, space: string): Promise<readonly Ledger
       to,
       appliedAt: appliedAtDate,
       operationCount: opList.length,
-    };
-  });
+    });
+  }
+  return entries;
 }
 
 export async function writeLedgerEntry(

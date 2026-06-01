@@ -410,6 +410,38 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
     ]);
   });
 
+  it('skips legacy ledger docs missing migrationName or migrationHash', async () => {
+    await db.collection('_prisma_migrations').insertOne({
+      type: 'ledger',
+      space: APP,
+      edgeId: 'legacy-edge',
+      from: 'sha256:v1',
+      to: 'sha256:v2',
+      appliedAt: new Date('2024-01-01T00:00:00.000Z'),
+      operations: [],
+    });
+    await writeLedgerEntry(db, APP, {
+      edgeId: 'edge-1',
+      from: 'sha256:v1',
+      to: 'sha256:v2',
+      migrationName: '001_ok',
+      migrationHash: 'sha256:ok',
+      operations: [{ id: 'op.one' }],
+    });
+
+    const ledger = await readLedger(db, APP);
+    expectReadLedger(ledger, [
+      {
+        space: APP,
+        migrationName: '001_ok',
+        migrationHash: 'sha256:ok',
+        from: 'sha256:v1',
+        to: 'sha256:v2',
+        operationCount: 1,
+      },
+    ]);
+  });
+
   it('maps synth empty-string from to null', async () => {
     await writeLedgerEntry(db, APP, {
       edgeId: '->sha256:v1',

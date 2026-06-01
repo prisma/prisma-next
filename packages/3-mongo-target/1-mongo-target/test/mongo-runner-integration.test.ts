@@ -3,6 +3,7 @@ import {
   createMongoRunnerDeps,
   initMarker,
   introspectSchema,
+  readLedger,
   readMarker,
 } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
@@ -11,6 +12,8 @@ import type {
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
+import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -21,6 +24,8 @@ import {
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { mongoTargetDescriptor } from '../src/core/control-target';
+import { createCollection } from '../src/core/migration-factories';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
 import { MongoMigrationRunner } from '../src/core/mongo-runner';
@@ -874,6 +879,66 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
     if (result2.ok) {
       expect(result2.value.operationsExecuted).toBe(0);
     }
+  });
+});
+
+describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', () => {
+  it('threads migrationEdges through createRunner().execute() into per-edge ledger docs', async () => {
+    const family = fakeFamily();
+    const runner = mongoTargetDescriptor.migrations.createRunner(family);
+    const driver = createMongoControlDriver(db, client);
+    const space = 'ledger-wrapper-test';
+    const destHash = 'sha256:wrapper-dest';
+    const midHash = 'sha256:wrapper-mid';
+    const contract = bareContract(destHash);
+    const edges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        migrationHash: 'sha256:mig-a',
+        dirName: '001_a',
+        from: EMPTY_CONTRACT_HASH,
+        to: midHash,
+        operationCount: 1,
+      },
+      {
+        migrationHash: 'sha256:mig-b',
+        dirName: '002_b',
+        from: midHash,
+        to: destHash,
+        operationCount: 1,
+      },
+    ];
+    const plan: MigrationPlan = {
+      targetId: 'mongo',
+      spaceId: space,
+      origin: null,
+      destination: { storageHash: destHash },
+      operations: JSON.parse(
+        serializeMongoOps([createCollection('wrapper_a'), createCollection('wrapper_b')]),
+      ) as MigrationPlan['operations'],
+    };
+
+    const result = await runner.execute({
+      driver,
+      perSpaceOptions: [
+        {
+          space,
+          plan,
+          driver,
+          destinationContract: contract,
+          policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+          frameworkComponents: [],
+          strictVerification: false,
+          executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
+          migrationEdges: edges,
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    const ledger = await readLedger(db, space);
+    expect(ledger).toHaveLength(2);
+    expect(ledger.map((entry) => entry.migrationName)).toEqual(['001_a', '002_b']);
+    expect(ledger.map((entry) => entry.migrationHash)).toEqual(['sha256:mig-a', 'sha256:mig-b']);
   });
 });
 

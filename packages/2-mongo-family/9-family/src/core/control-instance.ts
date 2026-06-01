@@ -173,7 +173,7 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
     const controlAdapter = adapter.create(controlStack as ControlStack<'mongo', 'mongo'>);
     if (!isMongoControlAdapter(controlAdapter)) {
       throw new Error(
-        'Adapter does not implement MongoControlAdapter (missing readMarker, readAllMarkers, or introspectSchema)',
+        'Adapter does not implement MongoControlAdapter (missing readMarker, readAllMarkers, readLedger, or introspectSchema)',
       );
     }
     return controlAdapter;

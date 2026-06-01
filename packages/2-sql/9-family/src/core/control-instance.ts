@@ -375,7 +375,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     const controlAdapter = adapter.create(stack);
     if (!isSqlControlAdapter(controlAdapter)) {
       throw new Error(
-        'Adapter does not implement SqlControlAdapter (missing introspect, readMarker, or readAllMarkers)',
+        'Adapter does not implement SqlControlAdapter (missing introspect, readMarker, readAllMarkers, readLedger, or lower)',
       );
     }
     return controlAdapter;
