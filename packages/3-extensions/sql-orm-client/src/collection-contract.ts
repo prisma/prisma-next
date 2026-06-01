@@ -5,6 +5,7 @@ import {
   domainModelsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { castAs } from '@prisma-next/utils/casts';
 import {
   resolveDomainModelForContract,
   resolveTableForContract,
@@ -314,8 +315,8 @@ function resolveThrough(
   }
 
   const fkColumnSet = new Set<string>([
-    ...(parentColumns as string[]),
-    ...(childColumns as string[]),
+    ...castAs<readonly string[]>(parentColumns),
+    ...castAs<readonly string[]>(childColumns),
   ]);
   const junctionTable = unboundTable(contract, table);
   const requiredPayloadColumns: string[] = [];
@@ -329,9 +330,9 @@ function resolveThrough(
 
   return {
     table,
-    parentColumns: parentColumns as readonly string[],
-    childColumns: childColumns as readonly string[],
-    targetColumns: targetColumns as readonly string[],
+    parentColumns: castAs<readonly string[]>(parentColumns),
+    childColumns: castAs<readonly string[]>(childColumns),
+    targetColumns: castAs<readonly string[]>(targetColumns),
     requiredPayloadColumns,
   };
 }
