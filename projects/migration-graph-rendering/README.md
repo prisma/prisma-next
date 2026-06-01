@@ -54,6 +54,15 @@ Future siblings (not core): `migration path --from X --to Y`
 ([TML-2771](https://linear.app/prisma-company/issue/TML-2771)) and `ref show`
 invariants ([TML-2772](https://linear.app/prisma-company/issue/TML-2772)).
 
+Presentation polish (independent of the sequence above):
+
+- **Colored lanes + `--legend`** —
+  [`slices/lane-colors-and-legend/spec.md`](./slices/lane-colors-and-legend/spec.md)
+  ([TML-2773](https://linear.app/prisma-company/issue/TML-2773)). The Tier-3 tree gains a `git log --graph`-style
+  per-column colored gutter and an opt-in `--legend` key. Presentation-only;
+  touches the tree renderer + the `graph` command, behind unchanged layout and
+  `--json`/`--dot`.
+
 ## Contents
 
 - [`spec.md`](./spec.md) — **slice 1's spec + dispatch plan.** Pins the
