@@ -4,7 +4,11 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../../utils/command-helpers';
-import { type CommonCommandOptions, parseGlobalFlagsOrExit } from '../../utils/global-flags';
+import {
+  type CommonCommandOptions,
+  deriveCanPrompt,
+  parseGlobalFlagsOrExit,
+} from '../../utils/global-flags';
 import { fireTelemetryAfterInitConsent } from '../../utils/telemetry';
 import {
   INIT_EXIT_EMIT_FAILED,
@@ -111,33 +115,4 @@ export function createInitCommand(): Command {
       });
       process.exit(exitCode);
     });
-}
-
-/**
- * Bridges the action handler's two TTY checks (stdout via `flags`, stdin
- * via `process.stdin.isTTY`) into the `canPrompt` boolean `runInit`
- * consumes.
- *
- * Per the [Style Guide § Interactivity](../../../../../../../docs/CLI%20Style%20Guide.md#interactivity):
- *
- * - `flags.interactive` governs *decoration* (TerminalUI, intro/outro,
- *   spinners) and is derived from stdout-TTY by `parseGlobalFlags`,
- *   honouring `--interactive` / `--no-interactive`.
- * - Prompting additionally requires a stdin TTY — closing stdin is a
- *   common signal in CI / agent environments even when stdout stays
- *   attached.
- * - `--interactive` is the explicit override: when the user passes it,
- *   we honour it (e.g. testing flows where stdin is stubbed).
- *
- * Exported so callers and tests can derive the same value without
- * touching `process` globals.
- */
-export function deriveCanPrompt(opts: {
-  readonly flagsInteractive: boolean | undefined;
-  readonly optionInteractive: boolean | undefined;
-  readonly stdinIsTTY: boolean;
-}): boolean {
-  if (opts.optionInteractive === true) return true;
-  if (opts.flagsInteractive === false) return false;
-  return opts.stdinIsTTY;
 }

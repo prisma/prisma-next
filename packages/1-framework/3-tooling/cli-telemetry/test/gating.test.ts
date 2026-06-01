@@ -15,10 +15,9 @@ describe('resolveGating', () => {
     });
   });
 
-  it('returns enabled=false when enableTelemetry is undefined (file missing or field absent)', () => {
+  it('returns enabled=true when enableTelemetry is undefined (opt-out default: file missing or field absent)', () => {
     expect(resolveGating({ env: {}, config: {} })).toEqual({
-      enabled: false,
-      reason: 'default-off',
+      enabled: true,
     });
   });
 

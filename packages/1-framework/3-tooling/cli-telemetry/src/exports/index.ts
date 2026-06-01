@@ -13,4 +13,9 @@ export { sanitizeCommanderResult } from '../sanitize';
 export type { RunTelemetryInputs, TelemetryRunOutcome } from '../spawn';
 export { runTelemetry, senderModuleUrl } from '../spawn';
 export type { UserConfig } from '../user-config';
-export { readUserConfig, userConfigPath, writeUserConfig } from '../user-config';
+export {
+  ensureInstallationId,
+  readUserConfig,
+  userConfigPath,
+  writeUserConfig,
+} from '../user-config';

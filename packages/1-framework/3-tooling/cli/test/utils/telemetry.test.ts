@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import {
   readUserConfig,
   sanitizeCommanderResult,
+  type TelemetryRunOutcome,
   userConfigPath,
   writeUserConfig,
 } from '@prisma-next/cli-telemetry';
@@ -21,8 +22,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const isCIMock = vi.fn(() => false);
 vi.mock('../../src/utils/is-ci', () => ({ isCI: isCIMock }));
 
-let commanderSnapshotForTelemetry: typeof import('../../src/utils/telemetry').commanderSnapshotForTelemetry;
+// Partial-mock the telemetry package so the default-on fire path can be
+// observed without spawning a real detached child. Everything else
+// (gating, user-config read/write/mint, sanitiser) stays real so the
+// notice + mint + gate logic is exercised end-to-end.
+const { runTelemetryMock } = vi.hoisted(() => ({
+  runTelemetryMock: vi.fn<(...args: unknown[]) => TelemetryRunOutcome>(() => ({
+    spawned: true,
+  })),
+}));
+vi.mock('@prisma-next/cli-telemetry', async () => {
+  const actual = await vi.importActual<typeof import('@prisma-next/cli-telemetry')>(
+    '@prisma-next/cli-telemetry',
+  );
+  return { ...actual, runTelemetry: runTelemetryMock };
+});
+
 let fireTelemetryFromPreAction: typeof import('../../src/utils/telemetry').fireTelemetryFromPreAction;
+let commanderSnapshotForTelemetry: typeof import('../../src/utils/telemetry').commanderSnapshotForTelemetry;
 
 function restoreEnv(name: string, value: string | undefined): void {
   if (value === undefined) {
@@ -37,6 +54,8 @@ describe('CLI telemetry bridge', () => {
   let originalXdg: string | undefined;
   let originalDisableTelemetry: string | undefined;
   let originalDoNotTrack: string | undefined;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     xdgRoot = mkdtempSync(join(tmpdir(), 'cli-telemetry-bridge-'));
@@ -48,6 +67,10 @@ describe('CLI telemetry bridge', () => {
     delete process.env['DO_NOT_TRACK'];
     mkdirSync(dirname(userConfigPath()), { recursive: true });
     isCIMock.mockReturnValue(false);
+    runTelemetryMock.mockClear();
+    runTelemetryMock.mockReturnValue({ spawned: true });
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
     vi.resetModules();
     const telem = await import('../../src/utils/telemetry');
     commanderSnapshotForTelemetry = telem.commanderSnapshotForTelemetry;
@@ -55,11 +78,17 @@ describe('CLI telemetry bridge', () => {
   });
 
   afterEach(() => {
+    stderrSpy.mockRestore();
+    stdoutSpy.mockRestore();
     restoreEnv('XDG_CONFIG_HOME', originalXdg);
     restoreEnv('PRISMA_NEXT_DISABLE_TELEMETRY', originalDisableTelemetry);
     restoreEnv('DO_NOT_TRACK', originalDoNotTrack);
     rmSync(xdgRoot, { recursive: true, force: true });
   });
+
+  function stderrText(): string {
+    return stderrSpy.mock.calls.map((call: readonly unknown[]) => String(call[0])).join('');
+  }
 
   it('projects only user-supplied long flag names from Commander metadata', () => {
     const command = new Command('init')
@@ -96,37 +125,175 @@ describe('CLI telemetry bridge', () => {
     ]);
   });
 
-  it('returns gated-off without forking when env opt-out disables telemetry', () => {
-    writeUserConfig({ enableTelemetry: true });
+  it('on default-on first run prints the notice to stderr, mints an id, and fires', () => {
+    const outcome = fireTelemetryFromPreAction(new Command('init'));
+
+    expect(outcome).toEqual({ spawned: true });
+    expect(runTelemetryMock).toHaveBeenCalledTimes(1);
+
+    const minted = readUserConfig().installationId;
+    expect(minted).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+    const notice = stderrText();
+    expect(notice).toContain('Prisma Next collects anonymous CLI usage data, enabled by default');
+    expect(notice).toContain(userConfigPath());
+    expect(notice).toContain('DO_NOT_TRACK=1');
+    expect(notice).toContain('PRISMA_NEXT_DISABLE_TELEMETRY=1');
+
+    expect(stdoutSpy).not.toHaveBeenCalled();
+
+    const refreshedConfig = runTelemetryMock.mock.calls[0]?.[0] as {
+      userConfig?: { installationId?: string };
+    };
+    expect(refreshedConfig.userConfig?.installationId).toBe(minted);
+  });
+
+  it('leaves enableTelemetry undefined after minting on the default-on path', () => {
+    fireTelemetryFromPreAction(new Command('init'));
+
+    expect(readUserConfig().enableTelemetry).toBeUndefined();
+  });
+
+  it('on a second run with a stored id, fires silently without printing a notice', () => {
+    writeUserConfig({ installationId: 'existing-id' });
+
+    const outcome = fireTelemetryFromPreAction(new Command('init'));
+
+    expect(outcome).toEqual({ spawned: true });
+    expect(runTelemetryMock).toHaveBeenCalledTimes(1);
+    expect(stderrText()).toBe('');
+    expect(readUserConfig().installationId).toBe('existing-id');
+  });
+
+  it('with enableTelemetry: false, does not notice, mint, or fire', () => {
+    writeUserConfig({ enableTelemetry: false });
+
+    const outcome = fireTelemetryFromPreAction(new Command('init'));
+
+    expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
+    expect(runTelemetryMock).not.toHaveBeenCalled();
+    expect(stderrText()).toBe('');
+    expect(readUserConfig().installationId).toBeUndefined();
+  });
+
+  it('with PRISMA_NEXT_DISABLE_TELEMETRY=1, does not notice, mint, or fire', () => {
     process.env['PRISMA_NEXT_DISABLE_TELEMETRY'] = '1';
 
     const outcome = fireTelemetryFromPreAction(new Command('init'));
 
     expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
-    expect(readUserConfig().enableTelemetry).toBe(true);
+    expect(runTelemetryMock).not.toHaveBeenCalled();
+    expect(stderrText()).toBe('');
+    expect(readUserConfig().installationId).toBeUndefined();
   });
 
-  it('returns gated-off without forking when DO_NOT_TRACK disables telemetry', () => {
-    writeUserConfig({ enableTelemetry: true });
+  it('with DO_NOT_TRACK=1, does not notice, mint, or fire', () => {
     process.env['DO_NOT_TRACK'] = '1';
 
     const outcome = fireTelemetryFromPreAction(new Command('init'));
 
     expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
+    expect(runTelemetryMock).not.toHaveBeenCalled();
+    expect(stderrText()).toBe('');
+    expect(readUserConfig().installationId).toBeUndefined();
   });
 
-  it('returns ci without forking when isCI is true', () => {
-    writeUserConfig({ enableTelemetry: true });
+  it('under CI, does not notice, mint, or fire', () => {
     isCIMock.mockReturnValue(true);
 
     const outcome = fireTelemetryFromPreAction(new Command('init'));
 
     expect(outcome).toEqual({ spawned: false, reason: 'ci' });
+    expect(runTelemetryMock).not.toHaveBeenCalled();
+    expect(stderrText()).toBe('');
+    expect(readUserConfig().installationId).toBeUndefined();
   });
 
-  it('returns gated-off without forking while telemetry is default-off', () => {
-    const outcome = fireTelemetryFromPreAction(new Command('init'));
+  describe('interactive init consent-prompt suppression', () => {
+    const originalStdinIsTTY = process.stdin.isTTY;
 
-    expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
+    function setStdinTTY(value: boolean): void {
+      Object.defineProperty(process.stdin, 'isTTY', { value, configurable: true });
+    }
+
+    afterEach(() => {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY,
+        configurable: true,
+      });
+    });
+
+    // Mirrors the real wiring: `init` is a leaf command under the
+    // `prisma-next` program, so `commandPathFor` reports `['prisma-next',
+    // 'init']` and global flags merge in from the parent via
+    // `optsWithGlobals`.
+    function initCommandUnderProgram(argv: readonly string[]): Command {
+      const program = new Command('prisma-next');
+      const init = new Command('init')
+        .option('--yes')
+        .option('--interactive')
+        .option('--no-interactive')
+        .action(() => {});
+      program.addCommand(init);
+      program.parse(['node', 'prisma-next', 'init', ...argv]);
+      return init;
+    }
+
+    it('on interactive init first run, defers entirely to the prompt (no notice, mint, or send)', () => {
+      setStdinTTY(true);
+
+      const outcome = fireTelemetryFromPreAction(initCommandUnderProgram([]));
+
+      expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
+      expect(runTelemetryMock).not.toHaveBeenCalled();
+      expect(stderrText()).toBe('');
+      expect(readUserConfig().installationId).toBeUndefined();
+      expect(readUserConfig().enableTelemetry).toBeUndefined();
+    });
+
+    it('on init --yes, fires immediately (notice + mint + send, not deferred)', () => {
+      setStdinTTY(true);
+
+      const outcome = fireTelemetryFromPreAction(initCommandUnderProgram(['--yes']));
+
+      expect(outcome).toEqual({ spawned: true });
+      expect(runTelemetryMock).toHaveBeenCalledTimes(1);
+      expect(stderrText()).toContain(
+        'Prisma Next collects anonymous CLI usage data, enabled by default',
+      );
+      expect(readUserConfig().installationId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    });
+
+    it('on piped init (stdin not a TTY, no override), fires immediately (D2 behaviour)', () => {
+      setStdinTTY(false);
+
+      const outcome = fireTelemetryFromPreAction(initCommandUnderProgram([]));
+
+      expect(outcome).toEqual({ spawned: true });
+      expect(runTelemetryMock).toHaveBeenCalledTimes(1);
+      expect(stderrText()).toContain(
+        'Prisma Next collects anonymous CLI usage data, enabled by default',
+      );
+      expect(readUserConfig().installationId).not.toBeUndefined();
+    });
+
+    it('suppression is init-scoped: an interactive non-init command still fires', () => {
+      setStdinTTY(true);
+      const program = new Command('prisma-next');
+      const status = new Command('status').action(() => {});
+      program.addCommand(status);
+      program.parse(['node', 'prisma-next', 'status']);
+
+      const outcome = fireTelemetryFromPreAction(status);
+
+      expect(outcome).toEqual({ spawned: true });
+      expect(runTelemetryMock).toHaveBeenCalledTimes(1);
+      expect(stderrText()).toContain(
+        'Prisma Next collects anonymous CLI usage data, enabled by default',
+      );
+      expect(readUserConfig().installationId).not.toBeUndefined();
+    });
   });
 });

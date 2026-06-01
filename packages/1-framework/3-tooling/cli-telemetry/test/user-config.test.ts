@@ -2,7 +2,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readUserConfig, userConfigPath, writeUserConfig } from '../src/user-config';
+import {
+  ensureInstallationId,
+  readUserConfig,
+  userConfigPath,
+  writeUserConfig,
+} from '../src/user-config';
 
 describe('readUserConfig / writeUserConfig', () => {
   let xdgRoot: string;
@@ -110,5 +115,51 @@ describe('readUserConfig / writeUserConfig', () => {
     rmSync(xdgRoot, { recursive: true, force: true });
     writeUserConfig({ enableTelemetry: false });
     expect(existsSync(userConfigPath())).toBe(true);
+  });
+});
+
+describe('ensureInstallationId', () => {
+  let xdgRoot: string;
+  let originalXdg: string | undefined;
+
+  beforeEach(() => {
+    xdgRoot = mkdtempSync(join(tmpdir(), 'prisma-next-cli-telemetry-id-'));
+    originalXdg = process.env['XDG_CONFIG_HOME'];
+    process.env['XDG_CONFIG_HOME'] = xdgRoot;
+    mkdirSync(dirname(userConfigPath()), { recursive: true });
+  });
+
+  afterEach(() => {
+    if (originalXdg === undefined) {
+      delete process.env['XDG_CONFIG_HOME'];
+    } else {
+      process.env['XDG_CONFIG_HOME'] = originalXdg;
+    }
+    rmSync(xdgRoot, { recursive: true, force: true });
+  });
+
+  it('mints and persists a v4 UUID when none is stored', () => {
+    const id = ensureInstallationId();
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(readUserConfig().installationId).toBe(id);
+  });
+
+  it('does NOT set enableTelemetry when minting', () => {
+    ensureInstallationId();
+    expect(readUserConfig().enableTelemetry).toBeUndefined();
+  });
+
+  it('returns the existing id and does not rotate it', () => {
+    writeFileSync(userConfigPath(), JSON.stringify({ installationId: 'sticky-id' }));
+    expect(ensureInstallationId()).toBe('sticky-id');
+    expect(readUserConfig().installationId).toBe('sticky-id');
+  });
+
+  it('preserves an existing enableTelemetry: false while minting an id', () => {
+    writeFileSync(userConfigPath(), JSON.stringify({ enableTelemetry: false }));
+    ensureInstallationId();
+    const cfg = readUserConfig();
+    expect(cfg.installationId).toBeDefined();
+    expect(cfg.enableTelemetry).toBe(false);
   });
 });
