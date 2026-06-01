@@ -1,6 +1,8 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
+import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
+import { laneColorForColumn } from '../../../src/utils/formatters/migration-graph-lane-colors';
 import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphRows } from '../../../src/utils/formatters/migration-graph-rows';
 import { renderMigrationGraphTree } from '../../../src/utils/formatters/migration-graph-tree-render';
@@ -492,5 +494,63 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  init                 -       -> ef9de27
       -"
     `);
+  });
+});
+
+describe('renderMigrationGraphTree (lane colors)', () => {
+  function diamondEdges(): readonly MigrationEdge[] {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');
+    const bob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
+    const mergeAlice = edge('73e3abe', '3b2d98d', 'merge_alice');
+    const mergeBob = edge('6656a6e', '3b2d98d', 'merge_bob');
+    return [init, alice, bob, mergeAlice, mergeBob];
+  }
+
+  it('colors structural gutter glyphs by column index when colorize is true', () => {
+    const colored = tree(diamondEdges(), { colorize: true });
+    const verticalPass = '│ ';
+    const branchTee = '├─';
+    expect(colored).toContain(laneColorForColumn(0)(verticalPass));
+    expect(colored).toContain(laneColorForColumn(1)(verticalPass));
+    expect(laneColorForColumn(0)(verticalPass)).not.toBe(laneColorForColumn(1)(verticalPass));
+    expect(colored).toContain(laneColorForColumn(0)(branchTee));
+    expect(colored).toContain(laneColorForColumn(1)('╮'));
+  });
+
+  it('rotates lane hues across three columns on a convergence fan', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const addAvatar = edge('ef9de27', '6656a6e', 'add_avatar');
+    const mergePhone = edge('73e3abe', '3116048', 'merge_phone');
+    const mergePosts = edge('a94b7b4', '3116048', 'merge_posts');
+    const mergeAvatar = edge('6656a6e', '3116048', 'merge_avatar');
+    const colored = tree(
+      [init, addPhone, addPosts, addAvatar, mergePhone, mergePosts, mergeAvatar],
+      { colorize: true },
+    );
+    const verticalPass = '│ ';
+    const hues = [0, 1, 2].map((column) => laneColorForColumn(column)(verticalPass));
+    expect(new Set(hues).size).toBe(3);
+    for (const hue of hues) {
+      expect(colored).toContain(hue);
+    }
+  });
+
+  it('preserves visible layout when colorize is true', () => {
+    const edges = diamondEdges();
+    const plain = tree(edges, { colorize: false });
+    const colored = tree(edges, { colorize: true });
+    expect(colored.split('\n').map(stripAnsi)).toEqual(plain.split('\n').map(stripAnsi));
+  });
+
+  it('leaves node markers and direction arrows without lane-color wrapping', () => {
+    const colored = tree(diamondEdges(), { colorize: true });
+    expect(colored.split('\n')[0]).toMatch(/^○/);
+    const mergeAliceLine = colored.split('\n').find((line) => line.includes('merge_alice'));
+    expect(mergeAliceLine).toBeDefined();
+    expect(mergeAliceLine).toContain(`${laneColorForColumn(0)('│')}↑`);
+    expect(mergeAliceLine).not.toContain(laneColorForColumn(0)('↑'));
   });
 });
