@@ -118,8 +118,9 @@ function arrowForEdgeKind(
 }
 
 /**
- * Crossings (`┼`) and the leftmost lane (column 0) render with the neutral dim
- * lane style rather than a palette hue — neither owns a distinguishable colour.
+ * The leftmost lane (column 0) renders with the neutral dim lane style rather
+ * than a palette hue — in the common single-lane case it has nothing to be told
+ * apart from. Used as the "no owning arc" sentinel during colour resolution.
  */
 const NEUTRAL_LANE = 0;
 
@@ -139,10 +140,13 @@ interface RowLaneColors {
 
 /**
  * Resolve per-cell colour columns for a row. Scanning right-to-left lets each
- * arc bridge inherit the corner column that closes it (the arc's back-lane),
- * so the whole arc — vertical run (already its own column), horizontal bridges,
- * corners, and the `◂`/`─` connector — reads as a single hue. Crossings stay
- * neutral so neither overlapping arc "steals" the cell.
+ * arc bridge inherit the corner column that closes it (the arc's back-lane), so
+ * the whole arc — vertical run (already its own column), horizontal bridges,
+ * corners, crossings, and the `◂`/`─` connector — reads as a single continuous
+ * hue. A crossing can only be one colour, so rather than leave it dim (wrong for
+ * both crossing lines) it takes the arc owning the horizontal run at this row
+ * (the nearest corner to its right); the crossed vertical lane is simply
+ * occluded at that one cell and reappears on the next row.
  */
 function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
   const lane = new Array<number>(cells.length);
@@ -163,8 +167,6 @@ function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
         lane[column] = column;
         break;
       case 'arc-crossing':
-        lane[column] = NEUTRAL_LANE;
-        break;
       case 'arc-land-bridge':
         lane[column] = arcCorner;
         break;

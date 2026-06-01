@@ -632,7 +632,7 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(colored).not.toContain(laneColorForColumn(2)('↑'));
   });
 
-  it('colors a routed back-arc as one hue and leaves crossings neutral', () => {
+  it("colors a routed back-arc's whole horizontal run — bridges and crossings — one hue", () => {
     const colored = tree(skipArcEdges(), { colorize: true });
     const lines = colored.split('\n');
     // Source-tee row: every horizontal bridge and the closing corner share the
@@ -643,14 +643,18 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(teeLine).toContain(laneColorForColumn(3)('╮ '));
     expect(teeLine).not.toContain(laneColorForColumn(1)('──'));
     expect(teeLine).not.toContain(laneColorForColumn(2)('──'));
-    // Landing row: the ◂ connector + ╯ corner follow the arc hue, the landing
-    // node ○ takes its own lane, and the crossing ┼ stays neutral.
+    // Landing row: the ◂ connector, the `┼` crossing, and the ╯ corner all take
+    // the arc's hue (column 3) so the horizontal run reads as one continuous
+    // line; the landing node ○ keeps its own lane. A crossing can only be one
+    // colour, so it follows the arc owning the run rather than reading dim.
     const landLine = lines.find((line) => line.includes('ddddddd') && line.includes('◂'));
     expect(landLine).toBeDefined();
     expect(landLine).toContain(laneColorForColumn(1)('○'));
     expect(landLine).toContain(laneColorForColumn(3)('◂'));
-    expect(landLine).toContain('┼');
+    expect(landLine).toContain(laneColorForColumn(3)('┼─'));
+    // The crossing never reads as a different lane's hue or as a bare/dim glyph.
     expect(landLine).not.toContain(laneColorForColumn(2)('┼'));
+    expect(stripAnsi(landLine ?? '')).toContain('┼');
   });
 });
 
