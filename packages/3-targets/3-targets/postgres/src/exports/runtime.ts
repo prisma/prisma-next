@@ -3,7 +3,7 @@ import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
-import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
+import { postgresTargetDescriptorMetaRuntime } from '../core/descriptor-meta-runtime';
 
 export { PostgresContractSerializer } from '../core/postgres-contract-serializer';
 
@@ -22,7 +22,7 @@ const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
 > & {
   readonly codecs: () => readonly AnyCodecDescriptor[];
 } = {
-  ...postgresTargetDescriptorMeta,
+  ...postgresTargetDescriptorMetaRuntime,
   codecs: () => [],
   create(): PostgresRuntimeTargetInstance {
     return {
