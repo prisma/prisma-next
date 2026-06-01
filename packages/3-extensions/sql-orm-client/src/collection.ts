@@ -393,7 +393,7 @@ export class Collection<
     > = IncludeRefinementCollection<
       TContract,
       RelatedName,
-      DefaultModelRow<TContract, RelatedName>,
+      SimplifyDeep<InferRootRow<TContract, RelatedName>>,
       CollectionTypeState,
       IsToMany
     >,
@@ -403,7 +403,7 @@ export class Collection<
       collection: IncludeRefinementCollection<
         TContract,
         RelatedName,
-        DefaultModelRow<TContract, RelatedName>,
+        SimplifyDeep<InferRootRow<TContract, RelatedName>>,
         DefaultCollectionTypeState,
         IsToMany
       >,
@@ -417,7 +417,7 @@ export class Collection<
           TContract,
           ModelName,
           K,
-          DefaultModelRow<TContract, RelatedName>,
+          SimplifyDeep<InferRootRow<TContract, RelatedName>>,
           RefinedResult
         >;
       }
@@ -433,7 +433,7 @@ export class Collection<
     if (refineFn) {
       const nestedCollection = this.#createCollection<
         RelatedName,
-        DefaultModelRow<TContract, RelatedName>,
+        SimplifyDeep<InferRootRow<TContract, RelatedName>>,
         DefaultCollectionTypeState
       >(relation.relatedModelName as RelatedName, {
         tableName: relation.relatedTableName,
@@ -444,7 +444,7 @@ export class Collection<
         nestedCollection as unknown as IncludeRefinementCollection<
           TContract,
           RelatedName,
-          DefaultModelRow<TContract, RelatedName>,
+          SimplifyDeep<InferRootRow<TContract, RelatedName>>,
           DefaultCollectionTypeState,
           IsToMany
         >,
@@ -493,7 +493,7 @@ export class Collection<
             TContract,
             ModelName,
             K,
-            DefaultModelRow<TContract, RelatedName>,
+            SimplifyDeep<InferRootRow<TContract, RelatedName>>,
             RefinedResult
           >;
         }
