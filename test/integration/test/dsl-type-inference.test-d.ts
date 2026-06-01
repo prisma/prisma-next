@@ -1,5 +1,5 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-import type { ContractModelsMap, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
+import type { ContractModelsMap } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
@@ -50,13 +50,13 @@ const singleModelContract = defineContract({
 
 test('table name literals survive in storage.tables (single model)', () => {
   expectTypeOf<
-    keyof (typeof singleModelContract.storage.namespaces)[typeof UNBOUND_DOMAIN_NAMESPACE_ID]['tables']
+    keyof (typeof singleModelContract.storage.namespaces)['public']['tables']
   >().toEqualTypeOf<'user'>();
 });
 
 test('column name literals survive in storage.tables[name].columns', () => {
   type UserColumns =
-    (typeof singleModelContract.storage.namespaces)[typeof UNBOUND_DOMAIN_NAMESPACE_ID]['tables']['user']['columns'];
+    (typeof singleModelContract.storage.namespaces)['public']['tables']['user']['columns'];
   expectTypeOf<keyof UserColumns>().toEqualTypeOf<'id' | 'email'>();
 });
 
@@ -76,7 +76,7 @@ test('deserializeContract preserves table name literals', () => {
     singleModelContract,
   ) as typeof singleModelContract;
   expectTypeOf<
-    keyof (typeof validated.storage.namespaces)[typeof UNBOUND_DOMAIN_NAMESPACE_ID]['tables']
+    keyof (typeof validated.storage.namespaces)['public']['tables']
   >().toEqualTypeOf<'user'>();
 });
 
@@ -123,7 +123,7 @@ const multiModelContract = defineContract({
 
 test('multi-model contract preserves table name literals', () => {
   expectTypeOf<
-    keyof (typeof multiModelContract.storage.namespaces)[typeof UNBOUND_DOMAIN_NAMESPACE_ID]['tables']
+    keyof (typeof multiModelContract.storage.namespaces)['public']['tables']
   >().toEqualTypeOf<'user' | 'post'>();
 });
 
@@ -135,7 +135,7 @@ test('multi-model contract preserves model name literals', () => {
 
 test('multi-model contract preserves column literals per table', () => {
   type PostColumns =
-    (typeof multiModelContract.storage.namespaces)[typeof UNBOUND_DOMAIN_NAMESPACE_ID]['tables']['post']['columns'];
+    (typeof multiModelContract.storage.namespaces)['public']['tables']['post']['columns'];
   expectTypeOf<keyof PostColumns>().toEqualTypeOf<'id' | 'userId' | 'title'>();
 });
 

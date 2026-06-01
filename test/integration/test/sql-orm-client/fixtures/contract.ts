@@ -88,7 +88,7 @@ const baseContract = defineContract({
   },
 });
 
-const defaultNamespace = baseContract.domain.namespaces.public!;
+const defaultNamespace = baseContract.domain.namespaces['public']!;
 const userModel = defaultNamespace.models['User']!;
 
 export const contract = {

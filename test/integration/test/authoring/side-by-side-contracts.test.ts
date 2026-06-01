@@ -202,13 +202,13 @@ describe('side-by-side contract examples', () => {
         users: { namespace: 'public', model: 'User' },
       });
       expect(
-        validatedContract.domain.namespaces.public!.models['User']?.relations['posts'],
+        validatedContract.domain.namespaces['public']!.models['User']?.relations['posts'],
       ).toMatchObject({
         cardinality: '1:N',
         to: { namespace: 'public', model: 'Post' },
       });
       expect(
-        validatedContract.domain.namespaces.public!.models['Post']?.relations['author'],
+        validatedContract.domain.namespaces['public']!.models['Post']?.relations['author'],
       ).toMatchObject({
         cardinality: 'N:1',
         to: { namespace: 'public', model: 'User' },
@@ -370,7 +370,7 @@ describe('side-by-side contract examples', () => {
       postgresContractJson['domain'] as {
         namespaces: Record<string, { models: Record<string, unknown> }>;
       }
-    ).namespaces.public!.models;
+    ).namespaces['public']!.models;
     const mongoModels = (
       mongoContractJson['domain'] as {
         namespaces: Record<string, { models: Record<string, unknown> }>;

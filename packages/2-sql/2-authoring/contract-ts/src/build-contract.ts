@@ -560,7 +560,7 @@ export function buildSqlContractFromDefinition(
   const { createNamespace } = definition;
   const namespaces = blindCast<
     SqlStorageInput['namespaces'],
-    'contract authoring always materialises the __unbound__ namespace coordinate'
+    'contract authoring materialises each namespace coordinate from the model set and explicit namespace list'
   >(
     Object.fromEntries(
       [...namespaceCoordinateIds].sort().map((id) => {

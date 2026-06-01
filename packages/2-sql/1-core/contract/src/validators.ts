@@ -461,11 +461,11 @@ export function validateStorage(value: unknown): SqlStorage {
     'arktype validated the JSON envelope but its output type is unknown (ColumnDefault carries runtime-only bigint|Date); bridge to the input shape'
   >(result);
   const namespaces = buildSqlNamespaceMap(validated.namespaces ?? {});
-  // The `__unbound__` brand is made true at construction: if the validated
-  // namespaces omit the late-bound slot (e.g. a contract declaring only named
-  // namespaces), inject the family unbound singleton rather than asserting a
-  // shape that isn't there. Reconstructing the literal lets the branded
-  // `SqlStorageInput['namespaces']` hold with no cast.
+  // Compatibility shim: inject the empty unbound singleton when absent so that
+  // production code paths which address __unbound__ for table metadata have a
+  // slot to read or write into. The `SqlStorageInput['namespaces']` type no
+  // longer requires __unbound__, so this is a runtime convenience, not a type
+  // invariant.
   const unbound = namespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
   return new SqlStorage({
     storageHash: validated.storageHash,

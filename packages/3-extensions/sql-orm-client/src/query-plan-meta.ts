@@ -1,5 +1,4 @@
 import type { Contract, PlanMeta } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { type AnyQueryAst, collectOrderedParamRefs } from '@prisma-next/sql-relational-core/ast';
@@ -15,9 +14,9 @@ export function deriveParamsFromAst(ast: AnyQueryAst): {
 }
 
 export function resolveTableColumns(contract: Contract<SqlStorage>, tableName: string): string[] {
-  const table = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables[tableName] as
-    | StorageTable
-    | undefined;
+  const table = Object.values(contract.storage.namespaces).find(
+    (ns) => ns.tables[tableName] !== undefined,
+  )?.tables[tableName] as StorageTable | undefined;
   if (!table) {
     throw new Error(`Unknown table "${tableName}" in SQL ORM query planner`);
   }

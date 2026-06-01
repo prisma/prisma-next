@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
@@ -117,9 +116,9 @@ function resolveColumn(
   tableName: string,
   columnName: string,
 ): { readonly codecId: string; readonly nullable: boolean } | undefined {
-  const table = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables[tableName] as
-    | StorageTable
-    | undefined;
+  const table = Object.values(contract.storage.namespaces).find(
+    (ns) => ns.tables[tableName] !== undefined,
+  )?.tables[tableName] as StorageTable | undefined;
   const column = table?.columns?.[columnName];
   if (!column) return undefined;
   return { codecId: column.codecId, nullable: column.nullable };

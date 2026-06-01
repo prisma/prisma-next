@@ -578,27 +578,33 @@ type BuiltDomain<Definition> =
         };
       };
 
+type DefaultStorageNamespaceId<Definition> =
+  DefinitionTargetId<Definition> extends 'postgres' ? 'public' : '__unbound__';
+
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
   readonly types?: BuiltDocumentScopedTypes<Definition>;
-  // SQL contracts always carry a literal `__unbound__` namespace whose tables
-  // slot is narrowed to the actual built table shape so downstream DSL
-  // surfaces (TableProxyContract, Ref, SelectBuilder) keep literal-keyed
-  // access without an optional-narrowing dance. The shape is described
-  // inline (rather than intersecting with `SqlStorage['namespaces']`) so
-  // its `Readonly<Record<string, Namespace>>` index signature doesn't
+  // The primary namespace key is target-specific: Postgres uses `public` (the
+  // default schema), all other SQL targets use `__unbound__`. The namespace
+  // carries the narrowed tables shape so downstream DSL surfaces keep
+  // literal-keyed access without an optional-narrowing dance. The shape is
+  // described inline (rather than intersecting with `SqlStorage['namespaces']`)
+  // so its `Readonly<Record<string, Namespace>>` index signature doesn't
   // collapse `keyof tables` to `string`. The literal object is still
-  // structurally assignable to `SqlStorage['namespaces']` because every
-  // value satisfies the framework `Namespace` interface.
+  // structurally assignable to `SqlStorage['namespaces']` because every value
+  // satisfies the framework `Namespace` interface.
   readonly namespaces: {
-    readonly __unbound__: {
-      readonly id: '__unbound__';
+    readonly [K in DefaultStorageNamespaceId<Definition>]: {
+      readonly id: K;
       readonly kind: string;
       readonly tables: BuiltStorageTables<Definition>;
       readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
     };
   } & {
-    readonly [Ns in Exclude<DefinitionNamespaces<Definition>, '__unbound__'>]: {
+    readonly [Ns in Exclude<
+      DefinitionNamespaces<Definition>,
+      DefaultStorageNamespaceId<Definition>
+    >]: {
       readonly id: Ns;
       readonly kind: string;
       readonly tables: Record<never, never>;
