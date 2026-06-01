@@ -18,7 +18,7 @@ Maintainers of Prisma Next who have permission to push branches and open PRs in 
 
 ## Background reading
 
-Read [`docs/oss/versioning.md`](../../../docs/oss/versioning.md) before running this skill. It covers:
+Read [`docs/oss/versioning.md`](../../docs/oss/versioning.md) before running this skill. It covers:
 
 - The source-of-truth model (root `package.json` `version`).
 - The lockstep guarantee (every workspace package matches the root).
@@ -50,7 +50,7 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
    echo "$CURRENT → $NEXT"
    ```
 
-   (Patch component is reset to 0 by design — see [`docs/oss/versioning.md`](../../../docs/oss/versioning.md).)
+   (Patch component is reset to 0 by design — see [`docs/oss/versioning.md`](../../docs/oss/versioning.md).)
 
 2. **Create a fresh worktree off `origin/main`.** Use the convention `release/<version>` for both the branch and the sibling worktree path:
 
@@ -100,7 +100,7 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
    The body should:
 
    - State the previous and new version (`<previous> → <new>`).
-   - Link to [`docs/oss/versioning.md`](../../../docs/oss/versioning.md) for context.
+   - Link to [`docs/oss/versioning.md`](../../docs/oss/versioning.md) for context.
    - Point reviewers at the committed `docs/releases/v<version>.md` (authored by the `draft-release-notes` skill in step 7) as the human-review surface for the release's user-facing changes.
    - Note that **merging this PR ships the release**: the resulting push to `main` carries the bumped root `version`, the `Publish to npm` workflow detects the change and publishes `<new>` under dist-tag `latest`, and a matching GitHub Release is created automatically.
 
