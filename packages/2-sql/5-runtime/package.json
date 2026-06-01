@@ -56,6 +56,9 @@
     "./test/utils": "./dist/test/utils.mjs",
     "./package.json": "./package.json"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
