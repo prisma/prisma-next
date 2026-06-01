@@ -1,5 +1,5 @@
-import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
-import { PostgresCreateSchema, PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
+import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
+import { createSchema, createTable } from '@prisma-next/target-postgres/contract-free';
 import {
   APP_SPACE_ID,
   ensureLedgerTableStatement,
@@ -12,71 +12,42 @@ import type { PostgresContract } from '../../src/core/types';
 
 const lowererContext = { contract: {} as PostgresContract };
 
-const markerColumns: readonly DdlColumn[] = [
-  {
-    name: 'space',
-    type: 'text',
-    notNull: true,
-    primaryKey: true,
-    default: { kind: 'literal', value: APP_SPACE_ID },
-  },
-  { name: 'core_hash', type: 'text', notNull: true },
-  { name: 'profile_hash', type: 'text', notNull: true },
-  { name: 'contract_json', type: 'jsonb' },
-  { name: 'canonical_version', type: 'int' },
-  {
-    name: 'updated_at',
-    type: 'timestamptz',
-    notNull: true,
-    default: { kind: 'function', expression: 'now()' },
-  },
-  { name: 'app_tag', type: 'text' },
-  {
-    name: 'meta',
-    type: 'jsonb',
-    notNull: true,
-    default: { kind: 'literal', value: '{}' },
-  },
-  {
-    name: 'invariants',
-    type: 'text[]',
-    notNull: true,
-    default: { kind: 'literal', value: '{}' },
-  },
-];
+const markerColumns = [
+  col('space', 'text', { notNull: true, primaryKey: true, default: lit(APP_SPACE_ID) }),
+  col('core_hash', 'text', { notNull: true }),
+  col('profile_hash', 'text', { notNull: true }),
+  col('contract_json', 'jsonb'),
+  col('canonical_version', 'int'),
+  col('updated_at', 'timestamptz', { notNull: true, default: fn('now()') }),
+  col('app_tag', 'text'),
+  col('meta', 'jsonb', { notNull: true, default: lit('{}') }),
+  col('invariants', 'text[]', { notNull: true, default: lit('{}') }),
+] as const;
 
-const ledgerColumns: readonly DdlColumn[] = [
-  { name: 'id', type: 'bigserial', primaryKey: true },
-  {
-    name: 'created_at',
-    type: 'timestamptz',
-    notNull: true,
-    default: { kind: 'function', expression: 'now()' },
-  },
-  { name: 'origin_core_hash', type: 'text' },
-  { name: 'origin_profile_hash', type: 'text' },
-  { name: 'destination_core_hash', type: 'text', notNull: true },
-  { name: 'destination_profile_hash', type: 'text' },
-  { name: 'contract_json_before', type: 'jsonb' },
-  { name: 'contract_json_after', type: 'jsonb' },
-  { name: 'operations', type: 'jsonb', notNull: true },
-];
+const ledgerColumns = [
+  col('id', 'bigserial', { primaryKey: true }),
+  col('created_at', 'timestamptz', { notNull: true, default: fn('now()') }),
+  col('origin_core_hash', 'text'),
+  col('origin_profile_hash', 'text'),
+  col('destination_core_hash', 'text', { notNull: true }),
+  col('destination_profile_hash', 'text'),
+  col('contract_json_before', 'jsonb'),
+  col('contract_json_after', 'jsonb'),
+  col('operations', 'jsonb', { notNull: true }),
+] as const;
 
 describe('Postgres DDL lowering matches statement-builders', () => {
   const adapter = createPostgresAdapter();
 
   it('matches ensurePrismaContractSchemaStatement', () => {
-    const ast = new PostgresCreateSchema({
-      schema: 'prisma_contract',
-      ifNotExists: true,
-    });
+    const ast = createSchema({ schema: 'prisma_contract', ifNotExists: true });
     const lowered = adapter.lower(ast, lowererContext);
     expect(lowered.sql).toBe(ensurePrismaContractSchemaStatement.sql);
     expect([...lowered.params]).toEqual([...ensurePrismaContractSchemaStatement.params]);
   });
 
   it('matches ensureMarkerTableStatement', () => {
-    const ast = new PostgresCreateTable({
+    const ast = createTable({
       schema: 'prisma_contract',
       table: 'marker',
       ifNotExists: true,
@@ -88,7 +59,7 @@ describe('Postgres DDL lowering matches statement-builders', () => {
   });
 
   it('matches ensureLedgerTableStatement', () => {
-    const ast = new PostgresCreateTable({
+    const ast = createTable({
       schema: 'prisma_contract',
       table: 'ledger',
       ifNotExists: true,
