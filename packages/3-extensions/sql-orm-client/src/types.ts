@@ -106,7 +106,7 @@ export interface CollectionTypeState {
   readonly variantName: string | undefined;
 }
 
-export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'M:N';
+export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'N:M';
 
 export type DefaultCollectionTypeState = {
   readonly hasOrderBy: false;

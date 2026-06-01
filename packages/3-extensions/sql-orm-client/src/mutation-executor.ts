@@ -348,8 +348,8 @@ function partitionByOwnership(relationMutations: readonly ParsedRelationMutation
       continue;
     }
 
-    if (relationMutation.relation.cardinality === 'M:N') {
-      throw new Error('M:N nested mutations are not supported yet');
+    if (relationMutation.relation.cardinality === 'N:M') {
+      throw new Error('N:M nested mutations are not supported yet');
     }
 
     childOwned.push(relationMutation);

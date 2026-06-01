@@ -341,7 +341,7 @@ export function resolveModelRelations(
 }
 
 export function parseRelationCardinality(value: unknown): RelationCardinalityTag | undefined {
-  if (value === '1:1' || value === 'N:1' || value === '1:N' || value === 'M:N') {
+  if (value === '1:1' || value === 'N:1' || value === '1:N' || value === 'N:M') {
     return value;
   }
   return undefined;
