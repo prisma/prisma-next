@@ -205,15 +205,18 @@ function qualifyTableFromNamespaceCoordinate(
     return quoteIdentifier(table.name);
   }
   const namespace = contract.storage.namespaces[table.namespaceId];
-  if (
-    namespace === undefined ||
-    typeof (namespace as { qualifyTable?: unknown }).qualifyTable !== 'function'
-  ) {
+  if (namespace === undefined) {
     throw new Error(
       `Table "${table.name}" references namespace "${table.namespaceId}" which is not present on the contract`,
     );
   }
-  return (namespace as { qualifyTable: (tableName: string) => string }).qualifyTable(table.name);
+  const qualifyTable = namespace.qualifyTable;
+  if (qualifyTable === undefined) {
+    throw new Error(
+      `Table "${table.name}" references namespace "${table.namespaceId}" which is not materialised for SQL rendering on the contract`,
+    );
+  }
+  return qualifyTable.call(namespace, table.name);
 }
 
 function renderTableSource(source: TableSource, contract: SqliteContract): string {
@@ -268,6 +271,9 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
       }
       return `(${node.exprs.map((part) => renderExpr(part, contract)).join(' OR ')})`;
     case 'exists': {
+      if (contract === undefined) {
+        throw new Error('EXISTS subquery rendering requires a Sqlite contract');
+      }
       const notKeyword = node.notExists ? 'NOT ' : '';
       const subquery = renderSelect(node.subquery, contract);
       return `${notKeyword}EXISTS (${subquery})`;
@@ -343,6 +349,9 @@ function renderOperation(expr: OperationExpr, contract?: SqliteContract): string
 function renderSubqueryExpr(expr: SubqueryExpr, contract?: SqliteContract): string {
   if (expr.query.projection.length !== 1) {
     throw new Error('Subquery expressions must project exactly one column');
+  }
+  if (contract === undefined) {
+    throw new Error('Subquery expression rendering requires a Sqlite contract');
   }
   return `(${renderSelect(expr.query, contract)})`;
 }
@@ -474,6 +483,9 @@ function renderJsonArrayAggExpr(expr: JsonArrayAggExpr, contract?: SqliteContrac
 }
 
 function renderJoin(join: JoinAst, contract?: SqliteContract): string {
+  if (contract === undefined) {
+    throw new Error('JOIN rendering requires a Sqlite contract');
+  }
   const joinType = join.joinType.toUpperCase();
   const source = renderSource(join.source, contract);
   const onClause = renderJoinOn(join.on, contract);

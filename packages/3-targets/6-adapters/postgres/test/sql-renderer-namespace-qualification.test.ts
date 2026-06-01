@@ -1,3 +1,5 @@
+import type { StorageHashBase } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
   BinaryExpr,
@@ -8,9 +10,9 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { PostgresSchema } from '../../../3-targets/postgres/src/core/postgres-schema';
 import { renderLoweredSql } from '../src/core/sql-renderer';
 import type { PostgresContract } from '../src/core/types';
 
@@ -24,6 +26,13 @@ const userTableInput = {
   foreignKeys: [],
 };
 
+const emptyLookup: CodecLookup = {
+  get: () => undefined,
+  targetTypesFor: () => undefined,
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
+};
+
 const publicContract = {
   target: 'postgres',
   targetFamily: 'sql',
@@ -33,7 +42,7 @@ const publicContract = {
   extensionPacks: {},
   meta: {},
   storage: new SqlStorage({
-    storageHash: 'sha256:test-core-public',
+    storageHash: 'sha256:test-core-public' as StorageHashBase<'sha256:test-core-public'>,
     namespaces: {
       public: new PostgresSchema({
         id: 'public',
@@ -51,12 +60,14 @@ describe('renderLoweredSql namespace qualification', () => {
     const selectSql = renderLoweredSql(
       SelectAst.from(user).withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]),
       publicContract,
+      emptyLookup,
     ).sql;
     expect(selectSql).toBe('SELECT "user"."id" AS "id" FROM "public"."user"');
 
     const deleteSql = renderLoweredSql(
       DeleteAst.from(user).withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), LiteralExpr.of(1))),
       publicContract,
+      emptyLookup,
     ).sql;
     expect(deleteSql).toContain('DELETE FROM "public"."user"');
   });

@@ -1,4 +1,6 @@
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
@@ -28,9 +30,9 @@ import {
   UpdateAst,
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { PostgresSchema } from '../../../3-targets/postgres/src/core/postgres-schema';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
 
@@ -547,11 +549,11 @@ describe('Postgres adapter', () => {
     const publicContract = {
       ...contract,
       storage: new SqlStorage({
-        storageHash: 'sha256:test-core-public',
+        storageHash: 'sha256:test-core-public' as StorageHashBase<'sha256:test-core-public'>,
         namespaces: {
           public: new PostgresSchema({
             id: 'public',
-            tables: contract.storage.namespaces.__unbound__!.tables,
+            tables: contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables,
           }),
         },
       }),

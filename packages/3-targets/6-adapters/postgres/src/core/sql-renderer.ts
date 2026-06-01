@@ -278,15 +278,18 @@ function qualifyTableFromNamespaceCoordinate(
     return quoteIdentifier(table.name);
   }
   const namespace = contract.storage.namespaces[table.namespaceId];
-  if (
-    namespace === undefined ||
-    typeof (namespace as { qualifyTable?: unknown }).qualifyTable !== 'function'
-  ) {
+  if (namespace === undefined) {
     throw new Error(
       `Table "${table.name}" references namespace "${table.namespaceId}" which is not present as a Postgres schema on the contract`,
     );
   }
-  return (namespace as { qualifyTable: (tableName: string) => string }).qualifyTable(table.name);
+  const qualifyTable = namespace.qualifyTable;
+  if (qualifyTable === undefined) {
+    throw new Error(
+      `Table "${table.name}" references namespace "${table.namespaceId}" which is not materialised as a Postgres schema on the contract`,
+    );
+  }
+  return qualifyTable.call(namespace, table.name);
 }
 
 function renderTableSource(source: TableSource, contract: PostgresContract): string {

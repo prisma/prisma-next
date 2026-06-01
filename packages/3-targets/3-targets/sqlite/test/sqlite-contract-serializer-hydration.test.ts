@@ -35,6 +35,9 @@ describe('SqliteContractSerializer namespace hydration', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
     const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
     expect(namespace).toBeInstanceOf(SqliteDatabase);
+    if (!(namespace instanceof SqliteDatabase)) {
+      return;
+    }
     expect(namespace.qualifyTable('user')).toBe('"user"');
     const userTable = namespace.tables['user'];
     expect(userTable).toBeInstanceOf(StorageTable);
