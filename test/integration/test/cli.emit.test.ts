@@ -70,7 +70,7 @@ describe('emit command functionality', () => {
         target: 'postgres',
         storage: {
           namespaces: {
-            __unbound__: {
+            public: {
               tables: {
                 user: expect.anything(),
               },
