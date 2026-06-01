@@ -1,9 +1,12 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   assertReturningCapability,
   hasContractCapability,
   isToOneCardinality,
   resolveIncludeRelation,
+  resolveModelRelations,
   resolveModelTableName,
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
@@ -363,5 +366,174 @@ describe('resolvePolymorphismInfo()', () => {
     expect(() => resolvePolymorphismInfo(withoutBug, 'Task')).toThrow(
       /declares variant "Bug", but that model is missing/,
     );
+  });
+});
+
+describe('resolveModelRelations() through descriptor', () => {
+  type RawColumn = { nativeType: string; codecId: string; nullable: boolean; default?: unknown };
+
+  function buildManyToManyContract(opts: {
+    junctionTable: string;
+    parentColumns: string[];
+    childColumns: string[];
+    targetColumns: string[];
+    extraColumns?: Record<string, RawColumn>;
+  }): Contract<SqlStorage> {
+    const { junctionTable, parentColumns, childColumns, targetColumns, extraColumns = {} } = opts;
+
+    const junctionStorageColumns: Record<string, RawColumn> = {};
+    for (const col of parentColumns) {
+      junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+    }
+    for (const col of childColumns) {
+      junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+    }
+    for (const [name, col] of Object.entries(extraColumns)) {
+      junctionStorageColumns[name] = col;
+    }
+
+    return {
+      domain: {
+        namespaces: {
+          public: {
+            id: 'public',
+            models: {
+              Parent: {
+                fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+                relations: {
+                  children: {
+                    to: { model: 'Child', namespace: 'public' },
+                    cardinality: 'N:M',
+                    on: { localFields: ['id'], targetFields: targetColumns },
+                    through: {
+                      table: junctionTable,
+                      parentColumns,
+                      childColumns,
+                      targetColumns,
+                    },
+                  },
+                },
+                storage: { table: 'parents', fields: { id: { column: 'id' } } },
+              },
+              Child: {
+                fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+                relations: {},
+                storage: { table: 'children', fields: { id: { column: 'id' } } },
+              },
+              Junction: {
+                fields: {},
+                relations: {},
+                storage: { table: junctionTable, fields: {} },
+              },
+            },
+          },
+        },
+      },
+      storage: {
+        namespaces: {
+          public: {
+            id: 'public',
+            tables: {
+              parents: {
+                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              children: {
+                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              [junctionTable]: {
+                columns: junctionStorageColumns,
+                primaryKey: { columns: [...parentColumns, ...childColumns] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      },
+      capabilities: {},
+    } as unknown as Contract<SqlStorage>;
+  }
+
+  it('populates through descriptor for a simple single-column M:N relation', () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    });
+
+    const relations = resolveModelRelations(contract, 'Parent');
+    expect(relations['children']?.through).toEqual({
+      table: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+      requiredPayloadColumns: [],
+    });
+  });
+
+  it('populates through descriptor for a composite-key M:N junction', () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['tenant_id', 'parent_id'],
+      childColumns: ['tenant_id', 'child_id'],
+      targetColumns: ['tenant_id', 'id'],
+    });
+
+    const relations = resolveModelRelations(contract, 'Parent');
+    const through = relations['children']?.through;
+    expect(through?.parentColumns).toEqual(['tenant_id', 'parent_id']);
+    expect(through?.childColumns).toEqual(['tenant_id', 'child_id']);
+    expect(through?.targetColumns).toEqual(['tenant_id', 'id']);
+    expect(through?.requiredPayloadColumns).toEqual([]);
+  });
+
+  it('includes NOT-NULL no-default non-FK columns in requiredPayloadColumns', () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+      extraColumns: {
+        assigned_at: { nativeType: 'timestamptz', codecId: 'pg/timestamptz@1', nullable: false },
+        role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      },
+    });
+
+    const relations = resolveModelRelations(contract, 'Parent');
+    expect(relations['children']?.through?.requiredPayloadColumns).toEqual(
+      expect.arrayContaining(['assigned_at', 'role']),
+    );
+    expect(relations['children']?.through?.requiredPayloadColumns).toHaveLength(2);
+  });
+
+  it('excludes nullable and defaulted non-FK columns from requiredPayloadColumns', () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+      extraColumns: {
+        note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+        created_at: {
+          nativeType: 'timestamptz',
+          codecId: 'pg/timestamptz@1',
+          nullable: false,
+          default: { kind: 'expression', sql: 'now()' },
+        },
+      },
+    });
+
+    const relations = resolveModelRelations(contract, 'Parent');
+    expect(relations['children']?.through?.requiredPayloadColumns).toEqual([]);
   });
 });
