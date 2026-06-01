@@ -586,6 +586,33 @@
               "items": { "type": "string" }
             }
           }
+        },
+        "through": {
+          "type": "object",
+          "description": "Junction table descriptor for N:M relations",
+          "additionalProperties": false,
+          "properties": {
+            "table": {
+              "type": "string",
+              "description": "Junction table name"
+            },
+            "parentColumns": {
+              "type": "array",
+              "description": "Junction columns referencing the parent FK",
+              "items": { "type": "string" }
+            },
+            "childColumns": {
+              "type": "array",
+              "description": "Junction columns referencing the target FK",
+              "items": { "type": "string" }
+            },
+            "targetColumns": {
+              "type": "array",
+              "description": "Target anchor columns (PK) the childColumns reference",
+              "items": { "type": "string" }
+            }
+          },
+          "required": ["table", "parentColumns", "childColumns", "targetColumns"]
         }
       },
       "required": ["to", "cardinality"]

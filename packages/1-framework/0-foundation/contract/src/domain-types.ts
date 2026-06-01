@@ -30,10 +30,18 @@ export type ContractRelationOn = {
   readonly targetFields: readonly string[];
 };
 
+export type ContractRelationThrough = {
+  readonly table: string;
+  readonly parentColumns: readonly string[];
+  readonly childColumns: readonly string[];
+  readonly targetColumns: readonly string[];
+};
+
 export type ContractReferenceRelation = {
   readonly to: CrossReference;
-  readonly cardinality: '1:1' | '1:N' | 'N:1';
+  readonly cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
   readonly on: ContractRelationOn;
+  readonly through?: ContractRelationThrough;
 };
 
 export type ContractEmbedRelation = {
