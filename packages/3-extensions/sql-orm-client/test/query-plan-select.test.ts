@@ -674,6 +674,8 @@ describe('compileSelect MTI JOINs', () => {
       'title',
       'type',
       'severity',
+      'project_id',
+      'parent_id',
     ]);
     const featuresMtiProjection = [
       ProjectionItem.of(
@@ -703,6 +705,8 @@ describe('compileSelect MTI JOINs', () => {
       'title',
       'type',
       'severity',
+      'project_id',
+      'parent_id',
     ]);
     const featuresMtiProjection = [
       ProjectionItem.of(
@@ -732,6 +736,8 @@ describe('compileSelect MTI JOINs', () => {
       'title',
       'type',
       'severity',
+      'project_id',
+      'parent_id',
     ]);
 
     const plan = compileSelect(contract, 'tasks', state, 'Task');
