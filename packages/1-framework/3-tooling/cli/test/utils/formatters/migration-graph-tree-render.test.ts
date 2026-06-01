@@ -74,7 +74,7 @@ describe('renderMigrationGraphTree', () => {
         '○   a94b7b4',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
-        '│↑  init                 ∅ → ef9de27',
+        '│↑  init                 ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -97,7 +97,7 @@ describe('renderMigrationGraphTree', () => {
         '○   a94b7b4              (main, db)',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
-        '│↑  init                 ∅ → ef9de27',
+        '│↑  init                 ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -121,7 +121,7 @@ describe('renderMigrationGraphTree', () => {
         '○   a94b7b4              (main, contract)',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27              (prod, db)',
-        '│↑  init                 ∅ → ef9de27',
+        '│↑  init                 ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -145,7 +145,7 @@ describe('renderMigrationGraphTree', () => {
         '│ │↑  bob_add_avatar     ef9de27 → 6656a6e',
         '├─╯',
         '○   ef9de27',
-        '│↑  init                 ∅ → ef9de27',
+        '│↑  init                 ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -174,7 +174,7 @@ describe('renderMigrationGraphTree', () => {
         '│ │ │↑  add_avatar       ef9de27 → 6656a6e',
         '├─┴─╯',
         '○   ef9de27',
-        '│↑  init                 ∅ → ef9de27',
+        '│↑  init                 ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -198,7 +198,7 @@ describe('renderMigrationGraphTree', () => {
         '○◂╯ │     73e3abe',
         '│↑  │     add_phone           ef9de27 → 73e3abe',
         '○◂──╯     ef9de27',
-        '│↑        init                ∅ → ef9de27',
+        '│↑        init                ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -219,7 +219,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  add_phone            ef9de27 → 73e3abe',
         '│↓  rollback_phone       73e3abe → ef9de27',
         '○   ef9de27',
-        '│↑  init                 ∅ → ef9de27',
+        '│↑  init                 ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -235,7 +235,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  next                 aaaaaaa → bbbbbbb',
         '│⟲  noop                 aaaaaaa → aaaaaaa',
         '○   aaaaaaa',
-        '│↑  init                 ∅ → aaaaaaa',
+        '│↑  init                 ∅       → aaaaaaa',
         '∅',
       ].join('\n'),
     );
@@ -280,7 +280,7 @@ describe('renderMigrationGraphTree', () => {
       │ │↑  bob_add_avatar     ef9de27 → 6656a6e
       ├─╯
       ○   ef9de27
-      │↑  init                 ∅ → ef9de27
+      │↑  init                 ∅       → ef9de27
       ∅"
     `);
   });
@@ -294,7 +294,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       "*   a94b7b4
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
-      |^  init                 - -> ef9de27
+      |^  init                 -       -> ef9de27
       -"
     `);
   });
@@ -315,7 +315,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       *   a94b7b4              (main, db)
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
-      |^  init                 - -> ef9de27
+      |^  init                 -       -> ef9de27
       -"
     `);
   });
@@ -337,7 +337,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       "*   a94b7b4              (main, contract)
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27              (prod, db)
-      |^  init                 - -> ef9de27
+      |^  init                 -       -> ef9de27
       -"
     `);
   });
@@ -359,7 +359,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | |^  bob_add_avatar     ef9de27 -> 6656a6e
       +-/
       *   ef9de27
-      |^  init                 - -> ef9de27
+      |^  init                 -       -> ef9de27
       -"
     `);
   });
@@ -388,7 +388,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | | |^  add_avatar       ef9de27 -> 6656a6e
       +-+-/
       *   ef9de27
-      |^  init                 - -> ef9de27
+      |^  init                 -       -> ef9de27
       -"
     `);
   });
@@ -412,7 +412,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       *</ |     73e3abe
       |^  |     add_phone           ef9de27 -> 73e3abe
       *<--/     ef9de27
-      |^        init                - -> ef9de27
+      |^        init                -       -> ef9de27
       -"
     `);
   });
@@ -431,7 +431,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  add_phone            ef9de27 -> 73e3abe
       |v  rollback_phone       73e3abe -> ef9de27
       *   ef9de27
-      |^  init                 - -> ef9de27
+      |^  init                 -       -> ef9de27
       -"
     `);
   });
@@ -445,7 +445,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  next                 aaaaaaa -> bbbbbbb
       |@  noop                 aaaaaaa -> aaaaaaa
       *   aaaaaaa
-      |^  init                 - -> aaaaaaa
+      |^  init                 -       -> aaaaaaa
       -"
     `);
   });
@@ -489,7 +489,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | |^  bob_add_avatar     ef9de27 -> 6656a6e
       +-/
       *   ef9de27
-      |^  init                 - -> ef9de27
+      |^  init                 -       -> ef9de27
       -"
     `);
   });

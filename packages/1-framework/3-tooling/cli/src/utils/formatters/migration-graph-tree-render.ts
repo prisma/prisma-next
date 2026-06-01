@@ -278,7 +278,8 @@ function formatEdgeHashColumn(
   }
   const source =
     edge.from === EMPTY_CONTRACT_HASH
-      ? style.glyph(palette.emptySource)
+      ? style.glyph(palette.emptySource) +
+        ' '.repeat(Math.max(0, hashLength - palette.emptySource.length))
       : style.sourceHash(abbreviateHash(edge.from, hashLength, palette.emptySource));
   const arrow = style.glyph(palette.forwardArrow);
   const dest = style.destHash(abbreviateHash(edge.to, hashLength, palette.emptySource));
