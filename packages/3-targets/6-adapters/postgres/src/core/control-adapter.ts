@@ -5,6 +5,11 @@ import type {
 } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import {
+  coerceLedgerAppliedAt,
+  ledgerOriginFromStored,
+  operationCountFromStored,
+} from '@prisma-next/family-sql/ledger-read';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
@@ -48,37 +53,6 @@ import type { PostgresContract } from './types';
 
 const POSTGRES_MARKER_TABLE = 'prisma_contract.marker';
 const POSTGRES_LEDGER_TABLE = 'prisma_contract.ledger';
-const EMPTY_ORIGIN_CORE_HASH = 'sha256:empty';
-
-function ledgerOriginFromStored(originCoreHash: string | null): string | null {
-  if (
-    originCoreHash === null ||
-    originCoreHash === '' ||
-    originCoreHash === EMPTY_ORIGIN_CORE_HASH
-  ) {
-    return null;
-  }
-  return originCoreHash;
-}
-
-function coerceLedgerAppliedAt(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
-}
-
-function operationCountFromStored(operations: unknown): number {
-  if (Array.isArray(operations)) {
-    return operations.length;
-  }
-  if (typeof operations === 'string') {
-    try {
-      const parsed: unknown = JSON.parse(operations);
-      return Array.isArray(parsed) ? parsed.length : 0;
-    } catch {
-      return 0;
-    }
-  }
-  return 0;
-}
 
 /**
  * Postgres control plane adapter for control-plane operations like introspection.

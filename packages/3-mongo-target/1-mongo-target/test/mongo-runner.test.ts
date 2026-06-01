@@ -708,6 +708,32 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
     expect(opIds).toEqual(planOps.map((o) => o.id));
   });
 
+  it('throws when migrationEdges operationCount sum does not match plan.operations length', async () => {
+    const { runner } = makeLedgerHarness();
+    const destHash = 'sha256:dest';
+    const edges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        migrationHash: 'sha256:mig-single',
+        dirName: '001_single',
+        from: EMPTY_CONTRACT_HASH,
+        to: destHash,
+        operationCount: 2,
+      },
+    ];
+
+    await expect(
+      runner.execute({
+        plan: makeLedgerPlan([createCollection('ledger_single')], { destinationHash: destHash }),
+        destinationContract: makeContract(destHash),
+        policy: ALL_POLICY,
+        frameworkComponents: [],
+        strictVerification: false,
+        executionChecks: LEDGER_EXECUTION_CHECKS,
+        migrationEdges: edges,
+      }),
+    ).rejects.toThrow(/does not match sum of migrationEdges operationCount/);
+  });
+
   it('writes one synthesised ledger entry with empty migration name for synth apply without migrationEdges', async () => {
     const { runner, ledgerEntries } = makeLedgerHarness();
     const destHash = 'sha256:dest';

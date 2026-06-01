@@ -57,6 +57,7 @@
     "./control": "./dist/control.mjs",
     "./control-adapter": "./dist/control-adapter.mjs",
     "./ir": "./dist/ir.mjs",
+    "./ledger-read": "./dist/ledger-read.mjs",
     "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
