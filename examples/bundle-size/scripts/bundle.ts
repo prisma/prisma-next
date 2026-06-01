@@ -91,6 +91,9 @@ for (const spec of bundles) {
     const gzipped = gzipSync(contents, { level: 9 });
     // Persist the .gz alongside so consumers can inspect it.
     await writeFile(`${outfile}.gz`, gzipped);
+    // Persist the esbuild metafile so it can be fed to a visualiser
+    // (esbuild.github.io/analyze, esbuild-visualizer, bundle-buddy, ...).
+    await writeFile(`${outfile}.meta.json`, JSON.stringify(built.metafile, null, 2));
     outputs.push({
       spec,
       variant,
