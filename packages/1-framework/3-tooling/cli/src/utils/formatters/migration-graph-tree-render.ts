@@ -16,9 +16,16 @@ import {
 } from './migration-list-data-column';
 import type { MigrationEdgeKind } from './migration-list-graph-topology';
 import type { MigrationListStyler } from './migration-list-render';
-import { createAnsiMigrationListStyler } from './migration-list-styler';
+import { CONTRACT_MARKER_NAME, createAnsiMigrationListStyler } from './migration-list-styler';
 
 const LABEL_GAP = 2;
+
+/**
+ * The live-database overlay marker. Just another ref as far as styling goes —
+ * the only emphasized markers are the active ref and the `contract`
+ * desired-state marker (see {@link CONTRACT_MARKER_NAME}).
+ */
+const DB_MARKER_NAME = 'db';
 
 export interface RenderMigrationGraphTreeOptions {
   readonly refsByHash?: ReadonlyMap<string, readonly string[]>;
@@ -243,10 +250,10 @@ function overlayNamesForContract(
     names.push(...[...userRefs].sort((a, b) => a.localeCompare(b)));
   }
   if (opts.dbHash === contractHash) {
-    names.push('db');
+    names.push(DB_MARKER_NAME);
   }
   if (opts.contractHash === contractHash && contractHash !== EMPTY_CONTRACT_HASH) {
-    names.push('contract');
+    names.push(CONTRACT_MARKER_NAME);
   }
   return names;
 }
