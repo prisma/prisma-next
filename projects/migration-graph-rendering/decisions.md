@@ -96,14 +96,27 @@ else is shown plain (it's the full list — no subgraph pruning):
 retires dagre (the last consumer) and makes the condensed tree the default
 (`--tree` flag dropped).
 
-### D7 — Make the ledger readable; add migration hash + name (TML-2769)
+### D7 — Restructure the ledger into a readable per-migration journal (TML-2769)
 
-Every target already writes an append-only ledger on apply (`from → to`,
-`operations`, real timestamp) but nothing reads it. Add `migration_hash` +
-`migration_name` to the ledger format (all targets; ignore back-compat), thread
-them from the apply path, and add a `readLedger(space)` SPI with cross-target
-parity + client plumbing. This is the foundation **both** `status` (applied =
-ledger entry) and `log` consume.
+Every target writes an append-only ledger on apply, but nothing reads it — and
+its shape is wrong for `status`/`log`. Investigation found it records **one
+collapsed row per space-apply** (origin→destination spanning the whole walked
+path), and the three target schemas have diverged (PG/SQLite have no `space`
+column; Mongo has no `operations`). Both consumers need **one row per migration
+edge**: `status` matches `migration_hash` exactly; `log` shows one row per apply
+event.
+
+So restructure (it's simpler than today's): one row per applied edge, each
+carrying `space` + `migration_name` (dirName) + `migration_hash` + per-edge
+`from`/`to` + the edge's `operations` (slice of `plan.operations` by
+`operationCount`) + `applied_at`. `contract_json_before/after` stays (nullable;
+only the apply's endpoints are materialised — multi-edge interiors are null; no
+consumer reads them yet). Writes happen per-edge inside the per-space
+transaction, in walk order, by threading `PerSpacePlan.migrationEdges` to the
+runner. Add `readLedger({ driver, space })` to `ControlFamilyInstance` (beside
+`readMarker`/`readAllMarkers`) returning `LedgerEntryRecord[]` in apply order
+with cross-target parity, plumbed through the control client + a control-api
+operation. Prototype — no back-compat migration of existing rows.
 
 ### D8 — `log` reads the ledger; flat, no tree (TML-2770)
 
