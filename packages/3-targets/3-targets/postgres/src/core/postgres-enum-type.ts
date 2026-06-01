@@ -1,3 +1,4 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
@@ -18,6 +19,7 @@ export interface PostgresEnumTypeInput<
    */
   readonly nativeType?: string;
   readonly values: TValues;
+  readonly control?: ControlPolicy;
 }
 
 /** Codec id used by Postgres enum-typed columns (text wire format). */
@@ -64,6 +66,7 @@ export class PostgresEnumType<
    * dispatching through the prototype-only `codecBinding` accessor.
    */
   readonly codecId: typeof PG_ENUM_CODEC_ID = PG_ENUM_CODEC_ID;
+  declare readonly control?: ControlPolicy;
 
   constructor(input: PostgresEnumTypeInput<TName, TValues>) {
     super();
@@ -73,6 +76,7 @@ export class PostgresEnumType<
     // `TValues` literal tuple. Cast preserves the caller-supplied
     // tuple shape so inferred contract types retain literal narrowing.
     this.values = Object.freeze([...input.values] as unknown as TValues);
+    if (input.control !== undefined) this.control = input.control;
     freezeNode(this);
   }
 

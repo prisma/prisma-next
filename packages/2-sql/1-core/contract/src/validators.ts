@@ -33,6 +33,7 @@ type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: s
 const literalKindSchema = type("'literal'");
 const functionKindSchema = type("'function'");
 const generatorKindSchema = type("'generator'");
+const ControlPolicySchema = type("'managed' | 'tolerated' | 'external' | 'observed'");
 const generatorIdSchema = type('string').narrow((value, ctx) => {
   return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value) ? true : ctx.mustBe('a flat generator id');
 });
@@ -84,6 +85,7 @@ const StorageColumnSchema = type({
   'typeParams?': 'Record<string, unknown>',
   'typeRef?': 'string',
   'default?': ColumnDefaultSchema,
+  'control?': ControlPolicySchema,
 }).narrow((col, ctx) => {
   if (col.typeParams !== undefined && col.typeRef !== undefined) {
     return ctx.mustBe('a column with either typeParams or typeRef, not both');
@@ -116,6 +118,7 @@ const PostgresEnumTypeSchema = type({
   'name?': 'string',
   'nativeType?': 'string',
   values: type.string.array().readonly(),
+  'control?': ControlPolicySchema,
 });
 
 /** Document-scoped `storage.types`: codec triples only. */
@@ -166,6 +169,7 @@ const StorageTableSchema = type({
   uniques: UniqueConstraintSchema.array().readonly(),
   indexes: IndexSchema.array().readonly(),
   foreignKeys: ForeignKeySchema.array().readonly(),
+  'control?': ControlPolicySchema,
 });
 
 /**
@@ -417,6 +421,7 @@ export function createSqlContractSchema(
     'capabilities?': 'Record<string, Record<string, boolean>>',
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': ContractMetaSchema,
+    'defaultControl?': ControlPolicySchema,
     'roots?': type({ '[string]': CrossReferenceSchema }),
     domain: type({
       namespaces: type({

@@ -2,6 +2,8 @@ import { CrossReferenceSchema } from '@prisma-next/contract/types';
 import { type Type, type } from 'arktype';
 import type { MongoJsonObject, MongoJsonPrimitive, MongoJsonValue } from './contract-types';
 
+const ControlPolicySchema = type("'managed' | 'tolerated' | 'external' | 'observed'");
+
 const ScalarFieldTypeSchema = type({
   '+': 'reject',
   kind: "'scalar'",
@@ -316,6 +318,7 @@ const StorageCollectionSchema = type({
   'indexes?': MongoStorageIndexSchema.array(),
   'validator?': MongoStorageValidatorSchema,
   'options?': MongoCollectionOptionsSchema,
+  'control?': ControlPolicySchema,
 });
 
 function collectionEntrySchema(fragments?: ReadonlyMap<string, Type<unknown>>): Type<unknown> {
@@ -387,6 +390,7 @@ export function createMongoContractSchema(
     'capabilities?': 'Record<string, unknown>',
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': 'Record<string, unknown>',
+    'defaultControl?': ControlPolicySchema,
     'sources?': 'Record<string, unknown>',
     '_generated?': 'Record<string, unknown>',
     domain: type({
