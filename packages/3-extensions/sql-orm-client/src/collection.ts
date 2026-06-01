@@ -16,6 +16,7 @@ import {
   type ToWhereExpr,
   type WhereArg,
 } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
@@ -115,6 +116,7 @@ import {
   type RuntimeQueryable,
   type ShorthandWhereFilter,
   type UniqueConstraintCriterion,
+  type VariantAwareModelAccessor,
   type VariantModelRow,
   type VariantNames,
 } from './types';
@@ -241,11 +243,13 @@ export class Collection<
    * ```
    */
   where(
-    fn: (model: ModelAccessor<TContract, ModelName>) => WhereDirectInput,
+    fn: (
+      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+    ) => WhereDirectInput,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(input: WhereDirectInput): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
-    fn: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+    fn: (model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
     filters: ShorthandWhereFilter<TContract, ModelName>,
@@ -253,13 +257,25 @@ export class Collection<
   where(
     input:
       | WhereDirectInput
-      | ((model: ModelAccessor<TContract, ModelName>) => WhereDirectInput)
-      | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
+      | ((
+          model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+        ) => WhereDirectInput)
+      | ((model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>> {
     const whereArg =
       typeof input === 'function'
-        ? input(createModelAccessor(this.ctx.context, this.modelName))
+        ? input(
+            // The runtime accessor exposes the selected variant's fields via
+            // the proxy when `state.variantName` is threaded in, but
+            // `createModelAccessor` is declared to return the base
+            // `ModelAccessor`; the variant widening lives only in the callback
+            // param type, so the value cannot be statically proven to satisfy it.
+            blindCast<
+              VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+              'runtime accessor carries the selected variant fields; the variant widening is callback-param-only'
+            >(createModelAccessor(this.ctx.context, this.modelName, this.state.variantName)),
+          )
         : isWhereDirectInput(input)
           ? input
           : shorthandToWhereExpr(this.ctx.context, this.modelName, input);

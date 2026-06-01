@@ -402,6 +402,24 @@ export type ModelAccessor<
   ModelName extends string,
 > = ScalarModelAccessor<TContract, ModelName> & RelationModelAccessor<TContract, ModelName>;
 
+/**
+ * The predicate accessor for a collection narrowed to a variant. When a real
+ * variant is selected its (possibly MTI) fields are merged onto the base
+ * accessor so `t.variant('Feature').where(x => x.priority…)` type-checks; with
+ * no variant the accessor is the plain base `ModelAccessor` and is unchanged.
+ */
+export type VariantAwareModelAccessor<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VariantName extends string | undefined,
+> = [VariantName] extends [string]
+  ? VariantName extends VariantNames<TContract, ModelName>
+    ? ScalarModelAccessor<TContract, ModelName> &
+        ScalarModelAccessor<TContract, VariantName> &
+        RelationModelAccessor<TContract, ModelName>
+    : ModelAccessor<TContract, ModelName>
+  : ModelAccessor<TContract, ModelName>;
+
 export type DefaultModelRow<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
 };
