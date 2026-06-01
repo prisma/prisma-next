@@ -547,10 +547,47 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(colored).toContain(laneColorForColumn(1)('│ '));
     expect(colored).toContain(laneColorForColumn(1)('╮'));
     expect(laneColorForColumn(1)('│')).not.toBe(laneColorForColumn(2)('│'));
-    // Column 0 is never palette-colored — its branch spine reads neutral.
-    expect(colored).not.toContain(laneColorForColumn(1)('├─'));
-    const connectorLine = colored.split('\n').find((line) => line.includes('├─'));
-    expect(connectorLine?.startsWith('├─')).toBe(true);
+    // A column-0 vertical pass-through (the surviving spine between the branch
+    // and merge connectors) reads neutral — no palette hue on the bare lane.
+    expect(colored).not.toContain(laneColorForColumn(1)('│↑'));
+  });
+
+  it('colors a branch-connector and a merge-connector run as one served-lane hue', () => {
+    const colored = tree(diamondEdges(), { colorize: true });
+    const lines = colored.split('\n');
+    // Fan-out: the run into column 1 (`├─╮`) is column 1's hue end-to-end — the
+    // leading tee follows the lane it serves rather than reading dim/gray.
+    const branchLine = lines.find((line) => line.includes('╮'));
+    expect(branchLine).toBeDefined();
+    expect(branchLine).toContain(laneColorForColumn(1)('├─'));
+    expect(branchLine).toContain(laneColorForColumn(1)('╮'));
+    expect(stripAnsi(branchLine ?? '')).toBe('├─╮');
+    // Convergence: the run collapsing into the survivor (`├─╯`) is one hue too.
+    const mergeLine = lines.find((line) => line.includes('╯'));
+    expect(mergeLine).toBeDefined();
+    expect(mergeLine).toContain(laneColorForColumn(1)('├─'));
+    expect(mergeLine).toContain(laneColorForColumn(1)('╯'));
+    expect(stripAnsi(mergeLine ?? '')).toBe('├─╯');
+  });
+
+  it('colors a multi-lane fan-out run by the lane each elbow serves', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const addAvatar = edge('ef9de27', '6656a6e', 'add_avatar');
+    const mergePhone = edge('73e3abe', '3116048', 'merge_phone');
+    const mergePosts = edge('a94b7b4', '3116048', 'merge_posts');
+    const mergeAvatar = edge('6656a6e', '3116048', 'merge_avatar');
+    const colored = tree(
+      [init, addPhone, addPosts, addAvatar, mergePhone, mergePosts, mergeAvatar],
+      { colorize: true },
+    );
+    // `├─┬─╮`: the leading `├─` reaches the first branch point (column 1), so it
+    // is column 1's hue — never dim/gray — and the closing corner is column 2's.
+    const fanLine = colored.split('\n').find((line) => line.includes('┬'));
+    expect(fanLine).toBeDefined();
+    expect(fanLine).toContain(laneColorForColumn(1)('├─'));
+    expect(fanLine).toContain(laneColorForColumn(2)('╮'));
   });
 
   it('rotates distinct hues across three lanes on a convergence fan', () => {

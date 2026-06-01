@@ -184,6 +184,53 @@ function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
 }
 
 /**
+ * The colour-source column for each cell of a forward branch/merge connector
+ * row. A connector's horizontal run is one logical line (a fork into new lanes,
+ * or a merge into a surviving lane) and reads best as a single hue — the colour
+ * of the lane it serves — rather than dim-gray or a per-pass-through-column
+ * "rainbow".
+ *
+ * Scanning right-to-left, a corner or an intermediate tee owns its own column
+ * (it anchors a created/merged lane there); the leading tee at `startLane` (the
+ * fork/merge origin) and pure horizontal segments inherit the nearest
+ * lane-owning branch point to their right, so the run into a branch — or the run
+ * collapsing into a merge corner — is a single colour end-to-end. Pass-through
+ * vertical lanes outside the run keep their own column (column-0 stays neutral).
+ */
+function resolveConnectorLaneColors(
+  cells: readonly StructuralCell[],
+  startLane: number,
+): readonly number[] {
+  const colorColumn = new Array<number>(cells.length);
+  let owner = NEUTRAL_LANE;
+  for (let column = cells.length - 1; column >= 0; column--) {
+    const cell = cells[column];
+    switch (cell?.kind) {
+      case 'branch-corner':
+      case 'merge-corner':
+        owner = column;
+        colorColumn[column] = column;
+        break;
+      case 'branch-tee':
+      case 'merge-tee':
+        if (column === startLane) {
+          colorColumn[column] = owner === NEUTRAL_LANE ? column : owner;
+        } else {
+          owner = column;
+          colorColumn[column] = column;
+        }
+        break;
+      case 'horizontal-pass':
+        colorColumn[column] = owner === NEUTRAL_LANE ? column : owner;
+        break;
+      default:
+        colorColumn[column] = column;
+    }
+  }
+  return colorColumn;
+}
+
+/**
  * Style a structural glyph by its resolved colour column. Column 0 and the
  * neutral sentinel render dim (`style.lane`); columns ≥ 1 take a palette hue.
  */
@@ -280,12 +327,13 @@ function renderConnectorRow(
 ): string {
   const isMerge = row.kind === 'merge-connector';
   if (row.cells.length > 0) {
+    const colorColumns = resolveConnectorLaneColors(row.cells, row.startLane ?? 0);
     let seenTee = false;
     let out = '';
     for (let column = 0; column < row.cells.length; column++) {
       const cell = row.cells[column];
       if (cell === undefined) continue;
-      const lane = laneStylerForColumn(column, colorize, style);
+      const lane = laneStylerForColumn(colorColumns[column] ?? column, colorize, style);
       switch (cell.kind) {
         case 'branch-tee':
           out += lane(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
@@ -322,13 +370,15 @@ function renderConnectorRow(
 
   const start = row.startLane ?? 0;
   const end = row.endLane ?? start;
+  // The whole fork/merge run reads as one line in the served lane's hue (the
+  // corner it reaches); pass-through columns outside the run keep their own.
+  const runLane = laneStylerForColumn(end, colorize, style);
   let out = '';
   for (let column = 0; column < gridWidth; column++) {
-    const lane = laneStylerForColumn(column, colorize, style);
     if (column < start || column > end) out += '  ';
-    else if (column === start) out += lane(palette.connectorBranchTee);
-    else if (column === end) out += lane(isMerge ? palette.mergeCorner : palette.branchCorner);
-    else out += lane(isMerge ? palette.connectorMergeTeeCo : palette.connectorBranchTeeCo);
+    else if (column === start) out += runLane(palette.connectorBranchTee);
+    else if (column === end) out += runLane(isMerge ? palette.mergeCorner : palette.branchCorner);
+    else out += runLane(isMerge ? palette.connectorMergeTeeCo : palette.connectorBranchTeeCo);
   }
   return out;
 }
