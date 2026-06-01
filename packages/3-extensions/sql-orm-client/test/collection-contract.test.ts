@@ -222,7 +222,7 @@ describe('collection-contract capability detection', () => {
     expect(isToOneCardinality('1:1')).toBe(true);
     expect(isToOneCardinality('N:1')).toBe(true);
     expect(isToOneCardinality('1:N')).toBe(false);
-    expect(isToOneCardinality('M:N')).toBe(false);
+    expect(isToOneCardinality('N:M')).toBe(false);
     expect(isToOneCardinality(undefined)).toBe(false);
   });
 

@@ -408,7 +408,7 @@ describe('mutation-executor', () => {
             ...user.relations,
             posts: {
               ...user.relations.posts,
-              cardinality: 'M:N',
+              cardinality: 'N:M',
             },
           },
         },
@@ -428,7 +428,7 @@ describe('mutation-executor', () => {
             posts.connect({ id: 10 }),
         } as never,
       }),
-    ).rejects.toThrow(/M:N nested mutations are not supported yet/);
+    ).rejects.toThrow(/N:M nested mutations are not supported yet/);
   });
 
   it('executeNestedCreateMutation() supports parent-owned nested create() payloads', async () => {

@@ -83,7 +83,7 @@ export type IsToManyRelation<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
-> = RelationCardinality<TContract, ModelName, RelName> extends '1:N' | 'M:N' ? true : false;
+> = RelationCardinality<TContract, ModelName, RelName> extends '1:N' | 'N:M' ? true : false;
 
 export type IncludeRefinementResult<
   TContract extends Contract<SqlStorage>,
