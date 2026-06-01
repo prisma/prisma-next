@@ -1,4 +1,5 @@
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   AndExpr,
@@ -29,6 +30,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { PostgresSchema } from '../../../3-targets/postgres/src/core/postgres-schema';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
 
@@ -539,5 +541,25 @@ describe('Postgres adapter', () => {
     expect(sql).toContain('("user"."id" = 1) IS NULL');
     expect(sql).toContain('(("user"."id" = 1)) IS NOT NULL');
     expect(sql).toContain('"user"."email" IS NULL');
+  });
+
+  it('qualifies table identifiers from the namespace coordinate on TableSource', () => {
+    const publicContract = {
+      ...contract,
+      storage: new SqlStorage({
+        storageHash: 'sha256:test-core-public',
+        namespaces: {
+          public: new PostgresSchema({
+            id: 'public',
+            tables: contract.storage.namespaces.__unbound__!.tables,
+          }),
+        },
+      }),
+    } as PostgresContract;
+    const ast = SelectAst.from(TableSource.named('user', undefined, 'public')).withProjection([
+      ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+    ]);
+    const sql = adapter.lower(ast, { contract: publicContract, params: [] }).sql;
+    expect(sql).toBe('SELECT "user"."id" AS "id" FROM "public"."user"');
   });
 });

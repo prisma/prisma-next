@@ -1,6 +1,11 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { SqliteUnboundDatabase, sqliteCreateNamespace } from '../src/core/sqlite-unbound-database';
+import {
+  SqliteDatabase,
+  SqliteUnboundDatabase,
+  sqliteCreateNamespace,
+} from '../src/core/sqlite-unbound-database';
 
 describe('SqliteUnboundDatabase', () => {
   it('exposes the framework-reserved unbound id as its singleton id', () => {
@@ -19,6 +24,25 @@ describe('SqliteUnboundDatabase', () => {
 
   it('is a stable singleton — repeated access returns the same instance', () => {
     expect(SqliteUnboundDatabase.instance).toBe(SqliteUnboundDatabase.instance);
+  });
+});
+
+describe('SqliteDatabase', () => {
+  it('qualifies table names without a schema prefix for runtime SQL rendering', () => {
+    const database = new SqliteDatabase({
+      id: UNBOUND_NAMESPACE_ID,
+      tables: {
+        user: new StorageTable({
+          columns: {
+            id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        }),
+      },
+    });
+    expect(database.qualifyTable('user')).toBe('"user"');
   });
 });
 

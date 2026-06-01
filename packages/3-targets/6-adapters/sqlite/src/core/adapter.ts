@@ -29,6 +29,7 @@ import type {
   SelectAst,
   SqlQueryable,
   SubqueryExpr,
+  TableSource,
   UpdateAst,
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -124,7 +125,7 @@ export function renderLoweredSql(
       sql = renderUpdate(node, contract);
       break;
     case 'delete':
-      sql = renderDelete(node);
+      sql = renderDelete(node, contract);
       break;
     default:
       throw new Error(`Unsupported AST node kind: ${(node as { kind: string }).kind}`);
@@ -143,7 +144,7 @@ function renderLimitOffset(
   return `${keyword} ${renderExpr(value, contract)}`;
 }
 
-function renderSelect(ast: SelectAst, contract?: SqliteContract): string {
+function renderSelect(ast: SelectAst, contract: SqliteContract): string {
   const distinctPrefix = ast.distinct ? 'DISTINCT ' : '';
   const selectClause = `SELECT ${distinctPrefix}${renderProjection(ast.projection, contract)}`;
   const fromClause = `FROM ${renderSource(ast.from, contract)}`;
@@ -196,16 +197,38 @@ function renderProjection(
     .join(', ');
 }
 
-function renderSource(source: AnyFromSource, contract?: SqliteContract): string {
+function qualifyTableFromNamespaceCoordinate(
+  table: Pick<TableSource, 'name' | 'namespaceId'>,
+  contract: SqliteContract,
+): string {
+  if (table.namespaceId === undefined) {
+    return quoteIdentifier(table.name);
+  }
+  const namespace = contract.storage.namespaces[table.namespaceId];
+  if (
+    namespace === undefined ||
+    typeof (namespace as { qualifyTable?: unknown }).qualifyTable !== 'function'
+  ) {
+    throw new Error(
+      `Table "${table.name}" references namespace "${table.namespaceId}" which is not present on the contract`,
+    );
+  }
+  return (namespace as { qualifyTable: (tableName: string) => string }).qualifyTable(table.name);
+}
+
+function renderTableSource(source: TableSource, contract: SqliteContract): string {
+  const qualified = qualifyTableFromNamespaceCoordinate(source, contract);
+  if (!source.alias) {
+    return qualified;
+  }
+  return `${qualified} AS ${quoteIdentifier(source.alias)}`;
+}
+
+function renderSource(source: AnyFromSource, contract: SqliteContract): string {
   const node = source;
   switch (node.kind) {
-    case 'table-source': {
-      const table = quoteIdentifier(node.name);
-      if (!node.alias) {
-        return table;
-      }
-      return `${table} AS ${quoteIdentifier(node.alias)}`;
-    }
+    case 'table-source':
+      return renderTableSource(node, contract);
     case 'derived-table-source':
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
     default:
@@ -479,7 +502,7 @@ function renderInsertValue(value: InsertValue): string {
 }
 
 function renderInsert(ast: InsertAst, contract: SqliteContract): string {
-  const table = quoteIdentifier(ast.table.name);
+  const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const rows = ast.rows;
   if (rows.length === 0) {
     throw new Error('INSERT requires at least one row');
@@ -538,7 +561,7 @@ function renderInsert(ast: InsertAst, contract: SqliteContract): string {
 }
 
 function renderUpdate(ast: UpdateAst, contract: SqliteContract): string {
-  const table = quoteIdentifier(ast.table.name);
+  const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const setClauses = Object.entries(ast.set).map(([col, val]) => {
     return `${quoteIdentifier(col)} = ${renderExpr(val, contract)}`;
   });
@@ -549,8 +572,8 @@ function renderUpdate(ast: UpdateAst, contract: SqliteContract): string {
   return `UPDATE ${table} SET ${setClauses.join(', ')}${whereClause}${returningClause}`;
 }
 
-function renderDelete(ast: DeleteAst): string {
-  const table = quoteIdentifier(ast.table.name);
+function renderDelete(ast: DeleteAst, contract: SqliteContract): string {
+  const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const whereClause = ast.where ? ` WHERE ${renderExpr(ast.where)}` : '';
   const returningClause = renderReturning(ast.returning);
 
