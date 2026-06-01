@@ -377,5 +377,19 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
       migration_hash: contract.storage.storageHash,
       destination_core_hash: contract.storage.storageHash,
     });
+
+    const ledger = await ledgerAdapter.readLedger(driver!, APP_SPACE_ID);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]).toMatchObject({
+      space: APP_SPACE_ID,
+      migrationName: '',
+      migrationHash: contract.storage.storageHash,
+      from: null,
+      to: contract.storage.storageHash,
+    });
+    const storedSynthOps = rows[0]!.operations;
+    expect(ledger[0]!.operationCount).toBe(
+      Array.isArray(storedSynthOps) ? storedSynthOps.length : 0,
+    );
   });
 });

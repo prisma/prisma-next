@@ -362,5 +362,17 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
       migration_hash: contract.storage.storageHash,
       destination_core_hash: contract.storage.storageHash,
     });
+
+    const ledger = await ledgerAdapter.readLedger(driver, APP_SPACE_ID);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]).toMatchObject({
+      space: APP_SPACE_ID,
+      migrationName: '',
+      migrationHash: contract.storage.storageHash,
+      from: null,
+      to: contract.storage.storageHash,
+    });
+    const storedSynthOps = JSON.parse(rows[0]!.operations) as unknown[];
+    expect(ledger[0]!.operationCount).toBe(storedSynthOps.length);
   });
 });
