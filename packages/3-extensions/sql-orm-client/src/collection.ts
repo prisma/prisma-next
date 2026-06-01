@@ -481,6 +481,7 @@ export class Collection<
       targetColumn: relation.targetColumn,
       localColumn: relation.localColumn,
       cardinality: relation.cardinality,
+      ...(relation.through !== undefined ? { through: relation.through } : {}),
       nested: nestedState,
       scalar: scalarSelector,
       combine: combineBranches,

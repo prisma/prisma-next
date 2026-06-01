@@ -21,10 +21,10 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { compileSelect, compileSelectWithIncludes } from '../src/query-plan-select';
-import { emptyState } from '../src/types';
+import { emptyState, type IncludeExpr } from '../src/types';
 import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
-import { buildMixedPolyContract, isSelectAst } from './helpers';
+import { buildManyToManyContract, buildMixedPolyContract, isSelectAst } from './helpers';
 import { unboundTables } from './unbound-tables';
 
 function codecForColumn(table: string, column: string): string {
@@ -617,6 +617,163 @@ describe('compileSelectWithIncludes', () => {
       const mediocreSelect = mediocreJoin.source.query;
       expect(mediocreSelect.where).toEqual(AndExpr.of([fkExpr, mediocreWhere]));
     });
+  });
+});
+
+describe('M:N include correlated subquery', () => {
+  function buildManyToManyIncludeExpr(opts: {
+    junctionTable: string;
+    parentColumns: string[];
+    childColumns: string[];
+    targetColumns: string[];
+    parentLocalColumns?: string[];
+  }): IncludeExpr {
+    const parentLocalColumns = opts.parentLocalColumns ?? ['id'];
+    return {
+      relationName: 'children',
+      relatedModelName: 'Child',
+      relatedTableName: 'children',
+      targetColumn: opts.targetColumns[0] ?? 'id',
+      localColumn: parentLocalColumns[0] ?? 'id',
+      cardinality: 'N:M',
+      through: {
+        table: opts.junctionTable,
+        parentColumns: opts.parentColumns,
+        childColumns: opts.childColumns,
+        targetColumns: opts.targetColumns,
+        parentLocalColumns,
+      },
+      nested: emptyState(),
+      scalar: undefined,
+      combine: undefined,
+    };
+  }
+
+  it('compiles a single-column M:N include to one correlated subquery through the junction', () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    });
+
+    const include = buildManyToManyIncludeExpr({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+      parentLocalColumns: ['id'],
+    });
+
+    const state = { ...emptyState(), includes: [include] };
+    const plan = compileSelectWithIncludes(contract, 'parents', state);
+
+    expectSelectAst(plan.ast);
+    // Single top-level subquery projection — no multiple executions
+    const childrenProjection = plan.ast.projection.find((item) => item.alias === 'children');
+    expectSubqueryExpr(childrenProjection?.expr);
+
+    // Outer aggregate: FROM (child rows derived table)
+    const aggregateQuery = childrenProjection.expr.query;
+    expectDerivedTableSource(aggregateQuery.from);
+    expect(aggregateQuery.from.alias).toBe('children__rows');
+
+    // Inner child rows SELECT
+    const childRowsSelect = aggregateQuery.from.query;
+    expect(childRowsSelect.from).toBeInstanceOf(TableSource);
+
+    // The child SELECT has exactly one inner join to the junction — no LATERAL
+    expect(childRowsSelect.joins).toHaveLength(1);
+    const junctionJoin = childRowsSelect.joins![0]!;
+    expect(junctionJoin.joinType).toBe('inner');
+    expect(junctionJoin.lateral).toBe(false);
+    expect(junctionJoin.source).toBeInstanceOf(TableSource);
+    expect((junctionJoin.source as TableSource).name).toBe('parent_child');
+
+    // JOIN ON: junction.child_id = children.id
+    expect(junctionJoin.on).toEqual(
+      BinaryExpr.eq(ColumnRef.of('parent_child', 'child_id'), ColumnRef.of('children', 'id')),
+    );
+
+    // WHERE correlates junction to parent: parent_child.parent_id = parents.id
+    expect(childRowsSelect.where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('parent_child', 'parent_id'), ColumnRef.of('parents', 'id')),
+    );
+  });
+
+  it('AND-s across all column pairs for a composite-key M:N junction', () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['tenant_id', 'parent_id'],
+      childColumns: ['tenant_id', 'child_id'],
+      targetColumns: ['tenant_id', 'id'],
+      localFields: ['tenant_id', 'id'],
+    });
+
+    const include = buildManyToManyIncludeExpr({
+      junctionTable: 'parent_child',
+      parentColumns: ['tenant_id', 'parent_id'],
+      childColumns: ['tenant_id', 'child_id'],
+      targetColumns: ['tenant_id', 'id'],
+      parentLocalColumns: ['tenant_id', 'id'],
+    });
+
+    const state = { ...emptyState(), includes: [include] };
+    const plan = compileSelectWithIncludes(contract, 'parents', state);
+
+    expectSelectAst(plan.ast);
+    const childrenProjection = plan.ast.projection.find((item) => item.alias === 'children');
+    expectSubqueryExpr(childrenProjection?.expr);
+
+    const childRowsSelect = childrenProjection.expr.query.from;
+    expectDerivedTableSource(childRowsSelect);
+    const childSelect = childRowsSelect.query;
+
+    // JOIN ON: AND(junction.tenant_id = children.tenant_id, junction.child_id = children.id)
+    expect(childSelect.joins).toHaveLength(1);
+    const junctionJoin = childSelect.joins![0]!;
+    expect(junctionJoin.lateral).toBe(false);
+    expect(junctionJoin.on).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(
+          ColumnRef.of('parent_child', 'tenant_id'),
+          ColumnRef.of('children', 'tenant_id'),
+        ),
+        BinaryExpr.eq(ColumnRef.of('parent_child', 'child_id'), ColumnRef.of('children', 'id')),
+      ]),
+    );
+
+    // WHERE: AND(parent_child.tenant_id = parents.tenant_id, parent_child.parent_id = parents.id)
+    expect(childSelect.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(
+          ColumnRef.of('parent_child', 'tenant_id'),
+          ColumnRef.of('parents', 'tenant_id'),
+        ),
+        BinaryExpr.eq(ColumnRef.of('parent_child', 'parent_id'), ColumnRef.of('parents', 'id')),
+      ]),
+    );
+  });
+
+  it('FK include path is unchanged (no regression)', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts').state;
+
+    const plan = compileSelectWithIncludes(baseContract, 'users', state);
+    expectSelectAst(plan.ast);
+
+    const postsProjection = plan.ast.projection.find((item) => item.alias === 'posts');
+    expectSubqueryExpr(postsProjection?.expr);
+
+    const childRowsSelect = postsProjection.expr.query.from;
+    expectDerivedTableSource(childRowsSelect);
+    const childSelect = childRowsSelect.query;
+
+    // FK path: no JOIN to junction, just WHERE on child FK
+    expect(childSelect.joins ?? []).toHaveLength(0);
+    expect(childSelect.where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+    );
   });
 });
 

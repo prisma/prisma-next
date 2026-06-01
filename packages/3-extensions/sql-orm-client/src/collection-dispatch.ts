@@ -91,7 +91,9 @@ function dispatchWithIncludes<Row>(options: {
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
-      const parentJoinColumns = state.includes.map((include) => include.localColumn);
+      const parentJoinColumns = state.includes.flatMap((include) =>
+        include.through !== undefined ? include.through.parentLocalColumns : [include.localColumn],
+      );
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
       const compiled = compileSelectWithIncludes(

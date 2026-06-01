@@ -292,6 +292,53 @@ function buildNestedIncludeProjections(
   );
 }
 
+/**
+ * Build the correlated WHERE and junction JOIN artifacts for a many-to-many
+ * include. The resulting WHERE correlates the junction to the parent rows
+ * (AND-ed across all column pairs for composite keys). The junction JOIN
+ * connects child rows to the junction via the child columns.
+ */
+function buildManyToManyJunctionArtifacts(
+  parentTableName: string,
+  childTableRef: string,
+  through: NonNullable<IncludeExpr['through']>,
+): {
+  readonly whereExpr: AnyExpression;
+  readonly junctionJoin: JoinAst;
+} {
+  const {
+    table: junctionTable,
+    parentColumns,
+    childColumns,
+    targetColumns,
+    parentLocalColumns,
+  } = through;
+
+  const joinOnPairs = childColumns.map((junctionCol, i) =>
+    BinaryExpr.eq(
+      ColumnRef.of(junctionTable, junctionCol),
+      ColumnRef.of(childTableRef, targetColumns[i] ?? junctionCol),
+    ),
+  );
+  const joinOn: AnyExpression =
+    joinOnPairs.length === 1 ? (joinOnPairs[0] as AnyExpression) : AndExpr.of(joinOnPairs);
+
+  const correlationPairs = parentColumns.map((junctionCol, i) =>
+    BinaryExpr.eq(
+      ColumnRef.of(junctionTable, junctionCol),
+      ColumnRef.of(parentTableName, parentLocalColumns[i] ?? junctionCol),
+    ),
+  );
+  const whereExpr: AnyExpression =
+    correlationPairs.length === 1
+      ? (correlationPairs[0] as AnyExpression)
+      : AndExpr.of(correlationPairs);
+
+  const junctionJoin = JoinAst.inner(TableSource.named(junctionTable), joinOn, false);
+
+  return { whereExpr, junctionJoin };
+}
+
 function buildIncludeChildRowsSelect(
   contract: Contract<SqlStorage>,
   parentTableName: string,
@@ -327,11 +374,25 @@ function buildIncludeChildRowsSelect(
   const childWhere = buildStateWhere(contract, childTableRef, childState, {
     filterTableName: include.relatedTableName,
   });
-  const joinExpr = BinaryExpr.eq(
-    ColumnRef.of(childTableRef, include.targetColumn),
-    ColumnRef.of(parentTableName, include.localColumn),
-  );
-  const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
+
+  let whereExpr: AnyExpression;
+  let junctionJoins: JoinAst[] = [];
+
+  if (include.through !== undefined) {
+    const artifacts = buildManyToManyJunctionArtifacts(
+      parentTableName,
+      childTableRef,
+      include.through,
+    );
+    whereExpr = childWhere ? AndExpr.of([artifacts.whereExpr, childWhere]) : artifacts.whereExpr;
+    junctionJoins = [artifacts.junctionJoin];
+  } else {
+    const joinExpr = BinaryExpr.eq(
+      ColumnRef.of(childTableRef, include.targetColumn),
+      ColumnRef.of(parentTableName, include.localColumn),
+    );
+    whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
+  }
 
   // `distinct()` on a non-leaf include cannot be lowered as
   // `SELECT DISTINCT <scalars>, json_agg(<grandchild>) FROM ...`:
@@ -359,6 +420,7 @@ function buildIncludeChildRowsSelect(
       hiddenOrderProjection,
       aggregateOrderBy,
       whereExpr,
+      junctionJoins,
     });
   }
 
@@ -393,6 +455,10 @@ function buildIncludeChildRowsSelect(
   )
     .withProjection([...childProjection, ...hiddenOrderProjection])
     .withWhere(whereExpr);
+
+  if (junctionJoins.length > 0) {
+    childRows = childRows.withJoins(junctionJoins);
+  }
 
   if (childState.distinctOn && childState.distinctOn.length > 0) {
     childRows = childRows.withDistinctOn(
@@ -456,6 +522,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   readonly hiddenOrderProjection: ReadonlyArray<ProjectionItem>;
   readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly whereExpr: AnyExpression;
+  readonly junctionJoins: ReadonlyArray<JoinAst>;
 }): {
   readonly childRows: SelectAst;
   readonly childProjection: ReadonlyArray<ProjectionItem>;
@@ -472,6 +539,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     hiddenOrderProjection,
     aggregateOrderBy,
     whereExpr,
+    junctionJoins,
   } = options;
   const childState = include.nested;
 
@@ -513,11 +581,14 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     selectedForQuery,
     childTableRef,
   );
-  const baseInner = SelectAst.from(
+  let baseInner = SelectAst.from(
     tableSourceForContract(contract, include.relatedTableName, childTableAlias),
   )
     .withProjection([...innerScalarProjection, ...hiddenOrderProjection])
     .withWhere(whereExpr);
+  if (junctionJoins.length > 0) {
+    baseInner = baseInner.withJoins(junctionJoins);
+  }
 
   // `childState.distinct` is non-empty by the `isDistinctNonLeaf` guard
   // at the only caller (`buildIncludeChildRowsSelect`); assert here so
