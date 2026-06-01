@@ -70,13 +70,18 @@ const posts = await db.Post
   .all();
 ```
 
-Integrations that own pagination — Relay-style backward cursor pagination, REST list endpoints — need to flip the user's sort order. `OrderByItem` is re-exported from this package and exposes `.reverse()`, which returns a new frozen item with the direction flipped and the expression unchanged:
+Integrations that own pagination — Relay-style backward cursor pagination, REST list endpoints — need to flip the user's sort order. `OrderByItem` (and its `Direction`) is re-exported from this package and exposes `.reverse()`, which returns a new frozen item with the direction flipped and the expression unchanged. Call it inside the `orderBy` selector to invert a user-supplied sort for a backward page:
 
 ```ts
-import type { OrderByItem } from '@prisma-next/sql-orm-client';
+import type { ModelAccessor, OrderByItem } from '@prisma-next/sql-orm-client';
 
-// Backward page: reverse every order item, fetch, then re-reverse the rows.
-const backward = (items: readonly OrderByItem[]) => items.map((item) => item.reverse());
+type OrderSelector = (post: ModelAccessor<typeof contract, 'Post'>) => OrderByItem;
+
+const forward: OrderSelector = (post) => post.createdAt.desc();
+// Backward page: reverse the user's order, fetch, then re-reverse the rows in JS.
+const backward: OrderSelector = (post) => forward(post).reverse();
+
+const page = await db.Post.orderBy(backward).take(10).all();
 ```
 
 ## Codec Roundtrip
