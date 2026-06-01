@@ -57,7 +57,7 @@ export interface MongoMigrationRunnerExecuteOptions {
    */
   readonly projectSchema?: (schema: MongoSchemaIR) => MongoSchemaIR;
   /** Per-edge breakdown from graph-walk planning; drives per-edge ledger writes. */
-  readonly migrationEdges?: readonly AggregateMigrationEdgeRef[];
+  readonly migrationEdges?: readonly AggregateMigrationEdgeRef[] | undefined;
 }
 
 export type MongoMigrationRunnerResult = Result<
