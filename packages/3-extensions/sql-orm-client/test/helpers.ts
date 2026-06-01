@@ -4,7 +4,6 @@ import {
   domainModelsAtDefaultNamespace,
   type Contract as FrameworkContract,
 } from '@prisma-next/contract/types';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type {
   CodecDescriptor,
   CodecInstanceContext,
@@ -21,7 +20,7 @@ import {
   type RuntimeParameterizedCodecDescriptor,
   type SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import type { RuntimeQueryable } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
@@ -31,12 +30,18 @@ export function isSelectAst(ast: unknown): ast is SelectAst {
   return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
 }
 
-const baseTestContract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+const postgresContractSerializer = new PostgresContractSerializer();
+
+export function deserializeTestContract(json: unknown = contractJson): Contract {
+  return postgresContractSerializer.deserializeContract(json) as Contract;
+}
+
+const baseTestContract = deserializeTestContract();
 
 export type TestContract = Contract;
 
 export function getTestContract(): TestContract {
-  return structuredClone(baseTestContract);
+  return deserializeTestContract(JSON.parse(JSON.stringify(contractJson)));
 }
 
 /**
@@ -194,14 +199,14 @@ export function buildMixedPolyContract(): TestContract {
     fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
-    base: 'Task',
+    base: { model: 'Task', namespace: 'public' },
   };
 
   domainModels['Feature'] = {
     fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
     relations: {},
     storage: { table: 'features', fields: { priority: { column: 'priority' } } },
-    base: 'Task',
+    base: { model: 'Task', namespace: 'public' },
   };
 
   raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.tasks = {
@@ -228,7 +233,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  return raw as TestContract;
+  return deserializeTestContract(raw);
 }
 
 /**
@@ -259,14 +264,14 @@ export function buildStiPolyContract(): TestContract {
     fields: { role: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'users', fields: { role: { column: 'role' } } },
-    base: 'User',
+    base: { model: 'User', namespace: 'public' },
   };
 
   domainModels['Regular'] = {
     fields: { plan: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'users', fields: { plan: { column: 'plan' } } },
-    base: 'User',
+    base: { model: 'User', namespace: 'public' },
   };
 
   const usersStorageTable = Object.values(
@@ -292,7 +297,7 @@ export function buildStiPolyContract(): TestContract {
     nullable: true,
   };
 
-  return raw as TestContract;
+  return deserializeTestContract(raw);
 }
 
 export function createMockRuntime(): MockRuntime {

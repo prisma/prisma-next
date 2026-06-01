@@ -36,7 +36,7 @@ export async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
  * Creates a control client configured for the e2e test stack (Postgres + pgvector).
  * Used for database initialization via dbInit.
  */
-function createControlClientForTests(connectionString: string): ControlClient {
+export function createControlClientForTests(connectionString: string): ControlClient {
   return createControlClient({
     family: sql,
     target: postgres,
@@ -126,7 +126,7 @@ async function materialisePgvectorPinnedArtefacts(migrationsDir: string): Promis
   await materialiseMigrationPackage(join(migrationsDir, 'pgvector'), baseline);
 }
 
-async function withE2eMigrationsDir<T>(
+export async function withE2eMigrationsDir<T>(
   callback: (migrationsDir: string) => Promise<T>,
 ): Promise<T> {
   const migrationsDir = await mkdtemp(join(tmpdir(), 'prisma-next-e2e-migrations-'));

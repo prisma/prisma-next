@@ -436,6 +436,38 @@ export async function runMigrationCheck(
   return runCommand(createMigrationCheckCommand(), ctx, extraArgs);
 }
 
+const END_CONTRACT_JSON_IMPORT_RE =
+  /import endContract from '\.\/end-contract\.json' with \{ type: 'json' \};\r?\n/;
+
+/**
+ * Planner scaffolds import raw `end-contract.json` as `endContract`. Runtime SQL
+ * qualification requires a hydrated Postgres schema namespace (`qualifyTable`).
+ */
+export function injectMigrationSqlDbSetup(scaffold: string): string {
+  const block = [
+    `import endContractJson from './end-contract.json' with { type: 'json' };`,
+    `import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';`,
+    `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';`,
+    `import { sql } from '@prisma-next/sql-builder/runtime';`,
+    `import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';`,
+    `import postgresTarget from '@prisma-next/target-postgres/runtime';`,
+    '',
+    'const endContract = new PostgresContractSerializer().deserializeContract(endContractJson);',
+    '',
+    'const db = sql({',
+    '  context: createExecutionContext({',
+    '    contract: endContract,',
+    '    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),',
+    '  }),',
+    '});',
+    '',
+    'export default class M extends Migration {',
+  ].join('\n');
+  return scaffold
+    .replace(END_CONTRACT_JSON_IMPORT_RE, '')
+    .replace('export default class M extends Migration {', block);
+}
+
 /**
  * Self-emits a migration package by running its `migration.ts` directly with
  * `tsx`. The migration.ts invokes `MigrationCLI.run(import.meta.url, …)`,

@@ -7,7 +7,7 @@ import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { describe, expect, it } from 'vitest';
 import { withReturningCapability } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContract } from './helpers';
+import { createMockRuntime, deserializeTestContract, getTestContract } from './helpers';
 import { unboundTables } from './unbound-tables';
 
 // Synthetic 36-char Tag ids — Tag.id is typed `Char<36>` in the test contract.
@@ -25,7 +25,9 @@ const tagId = (s: string): TagId => s as unknown as TagId;
 // both onCreate and onUpdate. The postgres test stack already registers
 // the `timestampNow` runtime generator, so the contract round-trips.
 function buildTagWithUpdatedAtContract(): TestContract {
-  const contract = structuredClone(withReturningCapability(getTestContract()));
+  const contract = JSON.parse(
+    JSON.stringify(withReturningCapability(getTestContract())),
+  ) as TestContract;
 
   const tagModel = contract.domain.namespaces['public']!.models['Tag'] as
     | Record<string, unknown>
@@ -66,7 +68,7 @@ function buildTagWithUpdatedAtContract(): TestContract {
     onUpdate: { kind: 'generator', id: 'timestampNow' },
   });
 
-  return contract;
+  return deserializeTestContract(contract);
 }
 
 function setupTagCollection(): {

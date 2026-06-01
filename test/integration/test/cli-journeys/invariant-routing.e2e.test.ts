@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
+  injectMigrationSqlDbSetup,
   type JourneyContext,
   parseJsonOutput,
   runContractEmit,
@@ -73,24 +74,7 @@ function patchBackfillMigrationTs(
   const migrationTsPath = join(migrationDir, 'migration.ts');
   const scaffold = readFileSync(migrationTsPath, 'utf-8');
 
-  const dbSetupBlock = [
-    `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';`,
-    `import { sql } from '@prisma-next/sql-builder/runtime';`,
-    `import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';`,
-    `import postgresTarget from '@prisma-next/target-postgres/runtime';`,
-    '',
-    'const db = sql({',
-    '  context: createExecutionContext({',
-    '    contract: endContract,',
-    '    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),',
-    '  }),',
-    '});',
-    '',
-    'export default class M extends Migration {',
-  ].join('\n');
-
-  let filled = scaffold
-    .replace('export default class M extends Migration {', dbSetupBlock)
+  let filled = injectMigrationSqlDbSetup(scaffold)
     .replace(
       `() => placeholder('${INVARIANT_ID}:check')`,
       "() => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1)",
@@ -604,7 +588,10 @@ import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import endContract from './end-contract.json' with { type: 'json' };
+import endContractJson from './end-contract.json' with { type: 'json' };
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+
+const endContract = new PostgresContractSerializer().deserializeContract(endContractJson);
 
 const db = sql({
   context: createExecutionContext({
@@ -753,7 +740,10 @@ import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import endContract from './end-contract.json' with { type: 'json' };
+import endContractJson from './end-contract.json' with { type: 'json' };
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+
+const endContract = new PostgresContractSerializer().deserializeContract(endContractJson);
 
 const db = sql({
   context: createExecutionContext({

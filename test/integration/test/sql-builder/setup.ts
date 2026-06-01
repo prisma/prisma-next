@@ -2,7 +2,6 @@ import { postgresRawCodecInferer } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -13,7 +12,7 @@ import {
   type Runtime,
 } from '@prisma-next/sql-runtime';
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { blindCast } from '@prisma-next/utils/casts';
 import { Client } from 'pg';
@@ -25,8 +24,8 @@ export { timeouts };
 
 const sqlContract = blindCast<
   Contract,
-  "SqlContractSerializer.deserializeContract returns the framework's Contract supertype; the test fixture's narrowed Contract type isn't expressible at the deserializer boundary"
->(new SqlContractSerializer().deserializeContract(contract));
+  "PostgresContractSerializer.deserializeContract returns the framework's Contract supertype; the test fixture's narrowed Contract type isn't expressible at the deserializer boundary"
+>(new PostgresContractSerializer().deserializeContract(contract));
 
 export function setupIntegrationTest() {
   let runtime: Runtime;

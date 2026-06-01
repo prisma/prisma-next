@@ -3,7 +3,12 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContext, getTestContract } from './helpers';
+import {
+  createMockRuntime,
+  deserializeTestContract,
+  getTestContext,
+  getTestContract,
+} from './helpers';
 
 export type TestModelName = keyof ContractModelDefinitions<TestContract> & string;
 
@@ -48,11 +53,12 @@ export function withReturningCapability(contract: TestContract = baseContract): 
 }
 
 export function withoutDefaultInInsert(contract: TestContract = baseContract): TestContract {
-  const clone = structuredClone(contract);
-  if (clone.capabilities?.['sql']) {
-    delete (clone.capabilities['sql'] as Record<string, unknown>)['defaultInInsert'];
+  const raw = JSON.parse(JSON.stringify(contract)) as Record<string, unknown>;
+  const capabilities = raw['capabilities'] as Record<string, Record<string, unknown>> | undefined;
+  if (capabilities?.['sql']) {
+    delete capabilities['sql']['defaultInInsert'];
   }
-  return clone;
+  return deserializeTestContract(raw);
 }
 
 export function createReturningCollectionWithoutDefaultInInsert<ModelName extends TestModelName>(

@@ -992,7 +992,8 @@ type ContractBase = Omit<
   readonly profileHash: ProfileHash;
 };
 
+export type Models = Contract extends ContractType<StorageBase, infer TModels> ? TModels : never;
+
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Namespaces = Contract['storage']['namespaces'];
-export type Models = Contract extends ContractType<StorageBase, infer TModels> ? TModels : never;
