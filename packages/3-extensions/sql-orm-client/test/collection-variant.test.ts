@@ -14,6 +14,20 @@ import {
   getTestContext,
 } from './helpers';
 
+// The mixed poly contract is patched in at runtime, so Project/tasks are
+// absent from the static Models type. This minimal surface lets the runtime
+// test drive include('tasks', t => t.variant('Bug')) and read the resulting
+// nested state without a static contract for the patched models.
+interface PolyVariantRefinement {
+  variant(name: string): PolyVariantRefinement;
+}
+interface PolyParent {
+  include(
+    relation: 'tasks',
+    refine?: (collection: PolyVariantRefinement) => PolyVariantRefinement,
+  ): { state: { includes: { nested: { variantName?: string } }[] } };
+}
+
 function createPolyCollection() {
   const contract = buildStiPolyContract();
   const baseContext = getTestContext();
@@ -198,6 +212,28 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 1 });
+  });
+
+  it('variant() on a polymorphic-target include refinement sets nested variantName', () => {
+    const contract = buildMixedPolyContract();
+    const context = { ...getTestContext(), contract };
+    const runtime = createMockRuntime();
+    const projects = new Collection({ runtime, context }, 'Project') as unknown as PolyParent;
+
+    const refined = projects.include('tasks', (tasks) => tasks.variant('Bug'));
+
+    expect(refined.state.includes[0]?.nested.variantName).toBe('Bug');
+  });
+
+  it('include of a polymorphic-target relation without refinement leaves variantName unset', () => {
+    const contract = buildMixedPolyContract();
+    const context = { ...getTestContext(), contract };
+    const runtime = createMockRuntime();
+    const projects = new Collection({ runtime, context }, 'Project') as unknown as PolyParent;
+
+    const included = projects.include('tasks');
+
+    expect(included.state.includes[0]?.nested.variantName).toBeUndefined();
   });
 });
 
