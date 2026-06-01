@@ -2,6 +2,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { bold } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
+import { laneColorForColumn } from './migration-graph-lane-colors';
 import type {
   MigrationGraphGridModel,
   MigrationGraphGridRow,
@@ -123,49 +124,71 @@ function arrowForEdgeKind(
  * gutter and stays dim (`style.lane`) — consistent with the plain node marker,
  * which is never dimmed.
  */
-function renderNodeMarkerPair(pair: string, style: MigrationListStyler): string {
-  return style.kind(pair.slice(0, 1)) + style.lane(pair.slice(1));
+function laneStyler(
+  column: number,
+  colorize: boolean,
+  style: MigrationListStyler,
+): (text: string) => string {
+  if (!colorize) {
+    return (text) => style.lane(text);
+  }
+  return laneColorForColumn(column);
+}
+
+function renderNodeMarkerPair(
+  pair: string,
+  column: number,
+  colorize: boolean,
+  style: MigrationListStyler,
+): string {
+  const lane = laneStyler(column, colorize, style);
+  return style.kind(pair.slice(0, 1)) + lane(pair.slice(1));
 }
 
 function renderCellPair(
   cell: StructuralCell,
+  column: number,
+  colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
 ): string {
+  const lane = laneStyler(column, colorize, style);
   switch (cell.kind) {
     case 'node':
-      if (cell.arcLand === true) return renderNodeMarkerPair(palette.arcLand, style);
-      if (cell.arcTee === true) return renderNodeMarkerPair(palette.arcTee, style);
+      if (cell.arcLand === true) {
+        return renderNodeMarkerPair(palette.arcLand, column, colorize, style);
+      }
+      if (cell.arcTee === true) {
+        return renderNodeMarkerPair(palette.arcTee, column, colorize, style);
+      }
       return style.kind(palette.node);
     case 'vertical-pass':
-      return style.lane(palette.verticalPass);
+      return lane(palette.verticalPass);
     case 'edge-lane':
-      // The lane stays dim; the direction arrow (↑ / ↓ / ⟲) is the signal and
-      // stays bright, like the contract-node marker.
       return cell.ownsLabel
-        ? style.lane(palette.verticalPass.trimEnd()) +
+        ? lane(palette.verticalPass.trimEnd()) +
             style.kind(arrowForEdgeKind(cell.edgeKind, palette))
-        : style.lane(palette.verticalPass);
+        : lane(palette.verticalPass);
     case 'branch-tee':
-      return style.lane(palette.branchTee);
+      return lane(palette.branchTee);
     case 'merge-tee':
-      return style.lane(palette.mergeTee);
+      return lane(palette.mergeTee);
     case 'branch-corner':
-      return style.lane(palette.branchCorner);
+      return lane(palette.branchCorner);
     case 'merge-corner':
-      return style.lane(palette.mergeCorner);
+      return lane(palette.mergeCorner);
     case 'arc-branch-corner':
-      return style.lane(palette.arcBranchCorner);
+      return lane(palette.arcBranchCorner);
     case 'arc-branch-tee':
-      return style.lane(palette.arcBranchTee);
+      return lane(palette.arcBranchTee);
     case 'arc-land-corner':
-      return style.lane(palette.arcLandCorner);
+      return lane(palette.arcLandCorner);
     case 'arc-crossing':
-      return style.lane(palette.arcCrossing);
+      return lane(palette.arcCrossing);
     case 'arc-land-bridge':
-      return style.lane(palette.arcLandBridge);
+      return lane(palette.arcLandBridge);
     case 'horizontal-pass':
-      return style.lane(palette.horizontalPass);
+      return lane(palette.horizontalPass);
     case 'empty':
       return '  ';
   }
@@ -174,6 +197,7 @@ function renderCellPair(
 function renderConnectorRow(
   row: MigrationGraphGridRow,
   gridWidth: number,
+  colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
 ): string {
@@ -181,27 +205,30 @@ function renderConnectorRow(
   if (row.cells.length > 0) {
     let seenTee = false;
     let out = '';
-    for (const cell of row.cells) {
+    for (let column = 0; column < row.cells.length; column++) {
+      const cell = row.cells[column];
+      if (cell === undefined) continue;
+      const lane = laneStyler(column, colorize, style);
       switch (cell.kind) {
         case 'branch-tee':
-          out += style.lane(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
+          out += lane(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
           seenTee = true;
           break;
         case 'merge-tee':
-          out += style.lane(seenTee ? palette.connectorMergeTeeCo : palette.connectorBranchTee);
+          out += lane(seenTee ? palette.connectorMergeTeeCo : palette.connectorBranchTee);
           seenTee = true;
           break;
         case 'branch-corner':
-          out += style.lane(palette.branchCorner);
+          out += lane(palette.branchCorner);
           break;
         case 'merge-corner':
-          out += style.lane(palette.mergeCorner);
+          out += lane(palette.mergeCorner);
           break;
         case 'vertical-pass':
-          out += style.lane(palette.verticalPass);
+          out += lane(palette.verticalPass);
           break;
         case 'horizontal-pass':
-          out += style.lane(palette.horizontalPass);
+          out += lane(palette.horizontalPass);
           break;
         default:
           out += '  ';
@@ -220,11 +247,11 @@ function renderConnectorRow(
   const end = row.endLane ?? start;
   let out = '';
   for (let column = 0; column < gridWidth; column++) {
+    const lane = laneStyler(column, colorize, style);
     if (column < start || column > end) out += '  ';
-    else if (column === start) out += style.lane(palette.connectorBranchTee);
-    else if (column === end)
-      out += style.lane(isMerge ? palette.mergeCorner : palette.branchCorner);
-    else out += style.lane(isMerge ? palette.connectorMergeTeeCo : palette.connectorBranchTeeCo);
+    else if (column === start) out += lane(palette.connectorBranchTee);
+    else if (column === end) out += lane(isMerge ? palette.mergeCorner : palette.branchCorner);
+    else out += lane(isMerge ? palette.connectorMergeTeeCo : palette.connectorBranchTeeCo);
   }
   return out;
 }
@@ -295,6 +322,13 @@ function formatEdgeHashColumn(
 function padVisible(text: string, targetWidth: number): string {
   const padding = Math.max(0, targetWidth - stringWidth(text));
   return text + ' '.repeat(padding);
+}
+
+const ANSI_ESCAPE = '\x1b';
+
+function trimTrailingWhitespace(line: string): string {
+  const trailingSpaceBeforeReset = new RegExp(`[\\t ]+((?:${ANSI_ESCAPE}\\[[0-9;]*m)+)$`);
+  return line.replace(trailingSpaceBeforeReset, '$1').replace(/\s+$/, '');
 }
 
 function gridWidthForModel(rows: readonly MigrationGraphGridRow[]): number {
@@ -373,11 +407,15 @@ export function renderMigrationGraphTree(
     }
 
     if (row.kind === 'branch-connector' || row.kind === 'merge-connector') {
-      lines.push(renderConnectorRow(row, gridWidth, style, palette).replace(/\s+$/, ''));
+      lines.push(
+        trimTrailingWhitespace(renderConnectorRow(row, gridWidth, opts.colorize, style, palette)),
+      );
       continue;
     }
 
-    let gutter = row.cells.map((cell) => renderCellPair(cell, style, palette)).join('');
+    let gutter = row.cells
+      .map((cell, column) => renderCellPair(cell, column, opts.colorize, style, palette))
+      .join('');
     const prevRow = model.rows[rowIndex - 1];
     let laneSpan = row.cells.length;
     if (row.kind === 'node') {
@@ -402,12 +440,12 @@ export function renderMigrationGraphTree(
     ) {
       gutter = row.cells
         .slice(0, 1)
-        .map((cell) => renderCellPair(cell, style, palette))
+        .map((cell, column) => renderCellPair(cell, column, opts.colorize, style, palette))
         .join('');
     } else if (row.kind === 'node' && laneSpan < row.cells.length && !nodeHasArcDecoration(row)) {
       gutter = row.cells
         .slice(0, laneSpan)
-        .map((cell) => renderCellPair(cell, style, palette))
+        .map((cell, column) => renderCellPair(cell, column, opts.colorize, style, palette))
         .join('');
     } else if (gutter.length < laneSpan * 2) {
       gutter = gutter.padEnd(laneSpan * 2, ' ');
@@ -421,16 +459,16 @@ export function renderMigrationGraphTree(
       if (contractHash === EMPTY_CONTRACT_HASH) {
         const trailingLanes = row.cells
           .slice(1)
-          .map((cell) => renderCellPair(cell, style, palette))
+          .map((cell, offset) => renderCellPair(cell, offset + 1, opts.colorize, style, palette))
           .join('');
         const emptyGutter = palette.emptySource.padEnd(2, ' ') + trailingLanes;
         const overlayNames = overlayNamesForContract(contractHash, opts);
         if (overlayNames.length === 0) {
-          lines.push(emptyGutter.replace(/\s+$/, ''));
+          lines.push(trimTrailingWhitespace(emptyGutter));
           continue;
         }
         const overlay = style.refs(overlayNames);
-        lines.push(`${padVisible(emptyGutter, dataColumn)}${overlay}`.replace(/\s+$/, ''));
+        lines.push(trimTrailingWhitespace(`${padVisible(emptyGutter, dataColumn)}${overlay}`));
         continue;
       }
       const hashText = style.sourceHash(
@@ -442,7 +480,7 @@ export function renderMigrationGraphTree(
           ? ' '.repeat(Math.max(0, dataColumn - labelColumn - stringWidth(hashText)))
           : '';
       const overlay = overlayNames.length > 0 ? style.refs(overlayNames) : '';
-      lines.push(`${gutterPad}${hashText}${overlayPad}${overlay}`.replace(/\s+$/, ''));
+      lines.push(trimTrailingWhitespace(`${gutterPad}${hashText}${overlayPad}${overlay}`));
       continue;
     }
 
@@ -452,7 +490,7 @@ export function renderMigrationGraphTree(
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
     const dirName = `${style.dirName(edge.dirName)}${dirNamePadding}`;
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
-    lines.push(`${gutterPad}${dirName}${hashColumn}`.replace(/\s+$/, ''));
+    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}`));
   }
 
   return lines.join('\n');
