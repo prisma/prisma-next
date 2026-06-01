@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b3b741a267f995ab52646b2cba176c396e7e2b651e78d048382dc9dc9399dd96'>;
+  StorageHashBase<'sha256:50aadcf996213451cd2876e3caf50c2752b5b8c9ce1aa55dcae24918518b4ffb'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -92,8 +92,8 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
+        readonly public: {
+          readonly id: 'public';
           readonly kind: 'sql-namespace';
           readonly tables: {
             readonly telemetry_event: {
@@ -285,13 +285,13 @@ type ContractBase = Omit<
   readonly targetFamily: 'sql';
   readonly roots: {
     readonly telemetry_event: {
-      readonly namespace: '__unbound__' & NamespaceId;
+      readonly namespace: 'public' & NamespaceId;
       readonly model: 'TelemetryEvent';
     };
   };
   readonly domain: {
     readonly namespaces: {
-      readonly __unbound__: {
+      readonly public: {
         readonly models: {
           readonly TelemetryEvent: {
             readonly fields: {
