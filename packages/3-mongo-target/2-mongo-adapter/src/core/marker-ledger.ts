@@ -238,7 +238,14 @@ export async function updateMarker(
 export async function writeLedgerEntry(
   db: Db,
   space: string,
-  entry: { readonly edgeId: string; readonly from: string; readonly to: string },
+  entry: {
+    readonly edgeId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly migrationName: string;
+    readonly migrationHash: string;
+    readonly operations: readonly unknown[];
+  },
 ): Promise<void> {
   const cmd = new RawInsertOneCommand(COLLECTION, {
     type: 'ledger',
@@ -246,6 +253,9 @@ export async function writeLedgerEntry(
     edgeId: entry.edgeId,
     from: entry.from,
     to: entry.to,
+    migrationName: entry.migrationName,
+    migrationHash: entry.migrationHash,
+    operations: entry.operations,
     appliedAt: new Date(),
   });
   await executeInsertOne(db, cmd);
