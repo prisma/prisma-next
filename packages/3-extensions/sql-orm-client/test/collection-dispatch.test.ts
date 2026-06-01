@@ -1,14 +1,42 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { resolveIncludeRelation } from '../src/collection-contract';
 import { dispatchCollectionRows } from '../src/collection-dispatch';
-import type { CollectionState, IncludeExpr } from '../src/types';
+import { type CollectionState, emptyState, type IncludeExpr } from '../src/types';
 import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
 import {
   buildMixedPolyContract,
   buildStiPolyContract,
+  createMockRuntime,
   getTestContract,
   withCapabilities,
 } from './helpers';
+
+function includeFor(
+  contract: Contract<SqlStorage>,
+  parentModel: string,
+  relationName: string,
+  nested: CollectionState = emptyState(),
+): IncludeExpr {
+  const relation = resolveIncludeRelation(contract, parentModel, relationName);
+  return {
+    relationName,
+    relatedModelName: relation.relatedModelName,
+    relatedTableName: relation.relatedTableName,
+    targetColumn: relation.targetColumn,
+    localColumn: relation.localColumn,
+    cardinality: relation.cardinality,
+    nested,
+    scalar: undefined,
+    combine: undefined,
+  };
+}
+
+function stateWithInclude(include: IncludeExpr): CollectionState {
+  return { ...emptyState(), includes: [include] };
+}
 
 function withSingleQueryCapabilities(contract: TestContract) {
   return withCapabilities(contract, {
@@ -343,8 +371,8 @@ describe('collection-dispatch', () => {
 
   it('dispatchCollectionRows() decodes STI-target include child rows to their discriminator variant', async () => {
     const contract = withSingleQueryCapabilities(buildStiPolyContract());
-    const { collection, runtime } = createCollectionFor('Account', contract);
-    const scoped = collection.include('members');
+    const runtime = createMockRuntime();
+    const state = stateWithInclude(includeFor(contract, 'Account', 'members'));
     // Both STI variant columns live in the base table, so the child SELECT
     // projects both for every row; the non-matching variant's column is NULL.
     // Decoding by discriminator must keep the matching variant's field and
@@ -363,9 +391,9 @@ describe('collection-dispatch', () => {
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
       runtime,
-      state: scoped.state,
-      tableName: scoped.tableName,
-      modelName: scoped.modelName,
+      state,
+      tableName: 'accounts',
+      modelName: 'Account',
     }).toArray();
 
     const members = (rows[0] as { members: Record<string, unknown>[] }).members;
@@ -389,8 +417,8 @@ describe('collection-dispatch', () => {
 
   it('dispatchCollectionRows() decodes MTI-target include child rows, surfacing variant columns under their field names', async () => {
     const contract = withSingleQueryCapabilities(buildMixedPolyContract());
-    const { collection, runtime } = createCollectionFor('Project', contract);
-    const scoped = collection.include('tasks');
+    const runtime = createMockRuntime();
+    const state = stateWithInclude(includeFor(contract, 'Project', 'tasks'));
     runtime.setNextResults([
       [
         {
@@ -405,9 +433,9 @@ describe('collection-dispatch', () => {
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
       runtime,
-      state: scoped.state,
-      tableName: scoped.tableName,
-      modelName: scoped.modelName,
+      state,
+      tableName: 'projects_tbl',
+      modelName: 'Project',
     }).toArray();
 
     const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
@@ -419,20 +447,13 @@ describe('collection-dispatch', () => {
 
   it('dispatchCollectionRows() maps a variant-narrowed include via its named variant', async () => {
     const contract = withSingleQueryCapabilities(buildMixedPolyContract());
-    const { collection, runtime } = createCollectionFor('Project', contract);
-    const scoped = collection.include('tasks');
-
-    // A variant-narrowed include sets `variantName` on the include's nested
-    // state (the runtime equivalent of `.variant('Feature')` inside the
-    // refinement). The decode side reads that to map every child row to the
-    // named variant rather than resolving per-row by discriminator.
-    const narrowedIncludes = scoped.state.includes.map(
-      (include): IncludeExpr => ({
-        ...include,
-        nested: { ...include.nested, variantName: 'Feature' } satisfies CollectionState,
-      }),
+    const runtime = createMockRuntime();
+    // A variant-narrowed include carries `variantName` on the include's nested
+    // state. The decode side reads that to map every child row to the named
+    // variant rather than resolving per-row by discriminator.
+    const state = stateWithInclude(
+      includeFor(contract, 'Project', 'tasks', { ...emptyState(), variantName: 'Feature' }),
     );
-    const narrowedState: CollectionState = { ...scoped.state, includes: narrowedIncludes };
 
     runtime.setNextResults([
       [
@@ -448,9 +469,9 @@ describe('collection-dispatch', () => {
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
       runtime,
-      state: narrowedState,
-      tableName: scoped.tableName,
-      modelName: scoped.modelName,
+      state,
+      tableName: 'projects_tbl',
+      modelName: 'Project',
     }).toArray();
 
     const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
