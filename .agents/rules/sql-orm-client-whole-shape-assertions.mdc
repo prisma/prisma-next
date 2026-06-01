@@ -70,6 +70,10 @@ expect(member).not.toHaveProperty('plan');               // enumerating absences
   for large shapes, but still pair them with explicit `select` so the snapshot is stable.
 - This is about *result-shape* assertions. Asserting a single scalar (a count, a thrown error
   code, a boolean) with `toBe`/`expect().rejects` is fine and expected.
+- **Implicit-default-projection tests are the deliberate exception:** a test whose explicit purpose
+  is to verify the default projection (no `.select(...)`) *should* assert the full default row shape
+  with `toEqual`, by design — that's the property under test. Name it as such. Everywhere else, a
+  `toEqual` on a full row with no `select` is the brittleness this rule warns against.
 - **Relationship to `prefer-object-matcher.mdc`:** that rule consolidates scattered
   `expect().toBe()` calls into one matcher repo-wide. This rule is the stricter, sql-orm-client
   specialization for *query results*: the result row is the contract, so assert it **completely**
