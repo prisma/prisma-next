@@ -152,26 +152,6 @@ export type ComputeColumnJsType<
     : never;
 
 /**
- * Utility type to check if a contract has the required capabilities for includeMany.
- * Requires both `lateral` and `jsonAgg` to be `true` in the contract's capabilities for the target.
- * Capabilities are nested by target: `{ [target]: { lateral: true, jsonAgg: true } }`
- */
-export type HasIncludeManyCapabilities<TContract extends Contract<SqlStorage>> = TContract extends {
-  capabilities: infer C;
-  target: infer T;
-}
-  ? T extends string
-    ? C extends Record<string, Record<string, boolean>>
-      ? C extends { [K in T]: infer TargetCaps }
-        ? TargetCaps extends { lateral: true; jsonAgg: true }
-          ? true
-          : false
-        : false
-      : false
-    : false
-  : false;
-
-/**
  * Alias for the SQL-domain executable plan, exposed under the legacy
  * `SqlPlan` name for compatibility with SQL builder/utility call sites.
  * The canonical name is `SqlExecutionPlan` (`./sql-execution-plan`).

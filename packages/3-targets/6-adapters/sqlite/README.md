@@ -20,7 +20,7 @@ Provide SQLite-specific adapter implementation, codecs, and capabilities. Enable
 
 - **Adapter Implementation**: Implement `Adapter` SPI for SQLite
   - Lower SQL ASTs to SQLite dialect SQL
-  - Render `includeMany` as correlated subquery with `json_group_array(json_object(...))` for nested array includes
+  - Render `.include(...)` as correlated subquery with `json_group_array(json_object(...))` for nested array includes
   - Advertise SQLite capabilities (`jsonAgg`, `returning`; no `lateral`, no `enums`)
   - Provide target-specific marker SQL via `readMarkerStatement()` on `AdapterProfile`
   - Map SQLite errors to `RuntimeError` envelope
@@ -91,7 +91,7 @@ flowchart TD
 - Main adapter implementation
 - Lowers SQL ASTs to SQLite SQL with `?` positional parameters
 - Renders joins (INNER, LEFT, RIGHT, FULL) with ON conditions
-- Renders `includeMany` as correlated subquery with `json_group_array(json_object(...))` for nested array includes
+- Renders `.include(...)` as correlated subquery with `json_group_array(json_object(...))` for nested array includes
 - Renders DML operations (INSERT, UPDATE, DELETE) with RETURNING clauses
 - Renders ON CONFLICT (DO NOTHING / DO UPDATE SET) for upserts
 - Uses `CAST(expr AS type)` instead of Postgres `::type` syntax
@@ -148,17 +148,17 @@ The adapter declares the following SQLite capabilities:
 
 - **`sql.orderBy: true`** -- Supports ORDER BY clauses
 - **`sql.limit: true`** -- Supports LIMIT clauses
-- **`sql.lateral: false`** -- No LATERAL join support; `includeMany` uses correlated subquery fallback
-- **`sql.jsonAgg: true`** -- Supports JSON aggregation via `json_group_array()` for `includeMany`
+- **`sql.lateral: false`** -- No LATERAL join support; `.include(...)` uses correlated subqueries
+- **`sql.jsonAgg: true`** -- Supports JSON aggregation via `json_group_array()` for `.include(...)`
 - **`sql.returning: true`** -- Supports RETURNING clauses for DML operations (SQLite 3.35+)
 - **`sql.enums: false`** -- No native enum support
 
-## includeMany Support
+## Include Support
 
-The adapter supports `includeMany` for nested array includes using SQLite's `json_group_array()` and `json_object()`:
+The adapter lowers `.include(...)` for nested array includes using SQLite's `json_group_array()` and `json_object()`:
 
 **Lowering Strategy:**
-- Renders `includeMany` as a correlated subquery with `json_group_array(json_object(...))` to aggregate child rows into a JSON array
+- Renders `.include(...)` as a correlated subquery with `json_group_array(json_object(...))` to aggregate child rows into a JSON array
 - Uses `COALESCE(..., '[]')` to handle empty results
 
 **Example SQL Output:**
