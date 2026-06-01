@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -502,7 +503,7 @@ describe('emitter', () => {
           public: undefined,
         },
       },
-    };
+    } as unknown as Contract;
     expect(() =>
       generateContractDts(contract, mockSqlHook, [], {
         storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',

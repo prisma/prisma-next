@@ -75,8 +75,8 @@ export function generateContractDts(
       : '';
 
   const resolveFieldTypeParams = emitter.resolveFieldTypeParams
-    ? (modelName: string, fieldName: string) =>
-        emitter.resolveFieldTypeParams?.(modelName, fieldName, modelsRecord[modelName], contract)
+    ? (modelName: string, fieldName: string, model: ContractModel) =>
+        emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract)
     : undefined;
 
   const fieldTypesMaps = generateBothFieldTypesMaps(
