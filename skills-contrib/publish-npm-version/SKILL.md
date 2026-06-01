@@ -35,7 +35,7 @@ The skill does **not** require the maintainer to be on `main` or to have a clean
 Before invoking this skill, confirm:
 
 1. The maintainer can fetch from `origin` (`git fetch origin main` succeeds).
-2. There are no in-flight breaking changes that need to be called out in the release notes before the bump is cut. (If there are, surface them to the maintainer and wait for confirmation.)
+2. You are ready to draft the release notes for this bump. The [`draft-release-notes`](../draft-release-notes/SKILL.md) skill (invoked in step 7 below) enumerates the merged PRs since the previous stable tag and surfaces the release-notes-worthy changes — including any breaking changes — so this no longer rests on the maintainer's unaided recollection. If you already know of an in-flight breaking change that must be called out, note it so the authoring step gives it prominence.
 
 If either precondition is unmet, stop and surface the issue. Do **not** try to auto-resolve.
 
@@ -87,9 +87,11 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
 
    No body is required — the PR description will explain the bump in detail.
 
-7. **Push the branch** to `origin`.
+7. **Draft the release notes.** From inside this `release/<version>` worktree, run the [`draft-release-notes`](../draft-release-notes/SKILL.md) skill for `<version>`. It enumerates the merged PRs since the previous stable `v*` tag, triages which are user-facing, categorizes them (breaking changes first), writes `docs/releases/v<version>.md`, and prepends a matching `CHANGELOG.md` entry — committing both on the release branch as their own commit. Committing the notes here is what lands them in the bump PR diff, so the PR-mode `check:release-notes` gate passes and the maintainer reviews the notes as part of the release PR.
 
-8. **Open the PR** with `gh pr create`. Use the title:
+8. **Push the branch** to `origin`.
+
+9. **Open the PR** with `gh pr create`. Use the title:
 
    ```text
    Bump to version <version>
@@ -99,10 +101,10 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
 
    - State the previous and new version (`<previous> → <new>`).
    - Link to [`docs/oss/versioning.md`](../../../docs/oss/versioning.md) for context.
-   - Surface any release-notes-worthy changes the maintainer flagged in the pre-flight check (or state explicitly that none were flagged).
+   - Point reviewers at the committed `docs/releases/v<version>.md` (authored by the `draft-release-notes` skill in step 7) as the human-review surface for the release's user-facing changes.
    - Note that **merging this PR ships the release**: the resulting push to `main` carries the bumped root `version`, the `Publish to npm` workflow detects the change and publishes `<new>` under dist-tag `latest`, and a matching GitHub Release is created automatically.
 
-9. **Stop and report** the PR URL **and the worktree path** to the maintainer. The maintainer can `git worktree remove ../release-<version>` after the PR merges. Do not merge the PR yourself; the merge is a human gate where someone confirms the release notes are acceptable. (Merging triggers the publish — there is no separate dispatch step.)
+10. **Stop and report** the PR URL **and the worktree path** to the maintainer. The maintainer can `git worktree remove ../release-<version>` after the PR merges. Do not merge the PR yourself; the merge is a human gate where someone confirms the release notes are acceptable. (Merging triggers the publish — there is no separate dispatch step.)
 
 ## Idempotency
 

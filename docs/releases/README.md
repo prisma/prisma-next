@@ -9,7 +9,7 @@ The notes file must be committed **before the release PR merges**. Two modes of 
 - **PR mode** (`pnpm check:release-notes --mode pr`) runs on every PR. When a PR changes the root `package.json` `version` (a release bump), it fails unless the matching `docs/releases/v<version>.md` is present — so a release PR that forgot its notes is caught in review, not after merge.
 - **Publish mode** (`pnpm check:release-notes --mode publish`) runs in the publish workflow for `latest` builds only, immediately before the Release is created, and fails the publish if the file is missing. Dev/beta builds create no GitHub Release and are not gated.
 
-For now these files are **hand-authored**. A forthcoming `draft-release-notes` skill will draft them automatically from the merged PRs in a release; until then, write them by hand using the template below.
+These files are drafted automatically by the [`draft-release-notes`](../../skills-contrib/draft-release-notes/SKILL.md) skill, which `publish-npm-version` runs before opening the release PR; the maintainer reviews and adjusts the result in the PR. You can also author one by hand using the template below.
 
 ## Authoring conventions
 
@@ -17,6 +17,7 @@ For now these files are **hand-authored**. A forthcoming `draft-release-notes` s
 - **Categorize** entries under the fixed section order below, and **omit any section that has no entries**.
 - **Lead with breaking changes** — they are what a reader scanning the notes most needs to see.
 - **Link PRs** (e.g. `(#1234)`) and **attribute contributors**, especially first-time ones.
+- **Link migration recipes as absolute, tag-pinned URLs** — `https://github.com/prisma/prisma-next/blob/v<version>/skills/upgrade/prisma-next-upgrade/upgrades/<prev.minor>-to-<head.minor>/` — not repo-relative paths. This file is published verbatim as the GitHub Release body, where repo-relative links do not resolve; pinning to the release tag keeps the link working and rot-proof. (PR `(#NNN)` references stay bare — GitHub auto-links those in a Release body.)
 
 The section order is: **Breaking changes → Features → Fixes → New contributors**.
 
@@ -36,7 +37,7 @@ Copy this into `docs/releases/v<version>.md` and fill it in, dropping any sectio
 
 ## Breaking changes
 
-- **<short title>** — <what changed and what the reader must do>. (#<pr>)
+- **<short title>** — <what changed and what the reader must do>. See the [migration recipe](https://github.com/prisma/prisma-next/blob/v<version>/skills/upgrade/prisma-next-upgrade/upgrades/<prev.minor>-to-<head.minor>/). (#<pr>)
 
 ## Features
 
