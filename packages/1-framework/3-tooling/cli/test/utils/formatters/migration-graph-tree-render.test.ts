@@ -5,7 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { laneColorForColumn } from '../../../src/utils/formatters/migration-graph-lane-colors';
 import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphRows } from '../../../src/utils/formatters/migration-graph-rows';
-import { renderMigrationGraphTree } from '../../../src/utils/formatters/migration-graph-tree-render';
+import {
+  renderMigrationGraphLegend,
+  renderMigrationGraphTree,
+} from '../../../src/utils/formatters/migration-graph-tree-render';
 
 let migSeq = 0;
 
@@ -552,5 +555,44 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(mergeAliceLine).toBeDefined();
     expect(mergeAliceLine).toContain(`${laneColorForColumn(0)('│')}↑`);
     expect(mergeAliceLine).not.toContain(laneColorForColumn(0)('↑'));
+  });
+});
+
+describe('renderMigrationGraphLegend', () => {
+  it('renders the unicode legend without color', () => {
+    expect(renderMigrationGraphLegend({ colorize: false })).toMatchInlineSnapshot(`
+      "Legend:
+        ○ contract node   ↑ forward   ↓ rollback   ⟲ self   ∅ empty / root
+        → from → to (data column)   (refs) node overlay incl. db / contract markers
+        lanes: colored by column"
+    `);
+  });
+
+  it('renders the ASCII legend without color', () => {
+    expect(
+      renderMigrationGraphLegend({ colorize: false, glyphMode: 'ascii' }),
+    ).toMatchInlineSnapshot(`
+      "Legend:
+        * contract node   ^ forward   v rollback   @ self   - empty / root
+        -> from -> to (data column)   (refs) node overlay incl. db / contract markers
+        lanes: colored by column"
+    `);
+  });
+
+  it('includes the rotating lane-color cycle only when colorize is true', () => {
+    const colored = renderMigrationGraphLegend({ colorize: true });
+    for (const column of [0, 1, 2, 3, 4, 5]) {
+      expect(colored).toContain(laneColorForColumn(column)('│'));
+    }
+    const plain = renderMigrationGraphLegend({ colorize: false });
+    expect(plain).not.toContain('\u001b[');
+    expect(plain).toContain('lanes: colored by column');
+  });
+
+  it('honors the ASCII palette when color is on', () => {
+    const colored = renderMigrationGraphLegend({ colorize: true, glyphMode: 'ascii' });
+    expect(stripAnsi(colored)).toContain('* contract node');
+    expect(stripAnsi(colored)).toContain('^ forward');
+    expect(colored).toContain(laneColorForColumn(0)('|'));
   });
 });
