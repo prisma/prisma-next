@@ -72,35 +72,54 @@ integration coverage confirms the whole.
 ### Dispatch 4: Integration coverage — STI + MTI target includes on a real DB
 
 - **Outcome:** integration tests in `test/integration/test/sql-orm-client/` exercise
-  `.include('<polyRel>')` for an STI-target and an MTI-target relation against PGlite and
-  SQLite, asserting variant-correct row shapes, a variant-specific `where` on the refinement,
-  and a `.variant()`-narrowed include. A polymorphic-relation fixture (parent model + STI poly
-  target + MTI poly target) + seed helpers are added (none exists today).
+  `.include('<polyRel>')` for an STI-target and an MTI-target relation against **PGlite
+  (Postgres)** — the only target this suite runs (see design-notes D4) — asserting
+  variant-correct row shapes, an **STI** variant-specific `where` on the refinement, and a
+  `.variant()`-narrowed include. A polymorphic-relation fixture (parent model + STI poly target
+  + MTI poly target) + seed helpers are added (none exists today).
 - **Builds on:** D1 + D2 + D3 (the full read path + narrowing API).
-- **Hands to:** slice-DoD integration coverage; the silent-degradation regression is locked
-  by acceptance-level tests on both targets.
-- **Focus:** integration fixture/contract + seeds + tests. **Not** further production-code
-  changes — if a gap surfaces here, it amends the spec via `drive-discussion` (invariant I12)
-  and re-opens the relevant dispatch. If discovery shows the shared `getTestContract()` cannot
-  be cleanly extended, splitting "author poly fixture" into its own dispatch is the sanctioned
-  resize.
+- **Hands to:** PGlite integration coverage; the silent-degradation regression is locked by
+  acceptance-level tests. Surfaced the MTI variant-`where` gap → D5.
+- **Focus:** integration fixture/contract + seeds + tests. **Not** production-code changes — a
+  surfaced gap halts and re-opens the relevant dispatch (which is exactly what happened: the MTI
+  variant-`where` gap routed to D5). Standalone poly contract per the sanctioned resize.
+- **Status:** delivered 5 PGlite tests (commit `34becbd8a`); MTI variant-`where` case to be
+  added in D5 once the accessor fix lands.
+
+### Dispatch 5: MTI variant-field `where` — variant-aware predicate accessor
+
+- **Outcome:** a variant-specific `where` referencing an **MTI** variant column on a poly include
+  refinement (e.g. `.include('tasks', t => t.variant('Feature').where(x => x.priority.gte(3)))`)
+  type-checks and evaluates correctly at runtime — the predicate accessor resolves the variant's
+  columns (merged from the selected variant) and qualifies their `ColumnRef` against the variant
+  table D1 already joins into the child SELECT. The D4 integration test is extended with the MTI
+  variant-`where` case (PGlite), and unit coverage pins the accessor/where-binding behavior.
+- **Builds on:** D1 (variant tables joined into the child SELECT), D3 (`.variant()` surface), D4
+  (the integration fixture + the STI `where` case to mirror).
+- **Hands to:** AC-3 fully discharged for both STI and MTI; slice-DoD met.
+- **Focus:** `model-accessor.ts` (make `createModelAccessor` variant-aware — merge variant
+  columns, qualify `ColumnRef` to the variant table) + the `where`-binding path; reuse the merged
+  field→column map pattern from the mutation path (`collection.ts` ~`:1274`). Tests-first: unit
+  (predicate resolves an MTI variant column to the variant-table `ColumnRef`) + extend the D4
+  integration test. **Not** the SQL join emission (D1 already joins the table) or the decode path.
 
 ## Handoff linearity
 
-D1→D2→D3→D4 is linear: each `builds on` is the immediately-prior `hands to`. Completeness:
-D4's hand-off (integration coverage on both targets + the narrowing API exercised) discharges
-the slice-DoD's integration + type-shape conditions; D3 discharges the API-surface acceptance
-criterion; D1+D2 discharge the core "rows match their variant" criterion.
+D1→D2→D3→D4→D5 is linear. Completeness: D1+D2 discharge "rows match their variant"; D3 discharges
+the `.variant()` narrowing API + type-shape; D4 discharges PGlite integration coverage + STI
+variant-`where`; D5 discharges MTI variant-`where` (the AC-3 remainder). D4 surfaced the D5 gap —
+a non-linear discovery, recorded in design-notes D3.
 
 ## Manual QA
 
 **N/A** — the change is library-internal read-path behavior with no CLI/UI surface; the
-acceptance surface is the Dispatch 4 integration tests (real DB, both targets). Recorded here
-as an explicit N/A per the slice-DoD requirement.
+acceptance surface is the D4/D5 integration tests (real DB, PGlite). Recorded here as an
+explicit N/A per the slice-DoD requirement.
 
 ## Whole-slice DoD
 
 - `pnpm test:packages typecheck lint:deps` green at the slice tip.
-- `pnpm test:integration` green across Postgres + SQLite.
+- `pnpm test:integration` green on Postgres (PGlite). *(SQLite poly-include coverage deferred —
+  design-notes D4.)*
 - Type-level tests assert the variant-union result shape and `.variant()` narrowing.
 - PR description is the slice spec (`projects/tml-2683/spec.md`) + Linear back-link.

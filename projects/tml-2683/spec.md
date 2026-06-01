@@ -120,8 +120,13 @@ parent↔child symmetry in one sitting.
   `mapPolymorphicRow` instead of `mapStorageRowToModelFields`.
 - `collection.ts` / type surface — expose `.variant()` on the include-refinement collection
   type and narrow the included relation's result type to the variant union member.
-- Variant-specific `where` on a poly include refinement evaluates correctly (falls out of
-  the joins added on the SQL side).
+- Variant-specific `where` on a poly include refinement evaluates correctly. For **STI** this
+  falls out of the SQL-side joins (the variant columns live on the base table the predicate
+  accessor already resolves). For **MTI** it does *not* — the predicate accessor
+  (`model-accessor.ts`) resolves fields against the base table only, so a variant column on a
+  joined variant table is unreferenceable; the accessor must become variant-aware (merge the
+  selected variant's columns, qualifying their `ColumnRef` against the variant table D1 already
+  joins into the child SELECT). Delivered by **D5**. *(Discovered during D4 — see design-notes D4.)*
 - Tests: unit (`test/query-plan-select.test.ts`, `test/collection-dispatch.test.ts`),
   types (`test/polymorphism.test-d.ts` or a new `test-d`), integration
   (`test/integration/test/sql-orm-client/`), plus a polymorphic-relation fixture for the
@@ -155,7 +160,12 @@ parent↔child symmetry in one sitting.
 
 - [ ] A new polymorphic-relation fixture (STI-target **and** MTI-target relation off a
       parent model) exists in the integration suite and is committed; integration tests pass
-      on both PGlite (Postgres) and SQLite.
+      on **PGlite (Postgres)**. *(Amended from "PGlite + SQLite" — see design-notes D4: the
+      `sql-orm-client` integration suite is Postgres-only; the emitted variant-join lowering is
+      target-agnostic, so PGlite exercises the D1–D3 logic. SQLite poly-include coverage is a
+      deferred follow-up, gated on the sqlite contract-builder gaining polymorphism support.)*
+- [ ] Variant-specific `where` works end-to-end on a real DB for **both** STI (base-table
+      column) and MTI (variant-table column, via the D5 variant-aware predicate accessor).
 - [ ] Type-level test asserts `.include('<polyRel>')` result row type = the variant union,
       and `.include('<polyRel>', r => r.variant('X'))` narrows to variant `X`.
 - [ ] `pnpm fixtures:check` clean (if any emitted fixture/contract changes).

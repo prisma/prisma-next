@@ -51,6 +51,49 @@ ordinary SQL, orthogonal to the LATERAL machinery 2729 removed. Must NOT touch t
 
 **Rejected:** keep a lateral path / strategy axis for this fix. Contradicts 2729.
 
+## D3 (execution-time, post-D4 discovery) — MTI variant-field `where`: **fix in this slice**
+
+**Discovery:** D4 integration testing found that a variant-specific `where` on an **MTI** poly
+include throws at runtime — `db.orm.Project.include('tasks', t => t.variant('Feature').where(x => x.priority.gte(3)))`
+→ `TypeError: Cannot read properties of undefined (reading 'gte')`. Root cause: `.variant()`
+(`collection.ts:296`) keeps the base `modelName` and only sets `state.variantName`; the predicate
+accessor `createModelAccessor(context, modelName)` (`model-accessor.ts:40`) resolves columns via the
+**base** table only (`resolveColumn(contract, baseTable, …)`), so an MTI variant column (which lives
+on a joined variant table) is `undefined`. STI variant columns live on the base table → they resolve
+→ the STI variant-`where` case works and is tested. So the spec's original AC-3 framing ("falls out
+of the joins") holds for STI but **not** MTI.
+
+**Decision (operator):** fix it in this slice — adds dispatch **D5**. Make the predicate accessor
+variant-aware: when a variant is selected, merge that variant's columns and qualify their `ColumnRef`
+against the variant table D1 already joins into the child SELECT. The merged field→column map already
+exists for the mutation path (`collection.ts` ~`:1274`); reuse the pattern for `where`.
+
+**Rejected:** defer MTI variant-field filtering to a follow-up ticket (scope AC-3 to STI). Smaller,
+but leaves an asymmetry where STI variant-`where` works and MTI silently throws.
+
+## D4 (execution-time, post-D4 discovery) — integration target: **PGlite-only; amend spec**
+
+**Discovery:** the `sql-orm-client` integration suite is **Postgres/PGlite-only** (`runtime-helpers.ts`
+imports only `postgres*`; `withDevDatabase` = PGlite) — not "both PGlite + SQLite" as the spec/plan
+stated. SQLite ORM coverage lives in a separate e2e package (`test/e2e/framework/test/sqlite/`) whose
+contract-builder has **no polymorphism support** (no `discriminator`/`variant`).
+
+**Decision (operator):** accept **PGlite-only** integration coverage for this slice and amend the
+"both targets" condition. Rationale: the emitted variant-join/projection lowering is target-agnostic,
+so PGlite already exercises the D1–D3 logic; a SQLite leg would only re-confirm the sqlite renderer
+handles an ordinary join. SQLite poly-include coverage is a **deferred follow-up**, itself gated on
+teaching the sqlite contract-builder about polymorphism.
+
+**Rejected:** build the SQLite harness now (largest scope; blocked on contract-builder polymorphism).
+
+## Non-blocking process note — stale `dist` masks the fix in integration
+
+The integration package imports the **built `dist`** of `@prisma-next/sql-orm-client`, not `src`. A
+stale `dist` makes the integration tests silently exercise pre-fix behavior. `pnpm test:integration`'s
+`pretest` runs `pnpm -w build`, so the full gate is safe; a bare `vitest` filter run is **not** —
+rebuild `@prisma-next/sql-orm-client` first.
+
+
 ## Non-blocking note — scalar reducers on polymorphic-target relations
 
 TML-2683 observes that include scalar reducers (`count()` / `sum()` / …) on a poly-target
