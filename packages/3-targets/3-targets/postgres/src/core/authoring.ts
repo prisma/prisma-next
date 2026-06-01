@@ -124,7 +124,7 @@ export const postgresAuthoringFieldPresets = {
       nativeType: 'timestamptz',
     },
   },
-  temporal: temporalAuthoringPresets({
+  temporal: /* @__PURE__ */ temporalAuthoringPresets({
     codecId: 'pg/timestamptz@1',
     nativeType: 'timestamptz',
   }),
