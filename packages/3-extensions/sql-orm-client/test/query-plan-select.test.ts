@@ -783,6 +783,208 @@ describe('M:N include correlated subquery', () => {
       BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
     );
   });
+
+  // M:N + distinct(cols) + nested non-leaf include exercises
+  // `buildDistinctNonLeafChildRowsSelect` which applies `junctionJoins` to
+  // `baseInner` — the innermost scalar SELECT inside the ROW_NUMBER wrap.
+  // This test verifies the junction join attaches to `baseInner` (not to the
+  // dedup wrapper or the outer distinct SELECT) and that the correlated WHERE
+  // is present at that same level.
+  it('attaches junction join to baseInner in M:N + distinct + nested non-leaf path', () => {
+    // Contract: parents -[M:N via parent_child]-> children (has `name` column),
+    // children -[1:N FK]-> grandchildren (child_id → id).
+    // We inline the contract to give `children` a `name` column for distinct.
+    const contract = {
+      domain: {
+        namespaces: {
+          public: {
+            id: 'public',
+            models: {
+              Parent: {
+                fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+                relations: {
+                  children: {
+                    to: { model: 'Child', namespace: 'public' },
+                    cardinality: 'N:M',
+                    on: { localFields: ['id'], targetFields: ['id'] },
+                    through: {
+                      table: 'parent_child',
+                      parentColumns: ['parent_id'],
+                      childColumns: ['child_id'],
+                      targetColumns: ['id'],
+                    },
+                  },
+                },
+                storage: { table: 'parents', fields: { id: { column: 'id' } } },
+              },
+              Child: {
+                fields: {
+                  id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+                  name: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+                },
+                relations: {},
+                storage: {
+                  table: 'children',
+                  fields: { id: { column: 'id' }, name: { column: 'name' } },
+                },
+              },
+              Grandchild: {
+                fields: {
+                  id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+                  child_id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+                },
+                relations: {},
+                storage: {
+                  table: 'grandchildren',
+                  fields: {
+                    id: { column: 'id' },
+                    child_id: { column: 'child_id' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      storage: {
+        namespaces: {
+          public: {
+            id: 'public',
+            tables: {
+              parents: {
+                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              children: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              grandchildren: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  child_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              parent_child: {
+                columns: {
+                  parent_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  child_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['parent_id', 'child_id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      },
+      capabilities: {},
+    };
+
+    // Grandchild FK include: children.id → grandchildren.child_id
+    const grandchildInclude: IncludeExpr = {
+      relationName: 'grandchildren',
+      relatedModelName: 'Grandchild',
+      relatedTableName: 'grandchildren',
+      targetColumn: 'child_id',
+      localColumn: 'id',
+      cardinality: '1:N',
+      nested: emptyState(),
+      scalar: undefined,
+      combine: undefined,
+    };
+
+    // M:N include: parents → children via parent_child, with distinct('name')
+    // and a nested non-leaf grandchild include — exercises
+    // buildDistinctNonLeafChildRowsSelect.
+    const include: IncludeExpr = {
+      relationName: 'children',
+      relatedModelName: 'Child',
+      relatedTableName: 'children',
+      targetColumn: 'id',
+      localColumn: 'id',
+      cardinality: 'N:M',
+      through: {
+        table: 'parent_child',
+        parentColumns: ['parent_id'],
+        childColumns: ['child_id'],
+        targetColumns: ['id'],
+        parentLocalColumns: ['id'],
+      },
+      nested: {
+        ...emptyState(),
+        distinct: ['name'],
+        includes: [grandchildInclude],
+      },
+      scalar: undefined,
+      combine: undefined,
+    };
+
+    const state = { ...emptyState(), includes: [include] };
+    // Cast: inline contract literal is structurally compatible but lacks
+    // generated nominal types; the cast is local to this test.
+    const plan = compileSelectWithIncludes(
+      contract as unknown as Parameters<typeof compileSelectWithIncludes>[0],
+      'parents',
+      state,
+    );
+
+    expectSelectAst(plan.ast);
+    const childrenProjection = plan.ast.projection.find((item) => item.alias === 'children');
+    expectSubqueryExpr(childrenProjection?.expr);
+
+    // Aggregate wrapper: FROM (children__rows)
+    const aggregateQuery = childrenProjection.expr.query;
+    expectDerivedTableSource(aggregateQuery.from);
+    expect(aggregateQuery.from.alias).toBe('children__rows');
+
+    // Outer distinct SELECT: FROM (children__distinct)
+    const childRows = aggregateQuery.from.query;
+    expectDerivedTableSource(childRows.from);
+    expect(childRows.from.alias).toBe('children__distinct');
+
+    // ROW_NUMBER dedup wrapper: FROM (children__ranked)
+    const innerSelect = childRows.from.query;
+    expectDerivedTableSource(innerSelect.from);
+    expect(innerSelect.from.alias).toBe('children__ranked');
+
+    // baseInner: innermost scalar SELECT — junction join must be here
+    const baseInner = innerSelect.from.query;
+
+    // Junction join attaches to baseInner, not the dedup wrapper or outer SELECT
+    expect(baseInner.joins).toHaveLength(1);
+    const junctionJoin = baseInner.joins![0]!;
+    expect(junctionJoin.joinType).toBe('inner');
+    expect(junctionJoin.lateral).toBe(false);
+    expect(junctionJoin.source).toBeInstanceOf(TableSource);
+    expect((junctionJoin.source as TableSource).name).toBe('parent_child');
+    expect(junctionJoin.on).toEqual(
+      BinaryExpr.eq(ColumnRef.of('parent_child', 'child_id'), ColumnRef.of('children', 'id')),
+    );
+
+    // Correlated WHERE is present at baseInner level
+    expect(baseInner.where).toEqual(
+      BinaryExpr.eq(ColumnRef.of('parent_child', 'parent_id'), ColumnRef.of('parents', 'id')),
+    );
+
+    // No junction join leaked to the dedup wrapper or outer distinct SELECT
+    expect(innerSelect.joins ?? []).toHaveLength(0);
+    expect(childRows.joins ?? []).toHaveLength(0);
+  });
 });
 
 describe('compileSelect MTI JOINs', () => {
