@@ -5,6 +5,7 @@ import {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
+  JoinAst,
   ListExpression,
   NotExpr,
   NullCheckExpr,
@@ -17,7 +18,12 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
-import { getTestContext, getTestContract, withPatchedDomainModels } from './helpers';
+import {
+  buildManyToManyContract,
+  getTestContext,
+  getTestContract,
+  withPatchedDomainModels,
+} from './helpers';
 import { unboundTables } from './unbound-tables';
 
 describe('createModelAccessor', () => {
@@ -475,6 +481,180 @@ describe('createModelAccessor', () => {
 
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,
+      );
+    });
+  });
+
+  describe('M:N relation filters via junction', () => {
+    it('some() emits EXISTS through junction (single-key)', () => {
+      const contract = buildManyToManyContract({
+        junctionTable: 'parent_children',
+        parentColumns: ['parent_id'],
+        childColumns: ['child_id'],
+        targetColumns: ['id'],
+      });
+      const accessor = createModelAccessor(
+        { ...getTestContext(), contract } as never,
+        'Parent',
+      ) as unknown as Record<string, { some: (pred?: unknown) => unknown }>;
+
+      const expr = accessor['children']!.some() as ExistsExpr;
+
+      expect(expr.notExists).toBe(false);
+      expect(expr.subquery.from).toEqual(TableSource.named('children'));
+      expect(expr.subquery.joins).toEqual([
+        JoinAst.inner(
+          TableSource.named('parent_children'),
+          BinaryExpr.eq(
+            ColumnRef.of('parent_children', 'child_id'),
+            ColumnRef.of('children', 'id'),
+          ),
+        ),
+      ]);
+      expect(expr.subquery.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('parent_children', 'parent_id'), ColumnRef.of('parents', 'id')),
+      );
+    });
+
+    it('some(pred) AND-s junction correlation with predicate', () => {
+      const contract = buildManyToManyContract({
+        junctionTable: 'parent_children',
+        parentColumns: ['parent_id'],
+        childColumns: ['child_id'],
+        targetColumns: ['id'],
+      });
+      const accessor = createModelAccessor(
+        { ...getTestContext(), contract } as never,
+        'Parent',
+      ) as unknown as Record<string, { some: (pred: (c: unknown) => unknown) => unknown }>;
+
+      const expr = accessor['children']!.some((c: unknown) =>
+        (c as Record<string, { eq: (v: unknown) => unknown }>)['id']!.eq(42),
+      ) as ExistsExpr;
+
+      expect(expr.notExists).toBe(false);
+      expect(expr.subquery.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(
+            ColumnRef.of('parent_children', 'parent_id'),
+            ColumnRef.of('parents', 'id'),
+          ),
+          BinaryExpr.eq(
+            ColumnRef.of('children', 'id'),
+            ParamRef.of(42, { codec: { codecId: 'pg/int4@1' } }),
+          ),
+        ]),
+      );
+    });
+
+    it('none() emits NOT EXISTS through junction', () => {
+      const contract = buildManyToManyContract({
+        junctionTable: 'parent_children',
+        parentColumns: ['parent_id'],
+        childColumns: ['child_id'],
+        targetColumns: ['id'],
+      });
+      const accessor = createModelAccessor(
+        { ...getTestContext(), contract } as never,
+        'Parent',
+      ) as unknown as Record<string, { none: (pred?: unknown) => unknown }>;
+
+      const expr = accessor['children']!.none() as ExistsExpr;
+      expect(expr.notExists).toBe(true);
+      expect(expr.subquery.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('parent_children', 'parent_id'), ColumnRef.of('parents', 'id')),
+      );
+    });
+
+    it('every(pred) emits NOT EXISTS(… AND NOT(pred)) through junction', () => {
+      const contract = buildManyToManyContract({
+        junctionTable: 'parent_children',
+        parentColumns: ['parent_id'],
+        childColumns: ['child_id'],
+        targetColumns: ['id'],
+      });
+      const accessor = createModelAccessor(
+        { ...getTestContext(), contract } as never,
+        'Parent',
+      ) as unknown as Record<string, { every: (pred: (c: unknown) => unknown) => unknown }>;
+
+      const expr = accessor['children']!.every((c: unknown) =>
+        (c as Record<string, { eq: (v: unknown) => unknown }>)['id']!.eq(99),
+      ) as ExistsExpr;
+
+      expect(expr.notExists).toBe(true);
+      expect(expr.subquery.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(
+            ColumnRef.of('parent_children', 'parent_id'),
+            ColumnRef.of('parents', 'id'),
+          ),
+          new NotExpr(
+            BinaryExpr.eq(
+              ColumnRef.of('children', 'id'),
+              ParamRef.of(99, { codec: { codecId: 'pg/int4@1' } }),
+            ),
+          ),
+        ]),
+      );
+    });
+
+    it('every({}) is vacuously true for M:N relations', () => {
+      const contract = buildManyToManyContract({
+        junctionTable: 'parent_children',
+        parentColumns: ['parent_id'],
+        childColumns: ['child_id'],
+        targetColumns: ['id'],
+      });
+      const accessor = createModelAccessor(
+        { ...getTestContext(), contract } as never,
+        'Parent',
+      ) as unknown as Record<string, { every: (pred: unknown) => unknown }>;
+
+      expect(accessor['children']!.every({})).toEqual(AndExpr.true());
+    });
+
+    it('some() emits EXISTS with composite-key AND-ed junction join', () => {
+      const contract = buildManyToManyContract({
+        junctionTable: 'parent_children',
+        parentColumns: ['tenant_id', 'parent_id'],
+        childColumns: ['tenant_id', 'child_id'],
+        targetColumns: ['tenant_id', 'id'],
+        localFields: ['tenant_id', 'id'],
+      });
+      const accessor = createModelAccessor(
+        { ...getTestContext(), contract } as never,
+        'Parent',
+      ) as unknown as Record<string, { some: () => unknown }>;
+
+      const expr = accessor['children']!.some() as ExistsExpr;
+
+      expect(expr.subquery.joins).toEqual([
+        JoinAst.inner(
+          TableSource.named('parent_children'),
+          AndExpr.of([
+            BinaryExpr.eq(
+              ColumnRef.of('parent_children', 'tenant_id'),
+              ColumnRef.of('children', 'tenant_id'),
+            ),
+            BinaryExpr.eq(
+              ColumnRef.of('parent_children', 'child_id'),
+              ColumnRef.of('children', 'id'),
+            ),
+          ]),
+        ),
+      ]);
+      expect(expr.subquery.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(
+            ColumnRef.of('parent_children', 'tenant_id'),
+            ColumnRef.of('parents', 'tenant_id'),
+          ),
+          BinaryExpr.eq(
+            ColumnRef.of('parent_children', 'parent_id'),
+            ColumnRef.of('parents', 'id'),
+          ),
+        ]),
       );
     });
   });

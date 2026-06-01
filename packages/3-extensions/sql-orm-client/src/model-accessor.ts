@@ -8,6 +8,7 @@ import {
   type CodecRef,
   ColumnRef,
   ExistsExpr,
+  JoinAst,
   ProjectionItem,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -30,6 +31,13 @@ import {
 } from './types';
 
 type ResolvedModelRelation = ReturnType<typeof resolveModelRelations>[string];
+type ResolvedModelRelationWithThrough = ResolvedModelRelation & {
+  through: NonNullable<ResolvedModelRelation['through']>;
+};
+
+function hasThrough(relation: ResolvedModelRelation): relation is ResolvedModelRelationWithThrough {
+  return relation.through !== undefined;
+}
 
 type RelationPredicateInput<TContract extends Contract<SqlStorage>, ModelName extends string> =
   | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)
@@ -233,6 +241,17 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
     readonly predicate: RelationPredicateInput<TContract, string> | undefined;
   },
 ): AnyExpression {
+  if (hasThrough(relation)) {
+    return buildManyToManyExistsExpr(
+      context,
+      parentModelName,
+      parentTableName,
+      relatedTableName,
+      relation,
+      options,
+    );
+  }
+
   const joinWhere = buildJoinWhere(
     context.contract,
     parentModelName,
@@ -268,6 +287,89 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
     .withWhere(subqueryWhere);
 
   return existsNot ? ExistsExpr.notExists(subquery) : ExistsExpr.exists(subquery);
+}
+
+function buildManyToManyExistsExpr<TContract extends Contract<SqlStorage>>(
+  context: ExecutionContext<TContract>,
+  parentModelName: string,
+  parentTableName: string,
+  relatedTableName: string,
+  relation: ResolvedModelRelationWithThrough,
+  options: {
+    readonly mode: 'some' | 'every' | 'none';
+    readonly predicate: RelationPredicateInput<TContract, string> | undefined;
+  },
+): AnyExpression {
+  const { through } = relation;
+  const junctionTable = through.table;
+
+  const junctionJoinOn = buildPairedColumnExprs(
+    junctionTable,
+    through.childColumns,
+    relatedTableName,
+    through.targetColumns,
+  );
+
+  const parentLocalColumns = relation.on.localFields.map((field) =>
+    resolveFieldToColumn(context.contract, parentModelName, field),
+  );
+  const junctionCorrelation = buildPairedColumnExprs(
+    junctionTable,
+    through.parentColumns,
+    parentTableName,
+    parentLocalColumns,
+  );
+
+  const childWhere = toRelationWhereExpr(context, relation.to, options.predicate);
+
+  let subqueryWhere: AnyExpression = junctionCorrelation;
+  let existsNot = false;
+
+  if (options.mode === 'every') {
+    if (!childWhere) {
+      return AndExpr.true();
+    }
+    existsNot = true;
+    subqueryWhere = and(junctionCorrelation, not(childWhere));
+  } else if (options.mode === 'none') {
+    existsNot = true;
+    if (childWhere) {
+      subqueryWhere = and(junctionCorrelation, childWhere);
+    }
+  } else if (childWhere) {
+    subqueryWhere = and(junctionCorrelation, childWhere);
+  }
+
+  const firstTargetCol = through.targetColumns[0] ?? 'id';
+  const subquery = SelectAst.from(TableSource.named(relatedTableName))
+    .withJoins([JoinAst.inner(TableSource.named(junctionTable), junctionJoinOn)])
+    .withProjection([ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, firstTargetCol))])
+    .withWhere(subqueryWhere);
+
+  return existsNot ? ExistsExpr.notExists(subquery) : ExistsExpr.exists(subquery);
+}
+
+function buildPairedColumnExprs(
+  leftTable: string,
+  leftColumns: readonly string[],
+  rightTable: string,
+  rightColumns: readonly string[],
+): AnyExpression {
+  const count = Math.min(leftColumns.length, rightColumns.length);
+  if (count === 0) {
+    throw new Error('Relation metadata is missing join columns');
+  }
+  const exprs: AnyExpression[] = [];
+  for (let i = 0; i < count; i++) {
+    const left = leftColumns[i];
+    const right = rightColumns[i];
+    if (!left || !right) continue;
+    exprs.push(BinaryExpr.eq(ColumnRef.of(leftTable, left), ColumnRef.of(rightTable, right)));
+  }
+  if (exprs.length === 1 && exprs[0]) {
+    return exprs[0];
+  }
+  return and(...exprs);
 }
 
 function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
