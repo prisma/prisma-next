@@ -11,7 +11,7 @@ import {
   resolveTableForContract,
   storageTableForContract,
 } from './storage-resolution';
-import type { RelationCardinalityTag } from './types';
+import type { IncludeThroughDescriptor, RelationCardinalityTag } from './types';
 
 type ModelStorageFields = Record<string, { column?: string }>;
 type ModelEntry = {
@@ -297,6 +297,7 @@ export interface ResolvedIncludeRelation {
   readonly targetColumn: string;
   readonly localColumn: string;
   readonly cardinality: RelationCardinalityTag | undefined;
+  readonly through?: IncludeThroughDescriptor;
 }
 
 export function resolveIncludeRelation(
@@ -327,6 +328,20 @@ export function resolveIncludeRelation(
     targetField,
   );
 
+  let through: IncludeThroughDescriptor | undefined;
+  if (relation.through !== undefined) {
+    const parentLocalColumns = relation.on.localFields.map((field) =>
+      resolveFieldToColumn(contract, modelName, field),
+    );
+    through = {
+      table: relation.through.table,
+      parentColumns: relation.through.parentColumns,
+      childColumns: relation.through.childColumns,
+      targetColumns: relation.through.targetColumns,
+      parentLocalColumns,
+    };
+  }
+
   return {
     relatedModelName: relation.to,
     relatedNamespaceId: relation.toNamespace,
@@ -334,6 +349,7 @@ export function resolveIncludeRelation(
     targetColumn,
     localColumn,
     cardinality: relation.cardinality,
+    ...(through !== undefined ? { through } : {}),
   };
 }
 
