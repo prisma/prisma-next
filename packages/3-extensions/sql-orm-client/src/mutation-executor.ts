@@ -8,6 +8,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import {
   getColumnToFieldMap,
   resolveFieldToColumn,
@@ -23,6 +24,8 @@ import {
 import { executeQueryPlan } from './execute-query-plan';
 import { and, shorthandToWhereExpr } from './filters';
 import {
+  compileDeleteCount,
+  compileInsertCount,
   compileInsertReturning,
   compileSelect,
   compileUpdateCount,
@@ -44,6 +47,13 @@ import type {
 } from './types';
 import { emptyState } from './types';
 
+interface JunctionThrough {
+  readonly table: string;
+  readonly parentColumns: readonly string[];
+  readonly childColumns: readonly string[];
+  readonly targetColumns: readonly string[];
+}
+
 interface RelationDefinition {
   readonly relationName: string;
   readonly relatedModelName: string;
@@ -51,6 +61,15 @@ interface RelationDefinition {
   readonly cardinality: RelationCardinalityTag | undefined;
   readonly localColumns: readonly string[];
   readonly targetColumns: readonly string[];
+  readonly through: JunctionThrough | undefined;
+}
+
+interface JunctionRelationDefinition extends RelationDefinition {
+  readonly through: JunctionThrough;
+}
+
+function hasThrough(relation: RelationDefinition): relation is JunctionRelationDefinition {
+  return relation.through !== undefined;
 }
 
 interface ParsedRelationMutation {
@@ -164,7 +183,7 @@ async function createGraph(
 ): Promise<Record<string, unknown>> {
   const contract = context.contract;
   const parsed = parseMutationInput(contract, modelName, input);
-  const { parentOwned, childOwned } = partitionByOwnership(parsed.relationMutations);
+  const { parentOwned, childOwned, junctionOwned } = partitionByOwnership(parsed.relationMutations);
 
   const scalarData = { ...parsed.scalarData };
 
@@ -200,6 +219,21 @@ async function createGraph(
     );
   }
 
+  for (const relationMutation of junctionOwned) {
+    if (relationMutation.mutation.kind === 'disconnect') {
+      throw new Error('disconnect() is only supported in update() nested mutations');
+    }
+
+    await applyJunctionOwnedMutation(
+      scope,
+      context,
+      modelName,
+      parentRow,
+      relationMutation.relation,
+      relationMutation.mutation,
+    );
+  }
+
   return parentRow;
 }
 
@@ -217,7 +251,7 @@ async function updateFirstGraph(
   }
 
   const parsed = parseMutationInput(contract, modelName, input as Record<string, unknown>);
-  const { parentOwned, childOwned } = partitionByOwnership(parsed.relationMutations);
+  const { parentOwned, childOwned, junctionOwned } = partitionByOwnership(parsed.relationMutations);
 
   const scalarData = { ...parsed.scalarData };
 
@@ -284,6 +318,17 @@ async function updateFirstGraph(
     );
   }
 
+  for (const relationMutation of junctionOwned) {
+    await applyJunctionOwnedMutation(
+      scope,
+      context,
+      modelName,
+      parentRow,
+      relationMutation.relation,
+      relationMutation.mutation,
+    );
+  }
+
   return parentRow;
 }
 
@@ -335,21 +380,31 @@ function parseMutationInput(
   };
 }
 
+interface JunctionParsedRelationMutation extends ParsedRelationMutation {
+  readonly relation: JunctionRelationDefinition;
+}
+
 function partitionByOwnership(relationMutations: readonly ParsedRelationMutation[]): {
   parentOwned: ParsedRelationMutation[];
   childOwned: ParsedRelationMutation[];
+  junctionOwned: JunctionParsedRelationMutation[];
 } {
   const parentOwned: ParsedRelationMutation[] = [];
   const childOwned: ParsedRelationMutation[] = [];
+  const junctionOwned: JunctionParsedRelationMutation[] = [];
 
   for (const relationMutation of relationMutations) {
-    if (relationMutation.relation.cardinality === 'N:1') {
-      parentOwned.push(relationMutation);
+    if (hasThrough(relationMutation.relation)) {
+      junctionOwned.push({
+        relation: relationMutation.relation,
+        mutation: relationMutation.mutation,
+      });
       continue;
     }
 
-    if (relationMutation.relation.cardinality === 'N:M') {
-      throw new Error('N:M nested mutations are not supported yet');
+    if (relationMutation.relation.cardinality === 'N:1') {
+      parentOwned.push(relationMutation);
+      continue;
     }
 
     childOwned.push(relationMutation);
@@ -358,6 +413,7 @@ function partitionByOwnership(relationMutations: readonly ParsedRelationMutation
   return {
     parentOwned,
     childOwned,
+    junctionOwned,
   };
 }
 
@@ -525,6 +581,184 @@ async function applyChildOwnedMutation(
       and(parentJoinWhere, criterionWhere),
     ]);
   }
+}
+
+async function applyJunctionOwnedMutation(
+  scope: RuntimeScope,
+  context: ExecutionContext,
+  parentModelName: string,
+  parentRow: Record<string, unknown>,
+  relation: JunctionRelationDefinition,
+  mutation: RelationMutation<Contract<SqlStorage>, string>,
+): Promise<void> {
+  const contract = context.contract;
+  const through = relation.through;
+  const parentPkValues = readJunctionParentValues(contract, parentModelName, relation, parentRow);
+
+  if (mutation.kind === 'create') {
+    for (const childInput of mutation.data) {
+      const relatedRow = await insertSingleRow(
+        scope,
+        context,
+        relation.relatedModelName,
+        blindCast<Record<string, unknown>, 'mutation create input is a plain object payload'>(
+          childInput,
+        ),
+      );
+      const targetPkValues = readJunctionTargetValues(contract, relation, relatedRow);
+      await insertJunctionLink(scope, context, through, parentPkValues, targetPkValues);
+    }
+    return;
+  }
+
+  if (mutation.kind === 'connect') {
+    for (const criterion of mutation.criteria) {
+      const targetPkValues = await resolveJunctionTargetValues(
+        scope,
+        context,
+        relation,
+        'connect',
+        criterion,
+      );
+      await insertJunctionLink(scope, context, through, parentPkValues, targetPkValues);
+    }
+    return;
+  }
+
+  if (!mutation.criteria || mutation.criteria.length === 0) {
+    throw new Error(
+      `disconnect() nested mutation for relation "${relation.relationName}" requires criterion`,
+    );
+  }
+
+  for (const criterion of mutation.criteria) {
+    const targetPkValues = await resolveJunctionTargetValues(
+      scope,
+      context,
+      relation,
+      'disconnect',
+      criterion,
+    );
+    await deleteJunctionLink(scope, context, through, parentPkValues, targetPkValues);
+  }
+}
+
+async function resolveJunctionTargetValues(
+  scope: RuntimeScope,
+  context: ExecutionContext,
+  relation: JunctionRelationDefinition,
+  kind: 'connect' | 'disconnect',
+  criterion: unknown,
+): Promise<Map<string, unknown>> {
+  const relatedRow = await findRowByCriterion(
+    scope,
+    context,
+    relation.relatedModelName,
+    blindCast<Record<string, unknown>, 'connect/disconnect criterion is a plain object'>(criterion),
+  );
+  if (!relatedRow) {
+    throw new Error(
+      `${kind}() nested mutation for relation "${relation.relationName}" did not find a matching row`,
+    );
+  }
+  return readJunctionTargetValues(context.contract, relation, relatedRow);
+}
+
+function readJunctionParentValues(
+  contract: Contract<SqlStorage>,
+  parentModelName: string,
+  relation: JunctionRelationDefinition,
+  parentRow: Record<string, unknown>,
+): Map<string, unknown> {
+  const values = new Map<string, unknown>();
+
+  for (let i = 0; i < relation.through.parentColumns.length; i++) {
+    const junctionColumn = relation.through.parentColumns[i];
+    const parentColumn = relation.localColumns[i];
+    if (!junctionColumn || !parentColumn) {
+      continue;
+    }
+
+    const parentFieldName = toFieldName(contract, parentModelName, parentColumn);
+    const parentValue = parentRow[parentFieldName];
+    if (parentValue === undefined) {
+      throw new Error(
+        `Nested mutation requires parent field "${parentFieldName}" to be present in returned row`,
+      );
+    }
+
+    values.set(junctionColumn, parentValue);
+  }
+
+  return values;
+}
+
+function readJunctionTargetValues(
+  contract: Contract<SqlStorage>,
+  relation: JunctionRelationDefinition,
+  relatedRow: Record<string, unknown>,
+): Map<string, unknown> {
+  const values = new Map<string, unknown>();
+
+  for (let i = 0; i < relation.through.childColumns.length; i++) {
+    const junctionColumn = relation.through.childColumns[i];
+    const targetColumn = relation.through.targetColumns[i];
+    if (!junctionColumn || !targetColumn) {
+      continue;
+    }
+
+    const targetFieldName = toFieldName(contract, relation.relatedModelName, targetColumn);
+    const targetValue = relatedRow[targetFieldName];
+    if (targetValue === undefined) {
+      throw new Error(
+        `Nested mutation requires target field "${targetFieldName}" to be present in returned row`,
+      );
+    }
+
+    values.set(junctionColumn, targetValue);
+  }
+
+  return values;
+}
+
+async function insertJunctionLink(
+  scope: RuntimeScope,
+  context: ExecutionContext,
+  through: JunctionThrough,
+  parentPkValues: Map<string, unknown>,
+  targetPkValues: Map<string, unknown>,
+): Promise<void> {
+  const junctionRow: Record<string, unknown> = {};
+  for (const [column, value] of parentPkValues.entries()) {
+    junctionRow[column] = value;
+  }
+  for (const [column, value] of targetPkValues.entries()) {
+    junctionRow[column] = value;
+  }
+
+  const compiled = compileInsertCount(context.contract, through.table, [junctionRow]);
+  await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
+}
+
+async function deleteJunctionLink(
+  scope: RuntimeScope,
+  context: ExecutionContext,
+  through: JunctionThrough,
+  parentPkValues: Map<string, unknown>,
+  targetPkValues: Map<string, unknown>,
+): Promise<void> {
+  const exprs: AnyExpression[] = [];
+  for (const [column, value] of parentPkValues.entries()) {
+    exprs.push(BinaryExpr.eq(ColumnRef.of(through.table, column), LiteralExpr.of(value)));
+  }
+  for (const [column, value] of targetPkValues.entries()) {
+    exprs.push(BinaryExpr.eq(ColumnRef.of(through.table, column), LiteralExpr.of(value)));
+  }
+
+  const first = exprs[0];
+  const where = exprs.length === 1 && first !== undefined ? first : and(...exprs);
+  const compiled = compileDeleteCount(context.contract, through.table, [where]);
+  await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 }
 
 function readParentColumnValues(
@@ -701,6 +935,14 @@ function getRelationDefinitions(
     targetColumns: relation.on.targetFields.map((f) =>
       resolveFieldToColumn(contract, relation.to, f),
     ),
+    through: relation.through
+      ? {
+          table: relation.through.table,
+          parentColumns: relation.through.parentColumns,
+          childColumns: relation.through.childColumns,
+          targetColumns: relation.through.targetColumns,
+        }
+      : undefined,
   }));
 
   perContract.set(modelName, definitions);
