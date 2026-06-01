@@ -59,6 +59,26 @@ const posts = await db.Post
   .all();
 ```
 
+## Pagination
+
+`.orderBy(...)` accepts model-accessor callbacks that return `OrderByItem`s via the column's `.asc()` / `.desc()` helpers:
+
+```ts
+const posts = await db.Post
+  .orderBy((post) => post.createdAt.desc())
+  .take(10)
+  .all();
+```
+
+Integrations that own pagination — Relay-style backward cursor pagination, REST list endpoints — need to flip the user's sort order. `OrderByItem` is re-exported from this package and exposes `.reverse()`, which returns a new frozen item with the direction flipped and the expression unchanged:
+
+```ts
+import type { OrderByItem } from '@prisma-next/sql-orm-client';
+
+// Backward page: reverse every order item, fetch, then re-reverse the rows.
+const backward = (items: readonly OrderByItem[]) => items.map((item) => item.reverse());
+```
+
 ## Codec Roundtrip
 
 The runtime always awaits codec query-time methods, but rows yielded to user code carry **plain field values** — no `Promise`-typed fields ever reach `.first()` / `.all()` / streaming consumers, regardless of whether a column's codec is sync or async. This is true for both one-shot and streaming usage:
