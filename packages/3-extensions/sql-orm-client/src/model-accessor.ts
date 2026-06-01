@@ -19,6 +19,8 @@ import {
   resolveFieldToColumn,
   resolveModelRelations,
   resolveModelTableName,
+  resolveVariantFieldColumns,
+  type VariantColumnRef,
 } from './collection-contract';
 import { and, not } from './filters';
 import { storageTableForContract, tableSourceForContract } from './storage-resolution';
@@ -40,11 +42,24 @@ type NamedOp = readonly [name: string, entry: SqlOperationEntry];
 export function createModelAccessor<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
->(context: ExecutionContext<TContract>, modelName: ModelName): ModelAccessor<TContract, ModelName> {
+>(
+  context: ExecutionContext<TContract>,
+  modelName: ModelName,
+  variantName?: string,
+): ModelAccessor<TContract, ModelName> {
   const contract = context.contract;
   const fieldToColumn = getFieldToColumnMap(contract, modelName);
   const tableName = resolveModelTableName(contract, modelName);
   const modelRelations = resolveModelRelations(contract, modelName);
+  // When a variant is selected, MTI variant-owned fields resolve to a
+  // `ColumnRef` qualified against the variant table the read path joins into
+  // the correlated child SELECT. STI variant columns live on the base table
+  // and never appear here, so base resolution is untouched. Gating strictly
+  // on `variantName` keeps the common base-predicate path byte-for-byte
+  // unchanged.
+  const variantFieldColumns: Record<string, VariantColumnRef> = variantName
+    ? resolveVariantFieldColumns(contract, modelName, variantName)
+    : {};
 
   const opsByCodecId = new Map<string, NamedOp[]>();
 
@@ -84,8 +99,10 @@ export function createModelAccessor<
         return createRelationFilterAccessor(context, modelName, tableName, relation);
       }
 
-      const columnName = fieldToColumn[prop] ?? prop;
-      const column = resolveColumn(contract, tableName, columnName);
+      const variantField = variantFieldColumns[prop];
+      const resolvedTable = variantField?.table ?? tableName;
+      const columnName = variantField?.column ?? fieldToColumn[prop] ?? prop;
+      const column = resolveColumn(contract, resolvedTable, columnName);
       // Unknown fields return `undefined`, matching plain JS object semantics.
       // The `ModelAccessor<TContract, ModelName>` type already rejects typos
       // at compile time for TS consumers, and contexts that iterate accessor
@@ -96,9 +113,9 @@ export function createModelAccessor<
       }
       const traits = context.codecDescriptors.descriptorFor(column.codecId)?.traits ?? [];
       const operations = opsByCodecId.get(column.codecId) ?? [];
-      const codec = codecRefForStorageColumn(contract.storage, tableName, columnName);
+      const codec = codecRefForStorageColumn(contract.storage, resolvedTable, columnName);
       return createScalarFieldAccessor(
-        tableName,
+        resolvedTable,
         columnName,
         column.codecId,
         column.nullable,

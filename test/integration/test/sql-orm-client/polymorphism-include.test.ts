@@ -354,6 +354,36 @@ describe('integration/polymorphism-include', () => {
   );
 
   it(
+    'an MTI variant-specific where on a poly include refinement filters by the variant table column',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        await setupMtiIncludeSchema(runtime);
+        await seedMtiIncludeData(runtime);
+
+        const projects = createProjectCollection(runtime);
+        // `priority` is the Feature (MTI) variant column — it lives on the
+        // joined `features` table, not the base `tasks` table. Filtering on it
+        // confirms the predicate accessor names the variant column against the
+        // joined variant table inside the correlated child SELECT.
+        const rows = await projects
+          .include('tasks', (tasks) =>
+            tasks.variant('Feature').where((task) => task.priority.gte(3)),
+          )
+          .all()
+          .toArray();
+
+        const roadmap = rows.find((r) => r['id'] === 1)!;
+        const tasks = roadmap['tasks'] as Record<string, unknown>[];
+        // Seed has Feature id=3 (priority 1) and id=4 (priority 3); only id=4
+        // passes priority >= 3.
+        expect(tasks).toHaveLength(1);
+        expect(tasks[0]).toMatchObject({ id: 4, type: 'feature', priority: 3 });
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
     'a variant-narrowed include returns only that variant',
     async () => {
       await withCollectionRuntime(async (runtime) => {

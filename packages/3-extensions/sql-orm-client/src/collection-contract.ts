@@ -128,6 +128,53 @@ export function resolveFieldToColumn(
   return getFieldToColumnMap(contract, modelName)[fieldName] ?? fieldName;
 }
 
+export interface VariantColumnRef {
+  readonly table: string;
+  readonly column: string;
+}
+
+const variantFieldColumnCache = new WeakMap<
+  object,
+  Map<string, Record<string, VariantColumnRef>>
+>();
+
+/**
+ * Map the fields that an MTI variant contributes to `{ table, column }` refs
+ * qualified against the variant's own table — the table the read path joins
+ * into the correlated child SELECT. STI variants contribute nothing here:
+ * their columns live on the base table and resolve through the ordinary
+ * base-table field map. Base fields are intentionally absent so callers can
+ * gate variant qualification strictly to variant-owned fields.
+ */
+export function resolveVariantFieldColumns(
+  contract: Contract<SqlStorage>,
+  baseModelName: string,
+  variantName: string,
+): Record<string, VariantColumnRef> {
+  const cacheKey = `${baseModelName}:${variantName}`;
+  let perContract = variantFieldColumnCache.get(contract);
+  if (!perContract) {
+    perContract = new Map();
+    variantFieldColumnCache.set(contract, perContract);
+  }
+  const cached = perContract.get(cacheKey);
+  if (cached) return cached;
+
+  const polyInfo = resolvePolymorphismInfo(contract, baseModelName);
+  const variant = polyInfo?.variants.get(variantName);
+  const result: Record<string, VariantColumnRef> = {};
+
+  if (variant && variant.strategy === 'mti') {
+    const variantFieldToColumn = getFieldToColumnMap(contract, variant.modelName);
+    for (const [field, column] of Object.entries(variantFieldToColumn)) {
+      result[field] = { table: variant.table, column };
+    }
+  }
+
+  perContract.set(cacheKey, result);
+  return result;
+}
+
 export function getFieldToColumnMap(
   contract: Contract<SqlStorage>,
   modelName: string,

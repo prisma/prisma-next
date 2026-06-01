@@ -383,3 +383,40 @@ test('r.variant("Feature") on an include refinement narrows the value to the Fea
   expectTypeOf<Element>().toHaveProperty('priority');
   expectTypeOf<Element>().not.toHaveProperty('severity');
 });
+
+// ---------------------------------------------------------------------------
+// Variant-aware predicate accessor: inside `t.variant('X').where(...)` the
+// predicate model exposes variant X's fields (MTI variant columns included).
+// ---------------------------------------------------------------------------
+
+test('where after variant("Feature") exposes the MTI variant field on the predicate model', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.variant('Feature').where((task) => {
+      expectTypeOf(task).toHaveProperty('priority');
+      expectTypeOf(task).toHaveProperty('title');
+      return task.priority.gte(3);
+    }),
+  );
+});
+
+test('where after variant("Bug") exposes the Bug variant field and rejects the other variant field', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.variant('Bug').where((task) => {
+      expectTypeOf(task).toHaveProperty('severity');
+      // @ts-expect-error priority belongs to the Feature variant, not Bug
+      task.priority;
+      return task.severity.isNull();
+    }),
+  );
+});
+
+test('where without a variant exposes only base fields on the predicate model', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.where((task) => {
+      expectTypeOf(task).toHaveProperty('title');
+      // @ts-expect-error priority is an MTI variant field, absent on the base predicate model
+      task.priority;
+      return task.title.isNotNull();
+    }),
+  );
+});
