@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "mongo",
   "target": "mongo",
-  "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
+  "profileHash": "sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510",
   "roots": {
     "posts": {
       "model": "Post",
@@ -13,109 +13,115 @@
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "Post": {
-      "fields": {
-        "_id": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/objectId@1",
-            "kind": "scalar"
-          }
-        },
-        "authorId": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/objectId@1",
-            "kind": "scalar"
-          }
-        },
-        "publishedAt": {
-          "nullable": true,
-          "type": {
-            "codecId": "mongo/date@1",
-            "kind": "scalar"
-          }
-        },
-        "title": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "author": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": [
-              "authorId"
-            ],
-            "targetFields": [
-              "_id"
-            ]
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "Post": {
+            "fields": {
+              "_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/objectId@1",
+                  "kind": "scalar"
+                }
+              },
+              "authorId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/objectId@1",
+                  "kind": "scalar"
+                }
+              },
+              "publishedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "mongo/date@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "author": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "authorId"
+                  ],
+                  "targetFields": [
+                    "_id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "collection": "posts"
+            }
           },
-          "to": {
-            "model": "User",
-            "namespace": "__unbound__"
+          "User": {
+            "fields": {
+              "_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/objectId@1",
+                  "kind": "scalar"
+                }
+              },
+              "bio": {
+                "nullable": true,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "_id"
+                  ],
+                  "targetFields": [
+                    "authorId"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "collection": "users"
+            }
           }
         }
-      },
-      "storage": {
-        "collection": "posts"
-      }
-    },
-    "User": {
-      "fields": {
-        "_id": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/objectId@1",
-            "kind": "scalar"
-          }
-        },
-        "bio": {
-          "nullable": true,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "name": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "posts": {
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "_id"
-            ],
-            "targetFields": [
-              "authorId"
-            ]
-          },
-          "to": {
-            "model": "Post",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "collection": "users"
       }
     }
   },
@@ -196,7 +202,7 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:bc9b75610f1b8a7b01ed510feb08f2e896dc2ad876874f9a0883c812355fcf72"
+    "storageHash": "sha256:5a009d33405083e69af2619504032cbf6d159d02972c26898375ab46613992b5"
   },
   "capabilities": {},
   "extensionPacks": {},

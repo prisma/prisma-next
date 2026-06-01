@@ -1,4 +1,5 @@
 import { int4Column, jsonbColumn, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import { uuidv4 } from '@prisma-next/ids';
@@ -88,37 +89,47 @@ const baseContract = defineContract({
   },
 });
 
-const userModel = baseContract.models['User']!;
+const namespaceId = UNBOUND_DOMAIN_NAMESPACE_ID;
+const unboundNamespace = baseContract.domain.namespaces[namespaceId]!;
+const userModel = unboundNamespace.models['User']!;
 
 export const contract = {
   ...baseContract,
-  models: {
-    ...baseContract.models,
-    User: {
-      ...userModel,
-      fields: {
-        ...userModel.fields,
-        address: {
-          nullable: true as const,
-          type: { kind: 'valueObject' as const, name: 'Address' },
+  domain: {
+    namespaces: {
+      ...baseContract.domain.namespaces,
+      [namespaceId]: {
+        ...unboundNamespace,
+        models: {
+          ...unboundNamespace.models,
+          User: {
+            ...userModel,
+            fields: {
+              ...userModel.fields,
+              address: {
+                nullable: true as const,
+                type: { kind: 'valueObject' as const, name: 'Address' },
+              },
+            },
+          },
         },
-      },
-    },
-  },
-  valueObjects: {
-    Address: {
-      fields: {
-        street: {
-          nullable: false as const,
-          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
-        },
-        city: {
-          nullable: false as const,
-          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
-        },
-        zip: {
-          nullable: true as const,
-          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: {
+                nullable: false as const,
+                type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+              },
+              city: {
+                nullable: false as const,
+                type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+              },
+              zip: {
+                nullable: true as const,
+                type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+              },
+            },
+          },
         },
       },
     },

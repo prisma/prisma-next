@@ -6,6 +6,8 @@ function crossRef(model: string, namespace = 'default') {
   return { namespace: asNamespaceId(namespace), model };
 }
 
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type CanonicalizeContractOptions,
   canonicalizeContract as canonicalizeContractRaw,
@@ -15,7 +17,9 @@ import {
 import { createPreserveEmptyPredicate, type PathPattern } from '../src/canonicalization-path-match';
 import { createStorageSort, type NamedArraySortTarget } from '../src/canonicalization-storage-sort';
 import type { Contract } from '../src/contract-types';
+import type { ContractModelBase, ContractValueObject } from '../src/domain-types';
 import { coreHash, profileHash } from '../src/types';
+import { applicationDomainOf } from './support/application-domain-of';
 
 // Tests author JSON-clean contracts directly, so the canonicalisation
 // hook trivially passes through.
@@ -53,17 +57,39 @@ const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
 const sqlSortStorage = createStorageSort(sqlSortTargets);
 
 function minimal(overrides?: Record<string, unknown>): Contract {
+  const models = (overrides?.['models'] as Record<string, unknown> | undefined) ?? {};
+  const valueObjects = overrides?.['valueObjects'] as Record<string, unknown> | undefined;
+  const domainOverride = overrides?.['domain'];
+  const {
+    models: _models,
+    valueObjects: _valueObjects,
+    domain: _domain,
+    ...rest
+  } = overrides ?? {};
   return {
     targetFamily: 'sql',
     target: 'postgres',
     roots: {},
-    models: {},
+    domain:
+      domainOverride !== undefined
+        ? (domainOverride as Contract['domain'])
+        : applicationDomainOf({
+            models: models as Record<string, ContractModelBase>,
+            ...ifDefined(
+              'valueObjects',
+              valueObjects !== undefined
+                ? blindCast<Record<string, ContractValueObject>, 'canonicalization test fixtures'>(
+                    valueObjects,
+                  )
+                : undefined,
+            ),
+          }),
     storage: { storageHash: coreHash('sha256:stub'), namespaces: {} },
     extensionPacks: {},
     capabilities: {},
     meta: {},
     profileHash: profileHash('sha256:stub'),
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -90,6 +116,14 @@ function unboundTables(result: Record<string, unknown>): Record<string, unknown>
   return drill(result, 'storage', 'namespaces', UNBOUND, 'tables');
 }
 
+function drillDomainModel(
+  result: Record<string, unknown>,
+  modelName: string,
+  ...path: string[]
+): Record<string, unknown> {
+  return drill(result, 'domain', 'namespaces', UNBOUND, 'models', modelName, ...path);
+}
+
 describe('canonicalizeContractToObject', () => {
   it('returns an object with top-level keys in canonical order', () => {
     const result = canonicalizeContractToObject(minimal());
@@ -99,7 +133,7 @@ describe('canonicalizeContractToObject', () => {
       'target',
       'profileHash',
       'roots',
-      'models',
+      'domain',
       'storage',
       'capabilities',
       'extensionPacks',
@@ -229,7 +263,7 @@ describe('canonicalizeContractToObject', () => {
         },
       }),
     );
-    const userFields = drill(result, 'models', 'User', 'fields');
+    const userFields = drillDomainModel(result, 'User', 'fields');
     expect(Object.keys(userFields)).toEqual(['age', 'name']);
   });
 });
@@ -258,7 +292,7 @@ describe('default omission', () => {
         },
       }),
     );
-    const idField = drill(result, 'models', 'User', 'fields', 'id');
+    const idField = drillDomainModel(result, 'User', 'fields', 'id');
     expect(idField['nullable']).toBe(false);
   });
 
@@ -276,7 +310,7 @@ describe('default omission', () => {
         },
       }),
     );
-    const idField = drill(result, 'models', 'User', 'fields', 'id');
+    const idField = drillDomainModel(result, 'User', 'fields', 'id');
     expect(idField).not.toHaveProperty('generated');
   });
 
@@ -299,7 +333,7 @@ describe('default omission', () => {
 
   it('preserves required empty objects at top level', () => {
     const result = canonicalizeContractToObject(minimal());
-    expect(result['models']).toEqual({});
+    expect(drill(result, 'domain', 'namespaces', UNBOUND, 'models')).toEqual({});
     expect(result['extensionPacks']).toEqual({});
     expect(result['capabilities']).toEqual({});
     expect(result['meta']).toEqual({});
@@ -335,7 +369,7 @@ describe('default omission', () => {
         },
       }),
     );
-    const user = drill(result, 'models', 'User');
+    const user = drillDomainModel(result, 'User');
     expect(user['relations']).toEqual({});
   });
 
@@ -427,7 +461,7 @@ describe('default omission', () => {
         },
       }),
     );
-    const address = drill(result, 'models', 'Address');
+    const address = drillDomainModel(result, 'Address');
     expect(address['storage']).toEqual({});
   });
 
@@ -445,7 +479,7 @@ describe('default omission', () => {
         },
       }),
     );
-    const idField = drill(result, 'models', 'User', 'fields', 'id');
+    const idField = drillDomainModel(result, 'User', 'fields', 'id');
     expect(idField).not.toHaveProperty('extra');
   });
 
@@ -473,7 +507,7 @@ describe('default omission', () => {
         },
       }),
     );
-    const idField = drill(result, 'models', 'User', 'fields', 'id');
+    const idField = drillDomainModel(result, 'User', 'fields', 'id');
     expect(idField['default']).toBeNull();
   });
 });
@@ -539,7 +573,7 @@ describe('index and unique sorting', () => {
         },
       }),
     );
-    const field = drill(result, 'models', 'User', 'fields', 'createdAt');
+    const field = drillDomainModel(result, 'User', 'fields', 'createdAt');
     expect(field['default']).toBe(isoString);
   });
 
@@ -661,21 +695,19 @@ describe('orderTopLevel', () => {
     expect(Object.keys(result)).toEqual(['targetFamily', 'target', 'apple', 'zebra']);
   });
 
-  it('places valueObjects between models and storage', () => {
+  it('places domain before storage', () => {
     const result = orderTopLevel({
       storage: {},
-      valueObjects: { Address: { fields: {} } },
-      models: {},
+      domain: { namespaces: { [UNBOUND]: { models: {} } } },
       target: 'postgres',
     });
     const keys = Object.keys(result);
-    expect(keys.indexOf('models')).toBeLessThan(keys.indexOf('valueObjects'));
-    expect(keys.indexOf('valueObjects')).toBeLessThan(keys.indexOf('storage'));
+    expect(keys.indexOf('domain')).toBeLessThan(keys.indexOf('storage'));
   });
 });
 
 describe('canonicalize with valueObjects', () => {
-  it('includes valueObjects in canonicalized output when present', () => {
+  it('includes valueObjects under domain.namespaces when present', () => {
     const contract = minimal({
       valueObjects: {
         Address: {
@@ -687,29 +719,22 @@ describe('canonicalize with valueObjects', () => {
       },
     });
     const result = canonicalizeContractToObject(contract);
-    expect(result).toHaveProperty('valueObjects');
-    const vo = result['valueObjects'] as Record<string, unknown>;
+    const vo = drill(result, 'domain', 'namespaces', UNBOUND, 'valueObjects');
     expect(vo).toHaveProperty('Address');
   });
 
-  it('omits valueObjects from output when undefined', () => {
+  it('omits valueObjects from namespace output when absent', () => {
     const contract = minimal();
     const result = canonicalizeContractToObject(contract);
-    expect(result).not.toHaveProperty('valueObjects');
+    const ns = drill(result, 'domain', 'namespaces', UNBOUND);
+    expect(ns).not.toHaveProperty('valueObjects');
   });
 });
 
 describe('domain plane', () => {
-  it('preserves domain types and empty typeParams', () => {
-    const result = canonicalizeContractToObject(
-      minimal({ domain: { auth: { types: { Embedding: { typeParams: {} } } } } }),
-    );
-    expect(drill(result, 'domain', 'auth', 'types', 'Embedding')['typeParams']).toEqual({});
-  });
-
-  it('omits domain from output when undefined', () => {
+  it('emits domain.namespaces in canonical output', () => {
     const result = canonicalizeContractToObject(minimal());
-    expect(result).not.toHaveProperty('domain');
+    expect(drill(result, 'domain', 'namespaces', UNBOUND, 'models')).toEqual({});
   });
 });
 

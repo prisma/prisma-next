@@ -1674,10 +1674,18 @@ export function interpretPslDocumentToSqlContract(
     })),
   });
 
-  let patchedModels = patchModelDomainFields(
-    contract.models as Record<string, ContractModel>,
-    modelResolvedFields,
-  );
+  const modelsForPatch: Record<string, ContractModel> = {};
+  for (const namespaceSlice of Object.values(contract.domain.namespaces)) {
+    for (const [modelName, model] of Object.entries(namespaceSlice.models)) {
+      if (Object.hasOwn(modelsForPatch, modelName)) {
+        throw new Error(
+          `duplicate model name "${modelName}" across domain namespaces during PSL interpretation`,
+        );
+      }
+      modelsForPatch[modelName] = model as ContractModel;
+    }
+  }
+  let patchedModels = patchModelDomainFields(modelsForPatch, modelResolvedFields);
 
   const polyDiagnostics: ContractSourceDiagnostic[] = [];
   patchedModels = resolvePolymorphism(
@@ -1708,8 +1716,27 @@ export function interpretPslDocumentToSqlContract(
   const patchedContract: Contract = {
     ...contract,
     roots: filteredRoots,
-    models: patchedModels,
-    ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
+    domain: {
+      namespaces: Object.fromEntries(
+        Object.entries(contract.domain.namespaces).map(([namespaceId, namespaceSlice]) => [
+          namespaceId,
+          {
+            models: Object.fromEntries(
+              Object.entries(namespaceSlice.models).map(([modelName, model]) => [
+                modelName,
+                patchedModels[modelName] ?? model,
+              ]),
+            ),
+            ...(namespaceSlice.valueObjects !== undefined
+              ? { valueObjects: namespaceSlice.valueObjects }
+              : {}),
+            ...(namespaceId === UNBOUND_NAMESPACE_ID && Object.keys(valueObjects).length > 0
+              ? { valueObjects }
+              : {}),
+          },
+        ]),
+      ),
+    },
   };
 
   return ok(patchedContract);

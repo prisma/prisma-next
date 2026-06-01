@@ -1,3 +1,4 @@
+import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollationOptions,
@@ -7,6 +8,7 @@ import {
   MongoStorage,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { MongoTargetContractSerializer } from '../src/core/mongo-target-contract-serializer';
 import { MongoTargetUnboundDatabase } from '../src/core/mongo-target-database';
@@ -27,7 +29,7 @@ function makeSingletonUnboundContractJson() {
         },
       },
     },
-    models: {},
+    domain: applicationDomainOf({ models: {}, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
   };
 }
 
@@ -49,12 +51,18 @@ function makeValidContractJson() {
         },
       },
     },
-    models: {
-      Item: {
-        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
-        storage: { collection: 'items' },
+    domain: applicationDomainOf({
+      models: {
+        Item: {
+          fields: {
+            _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+          },
+          relations: {},
+          storage: { collection: 'items' },
+        },
       },
-    },
+      namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+    }),
   };
 }
 
@@ -142,14 +150,18 @@ describe('MongoTargetContractSerializer', () => {
             },
           },
         },
-        models: {
-          Item: {
-            fields: {
-              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+        domain: applicationDomainOf({
+          models: {
+            Item: {
+              fields: {
+                _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              },
+              relations: {},
+              storage: { collection: 'items' },
             },
-            storage: { collection: 'items' },
           },
-        },
+          namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+        }),
       };
     }
 

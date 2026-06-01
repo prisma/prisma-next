@@ -3,6 +3,7 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -28,7 +29,7 @@ const extensionContract: Contract<SqlStorage> = {
     },
   }),
   roots: {},
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
   capabilities: {},
   extensionPacks: {},
   meta: {},

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 import {
   createPostgresTestContext,
+  modelsOf,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
   postgresTarget,
@@ -162,7 +163,10 @@ model Post {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+      const models = modelsOf(result.value) as Record<
+        string,
+        { relations?: Record<string, unknown> }
+      >;
       expect(models['User']?.relations).toMatchObject({
         posts: {
           cardinality: '1:N',

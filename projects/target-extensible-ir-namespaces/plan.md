@@ -2,146 +2,130 @@
 
 **Spec:** [`projects/target-extensible-ir-namespaces/spec.md`](./spec.md)
 **Linear Project:** [Target-Extensible IR + Namespaces](https://linear.app/prisma-company/project/target-extensible-ir-namespaces-fd69eff8aec6)
-**Purpose** _(from spec)_: Make first-class namespaces and target-extensible IR usable for the downstream Supabase integration. The IR gains a pack-contributed entity-kind mechanism (proven by Postgres enum migrating off the framework-shared `types` slot); runtime SQL and the DSL/ORM surfaces qualify identifiers and dispatch through default-namespace fallback so existing single-namespace consumers experience zero breakage; the explicit namespace-aware surface (`db.sql.auth.user`) lands later as purely additive work.
+**Purpose** _(from spec)_: Make first-class namespaces and target-extensible IR usable for the downstream Supabase integration. The contract IR reaches its canonical symmetric two-plane shape; runtime SQL and the DSL/ORM surfaces qualify identifiers and dispatch through a default-namespace fallback so existing single-namespace consumers experience zero breakage; the explicit namespace-aware surface (`db.sql.auth.user`) lands later as purely additive work.
 
 ## At a glance
 
-Three units, single stack thread: **S1 (sub-project) → S2 (slice) → S3 (slice)**. S1 + S2 are the must-ship core; S3 is additive and can land independently. No parallelisation at the umbrella level — each unit gates the next on substrate, not just on convention. The umbrella plan delegates execution detail to S1 (now closed; durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)) and to S2/S3 slice specs which will be authored via `drive-specify-slice` at pickup time.
+Single sequential stack on top of the closed **contract-ir-planes** substrate ([ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)). **Storage on `main` already matches the amended ADR** (`{ storageHash, types?, namespaces }`). The **domain** plane was never wired — `models` / `valueObjects` remain flat at the contract root. A closed PR (#649) attempted to flatten storage instead; that direction was wrong (heterogeneous-map cost), and ADR 221 was amended to prescribe symmetric `{ …metadata?, namespaces }` envelopes per plane.
+
+Units are **named, not numbered** — the S-numbering drifted during replanning and bought nothing.
+
+```text
+domain-plane   →   public-by-default   →   runtime-qualification   →   explicit-dsl (deferrable)
+```
+
+One worktree + branch per slice; slice tickets at pickup.
 
 ## Composition
 
 ### Stack (deliver in order)
 
-#### S1 — contract IR planes + pack-contributed entity-kind mechanism + Postgres enum migration
+#### contract-ir-planes — two-plane IR + pack-contributed entity-kind mechanism + Postgres enum exemplar
 
-**Unit type:** Sub-project (multi-slice; closed — durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)).
+**Unit type:** Sub-project (multi-slice; **closed** — [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)).
 
-**Purpose.** Restructure the contract IR around two planes (`domain`, `storage`) with uniform `<plane>.<ns>.<entityKind>.<entityName>` indexing and canonical entity coordinates. Add the pack-contributed entity-kind descriptor mechanism. Migrate Postgres enum off the framework-shared `types` slot as the substrate's load-bearing exemplar.
+**Outcome.** Two-plane model, entity coordinate, pack-contributed entity kinds (Postgres enum exemplar), storage plane in the `{ storageHash, types?, namespaces }` envelope. Domain plane not yet wired.
 
-**Scope.** ~50 source files across framework / SQL family / Postgres target / emitter + ~10 on-disk contracts. Delivered across five merged slices; durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md).
+**Linear:** [TML-2584](https://linear.app/prisma-company/issue/TML-2584) (Done).
 
-**Linear:** [TML-2584](https://linear.app/prisma-company/issue/TML-2584). Six internal-slice tickets need creating before slice pickup (folded into the Linear audit pass).
+#### domain-plane — wire the symmetric domain plane
 
-**Depends on.** PR #534 (TML-2520) merged. Met at commit `66da80f96`.
+**Unit type:** Slice (one PR; two dispatches).
 
-**Validation gate.** Each S1 slice has its own validation gate (see S1's plan). S1 closes when all six slices land and S1's PDoD1-PDoD11 are met.
+**Purpose.** Move flat `contract.models` / `contract.valueObjects` under `contract.domain.namespaces.<ns>.{ models, valueObjects }`, matching storage's envelope. Amend consumers (emitter, validators, migration walks, fixtures). **Do not change storage** — it is already correct on `main`. Framework domain has no `types` member; doc-scoped codec aliases stay on SQL `storage.types`.
 
-**Priority.** Must-ship core (closed).
+**Linear:** [TML-2751](https://linear.app/prisma-company/issue/TML-2751) (replaces the cancelled [TML-2747](https://linear.app/prisma-company/issue/TML-2747) storage-flatten attempt).
 
-#### S2 — runtime SQL qualification + default-namespace DSL/ORM fallback
-
-**Unit type:** Slice (single PR).
-
-**Purpose.** Close the runtime loop on PR #534's namespace IR: runtime SQL emits namespace-qualified identifiers; DSL/ORM reads through per-family default-namespace fallback (`'public'` for Postgres; `'__unbound__'` for Mongo/SQLite) so legacy query code keeps working unchanged. The fallback is the load-bearing backward-compatibility mechanism.
-
-**Scope.** ~10-12 files: family façade hardcoded `defaultNamespace` constant; DSL `Db<C>` type-resolution path; ORM accessor type-resolution path; runtime SQL identifier-qualification at the relational-core / runtime layers. Slice spec authored via `drive-specify-slice` at pickup time; lands at `projects/target-extensible-ir-namespaces/slices/runtime-qualification/spec.md`.
-
-**Linear:** [TML-2605](https://linear.app/prisma-company/issue/TML-2605).
-
-**Depends on.** S1 (consumes the two-plane IR shape + entity coordinate; the qualification path needs `Storage.elementCoordinates()` to walk).
+**Depends on.** contract-ir-planes (closed).
 
 **Validation gate.**
 
-- `pnpm typecheck`
-- `pnpm test:packages`
-- `pnpm test:integration` (loads the cross-namespace FK integration test plus a new regression test demonstrating default-namespace fallback works unchanged)
-- `pnpm test:e2e`
-- `pnpm lint:deps`
-- **Project-specific check:** the demo app's `examples/prisma-next-demo/src/queries/*.ts` files compile and run unchanged after S2 lands. (Surfaces FR5 satisfaction.)
+- `pnpm typecheck` · `pnpm test:packages` · `pnpm test:integration` · `pnpm test:e2e` · `pnpm lint:deps`
+- `pnpm fixtures:check` clean after regeneration.
+- **Project-specific check:** emitted IR has `domain.namespaces.<ns>.models` (and valueObjects where present); no flat `contract.models` at root in new emissions; grep gate confirms storage still uses `storage.namespaces`.
 
 **Priority.** Must-ship core.
 
-#### S3 — explicit namespace-aware DSL/ORM surface
+#### public-by-default — Postgres `public` namespace at the PSL interpreter
 
 **Unit type:** Slice (single PR).
 
-**Purpose.** Add `db.sql.<ns>.<table>` and `db.<ns>.<Model>` for explicit multi-namespace navigation. Purely additive on S2's default-namespace fallback — non-default-namespace consumers opt in to the explicit surface; default-namespace consumers see no change.
+**Purpose.** Un-namespaced Postgres models default to `public`; `__unbound__` is explicit PSL opt-in. Removes hardcoded `"public".`-prefix logic; regenerates Postgres contract artifacts.
 
-**Scope.** ~8-10 files: DSL accessor type construction (the `Db<C>` type machinery walks `contract.<plane>.<ns>` to produce per-namespace accessors); ORM accessor type construction; runtime resolution from the explicit surface to the same identifier-qualification path S2 established. Slice spec authored via `drive-specify-slice` at pickup time; lands at `projects/target-extensible-ir-namespaces/slices/explicit-namespace-dsl/spec.md`.
+**Depends on.** domain-plane.
+
+**Validation gate.** Standard package gates + `pnpm fixtures:check`; un-namespaced Postgres model emits under `public`; `__unbound__` opt-in round-trips.
+
+**Linear:** ticket at pickup.
+
+#### runtime-qualification — runtime SQL qualification + default-namespace DSL/ORM fallback
+
+**Unit type:** Slice (single PR).
+
+**Purpose.** Runtime SQL qualifies identifiers; DSL/ORM flat surface resolves through per-family default namespace (`public` / `__unbound__`).
+
+**Linear:** [TML-2605](https://linear.app/prisma-company/issue/TML-2605).
+
+**Depends on.** domain-plane + public-by-default.
+
+#### explicit-dsl — explicit namespace-aware DSL/ORM surface
+
+**Unit type:** Slice. **Deferrable.**
+
+**Purpose.** `db.sql.<ns>.<table>`, `db.<ns>.<Model>` — additive on runtime-qualification.
 
 **Linear:** [TML-2550](https://linear.app/prisma-company/issue/TML-2550).
 
-**Depends on.** S2 (the explicit surface is additive; it reuses S2's qualification path under the hood).
-
-**Validation gate.**
-
-- `pnpm typecheck`
-- `pnpm test:packages`
-- `pnpm test:integration` (includes a multi-namespace integration test demonstrating `db.sql.auth.user` works alongside `db.sql.user` for the default namespace)
-- `pnpm test:e2e`
-- `pnpm lint:deps`
-- **Project-specific check:** demo app migrates one query from `db.sql.user` to `db.sql.public.user` (explicit-namespace form) and both forms compile + run.
-
-**Priority.** Additive (can land independently).
-
 ### Parallel groups
 
-None. Single stack thread S1 → S2 → S3.
-
-S2 cannot start until S1 ships the two-plane IR shape (S2's qualification path needs to walk `contract.storage.<ns>.<entityKind>` generically). S3 cannot start until S2 ships the qualification path (S3 builds the explicit-namespace surface on top of S2's resolution mechanism).
-
-Within S1, S1's own plan defines parallelisation opportunities (Slices 4 + 5 are parallelisable per its plan). Those are S1-internal sequencing decisions and don't surface at the umbrella level.
+None.
 
 ## Dependencies (external)
 
-- [x] **PR #534 (TML-2520) merged.** Met at commit `66da80f96`. Required base for S1.
-- [x] **Linear audit completed** 2026-05-20. Triage outcomes:
-  - **Mainline (refreshed descriptions):** TML-2584 (S1), TML-2605 (S2), TML-2550 (S3)
-  - **S1 internal slice tickets created:** TML-2622 (S1.A), TML-2623 (S1.B), TML-2624 (S1.C), TML-2625 (S1.D) — all `relatedTo` TML-2584
-  - **Subsumed by S1 (auto-close on slice PR merge):** TML-2579, TML-2580, TML-2582, TML-2545, TML-2563, TML-2586
-  - **Out-of-umbrella (stay in Linear project for discoverability):** TML-2537 (TML-2537 PSL substrate), TML-2541, TML-2542, TML-2543, TML-2540, TML-2513
-  - **No action needed:** TML-2583 (orthogonal; spec § non-goals already covers); previously-resolved TML-2459/2520/2521/2575/2576/2577/2578/2581
-- [ ] **Supabase initiative awareness.** The downstream Supabase integration consumes this umbrella's substrate. Coordinated at initiative-level — not a blocker for this umbrella, but the Supabase initiative's planning needs to know what S1 ships and when.
+- [x] **contract-ir-planes closed.** ADR 221 + storage `namespaces` envelope on `main`.
+- [x] **ADR 221 amended** — symmetric plane envelopes; framework domain has no `types`.
+- [ ] **Supabase initiative awareness** — coordinated at initiative level.
 
 ## Project-DoD coverage map
 
 | Project-DoD | Delivered by |
 |---|---|
-| **PDoD1.** All units delivered or deferred | S1 + S2 + S3 (additive; or deferred to a sibling initiative) |
-| **PDoD2.** Multi-namespace contract authorable + emittable + queryable end-to-end | S1 (authoring + emission) + S2 (queryable) |
-| **PDoD3.** Pack-contributed entity-kind substrate exercised end-to-end (Postgres enum migration) | S1 (inherits its own PDoD3) |
-| **PDoD4.** Runtime SQL identifier-qualification | S2 |
-| **PDoD5.** Existing consumers on default-namespace contracts experience zero query-API breakage | S2 (default-namespace fallback) + verified across S1+S2 landings |
-| **PDoD6.** Long-lived ADRs migrated to `docs/architecture docs/adrs/` | Close-out task; lifts ADRs from S1 + any S2/S3 ADRs |
-| **PDoD7.** Linear Project marked Completed | Close-out task (auto via PR-merge integration) |
-| **PDoD8.** Rolled-up project folders archived; umbrella folder deleted | Close-out task |
-| **PDoD9.** Repo-wide references stripped | Close-out task |
+| **PDoD1.** All must-ship units delivered; explicit-dsl delivered or deferred | domain-plane + public-by-default + runtime-qualification; explicit-dsl optional |
+| **PDoD2.** Emitted IR matches ADR 221 (symmetric `domain` + `storage` envelopes) | domain-plane |
+| **PDoD3.** Pack-contributed entity kinds (enum exemplar) | contract-ir-planes |
+| **PDoD4.** Postgres public-by-default; `__unbound__` opt-in | public-by-default |
+| **PDoD5.** Runtime SQL qualification | public-by-default + runtime-qualification |
+| **PDoD6.** Zero query-API breakage for default-namespace consumers | public-by-default + runtime-qualification |
+| **PDoD7.** Multi-namespace E2E authorable + queryable | domain-plane + runtime-qualification |
+| **PDoD8–PDoD10.** ADRs, Linear complete, folder cleanup | Close-out |
 
 ## Risks + open questions
 
-1. **S1 internal slice falsifications cascade to umbrella.** *(Resolved — S1 closed; durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md).)* S1's assumptions held without forcing an umbrella-level re-sequencing of S2 / S3.
-2. **A3 default-namespace fallback sufficiency.** If consumers start writing multi-namespace contracts before S3 lands, the flat DSL surface becomes inadequate and S3 rises in priority. Mitigation: document the namespace-aware surface as a planned addition so consumers know explicit navigation is coming.
-3. **Linear audit surfaces unexpected scope.** The Linear tickets in the project may include work that wasn't accounted for in this umbrella's three-unit composition. If audit surfaces real-scope work the umbrella missed, the plan re-opens.
+1. **Fixture churn (domain-plane + public-by-default).** Both regenerate on-disk contracts. Mitigation: `pnpm fixtures:emit` / `pnpm fixtures:check` in slice DoD.
+2. **Domain-plane blast radius.** Every consumer of `contract.models` must migrate to `contract.domain.namespaces` walks; refusal trigger if scope expands into storage reshape.
+3. **public-by-default policy.** Regenerates all Postgres contracts; upgrade instructions if downstream *source* changes.
 
 ## Sequencing visualisation
 
 ```text
-PR #534 ✓ (merged)
+contract-ir-planes   ✓ CLOSED  (ADR 221; storage.namespaces on main)
    │
    ▼
-S1 — contract-ir-planes (sub-project, 5 merged slices)   ✓ CLOSED
+domain-plane ([TML-2751](https://linear.app/prisma-company/issue/TML-2751))   ← IN PROGRESS
    │
    ▼
-S2 — runtime-qualification (slice)                       → next
+public-by-default
    │
    ▼
-S3 — explicit-namespace-dsl (slice, additive)
+runtime-qualification (TML-2605)
    │
    ▼
-Downstream: Supabase integration consumes this substrate
+explicit-dsl (deferrable, TML-2550)
 ```
 
 ## Close-out (required)
 
-- [ ] Verify all PDoDs in [`projects/target-extensible-ir-namespaces/spec.md`](./spec.md)
-- [ ] Mandatory final retro complete; output landed in canonical / project-context / ADR
-- [ ] Migrate long-lived ADRs into `docs/architecture docs/adrs/`:
-  - S1's `0001-contract-planes.md`
-  - Any S2/S3 ADRs produced during execution
-- [ ] Archive / delete rolled-up project folders with long-lived contents migrated to `docs/`:
-  - `projects/target-extensible-ir/` (substrate predecessor)
-  - `projects/namespace-exemplar/` (TML-2520 / PR #534 — predecessor)
-  - S1 sub-project (closed; folder removed at its own close-out — durable decisions migrated to [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md))
-- [ ] Strip repo-wide references to `projects/target-extensible-ir-namespaces/**` and all rolled-up sibling folders (replace with canonical `docs/` links or remove)
-- [ ] Delete `projects/target-extensible-ir-namespaces/`
-- [ ] Linear Project "Target-Extensible IR + Namespaces" marked Completed (auto via PR-merge integration when the close-out PR lands)
+- [ ] Verify all PDoDs in [`spec.md`](./spec.md)
+- [ ] Mandatory final retro; lessons in canonical surfaces
+- [ ] Archive predecessor project folders; delete `projects/target-extensible-ir-namespaces/`
+- [ ] Linear project Completed

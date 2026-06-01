@@ -1,4 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import type { ContractModelsMap } from '@prisma-next/contract/types';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { Collection } from '@prisma-next/sql-orm-client';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
@@ -11,7 +12,7 @@ import { unboundTables } from './unbound-tables';
 
 // Synthetic 36-char Tag ids — Tag.id is typed `Char<36>` in the test contract.
 const TAG_ID_1 =
-  '00000000-0000-4000-8000-000000000001' as TestContract['models']['Tag']['fields']['id']['type'] extends {
+  '00000000-0000-4000-8000-000000000001' as ContractModelsMap<TestContract>['Tag']['fields']['id']['type'] extends {
     codecId: 'sql/char@1';
   }
     ? string
@@ -26,7 +27,9 @@ const tagId = (s: string): TagId => s as unknown as TagId;
 function buildTagWithUpdatedAtContract(): TestContract {
   const contract = structuredClone(withReturningCapability(getTestContract()));
 
-  const tagModel = contract.models['Tag'] as Record<string, unknown> | undefined;
+  const tagModel = contract.domain.namespaces['__unbound__']!.models['Tag'] as
+    | Record<string, unknown>
+    | undefined;
   if (!tagModel) {
     throw new Error('Test contract is missing the Tag model');
   }

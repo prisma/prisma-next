@@ -1,4 +1,3 @@
-import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   ControlFamilyInstance,
@@ -8,6 +7,7 @@ import type {
   MigrationPlanWithAuthoringSurface,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createContractSpaceAggregate } from '../../src/aggregate/aggregate';
 import { planMigration } from '../../src/aggregate/planner';

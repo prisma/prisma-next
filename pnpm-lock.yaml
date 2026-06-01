@@ -1209,9 +1209,6 @@ importers:
         specifier: 'catalog:'
         version: 2.2.0
     devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:0.11.0
-        version: link:../../../../test/utils
       '@prisma-next/tsconfig':
         specifier: workspace:0.11.0
         version: link:../../../0-config/tsconfig
@@ -1703,6 +1700,9 @@ importers:
         specifier: ^3.8.3
         version: 3.8.3
     devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:0.11.0
+        version: link:../../../../test/utils
       '@prisma-next/tsconfig':
         specifier: workspace:0.11.0
         version: link:../../../0-config/tsconfig
@@ -4537,6 +4537,13 @@ importers:
         version: 8.20.0
 
   test/utils:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:0.11.0
+        version: link:../../packages/1-framework/0-foundation/contract
+      '@prisma-next/utils':
+        specifier: workspace:0.11.0
+        version: link:../../packages/1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:0.11.0
@@ -11613,7 +11620,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@types/node@25.6.0)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.13(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.8.4))
+      vitest: 4.1.6(@types/node@25.6.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.13(@types/node@25.6.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.8.4))
 
   '@vitest/expect@4.1.6':
     dependencies:

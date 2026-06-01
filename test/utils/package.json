@@ -12,6 +12,10 @@
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:0.11.0",
+    "@prisma-next/utils": "workspace:0.11.0"
+  },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:0.11.0",
     "@prisma/dev": "catalog:",
@@ -26,6 +30,10 @@
     ".": {
       "types": "./dist/exports/index.d.mts",
       "import": "./dist/exports/index.mjs"
+    },
+    "./contract-factories": {
+      "types": "./dist/exports/contract-factories.d.mts",
+      "import": "./dist/exports/contract-factories.mjs"
     },
     "./column-descriptors": {
       "types": "./dist/exports/column-descriptors.d.mts",

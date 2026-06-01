@@ -10,7 +10,7 @@ import {
   resolveRowIdentityColumns,
   resolveUpsertConflictColumns,
 } from '../src/collection-contract';
-import { buildMixedPolyContract, getTestContract } from './helpers';
+import { buildMixedPolyContract, getTestContract, withPatchedDomainModels } from './helpers';
 import { unboundTables } from './unbound-tables';
 
 describe('collection-contract capability detection', () => {
@@ -86,21 +86,18 @@ describe('collection-contract capability detection', () => {
 
     expect(() => resolveIncludeRelation(contract, 'User', 'missing')).toThrow(/not found/);
 
-    const malformed = {
-      ...contract,
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          relations: {
-            posts: {
-              to: { model: 'Post', namespace: '__unbound__' },
-              on: { localFields: 'id', targetFields: ['userId'] },
-            },
+    const malformed = withPatchedDomainModels(contract, (models) => ({
+      ...models,
+      User: {
+        ...(models['User'] as Record<string, unknown>),
+        relations: {
+          posts: {
+            to: { model: 'Post', namespace: '__unbound__' },
+            on: { localFields: 'id', targetFields: ['userId'] },
           },
         },
       },
-    } as unknown as typeof contract;
+    }));
 
     expect(() => resolveIncludeRelation(malformed, 'User', 'posts')).toThrow(/not found/);
   });
@@ -108,25 +105,22 @@ describe('collection-contract capability detection', () => {
   it('resolveIncludeRelation() handles incomplete relation metadata', () => {
     const contract = getTestContract();
 
-    const incompleteRelation = {
-      ...contract,
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          relations: {
-            posts: {
-              to: { model: 'Post', namespace: '__unbound__' },
-              cardinality: 'unsupported',
-              on: {
-                localFields: [],
-                targetFields: [],
-              },
+    const incompleteRelation = withPatchedDomainModels(contract, (models) => ({
+      ...models,
+      User: {
+        ...(models['User'] as Record<string, unknown>),
+        relations: {
+          posts: {
+            to: { model: 'Post', namespace: '__unbound__' },
+            cardinality: 'unsupported',
+            on: {
+              localFields: [],
+              targetFields: [],
             },
           },
         },
       },
-    } as unknown as typeof contract;
+    }));
 
     expect(() => resolveIncludeRelation(incompleteRelation, 'User', 'posts')).toThrow(
       /incomplete join metadata/,
@@ -168,34 +162,28 @@ describe('collection-contract capability detection', () => {
 
   it('resolveModelTableName() reads from storage.table and throws for invalid values', () => {
     const contract = getTestContract();
-    const withStorageFallback = {
-      ...contract,
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          storage: {
-            ...contract.models.User.storage,
-            table: 'users_from_storage',
-          },
+    const withStorageFallback = withPatchedDomainModels(contract, (models) => ({
+      ...models,
+      User: {
+        ...(models['User'] as { storage: Record<string, unknown> }),
+        storage: {
+          ...(models['User'] as { storage: Record<string, unknown> }).storage,
+          table: 'users_from_storage',
         },
       },
-    } as unknown as typeof contract;
+    }));
 
     expect(resolveModelTableName(withStorageFallback, 'User')).toBe('users_from_storage');
 
-    const invalidStorageTable = {
-      ...contract,
-      models: {
-        ...contract.models,
-        User: {
-          ...contract.models.User,
-          storage: {
-            table: 123,
-          },
+    const invalidStorageTable = withPatchedDomainModels(contract, (models) => ({
+      ...models,
+      User: {
+        ...(models['User'] as Record<string, unknown>),
+        storage: {
+          table: 123,
         },
       },
-    } as unknown as typeof contract;
+    }));
 
     expect(() => resolveModelTableName(invalidStorageTable, 'User')).toThrow(
       'Model "User" has invalid or missing storage.table in the contract',
@@ -366,8 +354,11 @@ describe('resolvePolymorphismInfo()', () => {
 
   it('throws when a declared variant model is missing from the contract', () => {
     const contract = buildMixedPolyContract();
-    delete (contract.models as Record<string, unknown>)['Bug'];
-    expect(() => resolvePolymorphismInfo(contract, 'Task')).toThrow(
+    const withoutBug = withPatchedDomainModels(contract, (models) => {
+      const { Bug: _removed, ...rest } = models;
+      return rest;
+    });
+    expect(() => resolvePolymorphismInfo(withoutBug, 'Task')).toThrow(
       /declares variant "Bug", but that model is missing/,
     );
   });

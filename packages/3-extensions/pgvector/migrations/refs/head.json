@@ -1,4 +1,4 @@
 {
-  "hash": "sha256:06733db8971afcf2fb373dcd1278e801e9e1e083d6f07d07bc7479e143c938e3",
+  "hash": "sha256:192ac515d804995e7d81598000566a4359e1ad2c0b2ec16f8d324ab90e2407bc",
   "invariants": ["pgvector:install-vector-v1"]
 }

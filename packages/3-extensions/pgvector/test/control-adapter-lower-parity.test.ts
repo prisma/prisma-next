@@ -10,6 +10,7 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorControl from '../src/exports/control';
 import pgvectorRuntime from '../src/exports/runtime';
@@ -45,7 +46,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
 }) as PostgresContract;
 
 // Compose a stack with pgvector on both planes so the runtime and control

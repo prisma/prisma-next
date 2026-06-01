@@ -4,6 +4,7 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   contract,
@@ -157,7 +158,7 @@ describe.sequential('Schema verification after runner - integration', () => {
           },
         }),
         roots: {},
-        models: {},
+        domain: applicationDomainOf({ models: {} }),
         capabilities: {},
         extensionPacks: {},
         meta: {},
@@ -222,7 +223,7 @@ describe.sequential('Schema verification after runner - integration', () => {
           },
         }),
         roots: {},
-        models: {},
+        domain: applicationDomainOf({ models: {} }),
         capabilities: {},
         extensionPacks: {},
         meta: {},

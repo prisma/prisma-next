@@ -1,5 +1,10 @@
-import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
-import { asNamespaceId, profileHash } from '@prisma-next/contract/types';
+import {
+  asNamespaceId,
+  type ColumnDefault,
+  type Contract,
+  profileHash,
+  type StorageHashBase,
+} from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
@@ -8,6 +13,7 @@ import {
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { DefaultRenderer } from '../src/core/migrations/contract-to-schema-ir';
 import {
@@ -33,7 +39,7 @@ function wrap(storage: SqlStorage): Contract<SqlStorage> {
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage,
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
     extensionPacks: {},

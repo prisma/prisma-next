@@ -10,6 +10,7 @@ import {
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 const HOOKED_CODEC = 'cs/string@1';
@@ -33,7 +34,7 @@ function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Cont
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
       },
     }),
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
     extensionPacks: {},

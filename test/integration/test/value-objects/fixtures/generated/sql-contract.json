@@ -9,85 +9,6 @@
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "Shop": {
-      "fields": {
-        "id": {
-          "type": {
-            "kind": "scalar",
-            "codecId": "pg/int4@1"
-          },
-          "nullable": false
-        },
-        "name": {
-          "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
-        },
-        "location": {
-          "type": {
-            "kind": "valueObject",
-            "name": "Location"
-          },
-          "nullable": false
-        },
-        "notes": {
-          "type": {
-            "kind": "valueObject",
-            "name": "Location"
-          },
-          "nullable": true
-        }
-      },
-      "relations": {},
-      "storage": {
-        "table": "shop",
-        "fields": {
-          "id": {
-            "column": "id"
-          },
-          "name": {
-            "column": "name"
-          },
-          "location": {
-            "column": "location"
-          },
-          "notes": {
-            "column": "notes"
-          }
-        }
-      }
-    }
-  },
-  "valueObjects": {
-    "Location": {
-      "fields": {
-        "street": {
-          "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
-        },
-        "city": {
-          "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
-        },
-        "zip": {
-          "type": {
-            "kind": "scalar",
-            "codecId": "pg/text@1"
-          },
-          "nullable": false
-        }
-      }
-    }
-  },
   "storage": {
     "storageHash": "sha256:vo-sql-test-storage-hash",
     "namespaces": {
@@ -151,5 +72,90 @@
     }
   },
   "extensionPacks": {},
-  "meta": {}
+  "meta": {},
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "Shop": {
+            "fields": {
+              "id": {
+                "type": {
+                  "kind": "scalar",
+                  "codecId": "pg/int4@1"
+                },
+                "nullable": false
+              },
+              "name": {
+                "type": {
+                  "kind": "scalar",
+                  "codecId": "pg/text@1"
+                },
+                "nullable": false
+              },
+              "location": {
+                "type": {
+                  "kind": "valueObject",
+                  "name": "Location"
+                },
+                "nullable": false
+              },
+              "notes": {
+                "type": {
+                  "kind": "valueObject",
+                  "name": "Location"
+                },
+                "nullable": true
+              }
+            },
+            "relations": {},
+            "storage": {
+              "table": "shop",
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "location": {
+                  "column": "location"
+                },
+                "notes": {
+                  "column": "notes"
+                }
+              }
+            }
+          }
+        },
+        "valueObjects": {
+          "Location": {
+            "fields": {
+              "street": {
+                "type": {
+                  "kind": "scalar",
+                  "codecId": "pg/text@1"
+                },
+                "nullable": false
+              },
+              "city": {
+                "type": {
+                  "kind": "scalar",
+                  "codecId": "pg/text@1"
+                },
+                "nullable": false
+              },
+              "zip": {
+                "type": {
+                  "kind": "scalar",
+                  "codecId": "pg/text@1"
+                },
+                "nullable": false
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

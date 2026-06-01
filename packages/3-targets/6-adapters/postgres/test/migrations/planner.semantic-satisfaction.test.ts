@@ -6,6 +6,7 @@
  * - Unique indexes/constraints can satisfy non-unique index requirements
  * - Name differences do not cause operations to be emitted
  */
+
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
@@ -17,6 +18,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 describe('PostgresMigrationPlanner - semantic satisfaction', () => {
@@ -224,7 +226,7 @@ function createTestContract(tables: Record<string, StorageTableInput> = {}): Con
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
     roots: {},
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

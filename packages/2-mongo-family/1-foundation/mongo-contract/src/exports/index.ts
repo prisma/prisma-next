@@ -21,6 +21,7 @@ export type {
   MongoJsonValue,
   MongoModelDefinition,
   MongoModelStorage,
+  MongoModelsMap,
   MongoStorageShape,
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,

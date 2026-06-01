@@ -56,26 +56,32 @@ const contractJson = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { orders: crossRef('Order'), users: crossRef('User') },
-  models: {
-    Order: {
-      fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        department: { codecId: 'mongo/string@1', nullable: false },
-        amount: { codecId: 'mongo/double@1', nullable: false },
-        status: { codecId: 'mongo/string@1', nullable: false },
+  domain: {
+    namespaces: {
+      __unbound__: {
+        models: {
+          Order: {
+            fields: {
+              _id: { codecId: 'mongo/objectId@1', nullable: false },
+              department: { codecId: 'mongo/string@1', nullable: false },
+              amount: { codecId: 'mongo/double@1', nullable: false },
+              status: { codecId: 'mongo/string@1', nullable: false },
+            },
+            relations: {},
+            storage: { collection: 'orders' },
+          },
+          User: {
+            fields: {
+              _id: { codecId: 'mongo/objectId@1', nullable: false },
+              firstName: { codecId: 'mongo/string@1', nullable: false },
+              lastName: { codecId: 'mongo/string@1', nullable: false },
+              orderId: { codecId: 'mongo/objectId@1', nullable: false },
+            },
+            relations: {},
+            storage: { collection: 'users' },
+          },
+        },
       },
-      relations: {},
-      storage: { collection: 'orders' },
-    },
-    User: {
-      fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        firstName: { codecId: 'mongo/string@1', nullable: false },
-        lastName: { codecId: 'mongo/string@1', nullable: false },
-        orderId: { codecId: 'mongo/objectId@1', nullable: false },
-      },
-      relations: {},
-      storage: { collection: 'users' },
     },
   },
   storage: {
@@ -145,10 +151,10 @@ describe('pipeline builder integration', { timeout: timeouts.spinUpMongoMemorySe
 
       const plan = p
         .from('orders')
-        .match((f) => f.status.eq('completed'))
+        .match((f) => f['status']!.eq('completed'))
         .group((f) => ({
-          _id: f.department,
-          total: acc.sum(f.amount),
+          _id: f['department']!,
+          total: acc.sum(f['amount']!),
           orderCount: acc.count(),
         }))
         .sort({ total: -1 })
@@ -178,7 +184,7 @@ describe('pipeline builder integration', { timeout: timeouts.spinUpMongoMemorySe
         .from('orders')
         .addFields((f) => ({
           isHighValue: fn.cond(
-            fn.add(f.amount, fn.literal(0)).node,
+            fn.add(f['amount']!, fn.literal(0)).node,
             fn.literal<{ readonly codecId: 'mongo/bool@1'; readonly nullable: false }>(true),
             fn.literal<{ readonly codecId: 'mongo/bool@1'; readonly nullable: false }>(false),
           ),
@@ -209,7 +215,7 @@ describe('pipeline builder integration', { timeout: timeouts.spinUpMongoMemorySe
         .from('orders')
         .group((_f) => ({
           _id: null,
-          totalRevenue: acc.sum(_f.amount),
+          totalRevenue: acc.sum(_f['amount']!),
           count: acc.count(),
         }))
         .build();
@@ -240,15 +246,15 @@ describe('pipeline builder integration', { timeout: timeouts.spinUpMongoMemorySe
         .lookup((from) =>
           from('users')
             .on((local, foreign) => ({
-              local: local._id,
-              foreign: foreign.orderId,
+              local: local['_id']!,
+              foreign: foreign['orderId']!,
             }))
             .as('assignees'),
         )
         .unwind('assignees')
         .project((f) => ({
           department: 1 as const,
-          assignee: f.assignees,
+          assignee: f['assignees']!,
         }))
         .build();
 

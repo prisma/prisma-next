@@ -15,30 +15,35 @@ Here is a Postgres contract with two namespaces — `auth` and `public` — in t
   "targetFamily": "sql",
 
   "domain": {
-    "auth": {
-      "models":       { "User": { "fields": { /* … */ }, "relations": { /* … */ } } },
-      "valueObjects": {},
-      "types":        {}
-    },
-    "public": {
-      "models": {
-        "Post": {
-          "relations": {
-            "author": { "to": { "namespace": "auth", "model": "User" } }
-          }
-        }
+    "namespaces": {
+      "auth": {
+        "models":       { "User": { "fields": { /* … */ }, "relations": { /* … */ } } },
+        "valueObjects": {}
       },
-      "valueObjects": {},
-      "types":        { "Embedding1536": { /* codec alias */ } }
+      "public": {
+        "models": {
+          "Post": {
+            "relations": {
+              "author": { "to": { "namespace": "auth", "model": "User" } }
+            }
+          }
+        },
+        "valueObjects": {}
+      }
     }
   },
 
   "storage": {
     "storageHash": "…",
-    "auth":   { "tables": { "user": { /* columns */ } } },
-    "public": {
-      "tables": { "post": { /* columns, foreign keys */ } },
-      "enum":   { "user_role": { "kind": "postgres-enum", "values": ["admin", "member", "guest"] } }
+    "types": {
+      "Embedding1536": { /* doc-scoped codec alias — SQL family plane-level only */ }
+    },
+    "namespaces": {
+      "auth":   { "tables": { "user": { /* columns */ } } },
+      "public": {
+        "tables": { "post": { /* columns, foreign keys */ } },
+        "enum":   { "user_role": { "kind": "postgres-enum", "values": ["admin", "member", "guest"] } }
+      }
     }
   },
 
@@ -48,7 +53,7 @@ Here is a Postgres contract with two namespaces — `auth` and `public` — in t
 
 Two things to notice, because the rest of this document builds on them.
 
-**Everything lives under one of two planes.** `domain` holds the application concepts the user defines — models, value objects, type aliases. `storage` holds the family-owned persistence projection — tables for SQL, collections for Mongo, plus any kind a target pack contributes (here, Postgres's `enum`). Under each plane, the keys are namespace IDs; under each namespace, the keys are entity *kinds*; under each kind, entity *names*.
+**Everything lives under one of two planes.** `domain` holds the application concepts the user defines — models and value objects. `storage` holds the family-owned persistence projection — tables for SQL, collections for Mongo, plus any kind a target pack contributes (here, Postgres's `enum`). Each plane is shaped `{ <planeHash>?, …plane-level metadata?, namespaces: { <namespaceId>: … } }`. Under `namespaces`, each namespace envelope carries entity *kinds*; under each kind, entity *names*. Doc-scoped codec aliases (here, `Embedding1536`) live on the SQL storage plane as a `types` sibling of `namespaces` — not on the framework domain plane.
 
 **Every entity has the same four-part address.** The `User` model is `(domain, auth, models, User)`. The enum is `(storage, public, enum, user_role)`. The `post` table is `(storage, public, tables, post)`. This tuple — `(plane, namespaceId, entityKind, entityName)` — is the single way anything in the IR is identified. Because the namespace is part of the address, `auth.User` and `public.User` are two distinct models, exactly the way `auth.user` and `public.user` are two distinct tables.
 
@@ -59,7 +64,7 @@ Two things to notice, because the rest of this document builds on them.
 The contract IR is built on five structural commitments:
 
 1. **Two planes.** Entity content lives under exactly `domain` (application concepts) and `storage` (family-owned persistence). Nothing sits flat at the contract root.
-2. **One uniform shape:** `<plane>.<namespaceId>.<entityKind>.<entityName>`. The literal word `"namespaces"` never appears as an IR segment — namespace IDs are the keys directly under each plane.
+2. **One uniform plane envelope:** each plane is `{ <planeHash>?, …metadata?, namespaces: { <namespaceId>: <namespace envelope> } }`. The `namespaces` segment separates plane-level metadata (the content-addressed hash; on SQL storage only, the family-owned doc-scoped `types` map) from the open namespace map. The logical entity path is `<plane>.namespaces.<namespaceId>.<entityKind>.<entityName>`. The framework domain plane has no `types` member — codec aliases and native type registrations belong on the SQL storage plane.
 3. **One canonical address:** the entity coordinate `(plane, namespaceId, entityKind, entityName)`. Every consumer — migration diffing, planner disjoint calculation, validator collision checks, cross-plane references — identifies entities by this tuple, exposed through a polymorphic free-function walk `elementCoordinates(plane)`.
 4. **Cross-references are object pairs** — `{ namespace, model }` (or `{ namespace, table, columns }` for storage-plane references) — never dot-qualified strings, never implicit same-namespace resolution.
 5. **Target packs contribute entity kinds** through a single framework-level descriptor surface, keyed on the kind's discriminator. The framework `Namespace` interface itself carries only `{ id, kind }`; family-specific slots live on family-shaped namespace types.
@@ -87,18 +92,21 @@ Both planes use the identical indexing pattern, so a consumer learns it once and
 ```text
 contract
 ├── domain
-│   └── <namespaceId>
-│       ├── models       → { <ModelName>       → ContractModel }
-│       ├── valueObjects → { <ValueObjectName> → ContractValueObject }
-│       └── types        → { <TypeAliasName>   → ContractTypeAlias }
+│   └── namespaces
+│       └── <namespaceId>
+│           ├── models       → { <ModelName>       → ContractModel }
+│           └── valueObjects → { <ValueObjectName> → ContractValueObject }
 └── storage
-    └── <namespaceId>
-        ├── tables       → { <table_name>      → StorageTable }            // SQL family built-in
-        ├── collections  → { <collection_name> → MongoCollection }         // Mongo family built-in
-        └── enum         → { <enum_name>       → PostgresEnumStorageEntry } // Postgres pack-contributed
+    ├── storageHash
+    ├── types?                 → doc-scoped codec aliases (SQL family only; not on framework domain)
+    └── namespaces
+        └── <namespaceId>
+            ├── tables       → { <table_name>      → StorageTable }            // SQL family built-in
+            ├── collections  → { <collection_name> → MongoCollection }         // Mongo family built-in
+            └── enum         → { <enum_name>       → PostgresEnumStorageEntry } // Postgres pack-contributed
 ```
 
-An earlier candidate kept a `"namespaces"` segment — `contract.namespaces.<ns>.models` mirroring `storage.namespaces.<ns>.tables`. That repeats the word at two levels while conveying nothing extra; dropping it keeps the coordinate system without the redundancy.
+An earlier candidate dropped the `namespaces` segment and keyed namespace IDs directly under each plane — `storage.storageHash` alongside `storage.auth.tables`, and the same for `domain`. That looked like one fewer nesting level, but it mixes a **closed** set of plane-level metadata fields (the hash; on SQL storage, doc-scoped `types`) into the **open** namespace map. Every consumer then needs a denylist of reserved keys, structural sniffing to distinguish metadata from namespaces, and collision guards when a namespace id collides with a metadata name. Keeping `namespaces` as an explicit segment is the boundary between those two maps; walkers iterate `plane.namespaces` and never confuse `types` or `storageHash` with a namespace id.
 
 The coordinate `(plane, namespaceId, entityKind, entityName)` is the payoff. Without a single canonical address, every consumer reinvents what *"the same entity"* means — and the reinventions disagree. A migration planner deciding whether two operations touch the same entity needs a definition of identity that the validator's collision check and the planner's diff also share; if one consumer thinks a name alone identifies an entity and another thinks `(namespace, name)` does, the disjoint calculation is silently wrong and ships as a bug. Pinning one tuple that every consumer uses removes the class of disagreement.
 
@@ -145,11 +153,11 @@ IR constructors accept only fully-constructed `Namespace` instances — no plain
 
 ## Consequences
 
-**The IR is symmetric.** Collision-realism applies uniformly across planes, generic walkers are possible because every consumer reaches for `contract.<plane>.<ns>.<entityKind>.<entityName>`, and a flotilla of ad-hoc identity helpers (per-name global scans, mixed `(namespace, name)` pairs, string-keyed lookups, duck-typed element walks) collapses into one coordinate.
+**The IR is symmetric.** Collision-realism applies uniformly across planes, generic walkers are possible because every consumer reaches for `contract.<plane>.namespaces.<ns>.<entityKind>.<entityName>`, and a flotilla of ad-hoc identity helpers (per-name global scans, mixed `(namespace, name)` pairs, string-keyed lookups, duck-typed element walks) collapses into one coordinate.
 
 **The framework/family boundary is visible.** `domain` is framework-shaped; `storage` is family-owned. Layering violations show up as code naming the wrong plane's idioms.
 
-**Pack-contributed kinds are first-class.** Adding RLS policies, roles, sequences, or materialised views is one descriptor registration; the framework dispatches generically. A namespace-aware DSL surface (`db.auth.User`) becomes cheaper too, because it reads `domain.auth.models.User` directly with no flat-by-name collapse to invert.
+**Pack-contributed kinds are first-class.** Adding RLS policies, roles, sequences, or materialised views is one descriptor registration; the framework dispatches generically. A namespace-aware DSL surface (`db.auth.User`) becomes cheaper too, because it reads `domain.namespaces.auth.models.User` directly with no flat-by-name collapse to invert.
 
 **The contract shape — and its hashes — are part of the public contract.** Both `storageHash` and `profileHash` are content-addressed, so any change to the IR shape changes every existing contract's hashes; the emitted `contract.d.ts` shape changes with it, and downstream TypeScript that walks the IR programmatically (as opposed to authoring through handles) sees the new shape. Authoring through DSL handles is unaffected.
 
@@ -182,6 +190,9 @@ IR constructors accept only fully-constructed `Namespace` instances — no plain
 **A three-segment string ID** (`auth/postgres-enum/user_role`) as the coordinate. Rejected for the same separator-collision reasons as dot-qualified-string references.
 
 ---
+
+
+**Namespace keys directly under each plane** (`{ storageHash, types?, auth: {…}, public: {…} }` with no `namespaces` segment). Rejected. Mixes plane-level metadata into the namespace key-space (heterogeneous map). Forces reserved-key denylists, structural namespace sniffing, and collision guards; leaks SQL-family `types` into framework walking code when domain and storage share the flat pattern.
 
 ## References
 

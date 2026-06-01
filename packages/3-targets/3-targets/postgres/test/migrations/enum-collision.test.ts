@@ -6,7 +6,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry, StorageTableInput } from '@prisma-next/sql-contract/types';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { PG_ENUM_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { enumStorageCompoundKey } from '../../src/core/migrations/enum-planning';
 import { planIssues } from '../../src/core/migrations/issue-planner';
@@ -18,6 +18,7 @@ import {
 } from '../../src/core/migrations/op-factory-call';
 import { nativeEnumPlanCallStrategy } from '../../src/core/migrations/planner-strategies';
 import { PostgresSchema, PostgresUnboundSchema } from '../../src/core/postgres-schema';
+import { PG_ENUM_CODEC_ID } from '../../src/exports/codec-ids';
 import { PostgresEnumType } from '../../src/exports/types';
 
 const defaultCtx = {
@@ -63,7 +64,7 @@ function makeCollisionContract(
       },
     }),
     roots: {},
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -315,7 +316,7 @@ describe('enum namespace collision planning', () => {
           },
         }),
         roots: {},
-        models: {},
+        domain: applicationDomainOf({ models: {} }),
         capabilities: {},
         extensionPacks: {},
         meta: {},

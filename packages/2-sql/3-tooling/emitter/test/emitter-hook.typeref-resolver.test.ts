@@ -1,28 +1,10 @@
-import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
-import { normalizeRootSqlStorage } from './sql-storage-fixture';
+import { createEmitterTestContract as createContract } from './create-emitter-test-contract';
 
 // Integration test for the typeRef-resolver path: exercise the real SQL emitter walk end-to-end. Confirms that `sqlEmission.resolveFieldTypeParams` walks `storage.fields → namespace tables → columns → storage.types[ref] or namespace.types[ref]` and that the framework emit path (`generateContractDts`) consults the resolver via the `EmissionSpi.resolveFieldTypeParams` hook.
-
-function createContract(overrides: Partial<Contract>): Contract {
-  const merged = {
-    targetFamily: 'sql' as const,
-    target: 'test-db',
-    models: {},
-    roots: {},
-    storage: { tables: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    profileHash: 'sha256:test' as const,
-    ...overrides,
-  };
-  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
-  return merged as Contract;
-}
 
 const testHashes = { storageHash: 'sha256:test', profileHash: 'sha256:test' };
 

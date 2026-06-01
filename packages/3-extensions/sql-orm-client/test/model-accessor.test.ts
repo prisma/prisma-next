@@ -17,7 +17,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
-import { getTestContext, getTestContract } from './helpers';
+import { getTestContext, getTestContract, withPatchedDomainModels } from './helpers';
 import { unboundTables } from './unbound-tables';
 
 describe('createModelAccessor', () => {
@@ -228,25 +228,22 @@ describe('createModelAccessor', () => {
 
   it('throws when relation metadata is incomplete', () => {
     const base = getTestContract();
-    const brokenJoinContract = {
-      ...base,
-      models: {
-        ...base.models,
-        User: {
-          ...base.models.User,
-          relations: {
-            posts: {
-              to: { model: 'Post', namespace: '__unbound__' },
-              cardinality: '1:N',
-              on: {
-                localFields: [],
-                targetFields: [],
-              },
+    const brokenJoinContract = withPatchedDomainModels(base, (models) => ({
+      ...models,
+      User: {
+        ...(models['User'] as Record<string, unknown>),
+        relations: {
+          posts: {
+            to: { model: 'Post', namespace: '__unbound__' },
+            cardinality: '1:N',
+            on: {
+              localFields: [],
+              targetFields: [],
             },
           },
         },
       },
-    };
+    }));
 
     expect(() =>
       (
@@ -260,18 +257,21 @@ describe('createModelAccessor', () => {
 
   it('supports composite relation joins and first-target fallback projection', () => {
     const base = getTestContract();
-    const compositeContract = {
-      ...base,
-      models: {
-        ...base.models,
+    const compositeContract = withPatchedDomainModels(base, (models) => {
+      const user = models['User'] as {
+        storage: Record<string, unknown>;
+        relations: Record<string, unknown>;
+      };
+      return {
+        ...models,
         User: {
-          ...base.models.User,
+          ...user,
           storage: {
-            ...base.models.User.storage,
+            ...user.storage,
             table: 'users_alt',
           },
           relations: {
-            ...base.models.User.relations,
+            ...user.relations,
             posts: {
               to: { model: 'Post', namespace: '__unbound__' },
               cardinality: '1:N',
@@ -282,8 +282,8 @@ describe('createModelAccessor', () => {
             },
           },
         },
-      },
-    };
+      };
+    });
 
     const compositeExpr = (
       createModelAccessor(
@@ -301,18 +301,21 @@ describe('createModelAccessor', () => {
       ]),
     );
 
-    const noTargetFieldsContract = {
-      ...base,
-      models: {
-        ...base.models,
+    const noTargetFieldsContract = withPatchedDomainModels(base, (models) => {
+      const user = models['User'] as {
+        storage: Record<string, unknown>;
+        relations: Record<string, unknown>;
+      };
+      return {
+        ...models,
         User: {
-          ...base.models.User,
+          ...user,
           storage: {
-            ...base.models.User.storage,
+            ...user.storage,
             table: 'users_alt',
           },
           relations: {
-            ...base.models.User.relations,
+            ...user.relations,
             posts: {
               to: { model: 'Post', namespace: '__unbound__' },
               cardinality: '1:N',
@@ -323,8 +326,8 @@ describe('createModelAccessor', () => {
             },
           },
         },
-      },
-    };
+      };
+    });
 
     const fallbackExpr = (
       createModelAccessor(
@@ -339,19 +342,19 @@ describe('createModelAccessor', () => {
 
   it('returns undefined for fields whose storage table is not declared', () => {
     const base = getTestContract();
-    const storageFallbackContract = {
-      ...base,
-      models: {
-        ...base.models,
+    const storageFallbackContract = withPatchedDomainModels(base, (models) => {
+      const user = models['User'] as { storage: Record<string, unknown> };
+      return {
+        ...models,
         User: {
-          ...base.models.User,
+          ...user,
           storage: {
-            ...base.models.User.storage,
+            ...user.storage,
             table: 'users_storage',
           },
         },
-      },
-    };
+      };
+    });
 
     // Contract claims the User model lives in `users_storage`, but storage.tables has no entry for it. The Proxy returns undefined for fields whose column cannot be resolved, matching plain JS object semantics. Downstream consumers (or TypeScript at compile time) are responsible for noticing the missing column.
     const accessor = createModelAccessor(
@@ -363,17 +366,14 @@ describe('createModelAccessor', () => {
 
   it('resolves column when storage.table maps to a declared table with the field', () => {
     const base = getTestContract();
-    const modelNameFallbackContract = {
-      ...base,
-      models: {
-        ...base.models,
-        User: {
-          ...base.models.User,
-          storage: { table: 'users' },
-          relations: {},
-        },
+    const modelNameFallbackContract = withPatchedDomainModels(base, (models) => ({
+      ...models,
+      User: {
+        ...(models['User'] as Record<string, unknown>),
+        storage: { table: 'users' },
+        relations: {},
       },
-    };
+    }));
 
     expect(
       createModelAccessor({ ...context, contract: modelNameFallbackContract } as never, 'User')[
@@ -397,22 +397,19 @@ describe('createModelAccessor', () => {
     );
 
     const base = getTestContract();
-    const contractWithoutJoinArrays = {
-      ...base,
-      models: {
-        ...base.models,
-        User: {
-          ...base.models.User,
-          relations: {
-            posts: {
-              to: { model: 'Post', namespace: '__unbound__' },
-              cardinality: '1:N',
-              on: { localFields: [], targetFields: [] },
-            },
+    const contractWithoutJoinArrays = withPatchedDomainModels(base, (models) => ({
+      ...models,
+      User: {
+        ...(models['User'] as Record<string, unknown>),
+        relations: {
+          posts: {
+            to: { model: 'Post', namespace: '__unbound__' },
+            cardinality: '1:N',
+            on: { localFields: [], targetFields: [] },
           },
         },
       },
-    };
+    }));
 
     expect(() =>
       (

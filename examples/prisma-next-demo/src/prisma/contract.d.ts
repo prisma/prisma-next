@@ -28,6 +28,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
+  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -35,11 +36,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e75bed0cca186c56a9b3b0e93e70c90e3fec8900f565c602c229e44979e4d83d'>;
+  StorageHashBase<'sha256:e4f1d5410cd9e5aa7106d5ead1b0b14156a4adbbaab8c6bcf1841e0d0115606c'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
+  ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
+  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -580,7 +581,7 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
@@ -588,6 +589,268 @@ type ContractBase = Omit<
     readonly user: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
     readonly post: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
     readonly task: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly Bug: {
+            readonly fields: {
+              readonly severity: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly stepsToRepro: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'bug';
+              readonly fields: {
+                readonly severity: { readonly column: 'severity' };
+                readonly stepsToRepro: { readonly column: 'stepsToRepro' };
+              };
+            };
+            readonly base: {
+              readonly namespace: '__unbound__' & NamespaceId;
+              readonly model: 'Task';
+            };
+          };
+          readonly Feature: {
+            readonly fields: {
+              readonly priority: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly targetRelease: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'feature';
+              readonly fields: {
+                readonly priority: { readonly column: 'priority' };
+                readonly targetRelease: { readonly column: 'targetRelease' };
+              };
+            };
+            readonly base: {
+              readonly namespace: '__unbound__' & NamespaceId;
+              readonly model: 'Task';
+            };
+          };
+          readonly Post: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+              readonly embedding: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'User';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'post';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly title: { readonly column: 'title' };
+                readonly userId: { readonly column: 'userId' };
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly embedding: { readonly column: 'embedding' };
+              };
+            };
+          };
+          readonly Task: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly description: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly status: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly type: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'User';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'task';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly title: { readonly column: 'title' };
+                readonly description: { readonly column: 'description' };
+                readonly status: { readonly column: 'status' };
+                readonly type: { readonly column: 'type' };
+                readonly userId: { readonly column: 'userId' };
+                readonly createdAt: { readonly column: 'createdAt' };
+              };
+            };
+            readonly discriminator: { readonly field: 'type' };
+            readonly variants: {
+              readonly Bug: { readonly value: 'bug' };
+              readonly Feature: { readonly value: 'feature' };
+            };
+          };
+          readonly User: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly email: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly displayName: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+              readonly kind: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/enum@1' };
+              };
+              readonly address: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+              };
+            };
+            readonly relations: {
+              readonly posts: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'Post';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['userId'];
+                };
+              };
+              readonly tasks: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'Task';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['userId'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'user';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly email: { readonly column: 'email' };
+                readonly displayName: { readonly column: 'displayName' };
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly kind: { readonly column: 'kind' };
+                readonly address: { readonly column: 'address' };
+              };
+            };
+          };
+        };
+        readonly valueObjects: {
+          readonly Address: {
+            readonly fields: {
+              readonly street: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly city: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly zip: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly country: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+          };
+        };
+      };
+    };
   };
   readonly capabilities: {
     readonly postgres: {
@@ -702,4 +965,4 @@ type ContractBase = Omit<
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Namespaces = Contract['storage']['namespaces'];
-export type Models = Contract['models'];
+export type Models = ContractModelsMap<Contract>;

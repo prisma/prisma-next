@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "post": {
       "model": "Post",
@@ -17,412 +17,404 @@
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "Bug": {
-      "base": {
-        "model": "Task",
-        "namespace": "__unbound__"
-      },
-      "fields": {
-        "severity": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "stepsToRepro": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "severity": {
-            "column": "severity"
-          },
-          "stepsToRepro": {
-            "column": "stepsToRepro"
-          }
-        },
-        "table": "bug"
-      }
-    },
-    "Feature": {
-      "base": {
-        "model": "Task",
-        "namespace": "__unbound__"
-      },
-      "fields": {
-        "priority": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "targetRelease": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "priority": {
-            "column": "priority"
-          },
-          "targetRelease": {
-            "column": "targetRelease"
-          }
-        },
-        "table": "feature"
-      }
-    },
-    "Post": {
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "embedding": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/vector@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
-            }
-          }
-        },
-        "title": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "userId": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "user": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": [
-              "userId"
-            ],
-            "targetFields": [
-              "id"
-            ]
-          },
-          "to": {
-            "model": "User",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "createdAt"
-          },
-          "embedding": {
-            "column": "embedding"
-          },
-          "id": {
-            "column": "id"
-          },
-          "title": {
-            "column": "title"
-          },
-          "userId": {
-            "column": "userId"
-          }
-        },
-        "table": "post"
-      }
-    },
-    "Task": {
-      "discriminator": {
-        "field": "type"
-      },
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "description": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
-            }
-          }
-        },
-        "status": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "title": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "type": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "userId": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "user": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": [
-              "userId"
-            ],
-            "targetFields": [
-              "id"
-            ]
-          },
-          "to": {
-            "model": "User",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "createdAt"
-          },
-          "description": {
-            "column": "description"
-          },
-          "id": {
-            "column": "id"
-          },
-          "status": {
-            "column": "status"
-          },
-          "title": {
-            "column": "title"
-          },
-          "type": {
-            "column": "type"
-          },
-          "userId": {
-            "column": "userId"
-          }
-        },
-        "table": "task"
-      },
-      "variants": {
-        "Bug": {
-          "value": "bug"
-        },
-        "Feature": {
-          "value": "feature"
-        }
-      }
-    },
-    "User": {
-      "fields": {
-        "address": {
-          "nullable": true,
-          "type": {
-            "kind": "valueObject",
-            "name": "Address"
-          }
-        },
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "displayName": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
-            }
-          }
-        },
-        "kind": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/enum@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "posts": {
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "userId"
-            ]
-          },
-          "to": {
-            "model": "Post",
-            "namespace": "__unbound__"
-          }
-        },
-        "tasks": {
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "userId"
-            ]
-          },
-          "to": {
-            "model": "Task",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "address": {
-            "column": "address"
-          },
-          "createdAt": {
-            "column": "createdAt"
-          },
-          "displayName": {
-            "column": "displayName"
-          },
-          "email": {
-            "column": "email"
-          },
-          "id": {
-            "column": "id"
-          },
-          "kind": {
-            "column": "kind"
-          }
-        },
-        "table": "user"
-      }
-    }
-  },
-  "valueObjects": {
-    "Address": {
-      "fields": {
-        "city": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "country": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "street": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "zip": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        }
-      }
-    }
-  },
   "domain": {
-    "__unbound__": {
-      "types": {
-        "Embedding1536": {
-          "codecId": "pg/vector@1",
-          "kind": "codec-instance",
-          "nativeType": "vector",
-          "typeParams": {
-            "length": 1536
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "Bug": {
+            "base": {
+              "model": "Task",
+              "namespace": "__unbound__"
+            },
+            "fields": {
+              "severity": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "stepsToRepro": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "severity": {
+                  "column": "severity"
+                },
+                "stepsToRepro": {
+                  "column": "stepsToRepro"
+                }
+              },
+              "table": "bug"
+            }
+          },
+          "Feature": {
+            "base": {
+              "model": "Task",
+              "namespace": "__unbound__"
+            },
+            "fields": {
+              "priority": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "targetRelease": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "priority": {
+                  "column": "priority"
+                },
+                "targetRelease": {
+                  "column": "targetRelease"
+                }
+              },
+              "table": "feature"
+            }
+          },
+          "Post": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "embedding": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/vector@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "embedding": {
+                  "column": "embedding"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "table": "post"
+            }
+          },
+          "Task": {
+            "discriminator": {
+              "field": "type"
+            },
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "description": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "type": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "description": {
+                  "column": "description"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "type": {
+                  "column": "type"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "table": "task"
+            },
+            "variants": {
+              "Bug": {
+                "value": "bug"
+              },
+              "Feature": {
+                "value": "feature"
+              }
+            }
+          },
+          "User": {
+            "fields": {
+              "address": {
+                "nullable": true,
+                "type": {
+                  "kind": "valueObject",
+                  "name": "Address"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "displayName": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/enum@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "__unbound__"
+                }
+              },
+              "tasks": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "Task",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "address": {
+                  "column": "address"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "displayName": {
+                  "column": "displayName"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "kind": {
+                  "column": "kind"
+                }
+              },
+              "table": "user"
+            }
+          }
+        },
+        "valueObjects": {
+          "Address": {
+            "fields": {
+              "city": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "country": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "street": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "zip": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            }
           }
         }
       }
@@ -679,7 +671,7 @@
         "tables": {}
       }
     },
-    "storageHash": "sha256:e75bed0cca186c56a9b3b0e93e70c90e3fec8900f565c602c229e44979e4d83d",
+    "storageHash": "sha256:e4f1d5410cd9e5aa7106d5ead1b0b14156a4adbbaab8c6bcf1841e0d0115606c",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
@@ -692,7 +684,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e",
+    "executionHash": "sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e",
     "mutations": {
       "defaults": [
         {

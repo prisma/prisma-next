@@ -1,3 +1,4 @@
+import type { ContractModelsMap } from '@prisma-next/contract/types';
 import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import mongoTargetPack from '@prisma-next/target-mongo/pack';
 import { expectTypeOf } from 'vitest';
@@ -21,7 +22,7 @@ const withModel = defineContract({
   },
 });
 expectTypeOf(withModel.target).toEqualTypeOf<'mongo'>();
-expectTypeOf(withModel.models['User']).not.toBeNever();
+expectTypeOf<ContractModelsMap<typeof withModel>['User']>().not.toBeNever();
 
 // Model-shape inference flows through the return type (factory form)
 const withFactory = defineContract({}, ({ model: m, field: f }) => ({
@@ -30,4 +31,4 @@ const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   },
 }));
 expectTypeOf(withFactory.target).toEqualTypeOf<'mongo'>();
-expectTypeOf(withFactory.models['Post']).not.toBeNever();
+expectTypeOf<ContractModelsMap<typeof withFactory>['Post']>().not.toBeNever();

@@ -9,6 +9,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
+  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -16,11 +17,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:8ea47fc08b79e387a9136d5a4ac708723e4941a7b3cffe71d57ceca09229a486'>;
+  StorageHashBase<'sha256:62797f2d5fe89634e37cb97870980a71b692c2ec3047efa9cf4f335e29ee01b5'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:0903547be862dca3fa2dbc62a85cd52e9ca595f00cf43b6b26a3da3d4b9740ae'>;
+  ExecutionHashBase<'sha256:aa79980d83d295977c2ca3fd5a1407ea2bc67b4538b19971512d2f47ff71338e'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:c336398c1b6d00d93aa155a4f9072e69f55d1897ba5b9bbfd3d7d32f6b270bf4'>;
+  ProfileHashBase<'sha256:3cc333ecad9f3f4c7229370a9d2c37e908cdce0f8d2e9fb132d50605b024eff2'>;
 
 export type CodecTypes = SqliteTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -253,13 +254,117 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'sqlite';
   readonly targetFamily: 'sql';
   readonly roots: {
     readonly user: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
     readonly post: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly Post: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/datetime@1' };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'User';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'post';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly title: { readonly column: 'title' };
+                readonly userId: { readonly column: 'userId' };
+                readonly createdAt: { readonly column: 'createdAt' };
+              };
+            };
+          };
+          readonly User: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly email: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
+              };
+              readonly displayName: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/datetime@1' };
+              };
+            };
+            readonly relations: {
+              readonly posts: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'Post';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['userId'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'user';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly email: { readonly column: 'email' };
+                readonly displayName: { readonly column: 'displayName' };
+                readonly createdAt: { readonly column: 'createdAt' };
+              };
+            };
+          };
+        };
+      };
+    };
   };
   readonly capabilities: {
     readonly sql: {
@@ -296,4 +401,4 @@ type ContractBase = Omit<
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Namespaces = Contract['storage']['namespaces'];
-export type Models = Contract['models'];
+export type Models = ContractModelsMap<Contract>;

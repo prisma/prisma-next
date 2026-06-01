@@ -69,7 +69,7 @@ import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 // String constants pinned by source of truth in
@@ -163,7 +163,7 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
       },
     },
     roots: {},
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

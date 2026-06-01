@@ -6,6 +6,7 @@ import type {
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
+  MongoModelsMap,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 
@@ -13,12 +14,12 @@ type Simplify<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
 type ModelRelations<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
-> = NonNullable<TContract['models'][ModelName]['relations']>;
+  ModelName extends string & keyof MongoModelsMap<TContract>,
+> = NonNullable<MongoModelsMap<TContract>[ModelName]['relations']>;
 
 export type ReferenceRelationKeys<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
   [K in keyof ModelRelations<TContract, ModelName>]: ModelRelations<
     TContract,
@@ -30,7 +31,7 @@ export type ReferenceRelationKeys<
 
 export type EmbedRelationKeys<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
   [K in keyof ModelRelations<TContract, ModelName>]: ModelRelations<
     TContract,
@@ -42,7 +43,7 @@ export type EmbedRelationKeys<
 
 type ResolvedOutputRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = string extends keyof ExtractMongoFieldOutputTypes<TContract>
   ? InferModelRow<TContract, ModelName>
   : ModelName extends keyof ExtractMongoFieldOutputTypes<TContract>
@@ -53,7 +54,7 @@ type ResolvedOutputRow<
 
 type ResolvedInputRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = string extends keyof ExtractMongoFieldInputTypes<TContract>
   ? InferModelRow<TContract, ModelName>
   : ModelName extends keyof ExtractMongoFieldInputTypes<TContract>
@@ -63,21 +64,21 @@ type ResolvedInputRow<
     : InferModelRow<TContract, ModelName>;
 
 type RelationTargetModel<TContract extends MongoContract, R> = R extends {
-  readonly to: { readonly model: infer M extends string & keyof TContract['models'] };
+  readonly to: { readonly model: infer M extends string & keyof MongoModelsMap<TContract> };
 }
   ? M
   : never;
 
 type EmbedRelationRowType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   RelKey extends keyof ModelRelations<TContract, ModelName>,
 > = ModelRelations<TContract, ModelName>[RelKey] extends infer R
   ? R extends { readonly cardinality: infer C }
     ? ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
       ? never
       : RelationTargetModel<TContract, R> extends infer To extends string &
-            keyof TContract['models']
+            keyof MongoModelsMap<TContract>
         ? C extends '1:N'
           ? ResolvedOutputRow<TContract, To>[]
           : ResolvedOutputRow<TContract, To>
@@ -87,7 +88,7 @@ type EmbedRelationRowType<
 
 export type InferFullRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > =
   EmbedRelationKeys<TContract, ModelName> extends never
     ? ResolvedOutputRow<TContract, ModelName>
@@ -102,14 +103,14 @@ export type InferFullRow<
 
 type VariantRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
-> = TContract['models'][ModelName] extends {
+  ModelName extends string & keyof MongoModelsMap<TContract>,
+> = MongoModelsMap<TContract>[ModelName] extends {
   readonly discriminator: { readonly field: infer DiscField extends string };
   readonly variants: infer V;
 }
   ? V extends Record<string, { readonly value: string }>
     ? {
-        [VK in keyof V]: VK extends string & keyof TContract['models']
+        [VK in keyof V]: VK extends string & keyof MongoModelsMap<TContract>
           ? Simplify<
               Omit<InferFullRow<TContract, ModelName>, DiscField> &
                 InferFullRow<TContract, VK> &
@@ -122,13 +123,13 @@ type VariantRow<
 
 export type InferRootRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = VariantRow<TContract, ModelName>;
 
 export type VariantNames<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
-> = TContract['models'][ModelName] extends {
+  ModelName extends string & keyof MongoModelsMap<TContract>,
+> = MongoModelsMap<TContract>[ModelName] extends {
   readonly variants: infer V extends Record<string, unknown>;
 }
   ? keyof V & string
@@ -136,14 +137,14 @@ export type VariantNames<
 
 export type VariantModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   VariantName extends string,
-> = TContract['models'][ModelName] extends {
+> = MongoModelsMap<TContract>[ModelName] extends {
   readonly discriminator: { readonly field: infer DiscField extends string };
   readonly variants: infer V;
 }
   ? V extends Record<string, { readonly value: string }>
-    ? VariantName extends keyof V & string & keyof TContract['models']
+    ? VariantName extends keyof V & string & keyof MongoModelsMap<TContract>
       ? Simplify<
           Omit<InferFullRow<TContract, ModelName>, DiscField> &
             InferFullRow<TContract, VariantName> &
@@ -155,13 +156,13 @@ export type VariantModelRow<
 
 type IncludeRelationRowType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   RelKey extends keyof ModelRelations<TContract, ModelName>,
 > = ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
   ? ModelRelations<TContract, ModelName>[RelKey] extends infer R
     ? R extends { readonly cardinality: infer C }
       ? RelationTargetModel<TContract, R> extends infer To extends string &
-          keyof TContract['models']
+          keyof MongoModelsMap<TContract>
         ? C extends 'N:1' | '1:1'
           ? InferFullRow<TContract, To> | null
           : InferFullRow<TContract, To>[]
@@ -172,7 +173,7 @@ type IncludeRelationRowType<
 
 export type IncludeResultFields<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   TInclude extends MongoIncludeSpec<TContract, ModelName>,
 > = {
   -readonly [K in keyof TInclude & string as TInclude[K] extends true
@@ -184,10 +185,10 @@ export type IncludeResultFields<
 
 export type MongoWhereFilter<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
 > = {
-  readonly [K in keyof TContract['models'][ModelName]['fields']]?: TContract['models'][ModelName]['fields'][K] extends {
+  readonly [K in keyof MongoModelsMap<TContract>[ModelName]['fields']]?: MongoModelsMap<TContract>[ModelName]['fields'][K] extends {
     readonly type: {
       readonly kind: 'scalar';
       readonly codecId: infer CId extends string & keyof TCodecTypes;
@@ -199,7 +200,7 @@ export type MongoWhereFilter<
 
 export type MongoIncludeSpec<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
   readonly [K in ReferenceRelationKeys<TContract, ModelName>]?: true;
 };
@@ -208,18 +209,18 @@ export type NoIncludes = Pick<Record<string, boolean>, never>;
 
 export type IncludedRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
 > = InferRootRow<TContract, ModelName> & IncludeResultFields<TContract, ModelName, TIncludes>;
 
 export type DefaultModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = ResolvedOutputRow<TContract, ModelName>;
 
 export type CreateInput<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = Omit<ResolvedInputRow<TContract, ModelName>, '_id'> &
   Partial<
     Pick<
@@ -230,8 +231,8 @@ export type CreateInput<
 
 type DiscriminatorField<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
-> = TContract['models'][ModelName] extends {
+  ModelName extends string & keyof MongoModelsMap<TContract>,
+> = MongoModelsMap<TContract>[ModelName] extends {
   readonly discriminator: { readonly field: infer F extends string };
 }
   ? F
@@ -243,7 +244,7 @@ type DiscriminatorField<
 // input-side VariantModelRow.
 export type VariantCreateInput<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   VariantName extends string,
 > = Omit<
   VariantModelRow<TContract, ModelName, VariantName>,
@@ -258,7 +259,7 @@ export type VariantCreateInput<
 
 export type ResolvedCreateInput<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   TVariant extends string,
 > = [TVariant] extends [never]
   ? CreateInput<TContract, ModelName>

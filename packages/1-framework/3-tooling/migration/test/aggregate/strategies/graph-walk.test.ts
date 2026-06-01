@@ -1,4 +1,4 @@
-import { createSqlContract } from '@prisma-next/contract/testing';
+import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { graphWalkStrategy } from '../../../src/aggregate/strategies/graph-walk';
 import type { ContractSpaceMember } from '../../../src/aggregate/types';

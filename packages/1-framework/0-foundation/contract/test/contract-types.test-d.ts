@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
-import type { Contract } from '../src/contract-types';
+import type { Contract, ContractModelsMap } from '../src/contract-types';
 import type { CrossReference } from '../src/cross-reference';
 import type { ContractModel, ModelStorageBase } from '../src/domain-types';
 import type { NamespaceId } from '../src/namespace-id';
@@ -80,18 +80,20 @@ test('StorageBase with specific hash extends default StorageBase', () => {
 
 test('preserves model field literal types through TModels', () => {
   expectTypeOf<
-    ExampleContract['models']['User']['fields']['id']['type']['kind']
+    ContractModelsMap<ExampleContract>['User']['fields']['id']['type']['kind']
   >().toEqualTypeOf<'scalar'>();
 });
 
 test('preserves relation literal types through TModels', () => {
   expectTypeOf<
-    ExampleContract['models']['User']['relations']['posts']['to']
+    ContractModelsMap<ExampleContract>['User']['relations']['posts']['to']
   >().toEqualTypeOf<ExamplePostRef>();
 });
 
 test('preserves model storage bridge literals through TModels', () => {
-  expectTypeOf<ExampleContract['models']['User']['storage']['table']>().toEqualTypeOf<'user'>();
+  expectTypeOf<
+    ContractModelsMap<ExampleContract>['User']['storage']['table']
+  >().toEqualTypeOf<'user'>();
 });
 
 test('preserves storage hash literal through TStorage', () => {

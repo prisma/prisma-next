@@ -10,6 +10,7 @@ import type {
 } from '@prisma-next/mongo-contract';
 import type {
   Contract as ContractType,
+  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -17,10 +18,10 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:0274fe989c2e1be306437f06da2cc811297c1e952f2d92a7209b62c64e2a9661'>;
+  StorageHashBase<'sha256:b2b5135166e3ab47ee8cf2cac811542529234939623e7dbf95896314fca16686'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
+  ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
 
 export type CodecTypes = MongoCodecTypes;
 
@@ -308,13 +309,160 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
   readonly roots: {
     readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
     readonly posts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly Article: {
+            readonly fields: {
+              readonly summary: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: { readonly collection: 'posts' };
+            readonly base: {
+              readonly namespace: '__unbound__' & NamespaceId;
+              readonly model: 'Post';
+            };
+          };
+          readonly Post: {
+            readonly fields: {
+              readonly _id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly content: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly kind: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly authorId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
+              };
+            };
+            readonly relations: {
+              readonly author: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'User';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['authorId'];
+                  readonly targetFields: readonly ['_id'];
+                };
+              };
+            };
+            readonly storage: { readonly collection: 'posts' };
+            readonly discriminator: { readonly field: 'kind' };
+            readonly variants: {
+              readonly Article: { readonly value: 'article' };
+              readonly Tutorial: { readonly value: 'tutorial' };
+            };
+          };
+          readonly Tutorial: {
+            readonly fields: {
+              readonly difficulty: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly duration: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/int32@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: { readonly collection: 'posts' };
+            readonly base: {
+              readonly namespace: '__unbound__' & NamespaceId;
+              readonly model: 'Post';
+            };
+          };
+          readonly User: {
+            readonly fields: {
+              readonly _id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly email: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly bio: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly address: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+              };
+            };
+            readonly relations: {
+              readonly posts: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'Post';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['_id'];
+                  readonly targetFields: readonly ['authorId'];
+                };
+              };
+            };
+            readonly storage: { readonly collection: 'users' };
+          };
+        };
+        readonly valueObjects: {
+          readonly Address: {
+            readonly fields: {
+              readonly street: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly city: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly zip: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+              readonly country: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+              };
+            };
+          };
+        };
+      };
+    };
   };
   readonly capabilities: {};
   readonly extensionPacks: {};

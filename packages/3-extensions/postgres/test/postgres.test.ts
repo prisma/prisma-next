@@ -1,6 +1,6 @@
-import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { createContract } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({

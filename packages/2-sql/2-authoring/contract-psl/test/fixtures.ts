@@ -1,4 +1,6 @@
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
+import type { Contract } from '@prisma-next/contract/types';
+import { contractModels, contractValueObjects } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
@@ -10,7 +12,7 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import { freezeNode, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
 /**
@@ -487,12 +489,14 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
   };
 }
 
-export function documentScopedTypes(contract: {
-  readonly domain?: Record<string, { readonly types?: Record<string, unknown> } | undefined>;
-  readonly storage?: unknown;
-}) {
-  const storageTypes = (
-    contract.storage as { readonly types?: Record<string, unknown> } | undefined
-  )?.types;
-  return contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] ?? storageTypes;
+export function modelsOf(contract: Contract) {
+  return contractModels(contract);
+}
+
+export function valueObjectsOf(contract: Contract) {
+  return contractValueObjects(contract);
+}
+
+export function documentScopedTypes(contract: { readonly storage?: unknown }) {
+  return (contract.storage as { readonly types?: Record<string, unknown> } | undefined)?.types;
 }

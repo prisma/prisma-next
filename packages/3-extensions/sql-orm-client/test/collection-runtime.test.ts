@@ -1,3 +1,4 @@
+import { contractModels } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
 import { resolvePolymorphismInfo } from '../src/collection-contract';
@@ -208,7 +209,7 @@ describe('mapPolymorphicRow()', () => {
   it('preserves identity-mapped fields (no explicit column mapping)', () => {
     const contract = buildMixedPolyContract();
     // Remove explicit column mappings to create identity-mapped fields
-    const models = contract.models as Record<string, Record<string, unknown>>;
+    const models = contractModels(contract) as unknown as Record<string, Record<string, unknown>>;
     models['Task']!['storage'] = {
       table: 'tasks',
       fields: { id: {}, title: {}, type: {} },

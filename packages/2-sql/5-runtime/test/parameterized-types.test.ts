@@ -10,6 +10,7 @@ import {
   type SqlStorageTypeEntry,
 } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
@@ -54,7 +55,7 @@ function createParamTypesTestContract(
     targetFamily: 'sql',
     target: 'postgres',
     profileHash: profileHash('sha256:test'),
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     roots: {},
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),

@@ -17,7 +17,7 @@ import {
   MongoMigrationRunner,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
-import { timeouts } from '@prisma-next/test-utils';
+import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -45,21 +45,23 @@ function makeContract(
     target: 'mongo',
     targetFamily: 'mongo',
     roots: Object.fromEntries(Object.keys(collections).map((c) => [c, crossRef(c)])),
-    models: Object.fromEntries(
-      Object.keys(collections).map((c) => [
-        c,
-        {
-          fields: {
-            _id: {
-              nullable: false,
-              type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+    domain: applicationDomainOf({
+      models: Object.fromEntries(
+        Object.keys(collections).map((c) => [
+          c,
+          {
+            fields: {
+              _id: {
+                nullable: false,
+                type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+              },
             },
+            relations: {},
+            storage: { collection: c },
           },
-          relations: {},
-          storage: { collection: c },
-        },
-      ]),
-    ),
+        ]),
+      ),
+    }),
     storage: {
       namespaces: {
         __unbound__: {

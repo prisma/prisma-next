@@ -5,6 +5,7 @@ import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
@@ -145,7 +146,7 @@ describe('createExecutionContext — column codec integrity', () => {
       targetFamily: 'sql',
       target: 'postgres',
       profileHash: profileHash('sha256:test'),
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,
       extensionPacks: {},
@@ -302,7 +303,7 @@ describe('createExecutionContext — column codec integrity', () => {
       targetFamily: 'sql',
       target: 'postgres',
       profileHash: profileHash('sha256:test'),
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,
       extensionPacks: {},

@@ -31,41 +31,47 @@ type VOContract = MongoContractWithTypeMaps<
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
-    readonly models: {
-      readonly User: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+    readonly domain: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly models: {
+            readonly User: {
+              readonly fields: {
+                readonly _id: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+                };
+                readonly name: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+                readonly contactInfo: {
+                  readonly nullable: true;
+                  readonly type: { readonly kind: 'valueObject'; readonly name: 'ContactInfo' };
+                };
+                readonly tags: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                  readonly many: true;
+                };
+              };
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'users' };
+            };
           };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly contactInfo: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'ContactInfo' };
-          };
-          readonly tags: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-            readonly many: true;
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'users' };
-      };
-    };
-    readonly valueObjects: {
-      readonly ContactInfo: {
-        readonly fields: {
-          readonly phone: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly website: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly valueObjects: {
+            readonly ContactInfo: {
+              readonly fields: {
+                readonly phone: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+                readonly website: {
+                  readonly nullable: true;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+              };
+            };
           };
         };
       };
@@ -170,41 +176,47 @@ type VOContractWithFieldTypes = MongoContractWithTypeMaps<
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
-    readonly models: {
-      readonly User: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+    readonly domain: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly models: {
+            readonly User: {
+              readonly fields: {
+                readonly _id: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+                };
+                readonly name: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+                readonly contactInfo: {
+                  readonly nullable: true;
+                  readonly type: { readonly kind: 'valueObject'; readonly name: 'ContactInfo' };
+                };
+                readonly tags: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                  readonly many: true;
+                };
+              };
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'users' };
+            };
           };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly contactInfo: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'ContactInfo' };
-          };
-          readonly tags: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-            readonly many: true;
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'users' };
-      };
-    };
-    readonly valueObjects: {
-      readonly ContactInfo: {
-        readonly fields: {
-          readonly phone: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly website: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly valueObjects: {
+            readonly ContactInfo: {
+              readonly fields: {
+                readonly phone: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+                readonly website: {
+                  readonly nullable: true;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+              };
+            };
           };
         };
       };
@@ -290,100 +302,106 @@ type ExtContract = MongoContractWithTypeMaps<
       readonly tasks: CrossReference & { readonly model: 'Task' };
       readonly users: CrossReference & { readonly model: 'User' };
     };
-    readonly models: {
-      readonly Task: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly title: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly type: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly assigneeId: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-        };
-        readonly relations: {
-          readonly assignee: {
-            readonly to: CrossRefFor<'User'>;
-            readonly cardinality: 'N:1';
-            readonly on: {
-              readonly localFields: readonly ['assigneeId'];
-              readonly targetFields: readonly ['_id'];
+    readonly domain: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly models: {
+            readonly Task: {
+              readonly fields: {
+                readonly _id: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+                };
+                readonly title: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+                readonly type: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+                readonly assigneeId: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+                };
+              };
+              readonly relations: {
+                readonly assignee: {
+                  readonly to: CrossRefFor<'User'>;
+                  readonly cardinality: 'N:1';
+                  readonly on: {
+                    readonly localFields: readonly ['assigneeId'];
+                    readonly targetFields: readonly ['_id'];
+                  };
+                };
+                readonly comments: {
+                  readonly to: CrossRefFor<'Comment'>;
+                  readonly cardinality: '1:N';
+                };
+              };
+              readonly storage: {
+                readonly collection: 'tasks';
+                readonly relations: { readonly comments: { readonly field: 'comments' } };
+              };
+              readonly discriminator: { readonly field: 'type' };
+              readonly variants: {
+                readonly Bug: { readonly value: 'bug' };
+                readonly Feature: { readonly value: 'feature' };
+              };
+            };
+            readonly Bug: {
+              readonly fields: {
+                readonly severity: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+              };
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'tasks' };
+              readonly base: CrossRefFor<'Task'>;
+            };
+            readonly Feature: {
+              readonly fields: {
+                readonly priority: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+              };
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'tasks' };
+              readonly base: CrossRefFor<'Task'>;
+            };
+            readonly User: {
+              readonly fields: {
+                readonly _id: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+                };
+                readonly name: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+              };
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'users' };
+            };
+            readonly Comment: {
+              readonly fields: {
+                readonly _id: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+                };
+                readonly text: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+              };
+              readonly relations: Record<string, never>;
+              readonly storage: Record<string, never>;
+              readonly owner: 'Task';
             };
           };
-          readonly comments: {
-            readonly to: CrossRefFor<'Comment'>;
-            readonly cardinality: '1:N';
-          };
         };
-        readonly storage: {
-          readonly collection: 'tasks';
-          readonly relations: { readonly comments: { readonly field: 'comments' } };
-        };
-        readonly discriminator: { readonly field: 'type' };
-        readonly variants: {
-          readonly Bug: { readonly value: 'bug' };
-          readonly Feature: { readonly value: 'feature' };
-        };
-      };
-      readonly Bug: {
-        readonly fields: {
-          readonly severity: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'tasks' };
-        readonly base: CrossRefFor<'Task'>;
-      };
-      readonly Feature: {
-        readonly fields: {
-          readonly priority: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'tasks' };
-        readonly base: CrossRefFor<'Task'>;
-      };
-      readonly User: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly name: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'users' };
-      };
-      readonly Comment: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
-          };
-          readonly text: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: Record<string, never>;
-        readonly owner: 'Task';
       };
     };
     readonly storage: {

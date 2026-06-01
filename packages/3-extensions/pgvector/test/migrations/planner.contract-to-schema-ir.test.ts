@@ -23,6 +23,7 @@ import {
 import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
@@ -74,7 +75,7 @@ function createTestContract(
         ? storage
         : new SqlStorage({ ...storage, storageHash: storageHashValue }),
     roots: {},
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -797,7 +798,7 @@ function createDemoContract(
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({ ...storage, storageHash: storageHashValue }),
     roots: {},
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: { pgvector: {} },
     meta: {},

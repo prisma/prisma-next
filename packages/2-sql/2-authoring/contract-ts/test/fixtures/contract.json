@@ -5,34 +5,30 @@
   "targetFamily": "sql",
   "storageHash": "sha256:test-core",
   "profileHash": "sha256:test-profile",
-  "models": {
-    "User": {
-      "storage": {
-        "table": "user",
-        "fields": {
-          "id": { "column": "id" },
-          "email": { "column": "email" },
-          "createdAt": { "column": "createdAt" }
-        }
-      },
-      "fields": {
-        "id": { "codecId": "pg/int4@1", "nullable": false },
-        "email": { "codecId": "pg/text@1", "nullable": false },
-        "createdAt": { "codecId": "pg/timestamptz@1", "nullable": false }
-      },
-      "relations": {}
-    }
-  },
   "storage": {
     "tables": {
       "user": {
         "columns": {
-          "id": { "nativeType": "int4", "codecId": "pg/int4@1", "nullable": false },
-          "email": { "nativeType": "text", "codecId": "pg/text@1", "nullable": false },
-          "createdAt": { "nativeType": "timestamptz", "codecId": "pg/timestamptz@1", "nullable": false }
+          "id": {
+            "nativeType": "int4",
+            "codecId": "pg/int4@1",
+            "nullable": false
+          },
+          "email": {
+            "nativeType": "text",
+            "codecId": "pg/text@1",
+            "nullable": false
+          },
+          "createdAt": {
+            "nativeType": "timestamptz",
+            "codecId": "pg/timestamptz@1",
+            "nullable": false
+          }
         },
         "primaryKey": {
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "uniques": [],
         "indexes": [],
@@ -44,6 +40,45 @@
   "capabilities": {
     "postgres": {
       "returning": true
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "User": {
+            "storage": {
+              "table": "user",
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                }
+              }
+            },
+            "fields": {
+              "id": {
+                "codecId": "pg/int4@1",
+                "nullable": false
+              },
+              "email": {
+                "codecId": "pg/text@1",
+                "nullable": false
+              },
+              "createdAt": {
+                "codecId": "pg/timestamptz@1",
+                "nullable": false
+              }
+            },
+            "relations": {}
+          }
+        }
+      }
     }
   }
 }

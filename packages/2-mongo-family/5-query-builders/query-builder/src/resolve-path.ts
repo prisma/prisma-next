@@ -1,4 +1,5 @@
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import type { ContractValueObjectsMap } from '@prisma-next/contract/types';
+import type { MongoContract, MongoModelsMap } from '@prisma-next/mongo-contract';
 import type { DocField } from './types';
 
 /**
@@ -95,10 +96,6 @@ export type NestedDocShape = Record<string, DocField>;
 
 // ── Contract → NestedDocShape translation ────────────────────────────────
 
-type ContractHasValueObjects = {
-  readonly valueObjects?: Record<string, { readonly fields: Record<string, unknown> }>;
-};
-
 type FieldToLeaf<F> = F extends {
   readonly type: { readonly kind: 'scalar'; readonly codecId: infer C extends string };
   readonly nullable: infer N extends boolean;
@@ -122,7 +119,7 @@ type FieldToLeaf<F> = F extends {
  * `ModelNestedShape` hover output and `keyof`/indexed-access resolution
  * concrete instead of collapsing to `{ [x: string]: … }`.
  */
-type TranslateField<TContract extends ContractHasValueObjects, F> = F extends {
+type TranslateField<TContract extends MongoContract, F> = F extends {
   readonly many: true;
 }
   ? FieldToLeaf<F>
@@ -147,16 +144,10 @@ type TranslateField<TContract extends ContractHasValueObjects, F> = F extends {
  * `VOs[VOName]['fields']` is preserved and the hover / indexed-access
  * surface stays concrete at instantiation time.
  */
-type VONestedShape<
-  TContract extends ContractHasValueObjects,
-  VOName extends string,
-> = TContract extends {
-  readonly valueObjects: infer VOs extends Record<
-    string,
-    { readonly fields: Record<string, unknown> }
-  >;
-}
-  ? VOName extends keyof VOs
+type VONestedShape<TContract extends MongoContract, VOName extends string> = [
+  ContractValueObjectsMap<TContract>,
+] extends [infer VOs extends Record<string, { readonly fields: Record<string, unknown> }>]
+  ? VOName extends keyof VOs & string
     ? {
         readonly [K in keyof VOs[VOName]['fields'] & string]: TranslateField<
           TContract,
@@ -174,7 +165,7 @@ type VONestedShape<
  *
  * The mapped iteration is inlined (not hidden behind a helper type that
  * takes `Fields` as a generic) so TypeScript recognises the mapped type
- * as homomorphic over `TContract['models'][ModelName]['fields']`. That
+ * as homomorphic over `MongoModelsMap<TContract>[ModelName]['fields']`. That
  * preserves the literal field-name keys at instantiation — without this,
  * the intersection of `Record<string, ContractField>` and the specific
  * literal field record collapses `keyof` to `string` and the result hover
@@ -182,11 +173,11 @@ type VONestedShape<
  */
 export type ModelNestedShape<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
-  readonly [K in keyof TContract['models'][ModelName]['fields'] & string]: TranslateField<
-    TContract & ContractHasValueObjects,
-    TContract['models'][ModelName]['fields'][K]
+  readonly [K in keyof MongoModelsMap<TContract>[ModelName]['fields'] & string]: TranslateField<
+    TContract,
+    MongoModelsMap<TContract>[ModelName]['fields'][K]
   >;
 };
 

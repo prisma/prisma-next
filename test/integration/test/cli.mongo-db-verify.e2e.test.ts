@@ -21,14 +21,20 @@ const testContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { users: crossRef('User') },
-  models: {
-    User: {
-      fields: {
-        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
-        email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+  domain: {
+    namespaces: {
+      __unbound__: {
+        models: {
+          User: {
+            fields: {
+              _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+              email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+            },
+            relations: {},
+            storage: { collection: 'users' },
+          },
+        },
       },
-      relations: {},
-      storage: { collection: 'users' },
     },
   },
   storage: {

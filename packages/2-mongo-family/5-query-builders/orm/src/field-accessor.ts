@@ -1,10 +1,15 @@
-import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type {
+  ContractField,
+  ContractValueObject,
+  ContractValueObjectsMap,
+} from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
   ExtractMongoFieldOutputTypes,
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
+  MongoModelsMap,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type { MongoValue } from '@prisma-next/mongo-value';
@@ -32,46 +37,51 @@ export interface FieldOperation {
 
 type ScalarFieldKeys<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
-  [K in keyof TContract['models'][ModelName]['fields'] &
-    string]: TContract['models'][ModelName]['fields'][K] extends {
+  [K in keyof MongoModelsMap<TContract>[ModelName]['fields'] &
+    string]: MongoModelsMap<TContract>[ModelName]['fields'][K] extends {
     readonly type: { readonly kind: 'scalar' };
   }
     ? K
     : never;
-}[keyof TContract['models'][ModelName]['fields'] & string];
+}[keyof MongoModelsMap<TContract>[ModelName]['fields'] & string];
 
 type ValueObjectFieldKeys<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
-  [K in keyof TContract['models'][ModelName]['fields'] &
-    string]: TContract['models'][ModelName]['fields'][K] extends {
+  [K in keyof MongoModelsMap<TContract>[ModelName]['fields'] &
+    string]: MongoModelsMap<TContract>[ModelName]['fields'][K] extends {
     readonly type: { readonly kind: 'valueObject'; readonly name: string };
   }
     ? K
     : never;
-}[keyof TContract['models'][ModelName]['fields'] & string];
+}[keyof MongoModelsMap<TContract>[ModelName]['fields'] & string];
 
 type ResolvedModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
 > = string extends keyof ExtractMongoFieldOutputTypes<TContract>
-  ? InferModelRow<TContract, ModelName, TContract['models'][ModelName]['fields'], TCodecTypes>
+  ? InferModelRow<TContract, ModelName, MongoModelsMap<TContract>[ModelName]['fields'], TCodecTypes>
   : ModelName extends keyof ExtractMongoFieldOutputTypes<TContract>
     ? {
         -readonly [K in keyof ExtractMongoFieldOutputTypes<TContract>[ModelName]]: ExtractMongoFieldOutputTypes<TContract>[ModelName][K];
       }
-    : InferModelRow<TContract, ModelName, TContract['models'][ModelName]['fields'], TCodecTypes>;
+    : InferModelRow<
+        TContract,
+        ModelName,
+        MongoModelsMap<TContract>[ModelName]['fields'],
+        TCodecTypes
+      >;
 
 type ResolveFieldType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
-  K extends keyof TContract['models'][ModelName]['fields'] & string,
+  ModelName extends string & keyof MongoModelsMap<TContract>,
+  K extends keyof MongoModelsMap<TContract>[ModelName]['fields'] & string,
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
-> = TContract['models'][ModelName]['fields'][K] extends {
+> = MongoModelsMap<TContract>[ModelName]['fields'][K] extends {
   readonly type: {
     readonly kind: 'scalar';
     readonly codecId: infer CId extends string & keyof TCodecTypes;
@@ -80,7 +90,7 @@ type ResolveFieldType<
   readonly nullable: true;
 }
   ? readonly TCodecTypes[CId]['output'][] | null
-  : TContract['models'][ModelName]['fields'][K] extends {
+  : MongoModelsMap<TContract>[ModelName]['fields'][K] extends {
         readonly type: {
           readonly kind: 'scalar';
           readonly codecId: infer CId extends string & keyof TCodecTypes;
@@ -88,7 +98,7 @@ type ResolveFieldType<
         readonly many: true;
       }
     ? readonly TCodecTypes[CId]['output'][]
-    : TContract['models'][ModelName]['fields'][K] extends {
+    : MongoModelsMap<TContract>[ModelName]['fields'][K] extends {
           readonly type: {
             readonly kind: 'scalar';
             readonly codecId: infer CId extends string & keyof TCodecTypes;
@@ -96,7 +106,7 @@ type ResolveFieldType<
           readonly nullable: true;
         }
       ? TCodecTypes[CId]['output'] | null
-      : TContract['models'][ModelName]['fields'][K] extends {
+      : MongoModelsMap<TContract>[ModelName]['fields'][K] extends {
             readonly type: {
               readonly kind: 'scalar';
               readonly codecId: infer CId extends string & keyof TCodecTypes;
@@ -121,13 +131,24 @@ export type FieldExpression<T = unknown> = {
   pop(end: 1 | -1): FieldOperation;
 } & (T extends number ? NumericOps : unknown);
 
-type HasValueObjects = { readonly valueObjects?: Record<string, ContractValueObject> };
+type HasValueObjects = MongoContract;
 
-type VOFields<TContract extends HasValueObjects, VOName extends string> = TContract extends {
-  readonly valueObjects: infer VOs extends Record<string, ContractValueObject>;
-}
-  ? VOName extends keyof VOs
-    ? VOs[VOName]['fields']
+type MergedContractValueObjects<TContract extends HasValueObjects> =
+  ContractValueObjectsMap<TContract> &
+    (TContract extends { readonly valueObjects?: infer VOs }
+      ? VOs extends Record<string, ContractValueObject>
+        ? VOs
+        : Record<string, never>
+      : Record<string, never>);
+
+type VOFields<
+  TContract extends HasValueObjects,
+  VOName extends string,
+> = VOName extends keyof MergedContractValueObjects<TContract>
+  ? MergedContractValueObjects<TContract>[VOName] extends {
+      readonly fields: infer F extends Record<string, ContractField>;
+    }
+    ? F
     : never
   : never;
 
@@ -161,12 +182,12 @@ type VODotPaths<
 
 export type DotPath<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
   [K in ValueObjectFieldKeys<
     TContract,
     ModelName
-  >]: TContract['models'][ModelName]['fields'][K] extends {
+  >]: MongoModelsMap<TContract>[ModelName]['fields'][K] extends {
     readonly type: { readonly kind: 'valueObject'; readonly name: infer N extends string };
   }
     ? VODotPaths<TContract, VOFields<TContract, N>, `${K}.`>
@@ -199,12 +220,12 @@ type ResolveDotPathInFields<
 
 export type ResolveDotPathType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   Path extends string,
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
 > = Path extends `${infer Head}.${infer Rest}`
-  ? Head extends keyof TContract['models'][ModelName]['fields'] & string
-    ? TContract['models'][ModelName]['fields'][Head] extends {
+  ? Head extends keyof MongoModelsMap<TContract>[ModelName]['fields'] & string
+    ? MongoModelsMap<TContract>[ModelName]['fields'][Head] extends {
         readonly type: { readonly kind: 'valueObject'; readonly name: infer N extends string };
       }
       ? ResolveDotPathInFields<TContract, VOFields<TContract, N>, Rest, TCodecTypes>
@@ -214,7 +235,7 @@ export type ResolveDotPathType<
 
 export type FieldAccessor<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
 > = {
   readonly [K in ScalarFieldKeys<TContract, ModelName>]: FieldExpression<
@@ -271,7 +292,7 @@ function createFieldExpression(fieldPath: string): RuntimeFieldExpression {
 
 export function createFieldAccessor<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
 >(): FieldAccessor<TContract, ModelName, TCodecTypes> {
   return new Proxy((() => {}) as unknown as FieldAccessor<TContract, ModelName, TCodecTypes>, {

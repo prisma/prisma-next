@@ -1,6 +1,7 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
+import { modelsOf } from './contract-test-helpers';
 import { columnDescriptor } from './helpers/column-descriptor';
 import { testIndexPack } from './helpers/test-index-pack';
 import { unboundTables } from './unbound-tables';
@@ -122,9 +123,9 @@ describe('contract builder normalization', () => {
       },
     });
 
-    const userModel = (contract.models as Record<string, { relations?: Record<string, unknown> }>)[
-      'User'
-    ]!;
+    const userModel = (
+      modelsOf(contract) as Record<string, { relations?: Record<string, unknown> }>
+    )['User']!;
     expect(userModel).toHaveProperty('relations');
     expect(userModel.relations).toEqual({});
     expect(typeof userModel.relations).toBe('object');
@@ -160,12 +161,12 @@ describe('contract builder normalization', () => {
     expect(unboundTables(contract.storage)['post']!.foreignKeys).toEqual([]);
 
     // Verify all models have normalized relations
-    const userModel = (contract.models as Record<string, { relations?: Record<string, unknown> }>)[
-      'User'
-    ]!;
-    const postModel = (contract.models as Record<string, { relations?: Record<string, unknown> }>)[
-      'Post'
-    ]!;
+    const userModel = (
+      modelsOf(contract) as Record<string, { relations?: Record<string, unknown> }>
+    )['User']!;
+    const postModel = (
+      modelsOf(contract) as Record<string, { relations?: Record<string, unknown> }>
+    )['Post']!;
     expect(userModel.relations).toEqual({});
     expect(postModel.relations).toEqual({});
 
