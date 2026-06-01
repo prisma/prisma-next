@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { effectiveControl } from '@prisma-next/contract/types';
 import {
   SqlContractSerializerBase,
   type SqlEntityHydrationFactory,
@@ -164,6 +165,84 @@ describe('PostgresContractSerializer', () => {
 
     const contract = new RegistryDispatchProbeSerializer().deserializeContract({});
     expect(contract.storage.types?.['fake_thing']).toBe(sentinel);
+  });
+});
+
+describe('control-policy round-trip fidelity', () => {
+  function makeMixedControlContractJson() {
+    const base = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: {
+                    nativeType: 'int4',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    control: 'observed',
+                  },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+                control: 'external',
+              },
+            },
+          },
+        },
+      },
+    });
+    return {
+      ...base,
+      defaultControl: 'tolerated',
+      storage: {
+        ...base.storage,
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            ...base.storage.namespaces[UNBOUND_NAMESPACE_ID]!,
+            enum: {
+              Role: {
+                kind: 'postgres-enum',
+                name: 'Role',
+                nativeType: 'role',
+                values: ['admin', 'user'],
+                control: 'managed',
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  it('preserves effective control per node across serialize → deserialize', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeMixedControlContractJson();
+
+    const contract = serializer.deserializeContract(input);
+    const reparsed = JSON.parse(JSON.stringify(serializer.serializeContract(contract)));
+
+    expect(reparsed.defaultControl).toBe('tolerated');
+
+    const ns = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    const table = ns.tables.user;
+    const idColumn = table.columns.id;
+    const emailColumn = table.columns.email;
+    const enumEntry = ns.enum.Role;
+
+    const def = reparsed.defaultControl;
+    expect(effectiveControl(table.control, def)).toBe('external');
+    expect(effectiveControl(idColumn.control, def)).toBe('observed');
+    expect(effectiveControl(emailColumn.control, def)).toBe('tolerated');
+    expect(effectiveControl(enumEntry.control, def)).toBe('managed');
+
+    // Omit-when-default holds: the unset column never grows a control property.
+    expect(emailColumn).not.toHaveProperty('control');
   });
 });
 
