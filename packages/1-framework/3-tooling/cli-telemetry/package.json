@@ -53,6 +53,9 @@
       "import": "./dist/sender.mjs"
     }
   },
+  "engines": {
+    "node": ">=24"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
