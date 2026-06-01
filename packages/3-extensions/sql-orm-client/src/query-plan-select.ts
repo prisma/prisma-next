@@ -292,6 +292,42 @@ function buildNestedIncludeProjections(
   );
 }
 
+/**
+ * Resolve the MTI variant joins + `variant_table__column` projection for an
+ * include whose target model is polymorphic, mirroring the parent path in
+ * `compileSelectWithIncludes`. The discriminator column and any STI
+ * variant-specific columns live on the base table and reach the row through
+ * the ordinary base-column projection (`buildProjection`); only the MTI
+ * variant tables need a join.
+ *
+ * When the child base table is aliased (self-relations), `buildMtiJoins`
+ * emits a join `ON` against the unaliased base table name, which would fall
+ * out of scope. Remap it to the child alias — the same remap the row builder
+ * already applies to `orderBy`/`where`.
+ */
+function buildChildPolymorphismArtifacts(
+  contract: Contract<SqlStorage>,
+  include: IncludeExpr,
+  childTableAlias: string | undefined,
+  childTableRef: string,
+): { joins: ReadonlyArray<JoinAst>; projection: ReadonlyArray<ProjectionItem> } {
+  const polyInfo = resolvePolymorphismInfo(contract, include.relatedModelName);
+  if (!polyInfo || polyInfo.mtiVariants.length === 0) {
+    return { joins: [], projection: [] };
+  }
+
+  const { joins, projection } = buildMtiJoins(contract, polyInfo, include.nested.variantName);
+  if (!childTableAlias) {
+    return { joins, projection };
+  }
+
+  const remapper = createTableRefRemapper(polyInfo.baseTable, childTableRef);
+  return {
+    joins: joins.map((join) => join.rewrite(remapper)),
+    projection,
+  };
+}
+
 function buildIncludeChildRowsSelect(
   contract: Contract<SqlStorage>,
   parentTableName: string,
@@ -369,6 +405,18 @@ function buildIncludeChildRowsSelect(
     childTableRef,
   );
 
+  // When the include target is polymorphic, mirror the parent path: join
+  // the MTI variant tables into the correlated subquery's FROM and project
+  // their `variant_table__column` cells so the decoder can resolve each
+  // row's variant. The discriminator + STI variant columns ride the base
+  // projection above.
+  const polyArtifacts = buildChildPolymorphismArtifacts(
+    contract,
+    include,
+    childTableAlias,
+    childTableRef,
+  );
+
   // Recurse: each nested include produces a correlated subquery
   // projection. The nested aggregates are attached to *this* child
   // SELECT, so they correlate against `childTableRef` — which may itself
@@ -380,11 +428,13 @@ function buildIncludeChildRowsSelect(
   );
 
   // `childProjection` is the set of items that survive into the parent's
-  // JSON object — the scalar columns plus any nested-include aggregate
-  // columns. The hidden order-by projection is separate and is dropped
-  // before assembling the parent's json_object_expr.
+  // JSON object — the scalar columns, the MTI variant columns, plus any
+  // nested-include aggregate columns. The hidden order-by projection is
+  // separate and is dropped before assembling the parent's
+  // json_object_expr.
   const childProjection: ReadonlyArray<ProjectionItem> = [
     ...scalarProjection,
+    ...polyArtifacts.projection,
     ...nestedProjections,
   ];
 
@@ -393,6 +443,9 @@ function buildIncludeChildRowsSelect(
   )
     .withProjection([...childProjection, ...hiddenOrderProjection])
     .withWhere(whereExpr);
+  if (polyArtifacts.joins.length > 0) {
+    childRows = childRows.withJoins([...polyArtifacts.joins]);
+  }
 
   if (childState.distinctOn && childState.distinctOn.length > 0) {
     childRows = childRows.withDistinctOn(
@@ -513,11 +566,30 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     selectedForQuery,
     childTableRef,
   );
-  const baseInner = SelectAst.from(
+
+  // Polymorphic target: join the MTI variant tables into the pre-dedup
+  // inner SELECT and carry their `variant_table__column` cells through the
+  // ROW_NUMBER wrap so they reach the outer projection (forwarded by alias
+  // from `distinctAlias` below). The discriminator + STI variant columns
+  // ride the base projection.
+  const polyArtifacts = buildChildPolymorphismArtifacts(
+    contract,
+    include,
+    childTableAlias,
+    childTableRef,
+  );
+  let baseInner = SelectAst.from(
     tableSourceForContract(contract, include.relatedTableName, childTableAlias),
   )
-    .withProjection([...innerScalarProjection, ...hiddenOrderProjection])
+    .withProjection([
+      ...innerScalarProjection,
+      ...polyArtifacts.projection,
+      ...hiddenOrderProjection,
+    ])
     .withWhere(whereExpr);
+  if (polyArtifacts.joins.length > 0) {
+    baseInner = baseInner.withJoins([...polyArtifacts.joins]);
+  }
 
   // `childState.distinct` is non-empty by the `isDistinctNonLeaf` guard
   // at the only caller (`buildIncludeChildRowsSelect`); assert here so
@@ -574,6 +646,13 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     childState.includes,
   );
 
+  // Forward the MTI variant columns the inner wrap carried under their
+  // `variant_table__column` aliases onto the outer SELECT, now sourced
+  // from the deduped distinct alias (their join is gone at this level).
+  const outerPolyProjection = polyArtifacts.projection.map((proj) =>
+    ProjectionItem.of(proj.alias, ColumnRef.of(distinctAlias, proj.alias), proj.codec),
+  );
+
   // Forward hidden order columns from the inner distinct subquery to the
   // outer SELECT so `aggregateOrderBy` (which still references `rowsAlias`)
   // can resolve them when the outer wrap materialises `(childRows) AS rowsAlias`.
@@ -583,6 +662,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
 
   const childProjection: ReadonlyArray<ProjectionItem> = [
     ...outerScalarProjection,
+    ...outerPolyProjection,
     ...outerNestedProjections,
   ];
 
