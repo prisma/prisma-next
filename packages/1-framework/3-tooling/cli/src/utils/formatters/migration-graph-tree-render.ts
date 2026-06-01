@@ -118,50 +118,127 @@ function arrowForEdgeKind(
 }
 
 /**
- * A node-marker glyph pair (`○◂`, `○─`, `*<`, `*-`) is the contract node
- * marker (`○` / `*`) followed by an arc connector (`◂` / `─` / `<` / `-`).
- * The marker is the signal and stays bright (`style.kind`); the connector is
- * gutter and stays dim (`style.lane`) — consistent with the plain node marker,
- * which is never dimmed.
+ * Crossings (`┼`) and the leftmost lane (column 0) render with the neutral dim
+ * lane style rather than a palette hue — neither owns a distinguishable colour.
  */
-function laneStyler(
-  column: number,
+const NEUTRAL_LANE = 0;
+
+/**
+ * The colour-source column for each cell of a row, resolved together because a
+ * routed back-arc spans columns and must read as **one hue** rather than a
+ * per-column "rainbow". An arc's horizontal bridges, corners, and node-pair
+ * connector all take the arc's owning back-lane column (the corner that closes
+ * the arc), not the column they pass through.
+ */
+interface RowLaneColors {
+  /** Colour column for a cell's structural glyph (lane / spine / arc body). */
+  readonly lane: readonly number[];
+  /** Colour column for a node arc-pair's connector half (`◂` / `─`). */
+  readonly connector: readonly number[];
+}
+
+/**
+ * Resolve per-cell colour columns for a row. Scanning right-to-left lets each
+ * arc bridge inherit the corner column that closes it (the arc's back-lane),
+ * so the whole arc — vertical run (already its own column), horizontal bridges,
+ * corners, and the `◂`/`─` connector — reads as a single hue. Crossings stay
+ * neutral so neither overlapping arc "steals" the cell.
+ */
+function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
+  const lane = new Array<number>(cells.length);
+  const connector = new Array<number>(cells.length);
+  let arcCorner = NEUTRAL_LANE;
+  for (let column = cells.length - 1; column >= 0; column--) {
+    const cell = cells[column];
+    connector[column] = arcCorner;
+    switch (cell?.kind) {
+      case 'arc-branch-corner':
+      case 'arc-land-corner':
+        arcCorner = column;
+        lane[column] = column;
+        break;
+      case 'arc-branch-tee':
+        // An inner co-sourced arc's own back-lane junction: its vertical run
+        // continues below in this column, so it keeps its own column hue.
+        lane[column] = column;
+        break;
+      case 'arc-crossing':
+        lane[column] = NEUTRAL_LANE;
+        break;
+      case 'arc-land-bridge':
+        lane[column] = arcCorner;
+        break;
+      case 'horizontal-pass':
+        lane[column] = arcCorner === NEUTRAL_LANE ? column : arcCorner;
+        break;
+      case 'node':
+        lane[column] = column;
+        arcCorner = NEUTRAL_LANE;
+        break;
+      default:
+        lane[column] = column;
+        arcCorner = NEUTRAL_LANE;
+    }
+  }
+  return { lane, connector };
+}
+
+/**
+ * Style a structural glyph by its resolved colour column. Column 0 and the
+ * neutral sentinel render dim (`style.lane`); columns ≥ 1 take a palette hue.
+ */
+function laneStylerForColumn(
+  colorColumn: number,
   colorize: boolean,
   style: MigrationListStyler,
 ): (text: string) => string {
-  if (!colorize) {
+  if (!colorize || colorColumn <= NEUTRAL_LANE) {
     return (text) => style.lane(text);
   }
-  return laneColorForColumn(column);
+  return laneColorForColumn(colorColumn);
 }
 
+/**
+ * A node-marker glyph pair (`○◂`, `○─`, `*<`, `*-`) is the contract node
+ * marker (`○` / `*`) followed by an arc connector (`◂` / `─` / `<` / `-`). The
+ * marker takes its own lane's hue (so each node visibly belongs to its branch);
+ * the connector follows the arc it belongs to (its owning back-lane hue).
+ * Direction arrows are handled elsewhere and stay bright — they encode
+ * direction, not branch identity.
+ */
 function renderNodeMarkerPair(
   pair: string,
-  column: number,
+  nodeColumn: number,
+  arcColumn: number,
   colorize: boolean,
   style: MigrationListStyler,
 ): string {
-  const lane = laneStyler(column, colorize, style);
-  return style.kind(pair.slice(0, 1)) + lane(pair.slice(1));
+  const marker = laneStylerForColumn(nodeColumn, colorize, style);
+  const connector = laneStylerForColumn(arcColumn, colorize, style);
+  return marker(pair.slice(0, 1)) + connector(pair.slice(1));
 }
 
 function renderCellPair(
   cell: StructuralCell,
   column: number,
+  colors: RowLaneColors,
   colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
 ): string {
-  const lane = laneStyler(column, colorize, style);
+  const laneColumn = colors.lane[column] ?? column;
+  const lane = laneStylerForColumn(laneColumn, colorize, style);
   switch (cell.kind) {
-    case 'node':
+    case 'node': {
+      const arcColumn = colors.connector[column] ?? NEUTRAL_LANE;
       if (cell.arcLand === true) {
-        return renderNodeMarkerPair(palette.arcLand, column, colorize, style);
+        return renderNodeMarkerPair(palette.arcLand, column, arcColumn, colorize, style);
       }
       if (cell.arcTee === true) {
-        return renderNodeMarkerPair(palette.arcTee, column, colorize, style);
+        return renderNodeMarkerPair(palette.arcTee, column, arcColumn, colorize, style);
       }
-      return style.kind(palette.node);
+      return lane(palette.node);
+    }
     case 'vertical-pass':
       return lane(palette.verticalPass);
     case 'edge-lane':
@@ -208,7 +285,7 @@ function renderConnectorRow(
     for (let column = 0; column < row.cells.length; column++) {
       const cell = row.cells[column];
       if (cell === undefined) continue;
-      const lane = laneStyler(column, colorize, style);
+      const lane = laneStylerForColumn(column, colorize, style);
       switch (cell.kind) {
         case 'branch-tee':
           out += lane(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
@@ -247,7 +324,7 @@ function renderConnectorRow(
   const end = row.endLane ?? start;
   let out = '';
   for (let column = 0; column < gridWidth; column++) {
-    const lane = laneStyler(column, colorize, style);
+    const lane = laneStylerForColumn(column, colorize, style);
     if (column < start || column > end) out += '  ';
     else if (column === start) out += lane(palette.connectorBranchTee);
     else if (column === end) out += lane(isMerge ? palette.mergeCorner : palette.branchCorner);
@@ -413,8 +490,11 @@ export function renderMigrationGraphTree(
       continue;
     }
 
+    const cellColors = resolveRowLaneColors(row.cells);
     let gutter = row.cells
-      .map((cell, column) => renderCellPair(cell, column, opts.colorize, style, palette))
+      .map((cell, column) =>
+        renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+      )
       .join('');
     const prevRow = model.rows[rowIndex - 1];
     let laneSpan = row.cells.length;
@@ -440,12 +520,16 @@ export function renderMigrationGraphTree(
     ) {
       gutter = row.cells
         .slice(0, 1)
-        .map((cell, column) => renderCellPair(cell, column, opts.colorize, style, palette))
+        .map((cell, column) =>
+          renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+        )
         .join('');
     } else if (row.kind === 'node' && laneSpan < row.cells.length && !nodeHasArcDecoration(row)) {
       gutter = row.cells
         .slice(0, laneSpan)
-        .map((cell, column) => renderCellPair(cell, column, opts.colorize, style, palette))
+        .map((cell, column) =>
+          renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+        )
         .join('');
     } else if (gutter.length < laneSpan * 2) {
       gutter = gutter.padEnd(laneSpan * 2, ' ');
@@ -459,7 +543,9 @@ export function renderMigrationGraphTree(
       if (contractHash === EMPTY_CONTRACT_HASH) {
         const trailingLanes = row.cells
           .slice(1)
-          .map((cell, offset) => renderCellPair(cell, offset + 1, opts.colorize, style, palette))
+          .map((cell, offset) =>
+            renderCellPair(cell, offset + 1, cellColors, opts.colorize, style, palette),
+          )
           .join('');
         const emptyGutter = palette.emptySource.padEnd(2, ' ') + trailingLanes;
         const overlayNames = overlayNamesForContract(contractHash, opts);
