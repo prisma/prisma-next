@@ -16,19 +16,36 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
 // surfaces let the tests drive `.include('<polyRel>')` and read the
 // included rows without a static contract for the patched models. This
 // mirrors the cast pattern the unit `collection-variant.test.ts` uses.
+//
+// `select` / `orderBy` mirror the real `Collection` API idiom
+// (`.select('id', 'name').orderBy((row) => row.id.asc())`) so the asserted
+// shape is intentional and stable when new model fields are added.
 interface ScalarFilter {
   eq(value: unknown): unknown;
   gte(value: unknown): unknown;
 }
-interface TaskRefinementRow {
+interface OrderBy {
+  asc(): unknown;
+}
+interface RefinementRow {
+  id: OrderBy;
+}
+interface TaskRefinementRow extends RefinementRow {
   severity: ScalarFilter;
   priority: ScalarFilter;
 }
 interface PolyIncludeRefinement {
   variant(name: string): PolyIncludeRefinement;
   where(predicate: (row: TaskRefinementRow) => unknown): PolyIncludeRefinement;
+  select(...fields: string[]): PolyIncludeRefinement;
+  orderBy(selector: (row: TaskRefinementRow) => unknown): PolyIncludeRefinement;
+}
+interface ParentRow {
+  id: OrderBy;
 }
 interface PolyIncludeParent {
+  select(...fields: string[]): PolyIncludeParent;
+  orderBy(selector: (row: ParentRow) => unknown): PolyIncludeParent;
   include(
     relation: string,
     refine?: (collection: PolyIncludeRefinement) => PolyIncludeRefinement,
@@ -239,6 +256,7 @@ async function setupMtiIncludeSchema(runtime: PgIntegrationRuntime): Promise<voi
 
 async function seedMtiIncludeData(runtime: PgIntegrationRuntime): Promise<void> {
   await runtime.query("insert into projects_tbl (id, name) values (1, 'Roadmap')");
+  await runtime.query("insert into projects_tbl (id, name) values (2, 'Empty')");
   await runtime.query(
     "insert into tasks (id, title, type, severity, project_id) values (1, 'Crash on login', 'bug', 'critical', 1)",
   );
@@ -264,69 +282,78 @@ describe('integration/polymorphism-include', () => {
         await seedStiIncludeData(runtime);
 
         const accounts = createAccountCollection(runtime);
-        const rows = await accounts.include('members').all().toArray();
+        // `select(['id','kind','role','plan'])` projects all four base columns
+        // (STI variant fields are base-table columns); `mapPolymorphicRow`
+        // then drops the sibling-variant field per row by the discriminator —
+        // admin rows carry `role` (no `plan`), regular rows carry `plan`
+        // (no `role`).
+        const rows = await accounts
+          .select('id', 'name')
+          .orderBy((account) => account.id.asc())
+          .include('members', (members) =>
+            members.select('id', 'kind', 'role', 'plan').orderBy((member) => member.id.asc()),
+          )
+          .all()
+          .toArray();
 
-        const acme = rows.find((r) => r['id'] === 1)!;
-        const members = acme['members'] as Record<string, unknown>[];
-        expect(members).toHaveLength(3);
-
-        const ada = members.find((m) => m['id'] === 1)!;
-        expect(ada).toMatchObject({ id: 1, name: 'Ada', kind: 'admin', role: 'superadmin' });
-        // Admin rows must not carry the Regular variant's `plan` field.
-        expect(ada).not.toHaveProperty('plan');
-
-        const bob = members.find((m) => m['id'] === 2)!;
-        expect(bob).toMatchObject({ id: 2, name: 'Bob', kind: 'regular', plan: 'free' });
-        // Regular rows must not carry the Admin variant's `role` field.
-        expect(bob).not.toHaveProperty('role');
-
-        const cal = members.find((m) => m['id'] === 3)!;
-        expect(cal).toMatchObject({ id: 3, kind: 'admin', role: 'auditor' });
-        expect(cal).not.toHaveProperty('plan');
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Acme',
+            members: [
+              { id: 1, kind: 'admin', role: 'superadmin' },
+              { id: 2, kind: 'regular', plan: 'free' },
+              { id: 3, kind: 'admin', role: 'auditor' },
+            ],
+          },
+          { id: 2, name: 'Empty', members: [] },
+        ]);
       });
     },
     timeouts.spinUpPpgDev,
   );
 
   it(
-    'MTI-target include returns rows with the variant tables columns present',
+    'MTI-target include returns rows with the variant table column present',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await setupMtiIncludeSchema(runtime);
         await seedMtiIncludeData(runtime);
 
         const projects = createProjectCollection(runtime);
-        const rows = await projects.include('tasks').all().toArray();
+        // The MTI variant column (`features.priority`) is joined+projected by
+        // the poly machinery regardless of `select`; the base columns are
+        // controlled by `select`. So a bug row carries only the selected base
+        // fields, a feature row additionally carries `priority`.
+        const rows = await projects
+          .select('id', 'name')
+          .orderBy((project) => project.id.asc())
+          .include('tasks', (tasks) =>
+            tasks.select('id', 'title', 'type').orderBy((task) => task.id.asc()),
+          )
+          .all()
+          .toArray();
 
-        const roadmap = rows.find((r) => r['id'] === 1)!;
-        const tasks = roadmap['tasks'] as Record<string, unknown>[];
-        expect(tasks).toHaveLength(4);
-
-        const bug = tasks.find((t) => t['id'] === 1)!;
-        expect(bug).toMatchObject({
-          id: 1,
-          title: 'Crash on login',
-          type: 'bug',
-          severity: 'critical',
-        });
-        // Bug (STI) rows must not carry the Feature (MTI) variant column.
-        expect(bug).not.toHaveProperty('priority');
-
-        const feature = tasks.find((t) => t['id'] === 3)!;
-        // The MTI variant column (`features.priority`) is joined into the
-        // child SELECT and surfaces on the row.
-        expect(feature).toMatchObject({ id: 3, title: 'Dark mode', type: 'feature', priority: 1 });
-        expect(feature).not.toHaveProperty('severity');
-
-        const otherFeature = tasks.find((t) => t['id'] === 4)!;
-        expect(otherFeature).toMatchObject({ id: 4, type: 'feature', priority: 3 });
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Roadmap',
+            tasks: [
+              { id: 1, title: 'Crash on login', type: 'bug' },
+              { id: 2, title: 'Null ref', type: 'bug' },
+              { id: 3, title: 'Dark mode', type: 'feature', priority: 1 },
+              { id: 4, title: 'Export PDF', type: 'feature', priority: 3 },
+            ],
+          },
+          { id: 2, name: 'Empty', tasks: [] },
+        ]);
       });
     },
     timeouts.spinUpPpgDev,
   );
 
   it(
-    'a variant-specific where on a poly include refinement filters correctly',
+    'an STI variant-specific where on a poly include refinement filters by the variant field',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await setupMtiIncludeSchema(runtime);
@@ -335,19 +362,28 @@ describe('integration/polymorphism-include', () => {
         const projects = createProjectCollection(runtime);
         // `severity` is the Bug variant's discriminating field. Filtering an
         // STI-variant-narrowed include on it confirms the refinement's where
-        // is scoped to the joined child rows and filters per the variant
-        // field — the runtime confirmation of variant-specific where.
+        // is scoped to the joined child rows and filters per the variant field.
         const rows = await projects
+          .select('id', 'name')
+          .orderBy((project) => project.id.asc())
           .include('tasks', (tasks) =>
-            tasks.variant('Bug').where((task) => task.severity.eq('critical')),
+            tasks
+              .variant('Bug')
+              .where((task) => task.severity.eq('critical'))
+              .select('id', 'title', 'type', 'severity')
+              .orderBy((task) => task.id.asc()),
           )
           .all()
           .toArray();
 
-        const roadmap = rows.find((r) => r['id'] === 1)!;
-        const tasks = roadmap['tasks'] as Record<string, unknown>[];
-        expect(tasks).toHaveLength(1);
-        expect(tasks[0]).toMatchObject({ id: 1, type: 'bug', severity: 'critical' });
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Roadmap',
+            tasks: [{ id: 1, title: 'Crash on login', type: 'bug', severity: 'critical' }],
+          },
+          { id: 2, name: 'Empty', tasks: [] },
+        ]);
       });
     },
     timeouts.spinUpPpgDev,
@@ -364,27 +400,37 @@ describe('integration/polymorphism-include', () => {
         // `priority` is the Feature (MTI) variant column — it lives on the
         // joined `features` table, not the base `tasks` table. Filtering on it
         // confirms the predicate accessor names the variant column against the
-        // joined variant table inside the correlated child SELECT.
+        // joined variant table inside the correlated child SELECT. The MTI
+        // variant column projects regardless of select; seed has Feature id=3
+        // (priority 1) and id=4 (priority 3), only id=4 passes priority >= 3.
         const rows = await projects
+          .select('id', 'name')
+          .orderBy((project) => project.id.asc())
           .include('tasks', (tasks) =>
-            tasks.variant('Feature').where((task) => task.priority.gte(3)),
+            tasks
+              .variant('Feature')
+              .where((task) => task.priority.gte(3))
+              .select('id', 'title', 'type')
+              .orderBy((task) => task.id.asc()),
           )
           .all()
           .toArray();
 
-        const roadmap = rows.find((r) => r['id'] === 1)!;
-        const tasks = roadmap['tasks'] as Record<string, unknown>[];
-        // Seed has Feature id=3 (priority 1) and id=4 (priority 3); only id=4
-        // passes priority >= 3.
-        expect(tasks).toHaveLength(1);
-        expect(tasks[0]).toMatchObject({ id: 4, type: 'feature', priority: 3 });
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Roadmap',
+            tasks: [{ id: 4, title: 'Export PDF', type: 'feature', priority: 3 }],
+          },
+          { id: 2, name: 'Empty', tasks: [] },
+        ]);
       });
     },
     timeouts.spinUpPpgDev,
   );
 
   it(
-    'a variant-narrowed include returns only that variant',
+    'an MTI variant-narrowed include returns only that variant',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await setupMtiIncludeSchema(runtime);
@@ -392,19 +438,28 @@ describe('integration/polymorphism-include', () => {
 
         const projects = createProjectCollection(runtime);
         const rows = await projects
-          .include('tasks', (tasks) => tasks.variant('Feature'))
+          .select('id', 'name')
+          .orderBy((project) => project.id.asc())
+          .include('tasks', (tasks) =>
+            tasks
+              .variant('Feature')
+              .select('id', 'title', 'type')
+              .orderBy((task) => task.id.asc()),
+          )
           .all()
           .toArray();
 
-        const roadmap = rows.find((r) => r['id'] === 1)!;
-        const tasks = roadmap['tasks'] as Record<string, unknown>[];
-        expect(tasks).toHaveLength(2);
-        for (const task of tasks) {
-          expect(task['type']).toBe('feature');
-          expect(task).toHaveProperty('priority');
-          expect(task).not.toHaveProperty('severity');
-        }
-        expect(tasks.map((t) => t['id']).sort()).toEqual([3, 4]);
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Roadmap',
+            tasks: [
+              { id: 3, title: 'Dark mode', type: 'feature', priority: 1 },
+              { id: 4, title: 'Export PDF', type: 'feature', priority: 3 },
+            ],
+          },
+          { id: 2, name: 'Empty', tasks: [] },
+        ]);
       });
     },
     timeouts.spinUpPpgDev,
@@ -419,19 +474,28 @@ describe('integration/polymorphism-include', () => {
 
         const accounts = createAccountCollection(runtime);
         const rows = await accounts
-          .include('members', (members) => members.variant('Admin'))
+          .select('id', 'name')
+          .orderBy((account) => account.id.asc())
+          .include('members', (members) =>
+            members
+              .variant('Admin')
+              .select('id', 'kind', 'role')
+              .orderBy((member) => member.id.asc()),
+          )
           .all()
           .toArray();
 
-        const acme = rows.find((r) => r['id'] === 1)!;
-        const members = acme['members'] as Record<string, unknown>[];
-        expect(members).toHaveLength(2);
-        for (const member of members) {
-          expect(member['kind']).toBe('admin');
-          expect(member).toHaveProperty('role');
-          expect(member).not.toHaveProperty('plan');
-        }
-        expect(members.map((m) => m['id']).sort()).toEqual([1, 3]);
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Acme',
+            members: [
+              { id: 1, kind: 'admin', role: 'superadmin' },
+              { id: 3, kind: 'admin', role: 'auditor' },
+            ],
+          },
+          { id: 2, name: 'Empty', members: [] },
+        ]);
       });
     },
     timeouts.spinUpPpgDev,
