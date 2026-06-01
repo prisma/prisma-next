@@ -1,5 +1,6 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
+import { createColors } from 'colorette';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { laneColorForColumn } from '../../../src/utils/formatters/migration-graph-lane-colors';
@@ -9,6 +10,8 @@ import {
   renderMigrationGraphLegend,
   renderMigrationGraphTree,
 } from '../../../src/utils/formatters/migration-graph-tree-render';
+
+const { bold: forcedBold } = createColors({ useColor: true });
 
 let migSeq = 0;
 
@@ -629,15 +632,15 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(colored.split('\n')[0]).toMatch(/^○/);
   });
 
-  it('colors a branched edge arrow and name by the edge lane; column 0 stays default', () => {
+  it('colors a branched edge arrow and bolds its name by the edge lane; column 0 stays default', () => {
     const colored = tree(diamondEdges(), { colorize: true });
     const lines = colored.split('\n');
-    // A branched edge (column 1) reads in one branch colour: arrow and name both
-    // take the lane hue.
+    // A branched edge (column 1) reads in one branch colour: the arrow takes the
+    // lane hue (not bold), and the name takes the lane hue AND keeps its bold.
     const branchEdge = lines.find((line) => line.includes('bob_add_avatar'));
     expect(branchEdge).toBeDefined();
     expect(branchEdge).toContain(laneColorForColumn(1)('↑'));
-    expect(branchEdge).toContain(laneColorForColumn(1)('bob_add_avatar'));
+    expect(branchEdge).toContain(forcedBold(laneColorForColumn(1)('bob_add_avatar')));
     // A column-0 edge keeps the default arrow/name styling — no palette hue, so
     // a plain linear chain stays uncoloured.
     const linearEdge = lines.find((line) => line.includes('alice_add_phone'));
