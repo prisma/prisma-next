@@ -12,7 +12,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import type { SqlStatement } from '@prisma-next/target-postgres/statement-builders';
-import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import postgresAdapterDescriptor from '../../../src/exports/control';
 
 export const contract: Contract<SqlStorage> = {
@@ -40,7 +40,7 @@ export const contract: Contract<SqlStorage> = {
     },
   }),
   roots: {},
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
   capabilities: {},
   extensionPacks: {},
   meta: {},

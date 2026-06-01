@@ -4,7 +4,6 @@ import {
   type IRNode,
   type Namespace,
   NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
@@ -100,9 +99,7 @@ describe('per-model `namespace` field (TS builder)', () => {
     });
 
     expect(
-      (contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables as Record<string, unknown>)[
-        'User'
-      ],
+      (contract.storage.namespaces['public']?.tables as Record<string, unknown>)['User'],
     ).toBeDefined();
   });
 

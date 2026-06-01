@@ -4,10 +4,6 @@
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
-  "files": [
-    "dist",
-    "src"
-  ],
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
@@ -36,6 +32,18 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "exports": {
     ".": {
       "types": "./dist/exports/index.d.mts",
@@ -53,6 +61,9 @@
       "types": "./dist/test/utils.d.mts",
       "import": "./dist/test/utils.mjs"
     }
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

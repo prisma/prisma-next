@@ -24,6 +24,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
+  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -31,10 +32,10 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:3e50138f416ab435ac8933c9d2ddcb725f486464d13054a8100f17f06d97f970'>;
+  StorageHashBase<'sha256:5cf089c5e9bb470f953a45c8ed2234ff65dd569701f235b4d6ee6c5555fa7d88'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
+  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -71,8 +72,8 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
+        readonly public: {
+          readonly id: 'public';
           readonly kind: 'sql-namespace';
           readonly tables: {
             readonly item: {
@@ -148,12 +149,50 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
-    readonly item: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Item' };
+    readonly item: { readonly namespace: 'public' & NamespaceId; readonly model: 'Item' };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly public: {
+        readonly models: {
+          readonly Item: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly description: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly category: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly rating: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'item';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly description: { readonly column: 'description' };
+                readonly category: { readonly column: 'category' };
+                readonly rating: { readonly column: 'rating' };
+              };
+            };
+          };
+        };
+      };
+    };
   };
   readonly capabilities: {
     readonly postgres: {
@@ -199,4 +238,4 @@ type ContractBase = Omit<
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Namespaces = Contract['storage']['namespaces'];
-export type Models = Contract['models'];
+export type Models = ContractModelsMap<Contract>;

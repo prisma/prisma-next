@@ -64,15 +64,15 @@ describe('canonicalization', () => {
     const schemaVersionIndex = keys.indexOf('schemaVersion');
     const targetFamilyIndex = keys.indexOf('targetFamily');
     const targetIndex = keys.indexOf('target');
-    const modelsIndex = keys.indexOf('models');
+    const domainIndex = keys.indexOf('domain');
     const storageIndex = keys.indexOf('storage');
     const capabilitiesIndex = keys.indexOf('capabilities');
     const metaIndex = keys.indexOf('meta');
 
     expect(schemaVersionIndex).toBeLessThan(targetFamilyIndex);
     expect(targetFamilyIndex).toBeLessThan(targetIndex);
-    expect(targetIndex).toBeLessThan(modelsIndex);
-    expect(modelsIndex).toBeLessThan(storageIndex);
+    expect(targetIndex).toBeLessThan(domainIndex);
+    expect(domainIndex).toBeLessThan(storageIndex);
     expect(storageIndex).toBeLessThan(capabilitiesIndex);
     expect(capabilitiesIndex).toBeLessThan(metaIndex);
   });
@@ -167,7 +167,9 @@ describe('canonicalization', () => {
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result);
     expect(parsed).toMatchObject({
-      models: expect.anything(),
+      domain: {
+        namespaces: expect.anything(),
+      },
       storage: {
         namespaces: expect.anything(),
       },

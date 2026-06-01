@@ -3,28 +3,12 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { sqlStorageFixture, validSqlContractJson } from './sql-contract-json-fixture';
+import type { StorageLike } from './unbound-tables';
 import { unboundTables } from './unbound-tables';
 
-function sqlStorageFixture(tables: Record<string, unknown>) {
-  return {
-    storageHash: 'sha256:test',
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
-    },
-  };
-}
-
 describe('SqlContractSerializer', () => {
-  const validContractInput = {
-    schemaVersion: '1',
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test',
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    roots: {},
-    models: {},
+  const validContractInput = validSqlContractJson({
     storage: sqlStorageFixture({
       User: {
         columns: {
@@ -37,7 +21,7 @@ describe('SqlContractSerializer', () => {
         foreignKeys: [],
       },
     }),
-  };
+  });
 
   it('performs both structural and logical validation', () => {
     const result = validateSqlContractFully<Contract<SqlStorage>>(validContractInput);
@@ -57,7 +41,7 @@ describe('SqlContractSerializer', () => {
       ...validContractInput,
       storage: sqlStorageFixture({
         User: {
-          ...unboundTables(validContractInput.storage)['User'],
+          ...unboundTables(validContractInput.storage as StorageLike)['User'],
           primaryKey: { columns: ['id'] },
         },
       }),
@@ -70,7 +54,7 @@ describe('SqlContractSerializer', () => {
       ...validContractInput,
       storage: sqlStorageFixture({
         User: {
-          ...unboundTables(validContractInput.storage)['User'],
+          ...unboundTables(validContractInput.storage as StorageLike)['User'],
           primaryKey: { columns: ['id'], name: 'user_pkey' },
           indexes: [{ columns: ['id'], name: 'user_pkey' }],
         },
@@ -85,16 +69,7 @@ describe('SqlContractSerializer', () => {
   it('accepts type parameter for strict contract type', () => {
     // Simulate JSON import - TypeScript infers string types, not literal types
     // The type parameter provides the strict type from contract.d.ts
-    const contractJson = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const contractJson = validSqlContractJson({
       storage: sqlStorageFixture({
         User: {
           columns: {
@@ -106,7 +81,7 @@ describe('SqlContractSerializer', () => {
           foreignKeys: [],
         },
       }),
-    };
+    });
     const result = validateSqlContractFully<Contract<SqlStorage>>(contractJson);
     // After validation, types should match the type parameter
     expectTypeOf(result).toEqualTypeOf<Contract<SqlStorage>>();
@@ -116,16 +91,7 @@ describe('SqlContractSerializer', () => {
   });
 
   it('handles empty foreignKeys array', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const contractInput = validSqlContractJson({
       storage: sqlStorageFixture({
         User: {
           columns: {
@@ -137,21 +103,12 @@ describe('SqlContractSerializer', () => {
           foreignKeys: [],
         },
       }),
-    };
+    });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
   it('rejects foreignKey referencing non-existent table', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const contractInput = validSqlContractJson({
       storage: sqlStorageFixture({
         User: {
           columns: {
@@ -184,7 +141,7 @@ describe('SqlContractSerializer', () => {
           ],
         },
       }),
-    };
+    });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
       /foreignKey references non-existent table "__unbound__\.NonExistent"/,
     );

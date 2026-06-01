@@ -1,7 +1,7 @@
 {
   "from": null,
-  "to": "sha256:06733db8971afcf2fb373dcd1278e801e9e1e083d6f07d07bc7479e143c938e3",
+  "to": "sha256:29059dfe21ca210e1f8cc382550e24c429f91f9021607b0c61c90228c4fb84a6",
   "providedInvariants": ["pgvector:install-vector-v1"],
   "createdAt": "2026-06-01T00:00:00.000Z",
-  "migrationHash": "sha256:d7357d41724e5a75f74909bf558d6d36f317d01a8f1a61e5a92f80d4ca07718b"
+  "migrationHash": "sha256:b96ff47e8da34232e94ceec345de674908979465d8f394965a980e0a958dea56"
 }

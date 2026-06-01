@@ -32,6 +32,14 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
@@ -40,6 +48,9 @@
     "./config-types": "./dist/config-types.mjs",
     "./contract-builder": "./dist/contract-builder.mjs",
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

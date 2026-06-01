@@ -4,7 +4,7 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
 import { createMockSpi } from './mock-spi';
-import { createTestContract, emit } from './utils';
+import { createTestContract, emit, modelsFromCanonicalContract } from './utils';
 
 const mockSqlHook = createMockSpi();
 
@@ -195,7 +195,7 @@ describe('emitter integration', () => {
         targetFamily: contractJson1['targetFamily'] as string,
         target: contractJson1['target'] as string,
         roots: contractJson1['roots'] as Record<string, CrossReference>,
-        models: contractJson1['models'] as Record<string, unknown>,
+        models: modelsFromCanonicalContract(contractJson1),
         storage: contractJson1['storage'] as Record<string, unknown>,
         extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
         capabilities:

@@ -88,37 +88,46 @@ const baseContract = defineContract({
   },
 });
 
-const userModel = baseContract.models['User']!;
+const defaultNamespace = baseContract.domain.namespaces['public']!;
+const userModel = defaultNamespace.models['User']!;
 
 export const contract = {
   ...baseContract,
-  models: {
-    ...baseContract.models,
-    User: {
-      ...userModel,
-      fields: {
-        ...userModel.fields,
-        address: {
-          nullable: true as const,
-          type: { kind: 'valueObject' as const, name: 'Address' },
+  domain: {
+    namespaces: {
+      ...baseContract.domain.namespaces,
+      public: {
+        ...defaultNamespace,
+        models: {
+          ...defaultNamespace.models,
+          User: {
+            ...userModel,
+            fields: {
+              ...userModel.fields,
+              address: {
+                nullable: true as const,
+                type: { kind: 'valueObject' as const, name: 'Address' },
+              },
+            },
+          },
         },
-      },
-    },
-  },
-  valueObjects: {
-    Address: {
-      fields: {
-        street: {
-          nullable: false as const,
-          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
-        },
-        city: {
-          nullable: false as const,
-          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
-        },
-        zip: {
-          nullable: true as const,
-          type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+        valueObjects: {
+          Address: {
+            fields: {
+              street: {
+                nullable: false as const,
+                type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+              },
+              city: {
+                nullable: false as const,
+                type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+              },
+              zip: {
+                nullable: true as const,
+                type: { kind: 'scalar' as const, codecId: 'pg/text@1' as const },
+              },
+            },
+          },
         },
       },
     },

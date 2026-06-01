@@ -5,10 +5,6 @@
   "type": "module",
   "sideEffects": false,
   "description": "CLI telemetry client for Prisma Next: detached subprocess sender, gating resolution, user-config store, and consent surface",
-  "files": [
-    "dist",
-    "src"
-  ],
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
@@ -35,6 +31,18 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "exports": {
     ".": {
       "types": "./dist/exports/index.d.mts",
@@ -44,6 +52,9 @@
       "types": "./dist/sender.d.mts",
       "import": "./dist/sender.mjs"
     }
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

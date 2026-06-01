@@ -1,4 +1,4 @@
 {
-  "hash": "sha256:59877923532fc526703f572f1d54bdd6050502ef30ede3333ee1393ea93b9716",
+  "hash": "sha256:5dde71f8985299c9eb464edb00d06e2bdef0501bd30b072a614afb48ed4dc21b",
   "invariants": ["paradedb:install-pg-search-v1"]
 }

@@ -1,3 +1,4 @@
+import { contractModels } from '@prisma-next/contract/types';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import { describe, expect, it } from 'vitest';
 
@@ -22,7 +23,7 @@ describe('postgres defineContract wrap', () => {
     }));
     expect(result.target).toBe('postgres');
     expect(result.targetFamily).toBe('sql');
-    expect((result.models as Record<string, unknown>)['Foo']).toBeDefined();
+    expect(contractModels(result)['Foo']).toBeDefined();
   });
 
   it('accepts extensionPacks: undefined', () => {
@@ -36,6 +37,6 @@ describe('postgres defineContract wrap', () => {
         Bar: model('Bar', { fields: { id: field.column(textColumn).id() } }),
       },
     });
-    expect((result.models as Record<string, unknown>)['Bar']).toBeDefined();
+    expect(contractModels(result)['Bar']).toBeDefined();
   });
 });

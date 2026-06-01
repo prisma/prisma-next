@@ -1,5 +1,4 @@
 import { crossRef } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
 import { type } from 'arktype';
@@ -11,6 +10,7 @@ import {
 import {
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
+  modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
   testEnumEntityContributions,
@@ -62,7 +62,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             user: {
               columns: {
@@ -76,7 +76,7 @@ describe('interpretPslDocumentToSqlContract', () => {
         },
       },
     });
-    expect(result.value.roots).toEqual({ user: crossRef('User') });
+    expect(result.value.roots).toEqual({ user: crossRef('User', 'public') });
   });
 
   it('does not synthesise capabilities the target did not contribute', () => {
@@ -165,7 +165,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             user: {
               columns: {
@@ -214,9 +214,9 @@ model Comment {
     if (!result.ok) return;
 
     expect(result.value.roots).toEqual({
-      user: crossRef('User'),
-      post: crossRef('Post'),
-      comment: crossRef('Comment'),
+      user: crossRef('User', 'public'),
+      post: crossRef('Post', 'public'),
+      comment: crossRef('Comment', 'public'),
     });
   });
 
@@ -240,10 +240,10 @@ model Comment {
 
     expect(result.value.targetFamily).toBe('sql');
     expect(result.value.target).toBe('postgres');
-    expect(result.value.roots).toEqual({ user: crossRef('User') });
+    expect(result.value.roots).toEqual({ user: crossRef('User', 'public') });
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             user: {
               columns: {
@@ -256,7 +256,7 @@ model Comment {
         },
       },
     });
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       User: {
         storage: {
           table: 'user',
@@ -289,7 +289,7 @@ model Comment {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             idlessThing: {
               columns: {
@@ -306,7 +306,7 @@ model Comment {
     // present — assert absence directly via a narrowed accessor instead.
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
     expect(unboundTables(storage)['idlessThing']?.primaryKey).toBeUndefined();
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       IdlessThing: {
         storage: {
           table: 'idlessThing',
@@ -341,7 +341,7 @@ model Comment {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             compositeThing: {
               primaryKey: { columns: ['email', 'token'] },
@@ -375,7 +375,7 @@ model Comment {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             composite_thing: {
               primaryKey: {
@@ -429,14 +429,20 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.roots).toEqual({ user: crossRef('User'), post: crossRef('Post') });
+    expect(result.value.roots).toEqual({
+      user: crossRef('User', 'public'),
+      post: crossRef('Post', 'public'),
+    });
     expect(documentScopedTypes(result.value)).toMatchObject({
       Email: { codecId: 'pg/text@1', nativeType: 'text' },
     });
-    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    const models = modelsOf(result.value) as Record<
+      string,
+      { relations?: Record<string, unknown> }
+    >;
     expect(models['Post']?.relations).toMatchObject({
       author: {
-        to: crossRef('User'),
+        to: crossRef('User', 'public'),
         cardinality: 'N:1',
         on: {
           localFields: ['userId'],
@@ -474,12 +480,12 @@ model Member {
     if (!result.ok) return;
 
     expect(result.value.roots).toEqual({
-      org_team: crossRef('Team'),
-      team_member: crossRef('Member'),
+      org_team: crossRef('Team', 'public'),
+      team_member: crossRef('Member', 'public'),
     });
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             org_team: {
               columns: {
@@ -498,12 +504,12 @@ model Member {
               foreignKeys: [
                 {
                   source: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    namespaceId: 'public',
                     tableName: 'team_member',
                     columns: ['team_ref'],
                   },
                   target: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    namespaceId: 'public',
                     tableName: 'org_team',
                     columns: ['team_id'],
                   },
@@ -514,7 +520,7 @@ model Member {
         },
       },
     });
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       Team: {
         storage: {
           table: 'org_team',
@@ -559,7 +565,7 @@ model AuditLog {
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(unboundTables(storage)['audit_log']?.primaryKey).toBeUndefined();
-      expect(result.value.models).toMatchObject({
+      expect(modelsOf(result.value)).toMatchObject({
         AuditLog: { storage: { table: 'audit_log' } },
       });
     });
@@ -585,7 +591,7 @@ model OrderItem {
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          public: {
             tables: {
               order_item: {
                 primaryKey: {
@@ -623,7 +629,7 @@ model OrderItem {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             membership: {
               primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
@@ -657,7 +663,7 @@ model OrderItem {
 
       expect(result.value.storage).toMatchObject({
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          public: {
             tables: {
               doc: {
                 indexes: [
@@ -695,7 +701,7 @@ model OrderItem {
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          public: {
             tables: {
               doc: {
                 indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
@@ -809,7 +815,7 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      expect(storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['doc']).toMatchObject({
+      expect(unboundTables(storage)['doc']).toMatchObject({
         indexes: [{ columns: ['body'] }],
       });
     });

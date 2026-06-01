@@ -2,50 +2,56 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "feature_flag": {
       "model": "FeatureFlag",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
-  "models": {
-    "FeatureFlag": {
-      "fields": {
-        "enabled": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/bool@1",
-            "kind": "scalar"
-          }
-        },
-        "key": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "FeatureFlag": {
+            "fields": {
+              "enabled": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "key": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "enabled": {
+                  "column": "enabled"
+                },
+                "key": {
+                  "column": "key"
+                }
+              },
+              "table": "feature_flag"
+            }
           }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "enabled": {
-            "column": "enabled"
-          },
-          "key": {
-            "column": "key"
-          }
-        },
-        "table": "feature_flag"
       }
     }
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "feature_flag": {
             "columns": {
@@ -72,10 +78,11 @@
         }
       }
     },
-    "storageHash": "sha256:1a11ef0c4ef2dc0d6ae0663e65bf61113f980fee7f55e3dd828f65fe439a88cb"
+    "storageHash": "sha256:abd6046b098e9dd1d014eb490ca1edfa884631957a4727c76e6d4d1f4e3828be"
   },
   "capabilities": {
     "postgres": {
+      "distinctOn": true,
       "jsonAgg": true,
       "lateral": true,
       "limit": true,
@@ -85,6 +92,7 @@
     "sql": {
       "defaultInInsert": true,
       "enums": true,
+      "lateral": true,
       "returning": true
     }
   },

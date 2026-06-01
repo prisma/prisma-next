@@ -32,9 +32,7 @@ export interface SqlNamespaceTablesInput {
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   readonly types?: Record<string, SqlStorageTypeEntry>;
-  readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
-    readonly __unbound__: SqlNamespace;
-  };
+  readonly namespaces: Readonly<Record<string, SqlNamespace>>;
 }
 
 /**
@@ -63,7 +61,7 @@ export interface SqlStorageInput<THash extends string = string> {
 // SQL concretions always store `StorageTable`-shaped values in `tables`.
 // `tables` is a SQL-family idiom — the framework `Namespace` contract no
 // longer mandates this field; Mongo namespaces carry `collections`
-// instead. The `__unbound__` slot uses the same narrowing as every other
+// instead. The `tables` slot uses the same narrowing as every other
 // SQL namespace; the wider `Record<string, object>` on `StorageTable` is
 // only there so emitted `contract.d.ts` table literals (which lack the
 // runtime `kind` discriminator on `StorageTable`) structurally satisfy
@@ -75,9 +73,7 @@ export type SqlNamespace = Namespace & {
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
-    readonly __unbound__: SqlNamespace;
-  };
+  readonly namespaces: Readonly<Record<string, SqlNamespace>>;
   declare readonly types?: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
 
   constructor(input: SqlStorageInput<THash>) {

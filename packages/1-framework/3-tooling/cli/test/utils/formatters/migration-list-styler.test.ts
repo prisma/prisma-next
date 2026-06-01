@@ -1,4 +1,4 @@
-import { bold, cyan, cyanBright, dim, green, greenBright, yellow } from 'colorette';
+import { bold, cyan, cyanBright, dim, green, yellow } from 'colorette';
 import { describe, expect, it } from 'vitest';
 import {
   IDENTITY_MIGRATION_LIST_STYLER,
@@ -104,15 +104,20 @@ describe('createAnsiMigrationListStyler', () => {
     );
   });
 
-  it('renders user refs in green and the live-state `db` marker in green-bold', () => {
+  it('renders refs in green, emphasizes the contract marker, and leaves db plain', () => {
     const styler = createAnsiMigrationListStyler({ useColor: true });
     expect(styler.refs(['production'])).toBe(green('(') + green('production') + green(')'));
     expect(styler.refs(['production', 'staging'])).toBe(
       green('(') + [green('production'), green('staging')].join(green(', ')) + green(')'),
     );
-    expect(styler.refs(['db'])).toBe(green('(') + bold(greenBright('db')) + green(')'));
-    expect(styler.refs(['production', 'db'])).toBe(
-      green('(') + [green('production'), bold(greenBright('db'))].join(green(', ')) + green(')'),
+    // `db` is just another ref — plain green, no special treatment.
+    expect(styler.refs(['db'])).toBe(green('(') + green('db') + green(')'));
+    // `contract` is the desired-state marker — emphasized with bold.
+    expect(styler.refs(['contract'])).toBe(green('(') + bold(green('contract')) + green(')'));
+    expect(styler.refs(['production', 'db', 'contract'])).toBe(
+      green('(') +
+        [green('production'), green('db'), bold(green('contract'))].join(green(', ')) +
+        green(')'),
     );
   });
 });
@@ -144,7 +149,7 @@ describe('renderMigrationListWithStyle', () => {
       `⟲ ${bold('20260601T1200_backfill_emails')}  ` +
       `${dim(cyan('55bada2'))}` +
       `  ${yellow('{backfill_emails_v1}')} ` +
-      `${green('(') + [green('production'), bold(greenBright('db'))].join(green(', ')) + green(')')}`;
+      `${green('(') + [green('production'), green('db')].join(green(', ')) + green(')')}`;
     const expected = `${expectedRow}\n\n${dim('1 migration(s) on disk')}`;
     expect(styled).toBe(expected);
   });

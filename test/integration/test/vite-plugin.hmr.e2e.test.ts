@@ -14,12 +14,12 @@ import { replaceInFileOrThrow } from './utils/contract-fixture-editing';
 const tsFixtureSubdir = 'vite-plugin';
 const pslFixtureSubdir = 'vite-plugin-psl';
 
-const UNBOUND_NAMESPACE = '__unbound__';
+const POSTGRES_DEFAULT_NAMESPACE = 'public';
 
 function unboundUserColumns(storage: {
   namespaces: Record<string, { tables: { user: { columns: Record<string, unknown> } } }>;
 }) {
-  return storage.namespaces[UNBOUND_NAMESPACE]!.tables.user.columns;
+  return storage.namespaces[POSTGRES_DEFAULT_NAMESPACE]!.tables.user.columns;
 }
 
 type ViteModuleNodeLike = object;
@@ -175,7 +175,7 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           );
           expect(initialContract.storage).toMatchObject({
             namespaces: {
-              [UNBOUND_NAMESPACE]: {
+              [POSTGRES_DEFAULT_NAMESPACE]: {
                 tables: {
                   user: {
                     columns: {
@@ -210,7 +210,7 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           );
           expect(updatedContract.storage).toMatchObject({
             namespaces: {
-              [UNBOUND_NAMESPACE]: {
+              [POSTGRES_DEFAULT_NAMESPACE]: {
                 tables: {
                   user: {
                     columns: {
@@ -260,7 +260,7 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           );
           expect(initialContract.storage).toMatchObject({
             namespaces: {
-              [UNBOUND_NAMESPACE]: {
+              [POSTGRES_DEFAULT_NAMESPACE]: {
                 tables: {
                   user: {
                     columns: {
@@ -286,7 +286,7 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           );
           expect(updatedContract.storage).toMatchObject({
             namespaces: {
-              [UNBOUND_NAMESPACE]: {
+              [POSTGRES_DEFAULT_NAMESPACE]: {
                 tables: {
                   user: {
                     columns: {
@@ -356,7 +356,7 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           );
           expect(contractAfterConfigChange.storage).toMatchObject({
             namespaces: {
-              [UNBOUND_NAMESPACE]: {
+              [POSTGRES_DEFAULT_NAMESPACE]: {
                 tables: {
                   user: {
                     columns: {
@@ -385,7 +385,7 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           );
           expect(contractAfterAltEdit.storage).toMatchObject({
             namespaces: {
-              [UNBOUND_NAMESPACE]: {
+              [POSTGRES_DEFAULT_NAMESPACE]: {
                 tables: {
                   user: {
                     columns: {
@@ -486,7 +486,7 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           );
           expect(recoveredContract.storage).toMatchObject({
             namespaces: {
-              [UNBOUND_NAMESPACE]: {
+              [POSTGRES_DEFAULT_NAMESPACE]: {
                 tables: {
                   user: {
                     columns: {

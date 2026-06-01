@@ -41,6 +41,14 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src",
@@ -75,12 +83,15 @@
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/3-targets/3-targets/postgres"
   },
   "prismaNext": {
-    "minServerVersion": "14"
+    "minServerVersion": "17"
   }
 }

@@ -2,10 +2,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
+import type { Models } from './fixtures/generated/contract';
 import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
-export type TestModelName = Extract<keyof TestContract['models'], string>;
+export type TestModelName = Extract<keyof Models, string>;
 
 export const baseContract = getTestContract();
 

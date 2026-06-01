@@ -43,6 +43,14 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
@@ -56,6 +64,9 @@
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

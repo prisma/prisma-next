@@ -1,15 +1,16 @@
-import { bold, cyan, cyanBright, dim, green, greenBright, yellow } from 'colorette';
+import { bold, cyan, cyanBright, dim, green, yellow } from 'colorette';
 import { IDENTITY_MIGRATION_LIST_STYLER, type MigrationListStyler } from './migration-list-render';
 
 /**
- * The reserved ref name for the live-database marker. Treated as a
- * structurally distinct token from user-named refs so the styler can
- * make it visually pop in `(refs)` decorations.
+ * The current contract overlay marker. Unlike user refs, this names the user's
+ * declared desired state — the implicit base/target for `plan` / `migrate` —
+ * not a stored label. It is emphasized (bold) so it stands out from plain refs
+ * (including the live-database `db` marker, which is just another ref).
  */
-const DB_REF_NAME = 'db';
+export const CONTRACT_MARKER_NAME = 'contract';
 
 function styleRefName(name: string): string {
-  return name === DB_REF_NAME ? bold(greenBright(name)) : green(name);
+  return name === CONTRACT_MARKER_NAME ? bold(green(name)) : green(name);
 }
 
 /**
@@ -28,7 +29,8 @@ function styleRefName(name: string): string {
  * - `glyph` (`→` / `⟲` / `∅`): dim
  * - `lane` (graph gutter lines `│` and fan/join connectors `├─┐` / `├─┘`): dim
  * - `invariants` (`{...}`): yellow
- * - `refs` (`(...)`): green; the live-DB `db` marker inside is green-bold
+ * - `refs` (`(...)`): green; the `contract` desired-state marker inside is
+ *   green-bold (the active ref is bolded separately by the tree styler)
  * - `spaceHeading` (`<spaceId>:`): bold
  * - `summary`: dim
  * - `emptyState`: dim

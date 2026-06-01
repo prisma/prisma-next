@@ -2,152 +2,158 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "post": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
-  "models": {
-    "Post": {
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "Post": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "table": "post"
+            }
+          },
+          "User": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "table": "user"
             }
           }
-        },
-        "title": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "userId": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
         }
-      },
-      "relations": {
-        "user": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": [
-              "userId"
-            ],
-            "targetFields": [
-              "id"
-            ]
-          },
-          "to": {
-            "model": "User",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "createdAt"
-          },
-          "id": {
-            "column": "id"
-          },
-          "title": {
-            "column": "title"
-          },
-          "userId": {
-            "column": "userId"
-          }
-        },
-        "table": "post"
-      }
-    },
-    "User": {
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
-            }
-          }
-        }
-      },
-      "relations": {
-        "posts": {
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "userId"
-            ]
-          },
-          "to": {
-            "model": "Post",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "createdAt"
-          },
-          "email": {
-            "column": "email"
-          },
-          "id": {
-            "column": "id"
-          }
-        },
-        "table": "user"
       }
     }
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "post": {
             "columns": {
@@ -187,14 +193,14 @@
                   "columns": [
                     "userId"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "post"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "user"
                 }
               }
@@ -244,10 +250,10 @@
         }
       }
     },
-    "storageHash": "sha256:5d2b2c2468240c79ee5f380951267aa777888966aeba3bb19d573825189e7816"
+    "storageHash": "sha256:626aa1da8fa46b00f7665313531557ccd427550fb67616ab09c9526c41b1629b"
   },
   "execution": {
-    "executionHash": "sha256:8c5eef43d2153fd832b8288ed2d8ffc9f5afb62908f8b4b7e6a4b7018444c41f",
+    "executionHash": "sha256:b07c7341fd536d01ffc21a630b01fde3d05ea63b7ba0d8d1be7b0fe635217ad5",
     "mutations": {
       "defaults": [
         {

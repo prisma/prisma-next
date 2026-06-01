@@ -13,7 +13,7 @@ import {
   MongoMigrationRunner,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
-import { timeouts } from '@prisma-next/test-utils';
+import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -24,16 +24,18 @@ const emptyContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { users: crossRef('User') },
-  models: {
-    User: {
-      fields: {
-        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
-        email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+  domain: applicationDomainOf({
+    models: {
+      User: {
+        fields: {
+          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        },
+        relations: {},
+        storage: { collection: 'users' },
       },
-      relations: {},
-      storage: { collection: 'users' },
     },
-  },
+  }),
   storage: {
     namespaces: {
       __unbound__: {
@@ -56,16 +58,18 @@ const indexedContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { users: crossRef('User') },
-  models: {
-    User: {
-      fields: {
-        _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
-        email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+  domain: applicationDomainOf({
+    models: {
+      User: {
+        fields: {
+          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        },
+        relations: {},
+        storage: { collection: 'users' },
       },
-      relations: {},
-      storage: { collection: 'users' },
     },
-  },
+  }),
   storage: {
     namespaces: {
       __unbound__: {

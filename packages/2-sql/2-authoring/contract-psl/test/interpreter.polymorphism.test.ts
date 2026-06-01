@@ -9,6 +9,7 @@ import {
 import {
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
+  modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -41,7 +42,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
     if (!result.ok) return;
 
     expect(result.value.roots).toEqual({});
-    expect(result.value.models).toEqual({});
+    expect(modelsOf(result.value)).toEqual({});
     expect(documentScopedTypes(result.value)).toMatchObject({
       Email: {
         codecId: 'pg/text@1',
@@ -77,7 +78,7 @@ model Bug {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.models['Task']).toMatchObject({
+      expect(modelsOf(result.value)['Task']).toMatchObject({
         discriminator: { field: 'type' },
         variants: { Bug: { value: 'bug' } },
       });
@@ -109,8 +110,8 @@ model Bug {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.models['Bug']).toMatchObject({
-        base: crossRef('Task'),
+      expect(modelsOf(result.value)['Bug']).toMatchObject({
+        base: crossRef('Task', 'public'),
       });
     });
 
@@ -141,7 +142,7 @@ model Bug {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.models['Bug']?.storage).toMatchObject({ table: 'tasks' });
+      expect(modelsOf(result.value)['Bug']?.storage).toMatchObject({ table: 'tasks' });
     });
 
     it('variant with @@map gets own table (MTI)', () => {
@@ -172,7 +173,7 @@ model Feature {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.models['Feature']?.storage).toMatchObject({ table: 'features' });
+      expect(modelsOf(result.value)['Feature']?.storage).toMatchObject({ table: 'features' });
     });
 
     it('variant models contain only their own fields (thin)', () => {
@@ -201,7 +202,7 @@ model Bug {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      const bugFields = Object.keys(result.value.models['Bug']?.fields ?? {});
+      const bugFields = Object.keys(modelsOf(result.value)['Bug']?.fields ?? {});
       expect(bugFields).toEqual(['severity']);
     });
 
@@ -238,15 +239,15 @@ model Feature {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.models['Task']).toMatchObject({
+      expect(modelsOf(result.value)['Task']).toMatchObject({
         discriminator: { field: 'type' },
         variants: {
           Bug: { value: 'bug' },
           Feature: { value: 'feature' },
         },
       });
-      expect(result.value.models['Bug']).toMatchObject({ base: crossRef('Task') });
-      expect(result.value.models['Feature']).toMatchObject({ base: crossRef('Task') });
+      expect(modelsOf(result.value)['Bug']).toMatchObject({ base: crossRef('Task', 'public') });
+      expect(modelsOf(result.value)['Feature']).toMatchObject({ base: crossRef('Task', 'public') });
     });
 
     it('variants are not included in roots', () => {
@@ -275,8 +276,8 @@ model Bug {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.roots).toHaveProperty('task', crossRef('Task'));
-      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug'));
+      expect(result.value.roots).toHaveProperty('task', crossRef('Task', 'public'));
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug', 'public'));
     });
   });
 
@@ -550,20 +551,20 @@ model Feature {
 
       expect(() => validateContractDomain(result.value)).not.toThrow();
 
-      expect(result.value.models['Task']).toMatchObject({
+      expect(modelsOf(result.value)['Task']).toMatchObject({
         discriminator: { field: 'type' },
         variants: {
           Bug: { value: 'bug' },
           Feature: { value: 'feature' },
         },
       });
-      expect(result.value.models['Bug']).toMatchObject({ base: crossRef('Task') });
-      expect(result.value.models['Feature']).toMatchObject({ base: crossRef('Task') });
-      expect(result.value.models['Bug']?.storage).toMatchObject({ table: 'tasks' });
-      expect(result.value.models['Feature']?.storage).toMatchObject({ table: 'features' });
-      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug'));
-      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Feature'));
-      expect(result.value.roots).toHaveProperty('tasks', crossRef('Task'));
+      expect(modelsOf(result.value)['Bug']).toMatchObject({ base: crossRef('Task', 'public') });
+      expect(modelsOf(result.value)['Feature']).toMatchObject({ base: crossRef('Task', 'public') });
+      expect(modelsOf(result.value)['Bug']?.storage).toMatchObject({ table: 'tasks' });
+      expect(modelsOf(result.value)['Feature']?.storage).toMatchObject({ table: 'features' });
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug', 'public'));
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Feature', 'public'));
+      expect(result.value.roots).toHaveProperty('tasks', crossRef('Task', 'public'));
     });
   });
 });

@@ -7,9 +7,11 @@
  * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  */
 
+import { contractModels } from '@prisma-next/contract/types';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
+import type { Contract, Models } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 
 describe('demo contract visualization DX', () => {
@@ -19,8 +21,8 @@ describe('demo contract visualization DX', () => {
     expect(contract.target).toBeDefined();
     expect(typeof contract.target).toBe('string');
     expect(contract.storage.storageHash).toBeDefined();
-    expect(contract.models).toBeDefined();
-    expect(typeof contract.models).toBe('object');
+    expect(contract.domain.namespaces).toBeDefined();
+    expect(typeof contract.domain.namespaces).toBe('object');
     expect(contract.storage).toBeDefined();
     expect(contract.storage.namespaces).toBeDefined();
     expect(contract.capabilities).toBeDefined();
@@ -32,9 +34,10 @@ describe('demo contract visualization DX', () => {
   it('validated contract exposes model storage field mappings', () => {
     const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
-    expect(contract.models.User.storage.table).toBe('user');
-    expect(contract.models.User.storage.fields.email.column).toBe('email');
-    expect(contract.models.Post.storage.fields.userId.column).toBe('userId');
+    const models = contractModels(contract) as Models;
+    expect(models.User.storage.table).toBe('user');
+    expect(models.User.storage.fields.email.column).toBe('email');
+    expect(models.Post.storage.fields.userId.column).toBe('userId');
   });
 
   it('validated contract omits _generated at runtime', () => {
@@ -53,8 +56,11 @@ describe('demo contract visualization DX', () => {
   it('validated contract is traversable for render use-case', () => {
     const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
-    for (const [, model] of Object.entries(contract.models)) {
-      const m = model as Record<string, unknown>;
+    for (const [, model] of Object.entries(contractModels(contract))) {
+      const m = blindCast<
+        Record<string, unknown>,
+        'contract model entries are plain records in render traversal'
+      >(model);
       expect(m['storage']).toBeDefined();
       expect(m['fields']).toBeDefined();
       expect(m['relations']).toBeDefined();

@@ -5,6 +5,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbSignCommand } from '../../src/commands/db-sign';
@@ -133,7 +134,7 @@ async function writeEndContract(packageDir: string, storageHash: string): Promis
     target: TARGET,
     profileHash: `sha256:${'p'.repeat(64)}`,
     storage: { storageHash },
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     roots: {},
   };
   await writeFile(join(packageDir, 'end-contract.json'), `${JSON.stringify(contract, null, 2)}\n`);

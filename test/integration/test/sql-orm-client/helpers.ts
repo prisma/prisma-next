@@ -1,8 +1,12 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import { contractModels, type Contract as FrameworkContract } from '@prisma-next/contract/types';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+
+const POSTGRES_DEFAULT_NAMESPACE_ID = 'public' as const;
+
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -44,6 +48,45 @@ export function withCapabilities<TCaps extends Record<string, Record<string, boo
   return { ...contract, capabilities };
 }
 
+export function withPatchedDomainModels<T extends FrameworkContract<SqlStorage>>(
+  contract: T,
+  patch: (models: Record<string, unknown>) => Record<string, unknown>,
+): T {
+  const namespaceId = POSTGRES_DEFAULT_NAMESPACE_ID;
+  const namespace = contract.domain.namespaces[namespaceId]!;
+  const models = contractModels(contract);
+  return {
+    ...contract,
+    domain: {
+      namespaces: {
+        ...contract.domain.namespaces,
+        [namespaceId]: {
+          ...namespace,
+          models: patch({ ...models }) as typeof namespace.models,
+        },
+      },
+    },
+  } as T;
+}
+
+type MutableDomainModel = {
+  fields: Record<string, unknown>;
+  relations: Record<string, unknown>;
+  storage: Record<string, unknown>;
+  discriminator?: { field: string };
+  variants?: Record<string, { value: string }>;
+  base?: string;
+};
+
+function unboundDomainModels(raw: {
+  domain: { namespaces: Record<string, { models: Record<string, unknown> }> };
+}): Record<string, MutableDomainModel> {
+  return raw.domain.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID]!.models as Record<
+    string,
+    MutableDomainModel
+  >;
+}
+
 const testContext: ExecutionContext<TestContract> = createExecutionContext({
   contract: baseTestContract,
   stack: createSqlExecutionStack({
@@ -76,7 +119,8 @@ export interface MockRuntime extends RuntimeQueryable {
 export function buildMixedPolyContract(): TestContract {
   const raw = JSON.parse(JSON.stringify(getTestContract()));
 
-  raw.models.Task = {
+  const domainModels = unboundDomainModels(raw);
+  domainModels['Task'] = {
     fields: {
       id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
       title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
@@ -91,21 +135,21 @@ export function buildMixedPolyContract(): TestContract {
     variants: { Bug: { value: 'bug' }, Feature: { value: 'feature' } },
   };
 
-  raw.models.Bug = {
+  domainModels['Bug'] = {
     fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
     base: 'Task',
   };
 
-  raw.models.Feature = {
+  domainModels['Feature'] = {
     fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
     relations: {},
     storage: { table: 'features', fields: { priority: { column: 'priority' } } },
     base: 'Task',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.tasks = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -118,7 +162,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.features = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -140,43 +184,47 @@ export function buildMixedPolyContract(): TestContract {
  */
 export function buildStiPolyContract(): TestContract {
   const raw = JSON.parse(JSON.stringify(getTestContract()));
+  const domainModels = unboundDomainModels(raw);
 
-  raw.models.User.fields.kind = {
+  const userModel = domainModels['User']!;
+  userModel.fields['kind'] = {
     nullable: false,
     type: { kind: 'scalar', codecId: 'pg/text@1' },
   };
-  raw.models.User.storage.fields.kind = { column: 'kind' };
-  raw.models.User.discriminator = { field: 'kind' };
-  raw.models.User.variants = {
+  (userModel.storage as { fields: Record<string, { column: string }> }).fields['kind'] = {
+    column: 'kind',
+  };
+  userModel.discriminator = { field: 'kind' };
+  userModel.variants = {
     Admin: { value: 'admin' },
     Regular: { value: 'regular' },
   };
 
-  raw.models.Admin = {
+  domainModels['Admin'] = {
     fields: { role: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'users', fields: { role: { column: 'role' } } },
     base: 'User',
   };
 
-  raw.models.Regular = {
+  domainModels['Regular'] = {
     fields: { plan: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'users', fields: { plan: { column: 'plan' } } },
     base: 'User',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.kind = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.role = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.plan = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,

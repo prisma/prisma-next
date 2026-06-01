@@ -2,159 +2,153 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "post": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
-    }
-  },
-  "models": {
-    "Post": {
-      "fields": {
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "rating": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/float8@1",
-            "kind": "scalar"
-          }
-        },
-        "title": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "userId": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "author": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": ["userId"],
-            "targetFields": ["id"]
-          },
-          "to": {
-            "model": "User",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "id": {
-            "column": "id"
-          },
-          "rating": {
-            "column": "rating"
-          },
-          "title": {
-            "column": "title"
-          },
-          "userId": {
-            "column": "userId"
-          }
-        },
-        "table": "post"
-      }
-    },
-    "User": {
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "isActive": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/bool@1",
-            "kind": "scalar"
-          }
-        },
-        "profile": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/jsonb@1",
-            "kind": "scalar"
-          }
-        },
-        "role": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/enum@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "createdAt"
-          },
-          "email": {
-            "column": "email"
-          },
-          "id": {
-            "column": "id"
-          },
-          "isActive": {
-            "column": "isActive"
-          },
-          "profile": {
-            "column": "profile"
-          },
-          "role": {
-            "column": "role"
-          }
-        },
-        "table": "user"
-      }
+      "namespace": "public"
     }
   },
   "domain": {
-    "__unbound__": {
-      "types": {
-        "Email": {
-          "codecId": "pg/text@1",
-          "kind": "codec-instance",
-          "nativeType": "text",
-          "typeParams": {}
+    "namespaces": {
+      "public": {
+        "models": {
+          "Post": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "rating": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "author": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": ["userId"],
+                  "targetFields": ["id"]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "rating": {
+                  "column": "rating"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "table": "post"
+            }
+          },
+          "User": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "isActive": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "profile": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "role": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/enum@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "isActive": {
+                  "column": "isActive"
+                },
+                "profile": {
+                  "column": "profile"
+                },
+                "role": {
+                  "column": "role"
+                }
+              },
+              "table": "user"
+            }
+          }
         }
       }
     }
@@ -163,6 +157,19 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "tables": {}
+      },
+      "public": {
+        "enum": {
+          "Role": {
+            "codecId": "pg/enum@1",
+            "kind": "postgres-enum",
+            "name": "Role",
+            "nativeType": "Role",
+            "values": ["USER", "ADMIN"]
+          }
+        },
+        "id": "public",
         "tables": {
           "post": {
             "columns": {
@@ -199,12 +206,12 @@
                 "onUpdate": "cascade",
                 "source": {
                   "columns": ["userId"],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "post"
                 },
                 "target": {
                   "columns": ["id"],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "user"
                 }
               }
@@ -282,22 +289,9 @@
             ]
           }
         }
-      },
-      "public": {
-        "enum": {
-          "Role": {
-            "codecId": "pg/enum@1",
-            "kind": "postgres-enum",
-            "name": "Role",
-            "nativeType": "Role",
-            "values": ["USER", "ADMIN"]
-          }
-        },
-        "id": "public",
-        "tables": {}
       }
     },
-    "storageHash": "sha256:a0eae5e868776b85d3a394fe5d916c1518660c9e7cf7ab5f3ece00a05b27190d",
+    "storageHash": "sha256:a901bb3c04da99b42ac7a5b5e7ea162dfcc22231a690177743353cb6c501262b",
     "types": {
       "Email": {
         "codecId": "pg/text@1",

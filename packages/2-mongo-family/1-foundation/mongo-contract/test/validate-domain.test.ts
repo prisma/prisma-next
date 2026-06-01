@@ -1,28 +1,52 @@
-import { asNamespaceId } from '@prisma-next/contract/types';
-import { validateContractDomain } from '@prisma-next/contract/validate-domain';
+import {
+  asNamespaceId,
+  type ContractModelBase,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
+} from '@prisma-next/contract/types';
+import {
+  type DomainContractShape,
+  validateContractDomain,
+} from '@prisma-next/contract/validate-domain';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
-function crossRef(model: string, namespace = 'default') {
+function crossRef(model: string, namespace: string = UNBOUND_DOMAIN_NAMESPACE_ID) {
   return { namespace: asNamespaceId(namespace), model };
 }
 
 function makeMinimalModel(overrides: Record<string, unknown> = {}) {
   return {
     fields: {},
+    relations: {},
+    storage: {},
     ...overrides,
   };
 }
 
-function makeValidContract(overrides: Record<string, unknown> = {}) {
-  return {
-    roots: { items: crossRef('Item') },
-    models: {
-      Item: makeMinimalModel({
-        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
-      }),
-    },
-    ...overrides,
+function makeValidContract(overrides: Record<string, unknown> = {}): DomainContractShape {
+  const defaultModels = {
+    Item: makeMinimalModel({
+      fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
+    }),
   };
+  const {
+    models: modelsOverride,
+    roots: rootsOverride,
+    domain: domainOverride,
+    ...rest
+  } = overrides;
+  const models = {
+    ...defaultModels,
+    ...(modelsOverride !== undefined ? (modelsOverride as Record<string, ContractModelBase>) : {}),
+  };
+  return {
+    roots: (rootsOverride as DomainContractShape['roots']) ?? { items: crossRef('Item') },
+    domain:
+      domainOverride !== undefined
+        ? (domainOverride as DomainContractShape['domain'])
+        : applicationDomainOf({ models }),
+    ...rest,
+  } as DomainContractShape;
 }
 
 describe('validateContractDomain()', () => {
@@ -286,7 +310,7 @@ describe('validateContractDomain()', () => {
 
   describe('happy path', () => {
     it('validates a complex contract with polymorphism and relations', () => {
-      const contract = {
+      const contract = makeValidContract({
         roots: { tasks: crossRef('Task'), users: crossRef('User') },
         models: {
           Task: makeMinimalModel({
@@ -360,7 +384,7 @@ describe('validateContractDomain()', () => {
             },
           }),
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).not.toThrow();
     });
   });

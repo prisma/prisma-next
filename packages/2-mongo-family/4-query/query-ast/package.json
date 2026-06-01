@@ -29,6 +29,14 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
@@ -43,6 +51,9 @@
       "import": "./dist/exports/control.mjs"
     },
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

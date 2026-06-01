@@ -1,10 +1,7 @@
-import type { Contract } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
+import { createMongoContract } from './create-mongo-contract';
 
-export const blogContract: Contract = {
-  targetFamily: 'mongo',
-  target: 'mongo',
-  profileHash: 'sha256:test',
+export const blogContract = createMongoContract({
   roots: {
     users: crossRef('User'),
     posts: crossRef('Post'),
@@ -72,7 +69,4 @@ export const blogContract: Contract = {
       },
     },
   },
-  extensionPacks: {},
-  capabilities: {},
-  meta: {},
-};
+});

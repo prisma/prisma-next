@@ -1,4 +1,3 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -7,8 +6,10 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  valueObjectsOf,
 } from './fixtures';
 
 describe('interpretPslDocumentToSqlContract value objects and list fields', () => {
@@ -45,7 +46,7 @@ model User {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.valueObjects).toEqual({
+    expect(valueObjectsOf(result.value)).toEqual({
       Address: {
         fields: {
           street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
@@ -78,7 +79,7 @@ model User {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.valueObjects).toEqual({
+    expect(valueObjectsOf(result.value)).toEqual({
       Address: {
         fields: {
           street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
@@ -110,7 +111,7 @@ model User {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       User: {
         fields: {
           homeAddress: {
@@ -123,7 +124,7 @@ model User {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             user: {
               columns: {
@@ -157,7 +158,7 @@ model User {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       User: {
         fields: {
           tags: {
@@ -171,7 +172,7 @@ model User {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             user: {
               columns: {
@@ -210,7 +211,7 @@ model User {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       User: {
         fields: {
           addresses: {
@@ -224,7 +225,7 @@ model User {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             user: {
               columns: {
@@ -268,7 +269,7 @@ model Order {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.valueObjects).toEqual({
+    expect(valueObjectsOf(result.value)).toEqual({
       Address: {
         fields: {
           street: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
@@ -301,6 +302,6 @@ model Order {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.valueObjects).toBeUndefined();
+    expect(valueObjectsOf(result.value)).toBeUndefined();
   });
 });

@@ -11,6 +11,7 @@ import {
   type Codec as SqlCodec,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { renderLoweredSql } from '../src/core/sql-renderer';
 import type { PostgresContract } from '../src/core/types';
@@ -75,7 +76,7 @@ const baseContract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
 }) as PostgresContract;
 
 function selectWithParam(column: string, codecId: string | undefined, value: unknown) {

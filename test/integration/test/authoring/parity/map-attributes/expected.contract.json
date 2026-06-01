@@ -2,78 +2,84 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "org_team": {
       "model": "Team",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "team_member": {
       "model": "Member",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
-  "models": {
-    "Member": {
-      "fields": {
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "teamId": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "team": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": ["teamId"],
-            "targetFields": ["id"]
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "Member": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "teamId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "team": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": ["teamId"],
+                  "targetFields": ["id"]
+                },
+                "to": {
+                  "model": "Team",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "member_id"
+                },
+                "teamId": {
+                  "column": "team_ref"
+                }
+              },
+              "table": "team_member"
+            }
           },
-          "to": {
-            "model": "Team",
-            "namespace": "__unbound__"
+          "Team": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "team_id"
+                }
+              },
+              "table": "org_team"
+            }
           }
         }
-      },
-      "storage": {
-        "fields": {
-          "id": {
-            "column": "member_id"
-          },
-          "teamId": {
-            "column": "team_ref"
-          }
-        },
-        "table": "team_member"
-      }
-    },
-    "Team": {
-      "fields": {
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "id": {
-            "column": "team_id"
-          }
-        },
-        "table": "org_team"
       }
     }
   },
@@ -81,6 +87,10 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "tables": {}
+      },
+      "public": {
+        "id": "public",
         "tables": {
           "org_team": {
             "columns": {
@@ -119,12 +129,12 @@
                 "onUpdate": "cascade",
                 "source": {
                   "columns": ["team_ref"],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "team_member"
                 },
                 "target": {
                   "columns": ["team_id"],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "org_team"
                 }
               }
@@ -146,7 +156,7 @@
         }
       }
     },
-    "storageHash": "sha256:9732291f4b31310d455b987a854d21cb96db158ec1d29d3aa5ea09f5ae6c64a0"
+    "storageHash": "sha256:5d0fc9f0024b3023bec2a3465d83deedacfb6c02e216ef599bfb7cfef9889b9c"
   },
   "capabilities": {
     "postgres": {

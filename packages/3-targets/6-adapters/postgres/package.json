@@ -4,10 +4,6 @@
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
-  "files": [
-    "dist",
-    "src"
-  ],
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
@@ -48,6 +44,18 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "exports": {
     "./adapter": "./dist/adapter.mjs",
     "./column-types": "./dist/column-types.mjs",
@@ -56,6 +64,9 @@
     "./runtime": "./dist/runtime.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

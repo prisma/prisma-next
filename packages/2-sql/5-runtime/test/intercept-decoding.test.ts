@@ -15,6 +15,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {
@@ -37,7 +38,7 @@ const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
   profileHash: profileHash('sha256:test'),
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),

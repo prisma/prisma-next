@@ -26,16 +26,22 @@ function sampleContractIR(variant: 'a' | 'b' = 'a'): ContractIR {
       target: 'postgres',
       profileHash: PROFILE_HASH,
       storage: { storageHash },
-      models: {
-        User: {
-          fields: {
-            id: {
-              nullable: false,
-              type: { kind: 'scalar', codecId: 'sql/int4@1' },
+      domain: {
+        namespaces: {
+          __unbound__: {
+            models: {
+              User: {
+                fields: {
+                  id: {
+                    nullable: false,
+                    type: { kind: 'scalar', codecId: 'sql/int4@1' },
+                  },
+                },
+                relations: {},
+                storage: { table: 'users', namespace: 'public' },
+              },
             },
           },
-          relations: {},
-          storage: { table: 'users', namespace: 'public' },
         },
       },
       roots: {},

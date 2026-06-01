@@ -2,60 +2,66 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
-  "models": {
-    "User": {
-      "fields": {
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "User": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "table": "user"
+            }
           }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "createdAt": {
-            "column": "createdAt"
-          },
-          "email": {
-            "column": "email"
-          },
-          "id": {
-            "column": "id"
-          }
-        },
-        "table": "user"
       }
     }
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "user": {
             "columns": {
@@ -87,7 +93,7 @@
         }
       }
     },
-    "storageHash": "sha256:dce59e55ea27ee077fccb16ab776cc36817f1d60352a358267cbbbdf876dc9b1"
+    "storageHash": "sha256:3acffbcc5e09f18416f1fabd6671f283b6f984990c841a0cd8f7815ed1998823"
   },
   "capabilities": {
     "postgres": {

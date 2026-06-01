@@ -28,17 +28,25 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
-  "engines": {
-    "node": ">=20"
-  },
   "exports": {
     "./config-types": "./dist/config-types.mjs",
     "./config-validation": "./dist/config-validation.mjs",
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

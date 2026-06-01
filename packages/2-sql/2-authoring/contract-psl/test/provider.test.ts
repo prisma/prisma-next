@@ -1,11 +1,11 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
 import {
   createPostgresTestContext,
+  modelsOf,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
   postgresTarget,
@@ -87,7 +87,7 @@ describe('prismaContract provider helper', () => {
         target: 'postgres',
         storage: {
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
+            public: {
               tables: {
                 user: expect.any(Object),
               },
@@ -124,7 +124,7 @@ describe('prismaContract provider helper', () => {
       expect(result.value).toMatchObject({
         storage: {
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
+            public: {
               tables: {
                 user: expect.any(Object),
               },
@@ -162,7 +162,10 @@ model Post {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+      const models = modelsOf(result.value) as Record<
+        string,
+        { relations?: Record<string, unknown> }
+      >;
       expect(models['User']?.relations).toMatchObject({
         posts: {
           cardinality: '1:N',
@@ -450,7 +453,7 @@ model Document {
       });
       expect(result.value.storage).toMatchObject({
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          public: {
             tables: {
               user: {
                 columns: {

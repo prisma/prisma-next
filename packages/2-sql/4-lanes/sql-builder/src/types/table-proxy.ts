@@ -1,3 +1,4 @@
+import type { Contract, ContractModelsMap } from '@prisma-next/contract/types';
 import type {
   ExtractCodecTypes,
   ExtractFieldInputTypes,
@@ -19,30 +20,26 @@ import type { TableProxyContract, UnboundTables } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
-type FindModelForTable<C, TableName extends string> = C extends {
-  readonly models: infer Models extends Record<
-    string,
-    { readonly storage: { readonly table: string } }
-  >;
-}
+type FindModelForTable<C, TableName extends string> = C extends Contract
   ? {
-      [M in keyof Models & string]: Models[M]['storage']['table'] extends TableName ? M : never;
-    }[keyof Models & string]
+      [M in keyof ContractModelsMap<C> & string]: ContractModelsMap<C>[M] extends {
+        readonly storage: { readonly table: TableName };
+      }
+        ? M
+        : never;
+    }[keyof ContractModelsMap<C> & string]
   : never;
 
-type FindFieldForColumn<C, ModelName extends string, ColumnName extends string> = C extends {
-  readonly models: infer Models extends Record<
-    string,
-    { readonly storage: { readonly fields: Record<string, { readonly column: string }> } }
-  >;
-}
-  ? ModelName extends keyof Models
+type FindFieldForColumn<C, ModelName extends string, ColumnName extends string> = C extends Contract
+  ? ModelName extends keyof ContractModelsMap<C>
     ? {
-        [F in keyof Models[ModelName]['storage']['fields'] &
-          string]: Models[ModelName]['storage']['fields'][F]['column'] extends ColumnName
+        [F in keyof ContractModelsMap<C>[ModelName]['storage']['fields'] &
+          string]: ContractModelsMap<C>[ModelName]['storage']['fields'][F] extends {
+          readonly column: ColumnName;
+        }
           ? F
           : never;
-      }[keyof Models[ModelName]['storage']['fields'] & string]
+      }[keyof ContractModelsMap<C>[ModelName]['storage']['fields'] & string]
     : never
   : never;
 

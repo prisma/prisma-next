@@ -21,29 +21,35 @@
     "arktype": "catalog:"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:0.11.0",
     "@prisma-next/tsconfig": "workspace:0.11.0",
     "@prisma-next/tsdown": "workspace:0.11.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src",
     "schemas"
   ],
-  "engines": {
-    "node": ">=20"
-  },
   "exports": {
     "./contract-validation-error": "./dist/contract-validation-error.mjs",
     "./hashing": "./dist/hashing.mjs",
     "./hashing-utils": "./dist/hashing-utils.mjs",
-    "./testing": "./dist/testing.mjs",
     "./types": "./dist/types.mjs",
     "./validate-domain": "./dist/validate-domain.mjs",
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

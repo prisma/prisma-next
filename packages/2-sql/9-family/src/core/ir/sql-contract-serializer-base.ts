@@ -123,10 +123,14 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       );
     }
     const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaces);
-    // Keep the `__unbound__` brand sound: a deserialized contract may declare
-    // only named namespaces (cross-namespace contracts omit the late-bound
-    // slot), so inject the family unbound singleton when absent rather than
-    // asserting a shape that isn't present.
+    // Compatibility shim: production code that addresses `__unbound__` for table
+    // metadata lookups (collection-contract, query-plan-mutations, model-accessor,
+    // query-plan-meta, where-binding) uses optional chaining and tolerates absence,
+    // but runtime-qualification (TML-2605) has not yet landed cross-namespace table
+    // routing. Injecting the empty singleton here keeps helpers that augment the
+    // deserialized JSON (e.g. buildMixedPolyContract) working by providing a slot to
+    // write into. Once runtime-qualification routes table lookups by namespace, this
+    // shim should be removed.
     const unbound = hydratedNamespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
 
     return {
@@ -134,12 +138,11 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       storage: new SqlStorage({
         storageHash: validated.storage.storageHash,
         ...ifDefined('types', hydratedTypes),
-        // `__unbound__` is guaranteed present above; the residual narrowing is
-        // the family invariant that hydrated SQL namespaces are `SqlNamespace`
-        // instances (target/family classes, not the wider framework `Namespace`).
+        // Cast narrows the result of hydrateSqlNamespaceMap from the wider
+        // framework `Namespace` to the SQL-family `SqlNamespace`.
         namespaces: blindCast<
           SqlStorageInput['namespaces'],
-          'hydrated SQL namespaces are SqlNamespace instances; __unbound__ guaranteed present (injected above)'
+          'hydrated SQL namespaces are SqlNamespace instances (family hydration guarantees this)'
         >({ ...hydratedNamespaces, [UNBOUND_NAMESPACE_ID]: unbound }),
       }),
     };

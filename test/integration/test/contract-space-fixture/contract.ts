@@ -52,7 +52,13 @@ export const testContractSpaceContract: Contract<SqlStorage> = {
   target: TARGET,
   targetFamily: TARGET_FAMILY,
   roots: {},
-  models: {},
+  domain: {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        models: {},
+      },
+    },
+  },
   capabilities: {},
   extensionPacks: {},
   meta: {},

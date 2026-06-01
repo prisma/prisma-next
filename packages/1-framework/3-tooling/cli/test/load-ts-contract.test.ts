@@ -18,7 +18,7 @@ describe('loadContractFromTs', () => {
       expect(contract.targetFamily).toBe('sql');
       expect(contract.target).toBe('postgres');
       expect(contract.storage).toBeDefined();
-      expect(contract.models).toBeDefined();
+      expect(contract.domain.namespaces['public']?.models).toBeDefined();
     },
     timeouts.typeScriptCompilation,
   );

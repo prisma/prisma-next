@@ -3,6 +3,7 @@ import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
+import { modelsOf, valueObjectsOf } from './contract-test-helpers';
 import { unboundTables } from './unbound-tables';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
@@ -153,7 +154,9 @@ describe('value objects in contract definition builder', () => {
       ],
     });
 
-    const valueObjects = contract.valueObjects as Record<string, ContractValueObject> | undefined;
+    const valueObjects = valueObjectsOf(contract) as
+      | Record<string, ContractValueObject>
+      | undefined;
 
     expect(valueObjects).toBeDefined();
     expect(valueObjects?.['Address']).toEqual({
@@ -215,7 +218,7 @@ describe('value objects in contract definition builder', () => {
       ],
     });
 
-    const userModel = contract.models as Record<
+    const userModel = modelsOf(contract) as Record<
       string,
       { readonly fields: Record<string, ContractField> } | undefined
     >;
@@ -313,7 +316,7 @@ describe('value objects in contract definition builder', () => {
       ],
     });
 
-    const userModel = contract.models as Record<
+    const userModel = modelsOf(contract) as Record<
       string,
       { readonly fields: Record<string, ContractField> } | undefined
     >;
@@ -387,7 +390,9 @@ describe('value objects in contract definition builder', () => {
       ],
     });
 
-    const valueObjects = contract.valueObjects as Record<string, ContractValueObject> | undefined;
+    const valueObjects = valueObjectsOf(contract) as
+      | Record<string, ContractValueObject>
+      | undefined;
 
     expect(valueObjects?.['CompanyAddress']?.fields['location']).toEqual({
       type: { kind: 'valueObject', name: 'GeoLocation' },
@@ -423,7 +428,7 @@ describe('value objects in contract definition builder', () => {
       ],
     });
 
-    expect(contract.valueObjects).toBeUndefined();
+    expect(valueObjectsOf(contract)).toBeUndefined();
   });
 
   it('maps value object field to correct storage bridge entry', () => {
@@ -465,7 +470,7 @@ describe('value objects in contract definition builder', () => {
       ],
     });
 
-    const userModel = contract.models as unknown as Record<
+    const userModel = modelsOf(contract) as unknown as Record<
       string,
       | {
           readonly storage: { readonly fields: Record<string, { readonly column: string }> };

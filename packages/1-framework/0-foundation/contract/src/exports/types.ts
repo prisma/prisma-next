@@ -1,6 +1,23 @@
-export type { Contract, ContractExecutionSection } from '../contract-types';
+export type {
+  Contract,
+  ContractExecutionSection,
+  ContractModelsMap,
+  ContractValueObjectsMap,
+} from '../contract-types';
+export { DomainNamespaceResolutionError } from '../contract-validation-error';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
+export type {
+  ApplicationDomain,
+  ApplicationDomainNamespace,
+  ContractWithDomain,
+} from '../domain-envelope';
+export {
+  contractModels,
+  contractValueObjects,
+  resolveSingleDomainNamespaceId,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
+} from '../domain-envelope';
 export type {
   ContractDiscriminator,
   ContractEmbedRelation,

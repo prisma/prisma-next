@@ -11,6 +11,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -93,7 +94,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
       }),
       roots: {},
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -164,7 +165,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
       }),
       roots: {},
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -264,7 +265,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
       }),
       roots: {},
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -331,7 +332,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
       }),
       roots: {},
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -396,7 +397,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
       }),
       roots: {},
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},

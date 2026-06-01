@@ -5,6 +5,7 @@ import { extractQueryOperationTypeImports } from '@prisma-next/framework-compone
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 describe('emitter + postgres adapter descriptor', () => {
@@ -13,7 +14,7 @@ describe('emitter + postgres adapter descriptor', () => {
       target: 'postgres',
       targetFamily: 'sql',
       roots: {},
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       storage: {
         storageHash: 'storage:sha256:test' as never,
         namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },

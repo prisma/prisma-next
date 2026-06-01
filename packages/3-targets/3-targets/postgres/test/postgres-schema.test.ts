@@ -103,11 +103,10 @@ describe('ddlSchemaName', () => {
     expect(schema.ddlSchemaName(storageWithoutPublic)).toBe('auth');
   });
 
-  it('projects the unbound singleton to "public" when a sibling public namespace exists', () => {
-    expect(PostgresUnboundSchema.instance.ddlSchemaName(storageWithPublic)).toBe('public');
-  });
-
-  it('projects the unbound singleton to the framework sentinel when no public sibling exists', () => {
+  it('returns the sentinel for the unbound singleton regardless of sibling namespaces', () => {
+    expect(PostgresUnboundSchema.instance.ddlSchemaName(storageWithPublic)).toBe(
+      UNBOUND_NAMESPACE_ID,
+    );
     expect(PostgresUnboundSchema.instance.ddlSchemaName(storageWithoutPublic)).toBe(
       UNBOUND_NAMESPACE_ID,
     );

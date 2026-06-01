@@ -114,7 +114,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
     expect(namespace.qualifyTable('user')).toBe('"auth"."user"');
   });
 
-  it('top-level (implicit) models stay on the late-bound default — single-namespace contracts retain today\u2019s emit behaviour', () => {
+  it('top-level (implicit) models lower to the public namespace with schema-qualified DDL', () => {
     const document = parsePslDocument({
       schema: `model Post {
   id Int @id
@@ -134,9 +134,14 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    // Top-level declarations lower to the unbound namespace — the
-    // planner falls back to its `ctx.schemaName` (today `"public"`)
-    // for DDL qualification.
-    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['post']).toBeDefined();
+    expect(storage.namespaces['public']?.tables['post']).toBeDefined();
+
+    const namespace = storage.namespaces['public'];
+    expect(namespace).toBeInstanceOf(PostgresSchema);
+    expect(namespace).not.toBeInstanceOf(PostgresUnboundSchema);
+    if (!(namespace instanceof PostgresSchema)) {
+      throw new Error('expected PostgresSchema concretion');
+    }
+    expect(namespace.qualifyTable('post')).toBe('"public"."post"');
   });
 });

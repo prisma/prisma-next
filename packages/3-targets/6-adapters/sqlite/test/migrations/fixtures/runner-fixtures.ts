@@ -16,6 +16,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import type { SqlStatement } from '@prisma-next/target-sqlite/statement-builders';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import sqliteAdapterDescriptor from '../../../src/exports/control';
 
 export const contract: Contract<SqlStorage> = {
@@ -43,7 +44,7 @@ export const contract: Contract<SqlStorage> = {
     },
   }),
   roots: {},
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
   capabilities: {},
   extensionPacks: {},
   meta: {},

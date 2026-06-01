@@ -1,4 +1,4 @@
-import { crossRef } from '@prisma-next/contract/types';
+import { contractModels, contractValueObjects, crossRef } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
@@ -62,7 +62,7 @@ describe('mongo contract builder', () => {
       users: { kind: 'mongo-collection' },
       posts: { kind: 'mongo-collection' },
     });
-    expect(contract.models.Post).toEqual({
+    expect(contractModels(contract)['Post']).toEqual({
       storage: {
         collection: 'posts',
       },
@@ -145,7 +145,7 @@ describe('mongo contract builder', () => {
     expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
       tasks: { kind: 'mongo-collection' },
     });
-    expect(contract.valueObjects).toEqual({
+    expect(contractValueObjects(contract)).toEqual({
       Address: {
         fields: {
           street: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
@@ -153,18 +153,19 @@ describe('mongo contract builder', () => {
         },
       },
     });
-    expect(contract.models.Task.storage).toEqual({
+    const models = contractModels(contract);
+    expect(models['Task']!.storage).toEqual({
       collection: 'tasks',
       relations: {
         comments: { field: 'comments' },
       },
     });
-    expect(contract.models.Task.discriminator).toEqual({ field: 'type' });
-    expect(contract.models.Task.variants).toEqual({
+    expect(models['Task']!.discriminator).toEqual({ field: 'type' });
+    expect(models['Task']!.variants).toEqual({
       Bug: { value: 'bug' },
     });
-    expect(contract.models.Bug.base).toEqual(crossRef('Task'));
-    expect(contract.models.Comment.owner).toBe('Task');
+    expect(models['Bug']!.base).toEqual(crossRef('Task'));
+    expect(models['Comment']!.owner).toBe('Task');
   });
 
   it('lowers Mongo indexes into namespaced storage collections', () => {
@@ -220,7 +221,7 @@ describe('mongo contract builder', () => {
       models: { Metric },
     });
 
-    expect(contract.models.Metric.fields.value).toEqual({
+    expect(contractModels(contract)['Metric']?.fields['value']).toEqual({
       type: { kind: 'scalar', codecId: 'mongo/double@1' },
       nullable: false,
     });

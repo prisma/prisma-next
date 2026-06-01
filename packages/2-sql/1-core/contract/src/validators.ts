@@ -418,9 +418,14 @@ export function createSqlContractSchema(
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': ContractMetaSchema,
     'roots?': type({ '[string]': CrossReferenceSchema }),
-    models: type({ '[string]': ModelSchema }),
-    'valueObjects?': 'Record<string, unknown>',
-    'domain?': 'unknown',
+    domain: type({
+      namespaces: type({
+        '[string]': type({
+          models: type({ '[string]': ModelSchema }),
+          'valueObjects?': 'Record<string, unknown>',
+        }),
+      }),
+    }),
     storage,
     'execution?': ExecutionSchema,
   }) as Type<unknown>;
@@ -456,11 +461,11 @@ export function validateStorage(value: unknown): SqlStorage {
     'arktype validated the JSON envelope but its output type is unknown (ColumnDefault carries runtime-only bigint|Date); bridge to the input shape'
   >(result);
   const namespaces = buildSqlNamespaceMap(validated.namespaces ?? {});
-  // The `__unbound__` brand is made true at construction: if the validated
-  // namespaces omit the late-bound slot (e.g. a contract declaring only named
-  // namespaces), inject the family unbound singleton rather than asserting a
-  // shape that isn't there. Reconstructing the literal lets the branded
-  // `SqlStorageInput['namespaces']` hold with no cast.
+  // Compatibility shim: inject the empty unbound singleton when absent so that
+  // production code paths which address __unbound__ for table metadata have a
+  // slot to read or write into. The `SqlStorageInput['namespaces']` type no
+  // longer requires __unbound__, so this is a runtime convenience, not a type
+  // invariant.
   const unbound = namespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
   return new SqlStorage({
     storageHash: validated.storageHash,
@@ -682,43 +687,46 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
  * columns. Throws `ContractValidationError` on the first mismatch.
  */
 export function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
-  const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
-  for (const [modelName, model] of Object.entries(models)) {
-    const storageTable = model.storage.table;
+  for (const [namespaceId, namespace] of Object.entries(contract.domain.namespaces)) {
+    const models = namespace.models as Record<string, ContractModel<SqlModelStorage>>;
+    for (const [modelName, model] of Object.entries(models)) {
+      const qualifiedName = `${namespaceId}:${modelName}`;
+      const storageTable = model.storage.table;
 
-    const rawTable = findStorageTableByTableName(contract.storage, storageTable);
-    if (rawTable === undefined) {
-      throw new ContractValidationError(
-        `Model "${modelName}" references non-existent table "${storageTable}"`,
-        'storage',
-      );
-    }
-
-    const table = rawTable as StorageTable;
-
-    const columnNames = new Set(Object.keys(table.columns));
-    for (const [fieldName, field] of Object.entries(model.storage.fields)) {
-      if (!columnNames.has(field.column)) {
+      const rawTable = findStorageTableByTableName(contract.storage, storageTable);
+      if (rawTable === undefined) {
         throw new ContractValidationError(
-          `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${storageTable}"`,
+          `Model "${qualifiedName}" references non-existent table "${storageTable}"`,
           'storage',
         );
       }
-    }
 
-    const JSON_NATIVE_TYPES = new Set(['json', 'jsonb']);
-    for (const [fieldName, domainField] of Object.entries(model.fields ?? {})) {
-      const f = domainField as ContractField;
-      if (f.type?.kind !== 'valueObject') continue;
-      const storageField = model.storage.fields[fieldName];
-      if (!storageField) continue;
-      const column = table.columns[storageField.column];
-      if (!column) continue;
-      if (!JSON_NATIVE_TYPES.has(column.nativeType)) {
-        throw new ContractValidationError(
-          `Model "${modelName}" field "${fieldName}" is a value object but storage column "${storageField.column}" has nativeType "${column.nativeType}" (expected json or jsonb)`,
-          'storage',
-        );
+      const table = rawTable as StorageTable;
+
+      const columnNames = new Set(Object.keys(table.columns));
+      for (const [fieldName, field] of Object.entries(model.storage.fields)) {
+        if (!columnNames.has(field.column)) {
+          throw new ContractValidationError(
+            `Model "${qualifiedName}" field "${fieldName}" references non-existent column "${field.column}" in table "${storageTable}"`,
+            'storage',
+          );
+        }
+      }
+
+      const JSON_NATIVE_TYPES = new Set(['json', 'jsonb']);
+      for (const [fieldName, domainField] of Object.entries(model.fields ?? {})) {
+        const f = domainField as ContractField;
+        if (f.type?.kind !== 'valueObject') continue;
+        const storageField = model.storage.fields[fieldName];
+        if (!storageField) continue;
+        const column = table.columns[storageField.column];
+        if (!column) continue;
+        if (!JSON_NATIVE_TYPES.has(column.nativeType)) {
+          throw new ContractValidationError(
+            `Model "${qualifiedName}" field "${fieldName}" is a value object but storage column "${storageField.column}" has nativeType "${column.nativeType}" (expected json or jsonb)`,
+            'storage',
+          );
+        }
       }
     }
   }
@@ -858,8 +866,7 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(
   const validated = validateSqlContractStructure<T>(stripped, schema);
   validateContractDomain({
     roots: validated.roots,
-    models: validated.models,
-    ...(validated.valueObjects ? { valueObjects: validated.valueObjects } : {}),
+    domain: validated.domain,
   });
   validateSqlStorageConsistency(validated);
   const semanticErrors = validateStorageSemantics(validated.storage);

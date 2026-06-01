@@ -120,10 +120,11 @@ export class PostgresSchema extends NamespaceBase {
    * statements that need to identify this namespace in the live
    * database (e.g. `CREATE TABLE "<ddlSchemaName>"."<table>" …`,
    * catalog filters, planner conflict lookups). Named schemas resolve
-   * to their own id; the unbound singleton overrides this to project
-   * to `'public'` when a sibling public namespace exists in the same
-   * contract — and falls back to the framework sentinel otherwise so
-   * the planner can detect the missing-projection case explicitly.
+   * to their own id. The `PostgresUnboundSchema` singleton inherits
+   * this and returns `UNBOUND_NAMESPACE_ID` — callers that dispatch
+   * through `qualifyTableName` / `toRegclassLiteral` route through the
+   * polymorphic `PostgresUnboundSchema` overrides and produce
+   * unqualified (search-path-resolved) output automatically.
    */
   ddlSchemaName(_storage: SqlStorage): string {
     return this.id;
@@ -143,6 +144,11 @@ export class PostgresSchema extends NamespaceBase {
  * sentinel; Postgres decides what late-bound means here (the table
  * name, naked — the schema is supplied by the live connection's
  * `search_path`).
+ *
+ * `ddlSchemaName` is inherited from `PostgresSchema` and returns
+ * `UNBOUND_NAMESPACE_ID`. Downstream helpers (`qualifyTableName`,
+ * `toRegclassLiteral`) route through the polymorphic factory and
+ * produce unqualified output automatically.
  */
 export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
@@ -161,22 +167,6 @@ export class PostgresUnboundSchema extends PostgresSchema {
 
   override schemaSqlExpression(): string {
     return 'current_schema()';
-  }
-
-  /**
-   * The unbound slot has no schema name of its own, so DDL emission
-   * projects it onto a sibling when one is available: if the contract
-   * carries a `public` namespace, the late-bound slot resolves to
-   * `'public'` (the default Postgres landing schema); otherwise it
-   * resolves to the framework sentinel `UNBOUND_NAMESPACE_ID` so the
-   * planner can recognise the unprojected case and route accordingly
-   * (e.g. emit a conflict instead of silently picking a schema).
-   */
-  override ddlSchemaName(storage: SqlStorage): string {
-    if (storage.namespaces['public'] !== undefined) {
-      return 'public';
-    }
-    return UNBOUND_NAMESPACE_ID;
   }
 }
 

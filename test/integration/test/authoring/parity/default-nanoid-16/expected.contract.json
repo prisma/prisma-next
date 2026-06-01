@@ -2,35 +2,41 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
-  "models": {
-    "User": {
-      "fields": {
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 16
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "User": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 16
+                  }
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                }
+              },
+              "table": "user"
             }
           }
         }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "id": {
-            "column": "id"
-          }
-        },
-        "table": "user"
       }
     }
   },
@@ -38,6 +44,10 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "tables": {}
+      },
+      "public": {
+        "id": "public",
         "tables": {
           "user": {
             "columns": {
@@ -60,10 +70,10 @@
         }
       }
     },
-    "storageHash": "sha256:01d9c763a7df982f92a7e21f79cef04342f01359b9ac3e01b41910948b50e4d9"
+    "storageHash": "sha256:9abe6a328e48aeb881022b7a63e452924c8028158a4be50ea73e4fcec7dc6a1c"
   },
   "execution": {
-    "executionHash": "sha256:5a3a18f251eb8c82d18de2823d2e08108d644bafc9b7d3a878548bd129b385ad",
+    "executionHash": "sha256:0d8e153a5ea318598b253d010135c4dc3789e08beb01a315613da527cca56e3f",
     "mutations": {
       "defaults": [
         {

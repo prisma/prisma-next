@@ -25,7 +25,6 @@ import {
   type RuntimeTargetDescriptor,
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
@@ -47,13 +46,6 @@ type SqlNamespaceTables = Readonly<Record<string, StorageTable>>;
 function documentScopedCodecTypes(
   contract: Contract<SqlStorage>,
 ): Record<string, StorageTypeInstance> | undefined {
-  const fromDomain = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'];
-  if (fromDomain !== undefined && typeof fromDomain === 'object') {
-    return blindCast<
-      Record<string, StorageTypeInstance>,
-      'contract domain types object validated by schema; shape confirmed as StorageTypeInstance map'
-    >(fromDomain);
-  }
   return blindCast<
     Record<string, StorageTypeInstance> | undefined,
     'SqlStorage.types is typed for generic access; runtime shape is guaranteed by contract schema validation'

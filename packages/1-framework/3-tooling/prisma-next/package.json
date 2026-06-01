@@ -5,16 +5,13 @@
   "type": "module",
   "sideEffects": false,
   "description": "Prisma Next CLI: emit, verify, sign, and migrate databases from a type-safe contract.",
-  "files": [
-    "dist"
-  ],
+  "bin": {
+    "prisma-next": "./dist/cli.js"
+  },
   "scripts": {
     "build": "node ./scripts/build.mjs",
     "lint": "node ./scripts/lint-sync.mjs",
     "clean": "rm -rf dist"
-  },
-  "bin": {
-    "prisma-next": "./dist/cli.js"
   },
   "dependencies": {
     "@clack/prompts": "^1.4.0",
@@ -46,12 +43,26 @@
   "devDependencies": {
     "@prisma-next/cli": "workspace:0.11.0"
   },
-  "publishConfig": {
-    "access": "public"
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/1-framework/3-tooling/prisma-next"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

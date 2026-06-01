@@ -8,6 +8,7 @@ import {
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
 
@@ -42,7 +43,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
       },
     }),
     roots: {},
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

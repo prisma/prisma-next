@@ -4,10 +4,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
-  "files": [
-    "dist",
-    "src"
-  ],
+  "bin": {
+    "prisma-next": "./dist/cli.js"
+  },
   "scripts": {
     "build": "tsdown && node ./scripts/write-cli-js-compat.mjs",
     "test": "vitest run",
@@ -18,9 +17,6 @@
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "record": "tsx scripts/record.ts",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
-  },
-  "bin": {
-    "prisma-next": "./dist/cli.js"
   },
   "dependencies": {
     "@clack/prompts": "^1.4.0",
@@ -63,6 +59,18 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "exports": {
     ".": {
       "types": "./dist/exports/index.d.mts",
@@ -156,6 +164,9 @@
       "types": "./dist/exports/control-api.d.mts",
       "import": "./dist/exports/control-api.mjs"
     }
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

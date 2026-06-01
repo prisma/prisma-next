@@ -33,9 +33,6 @@
     "@prisma-next/utils": "workspace:0.11.0",
     "pathe": "^2.0.3"
   },
-  "peerDependencies": {
-    "mongodb": "^7.0.0"
-  },
   "devDependencies": {
     "mongodb": "catalog:",
     "@prisma-next/test-utils": "workspace:0.11.0",
@@ -46,18 +43,19 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "mongodb": "^7.0.0",
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/3-extensions/mongo"
-  },
-  "engines": {
-    "node": ">=20"
-  },
   "exports": {
     "./bson": "./dist/bson.mjs",
     "./config": "./dist/config.mjs",
@@ -67,5 +65,13 @@
     "./runtime": "./dist/runtime.mjs",
     "./target": "./dist/target.mjs",
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-extensions/mongo"
   }
 }

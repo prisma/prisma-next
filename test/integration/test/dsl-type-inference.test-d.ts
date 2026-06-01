@@ -1,4 +1,5 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import type { ContractModelsMap } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
@@ -49,22 +50,23 @@ const singleModelContract = defineContract({
 
 test('table name literals survive in storage.tables (single model)', () => {
   expectTypeOf<
-    keyof typeof singleModelContract.storage.namespaces.__unbound__.tables
+    keyof (typeof singleModelContract.storage.namespaces)['public']['tables']
   >().toEqualTypeOf<'user'>();
 });
 
 test('column name literals survive in storage.tables[name].columns', () => {
   type UserColumns =
-    (typeof singleModelContract.storage.namespaces.__unbound__.tables)['user']['columns'];
+    (typeof singleModelContract.storage.namespaces)['public']['tables']['user']['columns'];
   expectTypeOf<keyof UserColumns>().toEqualTypeOf<'id' | 'email'>();
 });
 
 test('model name literals survive in models', () => {
-  expectTypeOf<keyof typeof singleModelContract.models>().toEqualTypeOf<'User'>();
+  expectTypeOf<keyof ContractModelsMap<typeof singleModelContract>>().toEqualTypeOf<'User'>();
 });
 
 test('model table name is a literal string', () => {
-  expectTypeOf(singleModelContract.models.User.storage.table).toEqualTypeOf<'user'>();
+  type SingleModels = ContractModelsMap<typeof singleModelContract>;
+  expectTypeOf<SingleModels['User']['storage']['table']>().toEqualTypeOf<'user'>();
 });
 
 // -- deserializeContract preserves literals ------------------------------------
@@ -74,7 +76,7 @@ test('deserializeContract preserves table name literals', () => {
     singleModelContract,
   ) as typeof singleModelContract;
   expectTypeOf<
-    keyof typeof validated.storage.namespaces.__unbound__.tables
+    keyof (typeof validated.storage.namespaces)['public']['tables']
   >().toEqualTypeOf<'user'>();
 });
 
@@ -82,7 +84,7 @@ test('deserializeContract preserves model name literals', () => {
   const validated = new SqlContractSerializer().deserializeContract(
     singleModelContract,
   ) as typeof singleModelContract;
-  expectTypeOf<keyof typeof validated.models>().toEqualTypeOf<'User'>();
+  expectTypeOf<keyof ContractModelsMap<typeof validated>>().toEqualTypeOf<'User'>();
 });
 
 // -- sql() dot access works with inferred contract --------------------------
@@ -121,17 +123,19 @@ const multiModelContract = defineContract({
 
 test('multi-model contract preserves table name literals', () => {
   expectTypeOf<
-    keyof typeof multiModelContract.storage.namespaces.__unbound__.tables
+    keyof (typeof multiModelContract.storage.namespaces)['public']['tables']
   >().toEqualTypeOf<'user' | 'post'>();
 });
 
 test('multi-model contract preserves model name literals', () => {
-  expectTypeOf<keyof typeof multiModelContract.models>().toEqualTypeOf<'User' | 'Post'>();
+  expectTypeOf<keyof ContractModelsMap<typeof multiModelContract>>().toEqualTypeOf<
+    'User' | 'Post'
+  >();
 });
 
 test('multi-model contract preserves column literals per table', () => {
   type PostColumns =
-    (typeof multiModelContract.storage.namespaces.__unbound__.tables)['post']['columns'];
+    (typeof multiModelContract.storage.namespaces)['public']['tables']['post']['columns'];
   expectTypeOf<keyof PostColumns>().toEqualTypeOf<'id' | 'userId' | 'title'>();
 });
 

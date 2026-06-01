@@ -1,4 +1,5 @@
 import type { CrossReference } from './cross-reference';
+import type { ApplicationDomain } from './domain-envelope';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
 import type {
   ExecutionHashBase,
@@ -45,14 +46,11 @@ export interface Contract<
   readonly target: string;
   readonly targetFamily: string;
   readonly roots: Record<string, CrossReference>;
-  readonly models: TModels;
-  readonly valueObjects?: Record<string, ContractValueObject>;
   /**
-   * Domain plane keyed as `domain[plane][namespaceId][entityKind][entityName]`.
-   * Optional until downstream slices populate it; when absent the field is
-   * omitted from the on-disk envelope so emitted contracts stay byte-stable.
+   * Application plane (ADR 221): `domain.namespaces.<nsId>.{ models, valueObjects }`.
+   * `TModels` types the union of model entries across namespaces for family DSL inference.
    */
-  readonly domain?: Record<string, Record<string, Record<string, unknown>>>;
+  readonly domain: ApplicationDomain<TModels>;
   readonly storage: TStorage;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
@@ -60,3 +58,30 @@ export interface Contract<
   readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, unknown>;
 }
+
+export type ContractModelsMap<TContract extends Contract> =
+  TContract extends Contract<StorageBase, infer TModels> ? TModels : never;
+
+type ExactlyOneKey<T extends Record<string, unknown>> = keyof T extends infer Only extends keyof T
+  ? [keyof T] extends [Only]
+    ? Only
+    : never
+  : never;
+
+type NamespaceValueObjectsOf<TNamespace> = TNamespace extends {
+  readonly valueObjects?: infer VO;
+}
+  ? VO extends Record<string, ContractValueObject>
+    ? VO
+    : Record<never, never>
+  : Record<never, never>;
+
+/** Value-object map for the contract's sole domain namespace (type-level single-namespace projection). */
+export type ContractValueObjectsMap<TContract extends Contract> =
+  NamespaceValueObjectsOf<
+    TContract['domain']['namespaces'][ExactlyOneKey<TContract['domain']['namespaces']>]
+  > extends infer Projected
+    ? Projected extends Record<string, ContractValueObject>
+      ? Projected
+      : Record<never, never>
+    : Record<never, never>;

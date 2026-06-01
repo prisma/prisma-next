@@ -10,6 +10,7 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   contract as appContract,
@@ -73,7 +74,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
       },
     }),
     roots: {},
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

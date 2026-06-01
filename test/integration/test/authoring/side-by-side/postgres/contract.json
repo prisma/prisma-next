@@ -2,148 +2,154 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "posts": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "users": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
-  "models": {
-    "Post": {
-      "fields": {
-        "authorId": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "publishedAt": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/timestamptz@1",
-            "kind": "scalar"
-          }
-        },
-        "title": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "Post": {
+            "fields": {
+              "authorId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "publishedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "author": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "authorId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "authorId": {
+                  "column": "authorId"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "publishedAt": {
+                  "column": "publishedAt"
+                },
+                "title": {
+                  "column": "title"
+                }
+              },
+              "table": "posts"
+            }
+          },
+          "User": {
+            "fields": {
+              "bio": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "authorId"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "bio": {
+                  "column": "bio"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                }
+              },
+              "table": "users"
+            }
           }
         }
-      },
-      "relations": {
-        "author": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": [
-              "authorId"
-            ],
-            "targetFields": [
-              "id"
-            ]
-          },
-          "to": {
-            "model": "User",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "authorId": {
-            "column": "authorId"
-          },
-          "id": {
-            "column": "id"
-          },
-          "publishedAt": {
-            "column": "publishedAt"
-          },
-          "title": {
-            "column": "title"
-          }
-        },
-        "table": "posts"
-      }
-    },
-    "User": {
-      "fields": {
-        "bio": {
-          "nullable": true,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        },
-        "name": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "posts": {
-          "cardinality": "1:N",
-          "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "authorId"
-            ]
-          },
-          "to": {
-            "model": "Post",
-            "namespace": "__unbound__"
-          }
-        }
-      },
-      "storage": {
-        "fields": {
-          "bio": {
-            "column": "bio"
-          },
-          "email": {
-            "column": "email"
-          },
-          "id": {
-            "column": "id"
-          },
-          "name": {
-            "column": "name"
-          }
-        },
-        "table": "users"
       }
     }
   },
@@ -152,6 +158,11 @@
       "__unbound__": {
         "id": "__unbound__",
         "kind": "postgres-unbound-schema",
+        "tables": {}
+      },
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "posts": {
             "columns": {
@@ -188,14 +199,14 @@
                   "columns": [
                     "authorId"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "posts"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "users"
                 }
               }
@@ -247,7 +258,7 @@
         }
       }
     },
-    "storageHash": "sha256:0dd598e2a231ab7b6d81a6d82aed7e54e2894e3f4036809a80e71191086834fa"
+    "storageHash": "sha256:00943c780a16ec0704437fd1eb3286adc73d3d63010c837a2d69ff005e014155"
   },
   "capabilities": {
     "postgres": {

@@ -12,6 +12,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 
@@ -39,7 +40,7 @@ function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Cont
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
       },
     }),
-    models: {},
+    domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
     extensionPacks: {},

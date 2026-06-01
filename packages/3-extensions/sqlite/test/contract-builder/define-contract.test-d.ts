@@ -1,3 +1,4 @@
+import type { ContractModelsMap } from '@prisma-next/contract/types';
 import { expectTypeOf } from 'vitest';
 import { defineContract, field, model } from '../../src/exports/contract-builder';
 
@@ -19,7 +20,7 @@ const withModel = defineContract({
   },
 });
 expectTypeOf(withModel.target).toEqualTypeOf<'sqlite'>();
-expectTypeOf(withModel.models.User).not.toBeNever();
+expectTypeOf<ContractModelsMap<typeof withModel>['User']>().not.toBeNever();
 
 const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   models: {
@@ -27,4 +28,4 @@ const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   },
 }));
 expectTypeOf(withFactory.target).toEqualTypeOf<'sqlite'>();
-expectTypeOf(withFactory.models.Post).not.toBeNever();
+expectTypeOf<ContractModelsMap<typeof withFactory>['Post']>().not.toBeNever();

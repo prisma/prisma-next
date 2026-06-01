@@ -28,6 +28,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
+  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -35,11 +36,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:704c054ab903f2505136a2b7731c33b1c82394c8d2a5a74f8152d6a14fbd9138'>;
+  StorageHashBase<'sha256:44ea8be13beffe9e809eddd97444523af5d42e861ac8a40b4ecffee6b115c212'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:4d09909b2e09a240919c201ce4a5e63c3a2ec70515932e145dccca82936d8be5'>;
+  ExecutionHashBase<'sha256:f044f000ac77f18b44684c98aaf941827c8ad714912430a4526a16bd88e955e7'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
+  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -115,8 +116,8 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
+        readonly public: {
+          readonly id: 'public';
           readonly kind: 'sql-namespace';
           readonly tables: {
             readonly articles: {
@@ -330,10 +331,7 @@ type ContractBase = Omit<
         };
         readonly relations: {
           readonly comments: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Comment';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Comment' };
             readonly cardinality: '1:N';
             readonly on: {
               readonly localFields: readonly ['id'];
@@ -341,10 +339,7 @@ type ContractBase = Omit<
             };
           };
           readonly author: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'User';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
             readonly cardinality: 'N:1';
             readonly on: {
               readonly localFields: readonly ['userId'];
@@ -409,10 +404,7 @@ type ContractBase = Omit<
         };
         readonly relations: {
           readonly invitedUsers: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'User';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
             readonly cardinality: '1:N';
             readonly on: {
               readonly localFields: readonly ['id'];
@@ -420,10 +412,7 @@ type ContractBase = Omit<
             };
           };
           readonly invitedBy: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'User';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
             readonly cardinality: 'N:1';
             readonly on: {
               readonly localFields: readonly ['invitedById'];
@@ -431,10 +420,7 @@ type ContractBase = Omit<
             };
           };
           readonly posts: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Post';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
             readonly cardinality: '1:N';
             readonly on: {
               readonly localFields: readonly ['id'];
@@ -442,10 +428,7 @@ type ContractBase = Omit<
             };
           };
           readonly profile: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Profile';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Profile' };
             readonly cardinality: '1:1';
             readonly on: {
               readonly localFields: readonly ['id'];
@@ -465,24 +448,222 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
-    readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
-    readonly posts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
-    readonly comments: {
-      readonly namespace: '__unbound__' & NamespaceId;
-      readonly model: 'Comment';
-    };
-    readonly profiles: {
-      readonly namespace: '__unbound__' & NamespaceId;
-      readonly model: 'Profile';
-    };
-    readonly articles: {
-      readonly namespace: '__unbound__' & NamespaceId;
-      readonly model: 'Article';
+    readonly users: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+    readonly posts: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
+    readonly comments: { readonly namespace: 'public' & NamespaceId; readonly model: 'Comment' };
+    readonly profiles: { readonly namespace: 'public' & NamespaceId; readonly model: 'Profile' };
+    readonly articles: { readonly namespace: 'public' & NamespaceId; readonly model: 'Article' };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly public: {
+        readonly models: {
+          readonly Article: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'articles';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly title: { readonly column: 'title' };
+              };
+            };
+          };
+          readonly Comment: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly body: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly postId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'comments';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly body: { readonly column: 'body' };
+                readonly postId: { readonly column: 'post_id' };
+              };
+            };
+          };
+          readonly Post: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly views: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly embedding: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/vector@1';
+                  readonly typeParams: { readonly length: 3 };
+                };
+              };
+            };
+            readonly relations: {
+              readonly comments: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Comment';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['postId'];
+                };
+              };
+              readonly author: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'posts';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly title: { readonly column: 'title' };
+                readonly userId: { readonly column: 'user_id' };
+                readonly views: { readonly column: 'views' };
+                readonly embedding: { readonly column: 'embedding' };
+              };
+            };
+          };
+          readonly Profile: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly bio: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'profiles';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly userId: { readonly column: 'user_id' };
+                readonly bio: { readonly column: 'bio' };
+              };
+            };
+          };
+          readonly User: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly email: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly invitedById: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+            };
+            readonly relations: {
+              readonly invitedUsers: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['invitedById'];
+                };
+              };
+              readonly invitedBy: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['invitedById'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly posts: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['userId'];
+                };
+              };
+              readonly profile: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Profile';
+                };
+                readonly cardinality: '1:1';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['userId'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'users';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly name: { readonly column: 'name' };
+                readonly email: { readonly column: 'email' };
+                readonly invitedById: { readonly column: 'invited_by_id' };
+              };
+            };
+          };
+        };
+      };
     };
   };
   readonly capabilities: {
@@ -569,4 +750,4 @@ type ContractBase = Omit<
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Namespaces = Contract['storage']['namespaces'];
-export type Models = Contract['models'];
+export type Models = ContractModelsMap<Contract>;

@@ -1,7 +1,8 @@
+import { contractModels } from '@prisma-next/contract/types';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
-import type { Contract } from '../prisma/contract.d';
+import type { Contract, Models } from '../prisma/contract.d';
 
-type ContractModel = Contract['models'][keyof Contract['models']];
+type ContractModel = Models[keyof Models];
 
 function ModelCard({ modelName, model }: { modelName: string; model: ContractModel }) {
   const tableName = model.storage.table;
@@ -133,7 +134,7 @@ export function ContractView({ contract }: { contract: Contract }) {
       <Section title={`Target: ${contract.target}`}>{null}</Section>
 
       <Section title="Models">
-        {Object.entries(contract.models).map(([modelName, model]) => (
+        {Object.entries(contractModels(contract) as Models).map(([modelName, model]) => (
           <ModelCard key={modelName} modelName={modelName} model={model} />
         ))}
       </Section>

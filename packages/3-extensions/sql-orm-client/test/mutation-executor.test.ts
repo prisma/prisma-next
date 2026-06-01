@@ -1,4 +1,3 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type AnyExpression,
   BinaryExpr,
@@ -13,7 +12,12 @@ import {
   hasNestedMutationCallbacks,
 } from '../src/mutation-executor';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContext, getTestContract } from './helpers';
+import {
+  createMockRuntime,
+  getTestContext,
+  getTestContract,
+  withPatchedDomainModels,
+} from './helpers';
 
 function withTransaction(runtime: MockRuntime) {
   const commit = vi.fn(async () => undefined);
@@ -80,14 +84,16 @@ describe('mutation-executor', () => {
 
   it('hasNestedMutationCallbacks() tolerates malformed relation metadata and unknown models', () => {
     const contract = getTestContract();
-    const malformed = {
-      ...contract,
-      models: {
-        ...contract.models,
+    const malformed = withPatchedDomainModels(contract, (models) => {
+      const user = models['User'] as {
+        relations: Record<string, unknown>;
+      };
+      return {
+        ...models,
         User: {
-          ...contract.models.User,
+          ...user,
           relations: {
-            ...contract.models.User.relations,
+            ...user.relations,
             notObject: 1,
             missingTo: {
               cardinality: '1:N',
@@ -114,8 +120,8 @@ describe('mutation-executor', () => {
             },
           },
         },
-      },
-    } as unknown as TestContract;
+      };
+    });
 
     expect(
       hasNestedMutationCallbacks(malformed, 'User', {
@@ -144,19 +150,21 @@ describe('mutation-executor', () => {
   it('buildPrimaryKeyFilterFromRow() resolves custom primary key columns', () => {
     const contract = getTestContract();
 
-    const unboundNs = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
+    // Tables live in 'public' after public-by-default; put the custom-pk
+    // override in the same namespace so the scan-all-namespaces lookup finds it.
+    const publicNs = contract.storage.namespaces['public']!;
     const withCustomPk = {
       ...contract,
       storage: {
         ...contract.storage,
         namespaces: {
           ...contract.storage.namespaces,
-          [UNBOUND_NAMESPACE_ID]: {
-            ...unboundNs,
+          public: {
+            ...publicNs,
             tables: {
-              ...unboundNs.tables,
+              ...publicNs.tables,
               users: {
-                ...unboundNs.tables.users,
+                ...publicNs.tables.users,
                 primaryKey: { columns: ['pk_id'] },
               },
             },
@@ -387,22 +395,22 @@ describe('mutation-executor', () => {
   it('executeNestedCreateMutation() rejects M:N nested mutations', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();
-    const withManyToMany = {
-      ...contract,
-      models: {
-        ...contract.models,
+    const withManyToMany = withPatchedDomainModels(contract, (models) => {
+      const user = models['User'] as { relations: { posts: Record<string, unknown> } };
+      return {
+        ...models,
         User: {
-          ...contract.models.User,
+          ...user,
           relations: {
-            ...contract.models.User.relations,
+            ...user.relations,
             posts: {
-              ...contract.models.User.relations.posts,
+              ...user.relations.posts,
               cardinality: 'M:N',
             },
           },
         },
-      },
-    } as unknown as TestContract;
+      };
+    });
 
     await expect(
       executeNestedCreateMutation({
@@ -452,16 +460,16 @@ describe('mutation-executor', () => {
 
   it('executeNestedCreateMutation() tolerates sparse parent/child column pairs', async () => {
     const contract = getTestContract();
-    const sparseAuthorRelation = {
-      ...contract,
-      models: {
-        ...contract.models,
+    const sparseAuthorRelation = withPatchedDomainModels(contract, (models) => {
+      const post = models['Post'] as { relations: { author: Record<string, unknown> } };
+      return {
+        ...models,
         Post: {
-          ...contract.models.Post,
+          ...post,
           relations: {
-            ...contract.models.Post.relations,
+            ...post.relations,
             author: {
-              ...contract.models.Post.relations.author,
+              ...post.relations.author,
               on: {
                 localFields: [undefined, 'userId'] as unknown as readonly string[],
                 targetFields: ['id', 'id'],
@@ -469,8 +477,8 @@ describe('mutation-executor', () => {
             },
           },
         },
-      },
-    } as unknown as TestContract;
+      };
+    });
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 5, name: 'Author', email: 'author@example.com' }],
@@ -609,16 +617,16 @@ describe('mutation-executor', () => {
 
   it('executeNestedUpdateMutation() supports composite child joins and sparse relation columns', async () => {
     const contract = getTestContract();
-    const compositeRelationContract = {
-      ...contract,
-      models: {
-        ...contract.models,
+    const compositeRelationContract = withPatchedDomainModels(contract, (models) => {
+      const user = models['User'] as { relations: { posts: Record<string, unknown> } };
+      return {
+        ...models,
         User: {
-          ...contract.models.User,
+          ...user,
           relations: {
-            ...contract.models.User.relations,
+            ...user.relations,
             posts: {
-              ...contract.models.User.relations.posts,
+              ...user.relations.posts,
               on: {
                 localFields: [undefined, 'id', 'email'] as unknown as readonly string[],
                 targetFields: ['userId', 'userId', 'title'],
@@ -626,8 +634,8 @@ describe('mutation-executor', () => {
             },
           },
         },
-      },
-    } as unknown as TestContract;
+      };
+    });
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
 

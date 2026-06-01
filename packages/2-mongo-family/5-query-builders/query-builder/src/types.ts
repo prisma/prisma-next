@@ -3,6 +3,7 @@ import type {
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
+  MongoModelsMap,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type { MongoAggAccumulator, MongoAggExpr } from '@prisma-next/mongo-query-ast/execution';
@@ -41,11 +42,11 @@ type ExtractCodecId<F> = F extends { type: { kind: 'scalar'; codecId: infer C } 
 
 export type ModelToDocShape<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
-  [K in keyof TContract['models'][ModelName]['fields'] & string]: {
-    readonly codecId: ExtractCodecId<TContract['models'][ModelName]['fields'][K]>;
-    readonly nullable: TContract['models'][ModelName]['fields'][K]['nullable'];
+  [K in keyof MongoModelsMap<TContract>[ModelName]['fields'] & string]: {
+    readonly codecId: ExtractCodecId<MongoModelsMap<TContract>[ModelName]['fields'][K]>;
+    readonly nullable: MongoModelsMap<TContract>[ModelName]['fields'][K]['nullable'];
   };
 } & ModelOriginBranded<ModelName>;
 
@@ -65,7 +66,7 @@ type ResolveFields<
   -readonly [K in keyof Shape & string]: Shape[K] extends ModelArrayField<infer ModelName>
     ? IsConcreteContract<TContract> extends true
       ? TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>
-        ? ModelName extends string & keyof TContract['models']
+        ? ModelName extends string & keyof MongoModelsMap<TContract>
           ? Array<InferModelRow<TContract, ModelName>>
           : unknown[]
         : unknown[]
@@ -131,7 +132,7 @@ export type ResolveRow<
 > = Shape extends { readonly [ModelOriginBrand]?: infer ModelName extends string }
   ? IsConcreteContract<TContract> extends true
     ? TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>
-      ? ModelName extends string & keyof TContract['models']
+      ? ModelName extends string & keyof MongoModelsMap<TContract>
         ? Flatten<
             InferModelRow<TContract, ModelName> &
               Omit<

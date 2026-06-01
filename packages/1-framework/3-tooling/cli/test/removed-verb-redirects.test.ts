@@ -60,6 +60,19 @@ describe('removed verb redirects', () => {
     }
   });
 
+  it('rejects removed `--graph` flag on `migration list`', async () => {
+    try {
+      await execFileAsync('node', [CLI_PATH, 'migration', 'list', '--graph'], {
+        timeout: 5000,
+      });
+      expect.unreachable('should have exited with non-zero');
+    } catch (error) {
+      const err = error as { code?: number; stderr?: string };
+      expect(err.code).toBe(1);
+      expect(err.stderr).toMatch(/unknown option.*--graph/i);
+    }
+  });
+
   it('removed `--graph` flag on `migration status` redirects to `migration graph`', async () => {
     try {
       await execFileAsync('node', [CLI_PATH, 'migration', 'status', '--graph'], {

@@ -5,7 +5,7 @@ function crossRef(model: string, namespace = 'default') {
   return { namespace: asNamespaceId(namespace), model };
 }
 
-import { createContract, createSqlContract } from '../src/testing-factories';
+import { createContract, createSqlContract } from './support/contract-factories';
 
 describe('createContract', () => {
   it('creates a contract with defaults', () => {
@@ -13,7 +13,7 @@ describe('createContract', () => {
     expect(contract.target).toBe('postgres');
     expect(contract.targetFamily).toBe('sql');
     expect(contract.roots).toEqual({});
-    expect(contract.models).toEqual({});
+    expect(contract.domain.namespaces['__unbound__']?.models).toEqual({});
     expect(contract.capabilities).toEqual({});
     expect(contract.extensionPacks).toEqual({});
     expect(contract.meta).toEqual({});

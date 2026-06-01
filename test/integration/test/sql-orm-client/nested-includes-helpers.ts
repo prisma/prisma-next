@@ -10,6 +10,7 @@
 // across multiple files keeps each invocation under that threshold
 // while preserving the breadth of the coverage.
 
+import type { ContractModelsMap } from '@prisma-next/contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { getTestContext, getTestContract, type TestContract } from './helpers';
@@ -22,7 +23,9 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
  * so this is the right knob for exercising both single-query dispatch
  * strategies (lateral / correlated) against the same real database.
  */
-export function collectionWithCapabilities<ModelName extends keyof TestContract['models']>(
+export function collectionWithCapabilities<
+  ModelName extends keyof ContractModelsMap<TestContract> & string,
+>(
   runtime: PgIntegrationRuntime,
   modelName: ModelName,
   capabilities: Record<string, Record<string, boolean>>,
