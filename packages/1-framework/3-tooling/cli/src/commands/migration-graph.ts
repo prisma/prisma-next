@@ -16,7 +16,10 @@ import { migrationGraphToRenderInput } from '../utils/formatters/graph-migration
 import { graphRenderer } from '../utils/formatters/graph-render';
 import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
 import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
-import { renderMigrationGraphTree } from '../utils/formatters/migration-graph-tree-render';
+import {
+  renderMigrationGraphLegend,
+  renderMigrationGraphTree,
+} from '../utils/formatters/migration-graph-tree-render';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
@@ -29,6 +32,32 @@ interface MigrationGraphOptions extends CommonCommandOptions {
   readonly dot?: boolean;
   readonly tree?: boolean;
   readonly ascii?: boolean;
+  readonly legend?: boolean;
+}
+
+/**
+ * `--legend` describes the `--tree` visual language, so passing it auto-enables
+ * the tree path (it has nothing to say about the legacy dagre default).
+ */
+export function migrationGraphUsesTree(options: {
+  readonly tree?: boolean;
+  readonly legend?: boolean;
+}): boolean {
+  return options.tree === true || options.legend === true;
+}
+
+/**
+ * The legend is decoration printed alongside the command header on stderr, so
+ * it is suppressed for the machine-readable / silent paths (`--json`, `--dot`,
+ * `--quiet`) exactly as the header is.
+ */
+export function migrationGraphShowsLegend(
+  options: { readonly legend?: boolean; readonly dot?: boolean },
+  flags: GlobalFlags,
+): boolean {
+  return (
+    options.legend === true && options.dot !== true && flags.json !== true && flags.quiet !== true
+  );
 }
 
 export interface MigrationGraphResult {
@@ -61,6 +90,14 @@ export async function executeMigrationGraphCommand(
       flags,
     });
     ui.stderr(header);
+    if (migrationGraphShowsLegend(options, flags)) {
+      ui.stderr(
+        renderMigrationGraphLegend({
+          colorize: flags.color !== false,
+          glyphMode: ui.resolveGlyphMode(options.ascii === true),
+        }),
+      );
+    }
   }
 
   const loaded = await buildReadAggregate(config, { migrationsDir });
@@ -102,6 +139,7 @@ export function createMigrationGraphCommand(): Command {
     'prisma-next migration graph --dot',
     'prisma-next migration graph --tree',
     'prisma-next migration graph --tree --ascii',
+    'prisma-next migration graph --legend',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
@@ -114,6 +152,7 @@ export function createMigrationGraphCommand(): Command {
     .option('--dot', 'Output in Graphviz DOT format')
     .option('--tree', 'Experimental condensed annotated tree renderer')
     .option('--ascii', 'Use ASCII glyphs for --tree (pipe-friendly)')
+    .option('--legend', 'Print a key for the --tree glyphs and lane colors (implies --tree)')
     .action(async (options: MigrationGraphOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
@@ -145,7 +184,7 @@ export function createMigrationGraphCommand(): Command {
             JSON.stringify({ ok: true, nodes, edges, summary: graphResult.summary }, null, 2),
           );
         } else if (!flags.quiet) {
-          if (options.tree) {
+          if (migrationGraphUsesTree(options)) {
             const refsByHash = new Map<string, string[]>();
             for (const ref of graphResult.refs) {
               const existing = refsByHash.get(ref.hash);
