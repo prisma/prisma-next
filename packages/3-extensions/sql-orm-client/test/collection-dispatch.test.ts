@@ -71,13 +71,10 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() depth-1 include with emitted-shape capabilities fires a single SQL execution (regression guard for namespaced capability lookup)', async () => {
-    // Guards against regressing the fix that taught `selectIncludeStrategy`
-    // to read capability flags from the contract's `targetFamily` and
-    // `target` namespaces. Prior to that fix, every emitted contract fell
-    // back to multi-query for nested includes — silently, because
-    // functional correctness was unaffected. This test fails fast if the
-    // regression returns: an emitted-shape contract should resolve a
-    // depth-1 include in one SQL execution, not two.
+    // Guards against regressing single-query include dispatch. This test
+    // fails fast if a multi-query fallback returns: an emitted-shape
+    // contract should resolve a depth-1 include in one SQL execution,
+    // not two.
     const contract = withEmittedSqlCapabilities(getTestContract());
     const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.select('name').include('posts');
@@ -102,11 +99,10 @@ describe('collection-dispatch', () => {
 
   it('dispatchCollectionRows() depth-2 nested include with emitted-shape capabilities fires a single SQL execution', async () => {
     // Regression guard for the TML-2594 fix: depth-2 includes used to
-    // unconditionally fall back to the multi-query strategy via the
-    // `hasNestedIncludes` arm of `dispatchWithIncludeStrategy`, regardless
-    // of the contract's declared capabilities. On an emitted-shape
-    // contract that advertises `postgres.lateral` + `postgres.jsonAgg`,
-    // a `users -> posts -> comments` tree should resolve in one SQL
+    // unconditionally fall back to a multi-query path, regardless of the
+    // contract's declared capabilities. On an emitted-shape contract
+    // that advertises `postgres.lateral` + `postgres.jsonAgg`, a
+    // `users -> posts -> comments` tree should resolve in one SQL
     // execution, not three (parent + posts + comments).
     const contract = withEmittedSqlCapabilities(getTestContract());
     const { collection, runtime } = createCollectionFor('User', contract);
@@ -114,16 +110,16 @@ describe('collection-dispatch', () => {
       .select('name')
       .include('posts', (posts) => posts.select('title').include('comments'));
 
-    // The lateral builder produces one JSON column per top-level include;
-    // nested includes appear as nested JSON values (already parsed by
-    // JSON.parse inside the include payload — they are not stringified
-    // a second time). This shape mirrors what `json_array_agg` over a
-    // LATERAL JOIN with a nested LATERAL JOIN actually emits.
+    // The correlated builder produces one JSON column per top-level
+    // include; nested includes appear as nested JSON values (already
+    // parsed by JSON.parse inside the include payload — they are not
+    // stringified a second time). This shape mirrors what `json_array_agg`
+    // over a correlated subquery with a nested correlated subquery emits.
     //
     // The posts payload only carries `title` and `comments` because the
     // SQL projection is restricted by `.select('title')` plus the nested
     // aggregate column. Join keys (`posts.user_id`, `comments.post_id`)
-    // are referenced by WHERE clauses inside the lateral and never
+    // are referenced by WHERE clauses inside the subquery and never
     // projected to the parent's result row.
     runtime.setNextResults([
       [
@@ -164,8 +160,8 @@ describe('collection-dispatch', () => {
 
   it('dispatchCollectionRows() depth-2 mixed cardinality (to-many -> to-one) fires a single SQL execution', async () => {
     // Same regression guard, but covers the to-one leg of the depth-2
-    // tree: `users -> posts -> author`. The lateral builder must
-    // recursively wire a nested LATERAL JOIN even when the inner edge
+    // tree: `users -> posts -> author`. The correlated builder must
+    // recursively wire a nested subquery even when the inner edge
     // collapses to a single object via `coerceSingleQueryIncludeResult`.
     const contract = withEmittedSqlCapabilities(getTestContract());
     const { collection, runtime } = createCollectionFor('User', contract);
@@ -343,7 +339,7 @@ describe('collection-dispatch', () => {
   // Single-query include child-row codec decoding — DEFERRED follow-up.
   //
   // The three `it.skip` blocks below are placeholders for the case where the
-  // single-query include strategy (lateral / correlated jsonb_agg payload)
+  // single-query include builder (correlated jsonb_agg payload)
   // routes embedded child rows through the codec registry and surfaces
   // decoded values (or wrapped failures) on each child cell. The titles
   // describe what each case would assert under the single-path always-await
