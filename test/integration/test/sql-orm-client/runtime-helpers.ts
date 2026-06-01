@@ -43,6 +43,16 @@ interface SeedComment {
   postId: number;
 }
 
+interface SeedTag {
+  id: string;
+  name: string;
+}
+
+interface SeedUserTag {
+  userId: number;
+  tagId: string;
+}
+
 export interface PgIntegrationRuntime extends RuntimeQueryable {
   readonly executions: readonly SqlExecutionPlan[];
   query<Row extends Record<string, unknown> = Record<string, unknown>>(
@@ -173,6 +183,7 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
   )`);
   await runtime.query('create extension if not exists vector');
 
+  await runtime.query('drop table if exists user_tags');
   await runtime.query('drop table if exists tags');
   await runtime.query('drop table if exists comments');
   await runtime.query('drop table if exists profiles');
@@ -219,6 +230,14 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
     create table tags (
       id text primary key,
       name text not null unique
+    )
+  `);
+
+  await runtime.query(`
+    create table user_tags (
+      user_id integer not null,
+      tag_id text not null,
+      primary key (user_id, tag_id)
     )
   `);
 }
@@ -275,6 +294,27 @@ export async function seedComments(
       comment.id,
       comment.body,
       comment.postId,
+    ]);
+  }
+}
+
+export async function seedTags(
+  runtime: PgIntegrationRuntime,
+  tags: readonly SeedTag[],
+): Promise<void> {
+  for (const tag of tags) {
+    await runtime.query('insert into tags (id, name) values ($1, $2)', [tag.id, tag.name]);
+  }
+}
+
+export async function seedUserTags(
+  runtime: PgIntegrationRuntime,
+  userTags: readonly SeedUserTag[],
+): Promise<void> {
+  for (const ut of userTags) {
+    await runtime.query('insert into user_tags (user_id, tag_id) values ($1, $2)', [
+      ut.userId,
+      ut.tagId,
     ]);
   }
 }
