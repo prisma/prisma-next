@@ -1,6 +1,5 @@
-import type { AnyExpression } from '@prisma-next/sql-relational-core/ast';
 import { expectTypeOf, test } from 'vitest';
-import type { Direction, OrderByItem } from '../src/exports';
+import type { AnyExpression, Direction, OrderByItem } from '../../src/ast/types';
 
 test('OrderByItem.reverse() returns an OrderByItem', () => {
   expectTypeOf<OrderByItem['reverse']>().toEqualTypeOf<() => OrderByItem>();
