@@ -86,6 +86,26 @@ teaching the sqlite contract-builder about polymorphism.
 
 **Rejected:** build the SQLite harness now (largest scope; blocked on contract-builder polymorphism).
 
+## D5b (execution-time, post-D7 discovery) — nested include through a poly target: **fix in this PR (D8)**
+
+**Discovery:** D7's "nested include through a poly target" scenario (`Parent → tasks(poly) → reporter`)
+silently decodes the grandchild to `null` for every row. Root cause: `decodeIncludePayload`
+(`collection-dispatch.ts`) poly-maps the child row via `mapPolymorphicRow` **first**, then reads the
+nested-include payload from the *mapped* row — but `mapPolymorphicRow` (`collection-runtime.ts:122-126`)
+keeps only columns present in the variant model-field map, so the nested payload column (a relation
+alias, not a model field) is dropped → `null`. The non-poly mapper (`mapStorageRowToModelFields:58`)
+keeps unknown columns via fallback, which is why the non-poly nested path works. Same silent-degradation
+class as TML-2683, one level deeper.
+
+**Decision (operator):** fix in this PR — dispatch **D8**. Preferred fix: read each nested-include
+payload from the **raw** child row (`childRow[nestedInclude.relationName]`) before poly-mapping, then
+assign the decoded value onto the mapped row — leaving `mapPolymorphicRow`'s variant-shaping (which
+must keep dropping sibling-variant columns) untouched. Unskip the D7 scenario-4 test. Regression guard:
+sibling-variant columns must still be dropped per row.
+
+**Rejected:** make `mapPolymorphicRow` keep all unknown columns — would re-break the per-variant shaping
+D2 established (sibling-variant NULL columns would resurface).
+
 ## Non-blocking process note — stale `dist` masks the fix in integration
 
 The integration package imports the **built `dist`** of `@prisma-next/sql-orm-client`, not `src`. A

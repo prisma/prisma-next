@@ -122,6 +122,17 @@ explicit N/A per the slice-DoD requirement.
 - `pnpm test:integration` green on Postgres (PGlite). *(SQLite poly-include coverage deferred —
   design-notes D4.)*
 
+## Post-close test-coverage dispatches (added after slice DoD, same PR)
+
+- **D6 — harden `polymorphism.test.ts`:** whole-shape `toEqual`, top-level STI+MTI implicit-default
+  tests, de-raw gratuitous read-backs (keep the MTI two-table storage assertion). Committed.
+- **D7 — MTI+relationship coverage gaps:** MTI-as-parent, to-one/N:1 poly target, 2+ MTI variant
+  tables, nested-through-poly, relationship implicit-default. Committed. **Surfaced a depth-2 defect →
+  D8** (scenario-4 landed as `it.skip` asserting the correct shape).
+- **D8 — fix nested include through a poly target (depth-2 decode):** the poly row-mapper dropped the
+  nested-include payload column → grandchild decoded to `null`. Read the nested payload from the raw
+  child row before poly-mapping; unskip the D7 scenario-4 test. See design-notes § D5b.
+
 ## Open items (follow-ups, not in this slice)
 
 - **`orderBy` on a variant-narrowed collection has the same base-table-only gap for MTI variant
