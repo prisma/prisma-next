@@ -11,6 +11,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
+  DdlNode,
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
@@ -24,6 +25,11 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import {
+  buildControlTableBootstrapAsts,
+  buildSignMarkerBootstrapAsts,
+} from '@prisma-next/target-postgres/contract-free';
+import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import {
   createResolveExistingEnumValues,
@@ -35,12 +41,17 @@ import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-t
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
+import { renderLoweredDdl } from './ddl-renderer';
 import {
   introspectPostgresEnumTypes,
   type PostgresEnumStorageTypeAnnotation,
 } from './enum-control-hooks';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
+
+function isPostgresDdlNode(node: AnyQueryAst | DdlNode): node is PostgresDdlNode {
+  return node.kind === 'create-table' || node.kind === 'create-schema';
+}
 
 const POSTGRES_MARKER_TABLE = 'prisma_contract.marker';
 
@@ -99,6 +110,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly resolveExistingEnumValuesForContract = (contract: Contract<SqlStorage>) =>
     createResolveExistingEnumValues(contract.storage);
 
+  bootstrapControlTableAsts(): readonly DdlNode[] {
+    return buildControlTableBootstrapAsts();
+  }
+
+  bootstrapSignMarkerAsts(): readonly DdlNode[] {
+    return buildSignMarkerBootstrapAsts();
+  }
+
   /**
    * Lower a SQL query AST into a Postgres-flavored `{ sql, params }` payload.
    *
@@ -107,7 +126,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * and contract. Used at migration plan/emit time (e.g. by `dataTransform`)
    * without instantiating the runtime adapter.
    */
-  lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
+  lower(ast: AnyQueryAst | PostgresDdlNode, context: LowererContext<unknown>): LoweredStatement {
+    if (isPostgresDdlNode(ast)) {
+      return renderLoweredDdl(ast);
+    }
     return renderLoweredSql(ast, context.contract as PostgresContract, this.codecLookup);
   }
 

@@ -1,4 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlControlFamilyInstance,
@@ -18,6 +18,7 @@ import type {
   MigrationRunnerResult,
 } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -29,9 +30,6 @@ import type { PostgresPlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
   buildMergeMarkerStatements,
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
-  ensurePrismaContractSchemaStatement,
   type SqlStatement,
 } from './statement-builders';
 
@@ -116,7 +114,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     if (!policyCheck.ok) return policyCheck;
 
     await this.acquireLock(driver, lockKey);
-    const ensureResult = await this.ensureControlTables(driver);
+    const ensureResult = await this.ensureControlTables(driver, options.destinationContract);
     if (!ensureResult.ok) return ensureResult;
     const existingMarker = await this.family.readMarker({ driver, space });
 
@@ -291,18 +289,22 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    contract: Contract<SqlStorage>,
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
-    await this.executeStatement(driver, ensurePrismaContractSchemaStatement);
-    // Pre-1.0 zero-range guardrail: detect a pre-cleanup single-row
-    // marker table (no `space` column) and surface a structured failure
-    // rather than silently auto-migrating it to the per-space shape.
-    // See `specs/framework-mechanism.spec.md § 2`.
+    const lowererContext = { contract };
+    const bootstrapAsts = this.family.bootstrapControlTableAsts();
+    const [schemaAst, ...tableAsts] = bootstrapAsts;
+    if (schemaAst === undefined) {
+      throw new Error('Postgres control-table bootstrap must include CREATE SCHEMA');
+    }
+    await this.executeStatement(driver, this.family.lowerAst(schemaAst, lowererContext));
     const legacyDetection = await this.detectLegacyMarkerShape(driver);
     if (!legacyDetection.ok) {
       return legacyDetection;
     }
-    await this.executeStatement(driver, ensureMarkerTableStatement);
-    await this.executeStatement(driver, ensureLedgerTableStatement);
+    for (const ast of tableAsts) {
+      await this.executeStatement(driver, this.family.lowerAst(ast, lowererContext));
+    }
     return okVoid();
   }
 

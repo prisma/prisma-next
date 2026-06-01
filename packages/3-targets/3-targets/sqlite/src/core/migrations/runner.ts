@@ -1,4 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlControlFamilyInstance,
@@ -19,6 +19,7 @@ import type {
   MigrationRunnerResult,
 } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
@@ -28,8 +29,6 @@ import type { SqlitePlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
   buildWriteMarkerStatements,
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
   MARKER_TABLE_NAME,
   readMarkerStatement,
   type SqlStatement,
@@ -70,7 +69,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
     if (!policyCheck.ok) return policyCheck;
 
-    const ensureResult = await this.ensureControlTables(driver);
+    const ensureResult = await this.ensureControlTables(driver, options.destinationContract);
     if (!ensureResult.ok) return ensureResult;
     const existingMarker = await this.readMarker(driver, space);
 
@@ -306,17 +305,16 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
+    contract: Contract<SqlStorage>,
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
-    // Pre-1.0 zero-range guardrail: detect a pre-cleanup single-row
-    // marker table (no `space` column) and surface a structured failure
-    // rather than silently rebuilding the table into the per-space
-    // shape. See `specs/framework-mechanism.spec.md § 2`.
     const legacyDetection = await this.detectLegacyMarkerShape(driver);
     if (!legacyDetection.ok) {
       return legacyDetection;
     }
-    await this.executeStatement(driver, ensureMarkerTableStatement);
-    await this.executeStatement(driver, ensureLedgerTableStatement);
+    const lowererContext = { contract };
+    for (const ast of this.family.bootstrapControlTableAsts()) {
+      await this.executeStatement(driver, this.family.lowerAst(ast, lowererContext));
+    }
     return okVoid();
   }
 

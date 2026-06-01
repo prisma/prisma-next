@@ -8,6 +8,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import type {
   AnyQueryAst,
+  DdlNode,
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
@@ -21,11 +22,21 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import {
+  buildControlTableBootstrapAsts,
+  buildSignMarkerBootstrapAsts,
+} from '@prisma-next/target-sqlite/contract-free';
+import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
+import { renderLoweredDdl } from './ddl-renderer';
 import type { SqliteContract } from './types';
+
+function isSqliteDdlNode(node: AnyQueryAst | DdlNode): node is SqliteDdlNode {
+  return node.kind === 'create-table';
+}
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';
 
@@ -101,6 +112,14 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   readonly normalizeDefault = parseSqliteDefault;
   readonly normalizeNativeType = normalizeSqliteNativeType;
 
+  bootstrapControlTableAsts(): readonly DdlNode[] {
+    return buildControlTableBootstrapAsts();
+  }
+
+  bootstrapSignMarkerAsts(): readonly DdlNode[] {
+    return buildSignMarkerBootstrapAsts();
+  }
+
   /**
    * Lower a SQL query AST into a SQLite-flavored `{ sql, params }` payload.
    *
@@ -109,7 +128,10 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * and contract. Used at migration plan/emit time (e.g. by `dataTransform`)
    * without instantiating the runtime adapter.
    */
-  lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
+  lower(ast: AnyQueryAst | SqliteDdlNode, context: LowererContext<unknown>): LoweredStatement {
+    if (isSqliteDdlNode(ast)) {
+      return renderLoweredDdl(ast);
+    }
     return renderLoweredSql(ast, context.contract as SqliteContract);
   }
 

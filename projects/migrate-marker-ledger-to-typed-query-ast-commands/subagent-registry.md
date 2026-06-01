@@ -10,7 +10,7 @@ The Orchestrator's record of which spawned sub-agent ID belongs to which role/va
 
 | Role / variant | Sub-agent ID | Tier | Status | Last used |
 |---|---|---|---|---|
-| implementer/fast (composer) | 802dcecf-9c0c-4fbc-bbd0-14fbf6945fa5 | **composer-2.5-fast** | active (D1 spike) | 2026-06-01 |
+| implementer/fast (composer) | 802dcecf-9c0c-4fbc-bbd0-14fbf6945fa5 | **composer-2.5-fast** | active (D5) | 2026-06-01 |
 | reviewer/fast | 4277daba-8e6d-476f-abe8-7a6ad4cdd694 | **claude-opus-4-8-thinking-high** | active (D2 R1) | 2026-06-01 |
 
 ### Superseded — PR #661 (rejected design), retained for provenance
