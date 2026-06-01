@@ -4,6 +4,8 @@ import type {
   MigrationPlan,
   MigrationRunnerExecutionChecks,
 } from '@prisma-next/framework-components/control';
+import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import type {
@@ -539,5 +541,195 @@ describe('MongoMigrationRunner schema verification', () => {
     expect(result.assertOk()).toEqual({ operationsPlanned: 1, operationsExecuted: 1 });
     expect(calls.initMarker).toBe(1);
     expect(calls.writeLedgerEntry).toBe(1);
+  });
+});
+
+const LEDGER_TEST_SPACE_ID = 'ledger-test';
+
+type LedgerEntryPayload = Parameters<MarkerOperations['writeLedgerEntry']>[1];
+
+function makeLedgerHarness(): {
+  runner: MongoMigrationRunner;
+  ledgerEntries: LedgerEntryPayload[];
+} {
+  const ledgerEntries: LedgerEntryPayload[] = [];
+  const markerOps: MarkerOperations = {
+    readMarker: async () => null,
+    initMarker: async () => {},
+    updateMarker: async () => true,
+    writeLedgerEntry: async (_space, entry) => {
+      ledgerEntries.push(entry);
+    },
+  };
+  const deps: MongoRunnerDependencies = {
+    commandExecutor: new StubCommandExecutor(),
+    inspectionExecutor: new StubInspectionExecutor(),
+    adapter: new StubMongoAdapter(),
+    driver: new StubMongoDriver(),
+    markerOps,
+    introspectSchema: async () => new MongoSchemaIR([]),
+  };
+  return { runner: new MongoMigrationRunner(deps), ledgerEntries };
+}
+
+function makeLedgerPlan(
+  ops: readonly AnyMongoMigrationOperation[],
+  options: {
+    readonly destinationHash?: string;
+    readonly migrationEdges?: readonly AggregateMigrationEdgeRef[];
+  } = {},
+): MigrationPlan {
+  return {
+    targetId: 'mongo',
+    spaceId: LEDGER_TEST_SPACE_ID,
+    origin: null,
+    destination: { storageHash: options.destinationHash ?? 'sha256:dest' },
+    operations: serializedOperations(ops) as unknown as MigrationPlan['operations'],
+  };
+}
+
+const LEDGER_EXECUTION_CHECKS: MigrationRunnerExecutionChecks = {
+  prechecks: false,
+  postchecks: false,
+  idempotencyChecks: false,
+};
+
+describe('MongoMigrationRunner - per-edge ledger', () => {
+  it('writes one ledger entry for a single-edge apply with space, name, hash, from/to, and that edge ops', async () => {
+    const { runner, ledgerEntries } = makeLedgerHarness();
+    const destHash = 'sha256:dest';
+    const edges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        migrationHash: 'sha256:mig-single',
+        dirName: '001_single',
+        from: EMPTY_CONTRACT_HASH,
+        to: destHash,
+        operationCount: 1,
+      },
+    ];
+    const planOps = serializedOperations([createCollection('ledger_single')]);
+    const result = await runner.execute({
+      plan: makeLedgerPlan([createCollection('ledger_single')], { destinationHash: destHash }),
+      destinationContract: makeContract(destHash),
+      policy: ALL_POLICY,
+      frameworkComponents: [],
+      strictVerification: false,
+      executionChecks: LEDGER_EXECUTION_CHECKS,
+      migrationEdges: edges,
+    });
+
+    expect(result.assertOk()).toEqual({ operationsPlanned: 1, operationsExecuted: 1 });
+    expect(ledgerEntries).toHaveLength(1);
+    expect(ledgerEntries[0]).toMatchObject({
+      edgeId: `${EMPTY_CONTRACT_HASH}->${destHash}`,
+      from: EMPTY_CONTRACT_HASH,
+      to: destHash,
+      migrationName: '001_single',
+      migrationHash: 'sha256:mig-single',
+    });
+    const storedOps = ledgerEntries[0]?.operations as Array<{ id: string }>;
+    expect(storedOps).toHaveLength(1);
+    expect(storedOps[0]?.id).toBe((planOps[0] as { id: string }).id);
+  });
+
+  it('writes N ledger entries in walk order for multi-edge apply with ops attributed per edge', async () => {
+    const { runner, ledgerEntries } = makeLedgerHarness();
+    const hashA = 'sha256:ledger-mid-a';
+    const hashB = 'sha256:ledger-mid-b';
+    const destHash = 'sha256:dest';
+    const edges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        migrationHash: 'sha256:mig-a',
+        dirName: '001_a',
+        from: EMPTY_CONTRACT_HASH,
+        to: hashA,
+        operationCount: 1,
+      },
+      {
+        migrationHash: 'sha256:mig-b',
+        dirName: '002_b',
+        from: hashA,
+        to: hashB,
+        operationCount: 2,
+      },
+      {
+        migrationHash: 'sha256:mig-c',
+        dirName: '003_c',
+        from: hashB,
+        to: destHash,
+        operationCount: 1,
+      },
+    ];
+    const ops = [
+      createCollection('ledger_a'),
+      createCollection('ledger_b1'),
+      createCollection('ledger_b2'),
+      createCollection('ledger_c'),
+    ];
+    const planOps = serializedOperations(ops) as Array<{ id: string }>;
+
+    const result = await runner.execute({
+      plan: makeLedgerPlan(ops, { destinationHash: destHash }),
+      destinationContract: makeContract(destHash),
+      policy: ALL_POLICY,
+      frameworkComponents: [],
+      strictVerification: false,
+      executionChecks: LEDGER_EXECUTION_CHECKS,
+      migrationEdges: edges,
+    });
+
+    expect(result.assertOk()).toEqual({ operationsPlanned: 4, operationsExecuted: 4 });
+    expect(ledgerEntries).toHaveLength(3);
+    expect(ledgerEntries.map((e) => e.migrationName)).toEqual(['001_a', '002_b', '003_c']);
+    expect(ledgerEntries[0]).toMatchObject({
+      edgeId: `${EMPTY_CONTRACT_HASH}->${hashA}`,
+      from: EMPTY_CONTRACT_HASH,
+      to: hashA,
+      migrationHash: 'sha256:mig-a',
+    });
+    expect(ledgerEntries[1]).toMatchObject({
+      edgeId: `${hashA}->${hashB}`,
+      from: hashA,
+      to: hashB,
+      migrationHash: 'sha256:mig-b',
+    });
+    expect(ledgerEntries[2]).toMatchObject({
+      edgeId: `${hashB}->${destHash}`,
+      from: hashB,
+      to: destHash,
+      migrationHash: 'sha256:mig-c',
+    });
+
+    const opCounts = ledgerEntries.map((e) => (e.operations as unknown[]).length);
+    expect(opCounts).toEqual([1, 2, 1]);
+    const opIds = ledgerEntries.flatMap((e) =>
+      (e.operations as Array<{ id: string }>).map((o) => o.id),
+    );
+    expect(opIds).toEqual(planOps.map((o) => o.id));
+  });
+
+  it('writes one synthesised ledger entry with empty migration name for synth apply without migrationEdges', async () => {
+    const { runner, ledgerEntries } = makeLedgerHarness();
+    const destHash = 'sha256:dest';
+
+    const result = await runner.execute({
+      plan: makeLedgerPlan([createCollection('ledger_synth')], { destinationHash: destHash }),
+      destinationContract: makeContract(destHash),
+      policy: ALL_POLICY,
+      frameworkComponents: [],
+      strictVerification: false,
+      executionChecks: LEDGER_EXECUTION_CHECKS,
+    });
+
+    expect(result.assertOk()).toEqual({ operationsPlanned: 1, operationsExecuted: 1 });
+    expect(ledgerEntries).toHaveLength(1);
+    expect(ledgerEntries[0]).toMatchObject({
+      edgeId: `->${destHash}`,
+      from: '',
+      to: destHash,
+      migrationName: '',
+      migrationHash: destHash,
+    });
+    expect((ledgerEntries[0]?.operations as unknown[]).length).toBe(1);
   });
 });

@@ -57,6 +57,9 @@ export interface MarkerOperations {
       readonly edgeId: string;
       readonly from: string;
       readonly to: string;
+      readonly migrationName: string;
+      readonly migrationHash: string;
+      readonly operations: readonly unknown[];
     },
   ): Promise<void>;
 }

@@ -63,7 +63,14 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
   async writeLedgerEntry(
     driver: ControlDriverInstance<'mongo', 'mongo'>,
     space: string,
-    entry: { readonly edgeId: string; readonly from: string; readonly to: string },
+    entry: {
+      readonly edgeId: string;
+      readonly from: string;
+      readonly to: string;
+      readonly migrationName: string;
+      readonly migrationHash: string;
+      readonly operations: readonly unknown[];
+    },
   ): Promise<void> {
     await writeLedgerEntry(extractDb(driver), space, entry);
   }
