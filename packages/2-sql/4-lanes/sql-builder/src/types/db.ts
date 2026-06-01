@@ -24,12 +24,12 @@ export type UnboundTables<C extends TableProxyContract> = {
   readonly [Name in TableNamesAcrossNamespaces<C>]: TableInAnyNamespace<C, Name>;
 };
 
-type TableNamesAcrossNamespaces<C extends TableProxyContract> = {
+export type TableNamesAcrossNamespaces<C extends TableProxyContract> = {
   [NSId in keyof C['storage']['namespaces']]: keyof C['storage']['namespaces'][NSId]['tables'] &
     string;
 }[keyof C['storage']['namespaces']];
 
-type TableInAnyNamespace<C extends TableProxyContract, Name extends string> = {
+export type TableInAnyNamespace<C extends TableProxyContract, Name extends string> = {
   [NSId in keyof C['storage']['namespaces']]: Name extends keyof C['storage']['namespaces'][NSId]['tables']
     ? C['storage']['namespaces'][NSId]['tables'][Name]
     : never;

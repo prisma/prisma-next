@@ -2649,6 +2649,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:0.11.0
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/sql-builder':
+        specifier: workspace:0.11.0
+        version: link:../sql-builder
       '@prisma-next/sql-contract':
         specifier: workspace:0.11.0
         version: link:../../1-core/contract
