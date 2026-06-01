@@ -33,6 +33,7 @@ import {
 } from './collection-contract';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { augmentSelectionForJoinColumns } from './selection-shaping';
+import { tableSourceForContract } from './storage-resolution';
 import type { CollectionState, IncludeCombineBranch, IncludeExpr, IncludeScalar } from './types';
 import { bindWhereExpr } from './where-binding';
 import { combineWhereExprs } from './where-utils';
@@ -139,9 +140,12 @@ function createTableRefRemapper(fromTable: string, toTable: string): AstRewriter
   return {
     columnRef: (col) => (col.table === fromTable ? ColumnRef.of(toTable, col.column) : col),
     tableSource: (source) => {
-      if (source.alias === fromTable) return TableSource.named(source.name, toTable);
-      if (!source.alias && source.name === fromTable)
-        return TableSource.named(source.name, toTable);
+      if (source.alias === fromTable) {
+        return TableSource.named(source.name, toTable, source.namespaceId);
+      }
+      if (!source.alias && source.name === fromTable) {
+        return TableSource.named(source.name, toTable, source.namespaceId);
+      }
       return source;
     },
     eqColJoinOn: (on) =>
@@ -413,7 +417,9 @@ function buildIncludeChildRowsSelect(
     ...nestedProjections,
   ];
 
-  let childRows = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+  let childRows = SelectAst.from(
+    tableSourceForContract(contract, include.relatedTableName, childTableAlias),
+  )
     .withProjection([...childProjection, ...hiddenOrderProjection])
     .withJoins(nestedJoins)
     .withWhere(whereExpr);
@@ -539,7 +545,9 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     selectedForQuery,
     childTableRef,
   );
-  const baseInner = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+  const baseInner = SelectAst.from(
+    tableSourceForContract(contract, include.relatedTableName, childTableAlias),
+  )
     .withProjection([...innerScalarProjection, ...hiddenOrderProjection])
     .withWhere(whereExpr);
 
@@ -687,7 +695,9 @@ function buildIncludeChildScalarSelect(
     const jsonObjectExpr = JsonObjectExpr.fromEntries([
       JsonObjectExpr.entry('value', aggregateExpr),
     ]);
-    return SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+    return SelectAst.from(
+      tableSourceForContract(contract, include.relatedTableName, childTableAlias),
+    )
       .withProjection([ProjectionItem.of(include.relationName, jsonObjectExpr)])
       .withWhere(whereExpr);
   }
@@ -724,7 +734,9 @@ function buildIncludeChildScalarSelect(
     ...hiddenOrderProjection,
   ];
 
-  let inner = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+  let inner = SelectAst.from(
+    tableSourceForContract(contract, include.relatedTableName, childTableAlias),
+  )
     .withProjection(innerProjection)
     .withWhere(whereExpr);
 
@@ -1073,7 +1085,7 @@ function buildSelectAst(
         tableName,
         buildTopLevelDistinctRankedInner(contract, tableName, state, where),
       )
-    : TableSource.named(tableName);
+    : tableSourceForContract(contract, tableName);
 
   let ast = SelectAst.from(fromSource).withProjection(projection);
   if (usesRowNumberDistinct) {
@@ -1130,7 +1142,7 @@ function buildTopLevelDistinctRankedInner(
       ? state.orderBy
       : distinctColumnRefs.map((expr) => OrderByItem.asc(expr));
 
-  let inner = SelectAst.from(TableSource.named(tableName)).withProjection([
+  let inner = SelectAst.from(tableSourceForContract(contract, tableName)).withProjection([
     ...allColsProjection,
     ProjectionItem.of(
       '__prisma_distinct_rn',
@@ -1167,8 +1179,8 @@ function buildMtiJoins(
     );
     const join =
       joinType === 'inner'
-        ? JoinAst.inner(TableSource.named(variant.table), joinOn)
-        : JoinAst.left(TableSource.named(variant.table), joinOn);
+        ? JoinAst.inner(tableSourceForContract(contract, variant.table), joinOn)
+        : JoinAst.left(tableSourceForContract(contract, variant.table), joinOn);
     joins.push(join);
 
     const variantColumns = resolveTableColumns(contract, variant.table);

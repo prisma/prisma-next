@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
   ColumnRef,
@@ -9,19 +9,14 @@ import {
   InsertOnConflict,
   ParamRef,
   ProjectionItem,
-  TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
+import { storageTableForContract, tableSourceForContract } from './storage-resolution';
 import { combineWhereExprs } from './where-utils';
-
-function unboundTable(contract: Contract<SqlStorage>, tableName: string): StorageTable | undefined {
-  return Object.values(contract.storage.namespaces).find((ns) => ns.tables[tableName] !== undefined)
-    ?.tables[tableName] as StorageTable | undefined;
-}
 
 function buildReturningColumns(
   contract: Contract<SqlStorage>,
@@ -51,10 +46,7 @@ function toParamAssignments(
 } {
   const assignments: Record<string, ParamRef> = {};
 
-  const table = unboundTable(contract, tableName);
-  if (!table) {
-    throw new Error(`Unknown table "${tableName}"`);
-  }
+  const table = storageTableForContract(contract, tableName);
 
   for (const [column, value] of Object.entries(values)) {
     if (!table.columns[column]) {
@@ -94,10 +86,7 @@ function normalizeInsertRows(
     }
   }
 
-  const table = unboundTable(contract, tableName);
-  if (!table) {
-    throw new Error(`Unknown table "${tableName}"`);
-  }
+  const table = storageTableForContract(contract, tableName);
 
   const normalizedRows = rows.map((row) => {
     if (orderedColumns.length === 0) {
@@ -132,7 +121,7 @@ export function compileInsertReturning(
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
-  const ast = InsertAst.into(TableSource.named(tableName))
+  const ast = InsertAst.into(tableSourceForContract(contract, tableName))
     .withRows(normalizedRows)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
   const { params } = deriveParamsFromAst(ast);
@@ -145,7 +134,7 @@ export function compileInsertCount(
   rows: readonly Record<string, unknown>[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
-  const ast = InsertAst.into(TableSource.named(tableName)).withRows(normalizedRows);
+  const ast = InsertAst.into(tableSourceForContract(contract, tableName)).withRows(normalizedRows);
   const { params } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params);
 }
@@ -236,7 +225,7 @@ export function compileUpsertReturning(
         conflictColumns.map((column) => ColumnRef.of(tableName, column)),
       ).doNothing();
 
-  const ast = InsertAst.into(TableSource.named(tableName))
+  const ast = InsertAst.into(tableSourceForContract(contract, tableName))
     .withRows([createAssignments.assignments])
     .withOnConflict(onConflict)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
@@ -254,7 +243,7 @@ export function compileUpdateReturning(
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
   const { assignments } = toParamAssignments(contract, tableName, setValues);
-  let ast = UpdateAst.table(TableSource.named(tableName))
+  let ast = UpdateAst.table(tableSourceForContract(contract, tableName))
     .withSet(assignments)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
   if (where) {
@@ -272,7 +261,7 @@ export function compileUpdateCount(
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
   const { assignments } = toParamAssignments(contract, tableName, setValues);
-  let ast = UpdateAst.table(TableSource.named(tableName)).withSet(assignments);
+  let ast = UpdateAst.table(tableSourceForContract(contract, tableName)).withSet(assignments);
   if (where) {
     ast = ast.withWhere(where);
   }
@@ -287,7 +276,7 @@ export function compileDeleteReturning(
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
-  let ast = DeleteAst.from(TableSource.named(tableName)).withReturning(
+  let ast = DeleteAst.from(tableSourceForContract(contract, tableName)).withReturning(
     buildReturningColumns(contract, tableName, returningColumns),
   );
   if (where) {
@@ -303,7 +292,7 @@ export function compileDeleteCount(
   filters: readonly AnyExpression[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
-  let ast = DeleteAst.from(TableSource.named(tableName));
+  let ast = DeleteAst.from(tableSourceForContract(contract, tableName));
   if (where) {
     ast = ast.withWhere(where);
   }

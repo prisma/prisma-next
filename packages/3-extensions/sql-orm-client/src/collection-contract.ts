@@ -5,6 +5,11 @@ import {
   contractModels,
 } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  resolveDomainModelForContract,
+  resolveTableForContract,
+  storageTableForContract,
+} from './storage-resolution';
 import type { RelationCardinalityTag } from './types';
 
 type ModelStorageFields = Record<string, { column?: string }>;
@@ -34,17 +39,13 @@ export interface PolymorphismInfo {
   readonly mtiVariants: readonly PolymorphismVariantInfo[];
 }
 
-function unboundTable(contract: Contract<SqlStorage>, tableName: string): StorageTable | undefined {
-  return Object.values(contract.storage.namespaces).find((ns) => ns.tables[tableName] !== undefined)
-    ?.tables[tableName] as StorageTable | undefined;
-}
-
 function modelsOf(contract: Contract<SqlStorage>): ModelsMap {
   return contractModels(contract) as ModelsMap;
 }
 
 export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntry | undefined {
-  return modelsOf(contract)[name];
+  const resolved = resolveDomainModelForContract(contract, name);
+  return resolved?.model as ModelEntry | undefined;
 }
 
 const fieldToColumnCache = new WeakMap<object, Map<string, Record<string, string>>>();
@@ -319,15 +320,16 @@ export function resolveUpsertConflictColumns(
   }
 
   const tableName = resolveModelTableName(contract, modelName);
-  const primaryKeyColumns = unboundTable(contract, tableName)?.primaryKey?.columns ?? [];
+  const primaryKeyColumns = storageTableForContract(contract, tableName).primaryKey?.columns ?? [];
   return [...primaryKeyColumns];
 }
 
 export function resolveModelTableName(contract: Contract<SqlStorage>, modelName: string): string {
-  const model = modelsOf(contract)[modelName];
-  if (!model) {
+  const resolved = resolveDomainModelForContract(contract, modelName);
+  if (!resolved) {
     throw new Error(`Model "${modelName}" not found in contract`);
   }
+  const model = resolved.model as ModelEntry;
   if (model.storage && typeof model.storage.table === 'string') {
     return model.storage.table;
   }
@@ -335,15 +337,18 @@ export function resolveModelTableName(contract: Contract<SqlStorage>, modelName:
 }
 
 export function resolvePrimaryKeyColumn(contract: Contract<SqlStorage>, tableName: string): string {
-  return unboundTable(contract, tableName)?.primaryKey?.columns[0] ?? 'id';
+  const resolved = resolveTableForContract(contract, tableName);
+  return resolved?.table.primaryKey?.columns[0] ?? 'id';
 }
 
 export function resolveRowIdentityColumns(
   contract: Contract<SqlStorage>,
   tableName: string,
 ): readonly string[] {
-  const table = unboundTable(contract, tableName);
-  if (!table) {
+  let table: StorageTable;
+  try {
+    table = storageTableForContract(contract, tableName);
+  } catch {
     return [];
   }
   if (table.primaryKey && table.primaryKey.columns.length > 0) {

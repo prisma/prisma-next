@@ -149,7 +149,7 @@ describe('createModelAccessor', () => {
 
     expect(accessor['posts']!.some()).toEqual(
       ExistsExpr.exists(
-        SelectAst.from(TableSource.named('posts'))
+        SelectAst.from(TableSource.named('posts', undefined, 'public'))
           .withProjection([ProjectionItem.of('_exists', ColumnRef.of('posts', 'user_id'))])
           .withWhere(BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id'))),
       ),
