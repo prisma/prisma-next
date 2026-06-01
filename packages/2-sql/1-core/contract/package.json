@@ -43,10 +43,12 @@
   ],
   "exports": {
     "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
+    "./default-namespace": "./dist/default-namespace.mjs",
     "./factories": "./dist/factories.mjs",
     "./index-type-validation": "./dist/index-type-validation.mjs",
     "./index-types": "./dist/index-types.mjs",
     "./pack-types": "./dist/pack-types.mjs",
+    "./resolve-storage-table": "./dist/resolve-storage-table.mjs",
     "./types": "./dist/types.mjs",
     "./validators": "./dist/validators.mjs",
     "./package.json": "./package.json"
