@@ -5,7 +5,7 @@ export interface MongoIncludeExpr {
   readonly from: string;
   readonly localField: string;
   readonly foreignField: string;
-  readonly cardinality: '1:1' | 'N:1' | '1:N' | 'M:N';
+  readonly cardinality: '1:1' | 'N:1' | '1:N' | 'N:M';
 }
 
 export interface MongoCollectionState {

@@ -1,4 +1,7 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 import { modelsMapForAssertions, modelsOf } from './contract-test-helpers';
@@ -955,6 +958,84 @@ describe('self-referential and circular relations', () => {
         on: {
           localFields: ['headId'],
           targetFields: ['id'],
+        },
+      },
+    });
+  });
+
+  it('M:N relation round-trips through validateContract with through descriptor intact', () => {
+    const UserTag = model('UserTag', {
+      fields: {
+        userId: field.column(textColumn).column('user_id'),
+        tagId: field.column(textColumn).column('tag_id'),
+      },
+    })
+      .attributes(({ fields, constraints }) => ({
+        id: constraints.id([fields.userId, fields.tagId]),
+      }))
+      .sql({ table: 'user_tag' });
+
+    const TagBase = model('Tag', {
+      fields: {
+        id: field.column(textColumn).id(),
+        name: field.column(textColumn),
+      },
+    }).sql({ table: 'tag' });
+
+    const UserBase = model('User', {
+      fields: {
+        id: field.column(textColumn).id(),
+        email: field.column(textColumn),
+      },
+    });
+
+    const Tag = TagBase.relations({
+      users: rel.manyToMany(() => UserBase, {
+        through: () => UserTag,
+        from: 'tagId',
+        to: 'userId',
+      }),
+    });
+
+    const User = UserBase.relations({
+      tags: rel.manyToMany(() => Tag, {
+        through: () => UserTag,
+        from: 'userId',
+        to: 'tagId',
+      }),
+    }).sql({ table: 'app_user' });
+
+    const contract = defineTestContract({
+      models: { User, Tag, UserTag },
+    });
+
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).not.toThrow();
+
+    const contractModels = modelsOf(contract) as Record<
+      string,
+      { relations: Record<string, unknown> }
+    >;
+    expect(contractModels['User']?.relations).toMatchObject({
+      tags: {
+        to: crossRef('Tag', 'public'),
+        cardinality: 'N:M',
+        through: {
+          table: 'user_tag',
+          parentColumns: ['user_id'],
+          childColumns: ['tag_id'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+    expect(contractModels['Tag']?.relations).toMatchObject({
+      users: {
+        to: crossRef('User', 'public'),
+        cardinality: 'N:M',
+        through: {
+          table: 'user_tag',
+          parentColumns: ['tag_id'],
+          childColumns: ['user_id'],
+          targetColumns: ['id'],
         },
       },
     });

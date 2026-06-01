@@ -418,15 +418,24 @@ const ModelStorageSchema = type({
   fields: type({ '[string]': ModelStorageFieldSchema }),
 });
 
+const ContractRelationThroughSchema = type({
+  '+': 'reject',
+  table: 'string',
+  parentColumns: type.string.array().readonly(),
+  childColumns: type.string.array().readonly(),
+  targetColumns: type.string.array().readonly(),
+});
+
 const ContractReferenceRelationSchema = type({
   '+': 'reject',
   to: CrossReferenceSchema,
-  cardinality: "'1:1' | '1:N' | 'N:1'",
+  cardinality: "'1:1' | '1:N' | 'N:1' | 'N:M'",
   on: type({
     '+': 'reject',
     localFields: type.string.array().readonly(),
     targetFields: type.string.array().readonly(),
   }),
+  'through?': ContractRelationThroughSchema,
 });
 
 const ContractEmbedRelationSchema = type({

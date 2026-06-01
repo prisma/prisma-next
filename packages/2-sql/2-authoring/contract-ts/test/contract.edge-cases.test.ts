@@ -134,7 +134,7 @@ describe('SqlContractSerializer edge cases', () => {
           },
           relations: {
             posts: {
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },

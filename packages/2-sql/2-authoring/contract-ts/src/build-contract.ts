@@ -600,10 +600,7 @@ export function buildSqlContractFromDefinition(
           relation.toModel,
           resolveModelNamespaceId(targetModel, modelNameToNamespaceId, defaultNamespaceId),
         ),
-        // RelationDefinition.cardinality includes 'N:M' which isn't in
-        // ContractReferenceRelation yet — cast is needed until the contract
-        // type is extended to cover many-to-many.
-        cardinality: relation.cardinality as ContractRelation['cardinality'],
+        cardinality: relation.cardinality,
         on: {
           localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
           targetFields: relation.on.childColumns.map((col) => targetColumnToField.get(col) ?? col),
@@ -612,8 +609,9 @@ export function buildSqlContractFromDefinition(
           ? {
               through: {
                 table: relation.through.table,
-                parentCols: relation.through.parentColumns,
-                childCols: relation.through.childColumns,
+                parentColumns: relation.through.parentColumns,
+                childColumns: relation.through.childColumns,
+                targetColumns: targetModel.id?.columns ?? ([] as const),
               },
             }
           : undefined),
