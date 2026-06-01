@@ -1,5 +1,5 @@
 import type { StorageTable } from '@prisma-next/sql-contract/types';
-import { type AnyFromSource, TableSource } from '@prisma-next/sql-relational-core/ast';
+import type { AnyFromSource, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type {
   AggregateFunctions,
   Expression,
@@ -43,6 +43,7 @@ import {
   type UpdateSetCallback,
 } from './mutation-impl';
 import { SelectQueryImpl } from './query-impl';
+import { tableSourceForProxy } from './table-source-for-proxy';
 
 export class TableProxyImpl<
     C extends TableProxyContract,
@@ -61,15 +62,23 @@ export class TableProxyImpl<
 
   readonly #tableName: string;
   readonly #table: StorageTable;
+  readonly #namespaceId: string;
   readonly #fromSource: TableSource;
   readonly #scope: Scope;
 
-  constructor(tableName: string, table: StorageTable, alias: string, ctx: BuilderContext) {
+  constructor(
+    tableName: string,
+    table: StorageTable,
+    alias: string,
+    ctx: BuilderContext,
+    namespaceId: string,
+  ) {
     super(ctx);
     this.#tableName = tableName;
     this.#table = table;
+    this.#namespaceId = namespaceId;
     this.#scope = tableToScope(alias, table, { storage: ctx.storage, tableName });
-    this.#fromSource = TableSource.named(tableName, alias !== tableName ? alias : undefined);
+    this.#fromSource = tableSourceForProxy(tableName, alias, namespaceId);
   }
 
   lateralJoin = this._gate(
@@ -114,7 +123,7 @@ export class TableProxyImpl<
   as<NewAlias extends string>(
     newAlias: NewAlias,
   ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC> {
-    return new TableProxyImpl(this.#tableName, this.#table, newAlias, this.ctx);
+    return new TableProxyImpl(this.#tableName, this.#table, newAlias, this.ctx, this.#namespaceId);
   }
 
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
@@ -165,7 +174,7 @@ export class TableProxyImpl<
   }
 
   insert(rows: ReadonlyArray<Record<string, unknown>>): InsertQuery<QC, AvailableScope, EmptyRow> {
-    return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, rows, this.ctx);
+    return new InsertQueryImpl(this.#fromSource, this.#table, this.#scope, rows, this.ctx);
   }
 
   update(
@@ -190,7 +199,7 @@ export class TableProxyImpl<
         'update',
         this.ctx,
       );
-      return new UpdateQueryImpl(this.#tableName, this.#scope, setExpressions, this.ctx);
+      return new UpdateQueryImpl(this.#fromSource, this.#scope, setExpressions, this.ctx);
     }
     const setExpressions = buildParamValues(
       setOrCallback,
@@ -199,11 +208,11 @@ export class TableProxyImpl<
       'update',
       this.ctx,
     );
-    return new UpdateQueryImpl(this.#tableName, this.#scope, setExpressions, this.ctx);
+    return new UpdateQueryImpl(this.#fromSource, this.#scope, setExpressions, this.ctx);
   }
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow> {
-    return new DeleteQueryImpl(this.#tableName, this.#scope, this.ctx);
+    return new DeleteQueryImpl(this.#fromSource, this.#scope, this.ctx);
   }
 
   #toJoined(): JoinedTables<QC, AvailableScope> {
