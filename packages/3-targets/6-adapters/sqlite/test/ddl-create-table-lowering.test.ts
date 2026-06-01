@@ -4,16 +4,19 @@ import { createSqliteAdapter } from '../src/core/adapter';
 import type { SqliteContract } from '../src/core/types';
 
 describe('SqliteCreateTable DDL lowering', () => {
-  it('renders CREATE TABLE with quoted identifiers', () => {
+  it('renders IF NOT EXISTS with quoted-style column casing', () => {
     const ast = new SqliteCreateTable({
       table: '_prisma_marker',
+      ifNotExists: true,
       columns: [{ name: 'space', type: 'TEXT', notNull: true, primaryKey: true }],
     });
 
     const adapter = createSqliteAdapter();
     const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
 
-    expect(lowered.sql).toBe('CREATE TABLE "_prisma_marker" ("space" TEXT NOT NULL PRIMARY KEY)');
+    expect(lowered.sql).toBe(
+      'CREATE TABLE IF NOT EXISTS _prisma_marker (\n    space TEXT NOT NULL PRIMARY KEY\n  )',
+    );
     expect(lowered.params).toEqual([]);
   });
 });

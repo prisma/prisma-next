@@ -17,16 +17,19 @@ export class PostgresCreateTable extends PostgresDdlNode {
   readonly kind = 'create-table' as const;
   readonly table: string;
   readonly schema: string | undefined;
+  readonly ifNotExists: boolean | undefined;
   readonly columns: ReadonlyArray<DdlColumn>;
 
   constructor(options: {
     readonly table: string;
     readonly schema?: string;
+    readonly ifNotExists?: boolean;
     readonly columns: readonly DdlColumn[];
   }) {
     super();
     this.table = options.table;
     this.schema = options.schema;
+    this.ifNotExists = options.ifNotExists;
     this.columns = freezeDdlColumns(options.columns);
     this.freeze();
   }
