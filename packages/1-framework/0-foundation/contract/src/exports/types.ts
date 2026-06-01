@@ -7,6 +7,12 @@ export type {
 export { DomainNamespaceResolutionError } from '../contract-validation-error';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
+export {
+  defaultDomainNamespaceIdForMongo,
+  defaultDomainNamespaceIdForSqlTarget,
+  inferDefaultDomainNamespaceId,
+  POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
+} from '../default-namespace';
 export type {
   ApplicationDomain,
   ApplicationDomainNamespace,
@@ -39,6 +45,11 @@ export type {
 } from '../domain-types';
 export type { NamespaceId } from '../namespace-id';
 export { asNamespaceId } from '../namespace-id';
+export {
+  type ResolveDomainModelOptions,
+  type ResolvedDomainModel,
+  resolveDomainModel,
+} from '../resolve-domain-model';
 export type {
   $,
   Brand,

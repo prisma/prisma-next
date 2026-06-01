@@ -1,7 +1,8 @@
 import { DomainNamespaceResolutionError } from './contract-validation-error';
+import { inferDefaultDomainNamespaceId } from './default-namespace';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
 
-export const UNBOUND_DOMAIN_NAMESPACE_ID = '__unbound__' as const;
+export { UNBOUND_DOMAIN_NAMESPACE_ID } from './default-namespace';
 
 /**
  * One namespace's application-domain entities — models and optional value
@@ -41,20 +42,7 @@ export function resolveSingleDomainNamespaceId(
     return namespaceId;
   }
 
-  const namespaceIds = Object.keys(domain.namespaces);
-  if (namespaceIds.length === 0) {
-    throw new DomainNamespaceResolutionError('domain has no namespaces');
-  }
-  if (namespaceIds.length > 1) {
-    throw new DomainNamespaceResolutionError(
-      `expected exactly one domain namespace, found ${namespaceIds.length} (${namespaceIds.join(', ')})`,
-    );
-  }
-  const [soleNamespaceId] = namespaceIds;
-  if (soleNamespaceId === undefined) {
-    throw new DomainNamespaceResolutionError('domain has no namespaces');
-  }
-  return soleNamespaceId;
+  return inferDefaultDomainNamespaceId(domain);
 }
 
 // Transitional single-namespace projection; pending runtime-qualification slice.

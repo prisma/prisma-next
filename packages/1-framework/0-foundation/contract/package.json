@@ -42,8 +42,10 @@
   ],
   "exports": {
     "./contract-validation-error": "./dist/contract-validation-error.mjs",
+    "./default-namespace": "./dist/default-namespace.mjs",
     "./hashing": "./dist/hashing.mjs",
     "./hashing-utils": "./dist/hashing-utils.mjs",
+    "./resolve-domain-model": "./dist/resolve-domain-model.mjs",
     "./types": "./dist/types.mjs",
     "./validate-domain": "./dist/validate-domain.mjs",
     "./package.json": "./package.json"

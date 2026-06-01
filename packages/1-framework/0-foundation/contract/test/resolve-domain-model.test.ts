@@ -1,0 +1,82 @@
+import { blindCast } from '@prisma-next/utils/casts';
+import { describe, expect, it } from 'vitest';
+import { POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID } from '../src/default-namespace';
+import type { ApplicationDomain } from '../src/domain-envelope';
+import type { ContractModelBase } from '../src/domain-types';
+import { resolveDomainModel } from '../src/resolve-domain-model';
+import { applicationDomainOf } from './support/application-domain-of';
+
+function minimalModel(name: string): ContractModelBase {
+  return blindCast<ContractModelBase, 'minimal model fixture for resolveDomainModel tests'>({
+    name,
+    fields: {},
+    relations: {},
+    storage: {},
+  });
+}
+
+function multiNamespaceDomain(
+  namespaces: Record<string, Record<string, ContractModelBase>>,
+): ApplicationDomain {
+  return blindCast<
+    ApplicationDomain,
+    'multi-namespace domain fixture for resolveDomainModel tests'
+  >({
+    namespaces: Object.fromEntries(
+      Object.entries(namespaces).map(([namespaceId, models]) => [namespaceId, { models }]),
+    ),
+  });
+}
+
+describe('resolveDomainModel', () => {
+  it('prefers the default namespace when the same model name exists in multiple namespaces', () => {
+    const publicUser = minimalModel('User');
+    const authUser = minimalModel('User');
+    const domain = multiNamespaceDomain({
+      auth: { User: authUser },
+      public: { User: publicUser },
+    });
+
+    const resolved = resolveDomainModel(domain, 'User', {
+      defaultNamespaceId: POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
+    });
+
+    expect(resolved).toEqual({ namespaceId: 'public', model: publicUser });
+  });
+
+  it('falls back to a non-default namespace when the model is only declared there', () => {
+    const authUser = minimalModel('User');
+    const domain = multiNamespaceDomain({
+      public: {},
+      auth: { User: authUser },
+    });
+
+    const resolved = resolveDomainModel(domain, 'User', {
+      defaultNamespaceId: POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
+    });
+
+    expect(resolved).toEqual({ namespaceId: 'auth', model: authUser });
+  });
+
+  it('resolves within a single-namespace contract', () => {
+    const user = minimalModel('User');
+    const domain = applicationDomainOf({ models: { User: user } });
+
+    const resolved = resolveDomainModel(domain, 'User', {
+      defaultNamespaceId: '__unbound__',
+    });
+
+    expect(resolved?.namespaceId).toBe('__unbound__');
+    expect(resolved?.model).toBe(user);
+  });
+
+  it('returns undefined when no namespace declares the model name', () => {
+    const domain = applicationDomainOf({ models: {} });
+
+    expect(
+      resolveDomainModel(domain, 'Missing', {
+        defaultNamespaceId: POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
+      }),
+    ).toBeUndefined();
+  });
+});
