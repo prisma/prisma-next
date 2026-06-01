@@ -1,5 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { bold } from 'colorette';
+import { bold, createColors } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
 import { LANE_COLOR_CYCLE, laneColorForColumn } from './migration-graph-lane-colors';
@@ -123,6 +123,14 @@ function arrowForEdgeKind(
  * apart from. Used as the "no owning arc" sentinel during colour resolution.
  */
 const NEUTRAL_LANE = 0;
+
+/**
+ * Forced bold for branch-coloured names. A branched name pairs its lane hue
+ * (also forced, via {@link laneColorForColumn}) with bold; both must emit even
+ * when colorette's ambient TTY detection is off, so the colorized branch name
+ * is deterministically bold + hue rather than hue-only.
+ */
+const { bold: forcedBold } = createColors({ useColor: true });
 
 /**
  * The colour-source column for each cell of a row, resolved together because a
@@ -700,7 +708,13 @@ export function renderMigrationGraphTree(
     if (edge === undefined) continue;
 
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
-    const dirNameStyler = branchStylerOrDefault(row.laneIndex ?? 0, opts.colorize, style.dirName);
+    const laneIndex = row.laneIndex ?? 0;
+    // A branched name keeps its bold (via `style.dirName`) and adds the lane
+    // hue, so it reads as one with its lane/arrow; column-0 names stay bold-only.
+    const dirNameStyler =
+      opts.colorize && laneIndex > NEUTRAL_LANE
+        ? (text: string) => forcedBold(laneColorForColumn(laneIndex)(text))
+        : style.dirName;
     const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
     lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}`));
