@@ -389,7 +389,7 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
    * Per-edge breakdown from graph-walk planning. When present, the runner
    * writes one ledger row per edge instead of one collapsed row per apply.
    */
-  readonly migrationEdges?: readonly AggregateMigrationEdgeRef[];
+  readonly migrationEdges?: readonly AggregateMigrationEdgeRef[] | undefined;
 }
 
 export type SqlMigrationRunnerErrorCode =
