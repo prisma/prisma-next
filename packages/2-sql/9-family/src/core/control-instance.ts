@@ -45,6 +45,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
@@ -265,7 +266,8 @@ function isSqlControlAdapter<TTargetId extends string>(
     'readAllMarkers' in value &&
     typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
     'readLedger' in value &&
-    typeof (value as { readLedger: unknown }).readLedger === 'function' &&
+    typeof blindCast<{ readLedger: unknown }, 'SqlControlAdapter duck-type probe'>(value)
+      .readLedger === 'function' &&
     'lower' in value &&
     typeof (value as { lower: unknown }).lower === 'function'
   );
