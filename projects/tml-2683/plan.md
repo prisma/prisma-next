@@ -127,8 +127,10 @@ explicit N/A per the slice-DoD requirement.
 - **`orderBy` on a variant-narrowed collection has the same base-table-only gap for MTI variant
   columns** as the `where` path D5 fixed (`collection.ts` orderBy passes no variant to
   `createModelAccessor`). Surfaced + scope-controlled out of D5. The threading mechanism (optional
-  `variantName` on `createModelAccessor`) is now in place, so the fix is small. → file a follow-up ticket.
+  `variantName` on `createModelAccessor`) is now in place, so the fix is small. → filed as **TML-2782**.
 - **SQLite poly-include integration coverage** — deferred (design-notes D4), gated on the sqlite
-  contract-builder gaining polymorphism support. → file a follow-up ticket.
+  contract-builder gaining polymorphism support. Subsumed by the separately-tracked multi-target
+  test-runtime project (a larger effort); not filed here. Some SQLite breakage is acceptable through
+  mid-July while Postgres GA is the focus.
 - Type-level tests assert the variant-union result shape and `.variant()` narrowing.
 - PR description is the slice spec (`projects/tml-2683/spec.md`) + Linear back-link.
