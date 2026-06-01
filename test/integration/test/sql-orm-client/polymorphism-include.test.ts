@@ -325,6 +325,9 @@ describe('integration/polymorphism-include', () => {
         // the poly machinery regardless of `select`; the base columns are
         // controlled by `select`. So a bug row carries only the selected base
         // fields, a feature row additionally carries `priority`.
+        // TML-2783: explicit `.select('id', 'title', 'type')` does NOT restrict
+        // the poly variant columns — `priority` leaks in despite not being
+        // selected. This asserts the current (buggy) shape, not the post-fix one.
         const rows = await projects
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
