@@ -1,40 +1,43 @@
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type {
-  Adapter,
-  AdapterProfile,
-  AggregateExpr,
-  AnyExpression,
-  AnyFromSource,
-  AnyQueryAst,
-  BinaryExpr,
-  ColumnRef,
-  DeleteAst,
-  InsertAst,
-  InsertValue,
-  JoinAst,
-  JoinOnExpr,
-  JsonArrayAggExpr,
-  JsonObjectExpr,
-  ListExpression,
-  LiteralExpr,
-  LoweredParam,
-  LowererContext,
-  MarkerReadResult,
-  NullCheckExpr,
-  OperationExpr,
-  OrderByItem,
-  ProjectionItem,
-  RawExpr,
-  RawSqlLiteral,
-  SelectAst,
-  SqlQueryable,
-  SubqueryExpr,
-  UpdateAst,
-  WindowFuncExpr,
+import {
+  type Adapter,
+  type AdapterProfile,
+  type AggregateExpr,
+  type AnyDdlNode,
+  type AnyExpression,
+  type AnyFromSource,
+  type AnyQueryAst,
+  type BinaryExpr,
+  type ColumnRef,
+  type DeleteAst,
+  type InsertAst,
+  type InsertValue,
+  isAnyDdlNode,
+  type JoinAst,
+  type JoinOnExpr,
+  type JsonArrayAggExpr,
+  type JsonObjectExpr,
+  type ListExpression,
+  type LiteralExpr,
+  type LoweredParam,
+  type LowererContext,
+  type MarkerReadResult,
+  type NullCheckExpr,
+  type OperationExpr,
+  type OrderByItem,
+  type ProjectionItem,
+  type RawExpr,
+  type RawSqlLiteral,
+  type SelectAst,
+  type SqlQueryable,
+  type SubqueryExpr,
+  type UpdateAst,
+  type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
+import { renderLoweredDdl } from './ddl-renderer';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({
@@ -63,7 +66,13 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     });
   }
 
-  lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>): SqliteLoweredStatement {
+  lower(
+    ast: AnyQueryAst | AnyDdlNode,
+    context: LowererContext<SqliteContract>,
+  ): SqliteLoweredStatement {
+    if (isAnyDdlNode(ast)) {
+      return renderLoweredDdl(ast);
+    }
     return renderLoweredSql(ast, context.contract);
   }
 }

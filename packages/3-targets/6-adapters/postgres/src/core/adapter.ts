@@ -1,17 +1,20 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type {
-  Adapter,
-  AdapterProfile,
-  AnyQueryAst,
-  LowererContext,
-  MarkerReadResult,
-  RawSqlLiteral,
-  SqlQueryable,
+import {
+  type Adapter,
+  type AdapterProfile,
+  type AnyDdlNode,
+  type AnyQueryAst,
+  isAnyDdlNode,
+  type LowererContext,
+  type MarkerReadResult,
+  type RawSqlLiteral,
+  type SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
+import { renderLoweredDdl } from './ddl-renderer';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -52,7 +55,13 @@ class PostgresAdapterImpl
     });
   }
 
-  lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {
+  lower(
+    ast: AnyQueryAst | AnyDdlNode,
+    context: LowererContext<PostgresContract>,
+  ): PostgresLoweredStatement {
+    if (isAnyDdlNode(ast)) {
+      return renderLoweredDdl(ast);
+    }
     return renderLoweredSql(ast, context.contract, this.codecLookup);
   }
 }

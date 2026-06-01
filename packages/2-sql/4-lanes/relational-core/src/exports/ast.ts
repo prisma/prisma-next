@@ -1,5 +1,6 @@
 export * from '../ast/adapter-types';
 export * from '../ast/codec-types';
+export * from '../ast/ddl-types';
 export * from '../ast/driver-types';
 export * from '../ast/sql-codec-helpers';
 export * from '../ast/sql-codecs';
