@@ -715,11 +715,10 @@ Storage namespace envelopes in SQL-family contracts must carry a `qualifyTable(t
 Do not `structuredClone` hydrated contracts — it strips functions such as `qualifyTable`. Round-trip through the target serializer instead:
 
 ```ts
-import { PostgresContractSerializer } from '@prisma-next/target-postgres/contract';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 
-const hydrated = PostgresContractSerializer.deserialize(
-  PostgresContractSerializer.serialize(rawContract),
-);
+const serializer = new PostgresContractSerializer();
+const hydrated = serializer.deserializeContract(serializer.serializeContract(rawContract));
 ```
 
 ### Namespace-qualified runtime SQL
