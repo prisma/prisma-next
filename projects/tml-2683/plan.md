@@ -121,5 +121,14 @@ explicit N/A per the slice-DoD requirement.
 - `pnpm test:packages typecheck lint:deps` green at the slice tip.
 - `pnpm test:integration` green on Postgres (PGlite). *(SQLite poly-include coverage deferred —
   design-notes D4.)*
+
+## Open items (follow-ups, not in this slice)
+
+- **`orderBy` on a variant-narrowed collection has the same base-table-only gap for MTI variant
+  columns** as the `where` path D5 fixed (`collection.ts` orderBy passes no variant to
+  `createModelAccessor`). Surfaced + scope-controlled out of D5. The threading mechanism (optional
+  `variantName` on `createModelAccessor`) is now in place, so the fix is small. → file a follow-up ticket.
+- **SQLite poly-include integration coverage** — deferred (design-notes D4), gated on the sqlite
+  contract-builder gaining polymorphism support. → file a follow-up ticket.
 - Type-level tests assert the variant-union result shape and `.variant()` narrowing.
 - PR description is the slice spec (`projects/tml-2683/spec.md`) + Linear back-link.
