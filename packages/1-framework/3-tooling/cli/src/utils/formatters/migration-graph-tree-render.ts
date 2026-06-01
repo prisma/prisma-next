@@ -186,24 +186,36 @@ function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
 }
 
 /**
- * The colour-source column for each cell of a forward branch/merge connector
- * row. A connector's horizontal run is one logical line (a fork into new lanes,
- * or a merge into a surviving lane) and reads best as a single hue — the colour
- * of the lane it serves — rather than dim-gray or a per-pass-through-column
- * "rainbow".
- *
- * Scanning right-to-left, a corner or an intermediate tee owns its own column
- * (it anchors a created/merged lane there); the leading tee at `startLane` (the
- * fork/merge origin) and pure horizontal segments inherit the nearest
- * lane-owning branch point to their right, so the run into a branch — or the run
- * collapsing into a merge corner — is a single colour end-to-end. Pass-through
- * vertical lanes outside the run keep their own column (column-0 stays neutral).
+ * Per-cell colour for a forward branch/merge connector row, split into the
+ * cell's junction `glyph` and its trailing `dash`. A connector's horizontal run
+ * is one logical line (a fork into new lanes, or a merge into a surviving lane)
+ * and reads best as the colour of the lane each segment serves — not dim-gray
+ * or a per-pass-through-column "rainbow".
+ */
+interface ConnectorLaneColors {
+  /** Colour column for a cell's junction glyph (`├` / `┬` / `┴` / `╮` / `╯`). */
+  readonly glyph: readonly number[];
+  /** Colour column for a tee's trailing `─` — the branch it leads into. */
+  readonly dash: readonly number[];
+}
+
+/**
+ * Resolve per-cell connector colours. Scanning right-to-left, a corner or an
+ * intermediate tee anchors its own lane (its junction glyph takes that column),
+ * but a tee's **trailing dash leads into the branch on its right** (the next
+ * branch point), so `┬─` reads as "this lane, then on toward the next" rather
+ * than tinting the dash with the left lane. The leading tee at `startLane` (the
+ * fork/merge origin) and pure horizontal segments inherit the nearest branch
+ * point to their right whole-cell, so the run into a branch — or collapsing
+ * into a merge corner — stays continuous. Pass-through verticals outside the
+ * run keep their own column (column 0 stays neutral).
  */
 function resolveConnectorLaneColors(
   cells: readonly StructuralCell[],
   startLane: number,
-): readonly number[] {
-  const colorColumn = new Array<number>(cells.length);
+): ConnectorLaneColors {
+  const glyph = new Array<number>(cells.length);
+  const dash = new Array<number>(cells.length);
   let owner = NEUTRAL_LANE;
   for (let column = cells.length - 1; column >= 0; column--) {
     const cell = cells[column];
@@ -211,25 +223,33 @@ function resolveConnectorLaneColors(
       case 'branch-corner':
       case 'merge-corner':
         owner = column;
-        colorColumn[column] = column;
+        glyph[column] = column;
+        dash[column] = column;
         break;
       case 'branch-tee':
       case 'merge-tee':
         if (column === startLane) {
-          colorColumn[column] = owner === NEUTRAL_LANE ? column : owner;
+          const served = owner === NEUTRAL_LANE ? column : owner;
+          glyph[column] = served;
+          dash[column] = served;
         } else {
+          dash[column] = owner === NEUTRAL_LANE ? column : owner;
+          glyph[column] = column;
           owner = column;
-          colorColumn[column] = column;
         }
         break;
-      case 'horizontal-pass':
-        colorColumn[column] = owner === NEUTRAL_LANE ? column : owner;
+      case 'horizontal-pass': {
+        const served = owner === NEUTRAL_LANE ? column : owner;
+        glyph[column] = served;
+        dash[column] = served;
         break;
+      }
       default:
-        colorColumn[column] = column;
+        glyph[column] = column;
+        dash[column] = column;
     }
   }
-  return colorColumn;
+  return { glyph, dash };
 }
 
 /**
@@ -248,12 +268,48 @@ function laneStylerForColumn(
 }
 
 /**
+ * Tint a branch-owned token (direction arrow, migration name) by its edge's
+ * lane so the whole branch row reads in one colour. Column 0 has nothing to be
+ * told apart from in the common linear chain, so it keeps the token's existing
+ * default styling (`fallback`) rather than a palette hue; only lanes ≥ 1 take a
+ * colour. With colour off, the fallback (also colourless) is used unchanged.
+ */
+function branchStylerOrDefault(
+  column: number,
+  colorize: boolean,
+  fallback: (text: string) => string,
+): (text: string) => string {
+  if (!colorize || column <= NEUTRAL_LANE) {
+    return fallback;
+  }
+  return laneColorForColumn(column);
+}
+
+/**
+ * Render a connector tee (`├─` / `┬─` / `┴─`) with its junction glyph and its
+ * trailing dash coloured independently: the junction anchors its own lane while
+ * the dash leads into the branch on its right.
+ */
+function renderConnectorTee(
+  pair: string,
+  glyphColumn: number,
+  dashColumn: number,
+  colorize: boolean,
+  style: MigrationListStyler,
+): string {
+  const glyph = laneStylerForColumn(glyphColumn, colorize, style);
+  if (glyphColumn === dashColumn) {
+    return glyph(pair);
+  }
+  return glyph(pair.slice(0, 1)) + laneStylerForColumn(dashColumn, colorize, style)(pair.slice(1));
+}
+
+/**
  * A node-marker glyph pair (`○◂`, `○─`, `*<`, `*-`) is the contract node
  * marker (`○` / `*`) followed by an arc connector (`◂` / `─` / `<` / `-`). The
  * marker takes its own lane's hue (so each node visibly belongs to its branch);
  * the connector follows the arc it belongs to (its owning back-lane hue).
- * Direction arrows are handled elsewhere and stay bright — they encode
- * direction, not branch identity.
+ * Direction arrows are handled elsewhere — they take their edge's lane hue too.
  */
 function renderNodeMarkerPair(
   pair: string,
@@ -293,7 +349,11 @@ function renderCellPair(
     case 'edge-lane':
       return cell.ownsLabel
         ? lane(palette.verticalPass.trimEnd()) +
-            style.kind(arrowForEdgeKind(cell.edgeKind, palette))
+            branchStylerOrDefault(
+              column,
+              colorize,
+              style.kind,
+            )(arrowForEdgeKind(cell.edgeKind, palette))
         : lane(palette.verticalPass);
     case 'branch-tee':
       return lane(palette.branchTee);
@@ -329,20 +389,34 @@ function renderConnectorRow(
 ): string {
   const isMerge = row.kind === 'merge-connector';
   if (row.cells.length > 0) {
-    const colorColumns = resolveConnectorLaneColors(row.cells, row.startLane ?? 0);
+    const colors = resolveConnectorLaneColors(row.cells, row.startLane ?? 0);
     let seenTee = false;
     let out = '';
     for (let column = 0; column < row.cells.length; column++) {
       const cell = row.cells[column];
       if (cell === undefined) continue;
-      const lane = laneStylerForColumn(colorColumns[column] ?? column, colorize, style);
+      const glyphColumn = colors.glyph[column] ?? column;
+      const dashColumn = colors.dash[column] ?? glyphColumn;
+      const lane = laneStylerForColumn(glyphColumn, colorize, style);
       switch (cell.kind) {
         case 'branch-tee':
-          out += lane(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
+          out += renderConnectorTee(
+            seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee,
+            glyphColumn,
+            dashColumn,
+            colorize,
+            style,
+          );
           seenTee = true;
           break;
         case 'merge-tee':
-          out += lane(seenTee ? palette.connectorMergeTeeCo : palette.connectorBranchTee);
+          out += renderConnectorTee(
+            seenTee ? palette.connectorMergeTeeCo : palette.connectorBranchTee,
+            glyphColumn,
+            dashColumn,
+            colorize,
+            style,
+          );
           seenTee = true;
           break;
         case 'branch-corner':
@@ -626,7 +700,8 @@ export function renderMigrationGraphTree(
     if (edge === undefined) continue;
 
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
-    const dirName = `${style.dirName(edge.dirName)}${dirNamePadding}`;
+    const dirNameStyler = branchStylerOrDefault(row.laneIndex ?? 0, opts.colorize, style.dirName);
+    const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
     lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}`));
   }

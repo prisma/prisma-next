@@ -617,7 +617,7 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(colored.split('\n').map(stripAnsi)).toEqual(plain.split('\n').map(stripAnsi));
   });
 
-  it('colors the contract node glyph by its lane while arrows stay bright', () => {
+  it('colors the contract node glyph by its lane', () => {
     const colored = tree(diamondEdges(), { colorize: true });
     // A node sitting in column 1 takes its lane's hue.
     const branchNodeLine = colored
@@ -627,9 +627,45 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(branchNodeLine).toContain(laneColorForColumn(1)('○ '));
     // The column-0 node stays neutral (no palette wrapping).
     expect(colored.split('\n')[0]).toMatch(/^○/);
-    // Direction arrows are never wrapped in a lane hue — they remain the signal.
-    expect(colored).not.toContain(laneColorForColumn(1)('↑'));
-    expect(colored).not.toContain(laneColorForColumn(2)('↑'));
+  });
+
+  it('colors a branched edge arrow and name by the edge lane; column 0 stays default', () => {
+    const colored = tree(diamondEdges(), { colorize: true });
+    const lines = colored.split('\n');
+    // A branched edge (column 1) reads in one branch colour: arrow and name both
+    // take the lane hue.
+    const branchEdge = lines.find((line) => line.includes('bob_add_avatar'));
+    expect(branchEdge).toBeDefined();
+    expect(branchEdge).toContain(laneColorForColumn(1)('↑'));
+    expect(branchEdge).toContain(laneColorForColumn(1)('bob_add_avatar'));
+    // A column-0 edge keeps the default arrow/name styling — no palette hue, so
+    // a plain linear chain stays uncoloured.
+    const linearEdge = lines.find((line) => line.includes('alice_add_phone'));
+    expect(linearEdge).toBeDefined();
+    expect(linearEdge).not.toContain(laneColorForColumn(1)('↑'));
+    expect(linearEdge).not.toContain(laneColorForColumn(1)('alice_add_phone'));
+    expect(stripAnsi(linearEdge ?? '')).toContain('alice_add_phone');
+  });
+
+  it('colors a `┬─` trailing dash by the branch on its right', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const addAvatar = edge('ef9de27', '6656a6e', 'add_avatar');
+    const mergePhone = edge('73e3abe', '3116048', 'merge_phone');
+    const mergePosts = edge('a94b7b4', '3116048', 'merge_posts');
+    const mergeAvatar = edge('6656a6e', '3116048', 'merge_avatar');
+    const colored = tree(
+      [init, addPhone, addPosts, addAvatar, mergePhone, mergePosts, mergeAvatar],
+      { colorize: true },
+    );
+    // In `├─┬─╮`, the `┬` anchors its own lane (column 1) but its trailing `─`
+    // leads into the branch on its right (column 2, toward the `╮`).
+    const fanLine = colored.split('\n').find((line) => line.includes('┬'));
+    expect(fanLine).toBeDefined();
+    expect(fanLine).toContain(laneColorForColumn(1)('┬') + laneColorForColumn(2)('─'));
+    // The dash is no longer tinted with the tee's own (left) lane.
+    expect(fanLine).not.toContain(laneColorForColumn(1)('┬─'));
   });
 
   it("colors a routed back-arc's whole horizontal run — bridges and crossings — one hue", () => {
