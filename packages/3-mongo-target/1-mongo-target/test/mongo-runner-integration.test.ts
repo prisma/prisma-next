@@ -7,6 +7,7 @@ import {
   readMarker,
 } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import type { MongoControlFamilyInstance } from '@prisma-next/family-mongo/control';
 import type {
   ControlFamilyInstance,
   MigrationPlan,
@@ -884,8 +885,9 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
 
 describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', () => {
   it('threads migrationEdges through createRunner().execute() into per-edge ledger docs', async () => {
-    const family = fakeFamily();
-    const runner = mongoTargetDescriptor.migrations.createRunner(family);
+    const runner = mongoTargetDescriptor.migrations.createRunner(
+      fakeFamily() as MongoControlFamilyInstance,
+    );
     const driver = createMongoControlDriver(db, client);
     const space = 'ledger-wrapper-test';
     const destHash = 'sha256:wrapper-dest';
