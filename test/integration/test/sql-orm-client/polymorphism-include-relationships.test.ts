@@ -603,21 +603,15 @@ describe('integration/polymorphism-include-relationships', () => {
     timeouts.spinUpPpgDev,
   );
 
-  // SKIPPED: surfaces a real production defect, not a fixture mistake. A
-  // nested `.include('reporter')` hanging off a polymorphic include TARGET
-  // decodes to `null` for every row, regardless of data. Black-box isolation
-  // (identical fixture/seed/query, toggling only Task's polymorphism) confirms
-  // the grandchild stitches correctly when Task is NOT polymorphic and breaks
-  // only when it is. Root cause: `mapPolymorphicRow`
-  // (`collection-runtime.ts`) keeps only base/variant MODEL-field columns, so
-  // the nested-include payload column (`reporter`) is dropped before
-  // `decodeIncludePayload` (`collection-dispatch.ts`) reads it back at
-  // `mapped[nestedInclude.relationName]` — yielding `undefined` → `null`. The
-  // non-poly mapper (`mapStorageRowToModelFields`) preserves the payload, which
-  // is why the non-poly path works. This test asserts the CORRECT (stitched)
-  // shape and is unskipped once the decode path preserves nested-include
-  // payloads through poly-row mapping. Do not weaken it to match the bug.
-  it.skip(
+  // A nested `.include('reporter')` hanging off a polymorphic include TARGET
+  // used to decode to `null` for every row, regardless of data: `mapPolymorphicRow`
+  // (`collection-runtime.ts`) keeps only base/variant MODEL-field columns, so the
+  // nested-include payload column (`reporter`) was dropped before
+  // `decodeIncludePayload` (`collection-dispatch.ts`) read it back at the mapped
+  // row. The fix sources each nested-include payload from the RAW child row, which
+  // always carries the relation alias. This test asserts the CORRECT (stitched)
+  // shape; do not weaken it to match the old bug.
+  it(
     'a nested include through a poly target stitches the grandchild on variant-mapped rows',
     async () => {
       await withCollectionRuntime(async (runtime) => {

@@ -445,6 +445,84 @@ describe('collection-dispatch', () => {
     expect(tasks[1]).not.toHaveProperty('severity');
   });
 
+  it('dispatchCollectionRows() decodes a nested include hanging off a poly-target child from the raw child row, for both an MTI and a non-MTI variant', async () => {
+    // Regression guard: a nested include through a polymorphic include target
+    // used to decode the grandchild to an empty value for every row. The poly
+    // branch maps the child row via `mapPolymorphicRow` (which drops every
+    // column not in the variant model-field map — including the nested
+    // payload's relation alias), then read the nested payload from the MAPPED
+    // row, so it was always gone. The fix reads each nested payload from the
+    // RAW child row. This must hold for a variant WITH an MTI table (Feature ->
+    // features) and one WITHOUT (Bug, STI on the base table) — the bug hit both.
+    const contract = withSingleQueryCapabilities(buildMixedPolyContract());
+    const runtime = createMockRuntime();
+    const state = stateWithInclude(
+      includeFor(contract, 'Project', 'tasks', {
+        ...emptyState(),
+        includes: [includeFor(contract, 'Task', 'subtasks')],
+      }),
+    );
+
+    // Each task child row carries its `subtasks` nested payload under the
+    // relation alias (already parsed by the outer JSON.parse, so an array).
+    // The poly columns (`severity` for the STI Bug, `features__priority` for
+    // the MTI Feature) plus the sibling-variant NULL columns are present, as
+    // the per-variant SELECT emits them.
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Roadmap',
+          tasks: JSON.stringify([
+            {
+              id: 10,
+              title: 'Crash',
+              type: 'bug',
+              severity: 'critical',
+              project_id: 1,
+              features__priority: null,
+              subtasks: [{ id: 100, title: 'Repro', type: 'bug', parent_id: 10 }],
+            },
+            {
+              id: 11,
+              title: 'Dark mode',
+              type: 'feature',
+              severity: null,
+              project_id: 1,
+              features__priority: 7,
+              subtasks: [{ id: 101, title: 'Toggle', type: 'feature', parent_id: 11 }],
+            },
+          ]),
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state,
+      tableName: 'projects_tbl',
+      modelName: 'Project',
+    }).toArray();
+
+    const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
+
+    // Non-MTI (STI) variant: grandchild decodes to its real value, parent poly
+    // row is still variant-shaped (the sibling-variant `priority` column is
+    // dropped).
+    expect(tasks[0]).toMatchObject({ id: 10, title: 'Crash', type: 'bug', severity: 'critical' });
+    expect(tasks[0]).not.toHaveProperty('priority');
+    expect(tasks[0]!['subtasks']).toEqual([{ id: 100, title: 'Repro', type: 'bug', parentId: 10 }]);
+
+    // MTI variant: grandchild decodes to its real value, parent poly row is
+    // still variant-shaped (the sibling-variant `severity` column is dropped).
+    expect(tasks[1]).toMatchObject({ id: 11, title: 'Dark mode', type: 'feature', priority: 7 });
+    expect(tasks[1]).not.toHaveProperty('severity');
+    expect(tasks[1]!['subtasks']).toEqual([
+      { id: 101, title: 'Toggle', type: 'feature', parentId: 11 },
+    ]);
+  });
+
   it('dispatchCollectionRows() maps a variant-narrowed include via its named variant', async () => {
     const contract = withSingleQueryCapabilities(buildMixedPolyContract());
     const runtime = createMockRuntime();
