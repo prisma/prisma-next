@@ -14,8 +14,8 @@ _Parent project: `projects/sql-orm-many-to-many/`. Outcome: nested `connect`/`di
 - **`create(data)`** → insert the target row, then INSERT the junction link. (Only when the junction has no required payload — see the guard.)
 - `disconnect` stays gated to `update()` (existing rule); `connect`/`create` work in both flows. The currently-passing **rejection unit test flips to a positive assertion**.
 
-**Required-payload guard — types + runtime.** When the junction has required non-FK columns (NOT NULL, no default, not a FK), nested `.create` through the M:N sugar cannot supply them, so it is disabled:
-- **Runtime:** the junction-owned `create` branch throws a clear error naming the offending columns + pointing to the junction model / SQL builder. Uses slice 0's `requiredPayloadColumns` (already on `ResolvedRelation`).
+**Required-payload guard — types + runtime.** When the junction has required non-FK columns (NOT NULL, no default, not a FK), the M:N sugar cannot supply them on any operation that **writes a junction row** — that's **both `create` and `connect`** (each INSERTs a `(parent, child)` junction row, leaving the required column unset → a DB NOT-NULL violation). `disconnect` (a DELETE) is unaffected. So both `create` and `connect` are disabled:
+- **Runtime:** the junction-owned `create` **and `connect`** branches throw a clear error naming the offending columns + pointing to the junction model / SQL builder. Uses slice 0's `requiredPayloadColumns` (already on `ResolvedRelation`). `disconnect` stays allowed. _(Correction during execution — the original spec wrongly assumed `connect` was FK-pair-only safe; see `wip/unattended-decisions.md` #9.)_
 - **Type level (operator-mandated, in-slice):** the relation-mutator's `create` input resolves to `never` (or `create` is omitted) for an M:N relation whose junction has required payload columns. **Open risk** (see below): this requires the *type* level to know the junction's required-payload columns; slice 0 computes `requiredPayloadColumns` at *runtime* only — the contract `.d.ts` `through` type does **not** carry it. The type-disable dispatch must either derive "junction has a required non-FK field" from the junction model's field types in `contract.d.ts`, or — if that's infeasible — **halt and surface** (it may require extending slice 0's emitted `through` to carry the flag at the type level, which is a scope/▲contract decision for the operator).
 
 **Fixtures.** The pure `User ↔ Tag` junction (slice 1) covers connect/disconnect/create (no required payload). A **second** relation with a **required-payload junction** (e.g. `User ↔ Role` via `UserRole` with a required non-FK column like `level`) is added to the fixture to exercise the disable.
@@ -36,13 +36,13 @@ One story: "M:N nested writes go through the junction, with the required-payload
 |---|---|---|
 | `create()` parent flow vs `update()` | junction writes run after parent PK is known in **both**; `disconnect` stays `update()`-only (existing rule) | mirror the existing parent/child ownership flows |
 | Composite-key junction | INSERT/DELETE across all `parentColumns`/`childColumns` pairs | slice 0 arrays |
-| Required-payload junction | `.create` disabled types+runtime; `connect`/`disconnect` still allowed (FK-pair only) | needs the new fixture |
+| Required-payload junction | **`create` AND `connect` disabled** (both write a junction row that can't satisfy the required NOT-NULL column → DB violation); `disconnect` (DELETE) still allowed | corrected mid-flight — see decision #9 |
 | **Type-level disable feasibility** | the `.d.ts` `through` type may not carry required-payload info — derive from junction field types, or **halt + surface** if infeasible (possible slice-0 contract extension) | the slice's key risk |
 
 ## Slice-specific done conditions
 
 - [ ] `connect`/`disconnect`/`create` over the pure M:N relation route to junction INSERT/DELETE under both `create()` and `update()`; the `partitionByOwnership` guard is gone; the rejection unit test is flipped to a positive assertion.
-- [ ] Nested `.create` on a **required-payload** junction is rejected **at the type level** (negative type test) **and at runtime** (clear message); `connect`/`disconnect` on it still work.
+- [ ] Nested `create` **and `connect`** on a **required-payload** junction are rejected **at runtime** (clear message) — and at the **type level** for `create` once the type-disable is unblocked (deferred, decision #8); `disconnect` on it still works.
 - [ ] Integration tests (PGlite) per the standard: whole-row readback (via `include('tags')`) after connect/disconnect/create — whole-row `toEqual`, explicit `.select` in most, ≥1 implicit; cover both flows + the disable.
 
 ## Open Questions

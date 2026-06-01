@@ -10,6 +10,8 @@ This harness exposes no `SendMessage`/resume for spawned subagents — the `Agen
 
 `pnpm fixtures:check` fails at `fixtures:emit` in this sandbox (CLI not on PATH / "Failed to load config" for sql-builder + sql-orm-client emit scripts) — pre-existing, not introduced (matches the TML-2729 gotcha). Additivity is verified instead via a direct golden git-diff (`git diff -- ':(glob)**/contract.json' …`); CI runs the real gate. Don't treat the local `fixtures:check` red as a dispatch failure.
 
+**Correction (slice 3):** the canonical CLI emit **does** work in this sandbox — run it **from the repo root**: `node packages/1-framework/3-tooling/cli/dist/cli.js contract emit --config test/integration/test/sql-orm-client/fixtures/prisma-next.config.ts`, then `pnpm --filter @prisma-next/sql-orm-client emit` (package-local copy + pgvector strip). The earlier "config-load failure" was from running with the wrong cwd (`test/integration`). **Prefer the canonical emit from root over a `tsx` bypass** — no golden-stability risk.
+
 ## PGlite/WASM JIT flakiness on broad integration runs
 
 Running the whole sql-orm-client integration suite at once (`cd test/integration && pnpm test test/sql-orm-client/`) can crash with V8 `jit_page.has_value()` (WASM JIT) failures — **pre-existing PGlite/Node env flakiness**, reproduces on the parent branch, not introduced by M:N work. Targeted reruns (per-file, or the same suite again) pass cleanly. Verify integration blast radius with targeted per-file runs; don't trust a single broad-run red.
