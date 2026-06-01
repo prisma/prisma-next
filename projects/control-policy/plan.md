@@ -1,72 +1,58 @@
-# Project Plan
-
-## Summary
-
-_Drafted via drive-create-plan. Replace this placeholder._
+# Control Policy — Plan
 
 **Spec:** [`projects/control-policy/spec.md`](spec.md)
+**Linear Project:** [Control Policy](https://linear.app/prisma-company/project/control-policy-056d5d6b37c8) — umbrella issue TML-2493
 
-## Cross-project dependencies
+## At a glance
 
-This project lands **after** [TML-2459 — Target-Extensible IR](../target-extensible-ir/spec.md) because the dispatch tables for verifier and planner are most naturally wired into TML-2459's `SchemaVerifier` SPI and family abstract bases. Plugging `control` into pre-TML-2459 flat-data IR is possible but the dispatch would be reshaped when TML-2459 lands, so the cheaper sequencing is TML-2459 → this project.
+One substrate slice followed by a parallel fan of consumers. The IR field + serialization lands first (changing no behaviour), then verifier dispatch, planner dispatch, and the TS authoring surface proceed in parallel on top of it, with the PSL surface as a deferrable follow-on.
 
-Independent / non-blocking: TML-2459 can ship without this project (today's behaviour is the default `managed`). The Supabase integration project is blocked until both land — but Supabase's design has been shaped against this policy vocabulary, so it picks up immediately once this lands.
+## Composition
 
-## Milestones
+### Stack (deliver in order)
 
-### Milestone 1: Framework primitive
+1. **Slice `ir-primitive`** — Linear: TML-2775
+   - **Outcome:** Every storage-plane node can carry `control`; the contract carries `defaultControl`; one shared resolver computes effective control; contracts round-trip the field across Postgres, SQLite, and Mongo. Absent `control`, behaviour and contract hashes are unchanged.
+   - **Builds on:** None. (TML-2459 is Done.)
+   - **Hands to:** The `ControlPolicy` type, the `control`/`defaultControl` fields, the validators, and the effective-control resolver — the substrate every other slice reads.
+   - **Focus:** In scope — the IR field, its serialization/validation (omit-when-default to preserve hashes), and the resolver. Out of scope — all dispatch and authoring behaviour, handled by the slices below.
 
-**Tasks:**
+### Parallel group (each builds only on Slice 1; mutually independent)
 
-- [ ] Declare `ControlPolicy` type in `1-framework/` (`'managed' | 'tolerated' | 'external' | 'observed'`).
-- [ ] Add `control: ControlPolicy` field to the framework `SchemaNode` (or relevant base) so every IR node carries it.
-- [ ] Add contract-level `defaultControl?: ControlPolicy` to the framework Contract IR base.
-- [ ] Effective-control resolution: per-node value if set, else contract-level default, else `'managed'`. Pure function on the IR; one place, called by both verifier and planner.
+2. **Slice `verifier-dispatch`** — Linear: TML-2776
+   - **Outcome:** The verifier applies the four comparison strategies per node, with the compatible-shape relation supplied by the target; external-mode tolerated divergence surfaces as its own issue kind.
+   - **Builds on:** Slice 1's field + resolver.
+   - **Hands to:** Verifier behaviour for all four policies and the compatible-shape hook — consumed by Supabase's `auth.users` verification.
+   - **Focus:** In scope — the family-level dispatch, the target compatible-shape hook, and the issue taxonomy for tolerated divergence. Out of scope — planner behaviour (Slice 3) and authoring (Slice 4).
 
-### Milestone 2: Verifier dispatch
+3. **Slice `planner-dispatch`** — Linear: TML-2777
+   - **Outcome:** The planner gates DDL per policy (full / create-if-missing / none) and refuses to emit into an `external` namespace even when a `managed` object is mis-declared there, surfacing a diagnostic.
+   - **Builds on:** Slice 1's field + resolver.
+   - **Hands to:** Planner behaviour for all four policies and the external-namespace safety guard — consumed by Supabase delivery.
+   - **Focus:** In scope — the per-node DDL gate and the namespace-level safety guard + diagnostic. Out of scope — verifier comparison strategies (Slice 2).
 
-**Tasks:**
+4. **Slice `ts-authoring`** — Linear: TML-2778
+   - **Outcome:** The TS surface lets authors set the contract default and per-object overrides, lowering to the Slice 1 IR shape, exercised by an integration test.
+   - **Builds on:** Slice 1's field shape.
+   - **Hands to:** The ergonomic TS surface extension authors and power-users write against.
+   - **Focus:** In scope — the contract-level default option, the per-object override option, and their lowering. Out of scope — the PSL surface (Slice 5).
 
-- [ ] Add dispatch table to `SqlSchemaVerifierBase` (and `MongoSchemaVerifierBase`) keyed on `control`. Four strategies as per spec § "Verifier dispatch."
-- [ ] Surface "compatible shape" relation as a protected hook on the family base; concrete relation lives in target SPI (Postgres first).
-- [ ] Issue taxonomy: `external`-mode mismatches become a distinct `SchemaIssue.kind` so consumers can differentiate "shape diverged but tolerated" from "shape diverged and that's an error."
+### Deferrable follow-on
 
-### Milestone 3: Planner dispatch + cross-cutting safety
+5. **Slice `psl-authoring`** — Linear: TML-2779
+   - **Outcome:** The PSL surface expresses the same per-object override and contract default, lowering to the same IR as the TS path and round-tripping.
+   - **Builds on:** Slice 1's field; mirrors Slice 4's lowering target.
+   - **Hands to:** PSL/TS authoring parity.
+   - **Focus:** In scope — settling the PSL spelling (an open question in the spec) and wiring the interpreter lowering. Out of scope — re-litigating the IR shape, fixed by Slice 1.
+   - **Deferrable:** if the spelling proves load-bearing, this leaves the project as a tracked follow-up (per the spec's PSL open question), keeping the delivered core at four slices.
 
-**Tasks:**
+## Dependencies (external)
 
-- [ ] Add dispatch table to the planner: `managed` → full lifecycle, `tolerated` → create-if-missing, `external` / `observed` → emit nothing.
-- [ ] Cross-cutting safety: planner refuses to emit ops into a namespace whose declaring contract is `external` even if a `managed` object is mis-declared there. Surface a diagnostic.
-- [ ] Round-trip property tests for Postgres, SQLite, Mongo (AC7).
+- [x] **TML-2459 — Target-Extensible IR** — Done (2026-05-14). Provides the `SchemaVerifier` / `ContractSerializer` SPIs and family abstract bases the dispatch plugs into.
 
-### Milestone 4: TS authoring surface
+## Sequencing rationale
 
-**Tasks:**
-
-- [ ] `defineContract({ defaultControl?, … })` lowers to contract-level field.
-- [ ] `model(name, { control?, … })` lowers to per-object field.
-- [ ] Equivalent ergonomics for declarable IR kinds that gain `control` later (indexes, constraints).
-- [ ] Integration test exercising AC10 against PGlite.
-
-### Milestone 5: PSL authoring surface
-
-**Tasks:**
-
-- [ ] Settle PSL spelling (attribute vs top-level block) in PE pass.
-- [ ] Wire parser → AST → IR lowering so PSL contracts produce the same IR shape as TS-authored ones.
-- [ ] Round-trip property test for PSL authoring (AC11).
-
-### Milestone 6: Docs
-
-**Tasks:**
-
-- [ ] Subsystem docs updated to describe `ControlPolicy` and the dispatch tables.
-- [ ] ADR drafted capturing the four-policy vocabulary and the framework-vs-target locking.
-
-## Close-out (required)
-
-- [ ] Verify all acceptance criteria in [`projects/control-policy/spec.md`](spec.md).
-- [ ] Promote ADR draft to `docs/architecture docs/adrs/`.
-- [ ] Confirm subsystem docs (`Data Contract`, `Adapters & Targets`, relevant verifier/planner docs) describe `ControlPolicy`.
-- [ ] Strip repo-wide references to `projects/control-policy/**` (replace with canonical `docs/` links or remove).
-- [ ] Delete `projects/control-policy/`.
+- **Standalone substrate slice:** its hand-off feeds four downstream slices, so folding it into any one would serialize the other three behind that merge. Isolating it also lets the no-regression and no-hash-churn guarantees be verified before any behaviour changes — the cheapest place to catch a contract-hash surprise.
+- **Why 2/3/4 parallelize:** they touch different layers (family verifier, target planner, TS authoring) and share no seam beyond the Slice 1 field each reads independently; neither dispatch consumes the other's output at code level.
+- **Slice count:** the core is four slices; PSL is the negotiable fifth per the spec's open question, which keeps the delivered shape within the repo's 1–4 sweet spot if it defers.
+- **Docs/ADR:** drafted alongside the dispatch slices and promoted at close-out (a project-DoD condition), not a standalone slice.
