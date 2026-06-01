@@ -1,4 +1,8 @@
-import { contractModels, type PlanMeta } from '@prisma-next/contract/types';
+import {
+  defaultDomainNamespaceIdForMongo,
+  domainModelsAtDefaultNamespace,
+  type PlanMeta,
+} from '@prisma-next/contract/types';
 import type { MongoContract, MongoModelDefinition } from '@prisma-next/mongo-contract';
 import { createRawMongoCollection, type RawMongoCollection } from './raw-collection';
 
@@ -14,7 +18,10 @@ export function mongoRaw<TContract extends MongoContract>(options: {
   return {
     collection<K extends keyof TContract['roots'] & string>(rootName: K): RawMongoCollection {
       const modelName = contract.roots[rootName]?.model;
-      const models = contractModels(contract);
+      const models = domainModelsAtDefaultNamespace(
+        contract.domain,
+        defaultDomainNamespaceIdForMongo(),
+      );
       if (!modelName || !Object.hasOwn(models, modelName)) {
         throw new Error(`Unknown model "${modelName ?? ''}" for root "${rootName}"`);
       }

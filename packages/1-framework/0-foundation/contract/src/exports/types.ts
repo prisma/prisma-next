@@ -1,8 +1,8 @@
 export type {
   Contract,
   ContractExecutionSection,
-  ContractModelsMap,
-  ContractValueObjectsMap,
+  ContractModelDefinitions,
+  ContractValueObjectDefinitions,
 } from '../contract-types';
 export { DomainNamespaceResolutionError } from '../contract-validation-error';
 export type { CrossReference } from '../cross-reference';
@@ -18,12 +18,11 @@ export type {
   ApplicationDomainNamespace,
   ContractWithDomain,
 } from '../domain-envelope';
+export { UNBOUND_DOMAIN_NAMESPACE_ID } from '../domain-envelope';
 export {
-  contractModels,
-  contractValueObjects,
-  resolveSingleDomainNamespaceId,
-  UNBOUND_DOMAIN_NAMESPACE_ID,
-} from '../domain-envelope';
+  domainModelsAtDefaultNamespace,
+  domainValueObjectsAtDefaultNamespace,
+} from '../domain-namespace-access';
 export type {
   ContractDiscriminator,
   ContractEmbedRelation,

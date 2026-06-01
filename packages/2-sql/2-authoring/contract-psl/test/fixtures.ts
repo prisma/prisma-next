@@ -1,6 +1,10 @@
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
-import { contractModels, contractValueObjects } from '@prisma-next/contract/types';
+import {
+  defaultDomainNamespaceIdForSqlTarget,
+  domainModelsAtDefaultNamespace,
+  domainValueObjectsAtDefaultNamespace,
+} from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
@@ -490,11 +494,17 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
 }
 
 export function modelsOf(contract: Contract) {
-  return contractModels(contract);
+  return domainModelsAtDefaultNamespace(
+    contract.domain,
+    defaultDomainNamespaceIdForSqlTarget(contract.target),
+  );
 }
 
 export function valueObjectsOf(contract: Contract) {
-  return contractValueObjects(contract);
+  return domainValueObjectsAtDefaultNamespace(
+    contract.domain,
+    defaultDomainNamespaceIdForSqlTarget(contract.target),
+  );
 }
 
 export function documentScopedTypes(contract: { readonly storage?: unknown }) {

@@ -1,4 +1,9 @@
-import { contractModels, contractValueObjects, crossRef } from '@prisma-next/contract/types';
+import {
+  crossRef,
+  defaultDomainNamespaceIdForMongo,
+  domainModelsAtDefaultNamespace,
+  domainValueObjectsAtDefaultNamespace,
+} from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
@@ -62,7 +67,9 @@ describe('mongo contract builder', () => {
       users: { kind: 'mongo-collection' },
       posts: { kind: 'mongo-collection' },
     });
-    expect(contractModels(contract)['Post']).toEqual({
+    expect(
+      domainModelsAtDefaultNamespace(contract.domain, defaultDomainNamespaceIdForMongo())['Post'],
+    ).toEqual({
       storage: {
         collection: 'posts',
       },
@@ -145,7 +152,9 @@ describe('mongo contract builder', () => {
     expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
       tasks: { kind: 'mongo-collection' },
     });
-    expect(contractValueObjects(contract)).toEqual({
+    expect(
+      domainValueObjectsAtDefaultNamespace(contract.domain, defaultDomainNamespaceIdForMongo()),
+    ).toEqual({
       Address: {
         fields: {
           street: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
@@ -153,7 +162,10 @@ describe('mongo contract builder', () => {
         },
       },
     });
-    const models = contractModels(contract);
+    const models = domainModelsAtDefaultNamespace(
+      contract.domain,
+      defaultDomainNamespaceIdForMongo(),
+    );
     expect(models['Task']!.storage).toEqual({
       collection: 'tasks',
       relations: {
@@ -221,7 +233,10 @@ describe('mongo contract builder', () => {
       models: { Metric },
     });
 
-    expect(contractModels(contract)['Metric']?.fields['value']).toEqual({
+    expect(
+      domainModelsAtDefaultNamespace(contract.domain, defaultDomainNamespaceIdForMongo())['Metric']
+        ?.fields['value'],
+    ).toEqual({
       type: { kind: 'scalar', codecId: 'mongo/double@1' },
       nullable: false,
     });

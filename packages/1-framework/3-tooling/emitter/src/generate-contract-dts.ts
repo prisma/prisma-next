@@ -1,17 +1,11 @@
-import {
-  type Contract,
-  type ContractModel,
-  type ContractValueObject,
-  contractModels,
-  contractValueObjects,
-  resolveSingleDomainNamespaceId,
-} from '@prisma-next/contract/types';
+import type { Contract, ContractModel, ContractValueObject } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   EmissionSpi,
   GenerateContractTypesOptions,
   TypesImportSpec,
 } from '@prisma-next/framework-components/emission';
+import { assertSingleDomainNamespaceForEmission } from './assert-single-domain-namespace-for-emission';
 import {
   deduplicateImports,
   generateBothFieldTypesMaps,
@@ -57,15 +51,19 @@ export function generateContractDts(
 
   const storageType = emitter.generateStorageType(contract, 'StorageHash');
 
-  const domainNamespaceId = resolveSingleDomainNamespaceId(contract.domain);
-  const modelsRecord = contractModels(contract, domainNamespaceId) as Record<string, ContractModel>;
+  const domainNamespaceId = assertSingleDomainNamespaceForEmission(contract.domain);
+  const domainNamespace = contract.domain.namespaces[domainNamespaceId];
+  if (domainNamespace === undefined) {
+    throw new Error(`domain namespace "${domainNamespaceId}" is not present on the contract`);
+  }
+  const modelsRecord = domainNamespace.models as Record<string, ContractModel>;
   const modelsType = generateModelsType(modelsRecord, (name, model) =>
     emitter.generateModelStorageType(name, model),
   );
 
   const rootsType = generateRootsType(contract.roots);
 
-  const valueObjects = contractValueObjects(contract, domainNamespaceId) as
+  const valueObjects = domainNamespace.valueObjects as
     | Record<string, ContractValueObject>
     | undefined;
   const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects, codecLookup);
@@ -100,10 +98,10 @@ ${importLines.join('\n')}
 ${familyImportLines.join('\n')}
 import type {
   Contract as ContractType,
-  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
+  StorageBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
@@ -140,6 +138,8 @@ ${modelsType}
   ${valueObjects ? `readonly valueObjects: ${valueObjectsDescriptor};` : ''}
   readonly profileHash: ProfileHash;
 };
+
+export type Models = Contract extends ContractType<StorageBase, infer TModels> ? TModels : never;
 
 ${contractWrapper}
 `;

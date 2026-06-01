@@ -1,4 +1,4 @@
-import type { Contract, ContractModelsMap } from '@prisma-next/contract/types';
+import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
 import type {
   ExtractCodecTypes,
   ExtractFieldInputTypes,
@@ -22,24 +22,24 @@ import type { WithJoin, WithSelect } from './shared';
 
 type FindModelForTable<C, TableName extends string> = C extends Contract
   ? {
-      [M in keyof ContractModelsMap<C> & string]: ContractModelsMap<C>[M] extends {
+      [M in keyof ContractModelDefinitions<C> & string]: ContractModelDefinitions<C>[M] extends {
         readonly storage: { readonly table: TableName };
       }
         ? M
         : never;
-    }[keyof ContractModelsMap<C> & string]
+    }[keyof ContractModelDefinitions<C> & string]
   : never;
 
 type FindFieldForColumn<C, ModelName extends string, ColumnName extends string> = C extends Contract
-  ? ModelName extends keyof ContractModelsMap<C>
+  ? ModelName extends keyof ContractModelDefinitions<C>
     ? {
-        [F in keyof ContractModelsMap<C>[ModelName]['storage']['fields'] &
-          string]: ContractModelsMap<C>[ModelName]['storage']['fields'][F] extends {
+        [F in keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] &
+          string]: ContractModelDefinitions<C>[ModelName]['storage']['fields'][F] extends {
           readonly column: ColumnName;
         }
           ? F
           : never;
-      }[keyof ContractModelsMap<C>[ModelName]['storage']['fields'] & string]
+      }[keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] & string]
     : never
   : never;
 

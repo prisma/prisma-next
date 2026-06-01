@@ -2,7 +2,8 @@ import {
   type Contract,
   type ContractFieldType,
   type CrossReference,
-  contractModels,
+  defaultDomainNamespaceIdForSqlTarget,
+  domainModelsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
@@ -40,7 +41,10 @@ export interface PolymorphismInfo {
 }
 
 function modelsOf(contract: Contract<SqlStorage>): ModelsMap {
-  return contractModels(contract) as ModelsMap;
+  return domainModelsAtDefaultNamespace(
+    contract.domain,
+    defaultDomainNamespaceIdForSqlTarget(contract.target),
+  ) as ModelsMap;
 }
 
 export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntry | undefined {

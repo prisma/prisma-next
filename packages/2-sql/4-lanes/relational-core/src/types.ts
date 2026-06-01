@@ -1,4 +1,4 @@
-import type { Contract, ContractModelsMap } from '@prisma-next/contract/types';
+import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
 import type { ParamSpec } from '@prisma-next/operations';
 import type {
   ExtractFieldOutputTypes,
@@ -17,7 +17,7 @@ export type Expr = ColumnRef | ParamRef;
  * whose `storage.table` matches.
  */
 type ExtractTableToModel<TContract extends Contract<SqlStorage>, TableName extends string> =
-  ContractModelsMap<TContract> extends infer Models extends Record<string, unknown>
+  ContractModelDefinitions<TContract> extends infer Models extends Record<string, unknown>
     ? {
         [M in keyof Models & string]: Models[M] extends {
           readonly storage: { readonly table: TableName };
@@ -37,7 +37,7 @@ type ExtractColumnToField<
   ColumnName extends string,
 > =
   ExtractTableToModel<TContract, TableName> extends infer ModelName extends string
-    ? ContractModelsMap<TContract> extends infer Models extends Record<string, unknown>
+    ? ContractModelDefinitions<TContract> extends infer Models extends Record<string, unknown>
       ? ModelName & keyof Models extends infer MKey extends string
         ? Models[MKey] extends {
             readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };

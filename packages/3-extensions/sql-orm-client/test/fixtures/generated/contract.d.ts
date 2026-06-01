@@ -32,10 +32,10 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
-  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
+  StorageBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
@@ -995,4 +995,4 @@ type ContractBase = Omit<
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Namespaces = Contract['storage']['namespaces'];
-export type Models = ContractModelsMap<Contract>;
+export type Models = Contract extends ContractType<StorageBase, infer TModels> ? TModels : never;
