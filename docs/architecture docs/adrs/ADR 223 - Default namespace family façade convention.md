@@ -67,5 +67,4 @@ The symmetric-domain-plane work moved models under `contract.domain.namespaces` 
 ## References
 
 - [ADR 221 — Contract IR two planes with uniform entity coordinate and pack-contributed entity kinds](ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)
-- Slice spec: `projects/target-extensible-ir-namespaces/slices/runtime-qualification/spec.md` (Chosen design)
 - Linear: [TML-2605](https://linear.app/prisma-company/issue/TML-2605), [TML-2550](https://linear.app/prisma-company/issue/TML-2550)
