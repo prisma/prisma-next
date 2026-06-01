@@ -12,9 +12,18 @@ ContractSpace aggregate and holds a multi-root / multi-tip / cyclic-tolerant
 golden-path mapper + dagre renderer on top of that source; it is related to,
 but not blocked by, the consolidation project (TML-2739).
 
+## Slices
+
+1. **Redesign the Tier-3 renderer** — [`spec.md`](./spec.md). The condensed
+   annotated node-link diagram (shipped in PR #658).
+2. **Retire `migration list --graph`** —
+   [`slices/remove-list-graph-renderer/spec.md`](./slices/remove-list-graph-renderer/spec.md).
+   Now that the Tier-3 tree is compact and correct, the Tier-2 list-graph gutter
+   is the redundant middle; this slice removes it, leaving one graph renderer.
+
 ## Contents
 
-- [`spec.md`](./spec.md) — **the slice spec + dispatch plan.** Pins the
+- [`spec.md`](./spec.md) — **slice 1's spec + dispatch plan.** Pins the
   implementation architecture (render pipeline, module placement, scope), the
   coherence rationale, edge cases, slice-DoD, and the six-dispatch decomposition.
 - [`mockups.md`](./mockups.md) — **the locked visual language.** Hand-drawn
