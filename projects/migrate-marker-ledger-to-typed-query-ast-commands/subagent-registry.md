@@ -4,12 +4,23 @@ The Orchestrator's record of which spawned sub-agent ID belongs to which role/va
 
 ## Sub-agent registry
 
+> **Re-scope boundary (2026-06-01).** PR #661 was rejected and the project re-spec'd (target-contributed DDL + adapter visitor; no generic-core enum; no `family-sql` shared surface). The implementer/reviewer below worked the **rejected** design and are **not resumed** — resuming would carry the wrong mental model (deliberate pivot of role intent per `drive-build-workflow § Subagent continuity`). Fresh spawns for slice `ddl-in-query-ast`.
+
+### Slice `ddl-in-query-ast` (TML-2761) — active
+
 | Role / variant | Sub-agent ID | Tier | Status | Last used |
 |---|---|---|---|---|
-| setup-specialist | 4ce08b98-ecd5-47fb-848e-866eb8e566f3 | thorough (claude-opus-4-8-thinking-high) | active | 2026-05-31 |
+| implementer/fast (composer) | 802dcecf-9c0c-4fbc-bbd0-14fbf6945fa5 | **composer-2.5-fast** | active (D1 spike) | 2026-06-01 |
+| reviewer/fast | 4277daba-8e6d-476f-abe8-7a6ad4cdd694 | **claude-opus-4-8-thinking-high** | active (D2 R1) | 2026-06-01 |
+
+### Superseded — PR #661 (rejected design), retained for provenance
+
+| Role / variant | Sub-agent ID | Tier | Status | Last used |
+|---|---|---|---|---|
+| setup-specialist | 4ce08b98-ecd5-47fb-848e-866eb8e566f3 | thorough (claude-opus-4-8-thinking-high) | retired (rejected design) | 2026-05-31 |
 | implementer/fast | a8da9633-4786-4e99-9101-3b8f0c39d443 | mid (claude-4.6-sonnet-high-thinking) | retired (D1 R1 only) | 2026-05-31 |
-| implementer/fast (composer) | 5d69c410-bfab-42a7-adc2-e96914a37921 | **composer-2.5-fast** | active (D1 R2) | 2026-05-31 |
-| reviewer/fast | d1789b17-c0fe-4439-aea7-53381e729997 | **claude-opus-4-8-thinking-high** | active | 2026-05-31 |
+| implementer/fast (composer) | 5d69c410-bfab-42a7-adc2-e96914a37921 | composer-2.5-fast | retired (rejected design) | 2026-05-31 |
+| reviewer/fast | d1789b17-c0fe-4439-aea7-53381e729997 | claude-opus-4-8-thinking-high | retired (rejected design) | 2026-05-31 |
 
 ## Model policy (operator, 2026-05-31)
 

@@ -50,7 +50,7 @@ One reviewer holds it because it is a single mechanism delivered with its first 
 ## Scope
 
 **In:**
-- Family DDL-node base + visitor interface in `relational-core`; remove the generic-core `CreateSchemaAst`/`CreateTableAst`/`ColumnType`/`ColumnDefault` enum surface added by PR #661.
+- Family DDL-node base + visitor interface in `relational-core`. _(Note: PR #661's generic-core `CreateSchemaAst`/`CreateTableAst`/`ColumnType`/`ColumnDefault` surface is **absent** on this branch — #661 was closed unmerged and this branch is fresh off `origin/main`. There is nothing to remove; the work is purely additive. The done-condition grep stays as a guard that the rejected surface is never introduced.)_
 - Target-contributed `CreateTable` (PG + SQLite) and `CreateSchema` (PG) nodes.
 - Adapter DDL-lowering visitor in the Postgres and SQLite adapters; renderer `switch` no longer enumerates DDL kinds; correct identifier quoting + native-type handling.
 - Contract-free constructors for the DDL nodes (+ DML pass-through marker bootstrap needs).
@@ -84,7 +84,7 @@ One reviewer holds it because it is a single mechanism delivered with its first 
 
 ## Open Questions
 
-1. **DDL visitor / dispatch API.** Working position: a `DdlVisitor` the DDL node `accept`s (double-dispatch, mirroring `ExprVisitor`), with `lower()` widened to accept the family DDL-node base and the adapter owning the visitor implementation. Alternatives (extensible kind→renderer table; self-lowering nodes) weighed in the first dispatch. **Settled by dispatch 1.**
+1. **DDL visitor / dispatch API — SETTLED (dispatch 1 spike, validated on `CreateTable` across PG + SQLite).** A separate `DdlNode` hierarchy (`ast/ddl-types.ts`) with `accept(visitor: DdlVisitor)` double-dispatch mirroring `ExprVisitor`; `AnyQueryAst` gains no DDL member; `lower()` input widened to `AnyQueryAst | AnyDdlNode` with an `isAnyDdlNode` guard routing to `renderLoweredDdl` vs the untouched `renderLoweredSql`. Alternatives (kind→renderer table; self-lowering nodes) rejected on spike evidence. Full record + the D2/D3 follow-on (formalize `Adapter<AnyQueryAst | AnyDdlNode>`; relocate concretes to target packages) in `design-notes.md § Open questions`.
 2. **Where the family DDL-node base lives.** Working position: `relational-core` (beside the existing AST + `ExprVisitor`); target concrete classes in the target packages, lowering in the adapter packages.
 3. **Contract-free constructor home.** Working position: a module in `relational-core` beside the AST; revisit if a dedicated package is cleaner.
 
@@ -92,6 +92,6 @@ One reviewer holds it because it is a single mechanism delivered with its first 
 
 - Parent project: `projects/migrate-marker-ledger-to-typed-query-ast-commands/spec.md`
 - Design notes: `projects/migrate-marker-ledger-to-typed-query-ast-commands/design-notes.md`
-- Linear issue: _TBD (create at pickup; standalone, related to TML-2753/2754)_
+- Linear issue: [TML-2761](https://linear.app/prisma-company/issue/TML-2761) (standalone; project "Marker/ledger via typed query AST"; related to TML-2753/2754/2253).
 - Patterns: [three-layer polymorphic IR](../../../../docs/architecture%20docs/patterns/three-layer-polymorphic-ir.md), [frozen-class AST + visitor](../../../../docs/architecture%20docs/patterns/frozen-class-ast.md), [adapter SPI](../../../../docs/architecture%20docs/patterns/adapter-spi.md).
 - Superseded: PR #661 (generic-core DDL in `AnyQueryAst`).

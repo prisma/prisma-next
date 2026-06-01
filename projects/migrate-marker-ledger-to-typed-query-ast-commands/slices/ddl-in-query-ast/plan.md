@@ -13,8 +13,8 @@ _Authored at slice pickup; refine as dispatches land. The first dispatch is the 
 
 ### Dispatch 2: family DDL-node base + target concrete nodes
 
-- **Outcome:** The family DDL-node base (`kind`/`accept`/`collectParamRefs`/`toQueryAst`) lands in `relational-core`; Postgres ships `CreateTable` + `CreateSchema`, SQLite ships `CreateTable`, with column modelling as opaque native-type strings + literal/function defaults. The generic-core `CreateTableAst`/`CreateSchemaAst`/`ColumnType`/`ColumnDefault` enum surface from PR #661 is removed.
-- **Builds on:** Dispatch 1's settled API.
+- **Outcome:** The family DDL-node base (`kind`/`collectParamRefs`; no global visitor/accept) is formalized in `relational-core`; Postgres ships per-target `PostgresDdlVisitor` + `PostgresCreateTable` + `PostgresCreateSchema`, SQLite ships `SqliteDdlVisitor` + `SqliteCreateTable`, **in the target packages** (target owns shape), with column modelling as opaque native-type strings + `ColumnDefault` defaults from `@prisma-next/contract/types`. Adapters route via `isAnyDdlNode` → per-target visitor. _(No PR #661 generic-core surface on this branch — additive only. Shared `Adapter` interface type-param formalization deferred.)_
+- **Builds on:** Dispatch 1's settled API + committed skeleton (`d5b19d0af`).
 - **Hands to:** The target-contributed DDL node surface.
 - **Focus:** Node shape + layering only; lowering wired minimally to keep it compiling.
 
@@ -34,7 +34,7 @@ _Authored at slice pickup; refine as dispatches land. The first dispatch is the 
 
 ### Dispatch 5: marker/ledger bootstrap through the adapter (first consumer)
 
-- **Outcome:** Each target's control adapter builds its marker/ledger bootstrap DDL via the constructors and lowers it through `adapter.lower()`, replacing the raw-string bootstrap; the rejected shared `family-sql` canonical-column surface (PR #661's `control-tables.ts`/`buildMarkerTableAst`) is removed. No `CREATE TABLE` string remains in the bootstrap path.
+- **Outcome:** Each target's control adapter builds its marker/ledger bootstrap DDL via the constructors and lowers it through `adapter.lower()`, replacing the raw-string bootstrap. No `CREATE TABLE` string remains in the bootstrap path. _(The rejected shared `family-sql` `control-tables.ts`/`buildMarkerTableAst` surface does not exist on this branch; build the bootstrap fresh per target — PG and SQLite each own their marker DDL.)_
 - **Builds on:** Dispatches 3 + 4.
 - **Hands to:** A validated, adapter-lowered DDL surface with marker bootstrap proving it.
 - **Focus:** Bootstrap DDL only; marker DML/SPI consolidation is the next slice.
