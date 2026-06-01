@@ -170,6 +170,12 @@ export interface MockRuntime extends RuntimeQueryable {
  * - Task (base, table: tasks, discriminator: type)
  * - Bug (STI, table: tasks, value: bug) with `severity` field
  * - Feature (MTI, table: features, value: feature) with `priority` field
+ *
+ * A non-polymorphic `Project` parent (table: projects_tbl) owns a `tasks`
+ * relation targeting the polymorphic `Task`, so an include can be planned
+ * against a polymorphic target. `Task` also carries a self-relation
+ * `subtasks` (parent_id → id) so the self-relation alias path can be
+ * exercised on a polymorphic target.
  */
 export function buildMixedPolyContract(): TestContract {
   const raw = JSON.parse(JSON.stringify(getTestContract()));
@@ -180,15 +186,47 @@ export function buildMixedPolyContract(): TestContract {
       id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
       title: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
       type: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+      projectId: { nullable: true, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+      parentId: { nullable: true, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
     },
-    relations: {},
+    relations: {
+      subtasks: {
+        to: { model: 'Task' },
+        cardinality: '1:N',
+        on: { localFields: ['id'], targetFields: ['parentId'] },
+      },
+    },
     storage: {
       namespaceId: 'public',
       table: 'tasks',
-      fields: { id: { column: 'id' }, title: { column: 'title' }, type: { column: 'type' } },
+      fields: {
+        id: { column: 'id' },
+        title: { column: 'title' },
+        type: { column: 'type' },
+        projectId: { column: 'project_id' },
+        parentId: { column: 'parent_id' },
+      },
     },
     discriminator: { field: 'type' },
     variants: { Bug: { value: 'bug' }, Feature: { value: 'feature' } },
+  };
+
+  domainModels['Project'] = {
+    fields: {
+      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+      name: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+    },
+    relations: {
+      tasks: {
+        to: { model: 'Task' },
+        cardinality: '1:N',
+        on: { localFields: ['id'], targetFields: ['projectId'] },
+      },
+    },
+    storage: {
+      table: 'projects_tbl',
+      fields: { id: { column: 'id' }, name: { column: 'name' } },
+    },
   };
 
   domainModels['Bug'] = {
@@ -219,6 +257,19 @@ export function buildMixedPolyContract(): TestContract {
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
       type: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
       severity: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+      project_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: true },
+      parent_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: true },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+
+  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.projects_tbl = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
     },
     primaryKey: { columns: ['id'] },
     uniques: [],
@@ -245,6 +296,11 @@ export function buildMixedPolyContract(): TestContract {
  * - User (base, table: users, discriminator: kind)
  * - Admin (STI, table: users, value: admin) with `role` field
  * - Regular (STI, table: users, value: regular) with `plan` field
+ *
+ * A non-polymorphic `Account` parent (table: accounts) owns a `members`
+ * relation targeting the STI-polymorphic `User`, so an include can be
+ * planned against an STI-only polymorphic target (no MTI variant tables,
+ * so no joins — only discriminator + variant base-table column projection).
  */
 export function buildStiPolyContract(): TestContract {
   const raw = JSON.parse(JSON.stringify(getTestContract()));
@@ -258,10 +314,35 @@ export function buildStiPolyContract(): TestContract {
   (userModel.storage as { fields: Record<string, { column: string }> }).fields['kind'] = {
     column: 'kind',
   };
+  userModel.fields['accountId'] = {
+    nullable: true,
+    type: { kind: 'scalar', codecId: 'pg/int4@1' },
+  };
+  (userModel.storage as { fields: Record<string, { column: string }> }).fields['accountId'] = {
+    column: 'account_id',
+  };
   userModel.discriminator = { field: 'kind' };
   userModel.variants = {
     Admin: { value: 'admin' },
     Regular: { value: 'regular' },
+  };
+
+  domainModels['Account'] = {
+    fields: {
+      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+      name: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+    },
+    relations: {
+      members: {
+        to: { model: 'User' },
+        cardinality: '1:N',
+        on: { localFields: ['id'], targetFields: ['accountId'] },
+      },
+    },
+    storage: {
+      table: 'accounts',
+      fields: { id: { column: 'id' }, name: { column: 'name' } },
+    },
   };
 
   domainModels['Admin'] = {
@@ -299,6 +380,22 @@ export function buildStiPolyContract(): TestContract {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
+  };
+  usersStorageTable.columns['account_id'] = {
+    codecId: 'pg/int4@1',
+    nativeType: 'int4',
+    nullable: true,
+  };
+
+  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.accounts = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
   };
 
   return deserializeTestContract(raw);

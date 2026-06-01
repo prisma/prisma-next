@@ -1,3 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   AndExpr,
@@ -20,11 +23,12 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import { resolveIncludeRelation } from '../src/collection-contract';
 import { compileSelect, compileSelectWithIncludes } from '../src/query-plan-select';
-import { emptyState } from '../src/types';
+import { type CollectionState, emptyState, type IncludeExpr } from '../src/types';
 import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
-import { buildMixedPolyContract, isSelectAst } from './helpers';
+import { buildMixedPolyContract, buildStiPolyContract, isSelectAst } from './helpers';
 import { unboundTables } from './unbound-tables';
 
 function codecForColumn(table: string, column: string): string {
@@ -749,5 +753,116 @@ describe('compileSelect MTI JOINs', () => {
         )
         .withSelectAllIntent({ table: 'users' }),
     );
+  });
+});
+
+describe('compileSelectWithIncludes polymorphic targets', () => {
+  function includeFor(
+    contract: Contract<SqlStorage>,
+    parentModel: string,
+    relationName: string,
+    nested: CollectionState = emptyState(),
+  ): IncludeExpr {
+    const relation = resolveIncludeRelation(contract, parentModel, relationName);
+    return {
+      relationName,
+      relatedModelName: relation.relatedModelName,
+      relatedTableName: relation.relatedTableName,
+      targetColumn: relation.targetColumn,
+      localColumn: relation.localColumn,
+      cardinality: relation.cardinality,
+      nested,
+      scalar: undefined,
+      combine: undefined,
+    };
+  }
+
+  function stateWithInclude(include: IncludeExpr): CollectionState {
+    return { ...emptyState(), includes: [include] };
+  }
+
+  function childRowsSelectFor(plan: { ast: unknown }, relationName: string): SelectAst {
+    expectSelectAst(plan.ast);
+    const projection = plan.ast.projection.find((item) => item.alias === relationName);
+    expectSubqueryExpr(projection?.expr);
+    const aggregateQuery = projection.expr.query;
+    expectDerivedTableSource(aggregateQuery.from);
+    return aggregateQuery.from.query;
+  }
+
+  function projectionAliases(select: SelectAst): string[] {
+    return select.projection.map((item) => item.alias);
+  }
+
+  it('STI-target include projects discriminator and variant base-table columns, no joins', () => {
+    const contract = buildStiPolyContract();
+    const state = stateWithInclude(includeFor(contract, 'Account', 'members'));
+
+    const plan = compileSelectWithIncludes(contract, 'accounts', state, 'Account');
+    const childRows = childRowsSelectFor(plan, 'members');
+
+    expect(childRows.joins ?? []).toHaveLength(0);
+    const aliases = projectionAliases(childRows);
+    expect(aliases).toContain('kind');
+    expect(aliases).toContain('role');
+    expect(aliases).toContain('plan');
+  });
+
+  it('MTI-target include left-joins variant tables and projects variant_table__column', () => {
+    const contract = buildMixedPolyContract();
+    const state = stateWithInclude(includeFor(contract, 'Project', 'tasks'));
+
+    const plan = compileSelectWithIncludes(contract, 'projects_tbl', state, 'Project');
+    const childRows = childRowsSelectFor(plan, 'tasks');
+
+    expect(childRows.joins).toEqual([
+      JoinAst.left(
+        TableSource.named('features'),
+        EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
+      ),
+    ]);
+
+    const aliases = projectionAliases(childRows);
+    expect(aliases).toContain('type');
+    expect(aliases).toContain('severity');
+    expect(aliases).toContain('features__priority');
+  });
+
+  it('variant-narrowed MTI-target include inner-joins only the named variant', () => {
+    const contract = buildMixedPolyContract();
+    const include = includeFor(contract, 'Project', 'tasks', {
+      ...emptyState(),
+      variantName: 'Feature',
+    });
+    const state = stateWithInclude(include);
+
+    const plan = compileSelectWithIncludes(contract, 'projects_tbl', state, 'Project');
+    const childRows = childRowsSelectFor(plan, 'tasks');
+
+    expect(childRows.joins).toEqual([
+      JoinAst.inner(
+        TableSource.named('features'),
+        EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
+      ),
+    ]);
+    expect(projectionAliases(childRows)).toContain('features__priority');
+  });
+
+  it('self-relation poly include remaps the variant join ON to the child alias', () => {
+    const contract = buildMixedPolyContract();
+    // `subtasks` is a Task→Task self relation; the child base table is
+    // aliased, so the variant join ON must reference the alias rather
+    // than the unaliased base table name.
+    const state = stateWithInclude(includeFor(contract, 'Task', 'subtasks'));
+
+    const plan = compileSelectWithIncludes(contract, 'tasks', state, 'Task');
+    const childRows = childRowsSelectFor(plan, 'subtasks');
+
+    expect(childRows.joins).toEqual([
+      JoinAst.left(
+        TableSource.named('features'),
+        EqColJoinOn.of(ColumnRef.of('subtasks__child', 'id'), ColumnRef.of('features', 'id')),
+      ),
+    ]);
   });
 });
