@@ -89,7 +89,7 @@ type MutableDomainModel = {
   storage: Record<string, unknown>;
   discriminator?: { field: string };
   variants?: Record<string, { value: string }>;
-  base?: string;
+  base?: { model: string; namespace: string };
 };
 
 function unboundDomainModels(raw: {
