@@ -281,8 +281,20 @@ function decodeIncludePayload(
     return decodeCombineIncludePayload(contract, include, include.combine, raw);
   }
   const rawChildren = parseIncludedRows(raw);
+  const polyInfo = resolvePolymorphismInfo(contract, include.relatedModelName);
+  const mapChildRow = polyInfo
+    ? (childRow: Record<string, unknown>) =>
+        mapPolymorphicRow(
+          contract,
+          include.relatedModelName,
+          polyInfo,
+          childRow,
+          include.nested.variantName,
+        )
+    : (childRow: Record<string, unknown>) =>
+        mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
   const mappedChildren = rawChildren.map((childRow) => {
-    const mapped = mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
+    const mapped = mapChildRow(childRow);
     for (const nestedInclude of include.nested.includes) {
       mapped[nestedInclude.relationName] = decodeIncludePayload(
         contract,
