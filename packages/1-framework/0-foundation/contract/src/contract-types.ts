@@ -1,3 +1,4 @@
+import type { ControlPolicy } from './control-policy';
 import type { CrossReference } from './cross-reference';
 import type { ApplicationDomain } from './domain-envelope';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
@@ -57,6 +58,7 @@ export interface Contract<
   readonly execution?: ContractExecutionSection;
   readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, unknown>;
+  readonly defaultControl?: ControlPolicy;
 }
 
 export type ContractModelsMap<TContract extends Contract> =
