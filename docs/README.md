@@ -25,7 +25,7 @@ This directory contains the primary documentation for the repository.
 - [Reference docs](./reference/) — conventions and patterns used across the codebase
 - [Codec authoring guide](./reference/codec-authoring-guide.md) — class-based codecs (`CodecImpl`, `CodecDescriptorImpl`) and column helpers
 - [Mongo Pipeline Builder](./reference/Mongo%20Pipeline%20Builder.md) — typed builder for MongoDB aggregation pipelines, reads, writes, and find-and-modify
-- [`migration list --graph` rendering](./reference/migration-list-graph-rendering.md) — the annotated-tree rendering contract: model, topology source, glyph palette, worked topologies, and the lane-allocator state machine
+- [`migration graph --tree` rendering](./reference/migration-graph-rendering.md) — condensed annotated-tree rendering for offline migration topology
 - [CLI Style Guide](./CLI%20Style%20Guide.md) — CLI UX conventions
 
 ## Working with AI agents

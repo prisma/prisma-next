@@ -6,9 +6,6 @@ palette (Unicode and ASCII), routed back-arcs, and its relationship to the other
 migration views. It is reference material for anyone maintaining or extending the
 `--tree` output.
 
-For the Tier-2 edge-per-row annotated tree (`migration list --graph`), see
-[migration-list-graph-rendering.md](./migration-list-graph-rendering.md).
-
 ## Problem framing
 
 `migration graph` (without `--tree`) renders a **node graph** laid out by dagre:
@@ -31,7 +28,7 @@ coordinates.
    reversing the data column).
 3. **Vertical order** — tip at the top, roots at the bottom; within each weakly
    connected component, DFS post-order with `dirName`-descending neighbour order (same
-   tie-break as the Tier-2 topology pass). Disjoint components are separated by a blank
+   tie-break as `migration-list-graph-topology`). Disjoint components are separated by a blank
    row.
 4. **Detached contract** — when the workspace contract hash does not appear in the
    graph, a floating node row is emitted above the main component (with `(contract)`
@@ -92,10 +89,10 @@ Every edge row ends with:
 ```
 
 - **Hashes** — 7-character abbreviated contract hashes (`abbreviateContractHash`).
-- **Empty baseline** — `∅` (Unicode) or `-` (ASCII) for `EMPTY_CONTRACT_HASH`, shared
-  with Tier-2 via `migrationListEmptySource`.
-- **Forward arrow** — `→` (Unicode) or `->` (ASCII), shared with Tier-2 via
-  `migrationListForwardArrow`. Rollback rows still show `from → to`; the gutter
+- **Empty baseline** — `∅` (Unicode) or `-` (ASCII) for `EMPTY_CONTRACT_HASH`, via
+  `migrationListEmptySource`.
+- **Forward arrow** — `→` (Unicode) or `->` (ASCII), via `migrationListForwardArrow`.
+  Rollback rows still show `from → to`; the gutter
   `↓`/`v` carries the kind signal.
 - **Self-edge** — both hashes are shown (`from → to` with identical abbreviations).
 
@@ -138,7 +135,7 @@ glyph mode: `--no-color` disables ANSI styling; `--ascii` swaps glyphs only.
 | empty baseline source | `∅` | `-` |
 
 Implementation: `UNICODE_PALETTE` / `ASCII_PALETTE` in
-`migration-graph-tree-render.ts`; Tier-2 shared symbols come from
+`migration-graph-tree-render.ts`; shared list data-column symbols come from
 `migration-list-data-column.ts`.
 
 ### ASCII fallback
@@ -158,7 +155,6 @@ when color is enabled.
 | Command | Rows | Gutter |
 |---|---|---|
 | `migration list` | migrations | none (flat) |
-| `migration list --graph` | migrations (+ `o` at convergences) | forward spine only |
 | `migration graph` (default) | dagre node graph | full topology via GraphViz |
 | `migration graph --tree` | **nodes + migrations** | forward spine + routed back-arcs |
 
@@ -200,5 +196,3 @@ The same fixture in ASCII (`--ascii` / `glyphMode: 'ascii'`):
   snapshots are a separate follow-on.
 - **Default dagre renderer** — `graph-render.ts`, `graph-migration-mapper.ts`, and
   `--dot` output are unchanged by `--tree` / `--ascii`.
-- **`migration list --graph`** — separate formatter and layout; see the Tier-2
-  reference doc.
