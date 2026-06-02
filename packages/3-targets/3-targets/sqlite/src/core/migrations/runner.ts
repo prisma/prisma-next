@@ -13,7 +13,6 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import { type ContractMarkerRow, parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type {
   ControlDriverInstance,
   MigrationRunnerResult,
@@ -30,7 +29,6 @@ import {
   buildLedgerInsertStatement,
   buildWriteMarkerStatements,
   MARKER_TABLE_NAME,
-  readMarkerStatement,
   type SqlStatement,
 } from './statement-builders';
 
@@ -71,7 +69,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
     const ensureResult = await this.ensureControlTables(driver, options.destinationContract);
     if (!ensureResult.ok) return ensureResult;
-    const existingMarker = await this.readMarker(driver, space);
+    const existingMarker = await this.family.readMarker({ driver, space });
 
     const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
     if (!markerCheck.ok) return markerCheck;
@@ -343,32 +341,6 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
         },
       },
     );
-  }
-
-  private async readMarker(
-    driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
-    space: string,
-  ): Promise<ContractMarkerRecord | null> {
-    const stmt = readMarkerStatement(space);
-    try {
-      const result = await driver.query<ContractMarkerRow>(stmt.sql, stmt.params);
-      const row = result.rows[0];
-      if (!row) return null;
-      // SQLite stores arrays as JSON-encoded TEXT (no native array type), so
-      // the driver returns `invariants` as a string. Decode before delegating
-      // to the shared row schema, which expects `string[]`.
-      const invariants =
-        typeof row.invariants === 'string'
-          ? (JSON.parse(row.invariants) as unknown)
-          : row.invariants;
-      return parseContractMarkerRow({ ...row, invariants });
-    } catch (error) {
-      // Table might not exist yet
-      if (error instanceof Error && error.message.includes('no such table')) {
-        return null;
-      }
-      throw error;
-    }
   }
 
   private async runExpectationSteps(

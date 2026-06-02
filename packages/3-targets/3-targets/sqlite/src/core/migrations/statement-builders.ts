@@ -61,23 +61,6 @@ export const ensureLedgerTableStatement: SqlStatement = {
   params: [],
 };
 
-export function readMarkerStatement(space: string): SqlStatement {
-  return {
-    sql: `SELECT
-      core_hash,
-      profile_hash,
-      contract_json,
-      canonical_version,
-      updated_at,
-      app_tag,
-      meta,
-      invariants
-    FROM _prisma_marker
-    WHERE space = ?`,
-    params: [space],
-  };
-}
-
 export interface WriteMarkerInput {
   /**
    * Logical space identifier for this marker row. Required at every

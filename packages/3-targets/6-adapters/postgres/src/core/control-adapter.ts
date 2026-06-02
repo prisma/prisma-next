@@ -5,7 +5,7 @@ import type {
 } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
+import { parseContractMarkerRow, readMarkerResult } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   APP_SPACE_ID,
@@ -47,6 +47,7 @@ import {
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { postgresMarkerReadShape } from './adapter';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredDdl } from './ddl-renderer';
 import {
@@ -158,51 +159,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     space: string,
   ): Promise<ContractMarkerRecord | null> {
     const markerContext = { space, markerLocation: POSTGRES_MARKER_TABLE };
-    const exists = await withMarkerReadErrorHandling(
-      () =>
-        driver.query(
-          `select 1
-       from information_schema.tables
-       where table_schema = $1 and table_name = $2`,
-          ['prisma_contract', 'marker'],
-        ),
-      markerContext,
-    );
-    if (exists.rows.length === 0) {
-      return null;
-    }
-
     const result = await withMarkerReadErrorHandling(
-      () =>
-        driver.query<{
-          core_hash: string;
-          profile_hash: string;
-          contract_json: unknown | null;
-          canonical_version: number | null;
-          updated_at: Date | string;
-          app_tag: string | null;
-          meta: unknown | null;
-          invariants: readonly string[];
-        }>(
-          `select
-         core_hash,
-         profile_hash,
-         contract_json,
-         canonical_version,
-         updated_at,
-         app_tag,
-         meta,
-         invariants
-       from prisma_contract.marker
-       where space = $1`,
-          [space],
-        ),
+      () => readMarkerResult(driver, postgresMarkerReadShape(space)),
       markerContext,
     );
-
-    const row = result.rows[0];
-    if (!row) return null;
-    return parseMarkerRowSafely(row, parseContractMarkerRow, markerContext);
+    return result.kind === 'present' ? result.record : null;
   }
 
   /**

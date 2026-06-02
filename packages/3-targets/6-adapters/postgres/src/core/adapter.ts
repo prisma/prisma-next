@@ -1,3 +1,4 @@
+import { type MarkerReadShape, readMarkerResult } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type {
@@ -11,7 +12,6 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
-import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredDdl } from './ddl-renderer';
@@ -87,25 +87,27 @@ export const postgresRawCodecInferer: RawCodecInferer = {
   },
 };
 
-async function readPostgresMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
-  const exists = await queryable.query(
-    'select 1 from information_schema.tables where table_schema = $1 and table_name = $2',
-    ['prisma_contract', 'marker'],
-  );
-  if (exists.rows.length === 0) {
-    return { kind: 'no-table' };
-  }
+/**
+ * Builds the probe + select statements for the Postgres marker read at
+ * `space`. Shared by the runtime reader and the control adapter so both spell
+ * the read exactly once. Postgres' driver hydrates `text[]` columns as native
+ * JS arrays, so no row decode is needed before the shared parser.
+ */
+export function postgresMarkerReadShape(space: string): MarkerReadShape {
+  return {
+    tableProbe: {
+      sql: 'select 1 from information_schema.tables where table_schema = $1 and table_name = $2',
+      params: ['prisma_contract', 'marker'],
+    },
+    selectRow: {
+      sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
+      params: [space],
+    },
+  };
+}
 
-  const result = await queryable.query(
-    'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
-    [APP_SPACE_ID],
-  );
-  const row = result.rows[0];
-  if (!row) {
-    return { kind: 'absent' };
-  }
-  // Postgres' driver hydrates `text[]` columns as native JS arrays, so the row is already in the shape the shared parser expects.
-  return { kind: 'present', record: parseContractMarkerRow(row) };
+function readPostgresMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
+  return readMarkerResult(queryable, postgresMarkerReadShape(APP_SPACE_ID));
 }
 
 export function createPostgresAdapter(options?: PostgresAdapterOptions) {

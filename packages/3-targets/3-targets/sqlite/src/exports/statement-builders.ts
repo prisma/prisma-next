@@ -7,6 +7,5 @@ export {
   ensureMarkerTableStatement,
   LEDGER_TABLE_NAME,
   MARKER_TABLE_NAME,
-  readMarkerStatement,
   type SqlStatement,
 } from '../core/migrations/statement-builders';

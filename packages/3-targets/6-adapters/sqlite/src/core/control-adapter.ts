@@ -1,7 +1,7 @@
 import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
+import { parseContractMarkerRow, readMarkerResult } from '@prisma-next/family-sql/verify';
 import {
   APP_SPACE_ID,
   type ControlDriverInstance,
@@ -32,7 +32,7 @@ import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { renderLoweredSql } from './adapter';
+import { decodeSqliteMarkerRow, renderLoweredSql, sqliteMarkerReadShape } from './adapter';
 import { renderLoweredDdl } from './ddl-renderer';
 import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
 import * as markerLedgerWrites from './marker-ledger-writes';
@@ -40,29 +40,6 @@ import type { SqliteContract } from './types';
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';
 const SQLITE_LEDGER_TABLE = '_prisma_ledger';
-
-/**
- * SQLite stores arrays as JSON-encoded TEXT (no native array type), so the
- * driver returns `invariants` as a string. Decode before delegating to the
- * shared row schema, which expects `string[]`. A non-JSON value here is a
- * corrupt row and surfaces as `Invalid contract marker row: …` via the
- * typed-envelope wrapper.
- */
-function decodeSqliteMarkerRow(row: unknown): unknown {
-  if (typeof row !== 'object' || row === null || !('invariants' in row)) {
-    return row;
-  }
-  const record = row as { invariants: unknown };
-  if (typeof record.invariants !== 'string') return row;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(record.invariants);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`Invalid contract marker row: invariants is not valid JSON: ${detail}`);
-  }
-  return { ...record, invariants: parsed };
-}
 
 // PRAGMA result row types
 type PragmaTableInfoRow = {
@@ -146,52 +123,11 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
     space: string,
   ): Promise<ContractMarkerRecord | null> {
     const markerContext = { space, markerLocation: SQLITE_MARKER_TABLE };
-    const exists = await withMarkerReadErrorHandling(
-      () =>
-        driver.query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, [
-          '_prisma_marker',
-        ]),
-      markerContext,
-    );
-    if (exists.rows.length === 0) {
-      return null;
-    }
-
     const result = await withMarkerReadErrorHandling(
-      () =>
-        driver.query<{
-          core_hash: string;
-          profile_hash: string;
-          contract_json: unknown | null;
-          canonical_version: number | null;
-          updated_at: Date | string;
-          app_tag: string | null;
-          meta: unknown | null;
-          invariants: unknown;
-        }>(
-          `SELECT
-         core_hash,
-         profile_hash,
-         contract_json,
-         canonical_version,
-         updated_at,
-         app_tag,
-         meta,
-         invariants
-       FROM _prisma_marker
-       WHERE space = ?`,
-          [space],
-        ),
+      () => readMarkerResult(driver, sqliteMarkerReadShape(space)),
       markerContext,
     );
-
-    const row = result.rows[0];
-    if (!row) return null;
-    return parseMarkerRowSafely(
-      row,
-      (raw) => parseContractMarkerRow(decodeSqliteMarkerRow(raw)),
-      markerContext,
-    );
+    return result.kind === 'present' ? result.record : null;
   }
 
   /**
