@@ -18,6 +18,20 @@ function normalizeConnectionString(raw: string): string {
 
 export interface DevDatabase {
   readonly connectionString: string;
+  /**
+   * URL exported by `@prisma/dev` under its `server.ppg` field, normalised
+   * through the same helper as `connectionString`.
+   *
+   * Caveat: as of `@prisma/dev@0.24.7`, this endpoint serves the Prisma
+   * Accelerate / data-proxy GraphQL protocol (consumed by
+   * `@prisma/client/edge`), not the `@prisma/ppg` raw-SQL protocol
+   * (`/v0/statement` + `/v0/session`) consumed by
+   * `@prisma-next/driver-ppg-serverless`. The `prisma+postgres://` scheme
+   * is shared between the two products but the wire protocols are not
+   * interchangeable. Surfaced here for forward compatibility (and for
+   * any future PPG-protocol test shim that wants the URL at hand).
+   */
+  readonly ppgUrl: string;
   close(): Promise<void>;
 }
 
@@ -36,6 +50,7 @@ export async function createDevDatabase(options?: ServerOptions): Promise<DevDat
   return {
     ...server,
     connectionString: normalizeConnectionString(server.database.connectionString),
+    ppgUrl: normalizeConnectionString(server.ppg.url),
   };
 }
 
