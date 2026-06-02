@@ -501,10 +501,10 @@ describe('createModelAccessor', () => {
       const expr = accessor['children']!.some() as ExistsExpr;
 
       expect(expr.notExists).toBe(false);
-      expect(expr.subquery.from).toEqual(TableSource.named('children'));
+      expect(expr.subquery.from).toEqual(TableSource.named('children', undefined, 'public'));
       expect(expr.subquery.joins).toEqual([
         JoinAst.inner(
-          TableSource.named('parent_children'),
+          TableSource.named('parent_children', undefined, 'public'),
           BinaryExpr.eq(
             ColumnRef.of('parent_children', 'child_id'),
             ColumnRef.of('children', 'id'),
@@ -631,7 +631,7 @@ describe('createModelAccessor', () => {
 
       expect(expr.subquery.joins).toEqual([
         JoinAst.inner(
-          TableSource.named('parent_children'),
+          TableSource.named('parent_children', undefined, 'public'),
           AndExpr.of([
             BinaryExpr.eq(
               ColumnRef.of('parent_children', 'tenant_id'),
