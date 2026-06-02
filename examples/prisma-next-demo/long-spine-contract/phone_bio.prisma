@@ -1,8 +1,0 @@
-// use prisma-next
-
-model user {
-  id    String  @id @default(uuid())
-  email String
-  phone String?
-  bio String?
-}
