@@ -22,13 +22,28 @@
  *                                          on success; prints the rollback reason and the unchanged
  *                                          count on quota violation.
  *
+ * Many-to-many commands (Post ↔ Tag via PostTag junction):
+ * - post-tags <postId>                     Include a post's tags (N:M read)
+ * - posts-with-tag-some <label>            Posts that have at least one tag matching label
+ * - posts-with-tag-none <label>            Posts that have no tag matching label
+ * - posts-with-tag-every <label>           Posts where every tag differs from label
+ * - connect-post-tags <postId> <tagId...>  Link existing tags to a post
+ * - disconnect-post-tags <postId> <tagId...>  Unlink tags from a post
+ * - create-post-with-tags <id> <userId> <title> <label...>
+ *                                          Create post + new tags in one nested mutation
+ *
  * Each command opens a connection, runs the operation, prints the result as
  * JSON, and closes. Exits non-zero on usage errors or runtime failures.
  */
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';
+import { ormClientConnectPostTags } from './orm-client/connect-post-tags';
+import { ormClientCreatePostWithTags } from './orm-client/create-post-with-tags';
 import { ormClientCreateUser } from './orm-client/create-user';
+import { ormClientDisconnectPostTags } from './orm-client/disconnect-post-tags';
 import { ormClientFindUserById } from './orm-client/find-user-by-id';
+import { ormClientGetPostTags } from './orm-client/get-post-tags';
+import { ormClientGetPostsByTagFilter } from './orm-client/get-posts-by-tag-filter';
 import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { db } from './prisma/db';
 import { insertUser } from './queries/dml-operations';
@@ -121,12 +136,73 @@ async function main() {
         }
         throw txError;
       }
+    } else if (cmd === 'post-tags') {
+      const [postId] = args;
+      if (!postId) {
+        console.error('Usage: pnpm start -- post-tags <postId>');
+        process.exitCode = 1;
+        return;
+      }
+      const result = await ormClientGetPostTags(postId, runtime);
+      console.log(JSON.stringify(result, null, 2));
+    } else if (
+      cmd === 'posts-with-tag-some' ||
+      cmd === 'posts-with-tag-none' ||
+      cmd === 'posts-with-tag-every'
+    ) {
+      const [label] = args;
+      if (!label) {
+        console.error(`Usage: pnpm start -- ${cmd} <label>`);
+        process.exitCode = 1;
+        return;
+      }
+      const mode =
+        cmd === 'posts-with-tag-some' ? 'some' : cmd === 'posts-with-tag-none' ? 'none' : 'every';
+      const results = await ormClientGetPostsByTagFilter(mode, label, runtime);
+      console.log(JSON.stringify(results, null, 2));
+    } else if (cmd === 'connect-post-tags') {
+      const [postId, ...tagIds] = args;
+      if (!postId || tagIds.length === 0) {
+        console.error('Usage: pnpm start -- connect-post-tags <postId> <tagId...>');
+        process.exitCode = 1;
+        return;
+      }
+      const result = await ormClientConnectPostTags(postId, tagIds, runtime);
+      console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'disconnect-post-tags') {
+      const [postId, ...tagIds] = args;
+      if (!postId || tagIds.length === 0) {
+        console.error('Usage: pnpm start -- disconnect-post-tags <postId> <tagId...>');
+        process.exitCode = 1;
+        return;
+      }
+      const result = await ormClientDisconnectPostTags(postId, tagIds, runtime);
+      console.log(JSON.stringify(result, null, 2));
+    } else if (cmd === 'create-post-with-tags') {
+      const [id, userId, title, ...labels] = args;
+      if (!id || !userId || !title || labels.length === 0) {
+        console.error(
+          'Usage: pnpm start -- create-post-with-tags <id> <userId> <title> <label...>',
+        );
+        process.exitCode = 1;
+        return;
+      }
+      const result = await ormClientCreatePostWithTags(
+        { id, userId, title, tags: labels.map((label) => ({ label })) },
+        runtime,
+      );
+      console.log(JSON.stringify(result, null, 2));
     } else {
       console.log(
-        'Usage: pnpm start -- [users [limit] | repo-user <id> | repo-user-posts <id> [limit] | ' +
-          'repo-create-user <id> <email> <displayName> | insert-user <email> <displayName> | ' +
-          'user-by-email-prepared <email> [<email> ...] | ' +
-          'add-posts <userId> <title> [...moreTitles]]',
+        'Usage: pnpm start -- [users [limit] | repo-user <id> | repo-user-posts <id> [limit] |\n' +
+          '  repo-create-user <id> <email> <displayName> | insert-user <email> <displayName> |\n' +
+          '  user-by-email-prepared <email> [<email> ...] |\n' +
+          '  add-posts <userId> <title> [...moreTitles] |\n' +
+          '  post-tags <postId> |\n' +
+          '  posts-with-tag-some <label> | posts-with-tag-none <label> | posts-with-tag-every <label> |\n' +
+          '  connect-post-tags <postId> <tagId...> |\n' +
+          '  disconnect-post-tags <postId> <tagId...> |\n' +
+          '  create-post-with-tags <id> <userId> <title> <label...>]',
       );
       process.exitCode = 1;
       return;
