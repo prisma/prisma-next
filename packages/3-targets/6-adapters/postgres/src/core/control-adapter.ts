@@ -286,51 +286,33 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       return [];
     }
 
+    type LedgerQueryRow = {
+      space: string;
+      migration_name: string;
+      migration_hash: string;
+      origin_core_hash: string | null;
+      destination_core_hash: string;
+      operations: unknown;
+      created_at: Date | string;
+    };
+    let sql = `select
+         space,
+         migration_name,
+         migration_hash,
+         origin_core_hash,
+         destination_core_hash,
+         operations,
+         created_at
+       from prisma_contract.ledger`;
+    if (space !== undefined) {
+      sql += `
+       where space = $1`;
+    }
+    sql += `
+       order by id`;
+
     const result = await withMarkerReadErrorHandling(
-      () =>
-        space === undefined
-          ? driver.query<{
-              space: string;
-              migration_name: string;
-              migration_hash: string;
-              origin_core_hash: string | null;
-              destination_core_hash: string;
-              operations: unknown;
-              created_at: Date | string;
-            }>(
-              `select
-         space,
-         migration_name,
-         migration_hash,
-         origin_core_hash,
-         destination_core_hash,
-         operations,
-         created_at
-       from prisma_contract.ledger
-       order by id`,
-            )
-          : driver.query<{
-              space: string;
-              migration_name: string;
-              migration_hash: string;
-              origin_core_hash: string | null;
-              destination_core_hash: string;
-              operations: unknown;
-              created_at: Date | string;
-            }>(
-              `select
-         space,
-         migration_name,
-         migration_hash,
-         origin_core_hash,
-         destination_core_hash,
-         operations,
-         created_at
-       from prisma_contract.ledger
-       where space = $1
-       order by id`,
-              [space],
-            ),
+      () => driver.query<LedgerQueryRow>(sql, space === undefined ? undefined : [space]),
       ledgerContext,
     );
 
