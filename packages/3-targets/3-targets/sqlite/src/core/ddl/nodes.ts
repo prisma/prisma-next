@@ -9,7 +9,7 @@ export abstract class SqliteDdlNode extends DdlNode {
 }
 
 function freezeDdlColumns(columns: readonly DdlColumn[]): ReadonlyArray<DdlColumn> {
-  return Object.freeze(columns.map((column) => Object.freeze({ ...column })));
+  return Object.freeze([...columns]);
 }
 
 export class SqliteCreateTable extends SqliteDdlNode {

@@ -1,5 +1,9 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
-import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
+import type {
+  DdlColumn,
+  DdlColumnDefaultVisitor,
+  FunctionColumnDefault,
+  LiteralColumnDefault,
+} from '@prisma-next/sql-relational-core/ast';
 import type {
   SqliteCreateTable,
   SqliteDdlNode,
@@ -16,12 +20,9 @@ class SqliteDdlVisitorImpl implements SqliteDdlVisitor<string> {
   }
 }
 
-function renderColumnDefault(defaultValue: ColumnDefault | undefined): string {
-  if (defaultValue === undefined) {
-    return '';
-  }
-  if (defaultValue.kind === 'literal') {
-    const { value } = defaultValue;
+const defaultVisitor: DdlColumnDefaultVisitor<string> = {
+  literal(node: LiteralColumnDefault): string {
+    const { value } = node;
     if (typeof value === 'string') {
       return `DEFAULT '${value}'`;
     }
@@ -32,15 +33,14 @@ function renderColumnDefault(defaultValue: ColumnDefault | undefined): string {
       return 'DEFAULT NULL';
     }
     return `DEFAULT '${JSON.stringify(value)}'`;
-  }
-  if (defaultValue.kind === 'function') {
-    if (defaultValue.expression === 'autoincrement()') {
+  },
+  function(node: FunctionColumnDefault): string {
+    if (node.expression === 'autoincrement()') {
       return '';
     }
-    return `DEFAULT (${defaultValue.expression})`;
-  }
-  return '';
-}
+    return `DEFAULT (${node.expression})`;
+  },
+};
 
 function renderColumn(column: DdlColumn): string {
   if (column.type.includes('AUTOINCREMENT')) {
@@ -53,7 +53,7 @@ function renderColumn(column: DdlColumn): string {
   if (column.primaryKey) {
     parts.push('PRIMARY KEY');
   }
-  const defaultClause = renderColumnDefault(column.default);
+  const defaultClause = column.default ? column.default.accept(defaultVisitor) : '';
   if (defaultClause.length > 0) {
     parts.push(defaultClause);
   }

@@ -10,7 +10,7 @@ export abstract class PostgresDdlNode extends DdlNode {
 }
 
 function freezeDdlColumns(columns: readonly DdlColumn[]): ReadonlyArray<DdlColumn> {
-  return Object.freeze(columns.map((column) => Object.freeze({ ...column })));
+  return Object.freeze([...columns]);
 }
 
 export class PostgresCreateTable extends PostgresDdlNode {

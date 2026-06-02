@@ -1,5 +1,9 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
-import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
+import type {
+  DdlColumn,
+  DdlColumnDefaultVisitor,
+  FunctionColumnDefault,
+  LiteralColumnDefault,
+} from '@prisma-next/sql-relational-core/ast';
 import type {
   PostgresCreateSchema,
   PostgresCreateTable,
@@ -22,12 +26,9 @@ class PostgresDdlVisitorImpl implements PostgresDdlVisitor<string> {
   }
 }
 
-function renderColumnDefault(defaultValue: ColumnDefault | undefined): string {
-  if (defaultValue === undefined) {
-    return '';
-  }
-  if (defaultValue.kind === 'literal') {
-    const { value } = defaultValue;
+const defaultVisitor: DdlColumnDefaultVisitor<string> = {
+  literal(node: LiteralColumnDefault): string {
+    const { value } = node;
     if (typeof value === 'string') {
       return `default '${value}'`;
     }
@@ -38,18 +39,17 @@ function renderColumnDefault(defaultValue: ColumnDefault | undefined): string {
       return 'default null';
     }
     return `default '${JSON.stringify(value)}'`;
-  }
-  if (defaultValue.kind === 'function') {
-    if (defaultValue.expression === 'autoincrement()') {
+  },
+  function(node: FunctionColumnDefault): string {
+    if (node.expression === 'autoincrement()') {
       return '';
     }
-    if (defaultValue.expression === 'now()') {
+    if (node.expression === 'now()') {
       return 'default now()';
     }
-    return `default (${defaultValue.expression})`;
-  }
-  return '';
-}
+    return `default (${node.expression})`;
+  },
+};
 
 function renderColumn(column: DdlColumn): string {
   const parts = [column.name, column.type];
@@ -59,7 +59,7 @@ function renderColumn(column: DdlColumn): string {
   if (column.primaryKey) {
     parts.push('primary key');
   }
-  const defaultClause = renderColumnDefault(column.default);
+  const defaultClause = column.default ? column.default.accept(defaultVisitor) : '';
   if (defaultClause.length > 0) {
     parts.push(defaultClause);
   }

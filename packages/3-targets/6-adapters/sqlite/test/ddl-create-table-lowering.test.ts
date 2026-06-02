@@ -1,3 +1,4 @@
+import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { SqliteCreateTable } from '@prisma-next/target-sqlite/ddl';
 import { describe, expect, it } from 'vitest';
 import { createSqliteAdapter } from '../src/core/adapter';
@@ -8,7 +9,7 @@ describe('SqliteCreateTable DDL lowering', () => {
     const ast = new SqliteCreateTable({
       table: '_prisma_marker',
       ifNotExists: true,
-      columns: [{ name: 'space', type: 'TEXT', notNull: true, primaryKey: true }],
+      columns: [col('space', 'TEXT', { notNull: true, primaryKey: true })],
     });
 
     const adapter = createSqliteAdapter();
@@ -24,16 +25,12 @@ describe('SqliteCreateTable DDL lowering', () => {
     const ast = new SqliteCreateTable({
       table: 'defaults',
       columns: [
-        { name: 'a', type: 'TEXT', default: { kind: 'literal', value: 'x' } },
-        { name: 'b', type: 'INTEGER', default: { kind: 'literal', value: 7 } },
-        { name: 'c', type: 'INTEGER', default: { kind: 'literal', value: true } },
-        { name: 'd', type: 'TEXT', default: { kind: 'literal', value: null } },
-        { name: 'e', type: 'TEXT', default: { kind: 'function', expression: "datetime('now')" } },
-        {
-          name: 'g',
-          type: 'INTEGER',
-          default: { kind: 'function', expression: 'autoincrement()' },
-        },
+        col('a', 'TEXT', { default: lit('x') }),
+        col('b', 'INTEGER', { default: lit(7) }),
+        col('c', 'INTEGER', { default: lit(true) }),
+        col('d', 'TEXT', { default: lit(null) }),
+        col('e', 'TEXT', { default: fn("datetime('now')") }),
+        col('g', 'INTEGER', { default: fn('autoincrement()') }),
       ],
     });
 

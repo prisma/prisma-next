@@ -10,8 +10,14 @@ The Orchestrator's record of which spawned sub-agent ID belongs to which role/va
 
 | Role / variant | Sub-agent ID | Tier | Status | Last used |
 |---|---|---|---|---|
-| implementer/fast (composer) | 802dcecf-9c0c-4fbc-bbd0-14fbf6945fa5 | **composer-2.5-fast** | active (D5) | 2026-06-01 |
-| reviewer/fast | 4277daba-8e6d-476f-abe8-7a6ad4cdd694 | **claude-opus-4-8-thinking-high** | active (D2 R1) | 2026-06-01 |
+| implementer (opus) | f9bb427a-865c-4736-8bb1-580207f52b96 | **claude-opus-4-8-thinking-high** | active (D7) | 2026-06-02 |
+| reviewer/fast | 4277daba-8e6d-476f-abe8-7a6ad4cdd694 | **claude-opus-4-8-thinking-high** | active (D7 R1) | 2026-06-02 |
+
+### Retired — slice `ddl-in-query-ast`
+
+| Role / variant | Sub-agent ID | Tier | Status | Last used |
+|---|---|---|---|---|
+| implementer/fast (composer) | 802dcecf-9c0c-4fbc-bbd0-14fbf6945fa5 | composer-2.5-fast | retired (D5/D6; operator switched implementer to Opus at D7) | 2026-06-02 |
 
 ### Superseded — PR #661 (rejected design), retained for provenance
 
@@ -22,10 +28,10 @@ The Orchestrator's record of which spawned sub-agent ID belongs to which role/va
 | implementer/fast (composer) | 5d69c410-bfab-42a7-adc2-e96914a37921 | composer-2.5-fast | retired (rejected design) | 2026-05-31 |
 | reviewer/fast | d1789b17-c0fe-4439-aea7-53381e729997 | claude-opus-4-8-thinking-high | retired (rejected design) | 2026-05-31 |
 
-## Model policy (operator, 2026-05-31)
+## Model policy (operator, 2026-05-31; revised 2026-06-02)
 
-- **Implementer:** `composer-2.5-fast` — fast; requires tight briefs + Composer constraints block (see `learnings.md`).
-- **Reviewer:** `claude-opus-4-8-thinking-high` — judgment layer; catches Composer drift.
+- **Implementer:** `claude-opus-4-8-thinking-high` as of **D7** — operator switched off Composer after repeated pattern-fidelity drift (frozen-object factories instead of frozen classes). Earlier dispatches (D2–D6) ran on `composer-2.5-fast` with a tight-brief + constraints block.
+- **Reviewer:** `claude-opus-4-8-thinking-high` — judgment layer; persistent across rounds/dispatches via resume.
 
 D1 was in flight on Sonnet before the policy landed; let it complete, Opus reviews. D1 rework (if any) and D2–D4: fresh Composer spawn with constraints block inlined in every brief.
 

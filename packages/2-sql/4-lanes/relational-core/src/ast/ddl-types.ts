@@ -1,12 +1,77 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
+import { isColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import type { AnyParamRef } from './types';
 
-export interface DdlColumn {
+export interface DdlColumnDefaultVisitor<R> {
+  literal(node: LiteralColumnDefault): R;
+  function(node: FunctionColumnDefault): R;
+}
+
+export abstract class DdlColumnDefault {
+  abstract readonly kind: string;
+  abstract accept<R>(visitor: DdlColumnDefaultVisitor<R>): R;
+
+  protected freeze(): void {
+    Object.freeze(this);
+  }
+}
+
+export class LiteralColumnDefault extends DdlColumnDefault {
+  readonly kind = 'literal' as const;
+  readonly value: ColumnDefaultLiteralInputValue;
+
+  constructor(value: ColumnDefaultLiteralInputValue) {
+    super();
+    if (!isColumnDefaultLiteralInputValue(value)) {
+      throw new Error('Invalid column default literal value');
+    }
+    this.value = value;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: DdlColumnDefaultVisitor<R>): R {
+    return visitor.literal(this);
+  }
+}
+
+export class FunctionColumnDefault extends DdlColumnDefault {
+  readonly kind = 'function' as const;
+  readonly expression: string;
+
+  constructor(expression: string) {
+    super();
+    this.expression = expression;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: DdlColumnDefaultVisitor<R>): R {
+    return visitor.function(this);
+  }
+}
+
+export type AnyDdlColumnDefault = LiteralColumnDefault | FunctionColumnDefault;
+
+export class DdlColumn {
   readonly name: string;
   readonly type: string;
-  readonly notNull?: boolean;
-  readonly primaryKey?: boolean;
-  readonly default?: ColumnDefault;
+  readonly notNull?: boolean | undefined;
+  readonly primaryKey?: boolean | undefined;
+  readonly default?: DdlColumnDefault | undefined;
+
+  constructor(options: {
+    readonly name: string;
+    readonly type: string;
+    readonly notNull?: boolean;
+    readonly primaryKey?: boolean;
+    readonly default?: DdlColumnDefault;
+  }) {
+    this.name = options.name;
+    this.type = options.type;
+    this.notNull = options.notNull;
+    this.primaryKey = options.primaryKey;
+    this.default = options.default;
+    Object.freeze(this);
+  }
 }
 
 export abstract class DdlNode {
