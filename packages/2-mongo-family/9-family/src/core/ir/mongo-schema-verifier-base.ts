@@ -1,5 +1,5 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import { effectiveControl } from '@prisma-next/contract/types';
+import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type {
   SchemaIssue,
   SchemaVerifier,
@@ -43,17 +43,20 @@ export abstract class MongoSchemaVerifierBase<
     return { ok: issues.length === 0, issues };
   }
 
-  protected effectiveCollectionControl(
+  protected effectiveCollectionControlPolicy(
     contract: TContract,
     collection: MongoCollection | undefined,
   ): ControlPolicy {
-    return effectiveControl(collection?.control, contract.defaultControl);
+    return effectiveControlPolicy(collection?.control, contract.defaultControl);
   }
 
-  protected collectionControlForName(contract: TContract, collectionName: string): ControlPolicy {
+  protected collectionControlPolicyForName(
+    contract: TContract,
+    collectionName: string,
+  ): ControlPolicy {
     const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
     const collection = namespace?.collections[collectionName];
-    return this.effectiveCollectionControl(contract, collection);
+    return this.effectiveCollectionControlPolicy(contract, collection);
   }
 
   protected verifyCommonMongoSchema(

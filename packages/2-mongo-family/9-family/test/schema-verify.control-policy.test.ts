@@ -46,6 +46,73 @@ function idx(keys: Array<{ field: string; direction: 1 | -1 }>): MongoSchemaInde
 }
 
 describe('verifyMongoSchema control policy', () => {
+  it('fails any drift under managed', () => {
+    const contract = buildContract({ items: { control: 'managed' } });
+    const result = verifyMongoSchema({
+      contract,
+      schema: new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'items',
+          indexes: [idx([{ field: 'extra', direction: 1 }])],
+        }),
+      ]),
+      strict: true,
+      frameworkComponents: [],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.schema.counts.fail).toBeGreaterThan(0);
+    expect(result.schema.issues.some((i) => i.kind === 'extra_index')).toBe(true);
+  });
+
+  it('fails a missing declared collection under external (existence required)', () => {
+    const contract = buildContract({ items: { control: 'external' } });
+    const result = verifyMongoSchema({
+      contract,
+      schema: new MongoSchemaIR([]),
+      strict: true,
+      frameworkComponents: [],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.schema.issues).toContainEqual(
+      expect.objectContaining({ kind: 'missing_table', table: 'items' }),
+    );
+  });
+
+  it('ignores an extra live collection under external', () => {
+    const contract = buildContract({ items: { control: 'external' } }, 'external');
+    const result = verifyMongoSchema({
+      contract,
+      schema: new MongoSchemaIR([
+        new MongoSchemaCollection({ name: 'items', indexes: [] }),
+        new MongoSchemaCollection({ name: 'audit', indexes: [] }),
+      ]),
+      strict: true,
+      frameworkComponents: [],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues.some((i) => i.kind === 'extra_table')).toBe(false);
+  });
+
+  it('softens a non-strict extra index to warn for tolerated and observed alike', () => {
+    for (const controlPolicy of ['tolerated', 'observed'] as const) {
+      const contract = buildContract({ items: { control: controlPolicy } });
+      const result = verifyMongoSchema({
+        contract,
+        schema: new MongoSchemaIR([
+          new MongoSchemaCollection({
+            name: 'items',
+            indexes: [idx([{ field: 'extra', direction: 1 }])],
+          }),
+        ]),
+        strict: false,
+        frameworkComponents: [],
+      });
+      expect(result.ok).toBe(true);
+      expect(result.schema.counts.fail).toBe(0);
+      expect(result.schema.counts.warn).toBeGreaterThan(0);
+    }
+  });
+
   it('fails missing declared collection under tolerated', () => {
     const contract = buildContract({ items: { control: 'tolerated' } });
     const result = verifyMongoSchema({

@@ -10,13 +10,13 @@ import type {
   MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
 import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
-import { pushMongoControlledFinding } from './schema-verify/mongo-control-verify-emit';
+import { emitMongoIssueAndNodeUnderControlPolicy } from './schema-verify/mongo-control-verify-emit';
 
 export function diffMongoSchemas(
   live: MongoSchemaIR,
   expected: MongoSchemaIR,
   strict: boolean,
-  collectionControl: (collectionName: string) => ControlPolicy,
+  collectionControlPolicy: (collectionName: string) => ControlPolicy,
 ): {
   root: SchemaVerificationNode;
   issues: SchemaIssue[];
@@ -35,14 +35,14 @@ export function diffMongoSchemas(
     const expectedColl = expected.collection(name);
 
     if (!liveColl && expectedColl) {
-      const control = collectionControl(name);
+      const controlPolicy = collectionControlPolicy(name);
       const issue: SchemaIssue = {
         kind: 'missing_table',
         table: name,
         message: `Collection "${name}" is missing from the database`,
       };
-      const disposition = pushMongoControlledFinding(
-        control,
+      const disposition = emitMongoIssueAndNodeUnderControlPolicy(
+        controlPolicy,
         issue,
         {
           status: 'fail',
@@ -57,7 +57,6 @@ export function diffMongoSchemas(
         },
         issues,
         collectionChildren,
-        strict,
       );
       if (disposition === 'fail') fail++;
       else if (disposition === 'warn') warn++;
@@ -65,15 +64,15 @@ export function diffMongoSchemas(
     }
 
     if (liveColl && !expectedColl) {
-      const control = collectionControl(name);
+      const controlPolicy = collectionControlPolicy(name);
       const issue: SchemaIssue = {
         kind: 'extra_table',
         table: name,
         message: `Extra collection "${name}" exists in the database but not in the contract`,
       };
       const baseStatus = strict ? 'fail' : 'warn';
-      const disposition = pushMongoControlledFinding(
-        control,
+      const disposition = emitMongoIssueAndNodeUnderControlPolicy(
+        controlPolicy,
         issue,
         {
           status: baseStatus,
@@ -88,7 +87,6 @@ export function diffMongoSchemas(
         },
         issues,
         collectionChildren,
-        strict,
       );
       if (disposition === 'fail') fail++;
       else if (disposition === 'warn') warn++;
@@ -97,10 +95,10 @@ export function diffMongoSchemas(
 
     const lc = liveColl as MongoSchemaCollection;
     const ec = expectedColl as MongoSchemaCollection;
-    const control = collectionControl(name);
-    const indexChildren = diffIndexes(name, lc, ec, strict, control, issues);
-    const validatorChildren = diffValidator(name, lc, ec, strict, control, issues);
-    const optionsChildren = diffOptions(name, lc, ec, strict, control, issues);
+    const controlPolicy = collectionControlPolicy(name);
+    const indexChildren = diffIndexes(name, lc, ec, strict, controlPolicy, issues);
+    const validatorChildren = diffValidator(name, lc, ec, strict, controlPolicy, issues);
+    const optionsChildren = diffOptions(name, lc, ec, strict, controlPolicy, issues);
     const children = [...indexChildren, ...validatorChildren, ...optionsChildren];
 
     const worstStatus = children.reduce<'pass' | 'warn' | 'fail'>(
@@ -177,7 +175,7 @@ function diffIndexes(
   live: MongoSchemaCollection,
   expected: MongoSchemaCollection,
   strict: boolean,
-  collectionControl: ControlPolicy,
+  collectionControlPolicy: ControlPolicy,
   issues: SchemaIssue[],
 ): SchemaVerificationNode[] {
   const nodes: SchemaVerificationNode[] = [];
@@ -207,8 +205,8 @@ function diffIndexes(
         indexOrConstraint: formatIndexName(idx),
         message: `Index ${formatIndexName(idx)} missing on collection "${collName}"`,
       };
-      pushMongoControlledFinding(
-        collectionControl,
+      emitMongoIssueAndNodeUnderControlPolicy(
+        collectionControlPolicy,
         issue,
         {
           status: 'fail',
@@ -223,7 +221,6 @@ function diffIndexes(
         },
         issues,
         nodes,
-        strict,
       );
     }
   }
@@ -237,8 +234,8 @@ function diffIndexes(
         message: `Extra index ${formatIndexName(idx)} on collection "${collName}"`,
       };
       const baseStatus = strict ? 'fail' : 'warn';
-      pushMongoControlledFinding(
-        collectionControl,
+      emitMongoIssueAndNodeUnderControlPolicy(
+        collectionControlPolicy,
         issue,
         {
           status: baseStatus,
@@ -253,7 +250,6 @@ function diffIndexes(
         },
         issues,
         nodes,
-        strict,
       );
     }
   }
@@ -266,7 +262,7 @@ function diffValidator(
   live: MongoSchemaCollection,
   expected: MongoSchemaCollection,
   strict: boolean,
-  collectionControl: ControlPolicy,
+  collectionControlPolicy: ControlPolicy,
   issues: SchemaIssue[],
 ): SchemaVerificationNode[] {
   if (!live.validator && !expected.validator) return [];
@@ -278,8 +274,8 @@ function diffValidator(
       message: `Validator missing on collection "${collName}"`,
     };
     const nodes: SchemaVerificationNode[] = [];
-    pushMongoControlledFinding(
-      collectionControl,
+    emitMongoIssueAndNodeUnderControlPolicy(
+      collectionControlPolicy,
       issue,
       {
         status: 'fail',
@@ -294,7 +290,6 @@ function diffValidator(
       },
       issues,
       nodes,
-      strict,
     );
     return nodes;
   }
@@ -307,8 +302,8 @@ function diffValidator(
     };
     const nodes: SchemaVerificationNode[] = [];
     const baseStatus = strict ? 'fail' : 'warn';
-    pushMongoControlledFinding(
-      collectionControl,
+    emitMongoIssueAndNodeUnderControlPolicy(
+      collectionControlPolicy,
       issue,
       {
         status: baseStatus,
@@ -323,7 +318,6 @@ function diffValidator(
       },
       issues,
       nodes,
-      strict,
     );
     return nodes;
   }
@@ -346,8 +340,8 @@ function diffValidator(
       message: `Validator mismatch on collection "${collName}"`,
     };
     const nodes: SchemaVerificationNode[] = [];
-    pushMongoControlledFinding(
-      collectionControl,
+    emitMongoIssueAndNodeUnderControlPolicy(
+      collectionControlPolicy,
       issue,
       {
         status: 'fail',
@@ -370,7 +364,6 @@ function diffValidator(
       },
       issues,
       nodes,
-      strict,
     );
     return nodes;
   }
@@ -395,7 +388,7 @@ function diffOptions(
   live: MongoSchemaCollection,
   expected: MongoSchemaCollection,
   strict: boolean,
-  collectionControl: ControlPolicy,
+  collectionControlPolicy: ControlPolicy,
   issues: SchemaIssue[],
 ): SchemaVerificationNode[] {
   if (!live.options && !expected.options) return [];
@@ -409,8 +402,8 @@ function diffOptions(
     };
     const nodes: SchemaVerificationNode[] = [];
     const baseStatus = strict ? 'fail' : 'warn';
-    pushMongoControlledFinding(
-      collectionControl,
+    emitMongoIssueAndNodeUnderControlPolicy(
+      collectionControlPolicy,
       issue,
       {
         status: baseStatus,
@@ -425,8 +418,6 @@ function diffOptions(
       },
       issues,
       nodes,
-      strict,
-      { legacyNonStrictWarn: true },
     );
     return nodes;
   }
@@ -455,8 +446,8 @@ function diffOptions(
     message: `Collection options mismatch on "${collName}"`,
   };
   const nodes: SchemaVerificationNode[] = [];
-  pushMongoControlledFinding(
-    collectionControl,
+  emitMongoIssueAndNodeUnderControlPolicy(
+    collectionControlPolicy,
     issue,
     {
       status: 'fail',
@@ -471,7 +462,6 @@ function diffOptions(
     },
     issues,
     nodes,
-    strict,
   );
   return nodes;
 }

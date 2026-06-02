@@ -1,4 +1,4 @@
-import { type ControlPolicy, effectiveControl } from '@prisma-next/contract/types';
+import { type ControlPolicy, effectiveControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   OperationContext,
@@ -37,12 +37,12 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
     schema,
     expectedIR,
   );
-  const collectionControl = resolveMongoCollectionControl(contract);
+  const collectionControlPolicy = resolveMongoCollectionControlPolicy(contract);
   const { root, issues, counts } = diffMongoSchemas(
     canonicalLive,
     canonicalExpected,
     strict,
-    collectionControl,
+    collectionControlPolicy,
   );
 
   const ok = counts.fail === 0;
@@ -67,12 +67,12 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
   };
 }
 
-function resolveMongoCollectionControl(
+function resolveMongoCollectionControlPolicy(
   contract: MongoContract,
 ): (collectionName: string) => ControlPolicy {
   const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
   const collections: Record<string, MongoCollection> = namespace?.collections ?? {};
   const defaultControl = contract.defaultControl;
   return (collectionName: string) =>
-    effectiveControl(collections[collectionName]?.control, defaultControl);
+    effectiveControlPolicy(collections[collectionName]?.control, defaultControl);
 }

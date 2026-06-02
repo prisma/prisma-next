@@ -11,10 +11,10 @@ import { diffMongoSchemas } from '../src/core/schema-diff';
 
 const emptyIR = new MongoSchemaIR([]);
 
-const managedCollectionControl = (): ControlPolicy => 'managed';
+const managedCollectionControlPolicy = (): ControlPolicy => 'managed';
 
 function diffMongoSchemasManaged(live: MongoSchemaIR, expected: MongoSchemaIR, strict: boolean) {
-  return diffMongoSchemas(live, expected, strict, managedCollectionControl);
+  return diffMongoSchemas(live, expected, strict, managedCollectionControlPolicy);
 }
 
 function ir(collections: Record<string, MongoSchemaCollection>): MongoSchemaIR {
