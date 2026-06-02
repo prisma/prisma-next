@@ -150,9 +150,7 @@ function renderSpaceTree(args: {
   readonly markerHash: string | undefined;
   readonly showDbMarker: boolean;
   readonly targetHash: string;
-  readonly originHash: string;
-  readonly appliedHashes: ReadonlySet<string>;
-  readonly showAppliedOverlay: boolean;
+  readonly edgeAnnotations: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly colorize: boolean;
   readonly glyphMode: 'unicode' | 'ascii';
 }): string {
@@ -160,13 +158,6 @@ function renderSpaceTree(args: {
   if (graph.nodes.size === 0) {
     return '';
   }
-  const annotations = deriveStatusEdgeAnnotations({
-    graph,
-    targetHash: args.targetHash,
-    originHash: args.originHash,
-    appliedMigrationHashes: args.appliedHashes,
-    showAppliedOverlay: args.showAppliedOverlay,
-  });
   const refsByHash = listRefsByContractHash(args.member);
   const rowModel = buildMigrationGraphRows(graph, { contractHash: args.contractHash });
   const layout = buildMigrationGraphLayout(rowModel);
@@ -174,7 +165,7 @@ function renderSpaceTree(args: {
     refsByHash,
     ...(args.showDbMarker && args.markerHash !== undefined ? { dbHash: args.markerHash } : {}),
     contractHash: args.contractHash,
-    edgeAnnotationsByHash: annotations,
+    edgeAnnotationsByHash: args.edgeAnnotations,
     colorize: args.colorize,
     glyphMode: args.glyphMode,
   });
@@ -245,11 +236,9 @@ async function readMarkersAndLedgers(args: {
   readonly ledgersBySpace: ReadonlyMap<string, readonly LedgerEntryRecord[]>;
 }> {
   const markersBySpace = new Map<string, ContractMarkerRecordLike>();
-  if (typeof args.client.readAllMarkers === 'function') {
-    const all = await args.client.readAllMarkers();
-    for (const [spaceId, marker] of all) {
-      markersBySpace.set(spaceId, marker);
-    }
+  const all = await args.client.readAllMarkers();
+  for (const [spaceId, marker] of all) {
+    markersBySpace.set(spaceId, marker);
   }
   const ledgersBySpace = new Map<string, readonly LedgerEntryRecord[]>();
   for (const spaceId of args.spaceIds) {
@@ -459,7 +448,7 @@ async function executeMigrationStatusCommand(
     }
     const graph = member.graph();
     const spaceContractHash = member.contract().storage.storageHash;
-    const targetHash = resolveTargetHashForSpace(member, contractHash, activeRefHash);
+    const targetHash = resolveTargetHashForSpace(member, spaceContractHash, activeRefHash);
     if (targetHash === undefined) {
       diagnostics.push({
         code: 'MIGRATION.DIVERGED',
@@ -509,25 +498,22 @@ async function executeMigrationStatusCommand(
     const ledger = ledgersBySpace.get(spaceEntry.spaceId) ?? [];
     const appliedHashes = showAppliedOverlay ? appliedHashesFromLedger(ledger) : new Set<string>();
 
-    const tree = renderSpaceTree({
-      member,
-      contractHash: spaceContractHash,
-      markerHash,
-      showDbMarker,
-      targetHash,
-      originHash,
-      appliedHashes,
-      showAppliedOverlay,
-      colorize,
-      glyphMode,
-    });
-
     const annotations = deriveStatusEdgeAnnotations({
       graph,
       targetHash,
       originHash,
       appliedMigrationHashes: appliedHashes,
       showAppliedOverlay,
+    });
+    const tree = renderSpaceTree({
+      member,
+      contractHash: spaceContractHash,
+      markerHash,
+      showDbMarker,
+      targetHash,
+      edgeAnnotations: annotations,
+      colorize,
+      glyphMode,
     });
     const migrations = buildStatusMigrations(spaceEntry.migrations, annotations);
     const pending = countPending(migrations);
