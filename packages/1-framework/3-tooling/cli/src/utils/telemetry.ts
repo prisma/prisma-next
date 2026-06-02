@@ -13,7 +13,12 @@ import {
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { version as CLI_VERSION } from '../../package.json' with { type: 'json' };
-import { type CommonCommandOptions, deriveCanPrompt, parseGlobalFlags } from './global-flags';
+import {
+  type CommonCommandOptions,
+  deriveCanPrompt,
+  type GlobalFlags,
+  parseGlobalFlags,
+} from './global-flags';
 import { isCI } from './is-ci';
 
 type TelemetryGate =
@@ -133,17 +138,19 @@ function firstRunNotice(configPath: string): string {
  * `init` consent prompt stays live and no unasked-for consent is recorded.
  *
  * Every step is wrapped so an un-writable config dir (or any other failure)
- * never throws and never blocks the command. On mint failure the id stays
- * undefined: the notice may reprint next run, and `runTelemetry` no-ops on
- * the missing id.
+ * never throws and never blocks the command. Returns the minted (or
+ * pre-existing) id so the caller can forward it to `runTelemetry` without a
+ * redundant disk read. On mint failure it returns `undefined`: the notice may
+ * reprint next run, and `runTelemetry` no-ops on the missing id.
  */
-function discloseAndMintOnFirstRun(): void {
+function discloseAndMintOnFirstRun(): string | undefined {
   try {
     process.stderr.write(`${firstRunNotice(userConfigPath())}\n`);
   } catch {}
   try {
-    ensureInstallationId();
+    return ensureInstallationId();
   } catch {}
+  return undefined;
 }
 
 /**
@@ -168,14 +175,29 @@ function discloseAndMintOnFirstRun(): void {
  * prompt's gate rather than relying on the mint/consent coupling.
  */
 function interactiveInitPromptWillFire(actionCommand: Command, userConfig: UserConfig): boolean {
-  if (commandPathFor(actionCommand).at(-1) !== 'init') {
+  // Only the top-level `prisma-next init` owns the consent prompt. A leaf
+  // check alone (`name === 'init'`) would also match a hypothetical nested
+  // subcommand such as `prisma-next migrations init`, so require the rooted
+  // path to be exactly `[program, 'init']`.
+  const commandPath = commandPathFor(actionCommand);
+  if (!(commandPath.length === 2 && commandPath.at(-1) === 'init')) {
     return false;
   }
   if (userConfig.enableTelemetry !== undefined) {
     return false;
   }
   const options = actionCommand.optsWithGlobals<CommonCommandOptions>();
-  const flags = parseGlobalFlags(options);
+  let flags: GlobalFlags;
+  try {
+    flags = parseGlobalFlags(options);
+  } catch {
+    // Malformed/conflicting global flags: `init`'s own
+    // `parseGlobalFlagsOrExit` emits the structured PN-CLI error envelope and
+    // exits. Defer to it — suppress the notice/mint rather than re-surface a
+    // parse failure on the telemetry path, which must stay best-effort and
+    // never own command-exit UX.
+    return true;
+  }
   if (flags.yes === true) {
     return false;
   }
@@ -195,8 +217,11 @@ export function fireTelemetryFromPreAction(actionCommand: Command): TelemetryRun
     if (interactiveInitPromptWillFire(actionCommand, gate.userConfig)) {
       return { spawned: false, reason: 'gated-off' };
     }
-    discloseAndMintOnFirstRun();
-    return fireTelemetry(actionCommand, readUserConfig());
+    const installationId = discloseAndMintOnFirstRun();
+    return fireTelemetry(
+      actionCommand,
+      installationId === undefined ? gate.userConfig : { ...gate.userConfig, installationId },
+    );
   }
   return fireTelemetry(actionCommand, gate.userConfig);
 }

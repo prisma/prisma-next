@@ -295,5 +295,52 @@ describe('CLI telemetry bridge', () => {
       );
       expect(readUserConfig().installationId).not.toBeUndefined();
     });
+
+    it('on a nested `… init` subcommand, treats it as a normal command (fires, not deferred)', () => {
+      setStdinTTY(true);
+      const program = new Command('prisma-next');
+      const migrations = new Command('migrations');
+      const nestedInit = new Command('init')
+        .option('--yes')
+        .option('--interactive')
+        .option('--no-interactive')
+        .action(() => {});
+      migrations.addCommand(nestedInit);
+      program.addCommand(migrations);
+      program.parse(['node', 'prisma-next', 'migrations', 'init']);
+
+      const outcome = fireTelemetryFromPreAction(nestedInit);
+
+      expect(outcome).toEqual({ spawned: true });
+      expect(runTelemetryMock).toHaveBeenCalledTimes(1);
+      expect(stderrText()).toContain(
+        'Prisma Next collects anonymous CLI usage data, enabled by default',
+      );
+      expect(readUserConfig().installationId).not.toBeUndefined();
+    });
+
+    it('on interactive init with conflicting global flags, suppresses without throwing (defers to the init error path)', () => {
+      setStdinTTY(true);
+      const program = new Command('prisma-next');
+      const init = new Command('init')
+        .option('--yes')
+        .option('--interactive')
+        .option('--no-interactive')
+        .option('--format <format>')
+        .option('--json')
+        .action(() => {});
+      program.addCommand(init);
+      program.parse(['node', 'prisma-next', 'init', '--format', 'pretty', '--json']);
+
+      let outcome: ReturnType<typeof fireTelemetryFromPreAction> | undefined;
+      expect(() => {
+        outcome = fireTelemetryFromPreAction(init);
+      }).not.toThrow();
+
+      expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
+      expect(runTelemetryMock).not.toHaveBeenCalled();
+      expect(stderrText()).toBe('');
+      expect(readUserConfig().installationId).toBeUndefined();
+    });
   });
 });
