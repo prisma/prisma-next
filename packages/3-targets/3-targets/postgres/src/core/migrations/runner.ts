@@ -166,7 +166,12 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
     if (!isSelfEdgeNoOp) {
       await this.upsertMarker(driver, options, existingMarker, space);
-      await this.recordLedgerEntry(driver, options, existingMarker, applyValue.executedOperations);
+      await this.recordLedgerEntries(
+        driver,
+        options,
+        existingMarker,
+        applyValue.executedOperations,
+      );
     }
 
     return runnerSuccess({
@@ -612,25 +617,55 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     await this.executeStatement(driver, statement);
   }
 
-  private async recordLedgerEntry(
+  private async recordLedgerEntries(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
     executedOperations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[],
   ): Promise<void> {
-    const ledgerStatement = buildLedgerInsertStatement({
-      originStorageHash: existingMarker?.storageHash ?? null,
-      originProfileHash: existingMarker?.profileHash ?? null,
-      destinationStorageHash: options.plan.destination.storageHash,
-      destinationProfileHash:
-        options.plan.destination.profileHash ??
-        options.destinationContract.profileHash ??
-        options.plan.destination.storageHash,
-      contractJsonBefore: existingMarker?.contractJson ?? null,
-      contractJsonAfter: options.destinationContract,
-      operations: executedOperations,
-    });
-    await this.executeStatement(driver, ledgerStatement);
+    const plan = options.plan;
+    const space = plan.spaceId;
+    const destinationProfileHash =
+      plan.destination.profileHash ??
+      options.destinationContract.profileHash ??
+      plan.destination.storageHash;
+    const edges = options.migrationEdges;
+    const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
+    if (totalEdgeOps !== plan.operations.length) {
+      throw new Error(
+        `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
+      );
+    }
+    // The ledger records the operations as executed — idempotency-skipped ops
+    // are substituted with skip records (empty `execute`) by `applyPlan`, so the
+    // journal reflects what actually ran rather than the raw plan.
+    let offset = 0;
+    const lastIndex = edges.length - 1;
+    for (const [i, edge] of edges.entries()) {
+      const edgeOps = executedOperations.slice(offset, offset + edge.operationCount);
+      offset += edge.operationCount;
+      const isFirst = i === 0;
+      const isLast = i === lastIndex;
+      await this.executeStatement(
+        driver,
+        buildLedgerInsertStatement({
+          space,
+          migrationName: edge.dirName,
+          migrationHash: edge.migrationHash,
+          originStorageHash: edge.from === '' ? null : edge.from,
+          originProfileHash:
+            isFirst && existingMarker?.storageHash === edge.from
+              ? (existingMarker.profileHash ?? null)
+              : null,
+          destinationStorageHash: edge.to,
+          destinationProfileHash:
+            isLast && edge.to === plan.destination.storageHash ? destinationProfileHash : null,
+          contractJsonBefore: isFirst ? (existingMarker?.contractJson ?? null) : null,
+          contractJsonAfter: isLast ? options.destinationContract : null,
+          operations: edgeOps,
+        }),
+      );
+    }
   }
 
   private async acquireLock(

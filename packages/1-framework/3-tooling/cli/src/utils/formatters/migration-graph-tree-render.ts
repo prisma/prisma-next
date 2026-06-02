@@ -1,7 +1,8 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { bold } from 'colorette';
+import { bold, createColors } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
+import { laneColorForColumn } from './migration-graph-lane-colors';
 import type {
   MigrationGraphGridModel,
   MigrationGraphGridRow,
@@ -117,55 +118,275 @@ function arrowForEdgeKind(
 }
 
 /**
- * A node-marker glyph pair (`○◂`, `○─`, `*<`, `*-`) is the contract node
- * marker (`○` / `*`) followed by an arc connector (`◂` / `─` / `<` / `-`).
- * The marker is the signal and stays bright (`style.kind`); the connector is
- * gutter and stays dim (`style.lane`) — consistent with the plain node marker,
- * which is never dimmed.
+ * The leftmost lane (column 0) renders with the neutral dim lane style rather
+ * than a palette hue — in the common single-lane case it has nothing to be told
+ * apart from. Used as the "no owning arc" sentinel during colour resolution.
  */
-function renderNodeMarkerPair(pair: string, style: MigrationListStyler): string {
-  return style.kind(pair.slice(0, 1)) + style.lane(pair.slice(1));
+const NEUTRAL_LANE = 0;
+
+/**
+ * Forced bold for branch-coloured names. A branched name pairs its lane hue
+ * (also forced, via {@link laneColorForColumn}) with bold; both must emit even
+ * when colorette's ambient TTY detection is off, so the colorized branch name
+ * is deterministically bold + hue rather than hue-only.
+ */
+const { bold: forcedBold } = createColors({ useColor: true });
+
+/**
+ * The colour-source column for each cell of a row, resolved together because a
+ * routed back-arc spans columns and must read as **one hue** rather than a
+ * per-column "rainbow". An arc's horizontal bridges, corners, and node-pair
+ * connector all take the arc's owning back-lane column (the corner that closes
+ * the arc), not the column they pass through.
+ */
+interface RowLaneColors {
+  /** Colour column for a cell's structural glyph (lane / spine / arc body). */
+  readonly lane: readonly number[];
+  /** Colour column for a node arc-pair's connector half (`◂` / `─`). */
+  readonly connector: readonly number[];
+}
+
+/**
+ * Resolve per-cell colour columns for a row. Scanning right-to-left lets each
+ * arc bridge inherit the corner column that closes it (the arc's back-lane), so
+ * the whole arc — vertical run (already its own column), horizontal bridges,
+ * corners, crossings, and the `◂`/`─` connector — reads as a single continuous
+ * hue. A crossing can only be one colour, so rather than leave it dim (wrong for
+ * both crossing lines) it takes the arc owning the horizontal run at this row
+ * (the nearest corner to its right); the crossed vertical lane is simply
+ * occluded at that one cell and reappears on the next row.
+ */
+function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
+  const lane = new Array<number>(cells.length);
+  const connector = new Array<number>(cells.length);
+  let arcCorner = NEUTRAL_LANE;
+  for (let column = cells.length - 1; column >= 0; column--) {
+    const cell = cells[column];
+    connector[column] = arcCorner;
+    switch (cell?.kind) {
+      case 'arc-branch-corner':
+      case 'arc-land-corner':
+        arcCorner = column;
+        lane[column] = column;
+        break;
+      case 'arc-branch-tee':
+        // An inner co-sourced arc's own back-lane junction: its vertical run
+        // continues below in this column, so it keeps its own column hue.
+        lane[column] = column;
+        break;
+      case 'arc-crossing':
+      case 'arc-land-bridge':
+        lane[column] = arcCorner;
+        break;
+      case 'horizontal-pass':
+        lane[column] = arcCorner === NEUTRAL_LANE ? column : arcCorner;
+        break;
+      case 'node':
+        lane[column] = column;
+        arcCorner = NEUTRAL_LANE;
+        break;
+      default:
+        lane[column] = column;
+        arcCorner = NEUTRAL_LANE;
+    }
+  }
+  return { lane, connector };
+}
+
+/**
+ * Per-cell colour for a forward branch/merge connector row, split into the
+ * cell's junction `glyph` and its trailing `dash`. A connector's horizontal run
+ * is one logical line (a fork into new lanes, or a merge into a surviving lane)
+ * and reads best as the colour of the lane each segment serves — not dim-gray
+ * or a per-pass-through-column "rainbow".
+ */
+interface ConnectorLaneColors {
+  /** Colour column for a cell's junction glyph (`├` / `┬` / `┴` / `╮` / `╯`). */
+  readonly glyph: readonly number[];
+  /** Colour column for a tee's trailing `─` — the branch it leads into. */
+  readonly dash: readonly number[];
+}
+
+/**
+ * Resolve per-cell connector colours. Scanning right-to-left, a corner or an
+ * intermediate tee anchors its own lane (its junction glyph takes that column),
+ * but a tee's **trailing dash leads into the branch on its right** (the next
+ * branch point), so `┬─` reads as "this lane, then on toward the next" rather
+ * than tinting the dash with the left lane. The leading tee at `startLane` (the
+ * fork/merge origin) and pure horizontal segments inherit the nearest branch
+ * point to their right whole-cell, so the run into a branch — or collapsing
+ * into a merge corner — stays continuous. Pass-through verticals outside the
+ * run keep their own column (column 0 stays neutral).
+ */
+function resolveConnectorLaneColors(
+  cells: readonly StructuralCell[],
+  startLane: number,
+): ConnectorLaneColors {
+  const glyph = new Array<number>(cells.length);
+  const dash = new Array<number>(cells.length);
+  let owner = NEUTRAL_LANE;
+  for (let column = cells.length - 1; column >= 0; column--) {
+    const cell = cells[column];
+    switch (cell?.kind) {
+      case 'branch-corner':
+      case 'merge-corner':
+        owner = column;
+        glyph[column] = column;
+        dash[column] = column;
+        break;
+      case 'branch-tee':
+      case 'merge-tee':
+        if (column === startLane) {
+          const served = owner === NEUTRAL_LANE ? column : owner;
+          glyph[column] = column;
+          dash[column] = served;
+        } else {
+          dash[column] = owner === NEUTRAL_LANE ? column : owner;
+          glyph[column] = column;
+          owner = column;
+        }
+        break;
+      case 'arc-crossing':
+        glyph[column] = column;
+        dash[column] = column;
+        break;
+      case 'horizontal-pass': {
+        const served = owner === NEUTRAL_LANE ? column : owner;
+        glyph[column] = served;
+        dash[column] = served;
+        break;
+      }
+      default:
+        glyph[column] = column;
+        dash[column] = column;
+    }
+  }
+  return { glyph, dash };
+}
+
+/**
+ * Style a structural glyph by its resolved colour column. Column 0 and the
+ * neutral sentinel render dim (`style.lane`); columns ≥ 1 take a palette hue.
+ */
+function laneStylerForColumn(
+  colorColumn: number,
+  colorize: boolean,
+  style: MigrationListStyler,
+): (text: string) => string {
+  if (!colorize || colorColumn <= NEUTRAL_LANE) {
+    return (text) => style.lane(text);
+  }
+  return laneColorForColumn(colorColumn);
+}
+
+/**
+ * Tint a branch-owned token (direction arrow, migration name) by its edge's
+ * lane so the whole branch row reads in one colour. Column 0 has nothing to be
+ * told apart from in the common linear chain, so it keeps the token's existing
+ * default styling (`fallback`) rather than a palette hue; only lanes ≥ 1 take a
+ * colour. With colour off, the fallback (also colourless) is used unchanged.
+ */
+function branchStylerOrDefault(
+  column: number,
+  colorize: boolean,
+  fallback: (text: string) => string,
+): (text: string) => string {
+  if (!colorize || column <= NEUTRAL_LANE) {
+    return fallback;
+  }
+  return laneColorForColumn(column);
+}
+
+/**
+ * Render a connector tee (`├─` / `┬─` / `┴─`) with its junction glyph and its
+ * trailing dash coloured independently: the junction anchors its own lane while
+ * the dash leads into the branch on its right.
+ */
+function renderConnectorTee(
+  pair: string,
+  glyphColumn: number,
+  dashColumn: number,
+  colorize: boolean,
+  style: MigrationListStyler,
+): string {
+  const glyph = laneStylerForColumn(glyphColumn, colorize, style);
+  if (glyphColumn === dashColumn) {
+    return glyph(pair);
+  }
+  return glyph(pair.slice(0, 1)) + laneStylerForColumn(dashColumn, colorize, style)(pair.slice(1));
+}
+
+/**
+ * A node-marker glyph pair (`○◂`, `○─`, `*<`, `*-`) is the contract node
+ * marker (`○` / `*`) followed by an arc connector (`◂` / `─` / `<` / `-`). The
+ * marker takes its own lane's hue (so each node visibly belongs to its branch);
+ * the connector follows the arc it belongs to (its owning back-lane hue).
+ * Direction arrows are handled elsewhere — they take their edge's lane hue too.
+ */
+function renderNodeMarkerPair(
+  pair: string,
+  nodeColumn: number,
+  arcColumn: number,
+  colorize: boolean,
+  style: MigrationListStyler,
+): string {
+  const marker = laneStylerForColumn(nodeColumn, colorize, style);
+  const connector = laneStylerForColumn(arcColumn, colorize, style);
+  return marker(pair.slice(0, 1)) + connector(pair.slice(1));
 }
 
 function renderCellPair(
   cell: StructuralCell,
+  column: number,
+  colors: RowLaneColors,
+  colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
 ): string {
+  const laneColumn = colors.lane[column] ?? column;
+  const lane = laneStylerForColumn(laneColumn, colorize, style);
   switch (cell.kind) {
-    case 'node':
-      if (cell.arcLand === true) return renderNodeMarkerPair(palette.arcLand, style);
-      if (cell.arcTee === true) return renderNodeMarkerPair(palette.arcTee, style);
-      return style.kind(palette.node);
+    case 'node': {
+      const arcColumn = colors.connector[column] ?? NEUTRAL_LANE;
+      if (cell.arcLand === true) {
+        return renderNodeMarkerPair(palette.arcLand, column, arcColumn, colorize, style);
+      }
+      if (cell.arcTee === true) {
+        return renderNodeMarkerPair(palette.arcTee, column, arcColumn, colorize, style);
+      }
+      return lane(palette.node);
+    }
     case 'vertical-pass':
-      return style.lane(palette.verticalPass);
+      return lane(palette.verticalPass);
     case 'edge-lane':
-      // The lane stays dim; the direction arrow (↑ / ↓ / ⟲) is the signal and
-      // stays bright, like the contract-node marker.
       return cell.ownsLabel
-        ? style.lane(palette.verticalPass.trimEnd()) +
-            style.kind(arrowForEdgeKind(cell.edgeKind, palette))
-        : style.lane(palette.verticalPass);
+        ? lane(palette.verticalPass.trimEnd()) +
+            branchStylerOrDefault(
+              column,
+              colorize,
+              style.kind,
+            )(arrowForEdgeKind(cell.edgeKind, palette))
+        : lane(palette.verticalPass);
     case 'branch-tee':
-      return style.lane(palette.branchTee);
+      return lane(palette.branchTee);
     case 'merge-tee':
-      return style.lane(palette.mergeTee);
+      return lane(palette.mergeTee);
     case 'branch-corner':
-      return style.lane(palette.branchCorner);
+      return lane(palette.branchCorner);
     case 'merge-corner':
-      return style.lane(palette.mergeCorner);
+      return lane(palette.mergeCorner);
     case 'arc-branch-corner':
-      return style.lane(palette.arcBranchCorner);
+      return lane(palette.arcBranchCorner);
     case 'arc-branch-tee':
-      return style.lane(palette.arcBranchTee);
+      return lane(palette.arcBranchTee);
     case 'arc-land-corner':
-      return style.lane(palette.arcLandCorner);
+      return lane(palette.arcLandCorner);
     case 'arc-crossing':
-      return style.lane(palette.arcCrossing);
+      return lane(palette.arcLandBridge);
     case 'arc-land-bridge':
-      return style.lane(palette.arcLandBridge);
+      return lane(palette.arcLandBridge);
     case 'horizontal-pass':
-      return style.lane(palette.horizontalPass);
+      return lane(palette.horizontalPass);
     case 'empty':
       return '  ';
   }
@@ -174,34 +395,56 @@ function renderCellPair(
 function renderConnectorRow(
   row: MigrationGraphGridRow,
   gridWidth: number,
+  colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
 ): string {
   const isMerge = row.kind === 'merge-connector';
   if (row.cells.length > 0) {
+    const colors = resolveConnectorLaneColors(row.cells, row.startLane ?? 0);
     let seenTee = false;
     let out = '';
-    for (const cell of row.cells) {
+    for (let column = 0; column < row.cells.length; column++) {
+      const cell = row.cells[column];
+      if (cell === undefined) continue;
+      const glyphColumn = colors.glyph[column] ?? column;
+      const dashColumn = colors.dash[column] ?? glyphColumn;
+      const lane = laneStylerForColumn(glyphColumn, colorize, style);
       switch (cell.kind) {
         case 'branch-tee':
-          out += style.lane(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
+          out += renderConnectorTee(
+            seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee,
+            glyphColumn,
+            dashColumn,
+            colorize,
+            style,
+          );
           seenTee = true;
           break;
         case 'merge-tee':
-          out += style.lane(seenTee ? palette.connectorMergeTeeCo : palette.connectorBranchTee);
+          out += renderConnectorTee(
+            seenTee ? palette.connectorMergeTeeCo : palette.connectorBranchTee,
+            glyphColumn,
+            dashColumn,
+            colorize,
+            style,
+          );
           seenTee = true;
           break;
         case 'branch-corner':
-          out += style.lane(palette.branchCorner);
+          out += lane(palette.branchCorner);
           break;
         case 'merge-corner':
-          out += style.lane(palette.mergeCorner);
+          out += lane(palette.mergeCorner);
           break;
         case 'vertical-pass':
-          out += style.lane(palette.verticalPass);
+          out += lane(palette.verticalPass);
           break;
         case 'horizontal-pass':
-          out += style.lane(palette.horizontalPass);
+          out += lane(palette.horizontalPass);
+          break;
+        case 'arc-crossing':
+          out += renderConnectorTee(palette.arcCrossing, glyphColumn, dashColumn, colorize, style);
           break;
         default:
           out += '  ';
@@ -218,13 +461,15 @@ function renderConnectorRow(
 
   const start = row.startLane ?? 0;
   const end = row.endLane ?? start;
+  // The whole fork/merge run reads as one line in the served lane's hue (the
+  // corner it reaches); pass-through columns outside the run keep their own.
+  const runLane = laneStylerForColumn(end, colorize, style);
   let out = '';
   for (let column = 0; column < gridWidth; column++) {
     if (column < start || column > end) out += '  ';
-    else if (column === start) out += style.lane(palette.connectorBranchTee);
-    else if (column === end)
-      out += style.lane(isMerge ? palette.mergeCorner : palette.branchCorner);
-    else out += style.lane(isMerge ? palette.connectorMergeTeeCo : palette.connectorBranchTeeCo);
+    else if (column === start) out += runLane(palette.connectorBranchTee);
+    else if (column === end) out += runLane(isMerge ? palette.mergeCorner : palette.branchCorner);
+    else out += runLane(isMerge ? palette.connectorMergeTeeCo : palette.connectorBranchTeeCo);
   }
   return out;
 }
@@ -295,6 +540,13 @@ function formatEdgeHashColumn(
 function padVisible(text: string, targetWidth: number): string {
   const padding = Math.max(0, targetWidth - stringWidth(text));
   return text + ' '.repeat(padding);
+}
+
+const ANSI_ESCAPE = '\x1b';
+
+function trimTrailingWhitespace(line: string): string {
+  const trailingSpaceBeforeReset = new RegExp(`[\\t ]+((?:${ANSI_ESCAPE}\\[[0-9;]*m)+)$`);
+  return line.replace(trailingSpaceBeforeReset, '$1').replace(/\s+$/, '');
 }
 
 function gridWidthForModel(rows: readonly MigrationGraphGridRow[]): number {
@@ -373,19 +625,32 @@ export function renderMigrationGraphTree(
     }
 
     if (row.kind === 'branch-connector' || row.kind === 'merge-connector') {
-      lines.push(renderConnectorRow(row, gridWidth, style, palette).replace(/\s+$/, ''));
+      lines.push(
+        trimTrailingWhitespace(renderConnectorRow(row, gridWidth, opts.colorize, style, palette)),
+      );
       continue;
     }
 
-    let gutter = row.cells.map((cell) => renderCellPair(cell, style, palette)).join('');
-    const prevRow = model.rows[rowIndex - 1];
+    const cellColors = resolveRowLaneColors(row.cells);
+    let gutter = row.cells
+      .map((cell, column) =>
+        renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+      )
+      .join('');
     let laneSpan = row.cells.length;
     if (row.kind === 'node') {
       const contractHash = row.contractHash ?? EMPTY_CONTRACT_HASH;
-      if (prevRow?.kind === 'merge-connector' || contractHash === EMPTY_CONTRACT_HASH) {
+      if (contractHash === EMPTY_CONTRACT_HASH) {
         laneSpan = 1;
       } else {
-        laneSpan = row.cells.length;
+        let lastActiveColumn = -1;
+        for (let column = row.cells.length - 1; column >= 0; column--) {
+          if (row.cells[column]?.kind !== 'empty') {
+            lastActiveColumn = column;
+            break;
+          }
+        }
+        laneSpan = lastActiveColumn >= 0 ? lastActiveColumn + 1 : 1;
       }
     }
     const labelColumn =
@@ -402,12 +667,16 @@ export function renderMigrationGraphTree(
     ) {
       gutter = row.cells
         .slice(0, 1)
-        .map((cell) => renderCellPair(cell, style, palette))
+        .map((cell, column) =>
+          renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+        )
         .join('');
     } else if (row.kind === 'node' && laneSpan < row.cells.length && !nodeHasArcDecoration(row)) {
       gutter = row.cells
         .slice(0, laneSpan)
-        .map((cell) => renderCellPair(cell, style, palette))
+        .map((cell, column) =>
+          renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+        )
         .join('');
     } else if (gutter.length < laneSpan * 2) {
       gutter = gutter.padEnd(laneSpan * 2, ' ');
@@ -421,16 +690,18 @@ export function renderMigrationGraphTree(
       if (contractHash === EMPTY_CONTRACT_HASH) {
         const trailingLanes = row.cells
           .slice(1)
-          .map((cell) => renderCellPair(cell, style, palette))
+          .map((cell, offset) =>
+            renderCellPair(cell, offset + 1, cellColors, opts.colorize, style, palette),
+          )
           .join('');
         const emptyGutter = palette.emptySource.padEnd(2, ' ') + trailingLanes;
         const overlayNames = overlayNamesForContract(contractHash, opts);
         if (overlayNames.length === 0) {
-          lines.push(emptyGutter.replace(/\s+$/, ''));
+          lines.push(trimTrailingWhitespace(emptyGutter));
           continue;
         }
         const overlay = style.refs(overlayNames);
-        lines.push(`${padVisible(emptyGutter, dataColumn)}${overlay}`.replace(/\s+$/, ''));
+        lines.push(trimTrailingWhitespace(`${padVisible(emptyGutter, dataColumn)}${overlay}`));
         continue;
       }
       const hashText = style.sourceHash(
@@ -442,7 +713,7 @@ export function renderMigrationGraphTree(
           ? ' '.repeat(Math.max(0, dataColumn - labelColumn - stringWidth(hashText)))
           : '';
       const overlay = overlayNames.length > 0 ? style.refs(overlayNames) : '';
-      lines.push(`${gutterPad}${hashText}${overlayPad}${overlay}`.replace(/\s+$/, ''));
+      lines.push(trimTrailingWhitespace(`${gutterPad}${hashText}${overlayPad}${overlay}`));
       continue;
     }
 
@@ -450,10 +721,48 @@ export function renderMigrationGraphTree(
     if (edge === undefined) continue;
 
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
-    const dirName = `${style.dirName(edge.dirName)}${dirNamePadding}`;
+    const laneIndex = row.laneIndex ?? 0;
+    // A branched name keeps its bold (via `style.dirName`) and adds the lane
+    // hue, so it reads as one with its lane/arrow; column-0 names stay bold-only.
+    const dirNameStyler =
+      opts.colorize && laneIndex > NEUTRAL_LANE
+        ? (text: string) => forcedBold(laneColorForColumn(laneIndex)(text))
+        : style.dirName;
+    const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
-    lines.push(`${gutterPad}${dirName}${hashColumn}`.replace(/\s+$/, ''));
+    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}`));
   }
 
   return lines.join('\n');
+}
+
+export interface RenderMigrationGraphLegendOptions {
+  readonly colorize: boolean;
+  readonly glyphMode?: GlyphMode;
+}
+
+/**
+ * A compact key for the `--tree` visual language: the contract marker, the
+ * in-lane direction arrows, the empty baseline, the `(refs)` overlay (including
+ * the reserved `db` live-database and `contract` working-schema markers), and a
+ * worked sample of the data-column `from → to` migration hash arrow.
+ *
+ * Honors the same glyph palette (unicode vs ASCII) and `colorize` gate as the
+ * tree renderer, so the key matches whatever the graph itself drew and stays
+ * pipe-safe (zero ANSI when color is off). The caller adds the trailing blank
+ * line that separates this stderr key from the graph on stdout.
+ */
+export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptions): string {
+  const palette = paletteFor(opts.glyphMode ?? 'unicode');
+  const style = createAnsiMigrationListStyler({ useColor: opts.colorize });
+  const node = palette.node.trimEnd();
+  const sampleArrow = `${style.sourceHash('aaaaaa')} ${style.glyph(palette.forwardArrow)} ${style.destHash('bbbbbb')}`;
+  return [
+    'Legend:',
+    `  ${style.kind(node)} contract   ${style.kind(palette.edgeArrow.forward)} forward   ${style.kind(palette.edgeArrow.rollback)} rollback`,
+    `  ${style.kind(palette.edgeArrow.self)} migration without schema change`,
+    `  ${style.glyph(palette.emptySource)} empty database (baseline)`,
+    `  ${style.refs(['refs'])} ${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`,
+    `  ${sampleArrow}   migration from contract aaaaaa to bbbbbb`,
+  ].join('\n');
 }

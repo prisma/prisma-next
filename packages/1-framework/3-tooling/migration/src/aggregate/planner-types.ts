@@ -119,10 +119,10 @@ export interface PerSpacePlan {
   readonly destinationContract: Contract;
   readonly strategy: 'graph-walk' | 'synth';
   /**
-   * Per-edge breakdown of the chain. Populated by the graph-walk
-   * strategy; absent for synth-produced plans.
+   * Per-edge breakdown of the chain. Graph-walk plans carry one entry per
+   * authored edge; synth and at-head plans carry a single synthesised edge.
    */
-  readonly migrationEdges?: readonly AggregateMigrationEdgeRef[];
+  readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
   /**
    * Path decision data the strategy used to select the chain
    * (alternative count, tie-break reasons, required/satisfied

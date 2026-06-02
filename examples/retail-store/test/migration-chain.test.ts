@@ -138,6 +138,15 @@ describe('full retail-store migration chain (m1 → m2 → m3)', {
         policy: ALL_POLICY,
         frameworkComponents: [],
         strictVerification: true,
+        migrationEdges: [
+          {
+            migrationHash: m1.endContract.storage.storageHash,
+            dirName: MIG1_DIR,
+            from: '',
+            to: m1.endContract.storage.storageHash,
+            operationCount: m1.ops.length,
+          },
+        ],
       });
       expect(r1.ok, `m1 failed: ${JSON.stringify(r1)}`).toBe(true);
 
@@ -153,6 +162,15 @@ describe('full retail-store migration chain (m1 → m2 → m3)', {
         policy: ALL_POLICY,
         frameworkComponents: [],
         strictVerification: true,
+        migrationEdges: [
+          {
+            migrationHash: m2.endContract.storage.storageHash,
+            dirName: MIG2_DIR,
+            from: m1.endContract.storage.storageHash,
+            to: m2.endContract.storage.storageHash,
+            operationCount: m2.ops.length,
+          },
+        ],
       });
       expect(r2.ok, `m2 failed: ${JSON.stringify(r2)}`).toBe(true);
 
@@ -197,6 +215,15 @@ describe('full retail-store migration chain (m1 → m2 → m3)', {
         policy: ALL_POLICY,
         frameworkComponents: [],
         strictVerification: true,
+        migrationEdges: [
+          {
+            migrationHash: m3.endContract.storage.storageHash,
+            dirName: MIG3_DIR,
+            from: m2.endContract.storage.storageHash,
+            to: m3.endContract.storage.storageHash,
+            operationCount: m3.ops.length,
+          },
+        ],
       });
       expect(r3.ok, `m3 failed: ${JSON.stringify(r3)}`).toBe(true);
 

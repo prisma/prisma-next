@@ -865,6 +865,15 @@ export class OrderByItem extends AstNode {
   rewrite(rewriter: ExpressionRewriter): OrderByItem {
     return new OrderByItem(this.expr.rewrite(rewriter), this.dir);
   }
+
+  /**
+   * A new frozen item with the sort direction flipped and `expr` unchanged.
+   * Integrations that own pagination (e.g. backward cursor pagination) use
+   * this to reverse a user's sort order without reaching into the AST.
+   */
+  reverse(): OrderByItem {
+    return new OrderByItem(this.expr, this.dir === 'asc' ? 'desc' : 'asc');
+  }
 }
 
 export class JsonArrayAggExpr extends Expression {

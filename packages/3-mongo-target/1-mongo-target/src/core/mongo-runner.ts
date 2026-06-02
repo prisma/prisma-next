@@ -13,6 +13,7 @@ import {
   type MigrationRunnerPerSpaceSuccessValue,
   type OperationContext,
 } from '@prisma-next/framework-components/control';
+import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
@@ -55,6 +56,8 @@ export interface MongoMigrationRunnerExecuteOptions {
    * leave it unset and verify against the whole introspected schema.
    */
   readonly projectSchema?: (schema: MongoSchemaIR) => MongoSchemaIR;
+  /** Per-edge breakdown from graph-walk planning; drives per-edge ledger writes. */
+  readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
 }
 
 export type MongoMigrationRunnerResult = Result<
@@ -116,7 +119,9 @@ export class MongoMigrationRunner {
             runPostchecks,
           );
           if (result.failure) return result.failure;
-          if (result.executed) operationsExecuted += 1;
+          if (result.executed) {
+            operationsExecuted += 1;
+          }
           continue;
         }
 
@@ -249,15 +254,38 @@ export class MongoMigrationRunner {
         });
       }
 
-      const originHash = existingMarker?.storageHash ?? '';
-      await markerOps.writeLedgerEntry(space, {
-        edgeId: `${originHash}->${destination.storageHash}`,
-        from: originHash,
-        to: destination.storageHash,
-      });
+      await this.recordLedgerEntries(markerOps, space, options);
     }
 
     return ok({ operationsPlanned: operations.length, operationsExecuted });
+  }
+
+  private async recordLedgerEntries(
+    markerOps: MarkerOperations,
+    space: string,
+    options: MongoMigrationRunnerExecuteOptions,
+  ): Promise<void> {
+    const plan = options.plan;
+    const edges = options.migrationEdges;
+    const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
+    if (totalEdgeOps !== plan.operations.length) {
+      throw new Error(
+        `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
+      );
+    }
+    let offset = 0;
+    for (const edge of edges) {
+      const edgeOps = plan.operations.slice(offset, offset + edge.operationCount);
+      offset += edge.operationCount;
+      await markerOps.writeLedgerEntry(space, {
+        edgeId: `${edge.from}->${edge.to}`,
+        from: edge.from,
+        to: edge.to,
+        migrationName: edge.dirName,
+        migrationHash: edge.migrationHash,
+        operations: edgeOps,
+      });
+    }
   }
 
   private async executeDataTransform(

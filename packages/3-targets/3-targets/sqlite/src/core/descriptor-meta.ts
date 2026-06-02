@@ -1,14 +1,10 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { CodecTypes } from '../exports/codec-types';
 import { sqliteAuthoringFieldPresets } from './authoring';
+import { sqliteTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
 
 const sqliteTargetDescriptorMetaBase = {
-  kind: 'target',
-  familyId: 'sql',
-  targetId: 'sqlite',
-  id: 'sqlite',
-  version: '0.0.1',
-  capabilities: {},
+  ...sqliteTargetDescriptorMetaRuntime,
   defaultNamespaceId: UNBOUND_NAMESPACE_ID,
   authoring: {
     field: sqliteAuthoringFieldPresets,

@@ -17,6 +17,7 @@ import {
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
+  synthEdges,
   testTimeout,
 } from './fixtures/runner-fixtures';
 
@@ -89,6 +90,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         {
           space: result.plan.spaceId ?? APP_SPACE_ID,
           plan: result.plan,
+          migrationEdges: synthEdges(result.plan),
           driver: d,
           destinationContract: contractInput,
           policy: INIT_ADDITIVE_POLICY,

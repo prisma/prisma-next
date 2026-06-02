@@ -4,14 +4,10 @@ import {
   postgresAuthoringFieldPresets,
   postgresAuthoringTypes,
 } from './authoring';
+import { postgresTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
 
 const postgresTargetDescriptorMetaBase = {
-  kind: 'target',
-  familyId: 'sql',
-  targetId: 'postgres',
-  id: 'postgres',
-  version: '0.0.1',
-  capabilities: {},
+  ...postgresTargetDescriptorMetaRuntime,
   defaultNamespaceId: 'public',
   authoring: {
     type: postgresAuthoringTypes,

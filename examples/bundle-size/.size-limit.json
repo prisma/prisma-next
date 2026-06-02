@@ -18,5 +18,15 @@
     "name": "mongo / emit",
     "path": "dist/mongo-emit.bundle.min.mjs",
     "gzip": true
+  },
+  {
+    "name": "cf-worker / no-emit",
+    "path": "dist/cf-worker-no-emit.worker.min.mjs",
+    "gzip": true
+  },
+  {
+    "name": "cf-worker / emit",
+    "path": "dist/cf-worker-emit.worker.min.mjs",
+    "gzip": true
   }
 ]

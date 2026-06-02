@@ -7,12 +7,15 @@ import type {
   MigrationPlannerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import type { ContractMarkerRecordLike } from '../marker-types';
 import type { PerSpacePlan } from '../planner-types';
 import { projectSchemaToSpace } from '../project-schema-to-space';
+import { buildSynthMigrationEdge } from '../synth-migration-edge';
 import type { ContractSpaceMember } from '../types';
 
 export interface SynthStrategyInputs<TFamilyId extends string, TTargetId extends string> {
   readonly aggregateTargetId: string;
+  readonly currentMarker: ContractMarkerRecordLike | null;
   readonly member: ContractSpaceMember;
   readonly otherMembers: ReadonlyArray<ContractSpaceMember>;
   readonly schemaIntrospection: unknown;
@@ -109,6 +112,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     },
   });
 
+  const destinationStorageHash = synthedPlan.destination.storageHash;
   return {
     kind: 'ok',
     result: {
@@ -116,6 +120,13 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
       displayOps: synthedPlan.operations,
       destinationContract: input.member.contract(),
       strategy: 'synth',
+      migrationEdges: [
+        buildSynthMigrationEdge({
+          currentMarkerStorageHash: input.currentMarker?.storageHash,
+          destinationStorageHash,
+          operationCount: synthedPlan.operations.length,
+        }),
+      ],
     },
   };
 }

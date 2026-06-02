@@ -17,6 +17,7 @@ import {
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
+  synthEdges,
   testTimeout,
 } from './fixtures/runner-fixtures';
 
@@ -113,6 +114,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
           {
             space: planResult.plan.spaceId ?? APP_SPACE_ID,
             plan: planResult.plan,
+            migrationEdges: synthEdges(planResult.plan),
             driver: driver!,
             destinationContract: contractWithEnum,
             policy: INIT_ADDITIVE_POLICY,

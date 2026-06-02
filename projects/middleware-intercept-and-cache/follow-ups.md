@@ -94,7 +94,7 @@ Land after TML-2143 M1 merges. Doesn't block M2 or M3.
 
 The variadic annotation argument is now available on every user-facing query-issuing terminal of `Collection` and `GroupedCollection`:
 
-- **Read terminals (state-driven):** `all`, `first`. Annotations flow via `state.userAnnotations`, which `compileSelect` and `compileSelectWithIncludeStrategy` thread to `buildOrmQueryPlan`.
+- **Read terminals (state-driven):** `all`, `first`. Annotations flow via `state.userAnnotations`, which `compileSelect` and `compileSelectWithIncludes` thread to `buildOrmQueryPlan`.
 - **Read terminals (post-wrap):** `Collection.aggregate`, `GroupedCollection.aggregate`. Annotations are merged into the compiled plan via `mergeUserAnnotations` after `compileAggregate` / `compileGroupedAggregate` runs.
 - **Write terminals (post-wrap):** `create`, `createAll`, `createCount`, `update`, `updateAll`, `updateCount`, `delete`, `deleteAll`, `deleteCount`, `upsert`. Each post-wraps the compiled mutation plan(s) before dispatch.
 

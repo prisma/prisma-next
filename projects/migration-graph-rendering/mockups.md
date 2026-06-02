@@ -8,6 +8,28 @@ Carries forward the device from the original
 `migration-graph-display-scenarios.md` draft: **a direction arrow in the edge's own
 lane** (`↑` forward, `↓` rollback).
 
+> **Color extension (TML-2773, slice `lane-colors-and-legend`).** These mockups are
+> drawn **monochrome** — every layout rule below must read unambiguously without
+> color (rule 4 is explicit about this: the lane that owns the label carries the
+> arrow, so a wide fan is unambiguous in monochrome). On top of that monochrome-
+> correct base, the renderer now tints the **connective gutter** with a rotating
+> color when color is enabled: **vertical lanes + branch/merge spine
+> (`│ ├ ─ ╮ ┴ ┬`) by column index** (git `log --graph` style) — except the
+> **leftmost lane (column 0) stays neutral/dim**, since the single-lane linear
+> case has nothing to distinguish it from (the palette rotates over columns ≥ 1).
+> A **routed back-arc is colored as one line** (a single hue, its owning back-lane
+> color, across its vertical run + horizontal bridges + corners + `◂` landing) so
+> it stays traceable instead of fragmenting into a per-column rainbow; crossings
+> (`┼`) stay dim/neutral. The **contract node glyph `○` is colored by its lane**
+> (the column it sits in, column-0-neutral), so each node belongs to its branch;
+> the **direction arrows `↑ ↓ ⟲` stay bright** as the signal (they encode
+> direction, not branch).
+> Color is purely additive: it never changes which glyph is drawn or where, never
+> alters visible width, and is dropped entirely under `--no-color` / non-TTY /
+> piped output. An opt-in `--legend` flag prints a key for these glyphs and the
+> lane-color cycle. Color is therefore a legibility aid, not part of the locked
+> structural language — the monochrome reading remains the source of truth.
+
 ## The model
 
 Contracts are **nodes**, migrations are **edges**. A migration is never a property

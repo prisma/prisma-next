@@ -73,6 +73,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
     if (ignoreGraph) {
       const synthOutcome = await synthStrategy({
         aggregateTargetId: aggregate.targetId,
+        currentMarker,
         member,
         otherMembers,
         schemaIntrospection: currentDBState.schemaIntrospection,
@@ -131,6 +132,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
 
     const synthOutcome = await synthStrategy({
       aggregateTargetId: aggregate.targetId,
+      currentMarker,
       member,
       otherMembers,
       schemaIntrospection: currentDBState.schemaIntrospection,

@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/vite-plugin-contract-emit",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -19,13 +19,13 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/cli": "workspace:0.11.0",
-    "@prisma-next/emitter": "workspace:0.11.0",
+    "@prisma-next/cli": "workspace:0.12.0",
+    "@prisma-next/emitter": "workspace:0.12.0",
     "pathe": "^2.0.3"
   },
   "devDependencies": {
-    "@prisma-next/tsconfig": "workspace:0.11.0",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

@@ -82,6 +82,7 @@ describe('synthStrategy', () => {
 
     const outcome = await synthStrategy({
       aggregateTargetId: 'postgres',
+      currentMarker: null,
       member: appMember,
       otherMembers: [extMember],
       schemaIntrospection: liveSchema,
@@ -96,6 +97,15 @@ describe('synthStrategy', () => {
     // Synth strategy stamps the aggregate's targetId, not the planner's.
     expect(outcome.result.plan.targetId).toBe('postgres');
     expect(outcome.result.strategy).toBe('synth');
+    expect(outcome.result.migrationEdges).toEqual([
+      {
+        dirName: '',
+        migrationHash: 'sha256:synth',
+        from: '',
+        to: 'sha256:synth',
+        operationCount: 1,
+      },
+    ]);
 
     // Critical: the planner saw a schema with cipher_state pruned out.
     const observed = observedSchema as { tables: Record<string, unknown> };
@@ -126,6 +136,7 @@ describe('synthStrategy', () => {
 
     const outcome = await synthStrategy({
       aggregateTargetId: 'postgres',
+      currentMarker: null,
       member: makeMember('app', {}),
       otherMembers: [],
       schemaIntrospection: { tables: {} },

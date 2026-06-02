@@ -116,6 +116,8 @@ jobs:
         run: pnpm lint:casts
       - name: Check upgrade-instruction coverage
         run: pnpm check:upgrade-coverage --mode pr
+      - name: Check release notes
+        run: pnpm check:release-notes --mode pr
 
   fixtures:
     name: Fixtures

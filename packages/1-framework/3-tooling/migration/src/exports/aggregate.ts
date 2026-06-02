@@ -28,6 +28,7 @@ export {
   type GraphWalkStrategyInputs,
   graphWalkStrategy,
 } from '../aggregate/strategies/graph-walk';
+export { buildSynthMigrationEdge } from '../aggregate/synth-migration-edge';
 export type {
   ContractAtOptions,
   ContractAtResult,

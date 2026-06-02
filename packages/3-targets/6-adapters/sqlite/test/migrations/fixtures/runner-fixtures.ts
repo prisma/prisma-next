@@ -8,9 +8,14 @@ import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sq
 import {
   APP_SPACE_ID,
   createControlStack,
+  type MigrationPlan,
   type MigrationRunnerFailure,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  type AggregateMigrationEdgeRef,
+  buildSynthMigrationEdge,
+} from '@prisma-next/migration-tools/aggregate';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
@@ -147,6 +152,35 @@ export function createFailingPlan() {
 
 export function toPlanContractInfo(c: Contract<SqlStorage>) {
   return { storageHash: c.storage.storageHash, profileHash: c.profileHash };
+}
+
+export function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
+  return [
+    buildSynthMigrationEdge({
+      currentMarkerStorageHash: plan.origin?.storageHash,
+      destinationStorageHash: plan.destination.storageHash,
+      operationCount: plan.operations.length,
+    }),
+  ];
+}
+
+export const LEDGER_TEST_SPACE_ID = 'ledger-test';
+
+export function createLedgerTestPlan(options: {
+  readonly destinationHash: string;
+  readonly operations: ReturnType<
+    typeof createMigrationPlan<SqlitePlanTargetDetails>
+  >['operations'];
+  readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
+}) {
+  return createMigrationPlan<SqlitePlanTargetDetails>({
+    targetId: 'sqlite',
+    spaceId: LEDGER_TEST_SPACE_ID,
+    origin: null,
+    destination: { storageHash: options.destinationHash, profileHash: contract.profileHash },
+    operations: options.operations,
+    providedInvariants: [],
+  });
 }
 
 export async function executeStatement(

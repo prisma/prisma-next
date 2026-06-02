@@ -1,5 +1,6 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
+import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import {
   RawAggregateCommand,
   RawFindOneAndUpdateCommand,
@@ -10,6 +11,7 @@ import type { Db, Document, UpdateFilter } from 'mongodb';
 
 const COLLECTION = '_prisma_migrations';
 const MONGO_MARKER_COLLECTION = `_prisma_migrations marker documents in ${COLLECTION}`;
+const MONGO_LEDGER_COLLECTION = `_prisma_migrations ledger documents in ${COLLECTION}`;
 
 /**
  * Marker doc shape.
@@ -235,10 +237,69 @@ export async function updateMarker(
  * a synthetic ∅→head edge on first apply), so the ledger key is
  * `(space, edgeId)` — the doc carries `space` for partitioned reads.
  */
+/**
+ * Reads per-migration ledger entries for `space` in apply order. Returns
+ * `[]` when no ledger documents exist for that space yet.
+ */
+export async function readLedger(db: Db, space: string): Promise<readonly LedgerEntryRecord[]> {
+  const ledgerContext = { space, markerLocation: MONGO_LEDGER_COLLECTION };
+  const docs = await withMarkerReadErrorHandling(
+    () =>
+      executeAggregate(
+        db,
+        new RawAggregateCommand(COLLECTION, [
+          { $match: { type: 'ledger', space } },
+          { $sort: { _id: 1 } },
+        ]),
+      ),
+    ledgerContext,
+  );
+
+  const entries: LedgerEntryRecord[] = [];
+  for (const doc of docs) {
+    const migrationName = doc['migrationName'];
+    const migrationHash = doc['migrationHash'];
+    const from = doc['from'];
+    const to = doc['to'];
+    if (typeof migrationName !== 'string' || typeof migrationHash !== 'string') {
+      continue;
+    }
+    if (typeof from !== 'string' || typeof to !== 'string') {
+      continue;
+    }
+    const appliedAt = doc['appliedAt'];
+    const appliedAtDate =
+      appliedAt instanceof Date
+        ? appliedAt
+        : appliedAt !== undefined
+          ? new Date(String(appliedAt))
+          : new Date();
+    const operations = doc['operations'];
+    const opList = Array.isArray(operations) ? operations : [];
+    entries.push({
+      space,
+      migrationName,
+      migrationHash,
+      from: ledgerOriginFromStored(from),
+      to,
+      appliedAt: appliedAtDate,
+      operationCount: opList.length,
+    });
+  }
+  return entries;
+}
+
 export async function writeLedgerEntry(
   db: Db,
   space: string,
-  entry: { readonly edgeId: string; readonly from: string; readonly to: string },
+  entry: {
+    readonly edgeId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly migrationName: string;
+    readonly migrationHash: string;
+    readonly operations: readonly unknown[];
+  },
 ): Promise<void> {
   const cmd = new RawInsertOneCommand(COLLECTION, {
     type: 'ledger',
@@ -246,6 +307,9 @@ export async function writeLedgerEntry(
     edgeId: entry.edgeId,
     from: entry.from,
     to: entry.to,
+    migrationName: entry.migrationName,
+    migrationHash: entry.migrationHash,
+    operations: entry.operations,
     appliedAt: new Date(),
   });
   await executeInsertOne(db, cmd);

@@ -1,3 +1,4 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 import {
   MongoCollectionOptions,
@@ -19,6 +20,7 @@ export interface MongoCollectionInput {
   readonly indexes?: ReadonlyArray<MongoIndex | MongoIndexInput>;
   readonly validator?: MongoValidator | MongoValidatorInput;
   readonly options?: MongoCollectionOptions | MongoCollectionOptionsInput;
+  readonly control?: ControlPolicy;
 }
 
 /**
@@ -46,6 +48,7 @@ export class MongoCollection extends IRNodeBase {
   declare readonly indexes?: ReadonlyArray<MongoIndex>;
   declare readonly validator?: MongoValidator;
   declare readonly options?: MongoCollectionOptions;
+  declare readonly control?: ControlPolicy;
 
   constructor(input: MongoCollectionInput = {}) {
     super();
@@ -66,6 +69,7 @@ export class MongoCollection extends IRNodeBase {
           ? input.options
           : new MongoCollectionOptions(input.options);
     }
+    if (input.control !== undefined) this.control = input.control;
     freezeNode(this);
   }
 }
