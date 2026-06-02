@@ -1,6 +1,7 @@
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
+  ControlPolicy,
   ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
@@ -1216,6 +1217,7 @@ export type ContractInput<
   readonly naming?: NamingConfig;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
+  readonly defaultControl?: ControlPolicy;
   /**
    * Declared namespace coordinates the contract recognises. Per-model
    * `namespace` references must reference an entry in this list (or the
