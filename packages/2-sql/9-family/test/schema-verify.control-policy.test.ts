@@ -18,14 +18,17 @@ const verifyOpts = {
   frameworkComponents: [createMockPostgresComponent()],
 };
 
-function enumEntry(values: readonly string[], control?: ControlPolicy): PostgresEnumStorageEntry {
+function enumEntry(
+  values: readonly string[],
+  controlPolicy?: ControlPolicy,
+): PostgresEnumStorageEntry {
   return {
     kind: POSTGRES_ENUM_KIND,
     name: 'role',
     nativeType: 'role',
     values,
     codecId: 'pg/enum@1',
-    ...(control !== undefined ? { control } : {}),
+    ...(controlPolicy !== undefined ? { control: controlPolicy } : {}),
   };
 }
 
@@ -45,13 +48,13 @@ function enumNodeStatus(root: SchemaVerificationNode): string | undefined {
   return findNode(root, (n) => n.kind === 'storageType' && n.name === 'type role')?.status;
 }
 
-function userTable(control?: 'managed' | 'tolerated' | 'external' | 'observed') {
+function userTable(controlPolicy?: 'managed' | 'tolerated' | 'external' | 'observed') {
   return createContractTable(
     {
       id: { nativeType: 'int4', nullable: false },
       email: { nativeType: 'text', nullable: true },
     },
-    control !== undefined ? { control } : undefined,
+    controlPolicy !== undefined ? { control: controlPolicy } : undefined,
   );
 }
 
@@ -138,6 +141,36 @@ describe('verifySqlSchema control policy', () => {
     expect(result.schema.issues).toContainEqual(
       expect.objectContaining({ kind: 'type_mismatch', column: 'email' }),
     );
+  });
+
+  it('fails a type-mismatched declared column under tolerated', () => {
+    const contract = createTestContract({
+      user: createContractTable(
+        { email: { nativeType: 'character varying(255)', nullable: true } },
+        { control: 'tolerated' },
+      ),
+    });
+    const schema = createTestSchemaIR({
+      user: createSchemaTable('user', { email: { nativeType: 'text', nullable: true } }),
+    });
+    const result = verifySqlSchema({ contract, schema, ...verifyOpts });
+    expect(result.ok).toBe(false);
+    expect(result.schema.issues).toContainEqual(
+      expect.objectContaining({ kind: 'type_mismatch', column: 'email' }),
+    );
+  });
+
+  it('ignores an extra live table under external', () => {
+    const contract = createTestContract({ user: userTable() }, {}, undefined, {
+      defaultControl: 'external',
+    });
+    const schema = createTestSchemaIR({
+      user: userSchema(),
+      audit_log: createSchemaTable('audit_log', { id: { nativeType: 'int4', nullable: false } }),
+    });
+    const result = verifySqlSchema({ contract, schema, ...verifyOpts });
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues.some((i) => i.kind === 'extra_table')).toBe(false);
   });
 
   it('downgrades every divergence to warn under observed', () => {

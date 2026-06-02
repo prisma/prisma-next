@@ -4,7 +4,6 @@
  */
 
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import { verifierDisposition } from '@prisma-next/contract/types';
 import type {
   SchemaIssue,
   SchemaVerificationNode,
@@ -17,7 +16,10 @@ import type {
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import type { SqlForeignKeyIR, SqlIndexIR, SqlUniqueIR } from '@prisma-next/sql-schema-ir/types';
-import { pushControlledFinding, pushControlledIssueOnly } from './control-verify-emit';
+import {
+  emitIssueAndNodeUnderControlPolicy,
+  emitIssueUnderControlPolicy,
+} from './control-verify-emit';
 
 function indexOptionsLooselyEqual(
   a: Record<string, unknown> | undefined,
@@ -138,7 +140,7 @@ export function verifyPrimaryKey(
   schemaPK: PrimaryKey | undefined,
   tableName: string,
   namespaceId: string,
-  tableControl: ControlPolicy,
+  tableControlPolicy: ControlPolicy,
   issues: SchemaIssue[],
 ): 'pass' | 'warn' | 'fail' {
   if (!schemaPK) {
@@ -149,8 +151,8 @@ export function verifyPrimaryKey(
       expected: contractPK.columns.join(', '),
       message: `Table "${tableName}" is missing primary key`,
     };
-    pushControlledIssueOnly(tableControl, issue, issues);
-    return dispositionToPkStatus(verifierDisposition(tableControl, issue.kind));
+    const outcome = emitIssueUnderControlPolicy(tableControlPolicy, issue, issues);
+    return outcome === 'suppress' ? 'pass' : outcome;
   }
 
   if (!arraysEqual(contractPK.columns, schemaPK.columns)) {
@@ -162,20 +164,11 @@ export function verifyPrimaryKey(
       actual: schemaPK.columns.join(', '),
       message: `Table "${tableName}" has primary key mismatch: expected columns [${contractPK.columns.join(', ')}], got [${schemaPK.columns.join(', ')}]`,
     };
-    pushControlledIssueOnly(tableControl, issue, issues);
-    return dispositionToPkStatus(verifierDisposition(tableControl, issue.kind));
+    const outcome = emitIssueUnderControlPolicy(tableControlPolicy, issue, issues);
+    return outcome === 'suppress' ? 'pass' : outcome;
   }
 
   return 'pass';
-}
-
-function dispositionToPkStatus(
-  disposition: ReturnType<typeof verifierDisposition>,
-): 'pass' | 'warn' | 'fail' {
-  if (disposition === 'suppress') {
-    return 'pass';
-  }
-  return disposition;
 }
 
 /**
@@ -191,7 +184,7 @@ export function verifyForeignKeys(
   tableName: string,
   namespaceId: string,
   tablePath: string,
-  tableControl: ControlPolicy,
+  tableControlPolicy: ControlPolicy,
   issues: SchemaIssue[],
   strict: boolean,
 ): SchemaVerificationNode[] {
@@ -227,8 +220,8 @@ export function verifyForeignKeys(
         expected: `${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
         message: `Table "${tableName}" is missing foreign key: ${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
       };
-      pushControlledFinding(
-        tableControl,
+      emitIssueAndNodeUnderControlPolicy(
+        tableControlPolicy,
         issue,
         {
           status: 'fail',
@@ -259,8 +252,8 @@ export function verifyForeignKeys(
           actual: combinedActual,
           message: `Table "${tableName}" foreign key ${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}: ${combinedMessage}`,
         };
-        pushControlledFinding(
-          tableControl,
+        emitIssueAndNodeUnderControlPolicy(
+          tableControlPolicy,
           issue,
           {
             status: 'fail',
@@ -316,8 +309,8 @@ export function verifyForeignKeys(
           indexOrConstraint: schemaFK.name ?? `fk(${schemaFK.columns.join(',')})`,
           message: `Extra foreign key found in database (not in contract): ${schemaFK.columns.join(', ')} -> ${schemaFK.referencedTable}(${schemaFK.referencedColumns.join(', ')})`,
         };
-        pushControlledFinding(
-          tableControl,
+        emitIssueAndNodeUnderControlPolicy(
+          tableControlPolicy,
           issue,
           {
             status: 'fail',
@@ -358,7 +351,7 @@ export function verifyUniqueConstraints(
   tableName: string,
   namespaceId: string,
   tablePath: string,
-  tableControl: ControlPolicy,
+  tableControlPolicy: ControlPolicy,
   issues: SchemaIssue[],
   strict: boolean,
 ): SchemaVerificationNode[] {
@@ -386,8 +379,8 @@ export function verifyUniqueConstraints(
         expected: contractUnique.columns.join(', '),
         message: `Table "${tableName}" is missing unique constraint: ${contractUnique.columns.join(', ')}`,
       };
-      pushControlledFinding(
-        tableControl,
+      emitIssueAndNodeUnderControlPolicy(
+        tableControlPolicy,
         issue,
         {
           status: 'fail',
@@ -432,8 +425,8 @@ export function verifyUniqueConstraints(
           indexOrConstraint: schemaUnique.name ?? `unique(${schemaUnique.columns.join(',')})`,
           message: `Extra unique constraint found in database (not in contract): ${schemaUnique.columns.join(', ')}`,
         };
-        pushControlledFinding(
-          tableControl,
+        emitIssueAndNodeUnderControlPolicy(
+          tableControlPolicy,
           issue,
           {
             status: 'fail',
@@ -474,7 +467,7 @@ export function verifyIndexes(
   tableName: string,
   namespaceId: string,
   tablePath: string,
-  tableControl: ControlPolicy,
+  tableControlPolicy: ControlPolicy,
   issues: SchemaIssue[],
   strict: boolean,
 ): SchemaVerificationNode[] {
@@ -508,8 +501,8 @@ export function verifyIndexes(
         expected: contractIndex.columns.join(', '),
         message: `Table "${tableName}" is missing index: ${contractIndex.columns.join(', ')}`,
       };
-      pushControlledFinding(
-        tableControl,
+      emitIssueAndNodeUnderControlPolicy(
+        tableControlPolicy,
         issue,
         {
           status: 'fail',
@@ -559,8 +552,8 @@ export function verifyIndexes(
           indexOrConstraint: schemaIndex.name ?? `idx(${schemaIndex.columns.join(',')})`,
           message: `Extra index found in database (not in contract): ${schemaIndex.columns.join(', ')}`,
         };
-        pushControlledFinding(
-          tableControl,
+        emitIssueAndNodeUnderControlPolicy(
+          tableControlPolicy,
           issue,
           {
             status: 'fail',
