@@ -22,6 +22,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 };
 
 const int4Column = columnDescriptor('pg/int4@1');
@@ -189,7 +190,7 @@ describe('contract DSL authoring surface', () => {
         onCreate: { kind: 'generator', id: 'uuidv4' },
       },
     ]);
-    const contractModels = modelsOf(contract) as Record<
+    const modelsByName = modelsOf(contract) as Record<
       string,
       {
         fields: Record<string, unknown>;
@@ -197,9 +198,9 @@ describe('contract DSL authoring surface', () => {
         storage: { table: string; fields: Record<string, unknown> };
       }
     >;
-    expect(contractModels['User']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });
-    expect(contractModels['Post']?.storage.fields['userId']).toEqual({ column: 'user_id' });
-    expect(contractModels['User']?.relations).toMatchObject({
+    expect(modelsByName['User']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });
+    expect(modelsByName['Post']?.storage.fields['userId']).toEqual({ column: 'user_id' });
+    expect(modelsByName['User']?.relations).toMatchObject({
       posts: {
         to: crossRef('Post', 'public'),
         cardinality: '1:N',
@@ -209,7 +210,7 @@ describe('contract DSL authoring surface', () => {
         },
       },
     });
-    expect(contractModels['Post']?.relations).toMatchObject({
+    expect(modelsByName['Post']?.relations).toMatchObject({
       user: {
         to: crossRef('User', 'public'),
         cardinality: 'N:1',
@@ -372,17 +373,17 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    const contractModels = modelsOf(contract) as Record<
+    const modelsByName = modelsOf(contract) as Record<
       string,
       { relations: Record<string, unknown> }
     >;
-    expect(contractModels['Post']?.relations).toMatchObject({
+    expect(modelsByName['Post']?.relations).toMatchObject({
       tags: {
         to: crossRef('Tag', 'public'),
         cardinality: 'N:M',
       },
     });
-    expect(contractModels['Tag']?.relations).toMatchObject({
+    expect(modelsByName['Tag']?.relations).toMatchObject({
       posts: {
         to: crossRef('Post', 'public'),
         cardinality: 'N:M',
@@ -529,11 +530,11 @@ describe('contract DSL authoring surface', () => {
       ...ownershipCase,
     });
 
-    const contractModels = modelsOf(contract) as Record<
+    const modelsByName = modelsOf(contract) as Record<
       string,
       { relations: Record<string, unknown> }
     >;
-    expect(contractModels['User']?.relations).toMatchObject({
+    expect(modelsByName['User']?.relations).toMatchObject({
       [relationName]: {
         to: crossRef(targetModelName, 'public'),
         cardinality: expectedCardinality,
@@ -543,7 +544,7 @@ describe('contract DSL authoring surface', () => {
         },
       },
     });
-    expect(contractModels[targetModelName]?.relations).toMatchObject({
+    expect(modelsByName[targetModelName]?.relations).toMatchObject({
       user: {
         to: crossRef('User', 'public'),
         cardinality: 'N:1',
@@ -933,11 +934,11 @@ describe('self-referential and circular relations', () => {
       models: { Employee, Department },
     });
 
-    const contractModels = modelsOf(contract) as Record<
+    const modelsByName = modelsOf(contract) as Record<
       string,
       { relations: Record<string, unknown> }
     >;
-    expect(contractModels['Employee']?.relations).toMatchObject({
+    expect(modelsByName['Employee']?.relations).toMatchObject({
       department: {
         to: crossRef('Department', 'public'),
         cardinality: 'N:1',
@@ -947,7 +948,7 @@ describe('self-referential and circular relations', () => {
         },
       },
     });
-    expect(contractModels['Department']?.relations).toMatchObject({
+    expect(modelsByName['Department']?.relations).toMatchObject({
       head: {
         to: crossRef('Employee', 'public'),
         cardinality: 'N:1',

@@ -40,6 +40,9 @@ export const ensureLedgerTableStatement: SqlStatement = {
   sql: `create table if not exists prisma_contract.ledger (
     id bigserial primary key,
     created_at timestamptz not null default now(),
+    space text not null,
+    migration_name text not null,
+    migration_hash text not null,
     origin_core_hash text,
     origin_profile_hash text,
     destination_core_hash text not null,
@@ -138,6 +141,9 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
 }
 
 export interface LedgerInsertInput {
+  readonly space: string;
+  readonly migrationName: string;
+  readonly migrationHash: string;
   readonly originStorageHash?: string | null;
   readonly originProfileHash?: string | null;
   readonly destinationStorageHash: string;
@@ -150,6 +156,9 @@ export interface LedgerInsertInput {
 export function buildLedgerInsertStatement(input: LedgerInsertInput): SqlStatement {
   return {
     sql: `insert into prisma_contract.ledger (
+      space,
+      migration_name,
+      migration_hash,
       origin_core_hash,
       origin_profile_hash,
       destination_core_hash,
@@ -162,11 +171,17 @@ export function buildLedgerInsertStatement(input: LedgerInsertInput): SqlStateme
       $2,
       $3,
       $4,
-      $5::jsonb,
-      $6::jsonb,
-      $7::jsonb
+      $5,
+      $6,
+      $7,
+      $8::jsonb,
+      $9::jsonb,
+      $10::jsonb
     )`,
     params: [
+      input.space,
+      input.migrationName,
+      input.migrationHash,
       input.originStorageHash ?? null,
       input.originProfileHash ?? null,
       input.destinationStorageHash,

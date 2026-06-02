@@ -1062,6 +1062,7 @@ describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {
     const resolveFieldTypeParams = (
       modelName: string,
       fieldName: string,
+      _model: ContractModel,
     ): Record<string, unknown> | undefined =>
       modelName === 'Post' && fieldName === 'embedding' ? { length: 1536 } : undefined;
     const result = generateBothFieldTypesMaps(models, lookup, resolveFieldTypeParams);
@@ -1091,6 +1092,7 @@ describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {
     const resolveFieldTypeParams = (
       _modelName: string,
       _fieldName: string,
+      _model: ContractModel,
     ): Record<string, unknown> | undefined => ({ length: 1536 });
     const result = generateBothFieldTypesMaps(models, lookup, resolveFieldTypeParams);
     expect(result.output).toContain('readonly embedding: Vector<768>');

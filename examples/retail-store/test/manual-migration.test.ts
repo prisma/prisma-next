@@ -160,6 +160,15 @@ describe('hand-authored migration (backfill-product-status)', {
         policy: ALL_POLICY,
         frameworkComponents: [],
         strictVerification: false,
+        migrationEdges: [
+          {
+            migrationHash: STORAGE_HASH,
+            dirName: 'manual-migration',
+            from: '',
+            to: STORAGE_HASH,
+            operationCount: ops.length,
+          },
+        ],
       });
 
       expect(result.ok).toBe(true);

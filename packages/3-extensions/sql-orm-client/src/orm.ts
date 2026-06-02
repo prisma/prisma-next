@@ -1,7 +1,8 @@
-import { type Contract, contractModels } from '@prisma-next/contract/types';
+import { type Contract, domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from './collection';
+import { domainModelNames } from './storage-resolution';
 import type {
   CollectionContext,
   CollectionModelName,
@@ -59,7 +60,7 @@ export function orm<
   const { runtime, collections, context } = options;
   const contract = context.contract;
   const ctx: CollectionContext<TContract> = { runtime, context };
-  const modelNames = new Set(Object.keys(contractModels(contract)));
+  const modelNames = new Set(domainModelNames(contract));
   const collectionRegistry = createCollectionRegistry(contract, collections);
   const cache = new Map<
     ModelNames<TContract>,
@@ -116,7 +117,7 @@ function createCollectionRegistry<
     return registry;
   }
 
-  const models = contractModels(contract);
+  const models = domainModelsAtDefaultNamespace(contract.domain);
   for (const [key, collectionClass] of Object.entries(collections)) {
     if (!collectionClass) {
       continue;

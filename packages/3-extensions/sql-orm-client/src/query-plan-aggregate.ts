@@ -12,11 +12,11 @@ import {
   OrExpr,
   ProjectionItem,
   SelectAst,
-  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, deriveParamsFromAst } from './query-plan-meta';
+import { tableSourceForContract } from './storage-resolution';
 import type { AggregateSelector } from './types';
 import { combineWhereExprs } from './where-utils';
 
@@ -140,7 +140,7 @@ export function compileAggregate(
     const { expr, codec } = toAggregateProjection(contract, tableName, selector);
     return ProjectionItem.of(alias, expr, codec);
   });
-  let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
+  let ast = SelectAst.from(tableSourceForContract(contract, tableName)).withProjection(projection);
   const where = combineWhereExprs(filters);
   if (where) {
     ast = ast.withWhere(where);
@@ -181,7 +181,7 @@ export function compileGroupedAggregate(
     }),
   ];
 
-  let ast = SelectAst.from(TableSource.named(tableName))
+  let ast = SelectAst.from(tableSourceForContract(contract, tableName))
     .withProjection(projection)
     .withGroupBy(groupByColumns.map((column) => ColumnRef.of(tableName, column)));
   const where = combineWhereExprs(filters);

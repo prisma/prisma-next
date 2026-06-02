@@ -23,6 +23,7 @@ import { createMigrationPlanCommand } from './commands/migration-plan';
 import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationStatusCommand } from './commands/migration-status';
 import { createRefCommand } from './commands/ref';
+import { createTelemetryCommand } from './commands/telemetry';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { formatCommandHelp, formatRootHelp } from './utils/formatters/help';
 import { parseGlobalFlags } from './utils/global-flags';
@@ -303,6 +304,9 @@ const migrateCommand = createMigrateCommand();
 // Top-level ref command (replaces `migration ref`)
 const refCommand = createRefCommand();
 
+// Top-level telemetry command
+const telemetryCommand = createTelemetryCommand();
+
 // Top-level init command
 const initCommand = createInitCommand();
 
@@ -317,6 +321,7 @@ program.addCommand(contractCommand);
 program.addCommand(dbCommand);
 program.addCommand(migrationCommand);
 program.addCommand(refCommand);
+program.addCommand(telemetryCommand);
 
 // Test-only hidden command used by `cli-telemetry`'s `cli-e2e.test.ts`
 // to verify that telemetry still lands when a CLI command crashes

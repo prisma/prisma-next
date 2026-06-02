@@ -1,10 +1,10 @@
 # Telemetry
 
-The `prisma-next` CLI can send a small, anonymous usage event each time you run a command. The team uses this data to answer adoption questions — how many people are actively using Prisma Next, which databases they target, which extensions get adopted, and how often the CLI is invoked by AI coding agents versus humans.
+The `prisma-next` CLI sends a small, anonymous usage event each time you run a command. The team uses this data to answer adoption questions — how many people are actively using Prisma Next, which databases they target, which extensions get adopted, and how often the CLI is invoked by AI coding agents versus humans.
 
-Telemetry is **off by default**. The CLI never sends an event until you explicitly opt in.
+Telemetry is **on by default (opt-out)**. On the first command that would send an event — including the very first `prisma-next init` — the CLI prints a one-time notice to stderr telling you telemetry is enabled and exactly how to turn it off. There is no interactive consent prompt; the first-run notice is the single disclosure for every command. You can opt out at any time and the opt-out is honoured immediately — see [How to opt out (or back in)](#how-to-opt-out-or-back-in).
 
-If you've already opted in and want to turn it off, jump to [How to opt out (or back in)](#how-to-opt-out-or-back-in).
+If you want to turn it off right now, jump to [How to opt out (or back in)](#how-to-opt-out-or-back-in).
 
 ## What is collected
 
@@ -12,7 +12,7 @@ Every event is a single JSON object with the fields below. Nothing else is sent.
 
 | Field | Type | Example | Source |
 | --- | --- | --- | --- |
-| `installationId` | string (v4 UUID) | `"7f1e1d6c-3b2a-4c5e-9f0d-1a2b3c4d5e6f"` | A random UUID generated and stored locally on first opt-in |
+| `installationId` | string (v4 UUID) | `"7f1e1d6c-3b2a-4c5e-9f0d-1a2b3c4d5e6f"` | A random UUID generated and stored locally on the first enabled send |
 | `version` | string | `"0.10.0"` | The version of the `prisma-next` package you're running |
 | `command` | string | `"migration new"` | The CLI command name, space-separated subcommands included |
 | `flags` | string[] | `["name", "dry-run"]` | The **names** of the flags you passed, with the `--` prefix stripped |
@@ -42,12 +42,20 @@ Telemetry deliberately excludes anything that could identify you, your machine, 
 
 ## The user-level config file
 
-Telemetry consent and the installation UUID live in a single per-user JSON file:
+Your telemetry preference and the installation UUID live in a single per-user JSON file:
 
 - **Unix (Linux, macOS):** `$XDG_CONFIG_HOME/prisma-next/config.json`, defaulting to `~/.config/prisma-next/config.json` when `$XDG_CONFIG_HOME` is unset. This follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/).
 - **Windows:** `%APPDATA%\prisma-next\config.json`, falling back to `%USERPROFILE%\AppData\Roaming\prisma-next\config.json`.
 
-After you've opted in, the file looks like this:
+After the first enabled run, the file looks like this:
+
+```json
+{
+  "installationId": "7f1e1d6c-3b2a-4c5e-9f0d-1a2b3c4d5e6f"
+}
+```
+
+The first enabled run mints the `installationId` but does **not** write an `enableTelemetry` field — leaving it absent is what keeps telemetry on by default. If you make an explicit choice (`prisma-next telemetry enable` / `disable`, or a hand edit), the file also carries an explicit `enableTelemetry` value:
 
 ```json
 {
@@ -58,18 +66,18 @@ After you've opted in, the file looks like this:
 
 Two fields matter to the CLI:
 
-- **`enableTelemetry`** (`boolean`) — your consent answer. `true` enables telemetry; `false` disables it; absent means "not asked yet, default off".
-- **`installationId`** (`string`) — a v4 random UUID, generated locally the first time you persist `enableTelemetry: true`. The CLI never rotates it on its own.
+- **`enableTelemetry`** (`boolean`, optional) — your explicit choice. `true` enables telemetry; `false` disables it; **absent means "on" (the opt-out default)**. The CLI only writes this field when you make an explicit choice (`prisma-next telemetry enable` / `disable`, or a hand edit); the default-on path never writes it.
+- **`installationId`** (`string`) — a v4 random UUID, minted locally on the first command that sends an event (the first enabled send). The CLI never rotates it on its own.
 
 Any other fields are tolerated and preserved across writes, so future Prisma Next versions can add new settings here without losing your existing data.
 
 ### Flipping your choice
 
-To turn telemetry off (or back on), edit the file in any text editor and change the `enableTelemetry` value. The change takes effect on the next CLI invocation.
+To turn telemetry off (or back on), run `prisma-next telemetry disable` / `prisma-next telemetry enable`, or edit the file in any text editor and change the `enableTelemetry` value. Either way the change takes effect on the next CLI invocation.
 
 ### Fully resetting
 
-To start fresh — clear your installation ID and ask the consent question again — delete the file:
+To start fresh — clear your installation ID and reset your preference — delete the file:
 
 ```bash
 # Unix
@@ -79,11 +87,23 @@ rm ~/.config/prisma-next/config.json
 Remove-Item "$env:APPDATA\prisma-next\config.json"
 ```
 
-The next time you run `prisma-next init` interactively, the consent prompt will reappear. Until then, the CLI is back to its default-off state.
+Deleting the file returns you to the default (telemetry on). The next enabled command will reprint the one-time first-run notice and mint a fresh `installationId`. If your intent is to stay opted out, don't delete the file — run `prisma-next telemetry disable` (or keep `"enableTelemetry": false` in it), or use an [environment-variable opt-out](#1-environment-variables-runtime-only).
 
 ## How to opt out (or back in)
 
-Telemetry can be disabled three independent ways. Any one is sufficient.
+Telemetry can be disabled several independent ways. Any one is sufficient.
+
+### The `prisma-next telemetry` command
+
+The friendliest path is the built-in command:
+
+```bash
+prisma-next telemetry disable   # stores "enableTelemetry": false
+prisma-next telemetry enable    # stores "enableTelemetry": true (mints an installation ID)
+prisma-next telemetry status    # reports whether telemetry is on, why, the config path, and whether an ID is stored
+```
+
+`disable` and `enable` write the stored preference described in [The stored preference](#2-the-stored-preference) for you. `status` is read-only — it emits no event, mints no ID, and does not print your installation ID (only whether one exists). The `telemetry` command is itself exempt from telemetry, so running it never emits a usage event.
 
 ### 1. Environment variables (runtime-only)
 
@@ -103,7 +123,7 @@ Export them in your shell profile if you want them to apply to every Prisma Next
 
 ### 2. The stored preference
 
-Set `enableTelemetry` to `false` in your `config.json`:
+`prisma-next telemetry disable` writes this for you; you can also set `enableTelemetry` to `false` in your `config.json` by hand:
 
 ```json
 {
@@ -111,47 +131,39 @@ Set `enableTelemetry` to `false` in your `config.json`:
 }
 ```
 
-This disables telemetry on every invocation until you change it back. No `installationId` is generated when you store `false` — only an affirmative `true` ever mints a UUID.
+This disables telemetry on every invocation until you change it back. Storing `false` does not mint an `installationId`, and if one was already minted on a prior enabled run it is left in place (deleting the file is the way to clear it).
 
-### 3. Don't opt in
+You can write this file before ever running the CLI — drop a `config.json` containing `{ "enableTelemetry": false }` at the path above and the CLI will never send an event or print the first-run notice.
 
-If you've never run `prisma-next init`, or you ran it under `--yes` / a non-interactive shell, or you answered "no" to the consent prompt, telemetry stays off. This is the default state on a fresh machine.
+## Disclosure
 
-## The consent prompt
+Because telemetry is on by default, the CLI discloses it the first time it would actually send something. There is a single disclosure surface — the first-run notice — and it fires for every command, including `init`. There is no interactive consent prompt.
 
-Telemetry consent is asked exactly once, as the final step of the interactive `prisma-next init` flow. The wording (verbatim) is:
+### The first-run notice
 
-> Help us prioritize features by sharing anonymous CLI usage data? The telemetry implementation is open source and fully transparent. (packages/1-framework/3-tooling/cli-telemetry and apps/telemetry-backend).
+On the first command that resolves to *enabled* and has no `installationId` stored yet, the CLI prints a one-time notice to **stderr** (never stdout, so it can't corrupt piped output) and then mints the `installationId` and sends the event. The wording (verbatim, with the resolved absolute path to your config file substituted in) is:
 
-The default answer is **Yes**.
+> Prisma Next collects anonymous CLI usage data, enabled by default. What's collected and why: https://prisma-next.dev/docs/cli/telemetry. Opt out: run "prisma-next telemetry disable", set DO_NOT_TRACK=1 or PRISMA_NEXT_DISABLE_TELEMETRY=1, or set "enableTelemetry": false in &lt;your config.json path&gt;.
 
-The prompt appears only when all of these are true:
+The notice is **idempotent via the `installationId`**: it prints only while no `installationId` is stored. Once the first enabled send mints the id, every later command sees the stored id and stays silent. Deleting `config.json` clears the id and makes the notice print once more on the next enabled command.
 
-- the consent answer has not been stored yet (`enableTelemetry` is absent from `config.json`, or the file doesn't exist);
-- `init` is running in interactive mode (stdin is a TTY);
-- you haven't passed `--yes` (or any other auto-accept flag) — consent must be a deliberate keystroke, not a side effect of automation;
-- neither `PRISMA_NEXT_DISABLE_TELEMETRY` nor `DO_NOT_TRACK=1` is set;
-- the CLI is not running in a CI environment.
+The notice does **not** fire when telemetry is disabled. If you've stored `enableTelemetry: false`, or set `DO_NOT_TRACK=1` / `PRISMA_NEXT_DISABLE_TELEMETRY`, or you're in CI, no notice is printed and nothing is sent — those paths have no `installationId` and never reach the first-run disclosure.
 
-If any of those conditions doesn't hold, the prompt is suppressed and your stored consent state is left untouched (i.e. default-off if you'd never answered before).
+The `prisma-next telemetry` command never prints the notice and emits no event: it is exempt from telemetry so you can inspect or change your preference without sending anything.
 
-The prompt is **never re-shown** once `enableTelemetry` is stored — even on a subsequent `prisma-next init`. To change your answer, edit (or delete) `config.json` as described above.
+## On by default
 
-No other CLI command shows a telemetry prompt or banner.
-
-## Default-off
-
-When `enableTelemetry` is undefined — because you haven't run `init` interactively, because the file is missing, or because the field was never written — telemetry is **disabled**. The CLI does not collect data without explicit prior consent. There is no soft default, no grace period, no "first 10 invocations" exemption.
+When `enableTelemetry` is absent — because you've never made an explicit choice, or the file is missing — telemetry is **enabled**. This is the opt-out default: absence of a stored choice means telemetry is on, and the first enabled command discloses that via the [first-run notice](#the-first-run-notice) before sending. The only things that turn telemetry off are an explicit `enableTelemetry: false`, an [environment-variable opt-out](#1-environment-variables-runtime-only), or a CI environment.
 
 ## Per-user, not per-project
 
-Telemetry consent lives in your user-level config file, not in your project's `prisma-next.config.ts`. There is intentionally no project-level telemetry toggle.
+Your telemetry preference lives in your user-level config file, not in your project's `prisma-next.config.ts`. There is intentionally no project-level telemetry toggle.
 
-The reason is straightforward: one developer enabling telemetry should not enrol their teammates. A project-level setting committed to a repository would do exactly that. The per-user file means each person on a team makes their own choice, and changing it never produces a diff in version control.
+The reason is straightforward: one developer's telemetry choice should not be imposed on their teammates. A project-level setting committed to a repository would do exactly that — one person opting out (or in) would silently flip everyone who cloned the repo. The per-user file means each person on a team makes their own choice, and changing it never produces a diff in version control.
 
 ## CI environments
 
-CI environments never emit telemetry and never see the consent prompt. The CLI uses the [`ci-info`](https://www.npmjs.com/package/ci-info) package to detect dozens of CI providers (GitHub Actions, GitLab CI, CircleCI, Buildkite, Jenkins, Drone, Bitbucket Pipelines, Azure Pipelines, AWS CodeBuild, and more), so providers that don't set the standard `CI=true` marker still suppress telemetry correctly.
+CI environments never emit telemetry and never see the first-run notice. The CLI uses the [`ci-info`](https://www.npmjs.com/package/ci-info) package to detect dozens of CI providers (GitHub Actions, GitLab CI, CircleCI, Buildkite, Jenkins, Drone, Bitbucket Pipelines, Azure Pipelines, AWS CodeBuild, and more), so providers that don't set the standard `CI=true` marker still suppress telemetry correctly.
 
 If you ever need to force the CLI to treat a CI environment as non-CI (e.g. to validate behaviour locally), set `CI=false` explicitly — `ci-info` short-circuits on that value.
 
@@ -192,3 +204,4 @@ Everything is open source. If you want to audit what gets sent, or how:
 - **Backend** (the service that receives events and stores them in Postgres): [`apps/telemetry-backend/`](../apps/telemetry-backend/)
 - **Architectural rationale for the installation ID design:** [ADR 216 — CLI telemetry installation ID is a stored random UUID, not a system fingerprint](./architecture%20docs/adrs/ADR%20216%20-%20CLI%20telemetry%20installation%20ID%20is%20a%20stored%20random%20UUID%20not%20a%20system%20fingerprint.md)
 - **Architectural rationale for the detached-subprocess design:** [ADR 217 — CLI telemetry runs in a detached subprocess spawned at command start](./architecture%20docs/adrs/ADR%20217%20-%20CLI%20telemetry%20runs%20in%20a%20detached%20subprocess%20spawned%20at%20command%20start.md)
+- **Architectural rationale for the opt-out default:** [ADR 223 — CLI telemetry defaults to opt-out with a first-run notice](./architecture%20docs/adrs/ADR%20223%20-%20CLI%20telemetry%20defaults%20to%20opt-out%20with%20a%20first-run%20notice.md)

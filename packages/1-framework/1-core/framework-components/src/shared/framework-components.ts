@@ -227,6 +227,8 @@ export type TargetPackRef<
   TTargetId extends string = string,
 > = PackRefBase<'target', TFamilyId> & {
   readonly targetId: TTargetId;
+  /** The namespace a bare (un-namespaced) entity name resolves to for this target (e.g. Postgres `'public'`). */
+  readonly defaultNamespaceId: string;
 };
 
 export type AdapterPackRef<

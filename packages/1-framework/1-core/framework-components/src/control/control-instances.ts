@@ -1,4 +1,8 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import type {
   AdapterInstance,
   DriverInstance,
@@ -90,6 +94,16 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
   readAllMarkers(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
   }): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
+
+  /**
+   * Reads the per-migration ledger journal for `space` in apply order.
+   * Returns an empty array when the ledger table/collection has no rows
+   * for that space (or when the ledger store does not yet exist).
+   */
+  readLedger(options: {
+    readonly driver: ControlDriverInstance<TFamilyId, string>;
+    readonly space: string;
+  }): Promise<readonly LedgerEntryRecord[]>;
 
   introspect(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;

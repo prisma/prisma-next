@@ -10,7 +10,6 @@ import {
   ExistsExpr,
   ProjectionItem,
   SelectAst,
-  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
@@ -22,6 +21,7 @@ import {
   resolveModelTableName,
 } from './collection-contract';
 import { and, not } from './filters';
+import { storageTableForContract, tableSourceForContract } from './storage-resolution';
 import {
   COMPARISON_METHODS_META,
   type ComparisonMethodFns,
@@ -116,10 +116,13 @@ function resolveColumn(
   tableName: string,
   columnName: string,
 ): { readonly codecId: string; readonly nullable: boolean } | undefined {
-  const table = Object.values(contract.storage.namespaces).find(
-    (ns) => ns.tables[tableName] !== undefined,
-  )?.tables[tableName] as StorageTable | undefined;
-  const column = table?.columns?.[columnName];
+  let table: StorageTable;
+  try {
+    table = storageTableForContract(contract, tableName);
+  } catch {
+    return undefined;
+  }
+  const column = table.columns[columnName];
   if (!column) return undefined;
   return { codecId: column.codecId, nullable: column.nullable };
 }
@@ -258,7 +261,7 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
   }
 
   const selectProjectionColumn = firstTargetColumn(context.contract, relation) ?? 'id';
-  const subquery = SelectAst.from(TableSource.named(relatedTableName))
+  const subquery = SelectAst.from(tableSourceForContract(context.contract, relatedTableName))
     .withProjection([
       ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, selectProjectionColumn)),
     ])

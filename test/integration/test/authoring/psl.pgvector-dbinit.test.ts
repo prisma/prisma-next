@@ -11,6 +11,7 @@ import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/cano
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
+import postgresPackRef from '@prisma-next/target-postgres/pack';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -77,7 +78,7 @@ describe(
 
       process.chdir(testDir);
       const contractConfig = prismaContract('./schema.prisma', {
-        target: postgres,
+        target: postgresPackRef,
       });
 
       const pslResult = await contractConfig.source.load({

@@ -12,7 +12,7 @@ import {
   InsertAst,
   ParamRef,
   ProjectionItem,
-  TableSource,
+  type TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -153,6 +153,7 @@ export class InsertQueryImpl<
   extends BuilderBase<QC['capabilities']>
   implements InsertQuery<QC, AvailableScope, RowType>
 {
+  readonly #tableSource: TableSource;
   readonly #tableName: string;
   readonly #table: StorageTable;
   readonly #scope: Scope;
@@ -162,7 +163,7 @@ export class InsertQueryImpl<
   readonly #annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 
   constructor(
-    tableName: string,
+    tableSource: TableSource,
     table: StorageTable,
     scope: Scope,
     rows: ReadonlyArray<Record<string, unknown>>,
@@ -172,7 +173,8 @@ export class InsertQueryImpl<
     annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
   ) {
     super(ctx);
-    this.#tableName = tableName;
+    this.#tableSource = tableSource;
+    this.#tableName = tableSource.name;
     this.#table = table;
     this.#scope = scope;
     this.#rows = rows;
@@ -192,7 +194,7 @@ export class InsertQueryImpl<
         newRowFields[col] = field;
       }
       return new InsertQueryImpl(
-        this.#tableName,
+        this.#tableSource,
         this.#table,
         this.#scope,
         this.#rows,
@@ -215,7 +217,7 @@ export class InsertQueryImpl<
     ...annotations: As & ValidAnnotations<'write', As>
   ): InsertQuery<QC, AvailableScope, RowType> {
     return new InsertQueryImpl(
-      this.#tableName,
+      this.#tableSource,
       this.#table,
       this.#scope,
       this.#rows,
@@ -238,7 +240,7 @@ export class InsertQueryImpl<
       buildParamValues(rowValues, this.#table, this.#tableName, 'create', this.ctx),
     );
 
-    let ast = InsertAst.into(TableSource.named(this.#tableName)).withRows(paramRows);
+    let ast = InsertAst.into(this.#tableSource).withRows(paramRows);
 
     if (this.#returningColumns.length > 0) {
       ast = ast.withReturning(
@@ -262,6 +264,7 @@ export class UpdateQueryImpl<
   extends BuilderBase<QC['capabilities']>
   implements UpdateQuery<QC, AvailableScope, RowType>
 {
+  readonly #tableSource: TableSource;
   readonly #tableName: string;
   readonly #scope: Scope;
   readonly #setExpressions: Record<string, AstExpression>;
@@ -271,7 +274,7 @@ export class UpdateQueryImpl<
   readonly #annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 
   constructor(
-    tableName: string,
+    tableSource: TableSource,
     scope: Scope,
     setExpressions: Record<string, AstExpression>,
     ctx: BuilderContext,
@@ -281,7 +284,8 @@ export class UpdateQueryImpl<
     annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
   ) {
     super(ctx);
-    this.#tableName = tableName;
+    this.#tableSource = tableSource;
+    this.#tableName = tableSource.name;
     this.#scope = scope;
     this.#setExpressions = setExpressions;
     this.#whereExprs = whereExprs;
@@ -295,7 +299,7 @@ export class UpdateQueryImpl<
     const fns = createFunctions(this.ctx.queryOperationTypes, this.ctx.rawCodecInferer);
     const result = (expr as ExpressionBuilder<Scope, QueryContext>)(fieldProxy, fns as never);
     return new UpdateQueryImpl(
-      this.#tableName,
+      this.#tableSource,
       this.#scope,
       this.#setExpressions,
       this.ctx,
@@ -317,7 +321,7 @@ export class UpdateQueryImpl<
         newRowFields[col] = field;
       }
       return new UpdateQueryImpl(
-        this.#tableName,
+        this.#tableSource,
         this.#scope,
         this.#setExpressions,
         this.ctx,
@@ -338,7 +342,7 @@ export class UpdateQueryImpl<
     ...annotations: As & ValidAnnotations<'write', As>
   ): UpdateQuery<QC, AvailableScope, RowType> {
     return new UpdateQueryImpl(
-      this.#tableName,
+      this.#tableSource,
       this.#scope,
       this.#setExpressions,
       this.ctx,
@@ -353,7 +357,7 @@ export class UpdateQueryImpl<
   }
 
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
-    let ast = UpdateAst.table(TableSource.named(this.#tableName))
+    let ast = UpdateAst.table(this.#tableSource)
       .withSet(this.#setExpressions)
       .withWhere(combineWhereExprs(this.#whereExprs));
 
@@ -379,6 +383,7 @@ export class DeleteQueryImpl<
   extends BuilderBase<QC['capabilities']>
   implements DeleteQuery<QC, AvailableScope, RowType>
 {
+  readonly #tableSource: TableSource;
   readonly #tableName: string;
   readonly #scope: Scope;
   readonly #whereCallbacks: readonly WhereCallback[];
@@ -387,7 +392,7 @@ export class DeleteQueryImpl<
   readonly #annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 
   constructor(
-    tableName: string,
+    tableSource: TableSource,
     scope: Scope,
     ctx: BuilderContext,
     whereCallbacks: readonly WhereCallback[] = [],
@@ -396,7 +401,8 @@ export class DeleteQueryImpl<
     annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
   ) {
     super(ctx);
-    this.#tableName = tableName;
+    this.#tableSource = tableSource;
+    this.#tableName = tableSource.name;
     this.#scope = scope;
     this.#whereCallbacks = whereCallbacks;
     this.#returningColumns = returningColumns;
@@ -406,7 +412,7 @@ export class DeleteQueryImpl<
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): DeleteQuery<QC, AvailableScope, RowType> {
     return new DeleteQueryImpl(
-      this.#tableName,
+      this.#tableSource,
       this.#scope,
       this.ctx,
       [...this.#whereCallbacks, expr as unknown as WhereCallback],
@@ -427,7 +433,7 @@ export class DeleteQueryImpl<
         newRowFields[col] = field;
       }
       return new DeleteQueryImpl(
-        this.#tableName,
+        this.#tableSource,
         this.#scope,
         this.ctx,
         this.#whereCallbacks,
@@ -446,7 +452,7 @@ export class DeleteQueryImpl<
     ...annotations: As & ValidAnnotations<'write', As>
   ): DeleteQuery<QC, AvailableScope, RowType> {
     return new DeleteQueryImpl(
-      this.#tableName,
+      this.#tableSource,
       this.#scope,
       this.ctx,
       this.#whereCallbacks,
@@ -466,7 +472,7 @@ export class DeleteQueryImpl<
       ),
     );
 
-    let ast = DeleteAst.from(TableSource.named(this.#tableName)).withWhere(whereExpr);
+    let ast = DeleteAst.from(this.#tableSource).withWhere(whereExpr);
 
     if (this.#returningColumns.length > 0) {
       ast = ast.withReturning(

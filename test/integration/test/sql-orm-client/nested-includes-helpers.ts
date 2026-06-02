@@ -10,7 +10,7 @@
 // across multiple files keeps each invocation under that threshold
 // while preserving the breadth of the coverage.
 
-import type { ContractModelsMap } from '@prisma-next/contract/types';
+import type { ContractModelDefinitions } from '@prisma-next/contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { getTestContext, getTestContract, type TestContract } from './helpers';
@@ -25,7 +25,7 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
  * flag is inert for include codegen against the same real database.
  */
 export function collectionWithCapabilities<
-  ModelName extends keyof ContractModelsMap<TestContract> & string,
+  ModelName extends keyof ContractModelDefinitions<TestContract> & string,
 >(
   runtime: PgIntegrationRuntime,
   modelName: ModelName,

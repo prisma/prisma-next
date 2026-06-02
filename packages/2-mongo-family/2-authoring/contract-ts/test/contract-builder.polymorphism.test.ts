@@ -16,6 +16,7 @@ const mongoTargetPack = {
   familyId: 'mongo',
   targetId: 'mongo',
   version: '0.0.1',
+  defaultNamespaceId: '__unbound__',
 } as const satisfies TargetPackRef<'mongo', 'mongo'>;
 
 describe('mongo contract builder — polymorphic index scoping', () => {

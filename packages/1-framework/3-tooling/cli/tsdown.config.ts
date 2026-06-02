@@ -17,6 +17,7 @@ export default defineConfig({
     'src/commands/migration-new.ts',
     'src/commands/migration-plan.ts',
     'src/commands/ref.ts',
+    'src/commands/telemetry/index.ts',
     'src/commands/migration-show.ts',
     'src/commands/migration-status.ts',
     'src/commands/migration-log.ts',

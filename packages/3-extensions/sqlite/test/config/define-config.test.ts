@@ -4,6 +4,7 @@ import sqliteDriver from '@prisma-next/driver-sqlite/control';
 import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import sqlite from '@prisma-next/target-sqlite/control';
+import sqlitePackRef from '@prisma-next/target-sqlite/pack';
 import { describe, expect, it } from 'vitest';
 import { defineConfig } from '../../src/config/define-config';
 
@@ -23,7 +24,7 @@ describe('defineConfig facade', () => {
       extensionPacks,
       contract: prismaContract(contractPath, {
         output: './prisma/contract.json',
-        target: sqlite,
+        target: sqlitePackRef,
       }),
     });
 

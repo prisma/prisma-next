@@ -17,7 +17,7 @@ export type ControlPolicy = 'managed' | 'tolerated' | 'external' | 'observed';
  * Both parameters are optional raw values so this function stays node-type-agnostic
  * and can be called by any consumer (verifier, planner, etc.) without importing IR classes.
  */
-export function effectiveControl(
+export function effectiveControlPolicy(
   nodeControl: ControlPolicy | undefined,
   defaultControl: ControlPolicy | undefined,
 ): ControlPolicy {

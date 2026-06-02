@@ -4,7 +4,7 @@ import type { UserConfig } from './user-config';
  * Why telemetry was disabled. Useful for debug-mode logging in the
  * parent; never surfaces to users.
  */
-export type GatingDisabledReason = 'env-override' | 'stored-opt-out' | 'default-off';
+export type GatingDisabledReason = 'env-override' | 'stored-opt-out';
 
 export type GatingResolution =
   | { readonly enabled: true }
@@ -45,14 +45,17 @@ function isTruthyOptOut(raw: string | undefined): boolean {
  *
  * Decision order:
  *   1. Env-var override (`PRISMA_NEXT_DISABLE_TELEMETRY` truthy, or
- *      `DO_NOT_TRACK=1`) → disabled.
- *   2. Stored `enableTelemetry === true` → enabled.
- *   3. Stored `enableTelemetry === false` → disabled (`stored-opt-out`).
+ *      `DO_NOT_TRACK=1`) → disabled. The env check runs first, so an
+ *      opt-out env var wins over any stored or unset preference.
+ *   2. Stored `enableTelemetry === false` → disabled (`stored-opt-out`).
+ *   3. Stored `enableTelemetry === true` → enabled.
  *   4. Stored `enableTelemetry === undefined` (file missing, or field
- *      not set) → disabled (`default-off`).
+ *      not set) → ENABLED. This is the opt-out default: absence of an
+ *      explicit choice means telemetry is on. This is the load-bearing,
+ *      counter-intuitive branch — do not "fix" it to default-off.
  *
- * Telemetry is enabled only when no env override is active **and**
- * `enableTelemetry` is explicitly `true`.
+ * Telemetry is disabled only when an env override is active or
+ * `enableTelemetry` is explicitly `false`.
  */
 export function resolveGating(inputs: GatingInputs): GatingResolution {
   if (
@@ -61,11 +64,8 @@ export function resolveGating(inputs: GatingInputs): GatingResolution {
   ) {
     return { enabled: false, reason: 'env-override' };
   }
-  if (inputs.config.enableTelemetry === true) {
-    return { enabled: true };
-  }
   if (inputs.config.enableTelemetry === false) {
     return { enabled: false, reason: 'stored-opt-out' };
   }
-  return { enabled: false, reason: 'default-off' };
+  return { enabled: true };
 }

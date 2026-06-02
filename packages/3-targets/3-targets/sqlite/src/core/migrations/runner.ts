@@ -1,4 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlControlFamilyInstance,
@@ -19,6 +19,7 @@ import type {
   MigrationRunnerResult,
 } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
@@ -28,8 +29,6 @@ import type { SqlitePlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
   buildWriteMarkerStatements,
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
   MARKER_TABLE_NAME,
   readMarkerStatement,
   type SqlStatement,
@@ -70,7 +69,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
     if (!policyCheck.ok) return policyCheck;
 
-    const ensureResult = await this.ensureControlTables(driver);
+    const ensureResult = await this.ensureControlTables(driver, options.destinationContract);
     if (!ensureResult.ok) return ensureResult;
     const existingMarker = await this.readMarker(driver, space);
 
@@ -127,7 +126,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
     if (!isSelfEdgeNoOp) {
       await this.upsertMarker(driver, options, existingMarker, space);
-      await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
+      await this.recordLedgerEntries(driver, options, existingMarker, executedOperations);
     }
 
     return runnerSuccess({
@@ -306,17 +305,16 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
+    contract: Contract<SqlStorage>,
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
-    // Pre-1.0 zero-range guardrail: detect a pre-cleanup single-row
-    // marker table (no `space` column) and surface a structured failure
-    // rather than silently rebuilding the table into the per-space
-    // shape. See `specs/framework-mechanism.spec.md § 2`.
     const legacyDetection = await this.detectLegacyMarkerShape(driver);
     if (!legacyDetection.ok) {
       return legacyDetection;
     }
-    await this.executeStatement(driver, ensureMarkerTableStatement);
-    await this.executeStatement(driver, ensureLedgerTableStatement);
+    const lowererContext = { contract };
+    for (const query of this.family.bootstrapControlTableQueries()) {
+      await this.executeStatement(driver, this.family.lowerAst(query, lowererContext));
+    }
     return okVoid();
   }
 
@@ -623,25 +621,55 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     await this.executeStatement(driver, statement);
   }
 
-  private async recordLedgerEntry(
+  private async recordLedgerEntries(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
     executedOperations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[],
   ): Promise<void> {
-    const ledgerStatement = buildLedgerInsertStatement({
-      originStorageHash: existingMarker?.storageHash ?? null,
-      originProfileHash: existingMarker?.profileHash ?? null,
-      destinationStorageHash: options.plan.destination.storageHash,
-      destinationProfileHash:
-        options.plan.destination.profileHash ??
-        options.destinationContract.profileHash ??
-        options.plan.destination.storageHash,
-      contractJsonBefore: existingMarker?.contractJson ?? null,
-      contractJsonAfter: options.destinationContract,
-      operations: executedOperations,
-    });
-    await this.executeStatement(driver, ledgerStatement);
+    const plan = options.plan;
+    const space = plan.spaceId;
+    const destinationProfileHash =
+      plan.destination.profileHash ??
+      options.destinationContract.profileHash ??
+      plan.destination.storageHash;
+    const edges = options.migrationEdges;
+    const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
+    if (totalEdgeOps !== plan.operations.length) {
+      throw new Error(
+        `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
+      );
+    }
+    // The ledger records the operations as executed — idempotency-skipped ops
+    // are substituted with skip records (empty `execute`) by `applyPlan`, so the
+    // journal reflects what actually ran rather than the raw plan.
+    let offset = 0;
+    const lastIndex = edges.length - 1;
+    for (const [i, edge] of edges.entries()) {
+      const edgeOps = executedOperations.slice(offset, offset + edge.operationCount);
+      offset += edge.operationCount;
+      const isFirst = i === 0;
+      const isLast = i === lastIndex;
+      await this.executeStatement(
+        driver,
+        buildLedgerInsertStatement({
+          space,
+          migrationName: edge.dirName,
+          migrationHash: edge.migrationHash,
+          originStorageHash: edge.from === '' ? null : edge.from,
+          originProfileHash:
+            isFirst && existingMarker?.storageHash === edge.from
+              ? (existingMarker.profileHash ?? null)
+              : null,
+          destinationStorageHash: edge.to,
+          destinationProfileHash:
+            isLast && edge.to === plan.destination.storageHash ? destinationProfileHash : null,
+          contractJsonBefore: isFirst ? (existingMarker?.contractJson ?? null) : null,
+          contractJsonAfter: isLast ? options.destinationContract : null,
+          operations: edgeOps,
+        }),
+      );
+    }
   }
 
   private async beginExclusiveTransaction(

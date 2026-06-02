@@ -67,13 +67,21 @@ changes:
     script: ./regenerate-extension-public-baseline.ts
   - id: domain-plane-spi-and-testing-subpath
     summary: |
-      Contract SPI is namespaced: read models/value objects through `contract.domain.namespaces.<ns>` (helpers: `contractModels()`, `ContractModelsMap`, `ContractValueObjectsMap`) instead of flat `contract.models`. The `@prisma-next/contract/testing` subpath export was removed — test factories (`createContract`, `createSqlContract`, `DUMMY_HASH`, `applicationDomainOf`) now live in `@prisma-next/test-utils`. Run the colocated import codemod and update SPI consumption to the namespaced contract shape.
+      Contract SPI is namespaced: read models/value objects through `contract.domain.namespaces.<ns>` (helpers: `domainModelsAtDefaultNamespace(contract.domain)`, `ContractModelDefinitions`) instead of flat `contract.models`. The `@prisma-next/contract/testing` subpath export was removed — test factories (`createContract`, `createSqlContract`, `DUMMY_HASH`, `applicationDomainOf`) now live in `@prisma-next/test-utils`. Run the colocated import codemod and update SPI consumption to the namespaced contract shape.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
         - "@prisma-next/contract/testing"
       anyMatch: true
     script: ./migrate-contract-testing-imports.ts
+  - id: default-namespace-domain-access-retire-projection-helpers
+    summary: |
+      The transitional `@prisma-next/contract` helpers `contractModels`, `contractValueObjects`, `resolveSingleDomainNamespaceId`, `ContractModelsMap`, and `ContractValueObjectsMap` are removed. Read models/value objects through `domainModelsAtDefaultNamespace(contract.domain)` / `domainValueObjectsAtDefaultNamespace(contract.domain)` (these read the contract's sole namespace and throw on a multi-namespace contract). Typed model shapes use `ContractModelDefinitions<Contract>`. SQL namespace concretions must expose `qualifyTable`; hydrate migration scaffolds with `PostgresContractSerializer` (not `structuredClone`) so `qualifyTable` survives. Runtime SQL is namespace-qualified on Postgres.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "contractModels"
+      anyMatch: true
 ---
 
 # 0.11 → 0.12 — Extension-author upgrade instructions
@@ -598,7 +606,7 @@ Run your extension's test suite and any migration-loading integration tests. Con
 
 Starting at the 0.12 release, two SPI changes affect extension authors:
 
-1. **Namespaced domain plane** — stop reading flat `contract.models` / `contract.valueObjects`. Models and value objects live under `contract.domain.namespaces.<ns>`. Use `contractModels(contract)`, `ContractModelsMap<C>`, and `ContractValueObjectsMap<C>` from `@prisma-next/contract/types` for typed access. Storage remains under `contract.storage.namespaces.<ns>` (unchanged shape).
+1. **Namespaced domain plane** — stop reading flat `contract.models` / `contract.valueObjects`. Models and value objects live under `contract.domain.namespaces.<ns>`. Use `domainModelsAtDefaultNamespace(contract.domain)` (reads the contract's sole namespace; throws on a multi-namespace contract — select explicitly per TML-2550) and `ContractModelDefinitions<C>` from `@prisma-next/contract/types` for typed access. Storage remains under `contract.storage.namespaces.<ns>` (unchanged shape).
 
 2. **Removed `@prisma-next/contract/testing` subpath** — test factories moved to `@prisma-next/test-utils`. Add `@prisma-next/test-utils` to your extension's `devDependencies` at the same version pin as your other `@prisma-next/*` packages if it is not already present.
 
@@ -629,11 +637,13 @@ Subpath imports such as `@prisma-next/test-utils/typed-expectations` were alread
 
 Walk extension source that constructs or reads contracts directly (tests, control adapters, planners). TypeScript will flag most stale reads after the bump; the mechanical rewrites are:
 
-**Reading models** — use the helper instead of the flat root:
+**Reading models** — resolve through the target's default domain namespace:
 
 ```diff
 -const models = contract.models;
-+const models = contractModels(contract);
++import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
++
++const models = domainModelsAtDefaultNamespace(contract.domain);
 ```
 
 **Patching models in tests** — nest under the domain namespace:
@@ -647,7 +657,7 @@ Walk extension source that constructs or reads contracts directly (tests, contro
 +      ...contract.domain.namespaces,
 +      [namespaceId]: {
 +        ...namespace,
-+        models: patch({ ...contractModels(contract) }),
++        models: patch({ ...domainModelsAtDefaultNamespace(contract.domain) }),
 +      },
 +    },
 +  },
@@ -667,7 +677,52 @@ After source updates, re-emit fixture contracts (`pnpm fixtures:emit` or your pa
 
 ### Validation
 
-Run `pnpm typecheck && pnpm test` on your extension package. The import codemod is deterministic; remaining errors indicate hand-edits for namespaced domain reads. Regenerated fixture diffs should show `domain.namespaces` and `ContractModelsMap` in emitted types.
+Run `pnpm typecheck && pnpm test` on your extension package. The import codemod is deterministic; remaining errors indicate hand-edits for namespaced domain reads. Regenerated fixture diffs should show `domain.namespaces` and `ContractModelDefinitions` (or the emitted `Models` infer alias) in types.
+
+## `default-namespace-domain-access-retire-projection-helpers`
+
+Starting at the 0.12 release (runtime qualification, [ADR 223](../../../../../docs/architecture%20docs/adrs/ADR%20223%20-%20Target-owned%20default%20namespace.md)), the foundation `contract` package retires the transitional projection helpers introduced during the symmetric domain-plane migration. Extension code that still calls them will fail to compile after the bump.
+
+The default namespace a bare name resolves through is **inferred** from the contract (sole namespace, else insertion order) — there are no `…ForSqlTarget` / `…ForMongo` helpers to import. A target's default namespace is declared on its descriptor (`defaultNamespaceId`) and consumed only by authoring; runtime code resolves target-agnostically.
+
+### Removed exports (old → new)
+
+| Removed | Replacement |
+|---|---|
+| `contractModels(contract)` | `domainModelsAtDefaultNamespace(contract.domain)` (reads the sole namespace; throws on multi-namespace) |
+| `contractValueObjects(contract)` | `domainValueObjectsAtDefaultNamespace(contract.domain)` |
+| `resolveSingleDomainNamespaceId(domain)` | `soleDomainNamespaceId(domain)` (same fail-loud single-namespace behaviour) |
+| `ContractModelsMap<C>` | `ContractModelDefinitions<C>` |
+| `ContractValueObjectsMap<C>` | Read `contract.domain.namespaces[ns].valueObjects` for a specific namespace, or `domainValueObjectsAtDefaultNamespace(contract.domain)` for the default slot |
+
+Import the replacements from `@prisma-next/contract/types`.
+
+### `qualifyTable` on SQL namespace concretions
+
+Storage namespace envelopes in SQL-family contracts must carry a `qualifyTable(tableName: string): string` method. The Postgres and SQLite packs in this repo already implement it on bound/unbound namespace concretions; custom serializers or hand-built namespace objects in tests must include it or rendering falls back incorrectly.
+
+### Hydrating contracts in tests
+
+Do not `structuredClone` hydrated contracts — it strips functions such as `qualifyTable`. Round-trip through the target serializer instead:
+
+```ts
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+
+const serializer = new PostgresContractSerializer();
+const hydrated = serializer.deserializeContract(serializer.serializeContract(rawContract));
+```
+
+### Namespace-qualified runtime SQL
+
+Postgres query renderers now emit `"<schema>"."<table>"` (default schema `public`). Update extension integration tests that assert raw SQL strings (`FROM "user"` → `FROM "public"."user"`). SQLite remains unqualified. Application/extension call sites for `db.sql.*` / `db.*` are unchanged.
+
+### Emitter guard (unchanged for multi-namespace extensions)
+
+`assertSingleDomainNamespaceForEmission` still fails when emitting `contract.d.ts` for contracts with multiple domain namespaces ([TML-2550](https://linear.app/prisma-company/issue/TML-2550)). Runtime execution does not throw for multi-namespace contracts; only emission stays fail-loud.
+
+### Validation
+
+Run `pnpm typecheck && pnpm test` on your extension package. Grep for the removed symbol names should return no hits outside historical upgrade prose.
 
 ## Validation by execution
 

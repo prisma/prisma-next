@@ -2,7 +2,7 @@ import { Collection } from '@prisma-next/sql-orm-client';
 import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { withReturningCapability } from './collection-fixtures';
-import { getTestContext, getTestContract } from './helpers';
+import { deserializeTestContract, getTestContext, getTestContract } from './helpers';
 import {
   createReturningTagsCollection,
   createReturningUsersCollection,
@@ -98,12 +98,16 @@ describe('integration/upsert', () => {
     'upsert() rejects when no conflict columns can be resolved',
     async () => {
       await withCollectionRuntime(async (runtime) => {
-        const contract = withReturningCapability(getTestContract());
-        delete (
-          contract.storage.namespaces['public']!.tables.users as {
-            primaryKey?: unknown;
+        const raw = JSON.parse(
+          JSON.stringify(withReturningCapability(getTestContract())),
+        ) as Record<string, unknown>;
+        const usersTable = (
+          raw['storage'] as {
+            namespaces: { public: { tables: { users: Record<string, unknown> } } };
           }
-        ).primaryKey;
+        ).namespaces.public.tables.users;
+        delete usersTable['primaryKey'];
+        const contract = deserializeTestContract(raw);
         const context = { ...getTestContext(), contract };
         const users = new Collection({ runtime, context }, 'User');
 

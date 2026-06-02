@@ -7,6 +7,7 @@ import type {
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import {
+  buildSynthMigrationEdge,
   type ContractMarkerRecordLike,
   type ContractSpaceAggregate,
   type ContractSpaceMember,
@@ -319,7 +320,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     includeMarkers: true,
   });
   const totalMigrationsApplied = applied.value.orderedResolutions.reduce(
-    (sum, r) => sum + (r.entry.migrationEdges?.length ?? 0),
+    (sum, r) => sum + r.entry.migrationEdges.length,
     0,
   );
   const summary = `Applied ${totalMigrationsApplied} migration(s) (${applied.value.totalOpsExecuted} operation(s)) across ${orderedAll.length} contract space(s)`;
@@ -361,7 +362,13 @@ function buildAtHeadResolution(args: {
     displayOps: [],
     destinationContract: member.contract(),
     strategy: 'graph-walk',
-    migrationEdges: [],
+    migrationEdges: [
+      buildSynthMigrationEdge({
+        currentMarkerStorageHash: liveMarker?.storageHash,
+        destinationStorageHash: targetHash,
+        operationCount: 0,
+      }),
+    ],
   };
 }
 
@@ -404,7 +411,7 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
   // JSON-shape consumers (e.g. `parsed.applied.length` in integration
   // tests). The aggregate per-space breakdown lives on `perSpace[]`.
   const applied = args.orderedResolutions.flatMap((r) => {
-    const edges = r.entry.migrationEdges ?? [];
+    const edges = r.entry.migrationEdges;
     return edges.map((edge) => ({
       spaceId: r.spaceId,
       dirName: edge.dirName,

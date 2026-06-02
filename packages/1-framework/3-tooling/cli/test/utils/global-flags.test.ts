@@ -4,7 +4,7 @@ import {
   errorInvalidOutputFormat,
   errorOutputFormatMutex,
 } from '../../src/utils/cli-errors';
-import { parseGlobalFlags } from '../../src/utils/global-flags';
+import { deriveCanPrompt, parseGlobalFlags } from '../../src/utils/global-flags';
 
 describe('parseGlobalFlags output format', () => {
   const originalIsTTY = process.stdout.isTTY;
@@ -144,5 +144,37 @@ describe('parseGlobalFlagsOrExit', () => {
     expect(stderr).toContain('PN-CLI-4015');
     expect(stderr).toMatch(/--format pretty.*--json/i);
     expect(stderr).not.toContain('at resolveOutputFormat');
+  });
+});
+
+describe('deriveCanPrompt (interactive-prompt eligibility, single source of truth)', () => {
+  it('returns false when stdin is closed even though stdout is a TTY (the canonical CI/agent shape)', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: true, optionInteractive: undefined, stdinIsTTY: false }),
+    ).toBe(false);
+  });
+
+  it('returns true when both streams are TTYs and no override is set', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: true, optionInteractive: undefined, stdinIsTTY: true }),
+    ).toBe(true);
+  });
+
+  it('honours an explicit --interactive override even when stdin is closed', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: true, optionInteractive: true, stdinIsTTY: false }),
+    ).toBe(true);
+  });
+
+  it('returns false when --no-interactive is set, regardless of stdin', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: false, optionInteractive: undefined, stdinIsTTY: true }),
+    ).toBe(false);
+  });
+
+  it('returns false in a fully piped environment (decoration off, stdin closed)', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: false, optionInteractive: undefined, stdinIsTTY: false }),
+    ).toBe(false);
   });
 });

@@ -6,6 +6,8 @@ export default defineConfig({
     'src/exports/codec-types.ts',
     'src/exports/codecs.ts',
     'src/exports/control.ts',
+    'src/exports/contract-free.ts',
+    'src/exports/ddl.ts',
     'src/exports/default-normalizer.ts',
     'src/exports/migration.ts',
     'src/exports/native-type-normalizer.ts',

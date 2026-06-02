@@ -1,4 +1,8 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
@@ -7,6 +11,7 @@ import type {
 import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
+  DdlNode,
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
@@ -51,6 +56,16 @@ export interface SqlControlAdapter<TTarget extends string = string>
   readAllMarkers(
     driver: ControlDriverInstance<'sql', TTarget>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
+
+  /**
+   * Reads the per-migration ledger journal for `space` in apply order.
+   * Returns an empty array when the ledger store does not yet exist or
+   * has no rows for that space.
+   */
+  readLedger(
+    driver: ControlDriverInstance<'sql', TTarget>,
+    space: string,
+  ): Promise<readonly LedgerEntryRecord[]>;
 
   /**
    * Introspects a database schema and returns a raw SqlSchemaIR.
@@ -112,6 +127,18 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ) => readonly string[] | null;
 
   /**
+   * Ordered DDL queries that bootstrap marker/ledger control tables for migration
+   * runners. Postgres includes `CREATE SCHEMA`; SQLite does not.
+   */
+  bootstrapControlTableQueries(): readonly DdlNode[];
+
+  /**
+   * Ordered DDL queries that bootstrap the marker table (and Postgres schema) for
+   * `sign` — excludes the ledger table.
+   */
+  bootstrapSignMarkerQueries(): readonly DdlNode[];
+
+  /**
    * Lower a SQL query AST into a target-flavored `{ sql, params }` payload.
    *
    * Migration tooling (e.g. the `dataTransform` operation) needs to materialize
@@ -120,7 +147,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * same AST and contract, ensuring planned SQL matches what the runtime would
    * emit.
    */
-  lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement;
+  lower(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
 }
 
 /**

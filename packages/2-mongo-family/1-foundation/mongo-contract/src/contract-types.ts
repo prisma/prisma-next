@@ -2,9 +2,9 @@ import type {
   Contract,
   ContractField,
   ContractModel,
-  ContractModelsMap,
+  ContractModelDefinitions,
   ContractValueObject,
-  ContractValueObjectsMap,
+  ContractValueObjectDefinitions,
   StorageBase,
 } from '@prisma-next/contract/types';
 import type { Namespace } from '@prisma-next/framework-components/ir';
@@ -74,13 +74,13 @@ export type MongoContract<
 > = Contract<S, M>;
 
 /** Model map inferred from a {@link MongoContract} (domain.namespaces union). */
-export type MongoModelsMap<TContract extends MongoContract> = ContractModelsMap<TContract>;
+export type MongoModelsMap<TContract extends MongoContract> = ContractModelDefinitions<TContract>;
 
 export type RootModelName<
   TContract extends MongoContract,
   RootName extends keyof TContract['roots'] & string,
 > = TContract['roots'][RootName] extends { readonly model: infer M extends string }
-  ? M & keyof import('@prisma-next/contract/types').ContractModelsMap<TContract>
+  ? M & keyof import('@prisma-next/contract/types').ContractModelDefinitions<TContract>
   : never;
 
 export type MongoTypeMaps<
@@ -130,7 +130,7 @@ export type ExtractMongoFieldInputTypes<T> =
       : Record<string, never>
     : Record<string, never>;
 
-type ExtractValueObjects<TContract extends Contract> = ContractValueObjectsMap<TContract>;
+type ExtractValueObjects<TContract extends Contract> = ContractValueObjectDefinitions<TContract>;
 
 type NormalizeContractFields<TFields> = {
   [K in keyof TFields]: TFields[K] extends ContractField ? TFields[K] : never;
@@ -182,8 +182,11 @@ type InferFieldType<
 
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof ContractModelsMap<TContract>,
-  TFields extends Record<string, ContractField> = ContractModelsMap<TContract>[ModelName]['fields'],
+  ModelName extends string & keyof ContractModelDefinitions<TContract>,
+  TFields extends Record<
+    string,
+    ContractField
+  > = ContractModelDefinitions<TContract>[ModelName]['fields'],
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
   TValueObjects extends Record<string, ContractValueObject> = ExtractValueObjects<TContract>,
 > = {

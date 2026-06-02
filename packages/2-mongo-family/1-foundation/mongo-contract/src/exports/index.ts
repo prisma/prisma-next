@@ -28,6 +28,10 @@ export type {
   MongoWildcardProjection,
   RootModelName,
 } from '../contract-types';
+export {
+  defaultMongoDomainNamespaceId,
+  defaultMongoStorageNamespaceId,
+} from '../default-namespace';
 export { buildMongoNamespace, buildMongoNamespaceMap } from '../ir/build-mongo-namespace';
 export type { MongoChangeStreamPreAndPostImagesOptionsInput } from '../ir/mongo-change-stream-pre-and-post-images-options';
 export { MongoChangeStreamPreAndPostImagesOptions } from '../ir/mongo-change-stream-pre-and-post-images-options';

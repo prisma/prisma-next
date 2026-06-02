@@ -1,4 +1,4 @@
-import { contractModels, type PlanMeta } from '@prisma-next/contract/types';
+import { domainModelsAtDefaultNamespace, type PlanMeta } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
   MongoContract,
@@ -820,7 +820,9 @@ export class PipelineChain<
     let resultShape: MongoResultShape | undefined;
     if (modelName !== undefined) {
       if (pipelineSupportsFlatResultShape(this.#state.stages)) {
-        const model = contractModels(contractNarrow)[modelName] as MongoModelDefinition | undefined;
+        const model = domainModelsAtDefaultNamespace(contractNarrow.domain)[modelName] as
+          | MongoModelDefinition
+          | undefined;
         resultShape = model ? contractModelToMongoResultShape(model) : { kind: 'unknown' as const };
       } else {
         resultShape = { kind: 'unknown' as const };

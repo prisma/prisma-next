@@ -1,4 +1,8 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
@@ -76,19 +80,6 @@ function asValidatedMongoContract(contract: unknown): MongoContract {
   return contract as MongoContract;
 }
 
-function isMongoControlAdapter(value: unknown): value is MongoControlAdapter<'mongo'> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'readMarker' in value &&
-    typeof (value as { readMarker: unknown }).readMarker === 'function' &&
-    'readAllMarkers' in value &&
-    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
-    'introspectSchema' in value &&
-    typeof (value as { introspectSchema: unknown }).introspectSchema === 'function'
-  );
-}
-
 function buildVerifyResult(opts: {
   ok: boolean;
   code?: string;
@@ -164,13 +155,7 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
     if (!adapter) {
       throw new Error('Mongo family requires an adapter descriptor in ControlStack');
     }
-    const controlAdapter = adapter.create(controlStack as ControlStack<'mongo', 'mongo'>);
-    if (!isMongoControlAdapter(controlAdapter)) {
-      throw new Error(
-        'Adapter does not implement MongoControlAdapter (missing readMarker, readAllMarkers, or introspectSchema)',
-      );
-    }
-    return controlAdapter;
+    return adapter.create(controlStack as ControlStack<'mongo', 'mongo'>);
   };
 
   // The family-level driver type is `ControlDriverInstance<'mongo', string>`,
@@ -369,6 +354,10 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
 
     async readAllMarkers(options): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
       return getControlAdapter().readAllMarkers(asMongoDriver(options.driver));
+    },
+
+    async readLedger(options): Promise<readonly LedgerEntryRecord[]> {
+      return getControlAdapter().readLedger(asMongoDriver(options.driver), options.space);
     },
 
     async introspect(options): Promise<MongoSchemaIR> {

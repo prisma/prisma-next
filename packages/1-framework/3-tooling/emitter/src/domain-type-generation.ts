@@ -253,6 +253,7 @@ function applyModifiers(base: string, field: ContractField): string {
 export type FieldTypeParamsResolver = (
   modelName: string,
   fieldName: string,
+  model: ContractModel,
 ) => Record<string, unknown> | undefined;
 
 export function resolveFieldType(
@@ -339,7 +340,8 @@ export function generateBothFieldTypesMaps(
         Object.keys(field.type.typeParams).length > 0
           ? field.type.typeParams
           : undefined;
-      const resolvedTypeParams = inlineTypeParams ?? resolveFieldTypeParams?.(modelName, fieldName);
+      const resolvedTypeParams =
+        inlineTypeParams ?? resolveFieldTypeParams?.(modelName, fieldName, model);
       const resolved = resolveFieldType(field, codecLookup, resolvedTypeParams);
       const key = `readonly ${serializeObjectKey(fieldName)}`;
       outputFieldEntries.push(`${key}: ${resolved.output}`);

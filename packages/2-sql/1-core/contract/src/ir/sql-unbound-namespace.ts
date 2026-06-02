@@ -52,4 +52,8 @@ export class SqlUnboundNamespace extends NamespaceBase {
     });
     freezeNode(this);
   }
+
+  qualifyTable(tableName: string): string {
+    return `"${tableName}"`;
+  }
 }

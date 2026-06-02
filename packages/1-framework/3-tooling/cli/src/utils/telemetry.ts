@@ -2,13 +2,14 @@ import { fileURLToPath } from 'node:url';
 import {
   type CommanderOptionShape,
   type CommanderResultShape,
+  ensureInstallationId,
   readUserConfig,
   resolveGating,
   runTelemetry,
   type TelemetryRunOutcome,
   type UserConfig,
+  userConfigPath,
 } from '@prisma-next/cli-telemetry';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { version as CLI_VERSION } from '../../package.json' with { type: 'json' };
 import { isCI } from './is-ci';
@@ -78,11 +79,7 @@ function senderPath(): string {
   return fileURLToPath(new URL(import.meta.resolve('@prisma-next/cli-telemetry/sender')));
 }
 
-function fireTelemetry(
-  actionCommand: Command,
-  userConfig: UserConfig,
-  overrides: { readonly databaseTarget?: string } = {},
-): TelemetryRunOutcome {
+function fireTelemetry(actionCommand: Command, userConfig: UserConfig): TelemetryRunOutcome {
   return runTelemetry({
     command: commanderSnapshotForTelemetry(actionCommand),
     version: CLI_VERSION,
@@ -91,7 +88,6 @@ function fireTelemetry(
     isCI: isCI(),
     env: process.env,
     userConfig,
-    ...ifDefined('databaseTarget', overrides.databaseTarget),
   });
 }
 
@@ -107,35 +103,75 @@ function fireTelemetry(
  * config touches disk. The child loading user TS code is acceptable
  * only because it's gated behind the same resolved-enabled signal.
  */
+/**
+ * Builds the one-time first-run disclosure. The resolved absolute path to
+ * the user-level config file is substituted in so the user can see exactly
+ * which file to edit (it must not be confused with `prisma-next.config.ts`).
+ * `prisma-next telemetry disable` is named as the primary, friendliest
+ * opt-out, alongside the env vars and the config edit.
+ */
+function firstRunNotice(configPath: string): string {
+  return [
+    'Prisma Next collects anonymous CLI usage data, enabled by default.',
+    "What's collected and why: https://prisma-next.dev/docs/cli/telemetry.",
+    'Opt out: run "prisma-next telemetry disable", set DO_NOT_TRACK=1 or',
+    `PRISMA_NEXT_DISABLE_TELEMETRY=1, or set "enableTelemetry": false in ${configPath}.`,
+  ].join(' ');
+}
+
+/**
+ * Best-effort first-run disclosure + installationId mint. Runs only on the
+ * gating-enabled path. Prints the notice to stderr (never stdout) and mints
+ * a persistent id without touching `enableTelemetry`, so the opt-out default
+ * stays intact and no unasked-for consent is recorded.
+ *
+ * Every step is wrapped so an un-writable config dir (or any other failure)
+ * never throws and never blocks the command. Returns the minted (or
+ * pre-existing) id so the caller can forward it to `runTelemetry` without a
+ * redundant disk read. On mint failure it returns `undefined`: the notice may
+ * reprint next run, and `runTelemetry` no-ops on the missing id.
+ */
+function discloseAndMintOnFirstRun(): string | undefined {
+  try {
+    process.stderr.write(`${firstRunNotice(userConfigPath())}\n`);
+  } catch {}
+  try {
+    return ensureInstallationId();
+  } catch {}
+  return undefined;
+}
+
+/**
+ * True when the run is the `telemetry` command (or one of its
+ * subcommands). The usage-telemetry preAction fire is exempted for it:
+ * it would be absurd for `telemetry disable` to send a usage event before
+ * disabling, or for `telemetry status` to mint an id + send while merely
+ * reporting state. This is the only command-specific exemption.
+ *
+ * The check is rooted at the program: the path must be
+ * `['prisma-next', 'telemetry', …]`, so it matches the top-level
+ * `telemetry` command and its subcommands without matching a hypothetical
+ * nested `… telemetry` elsewhere.
+ */
+function isTelemetryCommand(actionCommand: Command): boolean {
+  return commandPathFor(actionCommand)[1] === 'telemetry';
+}
+
 export function fireTelemetryFromPreAction(actionCommand: Command): TelemetryRunOutcome {
+  if (isTelemetryCommand(actionCommand)) {
+    return { spawned: false, reason: 'gated-off' };
+  }
   const gate = resolveTelemetryGate();
   if (!gate.enabled) {
     return gate.outcome;
   }
+  const storedId = gate.userConfig.installationId;
+  if (typeof storedId !== 'string' || storedId.length === 0) {
+    const installationId = discloseAndMintOnFirstRun();
+    return fireTelemetry(
+      actionCommand,
+      installationId === undefined ? gate.userConfig : { ...gate.userConfig, installationId },
+    );
+  }
   return fireTelemetry(actionCommand, gate.userConfig);
-}
-
-/**
- * Manual one-shot telemetry path for the first `init` run where the user
- * explicitly answers Yes to the consent prompt. The preAction hook for
- * that same run has already resolved before consent existed, so it is
- * default-off. After consent is persisted, `runInit` calls this helper
- * exactly for that first affirmative answer; subsequent init runs skip
- * it because the prompt is not shown again.
- *
- * The child's c12 load would return `databaseTarget: null` for this
- * specific invocation because `prisma-next.config.*` is not yet on
- * disk (init writes it later in the same run). To preserve the
- * prompt-chosen target in the first-init telemetry event, this
- * helper forwards the value as a parent-side IPC override on
- * `ParentToSenderPayload.databaseTarget` — the child consults the
- * override first and falls back to its c12 result when absent.
- */
-export function fireTelemetryAfterInitConsent(
-  actionCommand: Command,
-  inputs: { readonly databaseTarget: string },
-): TelemetryRunOutcome {
-  return fireTelemetry(actionCommand, readUserConfig(), {
-    databaseTarget: inputs.databaseTarget,
-  });
 }

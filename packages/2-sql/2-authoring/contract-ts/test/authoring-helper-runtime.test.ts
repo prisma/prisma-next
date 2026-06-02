@@ -69,6 +69,7 @@ const bareTargetPack = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 } as const satisfies TargetPackRef<'sql', 'postgres'>;
 
 const nestedTypeNamespace = {

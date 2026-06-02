@@ -70,6 +70,20 @@ Presentation polish (independent of the sequence above):
   The source-side has co-sourced tee handling; the target-side needs the analogous
   co-landing handling (plus an ordering check). Layout/routing-only.
 
+Ledger cleanups (follow-ups from the TML-2769 / PR #665 review; sequenced after the ledger foundation):
+
+- **Consolidate the per-edge breakdown onto the plan** —
+  [`slices/edges-on-plan/spec.md`](./slices/edges-on-plan/spec.md). The ledger
+  foundation threads `migrationEdges` as a sibling of `plan` on the runner
+  options, requiring a hand-maintained consistency guard. This slice moves the
+  breakdown onto `MigrationPlan.edges` so the runner reads one object and the
+  guard's reason to exist disappears.
+- **Stop spelling the empty-contract origin as a fake hash** —
+  [`slices/empty-origin-as-null/spec.md`](./slices/empty-origin-as-null/spec.md).
+  ∅ is modelled as `null` at the read boundary but as `sha256:empty` (not a real
+  hash) in storage/graph, bridged by a coercion helper. This slice gives ∅ one
+  honest representation (cut chosen with the graph-layer owner at pickup).
+
 ## Contents
 
 - [`spec.md`](./spec.md) — **slice 1's spec + dispatch plan.** Pins the

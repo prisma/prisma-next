@@ -11,7 +11,12 @@ describe('mongoTargetDescriptorMeta', () => {
       id: 'mongo',
       version: '0.0.1',
       capabilities: {},
+      defaultNamespaceId: '__unbound__',
     });
+  });
+
+  it('declares defaultNamespaceId as __unbound__', () => {
+    expect(mongoTargetDescriptorMeta.defaultNamespaceId).toBe('__unbound__');
   });
 });
 

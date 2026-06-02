@@ -23,7 +23,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   Contract as ContractType,
-  ContractModelsMap,
+  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -378,7 +378,8 @@ type ContractBase = Omit<
   readonly profileHash: ProfileHash;
 };
 
+export type Models = ContractModelDefinitions<Contract>;
+
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
 export type Namespaces = Contract['storage']['namespaces'];
-export type Models = ContractModelsMap<Contract>;

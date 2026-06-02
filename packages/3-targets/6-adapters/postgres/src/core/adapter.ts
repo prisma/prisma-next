@@ -9,9 +9,12 @@ import type {
   RawSqlLiteral,
   SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
+import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
+import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
+import { renderLoweredDdl } from './ddl-renderer';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -52,7 +55,13 @@ class PostgresAdapterImpl
     });
   }
 
-  lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {
+  lower(
+    ast: AnyQueryAst | PostgresDdlNode,
+    context: LowererContext<PostgresContract>,
+  ): PostgresLoweredStatement {
+    if (isDdlNode(ast)) {
+      return renderLoweredDdl(ast);
+    }
     return renderLoweredSql(ast, context.contract, this.codecLookup);
   }
 }

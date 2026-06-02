@@ -5,6 +5,36 @@ import {
 } from '@prisma-next/framework-components/ir';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 
+export type SqliteDatabaseInput = {
+  readonly id: string;
+  readonly tables: Readonly<Record<string, StorageTable>>;
+};
+
+/**
+ * SQLite namespace concretion carrying table metadata and unqualified
+ * `qualifyTable()` emission for runtime SQL rendering.
+ */
+export class SqliteDatabase extends NamespaceBase {
+  readonly kind = 'database' as const;
+  readonly id: string;
+  readonly tables: Readonly<Record<string, StorageTable>>;
+
+  constructor(input: SqliteDatabaseInput) {
+    super();
+    this.id = input.id;
+    this.tables = Object.freeze({ ...input.tables });
+    freezeNode(this);
+  }
+
+  qualifier(): string {
+    return '';
+  }
+
+  qualifyTable(tableName: string): string {
+    return `"${tableName}"`;
+  }
+}
+
 /**
  * SQLite target `Namespace` concretion. SQLite has no schema or
  * database-namespacing concept at the SQL level — there is exactly one

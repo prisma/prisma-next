@@ -57,6 +57,14 @@ changes:
         - "Contract['models']"
       anyMatch: true
     script: ./re-emit-domain-namespaced-contracts.ts
+  - id: runtime-qualified-sql-default-namespace
+    summary: |
+      Postgres runtime SQL now emits namespace-qualified table identifiers (e.g. `"public"."user"`). Flat `db.sql.*` / `db.*` call sites are unchanged. Update integration or snapshot tests that assert raw SQL strings. Re-emit contract artefacts only if you are still catching up an earlier 0.12 namespacing transition.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - 'FROM "user"'
+      anyMatch: true
 ---
 
 # 0.11 → 0.12 — User upgrade instructions
@@ -336,4 +344,38 @@ If you already re-emitted for `public-default-namespace` on 0.12, a single emit 
 
 ### Validation
 
-After re-emitting, run `pnpm typecheck && pnpm test`. The regenerated `contract.json` should carry a `domain.namespaces` envelope; `contract.d.ts` should export `Models = ContractModelsMap<Contract>`.
+After re-emitting, run `pnpm typecheck && pnpm test`. The regenerated `contract.json` should carry a `domain.namespaces` envelope; `contract.d.ts` should export a `Models` alias derived from the contract type (on current 0.12 builds this is typically `Contract extends ContractType<StorageBase, infer TModels> ? TModels : never`, not `ContractModelsMap`, which was removed with runtime default-namespace qualification — see `runtime-qualified-sql-default-namespace` below).
+
+## `runtime-qualified-sql-default-namespace`
+
+Starting at the 0.12 release, runtime SQL on Postgres qualifies table identifiers with the storage namespace the flat DSL/ORM surface resolved ([ADR 223](../../../../../docs/architecture%20docs/adrs/ADR%20223%20-%20Target-owned%20default%20namespace.md)). Un-namespaced Postgres models continue to resolve through the `public` default; explicit `namespace unbound { … }` in PSL still maps to `__unbound__`.
+
+### Application code
+
+No change is required for normal query code:
+
+```ts
+await db.sql.user.findMany();
+await db.User.findMany();
+```
+
+Bare names still resolve default-namespace-first; only the emitted SQL changes.
+
+### Tests and observability
+
+If you assert raw SQL strings (integration tests, query logs, migration snapshots), expect qualified Postgres identifiers:
+
+```diff
+-FROM "user"
++FROM "public"."user"
+```
+
+SQLite and Mongo behaviour for bare names is unchanged at the SQL/collection string level (SQLite `qualifyTable` is a no-op; Mongo has no SQL-style qualification).
+
+### Contract artefacts
+
+Re-emit (`pnpm emit` / `prisma-next contract emit`) is **not** required solely for this change when your PSL/contract source is already on the 0.12 namespaced shape. If you have not yet run the `domain-plane-namespaced-contract` or `public-default-namespace` transitions, complete those first — a single emit pass covers all on-disk contract updates.
+
+### Emitted types note
+
+If you maintain hand-written code against generated `contract.d.ts`, replace any use of removed `ContractModelsMap<Contract>` with the emitted `Models` export or `ContractModelDefinitions<YourContract>` from `@prisma-next/contract/types`. That removal affects extension authors directly; application projects that only import the generated `Models` alias pick up the new shape on re-emit.

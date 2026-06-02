@@ -22,6 +22,7 @@ import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { synthMigrationEdges } from './synth-migration-edges';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
@@ -80,12 +81,14 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
         ),
       );
       const destinationHash = 'sha256:authoring-test';
+      const plan = {
+        targetId: 'mongo',
+        destination: { storageHash: destinationHash },
+        operations: serialized,
+      };
       const result = await runner.execute({
-        plan: {
-          targetId: 'mongo',
-          destination: { storageHash: destinationHash },
-          operations: serialized,
-        },
+        plan,
+        migrationEdges: synthMigrationEdges(plan),
         // Synthetic-contract opt-out (paired with `strictVerification: false`):
         // these tests exercise the runner against hand-rolled migration ops,
         // not a real authored contract. Supply the minimum well-formed shape
@@ -339,13 +342,15 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
           ),
         );
         const destinationHashV2 = 'sha256:authoring-test-v2';
+        const planV2 = {
+          targetId: 'mongo',
+          origin: { storageHash: 'sha256:authoring-test' },
+          destination: { storageHash: destinationHashV2 },
+          operations: serialized2,
+        };
         const result2 = await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            origin: { storageHash: 'sha256:authoring-test' },
-            destination: { storageHash: destinationHashV2 },
-            operations: serialized2,
-          },
+          plan: planV2,
+          migrationEdges: synthMigrationEdges(planV2),
           // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
           destinationContract: {
             storage: {
@@ -390,13 +395,15 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
           ),
         );
         const destinationHashV3 = 'sha256:authoring-test-v3';
+        const planV3 = {
+          targetId: 'mongo',
+          origin: { storageHash: 'sha256:authoring-test-v2' },
+          destination: { storageHash: destinationHashV3 },
+          operations: serialized3,
+        };
         const result3 = await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            origin: { storageHash: 'sha256:authoring-test-v2' },
-            destination: { storageHash: destinationHashV3 },
-            operations: serialized3,
-          },
+          plan: planV3,
+          migrationEdges: synthMigrationEdges(planV3),
           // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
           destinationContract: {
             storage: {

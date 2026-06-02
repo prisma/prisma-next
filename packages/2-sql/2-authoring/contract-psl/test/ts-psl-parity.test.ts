@@ -50,6 +50,7 @@ const portablePostgresTargetPack = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
   authoring: {
     entityTypes: testEnumEntityContributions,
     type: {},
@@ -115,6 +116,7 @@ const sqliteTimestampTargetPack = {
   familyId: 'sql',
   targetId: 'sqlite',
   version: '0.0.1',
+  defaultNamespaceId: '__unbound__',
   authoring: {
     field: {
       int: {
@@ -165,6 +167,7 @@ const postgresTimestampTargetPack = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
   authoring: {
     field: {
       int: {

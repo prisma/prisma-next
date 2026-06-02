@@ -23,6 +23,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 };
 
 const sqliteTargetPack: TargetPackRef<'sql', 'sqlite'> = {
@@ -31,6 +32,7 @@ const sqliteTargetPack: TargetPackRef<'sql', 'sqlite'> = {
   familyId: 'sql',
   targetId: 'sqlite',
   version: '0.0.1',
+  defaultNamespaceId: '__unbound__',
 };
 
 class StubNamespace extends NamespaceBase {

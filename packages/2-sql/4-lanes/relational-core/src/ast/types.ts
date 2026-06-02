@@ -312,16 +312,24 @@ export class TableSource extends FromSource {
   readonly kind = 'table-source' as const;
   readonly name: string;
   readonly alias: string | undefined;
+  /**
+   * Resolved storage namespace coordinate for this table, stamped when the
+   * table proxy constructs the AST. Renderers qualify via the namespace
+   * concretion's `qualifyTable()` using this id — never by re-resolving the
+   * bare table name at render time.
+   */
+  readonly namespaceId: string | undefined;
 
-  constructor(name: string, alias?: string) {
+  constructor(name: string, alias?: string, namespaceId?: string) {
     super();
     this.name = name;
     this.alias = alias;
+    this.namespaceId = namespaceId;
     this.freeze();
   }
 
-  static named(name: string, alias?: string): TableSource {
-    return new TableSource(name, alias);
+  static named(name: string, alias?: string, namespaceId?: string): TableSource {
+    return new TableSource(name, alias, namespaceId);
   }
 
   override rewrite(rewriter: AstRewriter): AnyFromSource {

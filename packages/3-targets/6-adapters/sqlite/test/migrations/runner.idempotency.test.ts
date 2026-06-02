@@ -11,6 +11,7 @@ import {
   formatRunnerFailure,
   frameworkComponents,
   sqliteTargetDescriptor,
+  synthEdges,
   type TestDatabase,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
@@ -74,6 +75,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
         {
           space: APP_SPACE_ID,
           plan,
+          migrationEdges: synthEdges(plan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -129,6 +131,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
         {
           space: initPlan.spaceId ?? APP_SPACE_ID,
           plan: initPlan,
+          migrationEdges: synthEdges(initPlan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -162,6 +165,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
         {
           space: noOpPlan.spaceId ?? APP_SPACE_ID,
           plan: noOpPlan,
+          migrationEdges: synthEdges(noOpPlan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -213,6 +217,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
         {
           space: initPlan.spaceId ?? APP_SPACE_ID,
           plan: initPlan,
+          migrationEdges: synthEdges(initPlan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -260,6 +265,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
         {
           space: selfEdgePlan.spaceId ?? APP_SPACE_ID,
           plan: selfEdgePlan,
+          migrationEdges: synthEdges(selfEdgePlan),
           driver,
           destinationContract: contract,
           policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },

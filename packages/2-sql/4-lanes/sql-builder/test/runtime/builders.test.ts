@@ -83,6 +83,7 @@ describe('TableProxy', () => {
     expect(ast).toBeInstanceOf(TableSource);
     expect(ast.name).toBe('users');
     expect(ast.alias).toBe('u1');
+    expect(ast.namespaceId).toBe('public');
   });
 });
 

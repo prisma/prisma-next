@@ -1,6 +1,9 @@
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
-import { contractModels, contractValueObjects } from '@prisma-next/contract/types';
+import {
+  domainModelsAtDefaultNamespace,
+  domainValueObjectsAtDefaultNamespace,
+} from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
@@ -126,6 +129,7 @@ export const postgresTarget: TargetPackRef<'sql', 'postgres'> = {
   id: 'postgres',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: 'public',
 };
 
 export const sqliteTarget: TargetPackRef<'sql', 'sqlite'> = {
@@ -135,6 +139,7 @@ export const sqliteTarget: TargetPackRef<'sql', 'sqlite'> = {
   id: 'sqlite',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: '__unbound__',
 };
 
 export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
@@ -490,11 +495,11 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
 }
 
 export function modelsOf(contract: Contract) {
-  return contractModels(contract);
+  return domainModelsAtDefaultNamespace(contract.domain);
 }
 
 export function valueObjectsOf(contract: Contract) {
-  return contractValueObjects(contract);
+  return domainValueObjectsAtDefaultNamespace(contract.domain);
 }
 
 export function documentScopedTypes(contract: { readonly storage?: unknown }) {

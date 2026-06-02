@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@clack/prompts', () => ({
   intro: vi.fn(),
@@ -1899,58 +1899,6 @@ describe('redactSecrets (F09)', () => {
     expect(
       redactSecrets('GET https://alice:secret@registry.example.com/foo failed: 401 Unauthorized'),
     ).toBe('GET https://***@registry.example.com/foo failed: 401 Unauthorized');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// F14 — deriveCanPrompt action-handler bridge
-// ---------------------------------------------------------------------------
-
-describe('deriveCanPrompt (F14, action-handler bridge)', () => {
-  // Lazy import to avoid the static side-effect of pulling Commander into
-  // every test file.
-  let deriveCanPrompt: (opts: {
-    readonly flagsInteractive: boolean | undefined;
-    readonly optionInteractive: boolean | undefined;
-    readonly stdinIsTTY: boolean;
-  }) => boolean;
-
-  // `beforeAll` rather than `beforeEach`: `import()` caches the module, so
-  // repeating it is wasted work. The explicit timeout covers CI's cold
-  // transform of `init/index` — the first call has been observed
-  // exceeding Vitest's default 200ms hook timeout.
-  beforeAll(async () => {
-    ({ deriveCanPrompt } = await import('../../../src/commands/init/index'));
-  }, timeouts.coldTransformImport);
-
-  it('returns false when stdin is closed even though stdout is a TTY (the canonical CI/agent shape)', () => {
-    expect(
-      deriveCanPrompt({ flagsInteractive: true, optionInteractive: undefined, stdinIsTTY: false }),
-    ).toBe(false);
-  });
-
-  it('returns true when both streams are TTYs and no override is set', () => {
-    expect(
-      deriveCanPrompt({ flagsInteractive: true, optionInteractive: undefined, stdinIsTTY: true }),
-    ).toBe(true);
-  });
-
-  it('honours an explicit --interactive override even when stdin is closed', () => {
-    expect(
-      deriveCanPrompt({ flagsInteractive: true, optionInteractive: true, stdinIsTTY: false }),
-    ).toBe(true);
-  });
-
-  it('returns false when --no-interactive is set, regardless of stdin', () => {
-    expect(
-      deriveCanPrompt({ flagsInteractive: false, optionInteractive: undefined, stdinIsTTY: true }),
-    ).toBe(false);
-  });
-
-  it('returns false in a fully piped environment (decoration off, stdin closed)', () => {
-    expect(
-      deriveCanPrompt({ flagsInteractive: false, optionInteractive: undefined, stdinIsTTY: false }),
-    ).toBe(false);
   });
 });
 

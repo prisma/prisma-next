@@ -4,7 +4,12 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import { Collection } from '../src/collection';
 import type { Models } from './fixtures/generated/contract';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContext, getTestContract } from './helpers';
+import {
+  createMockRuntime,
+  deserializeTestContract,
+  getTestContext,
+  getTestContract,
+} from './helpers';
 
 export type TestModelName = Extract<keyof Models, string>;
 
@@ -49,11 +54,12 @@ export function withReturningCapability(contract: TestContract = baseContract): 
 }
 
 export function withoutDefaultInInsert(contract: TestContract = baseContract): TestContract {
-  const clone = structuredClone(contract);
-  if (clone.capabilities?.['sql']) {
-    delete (clone.capabilities['sql'] as Record<string, unknown>)['defaultInInsert'];
+  const raw = JSON.parse(JSON.stringify(contract)) as Record<string, unknown>;
+  const capabilities = raw['capabilities'] as Record<string, Record<string, unknown>> | undefined;
+  if (capabilities?.['sql']) {
+    delete capabilities['sql']['defaultInInsert'];
   }
-  return clone;
+  return deserializeTestContract(raw);
 }
 
 export function createReturningCollectionWithoutDefaultInInsert<ModelName extends TestModelName>(

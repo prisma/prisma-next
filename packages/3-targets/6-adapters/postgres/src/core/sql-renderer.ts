@@ -27,6 +27,7 @@ import {
   type RawSqlExpr,
   type SelectAst,
   type SubqueryExpr,
+  type TableSource,
   type UpdateAst,
   type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
@@ -269,6 +270,36 @@ function renderDistinctPrefix(
   return '';
 }
 
+function qualifyTableFromNamespaceCoordinate(
+  table: Pick<TableSource, 'name' | 'namespaceId'>,
+  contract: PostgresContract,
+): string {
+  if (table.namespaceId === undefined) {
+    return quoteIdentifier(table.name);
+  }
+  const namespace = contract.storage.namespaces[table.namespaceId];
+  if (namespace === undefined) {
+    throw new Error(
+      `Table "${table.name}" references namespace "${table.namespaceId}" which is not present as a Postgres schema on the contract`,
+    );
+  }
+  const qualifyTable = namespace.qualifyTable;
+  if (qualifyTable === undefined) {
+    throw new Error(
+      `Table "${table.name}" references namespace "${table.namespaceId}" which is not materialised as a Postgres schema on the contract`,
+    );
+  }
+  return qualifyTable.call(namespace, table.name);
+}
+
+function renderTableSource(source: TableSource, contract: PostgresContract): string {
+  const qualified = qualifyTableFromNamespaceCoordinate(source, contract);
+  if (!source.alias) {
+    return qualified;
+  }
+  return `${qualified} AS ${quoteIdentifier(source.alias)}`;
+}
+
 function renderSource(
   source: AnyFromSource,
   contract: PostgresContract,
@@ -276,13 +307,8 @@ function renderSource(
 ): string {
   const node = source;
   switch (node.kind) {
-    case 'table-source': {
-      const table = quoteIdentifier(node.name);
-      if (!node.alias) {
-        return table;
-      }
-      return `${table} AS ${quoteIdentifier(node.alias)}`;
-    }
+    case 'table-source':
+      return renderTableSource(node, contract);
     case 'derived-table-source':
       return `(${renderSelect(node.query, contract, pim)}) AS ${quoteIdentifier(node.alias)}`;
     // v8 ignore next 4
@@ -659,8 +685,9 @@ function renderJoinOn(on: JoinOnExpr, contract: PostgresContract, pim: ParamInde
 function getInsertColumnOrder(
   rows: ReadonlyArray<Record<string, InsertValue>>,
   contract: PostgresContract,
-  tableName: string,
+  tableRef: Pick<TableSource, 'name' | 'namespaceId'>,
 ): string[] {
+  const tableName = tableRef.name;
   const orderedColumns: string[] = [];
   const seenColumns = new Set<string>();
 
@@ -679,13 +706,22 @@ function getInsertColumnOrder(
   }
 
   let table: { columns: Record<string, unknown> } | undefined;
-  for (const ns of Object.values(contract.storage.namespaces)) {
-    // Namespace.tables is Record<string, IRNode> at the interface level;
-    // SQL family namespaces hold StorageTable instances which have .columns.
-    const found = ns.tables[tableName] as { columns: Record<string, unknown> } | undefined;
+  if (tableRef.namespaceId !== undefined) {
+    const ns = contract.storage.namespaces[tableRef.namespaceId];
+    const found = ns?.tables[tableName] as { columns: Record<string, unknown> } | undefined;
     if (found !== undefined) {
       table = found;
-      break;
+    }
+  }
+  if (table === undefined) {
+    for (const ns of Object.values(contract.storage.namespaces)) {
+      // Namespace.tables is Record<string, IRNode> at the interface level;
+      // SQL family namespaces hold StorageTable instances which have .columns.
+      const found = ns.tables[tableName] as { columns: Record<string, unknown> } | undefined;
+      if (found !== undefined) {
+        table = found;
+        break;
+      }
     }
   }
   if (!table) {
@@ -714,7 +750,7 @@ function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): 
 }
 
 function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamIndexMap): string {
-  const table = quoteIdentifier(ast.table.name);
+  const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const rows = ast.rows;
   if (rows.length === 0) {
     throw new Error('INSERT requires at least one row');
@@ -726,7 +762,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
         return `INSERT INTO ${table} DEFAULT VALUES`;
       }
 
-      const defaultColumns = getInsertColumnOrder(rows, contract, ast.table.name);
+      const defaultColumns = getInsertColumnOrder(rows, contract, ast.table);
       if (defaultColumns.length === 0) {
         return `INSERT INTO ${table} VALUES ${rows.map(() => '()').join(', ')}`;
       }
@@ -738,7 +774,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
         .join(', ')}`;
     }
 
-    const columnOrder = getInsertColumnOrder(rows, contract, ast.table.name);
+    const columnOrder = getInsertColumnOrder(rows, contract, ast.table);
     const columns = columnOrder.map((column) => quoteIdentifier(column));
     const values = rows
       .map((row) => {
@@ -786,7 +822,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
 }
 
 function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamIndexMap): string {
-  const table = quoteIdentifier(ast.table.name);
+  const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const setEntries = Object.entries(ast.set);
   if (setEntries.length === 0) {
     throw new Error('UPDATE requires at least one SET assignment');
@@ -805,7 +841,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamInde
 }
 
 function renderDelete(ast: DeleteAst, contract: PostgresContract, pim: ParamIndexMap): string {
-  const table = quoteIdentifier(ast.table.name);
+  const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract, pim)}` : '';
   const returningClause = ast.returning?.length
     ? ` RETURNING ${renderReturning(ast.returning, contract, pim)}`

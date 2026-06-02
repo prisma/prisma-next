@@ -7,7 +7,7 @@
   "description": "Contract types and validation for Prisma Next MongoDB support",
   "scripts": {
     "build": "tsdown",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",

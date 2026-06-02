@@ -72,16 +72,18 @@ function render(node: Foo): string {
 }
 ```
 
-## In tests
+## Always construct instances, never frozen object literals
 
-Always construct subclass instances, never plain objects:
+This holds everywhere a node is built — tests **and** production construction surfaces (contract-free factories, builders). A factory must return `new BarNode(...)`, never `Object.freeze({ kind: 'bar', value: 'x' })`. A frozen plain object has no prototype, so `instanceof` fails, `accept()` is missing, and a downstream shallow-copy (`{ ...node }`) silently strips the type back to an anonymous bag; constructor-time invariants are skipped too.
 
 ```typescript
 // ✅
 const call = new BarNode('x');
+export function bar(value: string): BarNode { return new BarNode(value); }
 
 // ❌
 const call: Foo = { kind: 'bar', value: 'x' };
+export function bar(value: string): Foo { return Object.freeze({ kind: 'bar', value }); }
 ```
 
 ## When NOT to use

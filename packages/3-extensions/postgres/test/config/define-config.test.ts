@@ -4,6 +4,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
+import postgresPackRef from '@prisma-next/target-postgres/pack';
 import { describe, expect, it } from 'vitest';
 import { defineConfig } from '../../src/config/define-config';
 
@@ -23,7 +24,7 @@ describe('defineConfig facade', () => {
       extensionPacks,
       contract: prismaContract(contractPath, {
         output: './prisma/contract.json',
-        target: postgres,
+        target: postgresPackRef,
       }),
     });
 

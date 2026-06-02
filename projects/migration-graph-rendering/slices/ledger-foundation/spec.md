@@ -55,7 +55,7 @@ intermediate contracts is out of scope.
 
 This is a prototype — no back-compat / migration of existing ledger rows.
 
-## Write path: one row per edge, inside the transaction
+## Write path: one row per edge, atomic with marker on SQL
 
 `migrate`/`db update`/`db init` walk a path of edges per space and collapse them
 into one `plan` before handing off to the runner (`apply.ts` →
@@ -64,14 +64,20 @@ into one `plan` before handing off to the runner (`apply.ts` →
 to the runner. Thread it to the runner's per-space execute options, and replace
 the single `recordLedgerEntry` call with a loop that inserts **one ledger row per
 edge** — attributing ops by slicing `plan.operations` with each edge's
-`operationCount` in walk order. The writes stay inside the per-space transaction
-(atomic with marker advancement), and apply in walk order so append order is
-apply order.
+`operationCount` in walk order.
 
-`synth`-produced plans (`db init`/`db update` greenfield) have no authored edges
-(`migrationEdges` absent). They keep writing a single synthesised row keyed by
-the plan's destination (name/hash derived from the plan; `from`=null) — the
-journal still records that the space was initialised.
+On **Postgres and SQLite**, those writes stay inside the per-space transaction
+(atomic with marker advancement). Apply in walk order so append order is apply
+order.
+
+On **Mongo**, DDL cannot run inside a transaction, so ledger writes and marker
+advancement are **resumable**, not atomic — the per-edge journal invariant is a
+SQL-only atomicity guarantee.
+
+`synth`-produced plans (`db init`/`db update` greenfield) carry a single
+synthesised edge in `migrationEdges` (empty `dirName`, destination-keyed hash,
+`from` wired from the live marker or the ∅ origin). Runners write one ledger row
+from that edge like any other apply.
 
 ## Read API: `readLedger`
 
@@ -87,20 +93,29 @@ readLedger(options: {
 `LedgerEntryRecord` (new, beside `ContractMarkerRecord` in `@prisma-next/contract/types`):
 `{ space, migrationName, migrationHash, from: string | null, to, appliedAt: Date, operationCount }`.
 Implemented per target (PG/SQLite `SELECT … WHERE space = ? ORDER BY id`; Mongo
-`$match: { type:'ledger', space }` sorted by insertion). Plumb through the
-control client + a descriptor-free control-api operation, mirroring how
-`readMarker`/`db-verify` reach the CLI.
+`$match: { type:'ledger', space }` sorted by insertion). The ∅-origin normaliser
+lives beside `EMPTY_CONTRACT_HASH` in `@prisma-next/migration-tools`; SQLite-
+specific ledger decode (`created_at`, TEXT `operations`) lives in the SQLite
+adapter. Plumb through the control client (this slice); a descriptor-free
+control-api operation ships with the `status` / `log` consumers (TML-2748 /
+TML-2770).
+
+**Read leniency:** `readLedger` never throws on malformed or legacy rows. Docs
+missing per-migration journal fields (`migrationName` / `migrationHash` on Mongo;
+unreadable rows on SQL) are **skipped** so a single legacy entry cannot poison
+`status` / `log`. Well-formed rows map to `LedgerEntryRecord` as before.
 
 ## Done when
 
 - Ledger rows carry `space` + `migration_name` + `migration_hash` on Postgres,
-  SQLite, and Mongo, written **one per applied edge** inside the per-space
-  transaction, in apply order.
+  SQLite, and Mongo, written **one per applied edge** (inside the per-space SQL
+  transaction on Postgres/SQLite; resumable on Mongo), in apply order.
 - `readLedger({ driver, space })` returns that space's entries in apply order,
   with cross-target parity (same `LedgerEntryRecord` shape from all three).
-- The control client exposes it; a control-api operation wraps it for the CLI.
+- The control client exposes `readLedger` (this slice). A control-api operation
+  wrapping it for the CLI is delivered with its consumers (TML-2748 / TML-2770).
 - Tests: per-target write (single-edge, multi-edge, synth) + read round-trip,
-  and cross-target parity on the read shape.
+  cross-target parity on the read shape, and a control-client `readLedger` test.
 
 ## Out of scope
 

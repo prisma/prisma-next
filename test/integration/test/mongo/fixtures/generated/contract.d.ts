@@ -10,7 +10,7 @@ import type {
 } from '@prisma-next/mongo-contract';
 import type {
   Contract as ContractType,
-  ContractModelsMap,
+  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
@@ -430,5 +430,7 @@ type ContractBase = Omit<
 
   readonly profileHash: ProfileHash;
 };
+
+export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;

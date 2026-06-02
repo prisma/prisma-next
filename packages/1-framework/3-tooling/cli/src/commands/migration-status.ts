@@ -500,7 +500,7 @@ export async function loadAggregateStatusSpaces(args: {
       // Count pending *migrations* (graph edges), not operations: a
       // single authored migration that lowers to N ops or zero ops
       // both count as exactly one pending unit of work for the user.
-      pendingCount = walked.result.migrationEdges?.length ?? 0;
+      pendingCount = walked.result.migrationEdges.length;
       if (liveMarker === null) {
         status = pendingCount === 0 ? 'no-marker' : 'pending';
       } else {

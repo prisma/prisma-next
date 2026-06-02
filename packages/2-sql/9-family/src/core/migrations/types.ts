@@ -22,6 +22,7 @@ import type {
   SchemaIssue,
   SchemaVerifier,
 } from '@prisma-next/framework-components/control';
+import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type {
   SqlStorage,
   StorageColumn,
@@ -31,6 +32,7 @@ import type {
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
+import type { SqlControlAdapter } from '../control-adapter';
 import type { SqlControlFamilyInstance } from '../control-instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
@@ -174,7 +176,7 @@ export interface SqlControlExtensionDescriptor<TTargetId extends string>
 }
 
 export interface SqlControlAdapterDescriptor<TTargetId extends string>
-  extends ControlAdapterDescriptor<'sql', TTargetId> {
+  extends ControlAdapterDescriptor<'sql', TTargetId, SqlControlAdapter<TTargetId>> {
   readonly queryOperations?: () => SqlOperationDescriptors;
 }
 
@@ -384,6 +386,11 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  /**
+   * Per-edge breakdown from graph-walk planning. When present, the runner
+   * writes one ledger row per edge instead of one collapsed row per apply.
+   */
+  readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
 }
 
 export type SqlMigrationRunnerErrorCode =

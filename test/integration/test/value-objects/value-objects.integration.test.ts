@@ -1,8 +1,9 @@
 import {
+  type Contract,
   type ContractField,
   type ContractValueObject,
-  contractModels,
-  contractValueObjects,
+  domainModelsAtDefaultNamespace,
+  domainValueObjectsAtDefaultNamespace,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
@@ -51,6 +52,7 @@ const postgresTarget = {
   id: 'postgres',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: 'public' as const,
 };
 
 const postgresScalarTypeDescriptors = new Map([
@@ -82,6 +84,14 @@ function interpretSqlPsl(schema: string) {
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
   });
+}
+
+function modelsAtDefaultNamespace(contract: Contract) {
+  return domainModelsAtDefaultNamespace(contract.domain);
+}
+
+function valueObjectsAtDefaultNamespace(contract: Contract) {
+  return domainValueObjectsAtDefaultNamespace(contract.domain);
 }
 
 describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
@@ -246,8 +256,8 @@ type Metadata {
     expect(sqlResult.ok).toBe(true);
     if (!mongoResult.ok || !sqlResult.ok) return;
 
-    const mongoVos = contractValueObjects(mongoResult.value)!;
-    const sqlVos = contractValueObjects(sqlResult.value)!;
+    const mongoVos = valueObjectsAtDefaultNamespace(mongoResult.value)!;
+    const sqlVos = valueObjectsAtDefaultNamespace(sqlResult.value)!;
 
     expect(Object.keys(mongoVos)).toEqual(Object.keys(sqlVos));
 
@@ -262,11 +272,11 @@ type Metadata {
       expect(mongoField.nullable).toBe(sqlField.nullable);
     }
 
-    const mongoItemFields = contractModels(mongoResult.value)['Item']!.fields as Record<
+    const mongoItemFields = modelsAtDefaultNamespace(mongoResult.value)['Item']!.fields as Record<
       string,
       ContractField
     >;
-    const sqlItemFields = contractModels(sqlResult.value)['Item']!.fields as Record<
+    const sqlItemFields = modelsAtDefaultNamespace(sqlResult.value)['Item']!.fields as Record<
       string,
       ContractField
     >;
@@ -313,16 +323,14 @@ type Address {
     expect(sqlResult.ok).toBe(true);
     if (!mongoResult.ok || !sqlResult.ok) return;
 
-    expect(Object.keys(contractValueObjects(mongoResult.value)!).sort()).toEqual(
-      Object.keys(contractValueObjects(sqlResult.value)!).sort(),
+    expect(Object.keys(valueObjectsAtDefaultNamespace(mongoResult.value)!).sort()).toEqual(
+      Object.keys(valueObjectsAtDefaultNamespace(sqlResult.value)!).sort(),
     );
 
-    const mongoShipping = contractValueObjects(mongoResult.value)!['ShippingInfo']!
+    const mongoShipping = valueObjectsAtDefaultNamespace(mongoResult.value)!['ShippingInfo']!
       .fields as Record<string, ContractField>;
-    const sqlShipping = contractValueObjects(sqlResult.value)!['ShippingInfo']!.fields as Record<
-      string,
-      ContractField
-    >;
+    const sqlShipping = valueObjectsAtDefaultNamespace(sqlResult.value)!['ShippingInfo']!
+      .fields as Record<string, ContractField>;
 
     expect(mongoShipping['address']!.type).toEqual({ kind: 'valueObject', name: 'Address' });
     expect(sqlShipping['address']!.type).toEqual({ kind: 'valueObject', name: 'Address' });

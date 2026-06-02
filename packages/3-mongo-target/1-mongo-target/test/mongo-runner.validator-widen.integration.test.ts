@@ -10,6 +10,10 @@ import type {
   ControlFamilyInstance,
   MigrationPlan,
 } from '@prisma-next/framework-components/control';
+import {
+  type AggregateMigrationEdgeRef,
+  buildSynthMigrationEdge,
+} from '@prisma-next/migration-tools/aggregate';
 import { MongoCollection, type MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -42,6 +46,16 @@ afterAll(async () => {
   await client?.close();
   await replSet?.stop();
 });
+
+function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
+  return [
+    buildSynthMigrationEdge({
+      currentMarkerStorageHash: plan.origin?.storageHash,
+      destinationStorageHash: plan.destination.storageHash,
+      operationCount: plan.operations.length,
+    }),
+  ];
+}
 
 beforeEach(async () => {
   const collections = await db.listCollections().toArray();
@@ -168,6 +182,7 @@ describe('MongoMigrationRunner - validator widen', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(serialized),
       destinationContract: destContract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -285,6 +300,7 @@ describe('MongoMigrationRunner - validator widen', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(serialized),
       destinationContract: destContract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],

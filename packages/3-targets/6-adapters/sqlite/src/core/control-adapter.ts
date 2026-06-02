@@ -1,4 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
@@ -6,11 +6,14 @@ import {
   APP_SPACE_ID,
   type ControlDriverInstance,
 } from '@prisma-next/framework-components/control';
+import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import type {
   AnyQueryAst,
+  DdlNode,
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
+import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
   PrimaryKey,
   SqlColumnIR,
@@ -21,13 +24,21 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import {
+  buildControlTableBootstrapQueries,
+  buildSignMarkerBootstrapQueries,
+} from '@prisma-next/target-sqlite/contract-free';
+import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
+import { renderLoweredDdl } from './ddl-renderer';
+import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
 import type { SqliteContract } from './types';
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';
+const SQLITE_LEDGER_TABLE = '_prisma_ledger';
 
 /**
  * SQLite stores arrays as JSON-encoded TEXT (no native array type), so the
@@ -101,6 +112,14 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   readonly normalizeDefault = parseSqliteDefault;
   readonly normalizeNativeType = normalizeSqliteNativeType;
 
+  bootstrapControlTableQueries(): readonly DdlNode[] {
+    return buildControlTableBootstrapQueries();
+  }
+
+  bootstrapSignMarkerQueries(): readonly DdlNode[] {
+    return buildSignMarkerBootstrapQueries();
+  }
+
   /**
    * Lower a SQL query AST into a SQLite-flavored `{ sql, params }` payload.
    *
@@ -109,7 +128,10 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * and contract. Used at migration plan/emit time (e.g. by `dataTransform`)
    * without instantiating the runtime adapter.
    */
-  lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
+  lower(ast: AnyQueryAst | SqliteDdlNode, context: LowererContext<unknown>): LoweredStatement {
+    if (isDdlNode(ast)) {
+      return renderLoweredDdl(ast);
+    }
     return renderLoweredSql(ast, context.contract as SqliteContract);
   }
 
@@ -230,6 +252,65 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       );
     }
     return rows;
+  }
+
+  /**
+   * Reads per-migration ledger rows for `space` from `_prisma_ledger` in
+   * apply order. Probes `sqlite_master` first so a fresh database without
+   * the ledger table returns `[]` instead of raising "no such table".
+   */
+  async readLedger(
+    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    space: string,
+  ): Promise<readonly LedgerEntryRecord[]> {
+    const ledgerContext = { space, markerLocation: SQLITE_LEDGER_TABLE };
+    const exists = await withMarkerReadErrorHandling(
+      () =>
+        driver.query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, [
+          '_prisma_ledger',
+        ]),
+      ledgerContext,
+    );
+    if (exists.rows.length === 0) {
+      return [];
+    }
+
+    const result = await withMarkerReadErrorHandling(
+      () =>
+        driver.query<{
+          space: string;
+          migration_name: string;
+          migration_hash: string;
+          origin_core_hash: string | null;
+          destination_core_hash: string;
+          operations: unknown;
+          created_at: Date | string;
+        }>(
+          `SELECT
+         space,
+         migration_name,
+         migration_hash,
+         origin_core_hash,
+         destination_core_hash,
+         operations,
+         created_at
+       FROM _prisma_ledger
+       WHERE space = ?
+       ORDER BY id`,
+          [space],
+        ),
+      ledgerContext,
+    );
+
+    return result.rows.map((row) => ({
+      space: row.space,
+      migrationName: row.migration_name,
+      migrationHash: row.migration_hash,
+      from: ledgerOriginFromStored(row.origin_core_hash),
+      to: row.destination_core_hash,
+      appliedAt: coerceLedgerAppliedAt(row.created_at),
+      operationCount: operationCountFromStored(row.operations),
+    }));
   }
 
   async introspect(

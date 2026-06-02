@@ -26,6 +26,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
+  injectMigrationSqlDbSetup,
   type JourneyContext,
   runContractEmit,
   runMigrate,
@@ -108,28 +109,12 @@ withTempDir(({ createTempDir }) => {
         expect(manifestBefore.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
         expect(JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'))).toEqual([]);
 
-        const dbSetupBlock = [
-          `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';`,
-          `import { sql } from '@prisma-next/sql-builder/runtime';`,
-          `import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';`,
-          `import postgresTarget from '@prisma-next/target-postgres/runtime';`,
-          '',
-          'const db = sql({',
-          '  context: createExecutionContext({',
-          '    contract: endContract,',
-          '    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),',
-          '  }),',
-          '});',
-          '',
-          'export default class M extends Migration {',
-        ].join('\n');
         // The contract `migration.ts` imports is the *new* contract,
         // where `status` only allows ['active', 'archived']. We can't
         // reference 'pending' directly through the typed builder, so
         // the user-written queries select-by/update-by exclusion
         // against the surviving values.
-        const filled = scaffold
-          .replace('export default class M extends Migration {', dbSetupBlock)
+        const filled = injectMigrationSqlDbSetup(scaffold)
           .replace(
             "() => placeholder('migrate-status-values:check')",
             "() => db.user.select('id').where((f, fns) => fns.notIn(f.status, ['active', 'archived'])).limit(1)",

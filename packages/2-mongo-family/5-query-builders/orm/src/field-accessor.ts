@@ -1,7 +1,7 @@
 import type {
   ContractField,
   ContractValueObject,
-  ContractValueObjectsMap,
+  ContractValueObjectDefinitions,
 } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
@@ -134,7 +134,7 @@ export type FieldExpression<T = unknown> = {
 type HasValueObjects = MongoContract;
 
 type MergedContractValueObjects<TContract extends HasValueObjects> =
-  ContractValueObjectsMap<TContract> &
+  ContractValueObjectDefinitions<TContract> &
     (TContract extends { readonly valueObjects?: infer VOs }
       ? VOs extends Record<string, ContractValueObject>
         ? VOs
