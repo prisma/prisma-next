@@ -478,6 +478,7 @@ describe('resolveModelRelations() through descriptor', () => {
       childColumns: ['child_id'],
       targetColumns: ['id'],
       requiredPayloadColumns: [],
+      namespaceId: 'public',
     });
   });
 

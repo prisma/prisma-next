@@ -31,6 +31,7 @@ export type {
   ContractReferenceRelation,
   ContractRelation,
   ContractRelationOn,
+  ContractRelationThrough,
   ContractValueObject,
   ContractVariantEntry,
   EmbedRelationKeys,
