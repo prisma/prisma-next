@@ -271,6 +271,18 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/3-targets/7-drivers/ppg-serverless/src/ppg-driver.ts",
+      "domain": "targets",
+      "layer": "drivers",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-targets/7-drivers/ppg-serverless/src/normalize-error.ts",
+      "domain": "targets",
+      "layer": "drivers",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/3-targets/7-drivers/ppg-serverless/src/exports/runtime.ts",
       "domain": "targets",
       "layer": "drivers",
