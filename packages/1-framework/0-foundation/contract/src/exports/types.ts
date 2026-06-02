@@ -6,7 +6,7 @@ export type {
 } from '../contract-types';
 export { DomainNamespaceResolutionError } from '../contract-validation-error';
 export type { ControlPolicy } from '../control-policy';
-export { effectiveControl } from '../control-policy';
+export { effectiveControlPolicy } from '../control-policy';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
 export { soleDomainNamespaceId } from '../default-namespace';
