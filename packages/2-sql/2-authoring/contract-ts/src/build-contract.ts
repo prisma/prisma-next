@@ -21,7 +21,6 @@ import {
 } from '@prisma-next/contract/types';
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
@@ -156,12 +155,12 @@ const JSONB_NATIVE_TYPE = 'jsonb';
 function resolveModelNamespaceId(
   model: ModelNode,
   modelNameToNamespaceId: ReadonlyMap<string, string>,
-  targetId: string,
+  defaultNamespaceId: string,
 ): string {
   if (model.namespaceId !== undefined && model.namespaceId.length > 0) {
     return model.namespaceId;
   }
-  return modelNameToNamespaceId.get(model.modelName) ?? defaultModelNamespaceId(targetId);
+  return modelNameToNamespaceId.get(model.modelName) ?? defaultNamespaceId;
 }
 
 function buildStorageColumn(
@@ -231,7 +230,7 @@ function buildDomainField(
 
 function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): Set<string> {
   const ids = new Set<string>();
-  ids.add(defaultModelNamespaceId(definition.target.targetId));
+  ids.add(definition.target.defaultNamespaceId);
   for (const id of definition.namespaces ?? []) {
     if (id.length > 0) {
       ids.add(id);
@@ -246,11 +245,6 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
 }
 
 const POSTGRES_ENUM_NAMESPACE_ID = 'public';
-const POSTGRES_DEFAULT_NAMESPACE_ID = 'public';
-
-function defaultModelNamespaceId(targetId: string): string {
-  return targetId === 'postgres' ? POSTGRES_DEFAULT_NAMESPACE_ID : UNBOUND_NAMESPACE_ID;
-}
 
 function partitionStorageTypesForTarget(
   targetId: string,
@@ -304,6 +298,7 @@ export function buildSqlContractFromDefinition(
   codecLookup?: CodecLookup,
 ): Contract<SqlStorage> {
   const target = definition.target.targetId;
+  const defaultNamespaceId = definition.target.defaultNamespaceId;
   const targetFamily = 'sql';
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
 
@@ -319,7 +314,7 @@ export function buildSqlContractFromDefinition(
     const namespaceId =
       semanticModel.namespaceId !== undefined && semanticModel.namespaceId.length > 0
         ? semanticModel.namespaceId
-        : defaultModelNamespaceId(target);
+        : defaultNamespaceId;
     modelNameToNamespaceId.set(semanticModel.modelName, namespaceId);
     roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
 
@@ -390,7 +385,7 @@ export function buildSqlContractFromDefinition(
         fk.references.namespaceId ??
         (targetModel.namespaceId !== undefined && targetModel.namespaceId.length > 0
           ? targetModel.namespaceId
-          : defaultModelNamespaceId(target));
+          : defaultNamespaceId);
       return {
         source: { namespaceId: asNamespaceId(namespaceId), tableName, columns: fk.columns },
         target: {
@@ -487,7 +482,7 @@ export function buildSqlContractFromDefinition(
       modelRelations[relation.fieldName] = {
         to: crossRef(
           relation.toModel,
-          resolveModelNamespaceId(targetModel, modelNameToNamespaceId, target),
+          resolveModelNamespaceId(targetModel, modelNameToNamespaceId, defaultNamespaceId),
         ),
         // RelationDefinition.cardinality includes 'N:M' which isn't in
         // ContractReferenceRelation yet — cast is needed until the contract
@@ -672,7 +667,6 @@ export function buildSqlContractFromDefinition(
         )
       : undefined;
 
-  const defaultNamespaceId = defaultModelNamespaceId(target);
   const domainNamespaceIds = new Set(Object.keys(modelsByNamespace));
   if (domainNamespaceIds.size === 0) {
     domainNamespaceIds.add(defaultNamespaceId);

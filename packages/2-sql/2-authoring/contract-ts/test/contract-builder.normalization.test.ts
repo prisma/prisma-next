@@ -22,6 +22,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 };
 
 describe('contract builder normalization', () => {

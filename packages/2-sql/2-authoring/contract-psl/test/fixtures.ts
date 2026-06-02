@@ -130,6 +130,7 @@ export const postgresTarget: TargetPackRef<'sql', 'postgres'> = {
   id: 'postgres',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: 'public',
 };
 
 export const sqliteTarget: TargetPackRef<'sql', 'sqlite'> = {
@@ -139,6 +140,7 @@ export const sqliteTarget: TargetPackRef<'sql', 'sqlite'> = {
   id: 'sqlite',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: '__unbound__',
 };
 
 export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {

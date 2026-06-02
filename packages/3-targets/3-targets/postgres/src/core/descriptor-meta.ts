@@ -12,6 +12,7 @@ const postgresTargetDescriptorMetaBase = {
   id: 'postgres',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: 'public',
   authoring: {
     type: postgresAuthoringTypes,
     field: postgresAuthoringFieldPresets,

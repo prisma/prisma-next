@@ -18,6 +18,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 };
 
 const stubContext: ContractSourceContext = {

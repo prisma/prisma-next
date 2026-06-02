@@ -7,4 +7,5 @@ export const postgresPack: TargetPackRef<'sql', 'postgres'> = {
   targetId: 'postgres',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: 'public',
 };

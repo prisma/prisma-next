@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { CodecTypes } from './codec-types';
 
 const mongoTargetDescriptorMetaBase = {
@@ -7,6 +8,7 @@ const mongoTargetDescriptorMetaBase = {
   id: 'mongo',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: UNBOUND_NAMESPACE_ID,
 } as const;
 
 export const mongoTargetDescriptorMeta: typeof mongoTargetDescriptorMetaBase & {

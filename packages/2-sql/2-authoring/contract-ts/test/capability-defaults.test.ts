@@ -24,6 +24,7 @@ const bareTargetPack = {
   targetId: 'postgres',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: 'public',
 } as const satisfies TargetPackRef<'sql', 'postgres'>;
 
 const targetWithCapabilities = {

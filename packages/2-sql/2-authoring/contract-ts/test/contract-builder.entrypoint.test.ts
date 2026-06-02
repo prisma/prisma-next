@@ -57,6 +57,7 @@ const postgresTargetPack = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 } as const satisfies TargetPackRef<'sql', 'postgres'>;
 
 const pgvectorExtensionPack = {
@@ -148,6 +149,7 @@ describe('defineContract namespace declaration runtime guards', () => {
     familyId: 'sql',
     targetId: 'sqlite',
     version: '0.0.1',
+    defaultNamespaceId: '__unbound__',
   } as const satisfies TargetPackRef<'sql', 'sqlite'>;
 
   it('accepts an empty namespaces list and treats it as no-op', () => {

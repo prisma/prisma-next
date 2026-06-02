@@ -54,6 +54,7 @@ const postgresTarget = {
   id: 'postgres',
   version: '0.0.1',
   capabilities: {},
+  defaultNamespaceId: 'public' as const,
 };
 
 const postgresScalarTypeDescriptors = new Map([
