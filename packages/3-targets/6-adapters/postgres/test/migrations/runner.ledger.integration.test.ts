@@ -158,9 +158,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     expect(ops).toHaveLength(1);
     expect(ops[0]?.id).toBe('edge.single.op');
     expect(rows[0]!.contract_json_before).toBeNull();
-    expect(rows[0]!.contract_json_after).toMatchObject({
-      storage: { storageHash: destHash },
-    });
+    expect(rows[0]!.contract_json_after).toBeNull();
 
     const ledger = await ledgerAdapter.readLedger(driver!, LEDGER_TEST_SPACE_ID);
     expectReadLedger(ledger, [
@@ -308,9 +306,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     expect(rows[1]!.contract_json_before).toBeNull();
     expect(rows[1]!.contract_json_after).toBeNull();
     expect(rows[2]!.contract_json_before).toBeNull();
-    expect(rows[2]!.contract_json_after).toMatchObject({
-      storage: { storageHash: destHash },
-    });
+    expect(rows[2]!.contract_json_after).toBeNull();
 
     const ledger = await ledgerAdapter.readLedger(driver!, LEDGER_TEST_SPACE_ID);
     expectReadLedger(ledger, [

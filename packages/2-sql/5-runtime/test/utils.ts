@@ -46,7 +46,6 @@ import {
   createSqlExecutionStack,
   ensureSchemaStatement,
   ensureTableStatement,
-  writeContractMarker,
 } from '../src/exports';
 import type {
   ExecutionContext,
@@ -113,31 +112,55 @@ export async function setupTestDatabase(
 
   await executeStatement(client, ensureSchemaStatement);
   await executeStatement(client, ensureTableStatement);
-  const write = writeContractMarker({
-    space: APP_SPACE_ID,
-    storageHash: contract.storage.storageHash,
-    profileHash: contract.profileHash,
-    contractJson: contract,
-    canonicalVersion: 1,
-  });
-  await executeStatement(client, write.insert);
+  await writeTestContractMarker(client, contract);
+}
+
+export interface SeedMarkerInput {
+  /** Logical space for the marker row; defaults to {@link APP_SPACE_ID}. */
+  readonly space?: string;
+  readonly storageHash: string;
+  readonly profileHash: string;
+  readonly contractJson?: unknown;
+  readonly canonicalVersion?: number;
+  readonly invariants?: readonly string[];
 }
 
 /**
- * Writes a contract marker to the database. This helper DRYs up the common pattern of writing contract markers in tests.
+ * Seeds a contract marker row directly via raw SQL. Test-only: the production
+ * write path goes through the control adapter SPI (`initMarker`/`updateMarker`),
+ * which needs a `ControlDriverInstance`; these fixtures hold a raw `pg.Client`,
+ * so they perform a minimal `INSERT` over the columns the runtime reads back.
+ */
+export async function seedTestMarker(client: Client, input: SeedMarkerInput): Promise<void> {
+  await client.query(
+    `insert into prisma_contract.marker
+       (space, core_hash, profile_hash, contract_json, canonical_version, invariants, updated_at)
+     values ($1, $2, $3, $4::jsonb, $5, $6::text[], now())`,
+    [
+      input.space ?? APP_SPACE_ID,
+      input.storageHash,
+      input.profileHash,
+      input.contractJson === undefined ? null : JSON.stringify(input.contractJson),
+      input.canonicalVersion ?? null,
+      input.invariants ?? [],
+    ],
+  );
+}
+
+/**
+ * Seeds the app-space marker for a contract. Thin wrapper over
+ * {@link seedTestMarker} for the common "write the marker for this contract" case.
  */
 export async function writeTestContractMarker(
   client: Client,
   contract: Contract<SqlStorage>,
 ): Promise<void> {
-  const write = writeContractMarker({
-    space: APP_SPACE_ID,
+  await seedTestMarker(client, {
     storageHash: contract.storage.storageHash,
     profileHash: contract.profileHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
-  await executeStatement(client, write.insert);
 }
 
 /**

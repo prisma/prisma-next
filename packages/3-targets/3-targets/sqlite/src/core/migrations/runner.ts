@@ -25,12 +25,7 @@ import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
-import {
-  buildLedgerInsertStatement,
-  buildWriteMarkerStatements,
-  MARKER_TABLE_NAME,
-  type SqlStatement,
-} from './statement-builders';
+import { MARKER_TABLE_NAME, type SqlStatement } from './statement-builders';
 
 export function createSqliteMigrationRunner(
   family: SqlControlFamilyInstance,
@@ -123,8 +118,9 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     const isSelfEdgeNoOp = isSelfEdge && operationsExecuted === 0 && incomingIsSubsetOfExisting;
 
     if (!isSelfEdgeNoOp) {
-      await this.upsertMarker(driver, options, existingMarker, space);
-      await this.recordLedgerEntries(driver, options, existingMarker, executedOperations);
+      const markerResult = await this.upsertMarker(driver, options, existingMarker, space);
+      if (!markerResult.ok) return markerResult;
+      await this.recordLedgerEntries(driver, options, executedOperations);
     }
 
     return runnerSuccess({
@@ -570,41 +566,52 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
     space: string,
-  ): Promise<void> {
-    // SQLite has no native array type, so we can't merge invariants in SQL
-    // the way Postgres does. Merge client-side under the runner's
-    // BEGIN EXCLUSIVE — sort + dedupe so the JSON-encoded value is stable.
-    const merged = new Set<string>(existingMarker?.invariants ?? []);
-    for (const inv of options.plan.providedInvariants) merged.add(inv);
-    const invariants = Array.from(merged).sort();
-    const writeStatements = buildWriteMarkerStatements({
-      space,
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    // Pass the plan's incoming invariants verbatim; `updateMarker` unions them
+    // with the stored set (TS-side, dialect-uniform) under the runner's
+    // BEGIN EXCLUSIVE — no client-side pre-merge here, so there is no
+    // double-merge with the SPI's internal accumulate-dedupe.
+    const destination = {
       storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??
         options.destinationContract.profileHash ??
         options.plan.destination.storageHash,
-      contractJson: options.destinationContract,
-      canonicalVersion: null,
-      meta: {},
-      invariants,
+      invariants: options.plan.providedInvariants ?? [],
+    };
+    if (!existingMarker) {
+      await this.family.initMarker({ driver, space, destination });
+      return okVoid();
+    }
+    const updated = await this.family.updateMarker({
+      driver,
+      space,
+      expectedFrom: existingMarker.storageHash,
+      destination,
     });
-    const statement = existingMarker ? writeStatements.update : writeStatements.insert;
-    await this.executeStatement(driver, statement);
+    if (!updated) {
+      return runnerFailure(
+        'MARKER_CAS_FAILURE',
+        'Marker was modified by another process during migration execution.',
+        {
+          meta: {
+            space,
+            expectedStorageHash: existingMarker.storageHash,
+            destinationStorageHash: options.plan.destination.storageHash,
+          },
+        },
+      );
+    }
+    return okVoid();
   }
 
   private async recordLedgerEntries(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
-    existingMarker: ContractMarkerRecord | null,
     executedOperations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[],
   ): Promise<void> {
     const plan = options.plan;
     const space = plan.spaceId;
-    const destinationProfileHash =
-      plan.destination.profileHash ??
-      options.destinationContract.profileHash ??
-      plan.destination.storageHash;
     const edges = options.migrationEdges;
     const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
     if (totalEdgeOps !== plan.operations.length) {
@@ -616,31 +623,21 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     // are substituted with skip records (empty `execute`) by `applyPlan`, so the
     // journal reflects what actually ran rather than the raw plan.
     let offset = 0;
-    const lastIndex = edges.length - 1;
-    for (const [i, edge] of edges.entries()) {
+    for (const edge of edges) {
       const edgeOps = executedOperations.slice(offset, offset + edge.operationCount);
       offset += edge.operationCount;
-      const isFirst = i === 0;
-      const isLast = i === lastIndex;
-      await this.executeStatement(
+      await this.family.writeLedgerEntry({
         driver,
-        buildLedgerInsertStatement({
-          space,
+        space,
+        entry: {
+          edgeId: `${edge.from}->${edge.to}`,
+          from: edge.from,
+          to: edge.to,
           migrationName: edge.dirName,
           migrationHash: edge.migrationHash,
-          originStorageHash: edge.from === '' ? null : edge.from,
-          originProfileHash:
-            isFirst && existingMarker?.storageHash === edge.from
-              ? (existingMarker.profileHash ?? null)
-              : null,
-          destinationStorageHash: edge.to,
-          destinationProfileHash:
-            isLast && edge.to === plan.destination.storageHash ? destinationProfileHash : null,
-          contractJsonBefore: isFirst ? (existingMarker?.contractJson ?? null) : null,
-          contractJsonAfter: isLast ? options.destinationContract : null,
           operations: edgeOps,
-        }),
-      );
+        },
+      });
     }
   }
 

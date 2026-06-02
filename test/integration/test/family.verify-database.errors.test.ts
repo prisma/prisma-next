@@ -7,7 +7,6 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
-  APP_SPACE_ID,
   createControlStack,
   type VerifyDatabaseResult,
 } from '@prisma-next/framework-components/control';
@@ -15,12 +14,8 @@ import { defineContract, field, model } from '@prisma-next/postgres/contract-bui
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
-import {
-  ensureSchemaStatement,
-  ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
+import { ensureSchemaStatement, ensureTableStatement } from '@prisma-next/sql-runtime';
+import { executeStatement, seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -214,14 +209,12 @@ describe('family instance verify - errors', () => {
             await executeStatement(client, ensureTableStatement);
 
             // Write marker with different hash
-            const write = writeContractMarker({
-              space: APP_SPACE_ID,
+            await seedTestMarker(client, {
               storageHash: 'sha256:different-hash',
               profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
-            await executeStatement(client, write.insert);
           });
 
           // Load contract and verify
@@ -273,14 +266,12 @@ describe('family instance verify - errors', () => {
             await executeStatement(client, ensureTableStatement);
 
             // Write marker with different profileHash
-            const write = writeContractMarker({
-              space: APP_SPACE_ID,
+            await seedTestMarker(client, {
               storageHash: contractWithDb.storage.storageHash,
               profileHash: 'sha256:different-profile-hash',
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
-            await executeStatement(client, write.insert);
           });
 
           // Load contract and verify
@@ -370,14 +361,12 @@ describe('family instance verify - errors', () => {
             await executeStatement(client, ensureSchemaStatement);
             await executeStatement(client, ensureTableStatement);
 
-            const write = writeContractMarker({
-              space: APP_SPACE_ID,
+            await seedTestMarker(client, {
               storageHash: contractWithDb.storage.storageHash,
               profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
-            await executeStatement(client, write.insert);
           });
 
           // Load contract and verify

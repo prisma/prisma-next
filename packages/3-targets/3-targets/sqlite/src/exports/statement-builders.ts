@@ -1,7 +1,5 @@
 export {
   APP_SPACE_ID,
-  buildLedgerInsertStatement,
-  buildWriteMarkerStatements,
   CONTROL_TABLE_NAMES,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,

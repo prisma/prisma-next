@@ -127,7 +127,7 @@ const runtime = createRuntime({
 
 ### SQL Marker
 
-- `readContractMarker`, `writeContractMarker` - SQL marker statements
+- `readContractMarker` - SQL marker read statement (writes go through the control adapter SPI)
 - `ensureSchemaStatement`, `ensureTableStatement` - DDL statements for marker table setup
 - `SqlStatement` - SQL statement type
 

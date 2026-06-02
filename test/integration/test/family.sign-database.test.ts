@@ -11,12 +11,8 @@ import {
 } from '@prisma-next/framework-components/control';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import {
-  ensureSchemaStatement,
-  ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
+import { ensureSchemaStatement, ensureTableStatement } from '@prisma-next/sql-runtime';
+import { executeStatement, seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
 import type { DevDatabase } from '@prisma-next/test-utils';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
@@ -164,14 +160,12 @@ describe('family instance sign', () => {
           )
         `);
         // Write initial marker with different hash
-        const write = writeContractMarker({
-          space: APP_SPACE_ID,
+        await seedTestMarker(client, {
           storageHash: 'sha256:old-hash',
           profileHash: 'sha256:old-profile-hash',
           contractJson: { target: 'postgres' },
           canonicalVersion: 1,
         });
-        await executeStatement(client, write.insert);
       });
     }, timeouts.spinUpPpgDev);
 

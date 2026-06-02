@@ -59,7 +59,6 @@ export {
   ensureSchemaStatement,
   ensureTableStatement,
   readContractMarker,
-  writeContractMarker,
 } from '../sql-marker';
 export type {
   CreateRuntimeOptions,

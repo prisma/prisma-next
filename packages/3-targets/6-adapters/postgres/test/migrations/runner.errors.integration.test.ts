@@ -2,7 +2,6 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import {
-  buildMergeMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
@@ -200,16 +199,15 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       await executeStatement(driver!, ensureMarkerTableStatement);
       await executeStatement(driver!, ensureLedgerTableStatement);
 
-      const mismatchedMarker = buildMergeMarkerStatements({
+      await familyInstance.initMarker({
+        driver: driver!,
         space: APP_SPACE_ID,
-        storageHash: 'sha256:other-contract',
-        profileHash: 'sha256:other-profile',
-        contractJson: { storageHash: 'sha256:other-contract' },
-        canonicalVersion: null,
-        meta: {},
-        invariants: [],
+        destination: {
+          storageHash: 'sha256:other-contract',
+          profileHash: 'sha256:other-profile',
+          invariants: [],
+        },
       });
-      await executeStatement(driver!, mismatchedMarker.insert);
 
       const runner = postgresTargetDescriptor.createRunner(familyInstance);
       const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
