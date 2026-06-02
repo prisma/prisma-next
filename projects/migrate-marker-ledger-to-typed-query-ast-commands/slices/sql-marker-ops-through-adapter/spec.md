@@ -30,7 +30,7 @@ One reviewer holds it: this slice migrates *all* SQL marker/ledger DML call site
 
 | Edge case | Disposition | Notes |
 |---|---|---|
-| SQLite invariant overwrite→merge | Intended behaviour change | Operator-confirmed; PR states it explicitly. |
+| SQLite invariant overwrite→merge | Layer relocation; net behaviour preserved (revised at D2) | **Revised:** the legacy SQLite *runner* (`runner.ts:605-607`) already pre-merges invariants client-side before its overwrite statement, so today's *net* SQLite behaviour already accumulate-dedupes — only the SQL *statement* overwrote. D2 relocates the merge into the `updateMarker` SPI (uniform TS merge, both dialects); D4's cut-over drops the runner pre-merge. Net observable behaviour is therefore **preserved**, not changed — the convergence is at the SPI/statement layer. Operator confirmation already given covered the stronger (behaviour-change) reading. **PR body must state this accurately** (relocation, not net change). |
 | `meta`/`contract_json` JSON encoding skew | Fixed by value codecs | Today `sql-marker.ts` hand-`JSON.stringify`s `meta` but not `contract_json`; routing through codecs makes encode/decode uniform across dialects. |
 | Marker read on absent table | Preserve tagged result | `MarkerReadResult` `no-table`/`absent`/`present` semantics unchanged. |
 
