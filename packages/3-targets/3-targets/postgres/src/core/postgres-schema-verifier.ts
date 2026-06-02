@@ -3,7 +3,6 @@ import { SqlSchemaVerifierBase } from '@prisma-next/family-sql/ir';
 import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { postgresColumnsCompatible } from './column-type-compatibility';
 
 /**
  * Postgres target `SchemaVerifier` concretion. Plugs into the
@@ -24,10 +23,6 @@ export class PostgresSchemaVerifier extends SqlSchemaVerifierBase<
   Contract<SqlStorage>,
   SqlSchemaIR
 > {
-  protected columnsCompatible(declared: string, live: string): boolean {
-    return postgresColumnsCompatible(declared, live);
-  }
-
   protected verifyCommonSqlSchema(
     _options: SchemaVerifyOptions<Contract<SqlStorage>, SqlSchemaIR>,
   ): readonly SchemaIssue[] {

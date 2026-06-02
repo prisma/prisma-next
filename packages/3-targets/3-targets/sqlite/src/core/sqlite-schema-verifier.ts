@@ -10,10 +10,6 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
  * that routes the existing verifier behaviour through the SPI.
  */
 export class SqliteSchemaVerifier extends SqlSchemaVerifierBase<Contract<SqlStorage>, SqlSchemaIR> {
-  protected columnsCompatible(declared: string, live: string): boolean {
-    return declared === live;
-  }
-
   protected verifyCommonSqlSchema(
     _options: SchemaVerifyOptions<Contract<SqlStorage>, SqlSchemaIR>,
   ): readonly SchemaIssue[] {
