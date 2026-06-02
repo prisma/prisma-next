@@ -4,7 +4,6 @@ import type {
   Adapter,
   AdapterProfile,
   AnyQueryAst,
-  DdlNode,
   LowererContext,
   MarkerReadResult,
   RawSqlLiteral,
@@ -18,10 +17,6 @@ import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredDdl } from './ddl-renderer';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
-
-function isPostgresDdlNode(node: AnyQueryAst | DdlNode): node is PostgresDdlNode {
-  return isDdlNode(node);
-}
 
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -64,7 +59,7 @@ class PostgresAdapterImpl
     ast: AnyQueryAst | PostgresDdlNode,
     context: LowererContext<PostgresContract>,
   ): PostgresLoweredStatement {
-    if (isPostgresDdlNode(ast)) {
+    if (isDdlNode(ast)) {
       return renderLoweredDdl(ast);
     }
     return renderLoweredSql(ast, context.contract, this.codecLookup);

@@ -8,7 +8,6 @@ import type {
   AnyQueryAst,
   BinaryExpr,
   ColumnRef,
-  DdlNode,
   DeleteAst,
   InsertAst,
   InsertValue,
@@ -41,10 +40,6 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-u
 import { renderLoweredDdl } from './ddl-renderer';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
-function isSqliteDdlNode(node: AnyQueryAst | DdlNode): node is SqliteDdlNode {
-  return isDdlNode(node);
-}
-
 const defaultCapabilities = Object.freeze({
   sql: {
     orderBy: true,
@@ -75,7 +70,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     ast: AnyQueryAst | SqliteDdlNode,
     context: LowererContext<SqliteContract>,
   ): SqliteLoweredStatement {
-    if (isSqliteDdlNode(ast)) {
+    if (isDdlNode(ast)) {
       return renderLoweredDdl(ast);
     }
     return renderLoweredSql(ast, context.contract);

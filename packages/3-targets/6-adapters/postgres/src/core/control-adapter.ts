@@ -50,10 +50,6 @@ import {
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
-function isPostgresDdlNode(node: AnyQueryAst | DdlNode): node is PostgresDdlNode {
-  return isDdlNode(node);
-}
-
 const POSTGRES_MARKER_TABLE = 'prisma_contract.marker';
 
 /**
@@ -128,7 +124,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * without instantiating the runtime adapter.
    */
   lower(ast: AnyQueryAst | PostgresDdlNode, context: LowererContext<unknown>): LoweredStatement {
-    if (isPostgresDdlNode(ast)) {
+    if (isDdlNode(ast)) {
       return renderLoweredDdl(ast);
     }
     return renderLoweredSql(ast, context.contract as PostgresContract, this.codecLookup);

@@ -9,6 +9,7 @@ import type {
   SqliteDdlNode,
   SqliteDdlVisitor,
 } from '@prisma-next/target-sqlite/ddl';
+import { escapeLiteral } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteLoweredStatement } from './types';
 
 class SqliteDdlVisitorImpl implements SqliteDdlVisitor<string> {
@@ -24,7 +25,7 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
   literal(node: LiteralColumnDefault): string {
     const { value } = node;
     if (typeof value === 'string') {
-      return `DEFAULT '${value}'`;
+      return `DEFAULT '${escapeLiteral(value)}'`;
     }
     if (typeof value === 'number' || typeof value === 'boolean') {
       return `DEFAULT ${String(value)}`;

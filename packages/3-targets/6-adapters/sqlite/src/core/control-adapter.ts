@@ -35,10 +35,6 @@ import { renderLoweredSql } from './adapter';
 import { renderLoweredDdl } from './ddl-renderer';
 import type { SqliteContract } from './types';
 
-function isSqliteDdlNode(node: AnyQueryAst | DdlNode): node is SqliteDdlNode {
-  return isDdlNode(node);
-}
-
 const SQLITE_MARKER_TABLE = '_prisma_marker';
 
 /**
@@ -130,7 +126,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * without instantiating the runtime adapter.
    */
   lower(ast: AnyQueryAst | SqliteDdlNode, context: LowererContext<unknown>): LoweredStatement {
-    if (isSqliteDdlNode(ast)) {
+    if (isDdlNode(ast)) {
       return renderLoweredDdl(ast);
     }
     return renderLoweredSql(ast, context.contract as SqliteContract);

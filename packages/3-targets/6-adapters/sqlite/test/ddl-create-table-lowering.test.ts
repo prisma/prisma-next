@@ -45,4 +45,16 @@ describe('SqliteCreateTable DDL lowering', () => {
     expect(lowered.sql).toContain('g INTEGER');
     expect(lowered.sql).not.toContain('autoincrement');
   });
+
+  it('escapes single quotes in string-literal defaults', () => {
+    const ast = new SqliteCreateTable({
+      table: 'defaults',
+      columns: [col('name', 'TEXT', { default: lit("O'Reilly") })],
+    });
+
+    const adapter = createSqliteAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
+
+    expect(lowered.sql).toContain("name TEXT DEFAULT 'O''Reilly'");
+  });
 });

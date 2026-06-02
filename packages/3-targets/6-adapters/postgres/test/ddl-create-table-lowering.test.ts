@@ -51,4 +51,16 @@ describe('PostgresCreateTable DDL lowering', () => {
     expect(lowered.sql).toContain('g bigserial');
     expect(lowered.sql).not.toContain('autoincrement');
   });
+
+  it('escapes single quotes in string-literal defaults', () => {
+    const ast = new PostgresCreateTable({
+      table: 'defaults',
+      columns: [col('name', 'text', { default: lit("O'Reilly") })],
+    });
+
+    const adapter = createPostgresAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+
+    expect(lowered.sql).toContain("name text default 'O''Reilly'");
+  });
 });

@@ -10,6 +10,7 @@ import type {
   PostgresDdlNode,
   PostgresDdlVisitor,
 } from '@prisma-next/target-postgres/ddl';
+import { escapeLiteral } from '@prisma-next/target-postgres/sql-utils';
 import type { PostgresLoweredStatement } from './types';
 
 class PostgresDdlVisitorImpl implements PostgresDdlVisitor<string> {
@@ -30,7 +31,7 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
   literal(node: LiteralColumnDefault): string {
     const { value } = node;
     if (typeof value === 'string') {
-      return `default '${value}'`;
+      return `default '${escapeLiteral(value)}'`;
     }
     if (typeof value === 'number' || typeof value === 'boolean') {
       return `default ${String(value)}`;
