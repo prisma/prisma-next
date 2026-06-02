@@ -175,12 +175,14 @@ export interface RenderMigrationListWithStyleOptions {
  * Compose the styled `migration list` human output via the shared tree
  * renderer. Each on-disk migration is one edge row with package-fact
  * annotations; refs decorate destination contract nodes.
+ *
+ * `options.colorize` must match whether `style` emits ANSI (e.g. both true for
+ * `createAnsiMigrationListStyler({ useColor: true })`).
  */
 export function renderMigrationListWithStyle(
   result: MigrationListResult,
   style: MigrationListStyler,
   glyphMode: GlyphMode = 'unicode',
-  _topologyBySpaceId?: ReadonlyMap<string, unknown>,
   options: RenderMigrationListWithStyleOptions = {},
 ): string {
   const multiSpace = result.spaces.length > 1;

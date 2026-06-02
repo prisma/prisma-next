@@ -315,6 +315,42 @@ describe('runMigrationList — slice-spec worked example', () => {
     expect(human.trim().endsWith(`${specs.length} migration(s) on disk`)).toBe(true);
   });
 
+  it('locks list tree layout for a linear chain (golden)', async () => {
+    const { migrationsRoot } = await setupFixture();
+
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0720_initial',
+      from: null,
+      to: HASH_4cb4256,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0742_migration',
+      from: HASH_4cb4256,
+      to: HASH_55bada2,
+    });
+
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const human = renderListed(result.value);
+    expect(human).toBe(
+      [
+        '○   55bada2',
+        '│↑  20260422T0742_migration  4cb4256 → 55bada2  1 ops',
+        '○   4cb4256',
+        '│↑  20260422T0720_initial    ∅       → 4cb4256  1 ops',
+        '∅',
+        '',
+        '2 migration(s) on disk',
+      ].join('\n'),
+    );
+    expect(human).toContain('20260422T0720_initial');
+    expect(human).toContain('20260422T0742_migration');
+    expect(human.trim().endsWith('2 migration(s) on disk')).toBe(true);
+  });
+
   it('renders multi-contract-space output with per-space heading and 2-space indent', async () => {
     const { migrationsRoot } = await setupFixture();
 
@@ -354,6 +390,25 @@ describe('runMigrationList — slice-spec worked example', () => {
     expectOk(result);
 
     const human = renderListed(result.value);
+    expect(human).toBe(
+      [
+        'app:',
+        '  ○   804e018                           (db)',
+        '  │↑  20260518T1701_namespaces_bookend  55bada2 → 804e018  1 ops',
+        '  ○   55bada2                           (production)',
+        '  │↑  20260422T0742_migration           4cb4256 → 55bada2  1 ops',
+        '  ○   4cb4256',
+        '  │↑  20260422T0720_initial             ∅       → 4cb4256  1 ops',
+        '  ∅',
+        '',
+        'postgis:',
+        '  ○   9aabbcc                                  (db)',
+        '  │↑  20260601T0000_install_postgis_extension  ∅       → 9aabbcc  1 ops',
+        '  ∅',
+        '',
+        '4 migration(s) across 2 contract space(s)',
+      ].join('\n'),
+    );
     expect(human).toContain('app:');
     expect(human).toContain('postgis:');
     expect(human).toContain('20260518T1701_namespaces_bookend');

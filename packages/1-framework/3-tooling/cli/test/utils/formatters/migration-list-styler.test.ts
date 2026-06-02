@@ -145,7 +145,6 @@ describe('renderMigrationListWithStyle', () => {
       r,
       createAnsiMigrationListStyler({ useColor: true }),
       'unicode',
-      undefined,
       { colorize: true },
     );
     expect(styled).toContain(bold('20260601T1200_backfill_emails'));
@@ -182,7 +181,6 @@ describe('renderMigrationListWithStyle', () => {
       r,
       createAnsiMigrationListStyler({ useColor: true }),
       'unicode',
-      undefined,
       { colorize: true },
     );
     expect(styled).toContain(bold('app:'));
@@ -220,7 +218,6 @@ describe('renderMigrationListWithStyle', () => {
       r,
       createAnsiMigrationListStyler({ useColor: true }),
       'unicode',
-      undefined,
       { colorize: true },
     );
 

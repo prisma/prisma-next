@@ -1,6 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
-import type { MigrationListEntry } from './migration-list-types';
 
 export type MigrationEdgeKind = 'forward' | 'rollback' | 'self';
 
@@ -11,8 +10,7 @@ export interface MigrationListGraphTopology {
 }
 
 // ---------------------------------------------------------------------------
-// Shared classifier — operates on a normalized edge shape common to both
-// MigrationListEntry (Tier-2) and MigrationEdge / MigrationGraph (Tier-3).
+// Shared classifier — operates on a normalized edge shape for MigrationGraph.
 // ---------------------------------------------------------------------------
 
 interface NormalizedEdge {
@@ -325,32 +323,8 @@ function classifyNormalizedEdges(edges: readonly NormalizedEdge[]): MigrationLis
   };
 }
 
-function canonicalFrom(from: string | null): string {
-  return from ?? EMPTY_CONTRACT_HASH;
-}
-
 /**
- * Classify forward/rollback/self for a Tier-2 `MigrationListEntry[]` edge set.
- * Returns the kind of each migration plus the forward in/out degree of each
- * contract node. This is the established Tier-2 surface; its behaviour is
- * unchanged — only its implementation now delegates to the shared classifier.
- */
-export function classifyMigrationListGraphTopology(
-  entries: readonly MigrationListEntry[],
-): MigrationListGraphTopology {
-  const normalized: NormalizedEdge[] = entries.map((entry) => ({
-    hash: entry.migrationHash,
-    from: canonicalFrom(entry.from),
-    to: entry.to,
-    dirName: entry.dirName,
-  }));
-  return classifyNormalizedEdges(normalized);
-}
-
-/**
- * Classify forward/rollback/self for a `MigrationGraph` edge set (Tier-3).
- * Delegates to the same shared classifier as `classifyMigrationListGraphTopology`
- * so both tiers agree on forward/rollback/self without duplicating logic.
+ * Classify forward/rollback/self for a `MigrationGraph` edge set.
  */
 export function classifyMigrationGraphTopology(graph: MigrationGraph): MigrationListGraphTopology {
   const normalized: NormalizedEdge[] = [];

@@ -140,7 +140,7 @@ export function renderMigrationListHumanOutput(
   options: MigrationListHumanRenderOptions,
 ): string {
   const styler = createAnsiMigrationListStyler({ useColor: options.useColor });
-  return renderMigrationListWithStyle(result, styler, options.glyphMode, undefined, {
+  return renderMigrationListWithStyle(result, styler, options.glyphMode, {
     colorize: options.useColor,
   });
 }
