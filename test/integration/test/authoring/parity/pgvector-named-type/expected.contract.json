@@ -6,12 +6,12 @@
   "roots": {
     "document": {
       "model": "Document",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Document": {
             "fields": {
@@ -51,6 +51,10 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "tables": {}
+      },
+      "public": {
+        "id": "public",
         "tables": {
           "document": {
             "columns": {
@@ -80,7 +84,7 @@
         }
       }
     },
-    "storageHash": "sha256:76e9d2fe6bb81df79b4dc773e3d49613723f5ce2dcd1db6fa4fc679789b9de3e",
+    "storageHash": "sha256:bf8636d21a100027d7648f10cb58cb404d3733b7cf1ddf7afa6dba08e98a0d38",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

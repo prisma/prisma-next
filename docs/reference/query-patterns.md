@@ -152,39 +152,6 @@ const plan = db.sql
 type JoinedRow = ResultType<typeof plan>;
 ```
 
-### Queries with includeMany
-
-```typescript
-import { db } from '../prisma/db';
-import type { ResultType } from '@prisma-next/sql-query/types';
-
-const userTable = db.schema.tables.user;
-const postTable = db.schema.tables.post;
-
-const plan = db.sql
-  .from(userTable)
-  .includeMany(
-    postTable,
-    (on) => on.eqCol(userTable.columns.id, postTable.columns.userId),
-    (child) =>
-      child
-        .select({
-          id: postTable.columns.id,
-          title: postTable.columns.title,
-        })
-        .orderBy(postTable.columns.createdAt.desc()),
-    { alias: 'posts' },
-  )
-  .select({
-    id: userTable.columns.id,
-    email: userTable.columns.email,
-    posts: true,
-  })
-  .build();
-
-type UserWithPosts = ResultType<typeof plan>;
-```
-
 ## Anti-Patterns
 
 **❌ WRONG: Don't create extra aliases for one-off usage**

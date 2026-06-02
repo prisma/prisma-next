@@ -80,7 +80,7 @@ describe('react-router-demo offline emit (e2e)', () => {
     expect(reEmittedContract).toMatchObject({
       storage: {
         namespaces: {
-          __unbound__: {
+          public: {
             tables: {
               user: { columns: { email: expect.anything() } },
             },

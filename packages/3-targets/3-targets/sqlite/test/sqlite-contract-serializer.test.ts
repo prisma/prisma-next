@@ -1,3 +1,4 @@
+import { effectiveControl } from '@prisma-next/contract/types';
 import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
@@ -78,6 +79,57 @@ describe('SqliteContractSerializer', () => {
     expect(
       reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user.columns.id,
     ).not.toHaveProperty('kind');
+  });
+});
+
+describe('control-policy round-trip fidelity', () => {
+  function makeMixedControlContractJson() {
+    return {
+      ...createSqlContract({
+        target: 'sqlite',
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              tables: {
+                user: {
+                  columns: {
+                    id: {
+                      nativeType: 'INTEGER',
+                      codecId: 'sqlite/integer@1',
+                      nullable: false,
+                      control: 'observed',
+                    },
+                    email: { nativeType: 'TEXT', codecId: 'sqlite/text@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                  control: 'external',
+                },
+              },
+            },
+          },
+        },
+      }),
+      defaultControl: 'tolerated',
+    };
+  }
+
+  it('preserves effective control per node across serialize → deserialize', () => {
+    const serializer = new SqliteContractSerializer();
+    const contract = serializer.deserializeContract(makeMixedControlContractJson());
+    const reparsed = JSON.parse(JSON.stringify(serializer.serializeContract(contract)));
+
+    expect(reparsed.defaultControl).toBe('tolerated');
+
+    const table = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user;
+    const def = reparsed.defaultControl;
+    expect(effectiveControl(table.control, def)).toBe('external');
+    expect(effectiveControl(table.columns.id.control, def)).toBe('observed');
+    expect(effectiveControl(table.columns.email.control, def)).toBe('tolerated');
+    expect(table.columns.email).not.toHaveProperty('control');
   });
 });
 

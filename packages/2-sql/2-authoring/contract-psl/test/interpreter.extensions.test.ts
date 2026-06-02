@@ -1,4 +1,3 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -360,7 +359,7 @@ model Document {
     expect(documentScopedTypes(result.value) ?? {}).toEqual({});
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             document: {
               columns: {

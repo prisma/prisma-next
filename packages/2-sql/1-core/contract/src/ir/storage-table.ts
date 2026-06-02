@@ -1,3 +1,4 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { ForeignKey, type ForeignKeyInput } from './foreign-key';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
@@ -12,6 +13,7 @@ export interface StorageTableInput {
   readonly uniques: ReadonlyArray<UniqueConstraint | UniqueConstraintInput>;
   readonly indexes: ReadonlyArray<Index | IndexInput>;
   readonly foreignKeys: ReadonlyArray<ForeignKey | ForeignKeyInput>;
+  readonly control?: ControlPolicy;
 }
 
 /**
@@ -32,6 +34,7 @@ export class StorageTable extends SqlNode {
   readonly indexes: ReadonlyArray<Index>;
   readonly foreignKeys: ReadonlyArray<ForeignKey>;
   declare readonly primaryKey?: PrimaryKey;
+  declare readonly control?: ControlPolicy;
 
   constructor(input: StorageTableInput) {
     super();
@@ -56,6 +59,7 @@ export class StorageTable extends SqlNode {
     this.foreignKeys = Object.freeze(
       input.foreignKeys.map((fk) => (fk instanceof ForeignKey ? fk : new ForeignKey(fk))),
     );
+    if (input.control !== undefined) this.control = input.control;
     freezeNode(this);
   }
 }

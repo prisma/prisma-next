@@ -7,7 +7,6 @@
  * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  */
 
-import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract, Models, TypeMaps } from '../src/prisma/contract.d';
@@ -24,12 +23,12 @@ test('SPI deserializeContract output is assignable to visualization shape', () =
 
   expectTypeOf<Models>().toHaveProperty('User');
   expectTypeOf<Models>().toHaveProperty('Post');
-  expectTypeOf(contract.storage.namespaces['__unbound__'].tables).toHaveProperty('user');
-  expectTypeOf(contract.storage.namespaces['__unbound__'].tables).toHaveProperty('post');
-  expectTypeOf(
-    contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.User.storage.fields,
-  ).toHaveProperty('email');
-  expectTypeOf(
-    contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models.Post.storage.fields,
-  ).toHaveProperty('userId');
+  expectTypeOf(contract.storage.namespaces['public'].tables).toHaveProperty('user');
+  expectTypeOf(contract.storage.namespaces['public'].tables).toHaveProperty('post');
+  expectTypeOf(contract.domain.namespaces['public']!.models.User.storage.fields).toHaveProperty(
+    'email',
+  );
+  expectTypeOf(contract.domain.namespaces['public']!.models.Post.storage.fields).toHaveProperty(
+    'userId',
+  );
 });

@@ -6,12 +6,12 @@
   "roots": {
     "audit_event": {
       "model": "AuditEvent",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "AuditEvent": {
             "fields": {
@@ -59,9 +59,9 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "audit_event": {
             "columns": {
@@ -93,7 +93,7 @@
         }
       }
     },
-    "storageHash": "sha256:ee7d5c96dcef003066507ecc2a3cadf9e07efd5fcfed6c4d760fb0aea9490a73"
+    "storageHash": "sha256:fe392da2aa42388c72b60af5f613f19a501220e1d5c0c06a7524875b3e72f0c1"
   },
   "capabilities": {
     "postgres": {

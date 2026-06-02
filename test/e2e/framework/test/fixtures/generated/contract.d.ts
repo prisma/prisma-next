@@ -37,7 +37,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:2798d47330f6b3372cb0adf9d2d371ee5f26f973a1baa770326b4a089faec385'>;
+  StorageHashBase<'sha256:5f48b9ec3b79e4f41e04f20af6d36a4176ff9086fd6c26223767ff9e62e5c146'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:cee87ec002ede0c352cdf215e9e129a540bebd95555057beaa785c7dfadb95ea'>;
 export type ProfileHash =
@@ -178,8 +178,8 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
+        readonly public: {
+          readonly id: 'public';
           readonly kind: 'sql-namespace';
           readonly tables: {
             readonly comment: {
@@ -566,10 +566,7 @@ type ContractBase = Omit<
         };
         readonly relations: {
           readonly post: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Post';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
             readonly cardinality: 'N:1';
             readonly on: {
               readonly localFields: readonly ['postId'];
@@ -843,10 +840,7 @@ type ContractBase = Omit<
         };
         readonly relations: {
           readonly author: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'User';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
             readonly cardinality: 'N:1';
             readonly on: {
               readonly localFields: readonly ['userId'];
@@ -854,10 +848,7 @@ type ContractBase = Omit<
             };
           };
           readonly comments: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Comment';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Comment' };
             readonly cardinality: '1:N';
             readonly on: {
               readonly localFields: readonly ['id'];
@@ -907,10 +898,7 @@ type ContractBase = Omit<
         };
         readonly relations: {
           readonly posts: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Post';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
             readonly cardinality: '1:N';
             readonly on: {
               readonly localFields: readonly ['id'];
@@ -936,29 +924,23 @@ type ContractBase = Omit<
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
-    readonly user: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
-    readonly post: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
-    readonly comment: {
-      readonly namespace: '__unbound__' & NamespaceId;
-      readonly model: 'Comment';
-    };
+    readonly user: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+    readonly post: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
+    readonly comment: { readonly namespace: 'public' & NamespaceId; readonly model: 'Comment' };
     readonly param_types: {
-      readonly namespace: '__unbound__' & NamespaceId;
+      readonly namespace: 'public' & NamespaceId;
       readonly model: 'ParamTypes';
     };
-    readonly event: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
+    readonly event: { readonly namespace: 'public' & NamespaceId; readonly model: 'Event' };
     readonly literal_defaults: {
-      readonly namespace: '__unbound__' & NamespaceId;
+      readonly namespace: 'public' & NamespaceId;
       readonly model: 'LiteralDefaults';
     };
-    readonly embedding: {
-      readonly namespace: '__unbound__' & NamespaceId;
-      readonly model: 'Embedding';
-    };
+    readonly embedding: { readonly namespace: 'public' & NamespaceId; readonly model: 'Embedding' };
   };
   readonly domain: {
     readonly namespaces: {
-      readonly __unbound__: {
+      readonly public: {
         readonly models: {
           readonly Comment: {
             readonly fields: {
@@ -985,10 +967,7 @@ type ContractBase = Omit<
             };
             readonly relations: {
               readonly post: {
-                readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'Post';
-                };
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
                 readonly cardinality: 'N:1';
                 readonly on: {
                   readonly localFields: readonly ['postId'];
@@ -1262,10 +1241,7 @@ type ContractBase = Omit<
             };
             readonly relations: {
               readonly author: {
-                readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'User';
-                };
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
                 readonly cardinality: 'N:1';
                 readonly on: {
                   readonly localFields: readonly ['userId'];
@@ -1274,7 +1250,7 @@ type ContractBase = Omit<
               };
               readonly comments: {
                 readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly namespace: 'public' & NamespaceId;
                   readonly model: 'Comment';
                 };
                 readonly cardinality: '1:N';
@@ -1326,10 +1302,7 @@ type ContractBase = Omit<
             };
             readonly relations: {
               readonly posts: {
-                readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'Post';
-                };
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
                 readonly cardinality: '1:N';
                 readonly on: {
                   readonly localFields: readonly ['id'];

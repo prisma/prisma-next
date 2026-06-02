@@ -6,12 +6,12 @@
   "roots": {
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "User": {
             "fields": {
@@ -59,9 +59,9 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "user": {
             "columns": {
@@ -93,7 +93,7 @@
         }
       }
     },
-    "storageHash": "sha256:a3bba5d95ae88037100814083d6e6274c1223566eaf9fed82a02713e4aa4aa3e"
+    "storageHash": "sha256:3acffbcc5e09f18416f1fabd6671f283b6f984990c841a0cd8f7815ed1998823"
   },
   "capabilities": {
     "postgres": {

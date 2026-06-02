@@ -6,20 +6,20 @@
   "roots": {
     "cafe": {
       "model": "Cafe",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "neighborhood": {
       "model": "Neighborhood",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "route": {
       "model": "Route",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Cafe": {
             "fields": {
@@ -156,9 +156,9 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "cafe": {
             "columns": {
@@ -256,7 +256,7 @@
         }
       }
     },
-    "storageHash": "sha256:7a019a635e7114a712b928ce3a4d56e819863adbf5b17f8f5986d3d1a09e2fc3",
+    "storageHash": "sha256:c77eb5b7cb1c7637b6d0998810e73c1ffee7baab0b1d9f0ed048e3d4fd119ebd",
     "types": {
       "WgsGeometry": {
         "codecId": "pg/geometry@1",

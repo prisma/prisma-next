@@ -1,3 +1,4 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { StorageType } from '@prisma-next/framework-components/ir';
 
 /**
@@ -42,6 +43,7 @@ export interface PostgresEnumStorageEntry extends StorageType {
    * present on raw JSON envelopes).
    */
   readonly codecId: string;
+  readonly control?: ControlPolicy;
 }
 
 /**

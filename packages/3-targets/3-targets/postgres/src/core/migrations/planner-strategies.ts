@@ -112,12 +112,12 @@ export function resolveNamespaceIdForIssue(issue: { readonly namespaceId?: strin
 /**
  * Resolve the DDL schema name for a namespace coordinate. Postgres-aware
  * namespaces dispatch to their polymorphic `ddlSchemaName` override —
- * named schemas return their own id and the unbound singleton projects
- * to `'public'` (sibling-present) or the framework sentinel
- * (sibling-absent). Legacy single-namespace contracts whose `__unbound__`
- * slot is the framework-default `SqlUnboundNamespace` (rather than the
- * Postgres-aware `PostgresUnboundSchema`) flow the coordinate through
- * unchanged so downstream `qualifyTableName` resolves polymorphically.
+ * named schemas return their own id; the unbound singleton returns
+ * `UNBOUND_NAMESPACE_ID`. Legacy single-namespace contracts whose
+ * `__unbound__` slot is the framework-default `SqlUnboundNamespace`
+ * (rather than the Postgres-aware `PostgresUnboundSchema`) flow the
+ * coordinate through unchanged so downstream `qualifyTableName`
+ * resolves polymorphically.
  */
 export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: string): string {
   const namespace = ctx.toContract.storage.namespaces[namespaceId];

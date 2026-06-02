@@ -6,16 +6,16 @@
   "roots": {
     "posts": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "users": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Post": {
             "fields": {
@@ -61,7 +61,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -127,7 +127,7 @@
                 },
                 "to": {
                   "model": "Post",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -158,6 +158,11 @@
       "__unbound__": {
         "id": "__unbound__",
         "kind": "postgres-unbound-schema",
+        "tables": {}
+      },
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "posts": {
             "columns": {
@@ -194,14 +199,14 @@
                   "columns": [
                     "authorId"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "posts"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "users"
                 }
               }
@@ -253,7 +258,7 @@
         }
       }
     },
-    "storageHash": "sha256:90ea3dc78bbfd0c3952e0f8796e1487233320d9764023f76478a244c8c9b4684"
+    "storageHash": "sha256:00943c780a16ec0704437fd1eb3286adc73d3d63010c837a2d69ff005e014155"
   },
   "capabilities": {
     "postgres": {

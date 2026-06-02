@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/sql-lane-query-builder",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -16,10 +16,10 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "devDependencies": {
-    "@prisma-next/contract": "workspace:0.11.0",
-    "@prisma-next/sql-contract": "workspace:0.11.0",
-    "@prisma-next/tsconfig": "workspace:0.11.0",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/contract": "workspace:0.12.0",
+    "@prisma-next/sql-contract": "workspace:0.12.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

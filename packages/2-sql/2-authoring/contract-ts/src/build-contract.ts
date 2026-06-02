@@ -156,11 +156,12 @@ const JSONB_NATIVE_TYPE = 'jsonb';
 function resolveModelNamespaceId(
   model: ModelNode,
   modelNameToNamespaceId: ReadonlyMap<string, string>,
+  targetId: string,
 ): string {
   if (model.namespaceId !== undefined && model.namespaceId.length > 0) {
     return model.namespaceId;
   }
-  return modelNameToNamespaceId.get(model.modelName) ?? UNBOUND_NAMESPACE_ID;
+  return modelNameToNamespaceId.get(model.modelName) ?? defaultModelNamespaceId(targetId);
 }
 
 function buildStorageColumn(
@@ -230,7 +231,7 @@ function buildDomainField(
 
 function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): Set<string> {
   const ids = new Set<string>();
-  ids.add(UNBOUND_NAMESPACE_ID);
+  ids.add(defaultModelNamespaceId(definition.target.targetId));
   for (const id of definition.namespaces ?? []) {
     if (id.length > 0) {
       ids.add(id);
@@ -245,6 +246,11 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
 }
 
 const POSTGRES_ENUM_NAMESPACE_ID = 'public';
+const POSTGRES_DEFAULT_NAMESPACE_ID = 'public';
+
+function defaultModelNamespaceId(targetId: string): string {
+  return targetId === 'postgres' ? POSTGRES_DEFAULT_NAMESPACE_ID : UNBOUND_NAMESPACE_ID;
+}
 
 function partitionStorageTypesForTarget(
   targetId: string,
@@ -313,7 +319,7 @@ export function buildSqlContractFromDefinition(
     const namespaceId =
       semanticModel.namespaceId !== undefined && semanticModel.namespaceId.length > 0
         ? semanticModel.namespaceId
-        : UNBOUND_NAMESPACE_ID;
+        : defaultModelNamespaceId(target);
     modelNameToNamespaceId.set(semanticModel.modelName, namespaceId);
     roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
 
@@ -384,7 +390,7 @@ export function buildSqlContractFromDefinition(
         fk.references.namespaceId ??
         (targetModel.namespaceId !== undefined && targetModel.namespaceId.length > 0
           ? targetModel.namespaceId
-          : UNBOUND_NAMESPACE_ID);
+          : defaultModelNamespaceId(target));
       return {
         source: { namespaceId: asNamespaceId(namespaceId), tableName, columns: fk.columns },
         target: {
@@ -481,7 +487,7 @@ export function buildSqlContractFromDefinition(
       modelRelations[relation.fieldName] = {
         to: crossRef(
           relation.toModel,
-          resolveModelNamespaceId(targetModel, modelNameToNamespaceId),
+          resolveModelNamespaceId(targetModel, modelNameToNamespaceId, target),
         ),
         // RelationDefinition.cardinality includes 'N:M' which isn't in
         // ContractReferenceRelation yet — cast is needed until the contract
@@ -554,7 +560,7 @@ export function buildSqlContractFromDefinition(
   const { createNamespace } = definition;
   const namespaces = blindCast<
     SqlStorageInput['namespaces'],
-    'contract authoring always materialises the __unbound__ namespace coordinate'
+    'contract authoring materialises each namespace coordinate from the model set and explicit namespace list'
   >(
     Object.fromEntries(
       [...namespaceCoordinateIds].sort().map((id) => {
@@ -666,18 +672,19 @@ export function buildSqlContractFromDefinition(
         )
       : undefined;
 
+  const defaultNamespaceId = defaultModelNamespaceId(target);
   const domainNamespaceIds = new Set(Object.keys(modelsByNamespace));
   if (domainNamespaceIds.size === 0) {
-    domainNamespaceIds.add(UNBOUND_NAMESPACE_ID);
+    domainNamespaceIds.add(defaultNamespaceId);
   }
   if (valueObjects !== undefined) {
-    domainNamespaceIds.add(UNBOUND_NAMESPACE_ID);
+    domainNamespaceIds.add(defaultNamespaceId);
   }
   const domainNamespaces = Object.fromEntries(
     [...domainNamespaceIds].sort().map((namespaceId) => {
       const modelsInNs = modelsByNamespace[namespaceId] ?? {};
       const namespaceSlice =
-        namespaceId === UNBOUND_NAMESPACE_ID && valueObjects !== undefined
+        namespaceId === defaultNamespaceId && valueObjects !== undefined
           ? { models: modelsInNs, valueObjects }
           : { models: modelsInNs };
       return [namespaceId, namespaceSlice];

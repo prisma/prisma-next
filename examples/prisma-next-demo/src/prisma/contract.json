@@ -6,25 +6,25 @@
   "roots": {
     "post": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "task": {
       "model": "Task",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Bug": {
             "base": {
               "model": "Task",
-              "namespace": "__unbound__"
+              "namespace": "public"
             },
             "fields": {
               "severity": {
@@ -58,7 +58,7 @@
           "Feature": {
             "base": {
               "model": "Task",
-              "namespace": "__unbound__"
+              "namespace": "public"
             },
             "fields": {
               "priority": {
@@ -143,7 +143,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -239,7 +239,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -339,7 +339,7 @@
                 },
                 "to": {
                   "model": "Post",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               },
               "tasks": {
@@ -354,7 +354,7 @@
                 },
                 "to": {
                   "model": "Task",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -422,9 +422,21 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "enum": {
+          "user_type": {
+            "codecId": "pg/enum@1",
+            "kind": "postgres-enum",
+            "name": "user_type",
+            "nativeType": "user_type",
+            "values": [
+              "admin",
+              "user"
+            ]
+          }
+        },
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "bug": {
             "columns": {
@@ -504,14 +516,14 @@
                   "columns": [
                     "userId"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "post"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "user"
                 }
               }
@@ -581,14 +593,14 @@
                   "columns": [
                     "userId"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "task"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "user"
                 }
               }
@@ -652,26 +664,9 @@
             "uniques": []
           }
         }
-      },
-      "public": {
-        "enum": {
-          "user_type": {
-            "codecId": "pg/enum@1",
-            "kind": "postgres-enum",
-            "name": "user_type",
-            "nativeType": "user_type",
-            "values": [
-              "admin",
-              "user"
-            ]
-          }
-        },
-        "id": "public",
-        "kind": "postgres-schema",
-        "tables": {}
       }
     },
-    "storageHash": "sha256:e4f1d5410cd9e5aa7106d5ead1b0b14156a4adbbaab8c6bcf1841e0d0115606c",
+    "storageHash": "sha256:1375f137fa3186c77cda92aba4048c49714ed5fe65993ca7d5eed3bcd9e85cb7",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

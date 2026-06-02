@@ -7,11 +7,11 @@ export interface CrossReference {
   readonly model: string;
 }
 
-export const CrossReferenceSchema = blindCast<
+export const CrossReferenceSchema = /* @__PURE__ */ blindCast<
   Type<CrossReference>,
   'namespace is validated as string at runtime and branded to NamespaceId by asNamespaceId in crossRef(); the schema accepts plain strings but the public type reflects the branded shape'
 >(
-  type({
+  /* @__PURE__ */ type({
     '+': 'reject',
     namespace: 'string',
     model: 'string',

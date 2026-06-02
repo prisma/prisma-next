@@ -50,8 +50,8 @@ function createUsersCollectionWithCapabilities(
   // Replace capabilities entirely (rather than merging with base) so the
   // test's intent is unambiguous. Merging with the base contract's
   // postgres namespace would leak `postgres.lateral` and `postgres.jsonAgg`
-  // into the strategy detection — making it impossible to test the
-  // correlated-only path by passing only `jsonAgg`.
+  // into the advertised capabilities — making it impossible to assert
+  // behaviour against a contract that advertises only `jsonAgg`.
   const contract = {
     ...base,
     capabilities,
@@ -70,12 +70,11 @@ describe('integration/include', () => {
   it(
     'depth-1 include against an emitted contract fires a single SQL execution (regression guard for namespaced capability lookup)',
     async () => {
-      // Guards against regressing the fix that taught `selectIncludeStrategy`
-      // to read capability flags from the contract's `targetFamily` and
-      // `target` namespaces. The default `getTestContract()` carries
-      // `postgres: { lateral: true, jsonAgg: true, ... }` — the emitter's
-      // actual output shape. Prior to the fix, this exact test would fire
-      // 2 SQL queries instead of 1, against a real driver.
+      // Guards against regressing single-query include dispatch. The
+      // default `getTestContract()` carries `postgres: { lateral: true,
+      // jsonAgg: true, ... }` — the emitter's actual output shape. A
+      // depth-1 include must resolve in one SQL execution, not two,
+      // against a real driver.
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
 
@@ -181,7 +180,7 @@ describe('integration/include', () => {
           { id: 11, title: 'Post B', userId: 1, views: 200, embedding: null, comments: 0 },
           { id: 12, title: 'Post C', userId: 2, views: 300, embedding: null, comments: 1 },
         ]);
-        // Scalar `count()` lowers to a `LEFT JOIN LATERAL (SELECT
+        // Scalar `count()` lowers to a correlated subquery `(SELECT
         // json_build_object('value', count(*)) ...)` — the whole
         // parent + counts roll up into one SQL execution.
         expect(runtime.executions).toHaveLength(1);
@@ -193,11 +192,11 @@ describe('integration/include', () => {
   // Pagination composes through to the scalar aggregate scope: a
   // `take(N)` / `skip(M)` on a count() refine shapes the row set the
   // aggregate sees, so `where(W).take(N).count()` returns at most N.
-  // The lateral builder wraps the source in a derived SELECT that
+  // The correlated builder wraps the source in a derived SELECT that
   // materialises the paginated rows and aggregates over that, in a
   // single SQL execution.
   it(
-    'pagination composes through to scalar aggregate scope under lateral',
+    'pagination composes through to scalar aggregate scope',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
@@ -412,22 +411,22 @@ describe('integration/include', () => {
             posts: { avgViews: null, minViews: null, maxViews: null },
           },
         ]);
-        // All three scalar branches now pack into a single LATERAL
-        // (json_build_object packing three sub-envelopes); the parent
-        // SELECT rolls up everything into one round-trip.
+        // All three scalar branches now pack into a single correlated
+        // subquery (json_build_object packing three sub-envelopes); the
+        // parent SELECT rolls up everything into one round-trip.
         expect(runtime.executions).toHaveLength(1);
       });
     },
     timeouts.spinUpPpgDev,
   );
 
-  // TML-2595 worked example: the Pothos `totalCount` shape — a paginated
-  // row branch alongside a count() scalar branch. This is the headline
-  // case that motivated single-query combine emission: one LATERAL
-  // packs both branches; the parent + count + page roll up to one SQL
-  // execution per query.
+  // Worked example: the Pothos `totalCount` shape — a paginated row
+  // branch alongside a count() scalar branch. This is the headline case
+  // that motivated single-query combine emission: one correlated
+  // subquery packs both branches; the parent + count + page roll up to
+  // one SQL execution per query.
   it(
-    'TML-2595: include().combine({ recent: take(N), count: count() }) resolves in a single execution',
+    'include().combine({ recent: take(N), count: count() }) resolves in a single execution',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
@@ -546,7 +545,7 @@ describe('integration/include', () => {
             },
           },
         ]);
-        // Three branches (two row + one scalar) pack into one LATERAL.
+        // Three branches (two row + one scalar) pack into one correlated subquery.
         expect(runtime.executions).toHaveLength(1);
       });
     },
@@ -554,9 +553,11 @@ describe('integration/include', () => {
   );
 
   it(
-    'single-query include uses lateral strategy when lateral and jsonAgg are enabled',
+    'a lateral-capable contract still lowers an include to a correlated subquery',
     async () => {
       await withCollectionRuntime(async (runtime) => {
+        // The `lateral` capability flag is inert for include codegen:
+        // every include lowers to a correlated subquery regardless.
         const users = createUsersCollectionWithCapabilities(runtime, {
           postgres: { jsonAgg: true, lateral: true },
         });
@@ -602,18 +603,16 @@ describe('integration/include', () => {
         ]);
         expect(runtime.executions).toHaveLength(1);
 
-        const ast = runtime.executions[0]?.ast;
+        const execution = runtime.executions[0];
+        const ast = execution?.ast;
         expectSelectAst(ast);
-        const includeJoin = ast.joins?.find(
-          (join) =>
-            join.lateral &&
-            join.source.kind === 'derived-table-source' &&
-            join.source.alias === 'posts_lateral',
-        );
-        expect(includeJoin).toBeDefined();
+        // No lateral join is emitted for the include.
+        expect((ast.joins ?? []).some((join) => join.lateral)).toBe(false);
+        expect(execution?.sql).not.toContain('LATERAL');
 
-        expectDerivedTableSource(includeJoin?.source);
-        const includeAggregateProjection = includeJoin.source.query.projection[0];
+        const postsProjection = ast.projection.find((item) => item.alias === 'posts');
+        expectSubqueryExpr(postsProjection?.expr);
+        const includeAggregateProjection = postsProjection.expr.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
         expect(includeAggregateProjection.expr.expr.kind).toBe('json-object');
@@ -621,7 +620,7 @@ describe('integration/include', () => {
           OrderByItem.asc(ColumnRef.of('posts__rows', 'posts__order_0')),
         ]);
 
-        const rowsSource = includeJoin.source.query.from;
+        const rowsSource = postsProjection.expr.query.from;
         expectDerivedTableSource(rowsSource);
         expect(rowsSource.query.limit).toBe(1);
         expect(rowsSource.query.offset).toBe(1);
@@ -632,7 +631,7 @@ describe('integration/include', () => {
   );
 
   it(
-    'single-query lateral include correlates self-relations with child alias',
+    'a lateral-capable contract correlates self-relations with child alias',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
@@ -696,28 +695,25 @@ describe('integration/include', () => {
         expect(runtime.executions).toHaveLength(1);
         const ast = runtime.executions[0]?.ast;
         expectSelectAst(ast);
-        const includeJoin = ast.joins?.find(
-          (join) =>
-            join.lateral &&
-            join.source.kind === 'derived-table-source' &&
-            join.source.alias === 'invitedUsers_lateral',
-        );
-        expect(includeJoin).toBeDefined();
+        // No lateral join is emitted for the include.
+        expect((ast.joins ?? []).some((join) => join.lateral)).toBe(false);
 
-        expectDerivedTableSource(includeJoin?.source);
-        const includeAggregateProjection = includeJoin.source.query.projection[0];
+        const invitedUsersProjection = ast.projection.find((item) => item.alias === 'invitedUsers');
+        expectSubqueryExpr(invitedUsersProjection?.expr);
+        const includeAggregateProjection = invitedUsersProjection.expr.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.orderBy).toEqual([
           OrderByItem.asc(ColumnRef.of('invitedUsers__rows', 'invitedUsers__order_0')),
         ]);
 
-        const rowsSource = includeJoin.source.query.from;
+        const rowsSource = invitedUsersProjection.expr.query.from;
         expectDerivedTableSource(rowsSource);
         expect(rowsSource.query.projection.map((item) => item.alias)).toContain(
           'invitedUsers__order_0',
         );
 
         const sql = runtime.executions[0]?.sql;
+        expect(sql).not.toContain('LATERAL');
         expect(sql).toContain('"invitedUsers__child"."invited_by_id" = "users"."id"');
       });
     },
@@ -932,9 +928,8 @@ describe('integration/include', () => {
             ],
           },
         ]);
-        // TML-2594 acceptance: depth-2 on a lateral+jsonAgg-capable
-        // contract (the default postgres test contract) must collapse
-        // to a single SQL execution via nested LATERAL JOINs.
+        // Depth-2 on the default postgres test contract must collapse to
+        // a single SQL execution via nested correlated subqueries.
         expect(runtime.executions).toHaveLength(1);
       });
     },
@@ -944,9 +939,9 @@ describe('integration/include', () => {
   it(
     'depth-2 include uses correlated subqueries when only jsonAgg is enabled',
     async () => {
-      // jsonAgg without lateral → correlated strategy. Same acceptance
-      // criterion as the lateral case above: one round-trip, regardless
-      // of depth or row count, when the target advertises the capability.
+      // jsonAgg without lateral. Same acceptance criterion as the case
+      // above: one round-trip, regardless of depth or row count, when
+      // the target advertises the capability.
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
           sql: { jsonAgg: true },

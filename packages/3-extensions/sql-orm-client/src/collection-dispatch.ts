@@ -40,8 +40,7 @@ import {
   stripHiddenMappedFields,
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
-import { selectIncludeStrategy } from './include-strategy';
-import { compileSelect, compileSelectWithIncludeStrategy } from './query-plan';
+import { compileSelect, compileSelectWithIncludes } from './query-plan';
 import { augmentSelectionForJoinColumns } from './selection-shaping';
 import {
   type CollectionContext,
@@ -78,11 +77,9 @@ export function dispatchCollectionRows<Row>(options: {
   return dispatchWithIncludes<Row>(options);
 }
 
-// Both include builders — lateral and correlated — lower every include
+// The correlated-subquery include builder lowers every include
 // descriptor shape (row, scalar reducers, and combine()) at any depth
-// into a single query. Dispatch picks one purely on the `lateral`
-// capability flag via `selectIncludeStrategy`; the read path has no
-// multi-query fallback.
+// into a single query; the read path has no multi-query fallback.
 function dispatchWithIncludes<Row>(options: {
   contract: Contract<SqlStorage>;
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
@@ -91,21 +88,19 @@ function dispatchWithIncludes<Row>(options: {
   modelName: string;
 }): AsyncIterableResult<Row> {
   const { contract, runtime, state, tableName, modelName } = options;
-  const strategy = selectIncludeStrategy(contract);
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
       const parentJoinColumns = state.includes.map((include) => include.localColumn);
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
-      const compiled = compileSelectWithIncludeStrategy(
+      const compiled = compileSelectWithIncludes(
         contract,
         tableName,
         {
           ...state,
           selectedFields: parentSelectedForQuery,
         },
-        strategy,
         modelName,
       );
 
@@ -155,7 +150,7 @@ function dispatchWithIncludes<Row>(options: {
 /**
  * Reload the rows a mutation just wrote (create / createAll / update /
  * updateAll / upsert) through the read-path dispatch, so `.include()`
- * relations resolve via the exact same lateral / correlated builders,
+ * relations resolve via the exact same correlated-subquery builder,
  * decode, hidden-column stripping, and polymorphism mapping a read
  * query uses — there is no parallel mutation read-back implementation.
  *
@@ -255,7 +250,7 @@ function buildIdentityInFilter(
  * Decode a single-query include payload from a parent row's raw cell
  * into the model-shaped value that downstream consumers see. Recurses
  * through `include.nested.includes` so depth-2+ trees — emitted by the
- * recursive lateral / correlated builders — are decoded symmetrically.
+ * recursive correlated-subquery builder — are decoded symmetrically.
  *
  * The shape produced by the SQL side is one JSON column per top-level
  * include; values nested inside that JSON are already-parsed JS values
@@ -312,9 +307,10 @@ function decodeIncludePayload(
  *  - scalar branch -> unwrap the `{value: ...}` envelope via the
  *    standalone scalar decoder.
  *
- * On a parent with zero matching child rows the LATERAL still produces
- * one row (aggregates collapse the empty input to a single row), so
- * the combine envelope here is always present in the read path. The
+ * On a parent with zero matching child rows the correlated subquery
+ * still produces one row (aggregates collapse the empty input to a
+ * single row), so the combine envelope here is always present in the
+ * read path. The
  * mutation read-back's `assignEmptyMutationIncludes` writes the empty
  * per-branch shape directly to `parent.mapped[relationName]` for any
  * parent absent from the read-back result and never enters the decoder,
@@ -350,7 +346,7 @@ function decodeCombineIncludePayload(
 function parseCombineEnvelope(include: IncludeExpr, raw: unknown): Record<string, unknown> {
   if (raw === null || raw === undefined) {
     throw new Error(
-      `combine() envelope for include "${include.relationName}" is missing (got ${raw === null ? 'null' : 'undefined'}); the LATERAL / correlated subquery should always produce a JSON object — this indicates a planner or decoder bug.`,
+      `combine() envelope for include "${include.relationName}" is missing (got ${raw === null ? 'null' : 'undefined'}); the correlated subquery should always produce a JSON object — this indicates a planner or decoder bug.`,
     );
   }
   const parsed = parseIncludePayload(raw);
@@ -374,7 +370,7 @@ function describeEnvelopeShape(value: unknown): string {
 
 /**
  * Pull the primitive scalar value out of the JSON envelope emitted by
- * the lateral / correlated scalar builder.
+ * the correlated scalar builder.
  *
  * Contract: the envelope is always either
  *   - a `{ value: <primitive> }` JSON object (the SQL path), or
@@ -393,8 +389,8 @@ function describeEnvelopeShape(value: unknown): string {
  * `SUM` / `AVG` / `MIN` / `MAX` over an empty input set return SQL
  * `NULL`, which surfaces as `null` here. The outer `raw === null`
  * fallback is defensive cover for an empty parent set; in single-query
- * dispatch the LATERAL / correlated subquery always produces a row,
- * so the inner envelope's `value` is always set by SQL.
+ * dispatch the correlated subquery always produces a row, so the inner
+ * envelope's `value` is always set by SQL.
  */
 function decodeScalarIncludePayload(
   include: IncludeExpr,

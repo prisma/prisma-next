@@ -6,16 +6,16 @@
   "roots": {
     "post": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Post": {
             "fields": {
@@ -64,7 +64,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -126,7 +126,7 @@
                 },
                 "to": {
                   "model": "Post",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -151,9 +151,9 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "post": {
             "columns": {
@@ -193,14 +193,14 @@
                   "columns": [
                     "userId"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "post"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "user"
                 }
               }
@@ -250,7 +250,7 @@
         }
       }
     },
-    "storageHash": "sha256:2a2baf5dd8cd6273baac3dfac3bd2a22f446e55d222d2241f8d7697a4bf78bab"
+    "storageHash": "sha256:626aa1da8fa46b00f7665313531557ccd427550fb67616ab09c9526c41b1629b"
   },
   "execution": {
     "executionHash": "sha256:b07c7341fd536d01ffc21a630b01fde3d05ea63b7ba0d8d1be7b0fe635217ad5",

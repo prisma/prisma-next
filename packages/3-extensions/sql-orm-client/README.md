@@ -59,6 +59,18 @@ const posts = await db.Post
   .all();
 ```
 
+## Pagination
+
+`.orderBy(...)` accepts model-accessor callbacks that return `OrderByItem`s via the column's `.asc()` / `.desc()` helpers:
+
+```ts
+// Newest first.
+const posts = await db.Post
+  .orderBy((post) => post.createdAt.desc())
+  .take(10)
+  .all();
+```
+
 ## Codec Roundtrip
 
 The runtime always awaits codec query-time methods, but rows yielded to user code carry **plain field values** — no `Promise`-typed fields ever reach `.first()` / `.all()` / streaming consumers, regardless of whether a column's codec is sync or async. This is true for both one-shot and streaming usage:

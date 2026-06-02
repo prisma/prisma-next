@@ -1,6 +1,5 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
@@ -88,7 +87,7 @@ describe('prismaContract provider helper', () => {
         target: 'postgres',
         storage: {
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
+            public: {
               tables: {
                 user: expect.any(Object),
               },
@@ -125,7 +124,7 @@ describe('prismaContract provider helper', () => {
       expect(result.value).toMatchObject({
         storage: {
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
+            public: {
               tables: {
                 user: expect.any(Object),
               },
@@ -454,7 +453,7 @@ model Document {
       });
       expect(result.value.storage).toMatchObject({
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          public: {
             tables: {
               user: {
                 columns: {

@@ -21,8 +21,8 @@ type EmittedContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
+      readonly public: {
+        readonly id: 'public';
         readonly kind: 'sql-namespace';
         readonly tables: {
           readonly user: {
@@ -130,7 +130,7 @@ describe('contract emit command (CLI process e2e)', () => {
         target: 'postgres',
         storage: {
           namespaces: {
-            __unbound__: {
+            public: {
               tables: {
                 user: expect.anything(),
               },
@@ -189,11 +189,12 @@ describe('contract emit command (CLI process e2e)', () => {
 
       expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
       expect(validatedContract.target).toBe(originalContract.target);
-      const tables = (validatedContract.storage as SqlStorage).namespaces.__unbound__?.tables as
+      const tables = (validatedContract.storage as SqlStorage).namespaces['public']?.tables as
         | Record<string, unknown>
         | undefined;
-      const originalTables = (originalContract.storage as SqlStorage | undefined)?.namespaces
-        .__unbound__?.tables as Record<string, unknown> | undefined;
+      const originalTables = (originalContract.storage as SqlStorage | undefined)?.namespaces[
+        'public'
+      ]?.tables as Record<string, unknown> | undefined;
       const userTable = tables?.['user'] as Record<string, unknown> | undefined;
       const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
       if (userTable && originalUserTable) {

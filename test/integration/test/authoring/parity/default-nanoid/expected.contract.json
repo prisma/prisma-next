@@ -6,12 +6,12 @@
   "roots": {
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "User": {
             "fields": {
@@ -44,6 +44,10 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "tables": {}
+      },
+      "public": {
+        "id": "public",
         "tables": {
           "user": {
             "columns": {
@@ -66,7 +70,7 @@
         }
       }
     },
-    "storageHash": "sha256:a387ed20fd298ab5ea108185d849fd8794a8542e5373bc205828823c6c5c36ab"
+    "storageHash": "sha256:422fecb77cdf43ed7be5f0b5a6d51380aca318cbc7408357edf3565e35ff59ba"
   },
   "execution": {
     "executionHash": "sha256:04407e6b5c1efd89186edbee6c999cad6bff95ec87f56433272d7f08f3e6256a",

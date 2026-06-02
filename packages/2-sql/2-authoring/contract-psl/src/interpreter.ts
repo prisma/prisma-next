@@ -229,6 +229,10 @@ const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
  * slot empty (which means the late-bound default at the `StorageTable`
  * layer; emitted JSON omits the field).
  */
+function defaultSqlNamespaceIdForTarget(targetId: string): string {
+  return targetId === 'postgres' ? 'public' : UNBOUND_NAMESPACE_ID;
+}
+
 function resolveNamespaceIdForSqlTarget(input: {
   readonly bucketName: string;
   readonly targetId: string;
@@ -237,7 +241,7 @@ function resolveNamespaceIdForSqlTarget(input: {
     return undefined;
   }
   if (input.bucketName === UNSPECIFIED_PSL_NAMESPACE_NAME) {
-    return undefined;
+    return 'public';
   }
   if (input.bucketName === 'unbound') {
     return '__unbound__';
@@ -1306,6 +1310,7 @@ function resolvePolymorphism(
   modelNames: Set<string>,
   modelMappings: ReadonlyMap<string, ModelNameMapping>,
   modelNamespaceIds: ReadonlyMap<string, string>,
+  targetId: string,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): Record<string, ContractModel> {
@@ -1411,7 +1416,7 @@ function resolvePolymorphism(
         ...variantModel,
         base: crossRef(
           baseDecl.baseName,
-          modelNamespaceIds.get(baseDecl.baseName) ?? UNBOUND_NAMESPACE_ID,
+          modelNamespaceIds.get(baseDecl.baseName) ?? defaultSqlNamespaceIdForTarget(targetId),
         ),
         ...(resolvedTable ? { storage: { ...variantModel.storage, table: resolvedTable } } : {}),
       },
@@ -1695,6 +1700,7 @@ export function interpretPslDocumentToSqlContract(
     modelNames,
     modelMappings,
     modelNamespaceIds,
+    input.target.targetId,
     sourceId,
     polyDiagnostics,
   );
@@ -1730,7 +1736,8 @@ export function interpretPslDocumentToSqlContract(
             ...(namespaceSlice.valueObjects !== undefined
               ? { valueObjects: namespaceSlice.valueObjects }
               : {}),
-            ...(namespaceId === UNBOUND_NAMESPACE_ID && Object.keys(valueObjects).length > 0
+            ...(namespaceId === defaultSqlNamespaceIdForTarget(input.target.targetId) &&
+            Object.keys(valueObjects).length > 0
               ? { valueObjects }
               : {}),
           },

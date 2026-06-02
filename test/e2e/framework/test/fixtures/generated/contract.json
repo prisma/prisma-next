@@ -6,36 +6,36 @@
   "roots": {
     "comment": {
       "model": "Comment",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "embedding": {
       "model": "Embedding",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "event": {
       "model": "Event",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "literal_defaults": {
       "model": "LiteralDefaults",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "param_types": {
       "model": "ParamTypes",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "post": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Comment": {
             "fields": {
@@ -88,7 +88,7 @@
                 },
                 "to": {
                   "model": "Post",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -518,7 +518,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               },
               "comments": {
@@ -533,7 +533,7 @@
                 },
                 "to": {
                   "model": "Comment",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -618,7 +618,7 @@
                 },
                 "to": {
                   "model": "Post",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -649,9 +649,9 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "comment": {
             "columns": {
@@ -1087,7 +1087,7 @@
         }
       }
     },
-    "storageHash": "sha256:2798d47330f6b3372cb0adf9d2d371ee5f26f973a1baa770326b4a089faec385"
+    "storageHash": "sha256:5f48b9ec3b79e4f41e04f20af6d36a4176ff9086fd6c26223767ff9e62e5c146"
   },
   "execution": {
     "executionHash": "sha256:cee87ec002ede0c352cdf215e9e129a540bebd95555057beaa785c7dfadb95ea",

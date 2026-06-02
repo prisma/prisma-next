@@ -1,6 +1,6 @@
 import type { RuntimeTargetInstance } from '@prisma-next/framework-components/execution';
 import type { SqlRuntimeTargetDescriptor } from '@prisma-next/sql-runtime';
-import { sqliteTargetDescriptorMeta } from './descriptor-meta';
+import { sqliteTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
 
 export interface SqliteRuntimeTargetInstance extends RuntimeTargetInstance<'sql', 'sqlite'> {}
 
@@ -8,7 +8,7 @@ const sqliteRuntimeTargetDescriptor: SqlRuntimeTargetDescriptor<
   'sqlite',
   SqliteRuntimeTargetInstance
 > = {
-  ...sqliteTargetDescriptorMeta,
+  ...sqliteTargetDescriptorMetaRuntime,
   codecs: () => [],
   create(): SqliteRuntimeTargetInstance {
     return {

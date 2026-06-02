@@ -90,7 +90,6 @@ Rules below are listed by bare filename; the canonical file is `.agents/rules/<n
 ## SQL & Query Patterns
 - `query-patterns.mdc` — Query DSL patterns
 - `postgres-lateral-patterns.mdc` — LATERAL/json_agg patterns
-- `include-many-patterns.mdc` — includeMany type inference
 - `sql-types-imports.mdc` — SQL types import path (use @prisma-next/sql-contract/types)
 
 ## TypeScript & Typing

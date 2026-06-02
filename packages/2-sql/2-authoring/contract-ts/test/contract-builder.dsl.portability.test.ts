@@ -113,10 +113,77 @@ describe('contract DSL portability coverage', () => {
       typeParams: { length: 36 },
     });
 
+    const stripNamespaceIds = (value: unknown): unknown => {
+      if (Array.isArray(value)) {
+        return value.map(stripNamespaceIds);
+      }
+      if (value !== null && typeof value === 'object') {
+        const record = value as Record<string, unknown>;
+        if ('namespaceId' in record) {
+          const { namespaceId: _namespaceId, ...withoutNamespaceId } = record;
+          return stripNamespaceIds(withoutNamespaceId);
+        }
+        if ('namespace' in record) {
+          const { namespace: _namespace, ...withoutNamespace } = record;
+          return stripNamespaceIds(withoutNamespace);
+        }
+        return Object.fromEntries(
+          Object.entries(record).map(([key, entry]) => [key, stripNamespaceIds(entry)]),
+        );
+      }
+      return value;
+    };
+
     const stripTargetProfileAndStorageHashes = (c: Record<string, unknown>) => {
-      const { target: _t, profileHash: _p, storage, ...rest } = c;
-      const { storageHash: _sh, ...storageRest } = storage as Record<string, unknown>;
-      return { ...rest, storage: storageRest };
+      const { target: _t, profileHash: _p, storage, domain, roots, ...rest } = c;
+      const {
+        storageHash: _sh,
+        namespaces: _ns,
+        ...storageRest
+      } = storage as Record<string, unknown>;
+      const domainNamespaces = (domain as { namespaces: Record<string, { models: unknown }> })
+        .namespaces;
+      const models = Object.fromEntries(
+        Object.entries(
+          Object.assign(
+            {},
+            ...Object.values(domainNamespaces).map(
+              (slice) => slice.models as Record<string, unknown>,
+            ),
+          ),
+        ).map(([modelName, model]) => {
+          const typedModel = model as {
+            relations?: Record<string, { to: { model: string; namespace?: string } }>;
+          };
+          if (typedModel.relations === undefined) {
+            return [modelName, model];
+          }
+          return [
+            modelName,
+            {
+              ...typedModel,
+              relations: Object.fromEntries(
+                Object.entries(typedModel.relations).map(([relationName, relation]) => [
+                  relationName,
+                  {
+                    ...relation,
+                    to: { model: relation.to.model },
+                  },
+                ]),
+              ),
+            },
+          ];
+        }),
+      );
+      return stripNamespaceIds({
+        ...rest,
+        roots,
+        domain: { namespaces: { default: { models } } },
+        storage: {
+          ...storageRest,
+          tables: unboundTables(c['storage'] as Parameters<typeof unboundTables>[0]),
+        },
+      }) as Record<string, unknown>;
     };
 
     expect(
