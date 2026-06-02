@@ -64,24 +64,12 @@ const posts = await db.Post
 `.orderBy(...)` accepts model-accessor callbacks that return `OrderByItem`s via the column's `.asc()` / `.desc()` helpers:
 
 ```ts
-// Forward page (newest first).
-const firstPage = await db.Post
+// Newest first.
+const posts = await db.Post
   .orderBy((post) => post.createdAt.desc())
   .take(10)
   .all();
 ```
-
-Integrations that own pagination — Relay-style backward cursor pagination, REST list endpoints — need to flip the user's sort order. Each `OrderByItem` exposes `.reverse()`, which returns a new frozen item with the direction flipped and the expression unchanged. Call it on the item the selector returns to build the backward page (then re-reverse the returned rows in application code):
-
-```ts
-// Backward page: same sort, flipped.
-const lastPage = await db.Post
-  .orderBy((post) => post.createdAt.desc().reverse())
-  .take(10)
-  .all();
-```
-
-An integration that wraps a user-supplied order selector flips it the same way — `(post) => userSelector(post).reverse()` — without having to inspect the opaque `OrderByItem`.
 
 ## Codec Roundtrip
 
