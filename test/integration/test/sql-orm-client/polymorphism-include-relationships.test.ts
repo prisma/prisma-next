@@ -113,7 +113,7 @@ function buildPolyParentContract(): TestContract {
 
   const task = models['Task']!;
   task.relations['comments'] = {
-    to: { model: 'TaskComment' },
+    to: { model: 'TaskComment', namespace: 'public' },
     cardinality: '1:N',
     on: { localFields: ['id'], targetFields: ['taskId'] },
   };
@@ -149,7 +149,7 @@ function buildToOnePolyTargetContract(): TestContract {
     fields: { id: int(false), subject: text(false), ownerId: int(true) },
     relations: {
       owner: {
-        to: { model: 'User' },
+        to: { model: 'User', namespace: 'public' },
         cardinality: 'N:1',
         on: { localFields: ['ownerId'], targetFields: ['id'] },
       },
@@ -206,7 +206,7 @@ function buildTwoMtiVariantContract(): TestContract {
     fields: { id: int(false), name: text(false) },
     relations: {
       tasks: {
-        to: { model: 'Task' },
+        to: { model: 'Task', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['projectId'] },
       },
@@ -238,7 +238,7 @@ function buildNestedThroughPolyContract(): TestContract {
   task.fields['reporterId'] = int(true);
   task.storage.fields['reporterId'] = { column: 'reporter_id' };
   task.relations['reporter'] = {
-    to: { model: 'Person' },
+    to: { model: 'Person', namespace: 'public' },
     cardinality: 'N:1',
     on: { localFields: ['reporterId'], targetFields: ['id'] },
   };
@@ -262,7 +262,7 @@ function buildNestedThroughPolyContract(): TestContract {
     fields: { id: int(false), name: text(false) },
     relations: {
       tasks: {
-        to: { model: 'Task' },
+        to: { model: 'Task', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['projectId'] },
       },
@@ -297,7 +297,7 @@ function buildStiMembersContract(): TestContract {
     fields: { id: int(false), name: text(false) },
     relations: {
       members: {
-        to: { model: 'User' },
+        to: { model: 'User', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['accountId'] },
       },
@@ -331,7 +331,7 @@ function buildMtiTasksContract(): TestContract {
     fields: { id: int(false), name: text(false) },
     relations: {
       tasks: {
-        to: { model: 'Task' },
+        to: { model: 'Task', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['projectId'] },
       },

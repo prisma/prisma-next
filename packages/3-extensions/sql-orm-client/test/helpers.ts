@@ -191,7 +191,7 @@ export function buildMixedPolyContract(): TestContract {
     },
     relations: {
       subtasks: {
-        to: { model: 'Task' },
+        to: { model: 'Task', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['parentId'] },
       },
@@ -218,7 +218,7 @@ export function buildMixedPolyContract(): TestContract {
     },
     relations: {
       tasks: {
-        to: { model: 'Task' },
+        to: { model: 'Task', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['projectId'] },
       },
@@ -334,7 +334,7 @@ export function buildStiPolyContract(): TestContract {
     },
     relations: {
       members: {
-        to: { model: 'User' },
+        to: { model: 'User', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['accountId'] },
       },

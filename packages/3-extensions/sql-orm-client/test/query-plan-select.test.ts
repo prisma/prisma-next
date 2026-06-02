@@ -823,7 +823,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
 
     expect(childRows.joins).toEqual([
       JoinAst.left(
-        TableSource.named('features'),
+        TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
         EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
       ),
     ]);
@@ -847,7 +847,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
 
     expect(childRows.joins).toEqual([
       JoinAst.inner(
-        TableSource.named('features'),
+        TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
         EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
       ),
     ]);
@@ -866,7 +866,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
 
     expect(childRows.joins).toEqual([
       JoinAst.left(
-        TableSource.named('features'),
+        TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
         EqColJoinOn.of(ColumnRef.of('subtasks__child', 'id'), ColumnRef.of('features', 'id')),
       ),
     ]);

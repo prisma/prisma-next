@@ -111,7 +111,7 @@ function buildStiIncludeContract(): TestContract {
     },
     relations: {
       members: {
-        to: { model: 'User' },
+        to: { model: 'User', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['accountId'] },
       },
@@ -154,7 +154,7 @@ function buildMtiIncludeContract(): TestContract {
     },
     relations: {
       tasks: {
-        to: { model: 'Task' },
+        to: { model: 'Task', namespace: 'public' },
         cardinality: '1:N',
         on: { localFields: ['id'], targetFields: ['projectId'] },
       },
