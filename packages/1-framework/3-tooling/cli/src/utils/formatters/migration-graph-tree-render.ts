@@ -27,8 +27,15 @@ const LABEL_GAP = 2;
  */
 const DB_MARKER_NAME = 'db';
 
+export interface MigrationEdgeAnnotation {
+  readonly status?: 'applied' | 'pending';
+  readonly operationCount?: number;
+  readonly invariants?: readonly string[];
+}
+
 export interface RenderMigrationGraphTreeOptions {
   readonly refsByHash?: ReadonlyMap<string, readonly string[]>;
+  readonly edgeAnnotationsByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly dbHash?: string;
   readonly contractHash?: string;
   readonly activeRefName?: string;
@@ -517,6 +524,28 @@ function createTreeStyler(opts: RenderMigrationGraphTreeOptions): MigrationListS
   };
 }
 
+function formatEdgeAnnotationSuffix(
+  migrationHash: string,
+  opts: RenderMigrationGraphTreeOptions,
+  style: MigrationListStyler,
+): string {
+  const annotation = opts.edgeAnnotationsByHash?.get(migrationHash);
+  if (annotation === undefined) {
+    return '';
+  }
+  const segments: string[] = [];
+  if (annotation.operationCount !== undefined) {
+    segments.push(`${annotation.operationCount} ops`);
+  }
+  if (annotation.invariants !== undefined && annotation.invariants.length > 0) {
+    segments.push(style.invariants(annotation.invariants));
+  }
+  if (segments.length === 0) {
+    return '';
+  }
+  return `  ${segments.join('  ')}`;
+}
+
 function formatEdgeHashColumn(
   edge: ClassifiedEdge,
   style: MigrationListStyler,
@@ -730,7 +759,8 @@ export function renderMigrationGraphTree(
         : style.dirName;
     const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
-    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}`));
+    const annotationSuffix = formatEdgeAnnotationSuffix(edge.migrationHash, opts, style);
+    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}${annotationSuffix}`));
   }
 
   return lines.join('\n');

@@ -304,6 +304,43 @@ describe('renderMigrationGraphTree', () => {
     expect(ascii).toContain('+-+-/');
   });
 
+  it('appends operation count and invariants from edgeAnnotationsByHash', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '3b2d98d', '20260303_add_phone');
+    const annotations = new Map([
+      [init.migrationHash, { operationCount: 5 }],
+      [addPhone.migrationHash, { operationCount: 2, invariants: ['phone_present'] }],
+    ]);
+    expect(
+      tree([init, addPhone], {
+        colorize: false,
+        edgeAnnotationsByHash: annotations,
+      }),
+    ).toBe(
+      [
+        '○   3b2d98d',
+        '│↑  20260303_add_phone   ef9de27 → 3b2d98d  2 ops  {phone_present}',
+        '○   ef9de27',
+        '│↑  init                 ∅       → ef9de27  5 ops',
+        '∅',
+      ].join('\n'),
+    );
+  });
+
+  it('omits invariants from edgeAnnotationsByHash when the set is empty', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const annotations = new Map([[init.migrationHash, { operationCount: 1, invariants: [] }]]);
+    const output = tree([init], { colorize: false, edgeAnnotationsByHash: annotations });
+    expect(output).toContain('1 ops');
+    expect(output).not.toContain('{');
+  });
+
+  it('leaves migration rows plain when edgeAnnotationsByHash is absent', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const output = tree([init], { colorize: false });
+    expect(output).not.toContain(' ops');
+  });
+
   it('renders a realistic multi-topology graph', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');

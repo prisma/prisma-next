@@ -26,10 +26,7 @@ import {
   setCommandSeeAlso,
 } from '../utils/command-helpers';
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
-import {
-  buildMigrationListTopologyBySpace,
-  renderMigrationListWithStyle,
-} from '../utils/formatters/migration-list-render';
+import { renderMigrationListWithStyle } from '../utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
 import type {
   MigrationListEntry,
@@ -143,8 +140,9 @@ export function renderMigrationListHumanOutput(
   options: MigrationListHumanRenderOptions,
 ): string {
   const styler = createAnsiMigrationListStyler({ useColor: options.useColor });
-  const topologyBySpaceId = buildMigrationListTopologyBySpace(result);
-  return renderMigrationListWithStyle(result, styler, options.glyphMode, topologyBySpaceId);
+  return renderMigrationListWithStyle(result, styler, options.glyphMode, undefined, {
+    colorize: options.useColor,
+  });
 }
 
 /**
@@ -222,7 +220,7 @@ export async function executeMigrationListCommand(
   if (!flags.json && !flags.quiet) {
     const header = formatStyledHeader({
       command: 'migration list',
-      description: 'List on-disk migrations, latest first, per contract space',
+      description: 'List on-disk migrations per contract space',
       details: [
         { label: 'config', value: configPath },
         { label: 'migrations', value: migrationsRelative },
@@ -253,15 +251,13 @@ export function createMigrationListCommand(): Command {
   const command = new Command('list');
   setCommandDescriptions(
     command,
-    'List on-disk migrations, latest first, per contract space',
+    'List on-disk migrations per contract space',
     'Enumerates every on-disk migration under migrations/<space>/ for every\n' +
-      'contract space found on disk, latest first. Offline — does not consult\n' +
-      'the database. Each row leads with a kind glyph (* forward, ↩ rollback,\n' +
-      '⟲ self), then dirName, then source → destination contract hashes\n' +
-      '(7-char git-style). Self-edges show a single hash. Invariants render as\n' +
-      '{...}; refs on the destination as (production, db). Pass --space <id>\n' +
-      'to narrow to one contract space. --ascii forces ASCII kind glyphs\n' +
-      '(orthogonal to --no-color).',
+      'contract space found on disk. Offline — does not consult the database.\n' +
+      'Human output draws the shared migration graph tree with operation counts,\n' +
+      'invariants on each migration row, and refs on destination contract nodes.\n' +
+      'Pass --space <id> to narrow to one contract space. --ascii forces ASCII\n' +
+      'tree glyphs (orthogonal to --no-color).',
   );
   setCommandExamples(command, [
     'prisma-next migration list',
