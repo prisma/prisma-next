@@ -31,6 +31,7 @@ These are documented degrees-of-freedom from the slice/project spec; pinned here
 - **Builds on:** D1's `updateMarker`.
 - **Hands to:** the converged merge policy that the cut-over (D4) routes all advance call sites onto.
 - **Focus:** merge policy on the SPI method only. Operator-confirmed behaviour change; surface it in the slice's PR description.
+- **Mechanism:** compute the union+dedupe in the adapter (TS), uniform across dialects — this is precisely why SQLite (JSON-as-`TEXT`, no SQL array ops) can stop overwriting. The implementer wires where the *current* invariant set comes from (the runner already reads the marker pre-advance under the txn+lock; pass it in vs. re-read inside `updateMarker`) and surfaces if that's a non-trivial fork.
 
 ### D3 — Read + parser consolidation
 - **Outcome:** the runtime reader, the family `readMarker`, and the SQLite runner's private read collapse into **one** SPI read; the two `parseContractMarkerRow` copies become one. `MarkerReadResult` `no-table`/`absent`/`present` semantics unchanged.
@@ -43,6 +44,7 @@ These are documented degrees-of-freedom from the slice/project spec; pinned here
 - **Builds on:** D1 (write SPI) + D2 (merge policy) + D3 (read home).
 - **Hands to:** slice DoD — a fully adapter-routed SQL marker/ledger path.
 - **Focus:** deletion + call-site migration + upsert collapse. Cross-package gate: workspace-wide test + `git grep` for the removed symbols across `test/`, `examples/`, sibling packages.
+- **Reconcile the column set at cut-over (D1 R1 review item):** the legacy PG merge `update` (`statement-builders.ts:128`) rewrites the **full** marker row; the new `updateMarker` touches only `core_hash`/`profile_hash`/`updated_at`/`invariants`. At cut-over, confirm the advance path doesn't depend on the legacy write also refreshing `meta`/`contract_json` (or fold those into `updateMarker`/`initMarker` as appropriate) — don't silently drop columns the old path wrote.
 
 _Sequencing: D1 → D2 (merge policy lives on `updateMarker`); D3 independent of D2 (can interleave); D4 last (depends on D1–D3). Each dispatch is one reviewable unit; **may fan out** at dispatch time if a review can't hold it._
 
