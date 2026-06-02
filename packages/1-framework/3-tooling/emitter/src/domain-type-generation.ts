@@ -148,6 +148,24 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
       );
     }
 
+    const through = relObj['through'] as
+      | {
+          table?: string;
+          parentColumns?: string[];
+          childColumns?: string[];
+          targetColumns?: string[];
+        }
+      | undefined;
+    if (through?.table && through.parentColumns && through.childColumns && through.targetColumns) {
+      const table = serializeValue(through.table);
+      const parentColumns = through.parentColumns.map((c) => serializeValue(c)).join(', ');
+      const childColumns = through.childColumns.map((c) => serializeValue(c)).join(', ');
+      const targetColumns = through.targetColumns.map((c) => serializeValue(c)).join(', ');
+      parts.push(
+        `readonly through: { readonly table: ${table}; readonly parentColumns: readonly [${parentColumns}]; readonly childColumns: readonly [${childColumns}]; readonly targetColumns: readonly [${targetColumns}] }`,
+      );
+    }
+
     if (parts.length > 0) {
       relationEntries.push(`readonly ${serializeObjectKey(relName)}: { ${parts.join('; ')} }`);
     }
