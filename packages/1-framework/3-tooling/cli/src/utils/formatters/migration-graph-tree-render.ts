@@ -147,55 +147,93 @@ interface RowLaneColors {
   readonly lane: readonly number[];
   /** Colour column for a node arc-pair's connector half (`◂` / `─`). */
   readonly connector: readonly number[];
+  /**
+   * Colour column for the trailing `─` of a landing tee (`┴─`). The junction
+   * (`lane`) keeps its own column; the dash leads into the next converging arc.
+   */
+  readonly dash: readonly number[];
 }
 
 /**
  * Resolve per-cell colour columns for a row. Scanning right-to-left lets each
- * arc bridge inherit the corner column that closes it (the arc's back-lane), so
- * the whole arc — vertical run (already its own column), horizontal bridges,
- * corners, crossings, and the `◂`/`─` connector — reads as a single continuous
- * hue. A crossing can only be one colour, so rather than leave it dim (wrong for
- * both crossing lines) it takes the arc owning the horizontal run at this row
- * (the nearest corner to its right); the crossed vertical lane is simply
- * occluded at that one cell and reappears on the next row.
+ * arc segment inherit the hue of the arc it leads into.
+ *
+ * On a converging-landing line (`○◂──────┴─┴─╯`), every horizontal dash segment
+ * takes the hue of the **nearest landing anchor** — the next `arc-land-tee` or
+ * `arc-land-corner` — to its right, i.e. the branch it leads into: the bridge
+ * run leads into the first converging arc, and each tee's trailing `─` leads
+ * into the next arc out. Tee/corner junction glyphs keep their own column hue.
+ * This mirrors the forward connector's `┬─` rule (see
+ * {@link resolveConnectorLaneColors}). A single (non-converging) landing has
+ * only the corner as an anchor, so its whole horizontal run reads as one hue.
+ *
+ * The source side (`○─`, `arc-branch-tee`, `arc-branch-corner`) and pure
+ * horizontal passes are unaffected: they track the nearest corner to the right
+ * (`arcCorner`), so a routed back-arc's source fan still reads as one hue. A
+ * crossing can only be one colour, so it takes the arc owning the horizontal
+ * run at this row; the crossed vertical lane is occluded at that one cell and
+ * reappears on the next row.
  */
 function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
   const lane = new Array<number>(cells.length);
   const connector = new Array<number>(cells.length);
+  const dash = new Array<number>(cells.length);
   let arcCorner = NEUTRAL_LANE;
+  let landingAnchor = NEUTRAL_LANE;
   for (let column = cells.length - 1; column >= 0; column--) {
     const cell = cells[column];
-    connector[column] = arcCorner;
+    connector[column] = landingAnchor !== NEUTRAL_LANE ? landingAnchor : arcCorner;
     switch (cell?.kind) {
       case 'arc-branch-corner':
-      case 'arc-land-corner':
         arcCorner = column;
         lane[column] = column;
+        dash[column] = column;
         break;
-      case 'arc-branch-tee':
+      case 'arc-land-corner':
+        arcCorner = column;
+        landingAnchor = column;
+        lane[column] = column;
+        dash[column] = column;
+        break;
       // An inner co-sourced arc's own back-lane junction: its vertical run
-      // continues below in this column, so it keeps its own column hue. The
-      // co-landing tee is the symmetric case (vertical run continues above).
+      // continues below in this column, so the whole `┬─` keeps its own column.
+      case 'arc-branch-tee':
+        lane[column] = column;
+        dash[column] = column;
+        break;
+      // The symmetric co-landing junction: the `┴` keeps its own column (its
+      // vertical run continues above), but the trailing `─` leads into the next
+      // converging arc — the nearest landing anchor still to its right.
       case 'arc-land-tee':
         lane[column] = column;
+        dash[column] = landingAnchor === NEUTRAL_LANE ? column : landingAnchor;
+        landingAnchor = column;
         break;
       case 'arc-crossing':
-      case 'arc-land-bridge':
-        lane[column] = arcCorner;
+      case 'arc-land-bridge': {
+        const served = landingAnchor !== NEUTRAL_LANE ? landingAnchor : arcCorner;
+        lane[column] = served;
+        dash[column] = served;
         break;
+      }
       case 'horizontal-pass':
         lane[column] = arcCorner === NEUTRAL_LANE ? column : arcCorner;
+        dash[column] = lane[column] ?? column;
         break;
       case 'node':
         lane[column] = column;
+        dash[column] = column;
         arcCorner = NEUTRAL_LANE;
+        landingAnchor = NEUTRAL_LANE;
         break;
       default:
         lane[column] = column;
+        dash[column] = column;
         arcCorner = NEUTRAL_LANE;
+        landingAnchor = NEUTRAL_LANE;
     }
   }
-  return { lane, connector };
+  return { lane, connector, dash };
 }
 
 /**
@@ -387,7 +425,13 @@ function renderCellPair(
     case 'arc-land-corner':
       return lane(palette.arcLandCorner);
     case 'arc-land-tee':
-      return lane(palette.arcLandTee);
+      return renderConnectorTee(
+        palette.arcLandTee,
+        laneColumn,
+        colors.dash[column] ?? laneColumn,
+        colorize,
+        style,
+      );
     case 'arc-crossing':
       return lane(palette.arcLandBridge);
     case 'arc-land-bridge':

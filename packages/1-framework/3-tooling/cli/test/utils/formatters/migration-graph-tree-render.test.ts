@@ -843,6 +843,67 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(addNameMergeRow).toContain(laneColorForColumn(1)('─'));
   });
 
+  // A 4-way forward fan (occupying lanes 0..3) plus three node-skipping
+  // rollbacks converging on an early node. The back-lanes are pushed out to
+  // columns 4/5/6, so the landing row reads `○◂──────┴─┴─╯`: a bridge run, two
+  // converging landing tees, then the outermost corner.
+  function convergingLandingEdges(): readonly MigrationEdge[] {
+    return [
+      edge(EMPTY_CONTRACT_HASH, 'n0', 'init'),
+      edge('n0', 'n1', 'm1'),
+      edge('n1', 'n2', 'm2'),
+      edge('n2', 'n3', 'm3'),
+      edge('n3', 'n4', 'm4'),
+      edge('n4', 'n5', 'm5'),
+      edge('n5', 'n6', 'm6'),
+      edge('n6', 'n7', 'm7'),
+      edge('n1', 'b1', 'fan_b1'),
+      edge('n1', 'b2', 'fan_b2'),
+      edge('n1', 'b3', 'fan_b3'),
+      edge('b1', 'n6', 'merge_b1'),
+      edge('b2', 'n6', 'merge_b2'),
+      edge('b3', 'n6', 'merge_b3'),
+      edge('n3', 'n1', 'rb_a'),
+      edge('n4', 'n1', 'rb_c'),
+      edge('n5', 'n1', 'rb_b'),
+    ];
+  }
+
+  it('colors each converging-landing dash by the arc it leads into', () => {
+    const colored = tree(convergingLandingEdges(), { colorize: true });
+    const landing = colored.split('\n').find((line) => stripAnsi(line).startsWith('○◂──────┴─┴─╯'));
+    expect(landing).toBeDefined();
+    // Arcs converge in columns 4, 5, 6 (left → right). The bridge run leads into
+    // the first arc; each tee's trailing dash leads into the NEXT arc out.
+    expect(landing).toContain(laneColorForColumn(4)('◂'));
+    expect(landing).toContain(laneColorForColumn(4)('──'));
+    // First tee: `┴` keeps its own column (4); its trailing `─` leads into 5.
+    expect(landing).toContain(laneColorForColumn(4)('┴') + laneColorForColumn(5)('─'));
+    // Second tee: `┴` keeps its own column (5); its trailing `─` leads into 6.
+    expect(landing).toContain(laneColorForColumn(5)('┴') + laneColorForColumn(6)('─'));
+    // The corner keeps its own column hue.
+    expect(landing).toContain(laneColorForColumn(6)('╯ '));
+    // No tee's trailing dash wears its own (left) lane any more.
+    expect(landing).not.toContain(laneColorForColumn(4)('┴─'));
+    expect(landing).not.toContain(laneColorForColumn(5)('┴─'));
+    // The bridge run no longer wears the outer corner's (col 6) hue.
+    expect(landing).not.toContain(laneColorForColumn(6)('──'));
+  });
+
+  it('keeps a single (non-converging) back-arc landing one continuous hue', () => {
+    const colored = tree(skipArcEdges(), { colorize: true });
+    const landing = colored
+      .split('\n')
+      .find((line) => line.includes('bbbbbbb') && line.includes('◂'));
+    expect(landing).toBeDefined();
+    // The lone arc lands in column 2; with only the corner as an anchor, the
+    // whole run — connector, bridges, and corner — reads as that one hue.
+    expect(landing).toContain(laneColorForColumn(2)('◂'));
+    expect(landing).toContain(laneColorForColumn(2)('──'));
+    expect(landing).toContain(laneColorForColumn(2)('╯ '));
+    expect(landing).not.toContain('┴');
+  });
+
   it("colors a routed back-arc's whole horizontal run — bridges and crossings — one hue", () => {
     const colored = tree(skipArcEdges(), { colorize: true });
     const lines = colored.split('\n');
