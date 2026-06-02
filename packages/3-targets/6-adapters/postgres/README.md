@@ -20,7 +20,7 @@ Provide PostgreSQL-specific adapter implementation, codecs, and capabilities. En
 
 - **Adapter Implementation**: Implement `Adapter` SPI for PostgreSQL
   - Lower SQL ASTs to PostgreSQL dialect SQL
-  - Render `.include(...)` as a correlated subquery with `json_agg` for nested array includes
+  - Render JSON aggregation (`json_agg`, `json_build_object`) and scalar subqueries
   - Advertise PostgreSQL capabilities (`lateral`, `jsonAgg`)
   - Normalize PostgreSQL EXPLAIN output
   - Map PostgreSQL errors to `RuntimeError` envelope
@@ -89,8 +89,8 @@ flowchart TD
 **Adapter (`adapter.ts`)**
 - Main adapter implementation
 - Lowers SQL ASTs to PostgreSQL SQL
-- Renders joins (INNER, LEFT, RIGHT, FULL) with ON conditions
-- Renders `.include(...)` as a correlated subquery with `json_agg` for nested array includes
+- Renders joins (INNER, LEFT, RIGHT, FULL, LATERAL) with ON conditions
+- Renders JSON aggregation (`json_agg`, `json_build_object`) and scalar subqueries
 - Renders DML operations (INSERT, UPDATE, DELETE) with RETURNING clauses
 - Advertises PostgreSQL capabilities (`lateral`, `jsonAgg`, `returning`)
 - Maps PostgreSQL errors to `RuntimeError`
@@ -191,8 +191,8 @@ The adapter declares the following PostgreSQL capabilities:
 
 - **`orderBy: true`** - Supports ORDER BY clauses
 - **`limit: true`** - Supports LIMIT clauses
-- **`lateral: true`** - Supports LATERAL joins (used by the SQL-builder `lateralJoin()` DSL)
-- **`jsonAgg: true`** - Supports JSON aggregation functions (`json_agg`) used to lower `.include(...)` to correlated subqueries
+- **`lateral: true`** - Supports LATERAL joins
+- **`jsonAgg: true`** - Supports JSON aggregation functions (`json_agg`)
 - **`returning: true`** - Supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE)
 - **`sql.enums: true`** - Supports contract-defined enum storage types
 
@@ -205,17 +205,13 @@ The capabilities on the descriptor must match the capabilities in code. If they 
 
 See `docs/reference/capabilities.md` and `docs/architecture docs/subsystems/5. Adapters & Targets.md` for details.
 
-## Include Support
+## JSON Aggregation
 
-The adapter lowers `.include(...)` for nested array includes to a correlated subquery in the SELECT list, using `json_agg`:
+The renderer lowers JSON-aggregation AST nodes to PostgreSQL's `json_agg`:
 
-**Lowering Strategy:**
-- Renders each `.include(...)` as a correlated subquery that uses `json_agg(json_build_object(...))` to aggregate child rows into a JSON array
-- The ON condition from the include becomes the WHERE clause of the correlated subquery, referencing the outer row
-- When both `ORDER BY` and `LIMIT` are present, wraps the child query in an inner SELECT that projects individual columns with aliases, then uses `json_agg(row_to_json(sub.*))` on the result
-
-**Capabilities Required:**
-- `jsonAgg: true` - Enables `json_agg` function support
+- `json_agg(json_build_object(...))` aggregates a row set into a JSON array of objects
+- A scalar subquery (`SubqueryExpr`) in the SELECT list correlates against the outer row through its WHERE clause
+- When the subquery carries an inner `ORDER BY` and `LIMIT`, its rows are wrapped in an inner SELECT, then aggregated with `json_agg(row_to_json(sub.*))`
 
 **Example SQL Output:**
 ```sql
@@ -226,8 +222,6 @@ SELECT "user"."id" AS "id", (
 ) AS "posts"
 FROM "user"
 ```
-
-> LATERAL emission is retained in the renderer (and the `lateral` capability stays advertised) for the public SQL-builder `lateralJoin()` DSL; the ORM include path no longer uses it.
 
 ## DML Operations with RETURNING
 

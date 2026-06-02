@@ -271,25 +271,21 @@ function wrapWithRowNumberDedup(options: {
 }
 
 /**
- * Recursively build the projection artifacts for the nested includes
- * attached to a child SELECT. Used by `buildIncludeChildRowsSelect` to
- * wire depth-2+ aggregates into the inner SELECT at each level.
+ * Recursively build the correlated-subquery projections for the nested
+ * includes attached to a child SELECT. Used by `buildIncludeChildRowsSelect`
+ * to wire depth-2+ aggregates into the inner SELECT at each level.
  *
  * Each nested include contributes a single projection item whose
- * expression is a correlated subquery; no joins are produced.
+ * expression is a correlated subquery.
  */
-function buildNestedIncludeArtifacts(
+function buildNestedIncludeProjections(
   contract: Contract<SqlStorage>,
   parentTableRef: string,
   includes: readonly IncludeExpr[],
-): {
-  readonly projections: ReadonlyArray<ProjectionItem>;
-} {
-  const projections = includes.map(
+): ReadonlyArray<ProjectionItem> {
+  return includes.map(
     (nested) => buildCorrelatedIncludeProjection(contract, parentTableRef, nested).projection,
   );
-
-  return { projections };
 }
 
 function buildIncludeChildRowsSelect(
@@ -373,7 +369,7 @@ function buildIncludeChildRowsSelect(
   // projection. The nested aggregates are attached to *this* child
   // SELECT, so they correlate against `childTableRef` — which may itself
   // be an alias if the relation is self-referential.
-  const { projections: nestedProjections } = buildNestedIncludeArtifacts(
+  const nestedProjections = buildNestedIncludeProjections(
     contract,
     childTableRef,
     childState.includes,
@@ -564,7 +560,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     childState.selectedFields,
     distinctAlias,
   );
-  const { projections: outerNestedProjections } = buildNestedIncludeArtifacts(
+  const outerNestedProjections = buildNestedIncludeProjections(
     contract,
     distinctAlias,
     childState.includes,
