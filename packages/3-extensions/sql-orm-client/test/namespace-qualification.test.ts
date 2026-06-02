@@ -1,5 +1,9 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import type { Contract, ContractModelBase } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  type ContractModelBase,
+  DomainNamespaceResolutionError,
+} from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage as SqlStorageType } from '@prisma-next/sql-contract/types';
 import { SqlStorage, type SqlStorageInput, StorageTable } from '@prisma-next/sql-contract/types';
@@ -10,7 +14,6 @@ import { PostgresSchema } from '../../../3-targets/3-targets/postgres/src/core/p
 import { SqliteDatabase } from '../../../3-targets/3-targets/sqlite/src/core/sqlite-unbound-database';
 import type { PostgresContract } from '../../../3-targets/6-adapters/postgres/src/core/types';
 import { compileDeleteCount, compileInsertReturning, compileSelect } from '../src/query-plan';
-import { resolveDomainModelForContract } from '../src/storage-resolution';
 import { emptyState } from '../src/types';
 
 const PUBLIC_NAMESPACE_ID = 'public';
@@ -57,7 +60,7 @@ const publicPostgresContract = {
 } as unknown as PostgresContract;
 
 describe('ORM namespace qualification', () => {
-  it('resolves models default-namespace-first without throwing on multi-domain namespaces', () => {
+  it('throws on a multi-domain-namespace contract rather than silently picking one', () => {
     const contract = {
       ...publicPostgresContract,
       domain: {
@@ -68,9 +71,9 @@ describe('ORM namespace qualification', () => {
       },
     } as Contract<SqlStorageType>;
 
-    const resolved = resolveDomainModelForContract(contract, 'User');
-    expect(resolved?.namespaceId).toBe('public');
-    expect(() => compileSelect(contract, 'users', emptyState(), 'User')).not.toThrow();
+    expect(() => compileSelect(contract, 'users', emptyState(), 'User')).toThrow(
+      DomainNamespaceResolutionError,
+    );
   });
 
   it('stamps public on TableSource for select, insert, and delete plans', () => {

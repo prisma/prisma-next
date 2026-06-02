@@ -18,25 +18,7 @@ function tableNamed(_name: string): StorageTable {
 }
 
 describe('resolveStorageTable', () => {
-  it('prefers the default namespace when the same table name exists in multiple namespaces', () => {
-    const publicUser = tableNamed('public-user');
-    const authUser = tableNamed('auth-user');
-    const storage = new SqlStorage({
-      storageHash: 'sha256:test',
-      namespaces: {
-        auth: buildSqlNamespace({ id: 'auth', tables: { user: authUser } }),
-        public: buildSqlNamespace({ id: 'public', tables: { user: publicUser } }),
-      },
-    });
-
-    const resolved = resolveStorageTable(storage, 'user', {
-      defaultNamespaceId: 'public',
-    });
-
-    expect(resolved).toEqual({ namespaceId: 'public', table: publicUser });
-  });
-
-  it('falls back to a non-default namespace when the table is only declared there', () => {
+  it('finds a table in whichever namespace declares it', () => {
     const authOnly = tableNamed('auth-only');
     const storage = new SqlStorage({
       storageHash: 'sha256:test',
@@ -46,9 +28,7 @@ describe('resolveStorageTable', () => {
       },
     });
 
-    const resolved = resolveStorageTable(storage, 'user', {
-      defaultNamespaceId: 'public',
-    });
+    const resolved = resolveStorageTable(storage, 'user');
 
     expect(resolved).toEqual({ namespaceId: 'auth', table: authOnly });
   });
@@ -65,9 +45,7 @@ describe('resolveStorageTable', () => {
       },
     });
 
-    const resolved = resolveStorageTable(storage, 'users', {
-      defaultNamespaceId: UNBOUND_NAMESPACE_ID,
-    });
+    const resolved = resolveStorageTable(storage, 'users');
 
     expect(resolved).toEqual({ namespaceId: UNBOUND_NAMESPACE_ID, table: users });
   });
@@ -80,10 +58,6 @@ describe('resolveStorageTable', () => {
       },
     });
 
-    expect(
-      resolveStorageTable(storage, 'missing', {
-        defaultNamespaceId: 'public',
-      }),
-    ).toBeUndefined();
+    expect(resolveStorageTable(storage, 'missing')).toBeUndefined();
   });
 });

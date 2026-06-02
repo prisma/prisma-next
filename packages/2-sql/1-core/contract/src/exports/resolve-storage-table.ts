@@ -1,5 +1,1 @@
-export {
-  type ResolvedStorageTable,
-  type ResolveStorageTableOptions,
-  resolveStorageTable,
-} from '../resolve-storage-table';
+export { type ResolvedStorageTable, resolveStorageTable } from '../resolve-storage-table';

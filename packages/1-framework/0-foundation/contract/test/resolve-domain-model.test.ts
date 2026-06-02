@@ -28,31 +28,14 @@ function multiNamespaceDomain(
 }
 
 describe('resolveDomainModel', () => {
-  it('prefers the default namespace when the same model name exists in multiple namespaces', () => {
-    const publicUser = minimalModel('User');
-    const authUser = minimalModel('User');
-    const domain = multiNamespaceDomain({
-      auth: { User: authUser },
-      public: { User: publicUser },
-    });
-
-    const resolved = resolveDomainModel(domain, 'User', {
-      defaultNamespaceId: 'public',
-    });
-
-    expect(resolved).toEqual({ namespaceId: 'public', model: publicUser });
-  });
-
-  it('falls back to a non-default namespace when the model is only declared there', () => {
+  it('finds a model in whichever namespace declares it', () => {
     const authUser = minimalModel('User');
     const domain = multiNamespaceDomain({
       public: {},
       auth: { User: authUser },
     });
 
-    const resolved = resolveDomainModel(domain, 'User', {
-      defaultNamespaceId: 'public',
-    });
+    const resolved = resolveDomainModel(domain, 'User');
 
     expect(resolved).toEqual({ namespaceId: 'auth', model: authUser });
   });
@@ -61,9 +44,7 @@ describe('resolveDomainModel', () => {
     const user = minimalModel('User');
     const domain = applicationDomainOf({ models: { User: user } });
 
-    const resolved = resolveDomainModel(domain, 'User', {
-      defaultNamespaceId: '__unbound__',
-    });
+    const resolved = resolveDomainModel(domain, 'User');
 
     expect(resolved?.namespaceId).toBe('__unbound__');
     expect(resolved?.model).toBe(user);
@@ -72,10 +53,6 @@ describe('resolveDomainModel', () => {
   it('returns undefined when no namespace declares the model name', () => {
     const domain = applicationDomainOf({ models: {} });
 
-    expect(
-      resolveDomainModel(domain, 'Missing', {
-        defaultNamespaceId: 'public',
-      }),
-    ).toBeUndefined();
+    expect(resolveDomainModel(domain, 'Missing')).toBeUndefined();
   });
 });

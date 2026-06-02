@@ -1,5 +1,1 @@
-export {
-  type ResolveDomainModelOptions,
-  type ResolvedDomainModel,
-  resolveDomainModel,
-} from '../resolve-domain-model';
+export { type ResolvedDomainModel, resolveDomainModel } from '../resolve-domain-model';

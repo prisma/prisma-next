@@ -7,7 +7,7 @@ export type {
 export { DomainNamespaceResolutionError } from '../contract-validation-error';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
-export { inferDefaultDomainNamespaceId } from '../default-namespace';
+export { soleDomainNamespaceId } from '../default-namespace';
 export type {
   ApplicationDomain,
   ApplicationDomainNamespace,
@@ -39,11 +39,7 @@ export type {
 } from '../domain-types';
 export type { NamespaceId } from '../namespace-id';
 export { asNamespaceId } from '../namespace-id';
-export {
-  type ResolveDomainModelOptions,
-  type ResolvedDomainModel,
-  resolveDomainModel,
-} from '../resolve-domain-model';
+export { type ResolvedDomainModel, resolveDomainModel } from '../resolve-domain-model';
 export type {
   $,
   Brand,

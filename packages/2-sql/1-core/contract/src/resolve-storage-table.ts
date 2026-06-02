@@ -6,10 +6,6 @@ export interface ResolvedStorageTable {
   readonly table: StorageTable;
 }
 
-export interface ResolveStorageTableOptions {
-  readonly defaultNamespaceId?: string;
-}
-
 function tableInNamespace(
   namespace: SqlNamespace | undefined,
   tableName: string,
@@ -25,31 +21,17 @@ function tableInNamespace(
 }
 
 /**
- * Resolve a bare storage table name to its namespace coordinate and table IR.
- * Scans the default namespace first (when given), then every other declared
- * namespace.
+ * Resolve a bare storage table name to its namespace coordinate and table IR by
+ * scanning the contract's namespaces. For the single-namespace contracts in
+ * scope the scan is exact; cross-namespace bare-name collisions are selected
+ * explicitly (TML-2550).
  */
 export function resolveStorageTable(
   storage: SqlStorage,
   tableName: string,
-  options: ResolveStorageTableOptions = {},
 ): ResolvedStorageTable | undefined {
-  const { defaultNamespaceId } = options;
-  const namespaces = storage.namespaces;
-
-  if (defaultNamespaceId !== undefined) {
-    const defaultNamespace = namespaces[defaultNamespaceId];
-    const defaultTable = tableInNamespace(defaultNamespace, tableName);
-    if (defaultTable !== undefined) {
-      return { namespaceId: defaultNamespaceId, table: defaultTable };
-    }
-  }
-
-  for (const namespaceId of Object.keys(namespaces)) {
-    if (namespaceId === defaultNamespaceId) {
-      continue;
-    }
-    const table = tableInNamespace(namespaces[namespaceId], tableName);
+  for (const namespaceId of Object.keys(storage.namespaces)) {
+    const table = tableInNamespace(storage.namespaces[namespaceId], tableName);
     if (table !== undefined) {
       return { namespaceId, table };
     }

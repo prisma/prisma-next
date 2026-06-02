@@ -76,7 +76,7 @@ changes:
     script: ./migrate-contract-testing-imports.ts
   - id: default-namespace-domain-access-retire-projection-helpers
     summary: |
-      The transitional `@prisma-next/contract` helpers `contractModels`, `contractValueObjects`, `resolveSingleDomainNamespaceId`, `ContractModelsMap`, and `ContractValueObjectsMap` are removed. Read models/value objects through `domainModelsAtDefaultNamespace(contract.domain)` / `domainValueObjectsAtDefaultNamespace(contract.domain)` (the default namespace is inferred). Typed model shapes use `ContractModelDefinitions<Contract>`. SQL namespace concretions must expose `qualifyTable`; hydrate migration scaffolds with `PostgresContractSerializer` (not `structuredClone`) so `qualifyTable` survives. Runtime SQL is namespace-qualified on Postgres.
+      The transitional `@prisma-next/contract` helpers `contractModels`, `contractValueObjects`, `resolveSingleDomainNamespaceId`, `ContractModelsMap`, and `ContractValueObjectsMap` are removed. Read models/value objects through `domainModelsAtDefaultNamespace(contract.domain)` / `domainValueObjectsAtDefaultNamespace(contract.domain)` (these read the contract's sole namespace and throw on a multi-namespace contract). Typed model shapes use `ContractModelDefinitions<Contract>`. SQL namespace concretions must expose `qualifyTable`; hydrate migration scaffolds with `PostgresContractSerializer` (not `structuredClone`) so `qualifyTable` survives. Runtime SQL is namespace-qualified on Postgres.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
@@ -606,7 +606,7 @@ Run your extension's test suite and any migration-loading integration tests. Con
 
 Starting at the 0.12 release, two SPI changes affect extension authors:
 
-1. **Namespaced domain plane** — stop reading flat `contract.models` / `contract.valueObjects`. Models and value objects live under `contract.domain.namespaces.<ns>`. Use `domainModelsAtDefaultNamespace(contract.domain)` (the default namespace is inferred — sole namespace, else insertion order) and `ContractModelDefinitions<C>` from `@prisma-next/contract/types` for typed access. Storage remains under `contract.storage.namespaces.<ns>` (unchanged shape).
+1. **Namespaced domain plane** — stop reading flat `contract.models` / `contract.valueObjects`. Models and value objects live under `contract.domain.namespaces.<ns>`. Use `domainModelsAtDefaultNamespace(contract.domain)` (reads the contract's sole namespace; throws on a multi-namespace contract — select explicitly per TML-2550) and `ContractModelDefinitions<C>` from `@prisma-next/contract/types` for typed access. Storage remains under `contract.storage.namespaces.<ns>` (unchanged shape).
 
 2. **Removed `@prisma-next/contract/testing` subpath** — test factories moved to `@prisma-next/test-utils`. Add `@prisma-next/test-utils` to your extension's `devDependencies` at the same version pin as your other `@prisma-next/*` packages if it is not already present.
 
@@ -689,9 +689,9 @@ The default namespace a bare name resolves through is **inferred** from the cont
 
 | Removed | Replacement |
 |---|---|
-| `contractModels(contract)` | `domainModelsAtDefaultNamespace(contract.domain)` (default namespace inferred) |
+| `contractModels(contract)` | `domainModelsAtDefaultNamespace(contract.domain)` (reads the sole namespace; throws on multi-namespace) |
 | `contractValueObjects(contract)` | `domainValueObjectsAtDefaultNamespace(contract.domain)` |
-| `resolveSingleDomainNamespaceId(domain)` | `inferDefaultDomainNamespaceId(domain)`; multi-namespace contracts no longer throw at runtime |
+| `resolveSingleDomainNamespaceId(domain)` | `soleDomainNamespaceId(domain)` (same fail-loud single-namespace behaviour) |
 | `ContractModelsMap<C>` | `ContractModelDefinitions<C>` |
 | `ContractValueObjectsMap<C>` | Read `contract.domain.namespaces[ns].valueObjects` for a specific namespace, or `domainValueObjectsAtDefaultNamespace(contract.domain)` for the default slot |
 
