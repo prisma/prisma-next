@@ -4166,28 +4166,28 @@ importers:
   packages/3-targets/7-drivers/ppg-serverless:
     dependencies:
       '@prisma-next/contract':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../1-framework/0-foundation/contract
       '@prisma-next/errors':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../1-framework/1-core/errors
       '@prisma-next/framework-components':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/sql-contract':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../2-sql/1-core/contract
       '@prisma-next/sql-errors':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../2-sql/1-core/errors
       '@prisma-next/sql-operations':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../2-sql/1-core/operations
       '@prisma-next/sql-relational-core':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../2-sql/4-lanes/relational-core
       '@prisma-next/utils':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../1-framework/0-foundation/utils
       '@prisma/ppg':
         specifier: 'catalog:'
@@ -4197,13 +4197,13 @@ importers:
         version: 2.2.0
     devDependencies:
       '@prisma-next/test-utils':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../../test/utils
       '@prisma-next/tsconfig':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../0-config/tsconfig
       '@prisma-next/tsdown':
-        specifier: workspace:0.11.0
+        specifier: workspace:0.12.0
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'

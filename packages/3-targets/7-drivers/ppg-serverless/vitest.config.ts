@@ -18,7 +18,6 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
-        'src/named-cursor.ts',
       ],
       thresholds: {
         lines: 94,
