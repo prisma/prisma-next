@@ -246,6 +246,10 @@ function resolveConnectorLaneColors(
           owner = column;
         }
         break;
+      case 'arc-crossing':
+        glyph[column] = owner === NEUTRAL_LANE ? column : owner;
+        dash[column] = glyph[column];
+        break;
       case 'horizontal-pass': {
         const served = owner === NEUTRAL_LANE ? column : owner;
         glyph[column] = served;
@@ -438,6 +442,9 @@ function renderConnectorRow(
           break;
         case 'horizontal-pass':
           out += lane(palette.horizontalPass);
+          break;
+        case 'arc-crossing':
+          out += renderConnectorTee(palette.arcCrossing, glyphColumn, dashColumn, colorize, style);
           break;
         default:
           out += '  ';

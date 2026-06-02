@@ -152,7 +152,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑│   promote            D → E',
         '│ │↑  bob_extra          C → E',
         '○ │   D',
-        '├─┬─╮',
+        '├─┼─╮',
         '│↑│ │   merge_alice      B → D',
         '│ │ │↑  merge_bob        C → D',
         '○ │ │   B',
@@ -281,6 +281,27 @@ describe('renderMigrationGraphTree', () => {
         '∅',
       ].join('\n'),
     );
+  });
+
+  it('renders a crossing glyph where a pass-through lane crosses a fan connector', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
+    const alice = edge('root', 'phone', 'alice');
+    const bob = edge('root', 'posts', 'bob');
+    const fastForward = edge('root', 'avatar', 'fast_forward');
+    const mergeAlice = edge('phone', 'tip', 'merge_alice');
+    const mergeBob = edge('posts', 'tip', 'merge_bob');
+    const mergeFf = edge('avatar', 'tip', 'merge_ff');
+    const promote = edge('posts', 'spur', 'promote');
+    const spurHold = edge('spur', 'hold', 'spur_hold');
+    const edges = [init, alice, bob, fastForward, mergeAlice, mergeBob, mergeFf, promote, spurHold];
+
+    const rendered = tree(edges);
+    expect(rendered).toContain('├─┬─╮');
+    expect(rendered).toContain('├─┼─╯');
+
+    const ascii = treeAscii(edges);
+    expect(ascii).toContain('+-+-\\');
+    expect(ascii).toContain('+-+-/');
   });
 
   it('renders a realistic multi-topology graph', () => {

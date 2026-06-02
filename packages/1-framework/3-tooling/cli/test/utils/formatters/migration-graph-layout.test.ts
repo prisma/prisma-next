@@ -183,6 +183,9 @@ function renderConnectorRow(row: MigrationGraphGridRow, gridWidth: number): stri
         case 'horizontal-pass':
           out += '──';
           break;
+        case 'arc-crossing':
+          out += '┼─';
+          break;
         default:
           out += '  ';
       }
@@ -953,6 +956,45 @@ describe('buildMigrationGraphLayout', () => {
         '○         ∅',
       ].join('\n'),
     );
+  });
+
+  it('emits arc-crossing for an active lane inside a merge fan span', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
+    const alice = edge('root', 'phone', 'alice');
+    const bob = edge('root', 'posts', 'bob');
+    const fastForward = edge('root', 'avatar', 'fast_forward');
+    const mergeAlice = edge('phone', 'tip', 'merge_alice');
+    const mergeBob = edge('posts', 'tip', 'merge_bob');
+    const mergeFf = edge('avatar', 'tip', 'merge_ff');
+    const promote = edge('posts', 'spur', 'promote');
+    const spurHold = edge('spur', 'hold', 'spur_hold');
+    const model = layout([
+      init,
+      alice,
+      bob,
+      fastForward,
+      mergeAlice,
+      mergeBob,
+      mergeFf,
+      promote,
+      spurHold,
+    ]);
+
+    const branchAtTip = model.rows.find(
+      (r) => r.kind === 'branch-connector' && r.contractHash === 'tip',
+    );
+    expect(branchAtTip).toMatchObject({ startLane: 0, endLane: 2, branchCount: 3 });
+    expect(branchAtTip?.cells[0]?.kind).toBe('branch-tee');
+    expect(branchAtTip?.cells[1]?.kind).toBe('branch-tee');
+    expect(branchAtTip?.cells[2]?.kind).toBe('branch-corner');
+
+    const mergeAtPosts = model.rows.find(
+      (r) => r.kind === 'merge-connector' && r.contractHash === 'posts',
+    );
+    expect(mergeAtPosts).toMatchObject({ startLane: 1, endLane: 3, branchCount: 2 });
+    expect(mergeAtPosts?.cells[1]?.kind).toBe('merge-tee');
+    expect(mergeAtPosts?.cells[2]?.kind).toBe('arc-crossing');
+    expect(mergeAtPosts?.cells[3]?.kind).toBe('merge-corner');
   });
 
   it('uses structural cell roles without literal box-drawing characters', () => {

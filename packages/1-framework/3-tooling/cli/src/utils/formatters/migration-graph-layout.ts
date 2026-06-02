@@ -379,6 +379,7 @@ function emptyCells(width: number): StructuralCell[] {
 function buildBranchConnectorCells(
   startLane: number,
   endLane: number,
+  fanTargetLanes: ReadonlySet<number>,
   activeLanes: ReadonlySet<number>,
   gridWidth: number,
 ): StructuralCell[] {
@@ -393,7 +394,13 @@ function buildBranchConnectorCells(
     } else if (lane === endLane) {
       cells[lane] = { kind: 'branch-corner' };
     } else if (lane > startLane && lane < endLane) {
-      cells[lane] = { kind: 'branch-tee' };
+      if (fanTargetLanes.has(lane)) {
+        cells[lane] = { kind: 'branch-tee' };
+      } else if (activeLanes.has(lane)) {
+        cells[lane] = { kind: 'arc-crossing' };
+      } else {
+        cells[lane] = { kind: 'branch-tee' };
+      }
     }
   }
   return cells;
@@ -402,6 +409,7 @@ function buildBranchConnectorCells(
 function buildMergeConnectorCells(
   startLane: number,
   endLane: number,
+  fanTargetLanes: ReadonlySet<number>,
   activeLanes: ReadonlySet<number>,
   gridWidth: number,
 ): StructuralCell[] {
@@ -416,7 +424,13 @@ function buildMergeConnectorCells(
     } else if (lane === endLane) {
       cells[lane] = { kind: 'merge-corner' };
     } else if (lane > startLane && lane < endLane) {
-      cells[lane] = activeLanes.has(lane) ? { kind: 'merge-tee' } : { kind: 'horizontal-pass' };
+      if (fanTargetLanes.has(lane)) {
+        cells[lane] = { kind: 'merge-tee' };
+      } else if (activeLanes.has(lane)) {
+        cells[lane] = { kind: 'arc-crossing' };
+      } else {
+        cells[lane] = { kind: 'horizontal-pass' };
+      }
     }
   }
   return cells;
@@ -922,13 +936,14 @@ function layoutComponent(
     const endLane = Math.max(...laneIndices);
     ensureGridWidth(endLane + 1);
     const activeLanes = new Set(activeLaneIndices());
+    const fanTargetLanes = new Set(laneIndices);
     rows.push({
       kind: 'merge-connector',
       contractHash,
       startLane,
       endLane,
       branchCount: laneIndices.length,
-      cells: buildMergeConnectorCells(startLane, endLane, activeLanes, gridWidth),
+      cells: buildMergeConnectorCells(startLane, endLane, fanTargetLanes, activeLanes, gridWidth),
     });
     for (const index of laneIndices) {
       if (index !== startLane) setLane(index, null);
@@ -941,6 +956,7 @@ function layoutComponent(
     startLane: number,
     endLane: number,
     branchCount: number,
+    fanTargetLanes: readonly number[],
   ): void {
     ensureGridWidth(endLane + 1);
     const activeLanes = new Set(activeLaneIndices());
@@ -950,7 +966,13 @@ function layoutComponent(
       startLane,
       endLane,
       branchCount,
-      cells: buildBranchConnectorCells(startLane, endLane, activeLanes, gridWidth),
+      cells: buildBranchConnectorCells(
+        startLane,
+        endLane,
+        new Set(fanTargetLanes),
+        activeLanes,
+        gridWidth,
+      ),
     });
   }
 
@@ -1046,7 +1068,7 @@ function layoutComponent(
 
     if (groups.length >= 2) {
       const endLane = Math.max(...laneForGroup);
-      emitBranchConnector(node, column, endLane, groups.length);
+      emitBranchConnector(node, column, endLane, groups.length, laneForGroup);
     }
 
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
