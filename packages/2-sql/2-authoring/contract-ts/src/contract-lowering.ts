@@ -707,6 +707,7 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
 
   return {
     target: definition.target,
+    ...ifDefined('defaultControl', definition.defaultControl),
     ...(definition.extensionPacks ? { extensionPacks: definition.extensionPacks } : {}),
     ...(definition.storageHash ? { storageHash: definition.storageHash } : {}),
     ...(definition.foreignKeyDefaults ? { foreignKeyDefaults: definition.foreignKeyDefaults } : {}),

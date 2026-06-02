@@ -1,3 +1,4 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
@@ -65,6 +66,7 @@ type ContractDefinition<
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
+  readonly defaultControl?: ControlPolicy;
   readonly namespaces?: Namespaces;
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: Types;
@@ -87,6 +89,7 @@ type ContractScaffold<
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
+  readonly defaultControl?: ControlPolicy;
   readonly namespaces?: Namespaces;
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: never;
