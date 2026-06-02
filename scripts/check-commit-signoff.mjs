@@ -34,9 +34,10 @@ const AUTHOR_IDENT_RE = /^(.*)\s+<([^>]+)>\s+\d+\s+[+-]?\d+$/;
 // `Signed-off-by:` but `signed-off-by:` etc. are accepted by `git interpret-trailers`.
 const SIGNOFF_RE = /^\s*signed-off-by:\s*(.+?)\s+<([^>]+)>\s*$/i;
 
-// The line git inserts under `commit.cleanup=scissors`; anything below it is
-// stripped from the final message.
-const SCISSORS_LINE = '# ------------------------ >8 ------------------------';
+// The body of git's `commit.cleanup=scissors` marker; the leading character
+// is `core.commentChar` (defaults to `#`), so we prepend it at call time
+// rather than hardcoding `#` here.
+const SCISSORS_BODY = ' ------------------------ >8 ------------------------';
 
 export function parseAuthorIdent(ident) {
   const m = ident.match(AUTHOR_IDENT_RE);
@@ -45,10 +46,11 @@ export function parseAuthorIdent(ident) {
 }
 
 export function stripCommentsAndScissors(message, commentChar = '#') {
+  const scissorsLine = `${commentChar}${SCISSORS_BODY}`;
   const lines = message.split(/\r?\n/);
   const out = [];
   for (const line of lines) {
-    if (line === SCISSORS_LINE) break;
+    if (line === scissorsLine) break;
     if (line.startsWith(commentChar)) continue;
     out.push(line);
   }
@@ -152,6 +154,6 @@ function main(argv) {
   return 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   process.exit(main(process.argv));
 }
