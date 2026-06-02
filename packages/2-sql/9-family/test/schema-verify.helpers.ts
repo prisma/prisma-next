@@ -6,6 +6,7 @@ import {
   asNamespaceId,
   type ColumnDefault,
   type Contract,
+  type ControlPolicy,
   profileHash,
   type StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -14,6 +15,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
   buildSqlNamespace,
+  type PostgresEnumStorageEntry,
   type ReferentialAction,
   SqlStorage,
   StorageTable,
@@ -40,16 +42,25 @@ export function createTestContract(
   tables: Record<string, StorageTable>,
   extensionPacks: Record<string, unknown> = {},
   storageTypes?: Record<string, import('@prisma-next/sql-contract/types').SqlStorageTypeEntry>,
+  contractOverrides?: {
+    defaultControl?: ControlPolicy;
+    enums?: Record<string, PostgresEnumStorageEntry>;
+  },
 ): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
     roots: {},
     profileHash: profileHash('sha256:test'),
+    ...ifDefined('defaultControl', contractOverrides?.defaultControl),
     storage: new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          tables,
+          ...ifDefined('enum', contractOverrides?.enums),
+        }),
       },
       ...ifDefined('types', storageTypes),
     }),
@@ -99,6 +110,7 @@ export function createContractTable(
       type?: string;
       options?: Record<string, unknown>;
     }>;
+    control?: ControlPolicy;
   },
 ): StorageTable {
   const input = {
@@ -123,6 +135,7 @@ export function createContractTable(
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],
     ...ifDefined('primaryKey', options?.primaryKey),
+    ...ifDefined('control', options?.control),
   } satisfies StorageTableInput;
   return new StorageTable(input);
 }
