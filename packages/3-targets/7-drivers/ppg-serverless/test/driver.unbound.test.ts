@@ -129,19 +129,21 @@ describe('@prisma-next/driver-ppg-serverless runtime driver lifecycle', () => {
       expect(result.rows).toEqual([{ id: 1, name: 'alice' }]);
     });
 
-    it('routes acquireConnection to the bound impl, which throws a neutral not-implemented error', async () => {
+    it('routes acquireConnection to the bound impl, which returns a usable SqlConnection', async () => {
       const fake = makeFakeClient(() => ({ columns: [], rows: [] }));
       const driver = ppgServerlessRuntimeDriverDescriptor.create();
       await driver.connect({ kind: 'ppgClient', client: fake.client });
 
-      await expect(driver.acquireConnection()).rejects.toMatchObject({
-        code: 'DRIVER.NOT_IMPLEMENTED',
-        category: 'RUNTIME',
+      const connection = await driver.acquireConnection();
+      expect(connection).toMatchObject({
+        execute: expect.any(Function),
+        executePrepared: expect.any(Function),
+        query: expect.any(Function),
+        beginTransaction: expect.any(Function),
+        release: expect.any(Function),
+        destroy: expect.any(Function),
       });
-      // Verify the message does not leak transient project identifiers.
-      await expect(driver.acquireConnection()).rejects.toThrow(
-        /long-lived sessions are not yet implemented/,
-      );
+      await connection.release();
     });
   });
 
