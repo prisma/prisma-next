@@ -21,6 +21,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 };
 
 const int4Column = columnDescriptor('pg/int4@1');
