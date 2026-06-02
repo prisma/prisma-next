@@ -46,6 +46,7 @@ export {
   ForeignKeyReference,
   Index,
   isPostgresEnumStorageEntry,
+  isStorageTable,
   isStorageTypeInstance,
   POSTGRES_ENUM_KIND,
   PrimaryKey,
@@ -54,6 +55,7 @@ export {
   SqlUnboundNamespace,
   StorageColumn,
   StorageTable,
+  storageTableAt,
   toStorageTypeInstance,
   UniqueConstraint,
 } from '../types';

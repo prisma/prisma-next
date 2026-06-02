@@ -5,7 +5,7 @@ import {
   type PostgresEnumStorageEntry,
 } from './postgres-enum-storage-entry';
 import { SqlNode } from './sql-node';
-import type { StorageTable, StorageTableInput } from './storage-table';
+import { isStorageTable, type StorageTable, type StorageTableInput } from './storage-table';
 import {
   isStorageTypeInstance,
   type StorageTypeInstance,
@@ -96,6 +96,15 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
     }
     freezeNode(this);
   }
+}
+
+export function storageTableAt(
+  storage: SqlStorage,
+  namespaceId: string,
+  tableName: string,
+): StorageTable | undefined {
+  const raw = storage.namespaces[namespaceId]?.tables?.[tableName];
+  return isStorageTable(raw) ? raw : undefined;
 }
 
 /**
