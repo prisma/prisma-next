@@ -9,7 +9,6 @@ import {
   deriveCanPrompt,
   parseGlobalFlagsOrExit,
 } from '../../utils/global-flags';
-import { fireTelemetryAfterInitConsent } from '../../utils/telemetry';
 import {
   INIT_EXIT_EMIT_FAILED,
   INIT_EXIT_INSTALL_FAILED,
@@ -97,7 +96,7 @@ export function createInitCommand(): Command {
       '--no-skill',
       'Skip Prisma Next skills install (air-gapped CI, restricted registries, etc.)',
     )
-    .action(async (options: InitCommandOptions, actionCommand: Command) => {
+    .action(async (options: InitCommandOptions) => {
       const { runInit } = await import('./init');
       const flags = parseGlobalFlagsOrExit(options);
       const canPrompt = deriveCanPrompt({
@@ -109,9 +108,6 @@ export function createInitCommand(): Command {
         options,
         flags,
         canPrompt,
-        afterFirstTelemetryConsent: (inputs) => {
-          fireTelemetryAfterInitConsent(actionCommand, { databaseTarget: inputs.target });
-        },
       });
       process.exit(exitCode);
     });

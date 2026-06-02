@@ -10,15 +10,8 @@ import {
   type UserConfig,
   userConfigPath,
 } from '@prisma-next/cli-telemetry';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { version as CLI_VERSION } from '../../package.json' with { type: 'json' };
-import {
-  type CommonCommandOptions,
-  deriveCanPrompt,
-  type GlobalFlags,
-  parseGlobalFlags,
-} from './global-flags';
 import { isCI } from './is-ci';
 
 type TelemetryGate =
@@ -86,11 +79,7 @@ function senderPath(): string {
   return fileURLToPath(new URL(import.meta.resolve('@prisma-next/cli-telemetry/sender')));
 }
 
-function fireTelemetry(
-  actionCommand: Command,
-  userConfig: UserConfig,
-  overrides: { readonly databaseTarget?: string } = {},
-): TelemetryRunOutcome {
+function fireTelemetry(actionCommand: Command, userConfig: UserConfig): TelemetryRunOutcome {
   return runTelemetry({
     command: commanderSnapshotForTelemetry(actionCommand),
     version: CLI_VERSION,
@@ -99,7 +88,6 @@ function fireTelemetry(
     isCI: isCI(),
     env: process.env,
     userConfig,
-    ...ifDefined('databaseTarget', overrides.databaseTarget),
   });
 }
 
@@ -119,23 +107,23 @@ function fireTelemetry(
  * Builds the one-time first-run disclosure. The resolved absolute path to
  * the user-level config file is substituted in so the user can see exactly
  * which file to edit (it must not be confused with `prisma-next.config.ts`).
- * The docs link mirrors the in-repo reference style of the `init` consent
- * prompt (`TELEMETRY_CONSENT_MESSAGE`).
+ * `prisma-next telemetry disable` is named as the primary, friendliest
+ * opt-out, alongside the env vars and the config edit.
  */
 function firstRunNotice(configPath: string): string {
   return [
     'Prisma Next collects anonymous CLI usage data, enabled by default.',
     "What's collected and why: docs/Telemetry.md.",
-    'Opt out anytime: DO_NOT_TRACK=1, PRISMA_NEXT_DISABLE_TELEMETRY=1, or set',
-    `"enableTelemetry": false in ${configPath}.`,
+    'Opt out: run "prisma-next telemetry disable", set DO_NOT_TRACK=1 or',
+    `PRISMA_NEXT_DISABLE_TELEMETRY=1, or set "enableTelemetry": false in ${configPath}.`,
   ].join(' ');
 }
 
 /**
  * Best-effort first-run disclosure + installationId mint. Runs only on the
  * gating-enabled path. Prints the notice to stderr (never stdout) and mints
- * a persistent id without touching `enableTelemetry`, so the interactive
- * `init` consent prompt stays live and no unasked-for consent is recorded.
+ * a persistent id without touching `enableTelemetry`, so the opt-out default
+ * stays intact and no unasked-for consent is recorded.
  *
  * Every step is wrapped so an un-writable config dir (or any other failure)
  * never throws and never blocks the command. Returns the minted (or
@@ -154,69 +142,30 @@ function discloseAndMintOnFirstRun(): string | undefined {
 }
 
 /**
- * True when this run is the interactive `init` first-run that will show
- * the consent prompt — in which case the preAction notice/mint/send must
- * stand down so disclosure happens via the prompt only (and the affirmative
- * send happens via `fireTelemetryAfterInitConsent`).
+ * True when the run is the `telemetry` command (or one of its
+ * subcommands). The usage-telemetry preAction fire is exempted for it:
+ * it would be absurd for `telemetry disable` to send a usage event before
+ * disabling, or for `telemetry status` to mint an id + send while merely
+ * reporting state. This is the only command-specific exemption.
  *
- * Callers reach this only on the gate-enabled + `installationId === undefined`
- * path, which already guarantees not-CI, no env opt-out, and
- * `enableTelemetry !== false`. The remaining predicate mirrors the prompt's
- * own gate in `init/inputs.ts::resolveTelemetryConsent` exactly:
- *
- * - leaf command is `init`,
- * - the run is prompt-eligible per the shared `deriveCanPrompt` (so it
- *   cannot drift from the value the `init` action handler computes),
- * - `--yes` was not passed (auto-accept skips the prompt),
- * - `enableTelemetry` is still `undefined`.
- *
- * `enableTelemetry` is re-checked here even though `installationId === undefined`
- * usually implies it: keeping the predicate complete pins parity with the
- * prompt's gate rather than relying on the mint/consent coupling.
+ * The check is rooted at the program: the path must be
+ * `['prisma-next', 'telemetry', …]`, so it matches the top-level
+ * `telemetry` command and its subcommands without matching a hypothetical
+ * nested `… telemetry` elsewhere.
  */
-function interactiveInitPromptWillFire(actionCommand: Command, userConfig: UserConfig): boolean {
-  // Only the top-level `prisma-next init` owns the consent prompt. A leaf
-  // check alone (`name === 'init'`) would also match a hypothetical nested
-  // subcommand such as `prisma-next migrations init`, so require the rooted
-  // path to be exactly `[program, 'init']`.
-  const commandPath = commandPathFor(actionCommand);
-  if (!(commandPath.length === 2 && commandPath.at(-1) === 'init')) {
-    return false;
-  }
-  if (userConfig.enableTelemetry !== undefined) {
-    return false;
-  }
-  const options = actionCommand.optsWithGlobals<CommonCommandOptions>();
-  let flags: GlobalFlags;
-  try {
-    flags = parseGlobalFlags(options);
-  } catch {
-    // Malformed/conflicting global flags: `init`'s own
-    // `parseGlobalFlagsOrExit` emits the structured PN-CLI error envelope and
-    // exits. Defer to it — suppress the notice/mint rather than re-surface a
-    // parse failure on the telemetry path, which must stay best-effort and
-    // never own command-exit UX.
-    return true;
-  }
-  if (flags.yes === true) {
-    return false;
-  }
-  return deriveCanPrompt({
-    flagsInteractive: flags.interactive,
-    optionInteractive: options.interactive,
-    stdinIsTTY: Boolean(process.stdin.isTTY),
-  });
+function isTelemetryCommand(actionCommand: Command): boolean {
+  return commandPathFor(actionCommand)[1] === 'telemetry';
 }
 
 export function fireTelemetryFromPreAction(actionCommand: Command): TelemetryRunOutcome {
+  if (isTelemetryCommand(actionCommand)) {
+    return { spawned: false, reason: 'gated-off' };
+  }
   const gate = resolveTelemetryGate();
   if (!gate.enabled) {
     return gate.outcome;
   }
   if (gate.userConfig.installationId === undefined) {
-    if (interactiveInitPromptWillFire(actionCommand, gate.userConfig)) {
-      return { spawned: false, reason: 'gated-off' };
-    }
     const installationId = discloseAndMintOnFirstRun();
     return fireTelemetry(
       actionCommand,
@@ -224,29 +173,4 @@ export function fireTelemetryFromPreAction(actionCommand: Command): TelemetryRun
     );
   }
   return fireTelemetry(actionCommand, gate.userConfig);
-}
-
-/**
- * Manual one-shot telemetry path for the first `init` run where the user
- * explicitly answers Yes to the consent prompt. The preAction hook for
- * that same run has already resolved before consent existed, so it is
- * default-off. After consent is persisted, `runInit` calls this helper
- * exactly for that first affirmative answer; subsequent init runs skip
- * it because the prompt is not shown again.
- *
- * The child's c12 load would return `databaseTarget: null` for this
- * specific invocation because `prisma-next.config.*` is not yet on
- * disk (init writes it later in the same run). To preserve the
- * prompt-chosen target in the first-init telemetry event, this
- * helper forwards the value as a parent-side IPC override on
- * `ParentToSenderPayload.databaseTarget` — the child consults the
- * override first and falls back to its c12 result when absent.
- */
-export function fireTelemetryAfterInitConsent(
-  actionCommand: Command,
-  inputs: { readonly databaseTarget: string },
-): TelemetryRunOutcome {
-  return fireTelemetry(actionCommand, readUserConfig(), {
-    databaseTarget: inputs.databaseTarget,
-  });
 }
