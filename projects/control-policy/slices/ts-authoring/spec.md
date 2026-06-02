@@ -6,6 +6,15 @@ _Parent project: [`projects/control-policy/`](../../spec.md). Outcome it contrib
 
 Slice 1 added `control` to the IR and `defaultControl` to the contract, but nothing in the TS authoring surface sets them. This slice wires the ergonomic surface: a contract-level `defaultControl` option and a per-object (per-table) `control` override in the SQL TS contract builder, both lowering to the slice-1 IR fields. An integration test authors a contract that mixes a default with a per-object override and asserts the resulting IR carries the right effective control per node.
 
+## Settled design decisions
+
+Decided with the operator before planning:
+
+- **Spelling:** `defineContract({ defaultControl: 'external', … })` at the contract level + a per-table `{ control: 'external' }` option, type-checked to the four `ControlPolicy` values.
+- **Per-table only** — no per-column override (project non-goal); **enums deferred** to a follow-up.
+- **Authoring does not reject `managed`-in-`external`.** A per-table `control: 'managed'` inside a `defaultControl: 'external'` contract is allowed at authoring time; the planner's safety floor + `warn` diagnostic (slice 3) is the audit trail, not an authoring-time hard error.
+- **Lowering only — no policy logic here.** This slice threads authored values to the IR fields; it does not re-derive or validate effective control.
+
 ## Chosen design
 
 - **Contract-level default.** The SQL TS contract builder (`packages/2-sql/2-authoring/contract-ts/src/contract-builder.ts` + `build-contract.ts`, with types in `contract-types.ts`) accepts an optional `defaultControl?: ControlPolicy` at the contract-build entry point, lowering straight to `Contract.defaultControl`. The 80% path: an extension author writes `defaultControl: 'external'` once.
