@@ -134,7 +134,7 @@ export function ContractView({ contract }: { contract: Contract }) {
 
       <Section title="Models">
         {Object.entries(contract.domain.namespaces).flatMap(([namespaceId, ns]) =>
-          Object.entries(ns.models as Record<string, ContractModel>).map(([modelName, model]) => (
+          Object.entries(ns.models).map(([modelName, model]) => (
             <ModelCard key={`${namespaceId}.${modelName}`} modelName={modelName} model={model} />
           )),
         )}
@@ -142,7 +142,7 @@ export function ContractView({ contract }: { contract: Contract }) {
 
       <Section title="Tables">
         {Object.values(contract.storage.namespaces).flatMap((ns) =>
-          Object.entries(ns.tables as Record<string, StorageTable>).map(([tableName, table]) => (
+          Object.entries(ns.tables).map(([tableName, table]) => (
             <TableCard key={`${ns.id}.${tableName}`} tableName={tableName} table={table} />
           )),
         )}
