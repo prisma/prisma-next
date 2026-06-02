@@ -1,5 +1,4 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SqlPlannerControlWarning } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
@@ -47,7 +46,6 @@ function plan(
   toContract: Contract<SqlStorage>,
 ): {
   calls: readonly { factoryName: string }[];
-  warnings: readonly SqlPlannerControlWarning[];
 } {
   const result = planIssues({
     ...plannerCtx,
@@ -121,6 +119,31 @@ describe('planIssues control policy', () => {
       expect(calls.some((c) => c.factoryName === 'createTable')).toBe(true);
     });
 
+    it('emits add column for an existing table missing a column', () => {
+      const withEmail = makeContract({
+        users: {
+          control: 'tolerated',
+          columns: { id: baseColumn, email: baseColumn },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      });
+      const { calls } = plan(
+        [
+          {
+            kind: 'missing_column',
+            table: 'users',
+            column: 'email',
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            message: '',
+          },
+        ],
+        withEmail,
+      );
+      expect(calls.some((c) => c.factoryName === 'addColumn')).toBe(true);
+    });
+
     it('suppresses drop for extra_table', () => {
       const { calls } = plan([{ kind: 'extra_table', table: 'users', message: '' }], toContract);
       expect(calls).toHaveLength(0);
@@ -187,7 +210,7 @@ describe('planIssues control policy', () => {
   });
 
   describe('external defaultControl floor', () => {
-    it('suppresses managed object DDL and surfaces warn diagnostic', () => {
+    it('suppresses managed-override object DDL (the floor wins)', () => {
       const toContract = makeContract(
         {
           users: {
@@ -200,20 +223,11 @@ describe('planIssues control policy', () => {
         },
         'external',
       );
-      const { calls, warnings } = plan(
+      const { calls } = plan(
         [{ kind: 'missing_table', table: 'users', namespaceId: UNBOUND_NAMESPACE_ID, message: '' }],
         toContract,
       );
       expect(calls).toHaveLength(0);
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toMatchObject({
-        severity: 'warn',
-        code: 'control_managed_in_external_space',
-        namespaceId: UNBOUND_NAMESPACE_ID,
-        table: 'users',
-      });
-      expect(warnings[0]?.summary).toContain('users');
-      expect(warnings[0]?.summary).toContain('external');
     });
 
     it('proceeds without hard failure when floor suppresses DDL', () => {

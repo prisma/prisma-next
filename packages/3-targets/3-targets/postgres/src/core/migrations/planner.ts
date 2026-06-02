@@ -2,12 +2,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlannerPlanOptions,
-  SqlPlannerControlWarning,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
 import {
   extractCodecControlHooks,
-  gateCallsByControlPolicy,
+  filterCallsByControlPolicy,
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
@@ -24,7 +23,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { postgresColumnsCompatible } from '../column-type-compatibility';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import { resolvePostgresCallDdlSubject } from './control-policy-ddl-resolve';
+import { resolvePostgresCallControlSubject } from './control-policy';
 import { createResolveExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
@@ -61,7 +60,6 @@ export type PostgresPlanResult =
   | {
       readonly kind: 'success';
       readonly plan: TypeScriptRenderablePostgresMigration;
-      readonly warnings: readonly SqlPlannerControlWarning[];
     }
   | SqlPlannerFailureResult;
 
@@ -179,13 +177,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       readonly PostgresOpFactoryCall[],
       'Codec hook ops conform to PostgresOpFactoryCall at the app emitter boundary'
     >(fieldEventOps);
-    const gatedFieldEvents = gateCallsByControlPolicy({
+    const filteredFieldEvents = filterCallsByControlPolicy({
       calls: fieldEventPostgresCalls,
       contract: options.contract,
-      resolveSubject: (call) => resolvePostgresCallDdlSubject(call, options.contract),
+      resolveSubject: (call) => resolvePostgresCallControlSubject(call, options.contract),
     });
-    const calls = [...result.value.calls, ...gatedFieldEvents.calls];
-    const warnings = [...result.value.warnings, ...gatedFieldEvents.warnings];
+    const calls = [...result.value.calls, ...filteredFieldEvents];
 
     return Object.freeze({
       kind: 'success' as const,
@@ -197,7 +194,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         },
         options.spaceId,
       ),
-      warnings: Object.freeze(warnings),
     });
   }
 

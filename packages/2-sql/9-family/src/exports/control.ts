@@ -25,23 +25,13 @@ export {
   contractToSchemaIR,
   detectDestructiveChanges,
 } from '../core/migrations/contract-to-schema-ir';
-export type {
-  DdlIntent,
-  GateCallsByControlPolicyOptions,
-  GateCallsByControlPolicyResult,
-  ResolvedDdlSubject,
-  SqlPlannerControlWarning,
-} from '../core/migrations/control-policy-ddl-gate';
+export type { ResolvedControlSubject } from '../core/migrations/control-policy';
 export {
-  controlPolicyAllowsDdlIntent,
-  gateCallsByControlPolicy,
-  resolveControlForSchemaIssue,
-  resolveNamespaceIdForControl,
-  schemaIssueDdlIntent,
-  shouldEmitFieldEvent,
-  shouldEmitSchemaIssue,
-  warningForSuppressedSchemaIssue,
-} from '../core/migrations/control-policy-ddl-gate';
+  controlPolicyAllowedOperationClasses,
+  filterCallsByControlPolicy,
+  resolveControlPolicyForSchemaIssue,
+  resolveNamespaceId,
+} from '../core/migrations/control-policy';
 export type { PlanFieldEventOperationsOptions } from '../core/migrations/field-event-planner';
 export { planFieldEventOperations } from '../core/migrations/field-event-planner';
 export {
