@@ -21,6 +21,7 @@ import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { synthMigrationEdges } from './synth-migration-edges';
 
 /**
  * Codec-rehydration guardrail.
@@ -54,6 +55,10 @@ const ALL_POLICY = {
 const EXT_SPACE = 'cipherstash';
 
 type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>;
+
+function withSynthEdges(entry: Omit<PerSpaceOptions, 'migrationEdges'>): PerSpaceOptions {
+  return { ...entry, migrationEdges: synthMigrationEdges(entry.plan) };
+}
 
 function appContract(): MongoContract {
   return {
@@ -208,7 +213,7 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
     try {
       const perSpaceOptions: readonly PerSpaceOptions[] = [
-        {
+        withSynthEdges({
           space: EXT_SPACE,
           plan: {
             targetId: 'mongo',
@@ -220,8 +225,8 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
           destinationContract: ext,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
-        {
+        }),
+        withSynthEdges({
           space: APP_SPACE_ID,
           plan: {
             targetId: 'mongo',
@@ -233,7 +238,7 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
           destinationContract: app,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
+        }),
       ];
 
       const result = await runner.execute({ driver, perSpaceOptions });

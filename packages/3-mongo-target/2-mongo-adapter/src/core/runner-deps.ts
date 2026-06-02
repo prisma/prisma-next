@@ -57,6 +57,9 @@ export interface MarkerOperations {
       readonly edgeId: string;
       readonly from: string;
       readonly to: string;
+      readonly migrationName: string;
+      readonly migrationHash: string;
+      readonly operations: readonly unknown[];
     },
   ): Promise<void>;
 }
@@ -82,11 +85,11 @@ export interface MongoRunnerDependencies {
 export function createMongoRunnerDeps(
   controlDriver: ControlDriverInstance<'mongo', 'mongo'>,
   driver: MongoDriver,
-  // Vestigial after the M2.5 family→adapter SPI dispatch refactor: the runner
-  // dependencies now route every wire-level call through `controlAdapter`, so
-  // the `family` instance is no longer consulted. Kept on the signature to
-  // avoid rippling through ~14 call sites mid-orchestration; a follow-up that
-  // already touches this factory should drop the parameter outright.
+  // Vestigial after the family→adapter SPI refactor: the runner dependencies
+  // now route every wire-level call through `controlAdapter`, so the `family`
+  // instance is no longer consulted. Kept on the signature to avoid rippling
+  // through ~14 call sites; a follow-up that already touches this factory
+  // should drop the parameter outright.
   _family: ControlFamilyInstance<'mongo', MongoSchemaIR>,
   controlAdapter: MongoControlAdapter<'mongo'> = new MongoControlAdapterImpl(),
 ): MongoRunnerDependencies {

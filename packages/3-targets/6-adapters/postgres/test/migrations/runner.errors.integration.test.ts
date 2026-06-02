@@ -21,6 +21,7 @@ import {
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
+  synthEdges,
   testTimeout,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
@@ -72,6 +73,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           {
             space: emptyPlan.spaceId ?? APP_SPACE_ID,
             plan: emptyPlan,
+            migrationEdges: synthEdges(emptyPlan),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -101,6 +103,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           {
             space: failingPlan.spaceId ?? APP_SPACE_ID,
             plan: failingPlan,
+            migrationEdges: synthEdges(failingPlan),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -155,6 +158,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           {
             space: emptyPlan.spaceId ?? APP_SPACE_ID,
             plan: emptyPlan,
+            migrationEdges: synthEdges(emptyPlan),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -226,6 +230,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           {
             space: emptyPlan.spaceId ?? APP_SPACE_ID,
             plan: emptyPlan,
+            migrationEdges: synthEdges(emptyPlan),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -304,6 +309,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           {
             space: invalidPlan.spaceId ?? APP_SPACE_ID,
             plan: invalidPlan,
+            migrationEdges: synthEdges(invalidPlan),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -375,6 +381,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           {
             space: planWithFailingPostcheck.spaceId ?? APP_SPACE_ID,
             plan: planWithFailingPostcheck,
+            migrationEdges: synthEdges(planWithFailingPostcheck),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -445,6 +452,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           {
             space: planWithInvalidSql.spaceId ?? APP_SPACE_ID,
             plan: planWithInvalidSql,
+            migrationEdges: synthEdges(planWithInvalidSql),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -534,6 +542,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           {
             space: planWithConstraintViolation.spaceId ?? APP_SPACE_ID,
             plan: planWithConstraintViolation,
+            migrationEdges: synthEdges(planWithConstraintViolation),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,

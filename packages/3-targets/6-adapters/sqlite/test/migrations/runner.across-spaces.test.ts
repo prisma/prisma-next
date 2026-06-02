@@ -13,6 +13,7 @@ import {
   formatRunnerFailure,
   frameworkComponents,
   sqliteTargetDescriptor,
+  synthEdges,
   type TestDatabase,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
@@ -144,6 +145,7 @@ describe('SqliteMigrationRunner.execute', {
         {
           space: 'ext',
           plan: buildSuccessfulExtensionPlan(),
+          migrationEdges: synthEdges(buildSuccessfulExtensionPlan()),
           driver,
           destinationContract: extensionContract,
           policy: INIT_ADDITIVE_POLICY,
@@ -153,6 +155,7 @@ describe('SqliteMigrationRunner.execute', {
         {
           space: 'app',
           plan: buildAppPlan(),
+          migrationEdges: synthEdges(buildAppPlan()),
           driver,
           destinationContract: appContract,
           policy: INIT_ADDITIVE_POLICY,
@@ -200,6 +203,7 @@ describe('SqliteMigrationRunner.execute', {
           // Extension space succeeds first.
           space: 'ext',
           plan: buildSuccessfulExtensionPlan(),
+          migrationEdges: synthEdges(buildSuccessfulExtensionPlan()),
           driver,
           destinationContract: extensionContract,
           policy: INIT_ADDITIVE_POLICY,
@@ -210,6 +214,7 @@ describe('SqliteMigrationRunner.execute', {
           // App space fails — its raise(ABORT) aborts the outer tx.
           space: 'app',
           plan: buildFailingExtensionPlan(),
+          migrationEdges: synthEdges(buildFailingExtensionPlan()),
           driver,
           destinationContract: extensionContract,
           policy: INIT_ADDITIVE_POLICY,

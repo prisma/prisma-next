@@ -1,10 +1,13 @@
+import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
+import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   initMarker,
   readAllMarkers,
+  readLedger,
   readMarker,
   updateMarker,
   writeLedgerEntry,
@@ -25,12 +28,12 @@ beforeAll(async () => {
   client = new MongoClient(replSet.getUri());
   await client.connect();
   db = client.db(dbName);
-});
+}, timeouts.spinUpMongoMemoryServer);
 
 afterAll(async () => {
   await client?.close();
   await replSet?.stop();
-});
+}, timeouts.spinUpMongoMemoryServer);
 
 beforeEach(async () => {
   await db.collection('_prisma_migrations').deleteMany({});
@@ -331,12 +334,147 @@ describe('updateMarker', () => {
   });
 });
 
-describe('writeLedgerEntry', () => {
+type ExpectedLedgerEntry = Omit<LedgerEntryRecord, 'appliedAt'>;
+
+function expectReadLedger(
+  entries: readonly LedgerEntryRecord[],
+  expected: readonly ExpectedLedgerEntry[],
+): void {
+  expect(entries).toHaveLength(expected.length);
+  for (const entry of entries) {
+    expect(entry.appliedAt).toBeInstanceOf(Date);
+  }
+  expect(entries.map(({ appliedAt: _appliedAt, ...rest }) => rest)).toEqual(expected);
+}
+
+describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
+  it('returns an empty array when no ledger entries exist for the space', async () => {
+    expect(await readLedger(db, APP)).toEqual([]);
+  });
+
+  it('returns entries in insertion order with cross-target LedgerEntryRecord shape', async () => {
+    const hashA = 'sha256:ledger-mid-a';
+    const hashB = 'sha256:ledger-mid-b';
+    const destHash = 'sha256:ledger-dest';
+    await writeLedgerEntry(db, APP, {
+      edgeId: 'sha256:empty->sha256:ledger-mid-a',
+      from: 'sha256:empty',
+      to: hashA,
+      migrationName: '001_a',
+      migrationHash: 'sha256:mig-a',
+      operations: [{ id: 'edge.a' }],
+    });
+    await writeLedgerEntry(db, APP, {
+      edgeId: `${hashA}->${hashB}`,
+      from: hashA,
+      to: hashB,
+      migrationName: '002_b',
+      migrationHash: 'sha256:mig-b',
+      operations: [{ id: 'edge.b1' }, { id: 'edge.b2' }],
+    });
+    await writeLedgerEntry(db, APP, {
+      edgeId: `${hashB}->${destHash}`,
+      from: hashB,
+      to: destHash,
+      migrationName: '003_c',
+      migrationHash: 'sha256:mig-c',
+      operations: [{ id: 'edge.c' }],
+    });
+
+    const ledger = await readLedger(db, APP);
+    expectReadLedger(ledger, [
+      {
+        space: APP,
+        migrationName: '001_a',
+        migrationHash: 'sha256:mig-a',
+        from: null,
+        to: hashA,
+        operationCount: 1,
+      },
+      {
+        space: APP,
+        migrationName: '002_b',
+        migrationHash: 'sha256:mig-b',
+        from: hashA,
+        to: hashB,
+        operationCount: 2,
+      },
+      {
+        space: APP,
+        migrationName: '003_c',
+        migrationHash: 'sha256:mig-c',
+        from: hashB,
+        to: destHash,
+        operationCount: 1,
+      },
+    ]);
+  });
+
+  it('skips legacy ledger docs missing migrationName or migrationHash', async () => {
+    await db.collection('_prisma_migrations').insertOne({
+      type: 'ledger',
+      space: APP,
+      edgeId: 'legacy-edge',
+      from: 'sha256:v1',
+      to: 'sha256:v2',
+      appliedAt: new Date('2024-01-01T00:00:00.000Z'),
+      operations: [],
+    });
+    await writeLedgerEntry(db, APP, {
+      edgeId: 'edge-1',
+      from: 'sha256:v1',
+      to: 'sha256:v2',
+      migrationName: '001_ok',
+      migrationHash: 'sha256:ok',
+      operations: [{ id: 'op.one' }],
+    });
+
+    const ledger = await readLedger(db, APP);
+    expectReadLedger(ledger, [
+      {
+        space: APP,
+        migrationName: '001_ok',
+        migrationHash: 'sha256:ok',
+        from: 'sha256:v1',
+        to: 'sha256:v2',
+        operationCount: 1,
+      },
+    ]);
+  });
+
+  it('maps synth empty-string from to null', async () => {
+    await writeLedgerEntry(db, APP, {
+      edgeId: '->sha256:v1',
+      from: '',
+      to: 'sha256:v1',
+      migrationName: '',
+      migrationHash: 'sha256:v1',
+      operations: [],
+    });
+
+    const ledger = await readLedger(db, APP);
+    expectReadLedger(ledger, [
+      {
+        space: APP,
+        migrationName: '',
+        migrationHash: 'sha256:v1',
+        from: null,
+        to: 'sha256:v1',
+        operationCount: 0,
+      },
+    ]);
+  });
+});
+
+describe('writeLedgerEntry', { timeout: timeouts.databaseOperation }, () => {
   it('writes a ledger entry that exists in collection, tagged with space', async () => {
     await writeLedgerEntry(db, APP, {
       edgeId: 'edge-1',
       from: 'sha256:v1',
       to: 'sha256:v2',
+      migrationName: '001_init',
+      migrationHash: 'sha256:mig-1',
+      operations: [{ id: 'op.one' }],
     });
 
     const entries = await db.collection('_prisma_migrations').find({ type: 'ledger' }).toArray();
@@ -347,6 +485,9 @@ describe('writeLedgerEntry', () => {
       edgeId: 'edge-1',
       from: 'sha256:v1',
       to: 'sha256:v2',
+      migrationName: '001_init',
+      migrationHash: 'sha256:mig-1',
+      operations: [{ id: 'op.one' }],
     });
     expect(entries[0]?.['appliedAt']).toBeInstanceOf(Date);
   });
@@ -356,11 +497,17 @@ describe('writeLedgerEntry', () => {
       edgeId: 'edge-1',
       from: 'sha256:v1',
       to: 'sha256:v2',
+      migrationName: '001_a',
+      migrationHash: 'sha256:a',
+      operations: [{ id: 'a' }],
     });
     await writeLedgerEntry(db, APP, {
       edgeId: 'edge-2',
       from: 'sha256:v2',
       to: 'sha256:v3',
+      migrationName: '002_b',
+      migrationHash: 'sha256:b',
+      operations: [{ id: 'b' }],
     });
 
     const entries = await db
@@ -374,8 +521,22 @@ describe('writeLedgerEntry', () => {
   });
 
   it('records the same edgeId across different spaces without collision (key is (space, edgeId))', async () => {
-    await writeLedgerEntry(db, APP, { edgeId: 'edge-1', from: '', to: 'sha256:v1' });
-    await writeLedgerEntry(db, EXT, { edgeId: 'edge-1', from: '', to: 'sha256:v1' });
+    await writeLedgerEntry(db, APP, {
+      edgeId: 'edge-1',
+      from: '',
+      to: 'sha256:v1',
+      migrationName: '',
+      migrationHash: 'sha256:v1',
+      operations: [],
+    });
+    await writeLedgerEntry(db, EXT, {
+      edgeId: 'edge-1',
+      from: '',
+      to: 'sha256:v1',
+      migrationName: '',
+      migrationHash: 'sha256:v1',
+      operations: [],
+    });
 
     const entries = await db
       .collection('_prisma_migrations')
@@ -447,7 +608,14 @@ describe('readAllMarkers', () => {
 
   it('excludes ledger entries (filter keys on string _id with a space field)', async () => {
     await initMarker(db, APP, { storageHash: 'sha256:app1', profileHash: 'sha256:p1' });
-    await writeLedgerEntry(db, APP, { edgeId: 'edge-1', from: '', to: 'sha256:app1' });
+    await writeLedgerEntry(db, APP, {
+      edgeId: 'edge-1',
+      from: '',
+      to: 'sha256:app1',
+      migrationName: '',
+      migrationHash: 'sha256:app1',
+      operations: [],
+    });
 
     const markers = await readAllMarkers(db);
     expect(markers.size).toBe(1);

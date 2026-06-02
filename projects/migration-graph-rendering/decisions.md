@@ -109,9 +109,14 @@ event.
 So restructure (it's simpler than today's): one row per applied edge, each
 carrying `space` + `migration_name` (dirName) + `migration_hash` + per-edge
 `from`/`to` + the edge's `operations` (slice of `plan.operations` by
-`operationCount`) + `applied_at`. `contract_json_before/after` stays (nullable;
-only the apply's endpoints are materialised — multi-edge interiors are null; no
-consumer reads them yet). Writes happen per-edge inside the per-space
+`operationCount`) + `applied_at`. The edge's `operations` are kept on
+every row — they make the journal a high-value audit record (exactly what ran).
+`contract_json_before/after` stays too (nullable; only the apply's endpoints are
+materialised — multi-edge interiors are null; no consumer reads them yet). Both
+`operations` and `contract_json` are non-essential to `status`/`log` (which need
+only name/hash/from/to/count) — if storage ever bites, drop them or give users
+an opt-in/out control for non-essential ledger storage rather than removing the
+audit value by default. Writes happen per-edge inside the per-space
 transaction, in walk order, by threading `PerSpacePlan.migrationEdges` to the
 runner. Add `readLedger({ driver, space })` to `ControlFamilyInstance` (beside
 `readMarker`/`readAllMarkers`) returning `LedgerEntryRecord[]` in apply order

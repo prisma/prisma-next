@@ -17,6 +17,7 @@ import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { synthMigrationEdges } from './synth-migration-edges';
 
 const MIGRATIONS_COLLECTION = '_prisma_migrations';
 
@@ -180,13 +181,14 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
             makeFamily(),
           ),
         );
+        const plan = {
+          targetId: 'mongo',
+          destination: { storageHash: indexedContract.storage.storageHash },
+          operations: serialized,
+        };
         const runResult = await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            destination: { storageHash: indexedContract.storage.storageHash },
-            operations: serialized,
-          },
-
+          plan,
+          migrationEdges: synthMigrationEdges(plan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -230,13 +232,14 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
             makeFamily(),
           ),
         );
+        const plan = {
+          targetId: 'mongo',
+          destination: { storageHash: indexedContract.storage.storageHash },
+          operations: serialized,
+        };
         await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            destination: { storageHash: indexedContract.storage.storageHash },
-            operations: serialized,
-          },
-
+          plan,
+          migrationEdges: synthMigrationEdges(plan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -274,13 +277,14 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
             makeFamily(),
           ),
         );
+        const plan = {
+          targetId: 'mongo',
+          destination: { storageHash: indexedContract.storage.storageHash },
+          operations: serialized,
+        };
         await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            destination: { storageHash: indexedContract.storage.storageHash },
-            operations: serialized,
-          },
-
+          plan,
+          migrationEdges: synthMigrationEdges(plan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -324,13 +328,14 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
 
         const createOps = createResult.plan.operations as readonly MongoMigrationPlanOperation[];
         const createSerialized = JSON.parse(serializeMongoOps(createOps));
+        const createPlan = {
+          targetId: 'mongo',
+          destination: { storageHash: indexedContract.storage.storageHash },
+          operations: createSerialized,
+        };
         await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            destination: { storageHash: indexedContract.storage.storageHash },
-            operations: createSerialized,
-          },
-
+          plan: createPlan,
+          migrationEdges: synthMigrationEdges(createPlan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -358,14 +363,15 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         // Step 3: Apply drop
         const dropOps = dropResult.plan.operations as readonly MongoMigrationPlanOperation[];
         const dropSerialized = JSON.parse(serializeMongoOps(dropOps));
+        const dropPlan = {
+          targetId: 'mongo',
+          origin: { storageHash: indexedContract.storage.storageHash },
+          destination: { storageHash: emptyContract.storage.storageHash },
+          operations: dropSerialized,
+        };
         const dropRunResult = await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            origin: { storageHash: indexedContract.storage.storageHash },
-            destination: { storageHash: emptyContract.storage.storageHash },
-            operations: dropSerialized,
-          },
-
+          plan: dropPlan,
+          migrationEdges: synthMigrationEdges(dropPlan),
           destinationContract: emptyContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -431,7 +437,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
 
         await runner.execute({
           plan: bootstrapPlan,
-
+          migrationEdges: synthMigrationEdges(bootstrapPlan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -444,7 +450,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         };
         const reapplyResult = await runner.execute({
           plan: reapplyPlan,
-
+          migrationEdges: synthMigrationEdges(reapplyPlan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -489,13 +495,14 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
 
         const ops = result.plan.operations as readonly MongoMigrationPlanOperation[];
         const serialized = JSON.parse(serializeMongoOps(ops));
+        const plan = {
+          targetId: 'mongo',
+          destination: { storageHash: indexedContract.storage.storageHash },
+          operations: serialized,
+        };
         const runResult = await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            destination: { storageHash: indexedContract.storage.storageHash },
-            operations: serialized,
-          },
-
+          plan,
+          migrationEdges: synthMigrationEdges(plan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],

@@ -141,6 +141,7 @@ export async function applyMigration<TFamilyId extends string, TTargetId extends
     destinationContract: r.entry.destinationContract,
     policy,
     frameworkComponents,
+    migrationEdges: r.entry.migrationEdges,
     // Per-space post-apply schema verification is non-strict: each
     // space's `destinationContract` describes only its own slice; a
     // strict verifier would treat every other space's tables as

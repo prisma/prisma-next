@@ -9,6 +9,10 @@ import type {
   ControlFamilyInstance,
   MigrationPlan,
 } from '@prisma-next/framework-components/control';
+import {
+  type AggregateMigrationEdgeRef,
+  buildSynthMigrationEdge,
+} from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
@@ -128,6 +132,16 @@ function makeRunner() {
   );
 }
 
+function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
+  return [
+    buildSynthMigrationEdge({
+      currentMarkerStorageHash: plan.origin?.storageHash,
+      destinationStorageHash: plan.destination.storageHash,
+      operationCount: plan.operations.length,
+    }),
+  ];
+}
+
 describe('MongoMigrationRunner schema verification (integration)', () => {
   it('verifies the live schema, then writes marker + ledger when it matches the contract', async () => {
     const contract = makeContract({
@@ -138,6 +152,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan,
+      migrationEdges: synthEdges(plan),
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -171,6 +186,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
     const runner = makeRunner();
     const tamperedResult = await runner.execute({
       plan,
+      migrationEdges: synthEdges(plan),
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -197,6 +213,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
 
     const recoveryResult = await runner.execute({
       plan,
+      migrationEdges: synthEdges(plan),
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -229,6 +246,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan,
+      migrationEdges: synthEdges(plan),
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       strictVerification: false,

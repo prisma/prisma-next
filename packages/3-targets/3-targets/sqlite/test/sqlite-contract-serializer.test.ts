@@ -1,4 +1,4 @@
-import { effectiveControl } from '@prisma-next/contract/types';
+import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
@@ -126,9 +126,9 @@ describe('control-policy round-trip fidelity', () => {
 
     const table = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user;
     const def = reparsed.defaultControl;
-    expect(effectiveControl(table.control, def)).toBe('external');
-    expect(effectiveControl(table.columns.id.control, def)).toBe('observed');
-    expect(effectiveControl(table.columns.email.control, def)).toBe('tolerated');
+    expect(effectiveControlPolicy(table.control, def)).toBe('external');
+    expect(effectiveControlPolicy(table.columns.id.control, def)).toBe('observed');
+    expect(effectiveControlPolicy(table.columns.email.control, def)).toBe('tolerated');
     expect(table.columns.email).not.toHaveProperty('control');
   });
 });

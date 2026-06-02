@@ -71,6 +71,7 @@ describe('defineConfig', () => {
         }),
         readMarker: async () => null,
         readAllMarkers: async () => new Map(),
+        readLedger: async () => [],
         introspect: async () => ({ tables: {}, extensionPacks: [] }),
       }),
     },

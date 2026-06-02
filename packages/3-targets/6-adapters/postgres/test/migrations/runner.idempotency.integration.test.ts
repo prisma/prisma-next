@@ -13,6 +13,7 @@ import {
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
+  synthEdges,
   testTimeout,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
@@ -101,6 +102,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           {
             space: planWithPreSatisfiedPostcheck.spaceId ?? APP_SPACE_ID,
             plan: planWithPreSatisfiedPostcheck,
+            migrationEdges: synthEdges(planWithPreSatisfiedPostcheck),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -195,6 +197,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           {
             space: planWithPreSatisfiedPostcheck.spaceId ?? APP_SPACE_ID,
             plan: planWithPreSatisfiedPostcheck,
+            migrationEdges: synthEdges(planWithPreSatisfiedPostcheck),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -267,6 +270,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           {
             space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
             plan: initialPlan.plan,
+            migrationEdges: synthEdges(initialPlan.plan),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -300,6 +304,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           {
             space: noOpSelfEdgePlan.spaceId ?? APP_SPACE_ID,
             plan: noOpSelfEdgePlan,
+            migrationEdges: synthEdges(noOpSelfEdgePlan),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -353,6 +358,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           {
             space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
             plan: initialPlan.plan,
+            migrationEdges: synthEdges(initialPlan.plan),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY,
@@ -404,6 +410,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           {
             space: selfEdgePlan.spaceId ?? APP_SPACE_ID,
             plan: selfEdgePlan,
+            migrationEdges: synthEdges(selfEdgePlan),
             driver: driver!,
             destinationContract: contract,
             policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },

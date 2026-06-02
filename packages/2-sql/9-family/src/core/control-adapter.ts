@@ -1,4 +1,8 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
@@ -52,6 +56,16 @@ export interface SqlControlAdapter<TTarget extends string = string>
   readAllMarkers(
     driver: ControlDriverInstance<'sql', TTarget>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
+
+  /**
+   * Reads the per-migration ledger journal for `space` in apply order.
+   * Returns an empty array when the ledger store does not yet exist or
+   * has no rows for that space.
+   */
+  readLedger(
+    driver: ControlDriverInstance<'sql', TTarget>,
+    space: string,
+  ): Promise<readonly LedgerEntryRecord[]>;
 
   /**
    * Introspects a database schema and returns a raw SqlSchemaIR.

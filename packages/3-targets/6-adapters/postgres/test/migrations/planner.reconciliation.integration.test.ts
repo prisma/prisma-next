@@ -20,6 +20,7 @@ import {
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
+  synthEdges,
   testTimeout,
 } from './fixtures/runner-fixtures';
 
@@ -82,6 +83,7 @@ async function applyBaseline(
       {
         space: result.plan.spaceId ?? APP_SPACE_ID,
         plan: result.plan,
+        migrationEdges: synthEdges(result.plan),
         driver,
         destinationContract: contract,
         policy: INIT_ADDITIVE_POLICY,
@@ -122,6 +124,7 @@ async function planAndExecute(
       {
         space: planResult.plan.spaceId ?? APP_SPACE_ID,
         plan: planResult.plan,
+        migrationEdges: synthEdges(planResult.plan),
         driver,
         destinationContract: contract,
         policy: RECONCILIATION_POLICY,

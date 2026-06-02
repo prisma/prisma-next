@@ -479,6 +479,17 @@ export interface MigrationRunnerPerSpaceOptions<
    * Paths and metadata forwarded to schema verification diagnostics.
    */
   readonly context?: OperationContext;
+  /**
+   * Per-edge breakdown from aggregate planning. Runners write one ledger row
+   * per edge in walk order.
+   */
+  readonly migrationEdges: ReadonlyArray<{
+    readonly migrationHash: string;
+    readonly dirName: string;
+    readonly from: string;
+    readonly to: string;
+    readonly operationCount: number;
+  }>;
 }
 
 export interface MigrationRunner<
