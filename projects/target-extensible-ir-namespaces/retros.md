@@ -31,7 +31,15 @@ Mid-rework, the spec and plan drifted to describe the *rejected* design while th
 
 **Landed:** covered by `.agents/rules/doc-maintenance.mdc` ("keep docs current"). Sharper Drive-process framing (rework dispatches own their spec/plan re-sync) surfaced to the operator at close-out rather than edited unilaterally into Drive skill internals.
 
-### 5. Redundant casts get cargo-culted across refactors
+### 5. Capturing a decision in an ADR is not the same as keeping the reference docs current
+
+The two load-bearing decisions (two-plane IR; target-owned default namespace) were recorded in ADRs 221 and 223 during the project. But the *subsystem reference docs* — `subsystems/1. Data Contract.md`, `2. Contract Emitter & Types.md`, `3. Query Lanes.md` — were never updated to match, so they still described the pre-namespace flat shape (flat root `models`, `Models = Contract['models']`, no namespace qualification). The closeout's first pass missed this because "the ADR exists" was mistaken for "the durable knowledge has landed." An architect pass over the project assets caught it.
+
+**Landed:**
+- Subsystem docs refreshed to the two-plane namespaced shape (in the close-out PR), folding in the `ApplicationDomain` naming rationale and the identity-is-the-coordinate principle that previously lived only in the transient `symmetric-domain-plane` spec.
+- `.agents/rules/doc-maintenance.mdc` — new clause: an ADR records the decision, the subsystem/reference doc records the current shape, and they are separate obligations; landing the ADR does not discharge the duty to refresh the reference docs.
+
+### 6. Redundant casts get cargo-culted across refactors
 
 A redundant `as Record<string, ContractModel>` cast was reintroduced in the demo during R2 and caught on review. The contract walk was already well-typed; the cast was noise copied from an earlier shape.
 
