@@ -10,6 +10,7 @@ import {
 import {
   createStubAdapter,
   createTestAdapterDescriptor,
+  createTestFamilyDescriptor,
   createTestTargetDescriptor,
 } from './utils';
 
@@ -46,6 +47,7 @@ function createStack(
   extensionPacks: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>,
 ): SqlExecutionStack<'postgres'> {
   return {
+    family: createTestFamilyDescriptor(),
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),
     extensionPacks,
@@ -239,6 +241,7 @@ describe('composed runtime mutation default generators', () => {
           },
         },
         stack: {
+          family: createTestFamilyDescriptor(),
           target: createTestTargetDescriptor(),
           adapter: adapterWithoutMutationDefaultGenerators,
           extensionPacks: [],

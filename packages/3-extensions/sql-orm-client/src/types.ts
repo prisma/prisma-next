@@ -7,17 +7,7 @@ import type {
   StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
-import {
-  type AnyExpression,
-  BinaryExpr,
-  type BinaryOp,
-  type CodecRef,
-  type CodecTrait,
-  ListExpression,
-  NullCheckExpr,
-  OrderByItem,
-  ParamRef,
-} from '@prisma-next/sql-relational-core/ast';
+import type { AnyExpression, OrderByItem } from '@prisma-next/sql-relational-core/ast';
 import type { Expression } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ComputeColumnJsType, RuntimeScope } from '@prisma-next/sql-relational-core/types';
@@ -135,67 +125,44 @@ export interface CollectionContext<TContract extends Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
 }
 
-export type ComparisonMethodFns<T> = {
-  eq(value: T): AnyExpression;
-  neq(value: T): AnyExpression;
-  gt(value: T): AnyExpression;
-  lt(value: T): AnyExpression;
-  gte(value: T): AnyExpression;
-  lte(value: T): AnyExpression;
-  like(pattern: string): AnyExpression;
-  in(values: readonly T[]): AnyExpression;
-  notIn(values: readonly T[]): AnyExpression;
-  isNull(): AnyExpression;
-  isNotNull(): AnyExpression;
-  asc(): OrderByItem;
-  desc(): OrderByItem;
-};
-
 /**
- * Trait-gated comparison methods. Only methods whose required traits are all present in `Traits` are included.
- *
- * - `traits: []` → always available (isNull, isNotNull)
+ * Trait-gated `asc` / `desc` ordering-method surface — the type-level
+ * mirror of the runtime `LEGACY_ORDERING_METHODS` map in
+ * `./model-accessor.ts`. Slice 3b removes both halves of the pair when
+ * the ORM ordering registry lands and `asc` / `desc` move to a
+ * dedicated `OrderByModelAccessor`. Until then, both the column
+ * accessor and the chained-result accessor intersect this onto the
+ * registry-derived method surface so `m.field.asc()` and
+ * `column.someOp(...).desc()` continue to typecheck on `order`-trait
+ * codecs.
  */
-export type ComparisonMethods<T, Traits> = {
-  [K in keyof ComparisonMethodsMeta as [ComparisonMethodsMeta[K]['traits'][number]] extends [Traits]
-    ? K
-    : never]: ComparisonMethodFns<T>[K];
-};
-
-type QueryOperationReturnTraits<
-  Returns,
-  TCodecTypes extends Record<string, unknown>,
-> = Returns extends { readonly codecId: infer Id extends string }
-  ? Id extends keyof TCodecTypes
-    ? TCodecTypes[Id] extends { readonly traits: infer Traits }
-      ? Traits
-      : never
-    : never
-  : never;
-
-type QueryOperationReturnJsType<
-  Returns,
-  TCodecTypes extends Record<string, unknown>,
-> = Returns extends { readonly codecId: infer Id extends string; readonly nullable: infer N }
-  ? Id extends keyof TCodecTypes
-    ? TCodecTypes[Id] extends { readonly output: infer O }
-      ? N extends true
-        ? O | null
-        : O
-      : unknown
-    : unknown
-  : unknown;
+type LegacyOrderingMethods<Traits> = 'order' extends Traits
+  ? {
+      asc(): OrderByItem;
+      desc(): OrderByItem;
+    }
+  : Record<never, never>;
 
 type IsBooleanReturn<Returns, TCodecTypes extends Record<string, unknown>> = Returns extends {
   readonly codecId: infer Id extends string;
 }
-  ? Id extends keyof TCodecTypes
-    ? TCodecTypes[Id] extends { readonly traits: infer T }
-      ? 'boolean' extends T
-        ? true
+  ? // Family-SQL hardcodes `pg/bool@1` as the predicate-return codec id on
+    // every family op (`eq`, `gt`, `like`, `isNull`, etc.) in
+    // `family-sql/src/types/operation-types.ts`. Treat it as a universal
+    // boolean marker so the predicate-return branch fires on every SQL
+    // target — including SQLite, whose `CodecTypes` does not include
+    // `pg/bool@1`. The marker-recognition is target-neutral: Postgres
+    // contracts still resolve through the trait-check below, and the two
+    // branches agree.
+    Id extends 'pg/bool@1'
+    ? true
+    : Id extends keyof TCodecTypes
+      ? TCodecTypes[Id] extends { readonly traits: infer T }
+        ? 'boolean' extends T
+          ? true
+          : false
         : false
       : false
-    : false
   : false;
 
 /**
@@ -209,42 +176,86 @@ type ImplReturnSpec<Impl> = Impl extends (...args: never[]) => infer Ret ? SpecO
  * Builds the ORM column-method signature for an operation.
  *
  * - User args: drops the impl's first parameter (the column is bound at access time) and forwards the rest unchanged. Each remaining arg keeps its authored `CodecExpression` / `TraitExpression` shape — so callers can pass a raw JS value, another column handle (which itself implements `Expression`), or `null` when nullable.
- * - Return: predicate ops (boolean-traited return) yield `AnyExpression`; non-predicate ops yield `ComparisonMethods<JsType, Traits>` of the return codec.
+ * - Return: predicate ops (boolean-traited return) yield `AnyExpression`; non-predicate ops yield `ChainedResultMethods<Returns, TCodecTypes, Ops>`, deriving the chained-result surface from the same registry the column accessor reads.
+ *
+ * The third type parameter `Ops` carries the full registry (the
+ * contract's `queryOperationTypes` map) so the chained-result branch
+ * can iterate it the same way `FieldOperations` does for the column.
  */
-type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op extends {
+type QueryOperationMethod<
+  Op,
+  TCodecTypes extends Record<string, unknown>,
+  Ops,
+> = Op extends {
   readonly impl: (...args: never[]) => unknown;
 }
   ? Op['impl'] extends (first: never, ...rest: infer UserArgs extends readonly unknown[]) => unknown
     ? ImplReturnSpec<Op['impl']> extends infer Returns
       ? IsBooleanReturn<Returns, TCodecTypes> extends true
         ? (...args: UserArgs) => AnyExpression
-        : (
-            ...args: UserArgs
-          ) => ComparisonMethods<
-            QueryOperationReturnJsType<Returns, TCodecTypes>,
-            QueryOperationReturnTraits<Returns, TCodecTypes>
-          >
+        : (...args: UserArgs) => ChainedResultMethods<Returns, TCodecTypes, Ops>
       : never
     : never
   : never;
 
 /**
- * Tests whether an operation's `self` dispatch hint reaches a field with the given codec identity. Codec hints match by identity; trait hints match when every required trait is present in the field codec's trait set.
+ * Chained-result method surface for a non-predicate registry operation.
+ *
+ * Mirrors the column-accessor derivation pattern: given the return
+ * codec spec (`{ codecId, nullable }`) and the host contract's
+ * codec-types map + op registry, iterates the registry filtered by
+ * `OpMatchesField` against the return codec's identity and trait set
+ * — the same filter the column case uses. Intersected with the
+ * transient `LegacyOrderingMethods<ReturnTraits>` so `asc` / `desc`
+ * survive on chained results of `order`-trait codecs (slice 3b's
+ * ordering-registry deletion target).
+ *
+ * The recursive `QueryOperationMethod<Ops[OpName], TCodecTypes, Ops>`
+ * terminates naturally for the family-SQL registry today: every
+ * trait-gated entry returns `pg/bool@1` (a predicate), so the
+ * `IsBooleanReturn` branch fires on the first chain step and yields
+ * `AnyExpression` rather than another `ChainedResultMethods`.
+ */
+type ChainedResultMethods<
+  Returns,
+  TCodecTypes extends Record<string, unknown>,
+  Ops,
+> = Returns extends { readonly codecId: infer Id extends string }
+  ? Id extends keyof TCodecTypes
+    ? TCodecTypes[Id] extends { readonly traits: infer ReturnTraits }
+      ? {
+          [OpName in keyof Ops & string as OpMatchesField<
+            Ops[OpName],
+            Id,
+            TCodecTypes
+          > extends true
+            ? OpName
+            : never]: QueryOperationMethod<Ops[OpName], TCodecTypes, Ops>;
+        } & LegacyOrderingMethods<ReturnTraits>
+      : unknown
+    : unknown
+  : unknown;
+
+/**
+ * Tests whether an operation's `self` dispatch hint reaches a field with the given codec identity. The `any: true` arm matches every field codec; codec hints match by identity; trait hints match when every required trait is present in the field codec's trait set.
  */
 type OpMatchesField<Op, CodecId extends string, CT extends Record<string, unknown>> = Op extends {
   readonly self: infer Self;
 }
-  ? Self extends { readonly codecId: CodecId }
+  ? // `any: true` is the most permissive arm; handled first for documentation-of-intent, not for correctness — the discriminated union ensures mutual exclusion.
+    Self extends { readonly any: true }
     ? true
-    : Self extends { readonly traits: infer RequiredTraits extends readonly string[] }
-      ? CodecId extends keyof CT
-        ? CT[CodecId] extends { readonly traits: infer FieldTraits }
-          ? [RequiredTraits[number]] extends [FieldTraits]
-            ? true
+    : Self extends { readonly codecId: CodecId }
+      ? true
+      : Self extends { readonly traits: infer RequiredTraits extends readonly string[] }
+        ? CodecId extends keyof CT
+          ? CT[CodecId] extends { readonly traits: infer FieldTraits }
+            ? [RequiredTraits[number]] extends [FieldTraits]
+              ? true
+              : false
             : false
           : false
         : false
-      : false
   : false;
 
 type FieldOperations<
@@ -261,107 +272,12 @@ type FieldOperations<
             ExtractCodecTypes<TContract>
           > extends true
             ? OpName
-            : never]: QueryOperationMethod<AllOps[OpName], ExtractCodecTypes<TContract>>;
+            : never]: QueryOperationMethod<AllOps[OpName], ExtractCodecTypes<TContract>, AllOps>;
         }
       : unknown
     : unknown;
 
-function param(codec: CodecRef | undefined, value: unknown): ParamRef {
-  if (codec === undefined) return ParamRef.of(value);
-  return ParamRef.of(value, { codec });
-}
 
-function paramList(codec: CodecRef | undefined, values: readonly unknown[]): ListExpression {
-  return ListExpression.of(values.map((value) => param(codec, value)));
-}
-
-// never[] is intentional: factories have heterogeneous signatures (value: unknown, values: readonly unknown[], pattern: string, etc.) but are only called through the typed ComparisonMethodFns interface, never through this type directly.
-type MethodFactory = (
-  left: AnyExpression,
-  codec: CodecRef | undefined,
-) => (...args: never[]) => unknown;
-
-type ComparisonMethodMeta = {
-  readonly traits: readonly CodecTrait[];
-  readonly create: MethodFactory;
-};
-
-function scalarComparisonMethod(op: BinaryOp) {
-  return ((left, codec) => (value: unknown) => {
-    if (value === null && (op === 'eq' || op === 'neq')) {
-      return op === 'eq' ? NullCheckExpr.isNull(left) : NullCheckExpr.isNotNull(left);
-    }
-    return new BinaryExpr(op, left, param(codec, value));
-  }) satisfies MethodFactory;
-}
-
-function listComparisonMethod(op: BinaryOp) {
-  return ((left, codec) => (values: readonly unknown[]) =>
-    new BinaryExpr(op, left, paramList(codec, values))) satisfies MethodFactory;
-}
-
-/**
- * Declares trait requirements and runtime factory for each comparison method.
- *
- * - `traits: []` means "no trait required" — always available
- * - Multi-trait: `traits: ['equality', 'order']` means BOTH traits are required
- */
-export const COMPARISON_METHODS_META = {
-  eq: {
-    traits: ['equality'],
-    create: scalarComparisonMethod('eq'),
-  },
-  neq: {
-    traits: ['equality'],
-    create: scalarComparisonMethod('neq'),
-  },
-  in: {
-    traits: ['equality'],
-    create: listComparisonMethod('in'),
-  },
-  notIn: {
-    traits: ['equality'],
-    create: listComparisonMethod('notIn'),
-  },
-  gt: {
-    traits: ['order'],
-    create: scalarComparisonMethod('gt'),
-  },
-  lt: {
-    traits: ['order'],
-    create: scalarComparisonMethod('lt'),
-  },
-  gte: {
-    traits: ['order'],
-    create: scalarComparisonMethod('gte'),
-  },
-  lte: {
-    traits: ['order'],
-    create: scalarComparisonMethod('lte'),
-  },
-  like: {
-    traits: ['textual'],
-    create: scalarComparisonMethod('like'),
-  },
-  asc: {
-    traits: ['order'],
-    create: (left) => () => OrderByItem.asc(left),
-  },
-  desc: {
-    traits: ['order'],
-    create: (left) => () => OrderByItem.desc(left),
-  },
-  isNull: {
-    traits: [],
-    create: (left) => () => NullCheckExpr.isNull(left),
-  },
-  isNotNull: {
-    traits: [],
-    create: (left) => () => NullCheckExpr.isNotNull(left),
-  },
-} as const satisfies Record<keyof ComparisonMethodFns<unknown>, ComparisonMethodMeta>;
-
-type ComparisonMethodsMeta = typeof COMPARISON_METHODS_META;
 
 export type RelationPredicate<TContract extends Contract<SqlStorage>, ModelName extends string> = (
   model: ModelAccessor<TContract, ModelName>,
@@ -386,8 +302,8 @@ type ScalarModelAccessor<TContract extends Contract<SqlStorage>, ModelName exten
     codecId: FieldCodecId<TContract, ModelName, K>;
     nullable: FieldNullable<TContract, ModelName, K>;
   }> &
-    ComparisonMethods<FieldJsType<TContract, ModelName, K>, FieldTraits<TContract, ModelName, K>> &
-    FieldOperations<TContract, ModelName, K>;
+    FieldOperations<TContract, ModelName, K> &
+    LegacyOrderingMethods<FieldTraits<TContract, ModelName, K>>;
 };
 
 type RelationModelAccessor<TContract extends Contract<SqlStorage>, ModelName extends string> = {
@@ -492,10 +408,14 @@ export interface AggregateBuilder<
   ): AggregateSelector<number | null>;
 }
 
-export type HavingComparisonMethods<T> = Pick<
-  ComparisonMethods<T, 'equality' | 'order'>,
-  'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte'
->;
+export type HavingComparisonMethods<T> = {
+  eq(value: T): AnyExpression;
+  neq(value: T): AnyExpression;
+  gt(value: T): AnyExpression;
+  lt(value: T): AnyExpression;
+  gte(value: T): AnyExpression;
+  lte(value: T): AnyExpression;
+};
 
 export interface HavingBuilder<TContract extends Contract<SqlStorage>, ModelName extends string> {
   count(): HavingComparisonMethods<number>;

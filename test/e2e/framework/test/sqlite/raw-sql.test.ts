@@ -7,6 +7,7 @@ import { sqliteRawCodecInferer } from '@prisma-next/adapter-sqlite/adapter';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -76,6 +77,7 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
   rawDb.close();
 
   const stack = createSqlExecutionStack({
+    family: sqlRuntimeFamilyDescriptor,
     target: sqliteTarget,
     adapter: sqliteAdapter,
     driver: sqliteDriver,

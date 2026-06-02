@@ -20,6 +20,23 @@ export class SqlFamilyDescriptor
     field: sqlFamilyAuthoringFieldPresets,
     type: sqlFamilyAuthoringTypes,
   } as const;
+  /**
+   * Descriptor-meta type slots — read by the contract emitter's
+   * alias-aggregation step (`extractQueryOperationTypeImports` in
+   * `framework-components/control/control-stack.ts`) to lift the family's
+   * `QueryOperationTypes<CT>` into the generated `Contract['queryOperationTypes']`
+   * alias intersection. Mirrors the pattern at
+   * `packages/3-extensions/pgvector/src/core/descriptor-meta.ts:97-103`.
+   */
+  readonly types = {
+    queryOperationTypes: {
+      import: {
+        package: '@prisma-next/family-sql/operation-types',
+        named: 'QueryOperationTypes',
+        alias: 'SqlFamilyQueryOperationTypes',
+      },
+    },
+  } as const;
 
   create<TTargetId extends string>(
     stack: ControlStack<'sql', TTargetId>,

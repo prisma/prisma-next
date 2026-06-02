@@ -2,6 +2,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { orm as sqlOrm } from '@prisma-next/sql-orm-client';
@@ -132,6 +133,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
           );
 
           const stack = createSqlExecutionStack({
+            family: sqlRuntimeFamilyDescriptor,
             target: postgresTarget,
             adapter: postgresAdapter,
             driver: postgresDriver,

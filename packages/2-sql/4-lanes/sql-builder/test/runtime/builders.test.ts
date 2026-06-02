@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { sql } from '../../src/runtime/sql';
 import { contract as contractJson } from '../fixtures/contract';
 import type { Contract } from '../fixtures/generated/contract';
+import { testOperations } from './test-helpers';
 
 // ---------------------------------------------------------------------------
 // Fixture: real contract with users + posts
@@ -25,7 +26,7 @@ const sqlContract = validateSqlContractFully<Contract>(contractJson);
 const stubBase = {
   operations: {},
   codecs: {},
-  queryOperations: { entries: () => ({}) },
+  queryOperations: { entries: () => testOperations },
   types: {},
   applyMutationDefaults: () => [],
 };

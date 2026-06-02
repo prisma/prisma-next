@@ -1,8 +1,18 @@
 import type { QueryOperationTypesBase, StorageTable } from '@prisma-next/sql-contract/types';
-import type { AnyFromSource, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { AnyFromSource } from '@prisma-next/sql-relational-core/ast';
 import type { CodecTypesBase, ScopeField } from '@prisma-next/sql-relational-core/expression';
 
 export type { ScopeField };
+// `Subquery` was moved to `sql-relational-core` to break a workspace cycle
+// (`family-sql` needed `Subquery` for its operation type twin without
+// depending on `sql-builder`). Re-exported here so existing
+// `import { Subquery } from '@prisma-next/sql-builder/types'` callsites
+// continue to resolve. `SubqueryMarker` is not re-exported — in-package
+// consumers (`runtime/query-impl.ts`) import it directly from
+// `@prisma-next/sql-relational-core/expression` because it is a
+// `declare`d value symbol and a value re-export would emit a runtime
+// binding that the upstream module does not provide.
+export type { Subquery } from '@prisma-next/sql-relational-core/expression';
 
 export type TraitField = { traits: readonly string[]; nullable: boolean };
 export type FieldSpec = ScopeField | TraitField;
@@ -12,7 +22,6 @@ export type GatedMethod<Capabilities, Required, Method> = Capabilities extends R
   : never;
 
 export declare const JoinOuterScope: unique symbol;
-export declare const SubqueryMarker: unique symbol;
 
 export type Expand<T> = { [K in keyof T]: T[K] } & unknown;
 export type EmptyRow = Record<never, ScopeField>;
@@ -69,12 +78,6 @@ export type NullableScope<S extends Scope> = {
   namespaces: {
     [TableName in keyof S['namespaces']]: NullableScopeTable<S['namespaces'][TableName]>;
   };
-};
-
-export type Subquery<RowType extends Record<string, ScopeField>> = {
-  [SubqueryMarker]: RowType;
-  buildAst(): SelectAst;
-  getRowFields(): Record<string, ScopeField>;
 };
 
 export type QueryContext = {

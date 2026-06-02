@@ -1,6 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -155,6 +156,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
   const contract = resolveContract(options);
   let binding = resolveOptionalPostgresBinding(options);
   const stack = createSqlExecutionStack({
+    family: sqlRuntimeFamilyDescriptor,
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,

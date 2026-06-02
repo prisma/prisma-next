@@ -7,6 +7,7 @@ import type {
   Vector,
 } from '@prisma-next/extension-pgvector/codec-types';
 import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
+import type { QueryOperationTypes as SqlFamilyQueryOperationTypes } from '@prisma-next/family-sql/operation-types';
 import type {
   Bit,
   Char,
@@ -44,7 +45,8 @@ export type ProfileHash =
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
+export type QueryOperationTypes = SqlFamilyQueryOperationTypes<CodecTypes> &
+  PgAdapterQueryOps<CodecTypes> &
   PgVectorQueryOperationTypes<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']

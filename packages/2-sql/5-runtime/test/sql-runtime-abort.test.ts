@@ -30,7 +30,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs, stubAst } from './utils';
+import { createTestFamilyDescriptor, descriptorsFromCodecs, stubAst } from './utils';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -154,6 +154,7 @@ function createTestSetup(extras: readonly Codec<string>[] = [], driverOptions?: 
   };
 
   const stack = createSqlExecutionStack({
+    family: createTestFamilyDescriptor(),
     target: targetDescriptor,
     adapter: adapterDescriptor,
     extensionPacks: [],
@@ -169,7 +170,12 @@ function createTestSetup(extras: readonly Codec<string>[] = [], driverOptions?: 
 
   const context = createExecutionContext({
     contract: testContract,
-    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+    stack: {
+      family: createTestFamilyDescriptor(),
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      extensionPacks: [],
+    },
   });
 
   return { stackInstance, context, driver };

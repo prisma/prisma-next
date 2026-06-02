@@ -19,18 +19,25 @@ import { ExpressionImpl } from '../../src/runtime/expression-impl';
 import { createFieldProxy } from '../../src/runtime/field-proxy';
 import { createAggregateFunctions, createFunctions } from '../../src/runtime/functions';
 import type { ScopeField } from '../../src/scope';
-import { joinedScope, makeSubquery, usersScope } from './test-helpers';
+import {
+  joinedScope,
+  makeSubquery,
+  type TestAggregateFunctions,
+  type TestFunctions,
+  testOperations,
+  usersScope,
+} from './test-helpers';
 
 const f = () => createFieldProxy(usersScope);
 const jf = () => createFieldProxy(joinedScope);
 
-const stubInferer = { inferCodec: () => 'pg/text@1' };
+const stubInferer = { inferCodec: () => 'pg/text@1' as const };
 
 describe('createFunctions', () => {
-  let fns: ReturnType<typeof createFunctions>;
+  let fns: TestFunctions;
 
   beforeEach(() => {
-    fns = createFunctions({}, stubInferer);
+    fns = createFunctions(testOperations, stubInferer) as unknown as TestFunctions;
   });
 
   describe('comparison operators', () => {
@@ -46,8 +53,8 @@ describe('createFunctions', () => {
       expect((ast.right as ParamRef).value).toBe(1);
     });
 
-    it('ne produces BinaryExpr with op neq', () => {
-      const result = fns.ne(f().id, 1);
+    it('neq produces BinaryExpr with op neq', () => {
+      const result = fns.neq(f().id, 1);
       expect((result.buildAst() as BinaryExpr).op).toBe('neq');
     });
 
@@ -92,8 +99,8 @@ describe('createFunctions', () => {
       expect(ast.expr).toBeInstanceOf(IdentifierRef);
     });
 
-    it('ne with null produces NullCheckExpr (IS NOT NULL)', () => {
-      const result = fns.ne(f().name, null);
+    it('neq with null produces NullCheckExpr (IS NOT NULL)', () => {
+      const result = fns.neq(f().name, null);
       const ast = result.buildAst() as NullCheckExpr;
 
       expect(ast).toBeInstanceOf(NullCheckExpr);
@@ -240,10 +247,13 @@ describe('createFunctions', () => {
 });
 
 describe('createAggregateFunctions', () => {
-  let fns: ReturnType<typeof createAggregateFunctions>;
+  let fns: TestAggregateFunctions;
 
   beforeEach(() => {
-    fns = createAggregateFunctions({}, stubInferer);
+    fns = createAggregateFunctions(
+      testOperations,
+      stubInferer,
+    ) as unknown as TestAggregateFunctions;
   });
 
   it('count() produces AggregateExpr with fn count and no expr', () => {
@@ -365,7 +375,7 @@ describe('extension functions', () => {
 
 describe('parameter embedding', () => {
   it('inline literal values are embedded as ParamRef nodes', () => {
-    const fns = createFunctions({}, stubInferer);
+    const fns = createFunctions(testOperations, stubInferer) as unknown as TestFunctions;
     const fields = f();
 
     const r1 = fns.eq(fields.id, 42);
@@ -378,7 +388,7 @@ describe('parameter embedding', () => {
   });
 
   it('expression-to-expression comparisons do not create ParamRefs', () => {
-    const fns = createFunctions({}, stubInferer);
+    const fns = createFunctions(testOperations, stubInferer) as unknown as TestFunctions;
     const fields = jf();
 
     const result = fns.eq(fields.users.id, fields.posts.user_id);

@@ -33,7 +33,7 @@ import { db } from '../prisma/db';
  *
  * Features exercised:
  *   1. Self-join via `.as()` aliasing of the same table (`post` aliased as `p1` and `p2`).
- *   2. INNER JOIN with a non-equality predicate (`ne(p1.userId, p2.userId)`).
+ *   2. INNER JOIN with a non-equality predicate (`neq(p1.userId, p2.userId)`).
  *   3. pgvector `cosineDistance` called with two column references from two aliases — in the
  *      SELECT projection and in the ORDER BY.
  *   4. Typed result row inferred from the SELECT projection, mixing columns from both aliases.
@@ -41,7 +41,7 @@ import { db } from '../prisma/db';
 export async function crossAuthorSimilarity(limit = 10, runtime?: Runtime) {
   const plan = db.sql.post
     .as('p1')
-    .innerJoin(db.sql.post.as('p2'), (f, fns) => fns.ne(f.p1.userId, f.p2.userId))
+    .innerJoin(db.sql.post.as('p2'), (f, fns) => fns.neq(f.p1.userId, f.p2.userId))
     .select((f, fns) => ({
       postAId: f.p1.id,
       postATitle: f.p1.title,
@@ -51,7 +51,7 @@ export async function crossAuthorSimilarity(limit = 10, runtime?: Runtime) {
       postBUserId: f.p2.userId,
       distance: fns.cosineDistance(f.p1.embedding, f.p2.embedding),
     }))
-    .where((f, fns) => fns.and(fns.ne(f.p1.embedding, null), fns.ne(f.p2.embedding, null)))
+    .where((f, fns) => fns.and(fns.neq(f.p1.embedding, null), fns.neq(f.p2.embedding, null)))
     .orderBy((f, fns) => fns.cosineDistance(f.p1.embedding, f.p2.embedding), {
       direction: 'asc',
     })

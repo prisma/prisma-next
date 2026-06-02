@@ -32,7 +32,7 @@ describe('integration: subqueries', { timeout: timeouts.databaseOperation }, () 
         .select('id', 'name')
         .where((f, fns) =>
           fns.and(
-            fns.ne(f.name, 'Bob'),
+            fns.neq(f.name, 'Bob'),
             fns.in(
               f.id,
               d.posts.select('user_id').where((pf, pfns) => pfns.gt(pf.views, 50)),

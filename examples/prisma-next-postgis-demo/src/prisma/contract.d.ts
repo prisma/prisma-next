@@ -7,6 +7,7 @@ import type {
   Geometry,
 } from '@prisma-next/extension-postgis/codec-types';
 import type { QueryOperationTypes as PostgisQueryOperationTypes } from '@prisma-next/extension-postgis/operation-types';
+import type { QueryOperationTypes as SqlFamilyQueryOperationTypes } from '@prisma-next/family-sql/operation-types';
 import type {
   Bit,
   Char,
@@ -44,7 +45,8 @@ export type ProfileHash =
 
 export type CodecTypes = PgTypes & PostgisTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
+export type QueryOperationTypes = SqlFamilyQueryOperationTypes<CodecTypes> &
+  PgAdapterQueryOps<CodecTypes> &
   PostgisQueryOperationTypes<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']

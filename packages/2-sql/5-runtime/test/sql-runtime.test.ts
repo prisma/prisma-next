@@ -31,7 +31,7 @@ import { createExecutionContext, createSqlExecutionStack } from '../src/sql-cont
 import { createRuntime, withTransaction } from '../src/sql-runtime';
 import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs, stubAst } from './utils';
+import { createTestFamilyDescriptor, descriptorsFromCodecs, stubAst } from './utils';
 
 const runtimeSecretSeed = 'sql-runtime-secret';
 
@@ -202,6 +202,7 @@ function createTestSetup(options?: { extraCodecs?: readonly Codec<string>[] }) {
   const adapterDescriptor = createTestAdapterDescriptor(adapter);
 
   const stack = createSqlExecutionStack({
+    family: createTestFamilyDescriptor(),
     target: targetDescriptor,
     adapter: adapterDescriptor,
     extensionPacks: [],
@@ -217,7 +218,12 @@ function createTestSetup(options?: { extraCodecs?: readonly Codec<string>[] }) {
 
   const context = createExecutionContext({
     contract: testContract,
-    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+    stack: {
+      family: createTestFamilyDescriptor(),
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      extensionPacks: [],
+    },
   });
 
   return { stackInstance, context, driver };
@@ -470,6 +476,7 @@ describe('createRuntime', () => {
     const targetDescriptor = createTestTargetDescriptor();
     const adapterDescriptor = createTestAdapterDescriptor(adapter);
     const stack = createSqlExecutionStack({
+      family: createTestFamilyDescriptor(),
       target: targetDescriptor,
       adapter: adapterDescriptor,
       extensionPacks: [],
@@ -483,7 +490,12 @@ describe('createRuntime', () => {
     >;
     const context = createExecutionContext({
       contract: testContract,
-      stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+      stack: {
+        family: createTestFamilyDescriptor(),
+        target: targetDescriptor,
+        adapter: adapterDescriptor,
+        extensionPacks: [],
+      },
     });
 
     const rewriteA: SqlMiddleware = {

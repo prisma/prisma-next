@@ -3,7 +3,7 @@ import type { ParamSpec } from '@prisma-next/operations';
 import type { QueryOperationReturn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type { CodecRef } from './ast/codec-types';
-import type { AnyExpression as AstExpression, RawSqlLiteral } from './ast/types';
+import type { AnyExpression as AstExpression, RawSqlLiteral, SelectAst } from './ast/types';
 import { OperationExpr, ParamRef, RawExpr } from './ast/types';
 
 export type ScopeField = {
@@ -23,6 +23,32 @@ export type CodecTypesBase = Record<string, { readonly input: unknown; readonly 
 export type Expression<T extends ScopeField> = QueryOperationReturn & {
   readonly returnType: T;
   buildAst(): AstExpression;
+};
+
+/**
+ * Brand symbol that distinguishes `Subquery<RowType>` from any other shape
+ * exposing `buildAst()` + `getRowFields()`. Declared as a `unique symbol` so
+ * its identity is preserved across the workspace; only types referencing
+ * this exact symbol satisfy `Subquery`.
+ *
+ * Lives in `sql-relational-core` (rather than in `sql-builder` where it was
+ * originally introduced) so non-builder consumers — notably the SQL family
+ * operation type twin — can reference `Subquery` without a workspace edge
+ * back to `sql-builder`.
+ */
+export declare const SubqueryMarker: unique symbol;
+
+/**
+ * A SQL subquery typed by the row shape it produces. Built by the
+ * sql-builder `SelectQuery` / `GroupedQuery` runtime classes (which stamp
+ * `[SubqueryMarker]` via a `declare readonly` property); referenced by
+ * operation surfaces that accept subqueries (`fns.in`, `fns.notIn`,
+ * `fns.exists`, `fns.notExists`, `lateralJoin`).
+ */
+export type Subquery<RowType extends Record<string, ScopeField>> = {
+  [SubqueryMarker]: RowType;
+  buildAst(): SelectAst;
+  getRowFields(): Record<string, ScopeField>;
 };
 
 type CodecIdsWithTrait<

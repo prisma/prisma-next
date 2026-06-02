@@ -26,7 +26,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { createTestFamilyDescriptor, descriptorsFromCodecs } from './utils';
 
 /**
  * Documents the contract: when a `SqlMiddleware.intercept` hook short-circuits execution and returns raw rows, those rows go through the SQL runtime's normal codec decode pass — exactly as if they had come from the driver.
@@ -151,6 +151,7 @@ function createTestSetup(middleware: readonly SqlMiddleware[]) {
   const adapterDescriptor = createTestAdapterDescriptor(adapter);
 
   const stack = createSqlExecutionStack({
+    family: createTestFamilyDescriptor(),
     target: targetDescriptor,
     adapter: adapterDescriptor,
     extensionPacks: [],
@@ -166,7 +167,12 @@ function createTestSetup(middleware: readonly SqlMiddleware[]) {
 
   const context = createExecutionContext({
     contract: testContract,
-    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+    stack: {
+      family: createTestFamilyDescriptor(),
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      extensionPacks: [],
+    },
   });
 
   const runtime = createRuntime({

@@ -1,6 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { ContractModelsMap } from '@prisma-next/contract/types';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { Collection } from '@prisma-next/sql-orm-client';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
@@ -78,6 +79,7 @@ function setupTagCollection(): {
   const context = createExecutionContext({
     contract,
     stack: createSqlExecutionStack({
+      family: sqlRuntimeFamilyDescriptor,
       target: postgresTarget,
       adapter: postgresAdapter,
       extensionPacks: [pgvectorRuntime],

@@ -58,6 +58,7 @@
     "./control-adapter": "./dist/control-adapter.mjs",
     "./ir": "./dist/ir.mjs",
     "./migration": "./dist/migration.mjs",
+    "./operation-types": "./dist/operation-types.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./schema-verify": "./dist/schema-verify.mjs",

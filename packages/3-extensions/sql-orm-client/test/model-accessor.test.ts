@@ -2,6 +2,7 @@ import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
@@ -375,11 +376,20 @@ describe('createModelAccessor', () => {
       },
     }));
 
-    expect(
-      createModelAccessor({ ...context, contract: modelNameFallbackContract } as never, 'User')[
-        'name'
-      ]!.isNull(),
-    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'name')));
+    // `as never` collapses TContract to its constraint here, so the
+    // resulting accessor's per-field shape comes from a mapped type
+    // whose keys TS treats as an index signature. Mirror the existing
+    // `as unknown as Record<string, ...>` precedent further up in this
+    // file (the relation-fallback case) to project the accessor onto
+    // the minimal callable shape this assertion needs.
+    type IsNullCallable = { isNull(): AnyExpression };
+    const accessor = createModelAccessor(
+      { ...context, contract: modelNameFallbackContract } as never,
+      'User',
+    ) as unknown as Record<string, IsNullCallable>;
+    expect(accessor['name']!.isNull()).toEqual(
+      NullCheckExpr.isNull(ColumnRef.of('users', 'name')),
+    );
   });
 
   it('combines relation shorthand fields with and() and rejects missing join arrays', () => {
@@ -503,6 +513,36 @@ describe('createModelAccessor', () => {
 
       const views = post['views'] as unknown as Record<string, unknown>;
       expect(views['synthetic']).toBeUndefined();
+    });
+
+    it('attaches any-targeted op to every column regardless of codec traits', () => {
+      const queryOperations = createSqlOperationRegistry();
+      queryOperations.register('universalProbe', {
+        self: { any: true },
+        impl: () => undefined as never,
+      });
+
+      const traitsByCodec: Record<string, readonly CodecTrait[]> = {
+        'pg/text@1': ['equality', 'order', 'textual'],
+        'pg/int4@1': ['equality', 'order', 'numeric'],
+        'pg/bool@1': ['equality', 'boolean'],
+        'pg/jsonb@1': [],
+      };
+      const codecDescriptors = makeDescriptors(traitsByCodec);
+
+      const ctx = { ...context, queryOperations, codecDescriptors };
+      const user = createModelAccessor(ctx, 'User');
+      const post = createModelAccessor(ctx, 'Post');
+
+      // Columns spanning every trait set in the fixture: rich text traits,
+      // numeric, and zero-trait jsonb. The op must appear on each.
+      const name = user['name'] as unknown as Record<string, unknown>;
+      const views = post['views'] as unknown as Record<string, unknown>;
+      const address = user['address'] as unknown as Record<string, unknown>;
+
+      expect(typeof name['universalProbe']).toBe('function');
+      expect(typeof views['universalProbe']).toBe('function');
+      expect(typeof address['universalProbe']).toBe('function');
     });
   });
 });

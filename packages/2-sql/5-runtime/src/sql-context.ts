@@ -22,6 +22,7 @@ import {
   type RuntimeDriverInstance,
   type RuntimeExtensionDescriptor,
   type RuntimeExtensionInstance,
+  type RuntimeFamilyDescriptor,
   type RuntimeTargetDescriptor,
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
@@ -140,7 +141,31 @@ export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string
   create(): SqlRuntimeExtensionInstance<TTargetId>;
 }
 
+/**
+ * Runtime family descriptor for the SQL family. Structural shape
+ * — `RuntimeFamilyDescriptor<'sql'>` (kind / id / familyId / version /
+ * create) plus the `SqlStaticContributions` slots the contributors loop
+ * walks (`codecs`, `queryOperations`, `mutationDefaultGenerators`).
+ *
+ * Defined structurally here so `sql-runtime` does not need a workspace
+ * dependency on `@prisma-next/family-sql` (which would close a build
+ * cycle: family-sql already depends on sql-runtime for
+ * `RuntimeFamilyDescriptor`, `SqlStaticContributions`, etc.). Callers
+ * pass the concrete `sqlRuntimeFamilyDescriptor` from
+ * `@prisma-next/family-sql/runtime` explicitly via
+ * {@link createSqlExecutionStack}'s `family` parameter.
+ */
+export type SqlRuntimeFamilyDescriptor = RuntimeFamilyDescriptor<'sql'> & SqlStaticContributions;
+
 export interface SqlExecutionStack<TTargetId extends string = string> {
+  /**
+   * SQL-family contributor. Required: callers compose the descriptor
+   * explicitly so `sql-runtime` stays free of a workspace dependency
+   * on `@prisma-next/family-sql`. Production callers pass
+   * `sqlRuntimeFamilyDescriptor` from `@prisma-next/family-sql/runtime`;
+   * tests typically pass a minimal stub.
+   */
+  readonly family: SqlRuntimeFamilyDescriptor;
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
   readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
@@ -156,6 +181,13 @@ export type SqlExecutionStackWithDriver<TTargetId extends string = string> = Omi
   >,
   'target' | 'adapter' | 'driver' | 'extensionPacks'
 > & {
+  /**
+   * SQL-family contributor. Required on both the base
+   * {@link SqlExecutionStack} and this with-driver view; callers compose
+   * the descriptor explicitly so `sql-runtime` stays free of a workspace
+   * dependency on `@prisma-next/family-sql`.
+   */
+  readonly family: SqlRuntimeFamilyDescriptor;
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
   readonly driver:
@@ -189,13 +221,23 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
     | RuntimeDriverDescriptor<'sql', TTargetId, unknown, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
+  /**
+   * SQL-family contributor. Required so `sql-runtime` does not depend
+   * on `@prisma-next/family-sql` (which would close a workspace build
+   * cycle). Production callers pass `sqlRuntimeFamilyDescriptor` from
+   * `@prisma-next/family-sql/runtime`; tests typically pass a stub.
+   */
+  readonly family: SqlRuntimeFamilyDescriptor;
 }): SqlExecutionStackWithDriver<TTargetId> {
-  return createExecutionStack({
-    target: options.target,
-    adapter: options.adapter,
-    driver: options.driver,
-    extensionPacks: options.extensionPacks,
-  });
+  return {
+    ...createExecutionStack({
+      target: options.target,
+      adapter: options.adapter,
+      driver: options.driver,
+      extensionPacks: options.extensionPacks,
+    }),
+    family: options.family,
+  };
 }
 
 export type { ExecutionContext, TypeHelperRegistry };
@@ -807,6 +849,7 @@ export function createExecutionContext<
   };
 
   const contributors: Array<SqlStaticContributions & ComponentDescriptor<string>> = [
+    stack.family,
     stack.target,
     stack.adapter,
     ...stack.extensionPacks,

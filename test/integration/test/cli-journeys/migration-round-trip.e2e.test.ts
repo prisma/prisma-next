@@ -117,6 +117,7 @@ withTempDir(({ createTempDir }) => {
 
         const migrationTs = `
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/postgres/migration';
@@ -126,7 +127,7 @@ import endContract from './end-contract.json' with { type: 'json' };
 const db = sql({
   context: createExecutionContext({
     contract: endContract,
-    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
+    stack: createSqlExecutionStack({ family: sqlRuntimeFamilyDescriptor, target: postgresTarget, adapter: postgresAdapter }),
   }),
 });
 

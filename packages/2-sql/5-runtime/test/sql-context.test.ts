@@ -22,6 +22,7 @@ import { defineTestCodec } from './test-codec';
 import {
   createStubAdapter,
   createTestAdapterDescriptor,
+  createTestFamilyDescriptor,
   createTestTargetDescriptor,
   descriptorsFromCodecs,
 } from './utils';
@@ -88,6 +89,7 @@ function createStack(options?: {
   extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
 }): SqlExecutionStack<'postgres'> {
   return {
+    family: createTestFamilyDescriptor(),
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),
     extensionPacks: options?.extensionPacks ?? [],
@@ -185,6 +187,7 @@ describe('comprehensive descriptor-based derivation', () => {
     };
 
     const stack: SqlExecutionStack<'postgres'> = {
+      family: createTestFamilyDescriptor(),
       target,
       adapter: createTestAdapterDescriptor(createStubAdapter()),
       extensionPacks: [createTestExtensionDescriptor({ hasCodecs: true, hasOperations: true })],
@@ -852,6 +855,7 @@ describe('capability folding', () => {
 
   it('folds adapter capabilities into context.contract.capabilities', () => {
     const stack: SqlExecutionStack<'postgres'> = {
+      family: createTestFamilyDescriptor(),
       target: createTestTargetDescriptor(),
       adapter: adapterWithCapabilities({ sql: { returning: true } }),
       extensionPacks: [],
@@ -866,6 +870,7 @@ describe('capability folding', () => {
     const context = createExecutionContext({
       contract: testContract,
       stack: {
+        family: createTestFamilyDescriptor(),
         target: createTestTargetDescriptor(),
         adapter: createTestAdapterDescriptor(createStubAdapter()),
         extensionPacks: [],
@@ -878,6 +883,7 @@ describe('capability folding', () => {
 
   it('later contributor wins on key collision (adapter overrides target)', () => {
     const stack: SqlExecutionStack<'postgres'> = {
+      family: createTestFamilyDescriptor(),
       target: targetWithCapabilities({ sql: { returning: false } }),
       adapter: adapterWithCapabilities({ sql: { returning: true } }),
       extensionPacks: [],
@@ -898,6 +904,7 @@ describe('capability folding', () => {
     const context = createExecutionContext({
       contract: inputContract,
       stack: {
+        family: createTestFamilyDescriptor(),
         target: createTestTargetDescriptor(),
         adapter: adapterWithCapabilities({ sql: { returning: true } }),
         extensionPacks: [],
@@ -929,7 +936,12 @@ describe('capability folding', () => {
 
     const context = createExecutionContext({
       contract: testContract,
-      stack: { target, adapter, extensionPacks: [extension] },
+      stack: {
+        family: createTestFamilyDescriptor(),
+        target,
+        adapter,
+        extensionPacks: [extension],
+      },
       driver,
     });
 
@@ -941,6 +953,7 @@ describe('capability folding', () => {
       postgres: { lateral: true },
     });
     const stack: SqlExecutionStack<'postgres'> = {
+      family: createTestFamilyDescriptor(),
       target: createTestTargetDescriptor(),
       adapter: createTestAdapterDescriptor(createStubAdapter()),
       extensionPacks: [extension, extension],

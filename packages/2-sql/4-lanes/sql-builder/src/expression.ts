@@ -5,7 +5,7 @@ import type {
   RawSqlTag,
   TraitExpression,
 } from '@prisma-next/sql-relational-core/expression';
-import type { Expand, QueryContext, Scope, ScopeField, ScopeTable, Subquery } from './scope';
+import type { Expand, QueryContext, Scope, ScopeField, ScopeTable } from './scope';
 
 export type { CodecExpression, Expression, RawSqlTag, TraitExpression };
 
@@ -60,64 +60,18 @@ type DeriveExtFunctions<OT extends QueryOperationTypesBase> = {
   [K in keyof OT]: OT[K]['impl'];
 };
 
-export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
-  eq: <CodecId extends string>(
-    a: CodecExpression<CodecId, boolean, CT> | null,
-    b: CodecExpression<CodecId, boolean, CT> | null,
-  ) => Expression<BooleanCodecType>;
-  ne: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT> | null,
-    b: CodecExpression<CodecId, N, CT> | null,
-  ) => Expression<BooleanCodecType>;
-  gt: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT>,
-    b: CodecExpression<CodecId, N, CT>,
-  ) => Expression<BooleanCodecType>;
-  gte: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT>,
-    b: CodecExpression<CodecId, N, CT>,
-  ) => Expression<BooleanCodecType>;
-  lt: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT>,
-    b: CodecExpression<CodecId, N, CT>,
-  ) => Expression<BooleanCodecType>;
-  lte: <CodecId extends string, N extends boolean>(
-    a: CodecExpression<CodecId, N, CT>,
-    b: CodecExpression<CodecId, N, CT>,
-  ) => Expression<BooleanCodecType>;
-  and: (...ands: CodecExpression<'pg/bool@1', boolean, CT>[]) => Expression<BooleanCodecType>;
-  or: (...ors: CodecExpression<'pg/bool@1', boolean, CT>[]) => Expression<BooleanCodecType>;
-
-  exists: (subquery: Subquery<Record<string, ScopeField>>) => Expression<BooleanCodecType>;
-  notExists: (subquery: Subquery<Record<string, ScopeField>>) => Expression<BooleanCodecType>;
-
-  in: {
-    <CodecId extends string>(
-      expr: Expression<{ codecId: CodecId; nullable: boolean }>,
-      subquery: Subquery<Record<string, { codecId: CodecId; nullable: boolean }>>,
-    ): Expression<BooleanCodecType>;
-    <CodecId extends string>(
-      expr: Expression<{ codecId: CodecId; nullable: boolean }>,
-      values: Array<CodecExpression<CodecId, boolean, CT>>,
-    ): Expression<BooleanCodecType>;
-  };
-
-  notIn: {
-    <CodecId extends string>(
-      expr: Expression<{ codecId: CodecId; nullable: boolean }>,
-      subquery: Subquery<Record<string, { codecId: CodecId; nullable: boolean }>>,
-    ): Expression<BooleanCodecType>;
-    <CodecId extends string>(
-      expr: Expression<{ codecId: CodecId; nullable: boolean }>,
-      values: Array<CodecExpression<CodecId, boolean, CT>>,
-    ): Expression<BooleanCodecType>;
-  };
-
+// `BuiltinFunctions` was deleted in slice 3 of the unify-query-operations
+// project: every trait-gated builtin (eq, neq, in, notIn, gt, gte, lt, lte,
+// like, isNull, isNotNull, and, or, exists, notExists) now sources from the
+// SQL-family registry via `DeriveExtFunctions<QC['queryOperationTypes']>`.
+//
+// `raw` is preserved as a top-level slot on `Functions<QC>` because its
+// runtime impl depends on the adapter-supplied `RawCodecInferer` and so
+// is wired through `createFunctions(operations, rawCodecInferer)` rather
+// than registered as a family operation.
+export type Functions<QC extends QueryContext> = {
   readonly raw: RawSqlTag;
-};
-
-export type Functions<QC extends QueryContext> = BuiltinFunctions<QC['codecTypes']> &
-  DeriveExtFunctions<QC['queryOperationTypes']>;
+} & DeriveExtFunctions<QC['queryOperationTypes']>;
 
 export type CountField = { codecId: 'pg/int8@1'; nullable: false };
 

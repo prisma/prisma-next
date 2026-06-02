@@ -26,6 +26,12 @@ if (!target) {
 
 const source = readFileSync(target, 'utf8');
 
+// The emitter aggregates one import line per pack contributing to
+// `queryOperationTypes`. As of slice 2 the family-SQL pack contributes
+// `SqlFamilyQueryOperationTypes`. Carry it through the strip verbatim —
+// it doesn't participate in the
+// `pgvector → postgres → sql-orm-client` cycle this script exists to
+// break, so its only job here is to survive the replacement.
 const importBlock = [
   "import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';",
   'import type {',
@@ -33,10 +39,12 @@ const importBlock = [
   '  Vector,',
   "} from '@prisma-next/extension-pgvector/codec-types';",
   "import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';",
+  "import type { QueryOperationTypes as SqlFamilyQueryOperationTypes } from '@prisma-next/family-sql/operation-types';",
 ].join('\n');
 
 const replacement = [
   "import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';",
+  "import type { QueryOperationTypes as SqlFamilyQueryOperationTypes } from '@prisma-next/family-sql/operation-types';",
   '// pgvector types replaced with local aliases (see note above)',
   'type PgVectorTypes = object;',
   'type Vector<_N extends number> = number[];',

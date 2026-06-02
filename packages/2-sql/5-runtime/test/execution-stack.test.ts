@@ -9,7 +9,11 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { defineTestCodec } from './test-codec';
-import { createTestContract, descriptorsFromCodecs } from './utils';
+import {
+  createTestContract,
+  createTestFamilyDescriptor,
+  descriptorsFromCodecs,
+} from './utils';
 
 function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> {
   const registry: ReadonlyArray<Codec<string>> = [
@@ -117,6 +121,7 @@ describe('createExecutionStack', () => {
     const context = createExecutionContext({
       contract,
       stack: {
+        family: createTestFamilyDescriptor(),
         target: createStubTargetDescriptor(),
         adapter: createStubAdapterDescriptor(),
         extensionPacks: [createStubExtensionDescriptor()],
@@ -135,7 +140,11 @@ describe('createSqlExecutionStack', () => {
   it('preserves descriptor references and defaults extensions', () => {
     const target = createStubTargetDescriptor();
     const adapter = createStubAdapterDescriptor();
-    const stack = createSqlExecutionStack({ target, adapter });
+    const stack = createSqlExecutionStack({
+      family: createTestFamilyDescriptor(),
+      target,
+      adapter,
+    });
 
     expect(stack.target).toBe(target);
     expect(stack.adapter).toBe(adapter);
@@ -146,7 +155,12 @@ describe('createSqlExecutionStack', () => {
     const target = createStubTargetDescriptor();
     const adapter = createStubAdapterDescriptor();
     const extension = createStubExtensionDescriptor();
-    const stack = createSqlExecutionStack({ target, adapter, extensionPacks: [extension] });
+    const stack = createSqlExecutionStack({
+      family: createTestFamilyDescriptor(),
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
 
     expect(stack.extensionPacks).toEqual([extension]);
   });

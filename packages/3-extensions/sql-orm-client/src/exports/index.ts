@@ -12,7 +12,6 @@ export type {
   CollectionModelName,
   CollectionState,
   CollectionTypeState,
-  ComparisonMethods,
   CreateInput,
   DefaultCollectionTypeState,
   DefaultModelRow,
