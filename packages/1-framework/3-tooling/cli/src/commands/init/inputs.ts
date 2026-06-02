@@ -1,9 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import * as clack from '@clack/prompts';
-import { readUserConfig, resolveGating, writeUserConfig } from '@prisma-next/cli-telemetry';
 import { extname, join, normalize } from 'pathe';
 import type { GlobalFlags } from '../../utils/global-flags';
-import { isCI } from '../../utils/is-ci';
 import {
   errorInitAuthoringSchemaPathMismatch,
   errorInitInvalidFlagValue,
@@ -72,18 +70,6 @@ export interface ResolvedInitInputs {
    */
   readonly removePreviousFacade: string | null;
   /**
-   * Telemetry consent answer recorded during this `init` run, or `null`
-   * when no prompt was shown. The prompt fires only on the
-   * canPrompt + !autoAcceptPrompts + no env/CI opt-out +
-   * `enableTelemetry === undefined` intersection; outside that window
-   * the field is `null` and the stored preference (if any) stays
-   * unchanged. The answer has already been persisted to
-   * `$XDG_CONFIG_HOME/prisma-next/config.json` by
-   * the time `runInit` sees this value — it's surfaced here purely so
-   * the post-init summary can mention what the user chose.
-   */
-  readonly enableTelemetry: boolean | null;
-  /**
    * Whether to run `npx skills add prisma/prisma-next#v<version>` at the
    * project level after install + emit. True by default; `--no-skill`
    * sets it to `false`. The skill is always project-level (never
@@ -105,12 +91,6 @@ const AUTHORING_VALUES: ReadonlyMap<string, AuthoringId> = new Map([
   ['typescript', 'typescript'],
   ['ts', 'typescript'],
 ]);
-
-export const TELEMETRY_CONSENT_MESSAGE = [
-  'Help us prioritize features by sharing anonymous CLI usage data?',
-  'The telemetry implementation is open source and fully transparent.',
-  '(packages/1-framework/3-tooling/cli-telemetry and apps/telemetry-backend).',
-].join(' ');
 
 /**
  * Resolves every required input for `runInit`. In interactive mode, missing
@@ -197,11 +177,6 @@ export async function resolveInitInputs(ctx: {
     autoAcceptPrompts,
   });
 
-  const enableTelemetry = await resolveTelemetryConsent({
-    canPrompt,
-    autoAcceptPrompts,
-  });
-
   // Skill-install gating. `--no-skill` (commander parses
   // `options.skill === false`) is the only escape hatch; otherwise
   // project-level install is unconditional. The skill is always
@@ -219,58 +194,8 @@ export async function resolveInitInputs(ctx: {
     strictProbe: Boolean(options.strictProbe),
     reinit,
     removePreviousFacade,
-    enableTelemetry,
     installProjectSkill,
   };
-}
-
-/**
- * The interactive telemetry consent prompt. Shown as the last
- * question of the `init` sequence iff:
- *   1. `canPrompt === true` (interactive stdin / stdout combo),
- *   2. `autoAcceptPrompts === false` (the user did not pass `--yes`),
- *   3. neither telemetry env opt-out is active,
- *   4. the process is not running in CI,
- *   5. the stored `enableTelemetry` value is `undefined` (the user
- *      has never been asked, or skipped the prompt previously).
- *
- * Outside that intersection the function returns `null` and leaves the
- * stored preference untouched. Inside it, the user's answer is
- * persisted via `writeUserConfig({ enableTelemetry })` before this
- * function returns; on an affirmative answer `writeUserConfig`
- * generates and stores the v4 `installationId` in the same write.
- *
- * The wording names CLI usage data and points to the open-source
- * client/backend paths. Default value is `true` to match precedent
- * and to make the consent answer a single keystroke once it's been
- * disclosed.
- */
-async function resolveTelemetryConsent(opts: {
-  readonly canPrompt: boolean;
-  readonly autoAcceptPrompts: boolean;
-}): Promise<boolean | null> {
-  if (!opts.canPrompt || opts.autoAcceptPrompts || isCI()) {
-    return null;
-  }
-  const config = readUserConfig();
-  const gating = resolveGating({ env: process.env, config });
-  if (!gating.enabled && gating.reason === 'env-override') {
-    return null;
-  }
-  const stored = config.enableTelemetry;
-  if (stored !== undefined) {
-    return null;
-  }
-  const result = await clack.confirm({
-    message: TELEMETRY_CONSENT_MESSAGE,
-    initialValue: true,
-    output: process.stderr,
-  });
-  if (clack.isCancel(result)) {
-    throw errorInitUserAborted();
-  }
-  writeUserConfig({ enableTelemetry: Boolean(result) });
-  return Boolean(result);
 }
 
 async function resolveWriteEnv(opts: {

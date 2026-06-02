@@ -84,10 +84,11 @@ export function runTelemetry(inputs: RunTelemetryInputs): TelemetryRunOutcome {
   }
 
   const sanitised = sanitizeCommanderResult(inputs.command);
-  // Gating already confirmed enableTelemetry === true, so installationId
-  // must be set (writeUserConfig generates it alongside that field).
-  // Defence-in-depth: if a stale config has the flag but no id, skip
-  // rather than send a junk event.
+  // Gating resolved enabled, so installationId should be set: the parent
+  // fire path mints it before calling runTelemetry on the default-on
+  // first run, and the init consent flow mints it on explicit opt-in.
+  // Defence-in-depth: a missing id here means a stale/corrupt config, so
+  // skip rather than send a junk event.
   if (typeof config.installationId !== 'string' || config.installationId.length === 0) {
     return { spawned: false, reason: 'gated-off' };
   }

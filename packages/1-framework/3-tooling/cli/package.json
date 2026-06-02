@@ -152,6 +152,10 @@
       "types": "./dist/commands/ref.d.mts",
       "import": "./dist/commands/ref.mjs"
     },
+    "./commands/telemetry": {
+      "types": "./dist/commands/telemetry/index.d.mts",
+      "import": "./dist/commands/telemetry/index.mjs"
+    },
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",
       "import": "./dist/config-loader.mjs"

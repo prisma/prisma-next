@@ -4,10 +4,12 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'pathe';
 
 /**
- * The user-level config file. Persists the consent flag and the
- * installation UUID together so an env-var opt-out never mutates disk,
- * and so an opt-in → opt-out → opt-in cycle keeps the same UUID (correct
- * for MAU continuity).
+ * The user-level config file. Persists the telemetry flag and the
+ * installation UUID. Under the opt-out model the flag stays `undefined`
+ * until the user makes an explicit choice (default-on first run mints
+ * only the id via {@link ensureInstallationId}), and an env-var opt-out
+ * never mutates disk. Once the id exists it survives any
+ * on → off → on cycle, keeping the same UUID (correct for MAU continuity).
  *
  * Readers tolerate unknown fields for forward compat; writers merge
  * partials into the existing object so unknown fields are preserved.
@@ -89,10 +91,12 @@ export function readUserConfig(): UserConfig {
  *
  * When `partial.enableTelemetry === true` and no `installationId` is
  * stored yet, generates a v4 random UUID and persists both fields in
- * the same write. An existing `installationId` is never rotated.
- *
- * `writeUserConfig({ enableTelemetry: false })` does *not* generate an
- * installation id — only an affirmative consent answer produces one.
+ * the same write. An existing `installationId` is never rotated. This is
+ * the *explicit-consent* mint path: a `false` answer
+ * (`writeUserConfig({ enableTelemetry: false })`) writes no id, and a bare
+ * `writeUserConfig({ installationId })` mints nothing extra. The default-on
+ * first-send path mints its id separately via {@link ensureInstallationId},
+ * which records no consent answer.
  */
 export function writeUserConfig(partial: Partial<UserConfig>): void {
   const current = readUserConfig();
@@ -108,4 +112,24 @@ export function writeUserConfig(partial: Partial<UserConfig>): void {
   const tmpPath = `${path}.${process.pid}.tmp`;
   writeFileSync(tmpPath, `${JSON.stringify(merged, null, 2)}\n`, 'utf-8');
   renameSync(tmpPath, path);
+}
+
+/**
+ * Returns the stored `installationId`, minting and persisting a fresh v4
+ * UUID when none exists yet. Crucially, this persists *only* the id —
+ * `enableTelemetry` is left untouched (stays `undefined` on a default-on
+ * first run), so the interactive `init` consent prompt is not wrongly
+ * suppressed and no explicit consent the user never gave is recorded.
+ *
+ * Used by the default-on first-run fire path: the gate has already
+ * resolved enabled, so this only ever runs when telemetry is on.
+ */
+export function ensureInstallationId(): string {
+  const existing = readUserConfig().installationId;
+  if (typeof existing === 'string' && existing.length > 0) {
+    return existing;
+  }
+  const installationId = randomUUID();
+  writeUserConfig({ installationId });
+  return installationId;
 }
