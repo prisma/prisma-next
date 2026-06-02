@@ -117,6 +117,7 @@ export interface ModelNode {
   readonly indexes?: readonly IndexNode[];
   readonly foreignKeys?: readonly ForeignKeyNode[];
   readonly relations?: readonly RelationNode[];
+  readonly control?: ControlPolicy;
 }
 
 export interface ContractDefinition {

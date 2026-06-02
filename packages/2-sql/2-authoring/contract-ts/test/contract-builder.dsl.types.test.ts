@@ -43,4 +43,16 @@ describe('contract DSL type surface', () => {
     expectTypeOf(contract.targetFamily).toEqualTypeOf<'sql'>();
     expectTypeOf(modelsOf(contract).User.storage.table).toEqualTypeOf<'user'>();
   });
+
+  it('rejects invalid defaultControl at compile time', () => {
+    if (false as boolean) {
+      defineContract({
+        family: bareFamilyPack,
+        target: postgresTargetPack,
+        // @ts-expect-error invalid control policy literal
+        defaultControl: 'bogus',
+        models: {},
+      });
+    }
+  });
 });

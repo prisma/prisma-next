@@ -416,6 +416,7 @@ export function buildSqlContractFromDefinition(
 
     const tableInput: StorageTableInput = {
       columns,
+      ...ifDefined('control', semanticModel.control),
       uniques: (semanticModel.uniques ?? []).map((u) => ({
         columns: u.columns,
         ...ifDefined('name', u.name),

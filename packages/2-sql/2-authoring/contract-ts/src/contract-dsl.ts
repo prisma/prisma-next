@@ -786,6 +786,7 @@ export type ModelAttributesSpec = {
 
 export type SqlStageSpec = {
   readonly table?: string;
+  readonly control?: ControlPolicy;
   readonly indexes?: readonly IndexConstraint[];
   readonly foreignKeys?: readonly ForeignKeyConstraint[];
 };

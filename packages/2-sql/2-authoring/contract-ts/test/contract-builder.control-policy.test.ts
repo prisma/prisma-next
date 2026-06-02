@@ -1,7 +1,10 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
+import { effectiveControl } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
+import { unboundTables } from './unbound-tables';
 
 const bareFamilyPack: FamilyPackRef<'sql'> = {
   kind: 'family',
@@ -19,6 +22,13 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 };
 
 const int4Column = columnDescriptor('pg/int4@1');
+
+function tableEffectiveControl(
+  tableControl: ControlPolicy | undefined,
+  defaultControl: ControlPolicy | undefined,
+): ControlPolicy {
+  return effectiveControl(tableControl, defaultControl);
+}
 
 describe('defineContract defaultControl', () => {
   it('lowers defaultControl to Contract.defaultControl', () => {
@@ -48,5 +58,81 @@ describe('defineContract defaultControl', () => {
     });
 
     expect(built).not.toHaveProperty('defaultControl');
+  });
+});
+
+describe('defineContract per-table control', () => {
+  const policies = [
+    'managed',
+    'tolerated',
+    'external',
+    'observed',
+  ] as const satisfies readonly ControlPolicy[];
+
+  it('accepts each ControlPolicy on the table sql stage', () => {
+    for (const control of policies) {
+      const built = defineContract({
+        family: bareFamilyPack,
+        target: postgresTargetPack,
+        models: {
+          User: model('User', {
+            fields: { id: field.column(int4Column).id() },
+          }).sql({ table: 'app_user', control }),
+        },
+      });
+
+      const table = unboundTables(built.storage)['app_user'];
+      expect(tableEffectiveControl(table?.control, built.defaultControl)).toBe(control);
+    }
+  });
+
+  expectTypeOf<'external'>().toMatchTypeOf<ControlPolicy>();
+});
+
+describe('defineContract mixed default and per-table control', () => {
+  it('resolves effective control per table and round-trips', () => {
+    const built = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      defaultControl: 'external',
+      models: {
+        User: model('User', {
+          fields: { id: field.column(int4Column).id() },
+        }).sql({ table: 'app_user' }),
+        Profile: model('Profile', {
+          fields: { id: field.column(int4Column).id() },
+        }).sql({ table: 'user_profile', control: 'managed' }),
+        Audit: model('Audit', {
+          fields: { id: field.column(int4Column).id() },
+        }).sql({ table: 'audit_log', control: 'tolerated' }),
+      },
+    });
+
+    const tables = unboundTables(built.storage);
+    expect(tableEffectiveControl(tables['app_user']?.control, built.defaultControl)).toBe(
+      'external',
+    );
+    expect(tableEffectiveControl(tables['user_profile']?.control, built.defaultControl)).toBe(
+      'managed',
+    );
+    expect(tableEffectiveControl(tables['audit_log']?.control, built.defaultControl)).toBe(
+      'tolerated',
+    );
+
+    const roundTripped = JSON.parse(JSON.stringify(built)) as typeof built;
+    const roundTrippedTables = unboundTables(roundTripped.storage);
+    expect(roundTripped.defaultControl).toBe('external');
+    expect(
+      tableEffectiveControl(roundTrippedTables['app_user']?.control, roundTripped.defaultControl),
+    ).toBe('external');
+    expect(
+      tableEffectiveControl(
+        roundTrippedTables['user_profile']?.control,
+        roundTripped.defaultControl,
+      ),
+    ).toBe('managed');
+    expect(
+      tableEffectiveControl(roundTrippedTables['audit_log']?.control, roundTripped.defaultControl),
+    ).toBe('tolerated');
   });
 });
