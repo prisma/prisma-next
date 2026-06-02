@@ -11,6 +11,7 @@ import {
   JoinAst,
   ProjectionItem,
   SelectAst,
+  TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
@@ -406,8 +407,13 @@ function buildManyToManyExistsExpr<TContract extends Contract<SqlStorage>>(
   }
 
   const firstTargetCol = through.targetColumns[0] ?? 'id';
-  const subquery = SelectAst.from(TableSource.named(relatedTableName))
-    .withJoins([JoinAst.inner(TableSource.named(junctionTable), junctionJoinOn)])
+  const subquery = SelectAst.from(tableSourceForContract(context.contract, relatedTableName))
+    .withJoins([
+      JoinAst.inner(
+        TableSource.named(junctionTable, undefined, through.namespaceId),
+        junctionJoinOn,
+      ),
+    ])
     .withProjection([ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, firstTargetCol))])
     .withWhere(subqueryWhere);
 
