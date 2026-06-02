@@ -337,6 +337,42 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/3-extensions/prisma-postgres-serverless/src/exports/config.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/prisma-postgres-serverless/src/exports/contract-builder.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/prisma-postgres-serverless/src/exports/family.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/prisma-postgres-serverless/src/exports/migration.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-extensions/prisma-postgres-serverless/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-extensions/prisma-postgres-serverless/src/exports/target.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/3-extensions/mongo/src/config/**",
       "domain": "extensions",
       "layer": "adapters",

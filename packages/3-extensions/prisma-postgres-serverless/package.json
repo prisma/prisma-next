@@ -1,0 +1,76 @@
+{
+  "name": "@prisma-next/prisma-postgres-serverless",
+  "version": "0.12.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Edge/serverless-friendly Prisma Postgres client composition for Prisma Next",
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:0.12.0",
+    "@prisma-next/cli": "workspace:0.12.0",
+    "@prisma-next/config": "workspace:0.12.0",
+    "@prisma-next/contract": "workspace:0.12.0",
+    "@prisma-next/driver-ppg-serverless": "workspace:0.12.0",
+    "@prisma-next/family-sql": "workspace:0.12.0",
+    "@prisma-next/framework-components": "workspace:0.12.0",
+    "@prisma-next/sql-builder": "workspace:0.12.0",
+    "@prisma-next/sql-contract": "workspace:0.12.0",
+    "@prisma-next/sql-contract-psl": "workspace:0.12.0",
+    "@prisma-next/sql-contract-ts": "workspace:0.12.0",
+    "@prisma-next/sql-orm-client": "workspace:0.12.0",
+    "@prisma-next/sql-relational-core": "workspace:0.12.0",
+    "@prisma-next/sql-runtime": "workspace:0.12.0",
+    "@prisma-next/target-postgres": "workspace:0.12.0",
+    "@prisma-next/utils": "workspace:0.12.0",
+    "pathe": "^2.0.3"
+  },
+  "devDependencies": {
+    "@prisma-next/psl-parser": "workspace:0.12.0",
+    "@prisma-next/test-utils": "workspace:0.12.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "types": "./dist/runtime.d.mts",
+  "exports": {
+    "./config": "./dist/config.mjs",
+    "./contract-builder": "./dist/contract-builder.mjs",
+    "./family": "./dist/family.mjs",
+    "./migration": "./dist/migration.mjs",
+    "./runtime": "./dist/runtime.mjs",
+    "./target": "./dist/target.mjs",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-extensions/prisma-postgres-serverless"
+  }
+}
