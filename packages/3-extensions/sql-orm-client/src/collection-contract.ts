@@ -339,6 +339,9 @@ export function resolveIncludeRelation(
       childColumns: relation.through.childColumns,
       targetColumns: relation.through.targetColumns,
       parentLocalColumns,
+      ...(relation.through.namespaceId !== undefined
+        ? { namespaceId: relation.through.namespaceId }
+        : {}),
     };
   }
 

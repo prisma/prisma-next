@@ -362,6 +362,7 @@ function buildManyToManyJunctionArtifacts(
     childColumns,
     targetColumns,
     parentLocalColumns,
+    namespaceId,
   } = through;
 
   const joinOnPairs = childColumns.map((junctionCol, i) =>
@@ -384,7 +385,11 @@ function buildManyToManyJunctionArtifacts(
       ? castAs<AnyExpression>(correlationPairs[0]!)
       : AndExpr.of(correlationPairs);
 
-  const junctionJoin = JoinAst.inner(TableSource.named(junctionTable), joinOn, false);
+  const junctionJoin = JoinAst.inner(
+    TableSource.named(junctionTable, undefined, namespaceId),
+    joinOn,
+    false,
+  );
 
   return { whereExpr, junctionJoin };
 }
