@@ -120,7 +120,7 @@ Write the entries under the fixed section order from [`docs/releases/README.md`]
 3. **Fixes** — bug fixes.
 4. **New contributors** — first-time contributors, with the PR that welcomed them.
 
-Breaking changes lead because they are what a reader scanning the notes most needs to see. Every line links its PR (`#NNN`).
+Breaking changes lead because they are what a reader scanning the notes most needs to see. Every line links its PR as an **absolute markdown link** — `[#NNN](https://github.com/prisma/prisma-next/pull/NNN)`, never bare `#NNN`. Bare references only autolink inside the GitHub Release body; they render as plain text when the committed `docs/releases/v<version>.md` is read as a repo file or in PR review, so the explicit link form is what makes every reference work in every context.
 
 ### 6. Anchor breaking-change entries to their migration recipe
 
@@ -131,51 +131,90 @@ A breaking change shipping in this release has a matching upgrade-instructions d
 - User-facing migrations: `https://github.com/prisma/prisma-next/blob/v$NEXT/skills/upgrade/prisma-next-upgrade/upgrades/<prev.minor>-to-<head.minor>/`
 - Extension-author migrations: `https://github.com/prisma/prisma-next/blob/v$NEXT/skills/extension-author/prisma-next-extension-upgrade/upgrades/<prev.minor>-to-<head.minor>/`
 
-A breaking change can affect one or both audiences — link whichever recipe directories exist. (PR references stay as bare `(#NNN)` — GitHub auto-links those in a Release body, so do not turn them into absolute URLs.)
+A breaking change can affect one or both audiences — link whichever recipe directories exist.
 
 **If the recipe directory is absent**, do not fail authoring: still list the breaking change and describe the required action inline. The missing recipe is `check:upgrade-coverage`'s concern to enforce, not this skill's.
 
 For a **skipped-publish range** (more than one minor in this release — see graceful degradation below), the recipe is a *chain* of consecutive transition directories (e.g. `0.11-to-0.12` + `0.12-to-0.13` for a `v0.11.0` → `0.13.0` publish), mirroring how `check-upgrade-coverage` aggregates the chain. Anchor each breaking entry to the step that introduced it.
 
-### 7. Attribute contributors
+### 7. Show the impact of code-visible breaking changes with a before/after example
 
-Preserve the "New contributors" credit that `--generate-notes` gave for free. Each first-time contributor gets a line naming the PR that welcomed them:
+Prose tells a reader *that* something changed; a short before/after snippet shows them *what it looks like*, which is what they actually need to act. For the most code-visible breaking changes — contract-shape changes, authoring-surface changes, runtime-option or builder-API changes — nest a compact `before` / `after` example under the prose bullet.
+
+- **Source it from the recipe, don't invent it.** The matching `<prev.minor>-to-<head.minor>` upgrade recipe (authored via [`record-upgrade-instructions`](../record-upgrade-instructions/SKILL.md)) already contains authoritative before/after migration code — lift the snippet from there so it stays accurate. If the change is only visible in the emitted `contract.json` / `contract.d.ts`, a minimal shape diff from the recipe or the PR diff is fine.
+- **Keep it tight.** A few lines before, a few lines after — enough to show the shape, not the whole file.
+- **Lead with PSL.** When the change is on the authoring surface, write the example in PSL (```` ```prisma ````, never ```` ```psl ````), per the repo's authoring-surface convention. Use TS or JSON only when the change is genuinely a TS-surface change (a builder/runtime option, a consumer reading the emitted `.d.ts`) or an emitted-shape change with no PSL form.
+- **Skip operational-only breaks.** Version-floor bumps, peer-dependency changes, and package removals/extractions have no illuminating code diff — prose suffices for those.
+
+The format is the prose bullet, then the nested example:
+
+````md
+- **<title>** — <what changed and what the reader must do; recipe link>. ([#<pr>](https://github.com/prisma/prisma-next/pull/<pr>))
+
+  Before:
+
+  ```ts
+  …
+  ```
+
+  After:
+
+  ```ts
+  …
+  ```
+````
+
+### 8. Attribute contributors
+
+Preserve the "New contributors" credit that `--generate-notes` gave for free. Each first-time contributor gets a line naming the PR that welcomed them, with both the handle and the PR as absolute links:
 
 ```md
-- @<handle> made their first contribution in #<pr>
+- [@<handle>](https://github.com/<handle>) made their first contribution in [#<pr>](https://github.com/prisma/prisma-next/pull/<pr>)
 ```
 
 Resolve first-time status from PR author metadata (e.g. `gh api` `author_association` of `FIRST_TIME_CONTRIBUTOR` / `FIRST_TIMER`, or by checking whether the author appears in the range before this PR).
 
-### 8. Write the notes file and prepend the CHANGELOG
+### 9. Write the notes file and prepend the CHANGELOG
 
 Fill the [`docs/releases/README.md`](../../docs/releases/README.md) template into `docs/releases/v$NEXT.md`:
 
-```md
+````md
 # v<version>
 
 <optional one- or two-sentence summary of the release's theme>
 
 ## Breaking changes
 
-- **<short title>** — <what changed and what the reader must do; link the upgrade recipe>. (#<pr>)
+- **<short title>** — <what changed and what the reader must do; link the upgrade recipe>. ([#<pr>](https://github.com/prisma/prisma-next/pull/<pr>))
+
+  Before:
+
+  ```ts
+  <old shape>
+  ```
+
+  After:
+
+  ```ts
+  <new shape>
+  ```
 
 ## Features
 
-- <new capability>. (#<pr>)
+- <new capability>. ([#<pr>](https://github.com/prisma/prisma-next/pull/<pr>))
 
 ## Fixes
 
-- <bug fix>. (#<pr>)
+- <bug fix>. ([#<pr>](https://github.com/prisma/prisma-next/pull/<pr>))
 
 ## New contributors
 
-- @<handle> made their first contribution in #<pr>
-```
+- [@<handle>](https://github.com/<handle>) made their first contribution in [#<pr>](https://github.com/prisma/prisma-next/pull/<pr>)
+````
 
 Then **prepend** a `## v$NEXT` entry to [`CHANGELOG.md`](../../CHANGELOG.md), mirroring the notes-file body (newest-first). The CHANGELOG is a plain newest-first mirror — no second authoring format, no "Keep a Changelog" headers; copy the section bodies under the `## v$NEXT` header at the top of the entry list (below the file's intro and the `<!-- New release entries go here … -->` marker).
 
-### 9. Commit on the release branch
+### 10. Commit on the release branch
 
 Commit the notes file + CHANGELOG as their **own** commit on the `release/<version>` branch (keeping `publish-npm-version`'s `chore(release): bump` commit clean), so the notes ride in the bump PR diff and satisfy the `check:release-notes` PR-mode gate. Use explicit staging and sign off:
 
@@ -211,30 +250,42 @@ Cutting `v0.12.0` from `origin/main` (previous stable tag `v0.11.0`).
 4. Triage: #1240 changes the contract format → **always-include, breaking**. A CI-cache tweak (#1237) and a test-only refactor (#1239) → **default-exclude**, dropped silently. A new `includeMany` capability (#1234) → feature. A null-handling bug fix (#1242) → fix. First-time contributor @somebody on #1238.
 5. Categorize: Breaking changes (#1240) → Features (#1234) → Fixes (#1242) → New contributors (@somebody, #1238).
 6. The breaking change's transition is `0.11-to-0.12`. The recipe dir `skills/upgrade/prisma-next-upgrade/upgrades/0.11-to-0.12/` exists in the checkout → the breaking note links it as a tag-pinned URL, `https://github.com/prisma/prisma-next/blob/v0.12.0/skills/upgrade/prisma-next-upgrade/upgrades/0.11-to-0.12/`. (If it were absent, the note would describe the required adapter migration inline instead.)
-7. @somebody's line: `- @somebody made their first contribution in #1238`.
-8. Write `docs/releases/v0.12.0.md`:
+7. #1240 is a code-visible contract-shape/runtime change, so it earns a before/after example — lifted from the `0.11-to-0.12` recipe (a TS runtime change, so a `ts` fence). @somebody's contributor line, with absolute links: `- [@somebody](https://github.com/somebody) made their first contribution in [#1238](https://github.com/prisma/prisma-next/pull/1238)`.
+8. Write `docs/releases/v0.12.0.md` (every PR ref + handle an absolute link; the breaking entry carries a before/after):
 
-```md
+````md
 # v0.12.0
 
 Contract deserialization gains an explicit adapter seam, and queries can now eager-load related records.
 
 ## Breaking changes
 
-- **Contract deserialization requires an adapter seam** — deserialization now goes through an explicit seam adapter; existing code must register one. See the [0.11-to-0.12 upgrade recipe](https://github.com/prisma/prisma-next/blob/v0.12.0/skills/upgrade/prisma-next-upgrade/upgrades/0.11-to-0.12/). (#1240)
+- **Contract deserialization requires an adapter seam** — deserialization now goes through an explicit seam adapter; existing code must register one. See the [0.11-to-0.12 upgrade recipe](https://github.com/prisma/prisma-next/blob/v0.12.0/skills/upgrade/prisma-next-upgrade/upgrades/0.11-to-0.12/). ([#1240](https://github.com/prisma/prisma-next/pull/1240))
+
+  Before:
+
+  ```ts
+  const contract = deserializeContract(json);
+  ```
+
+  After:
+
+  ```ts
+  const contract = deserializeContract(json, { adapter: postgresAdapter });
+  ```
 
 ## Features
 
-- `includeMany` eager-loads related records in a single query. (#1234)
+- `includeMany` eager-loads related records in a single query. ([#1234](https://github.com/prisma/prisma-next/pull/1234))
 
 ## Fixes
 
-- Null values in `returning()` projections no longer throw. (#1242)
+- Null values in `returning()` projections no longer throw. ([#1242](https://github.com/prisma/prisma-next/pull/1242))
 
 ## New contributors
 
-- @somebody made their first contribution in #1238
-```
+- [@somebody](https://github.com/somebody) made their first contribution in [#1238](https://github.com/prisma/prisma-next/pull/1238)
+````
 
    Then prepend the same body under `## v0.12.0` to `CHANGELOG.md`.
 
