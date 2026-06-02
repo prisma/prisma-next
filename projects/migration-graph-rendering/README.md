@@ -62,6 +62,13 @@ Presentation polish (independent of the sequence above):
   per-column colored gutter and an opt-in `--legend` key. Presentation-only;
   touches the tree renderer + the `graph` command, behind unchanged layout and
   `--json`/`--dot`.
+- **Converging back-arcs** —
+  [`slices/converging-back-arcs/spec.md`](./slices/converging-back-arcs/spec.md)
+  ([TML-2793](https://linear.app/prisma-company/issue/TML-2793)). Bug follow-up:
+  two or more node-skipping rollbacks converging on the **same** target node break
+  the routed back-arc layer — only one arc lands and the tip falls out of order.
+  The source-side has co-sourced tee handling; the target-side needs the analogous
+  co-landing handling (plus an ordering check). Layout/routing-only.
 
 ## Contents
 
