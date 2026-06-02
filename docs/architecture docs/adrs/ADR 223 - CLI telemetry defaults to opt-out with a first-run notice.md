@@ -76,7 +76,7 @@ The stored field keeps its v0.11.0 name and `false` semantics. A v0.11.0 user wh
 On the first command that resolves enabled with `installationId === undefined`, the parent fire path (`discloseAndMintOnFirstRun` in `cli/src/utils/telemetry.ts`) prints a one-time disclosure to **stderr** (never stdout, so piped output is never corrupted), then mints the `installationId` and sends. This is the single disclosure surface for every command, `init` included. The notice text, with the resolved absolute config-file path substituted in, is exactly (`firstRunNotice`):
 
 ```text
-Prisma Next collects anonymous CLI usage data, enabled by default. What's collected and why: docs/Telemetry.md. Opt out: run "prisma-next telemetry disable", set DO_NOT_TRACK=1 or PRISMA_NEXT_DISABLE_TELEMETRY=1, or set "enableTelemetry": false in <resolved config.json path>.
+Prisma Next collects anonymous CLI usage data, enabled by default. What's collected and why: https://prisma-next.dev/docs/cli/telemetry. Opt out: run "prisma-next telemetry disable", set DO_NOT_TRACK=1 or PRISMA_NEXT_DISABLE_TELEMETRY=1, or set "enableTelemetry": false in <resolved config.json path>.
 ```
 
 The notice is keyed on `installationId === undefined`, so it prints exactly once: the mint that immediately follows it makes every later run silent. Both the print and the mint are wrapped best-effort — an un-writable config dir never throws and never blocks the command (on mint failure the id stays undefined, the sender no-ops on the missing id, and the notice may reprint next run).

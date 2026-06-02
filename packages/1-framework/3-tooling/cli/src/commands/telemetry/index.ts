@@ -88,8 +88,8 @@ export function createTelemetryCommand(): Command {
     command,
     'Inspect and change anonymous CLI telemetry',
     'Show telemetry status, or enable / disable anonymous CLI usage data.\n' +
-      'Telemetry is on by default (opt-out); see docs/Telemetry.md for what is\n' +
-      'collected and why.',
+      'Telemetry is on by default (opt-out); see https://prisma-next.dev/docs/cli/telemetry\n' +
+      'for what is collected and why.',
   );
   setCommandExamples(command, [
     'prisma-next telemetry status',
