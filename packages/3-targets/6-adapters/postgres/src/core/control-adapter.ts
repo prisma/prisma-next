@@ -52,6 +52,7 @@ import {
   introspectPostgresEnumTypes,
   type PostgresEnumStorageTypeAnnotation,
 } from './enum-control-hooks';
+import * as markerLedgerWrites from './marker-ledger-writes';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
@@ -322,6 +323,75 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       appliedAt: row.created_at instanceof Date ? row.created_at : new Date(row.created_at),
       operationCount: Array.isArray(row.operations) ? row.operations.length : 0,
     }));
+  }
+
+  /**
+   * Stamps the initial marker row for `space` via the shared contract-free DML
+   * builder, lowered through {@link lower} and executed on the driver. See the
+   * `SqlControlAdapter.initMarker` contract.
+   */
+  async initMarker(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    space: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<void> {
+    await markerLedgerWrites.initMarker(
+      (query) => this.lower(query, { contract: undefined }),
+      driver,
+      space,
+      destination,
+    );
+  }
+
+  /**
+   * Compare-and-swap advance of the marker row for `space`. See the
+   * `SqlControlAdapter.updateMarker` contract.
+   */
+  async updateMarker(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    space: string,
+    expectedFrom: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<boolean> {
+    return markerLedgerWrites.updateMarker(
+      (query) => this.lower(query, { contract: undefined }),
+      driver,
+      space,
+      expectedFrom,
+      destination,
+    );
+  }
+
+  /**
+   * Appends a ledger entry for `space`. See the
+   * `SqlControlAdapter.writeLedgerEntry` contract.
+   */
+  async writeLedgerEntry(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    space: string,
+    entry: {
+      readonly edgeId: string;
+      readonly from: string;
+      readonly to: string;
+      readonly migrationName: string;
+      readonly migrationHash: string;
+      readonly operations: readonly unknown[];
+    },
+  ): Promise<void> {
+    await markerLedgerWrites.writeLedgerEntry(
+      (query) => this.lower(query, { contract: undefined }),
+      driver,
+      space,
+      entry,
+    );
   }
 
   /**
