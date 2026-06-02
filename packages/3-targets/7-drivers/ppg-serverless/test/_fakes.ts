@@ -16,11 +16,42 @@ export type QueryHandler = (
   params: readonly unknown[],
 ) => ResultsetSpec | Promise<ResultsetSpec> | Error | Promise<Error>;
 
+/**
+ * Convenience handler for transaction tests: returns an empty resultset for
+ * any SQL whose first keyword is `BEGIN` / `COMMIT` / `ROLLBACK` (PPG
+ * accepts these via `session.query` and returns an empty resultset). For
+ * anything else, defers to the supplied inner handler.
+ */
+export function withTxnControlStatements(
+  inner: QueryHandler = () => ({ columns: [], rows: [] }),
+): QueryHandler {
+  return (sql, params) => {
+    const head = sql.trim().slice(0, 8).toUpperCase();
+    if (head.startsWith('BEGIN') || head.startsWith('COMMIT') || head.startsWith('ROLLBACK')) {
+      return { columns: [], rows: [] };
+    }
+    return inner(sql, params);
+  };
+}
+
 export interface FakeClientControls {
   readonly client: PpgClient;
   readonly newSessionCalls: () => number;
   readonly queryCalls: () => Array<{ sql: string; params: readonly unknown[] }>;
   readonly sessionCloseCalls: () => number;
+  /**
+   * Alias for `queryCalls` — query history observed across every fake session
+   * the client minted. Each entry carries the `sql` and `params` arguments
+   * passed to `session.query(sql, ...params)`. Useful for transaction tests
+   * that assert the exact `BEGIN` / `COMMIT` / `ROLLBACK` ordering.
+   */
+  readonly sessionQueryHistory: () => Array<{ sql: string; params: readonly unknown[] }>;
+  /**
+   * Alias for `sessionCloseCalls` — total number of `session.close()` calls
+   * across every fake session. Useful for tests asserting one-session-per-call
+   * vs held-session lifecycles.
+   */
+  readonly closeCount: () => number;
 }
 
 export function makeFakeClient(handler: QueryHandler): FakeClientControls {
@@ -72,6 +103,8 @@ export function makeFakeClient(handler: QueryHandler): FakeClientControls {
     newSessionCalls: () => newSessionCount,
     queryCalls: () => queryCalls,
     sessionCloseCalls: () => sessionCloseCount,
+    sessionQueryHistory: () => queryCalls,
+    closeCount: () => sessionCloseCount,
   };
 }
 
