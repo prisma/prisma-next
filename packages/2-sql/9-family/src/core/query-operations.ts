@@ -1,5 +1,5 @@
 /**
- * Runtime factory for the SQL family's query-operations contribution.
+ * Source-of-truth runtime factory for the SQL family's query operations.
  *
  * Returns the 15 family-level operation descriptors registered into the
  * `SqlOperationRegistry` at execution-context construction:
@@ -11,16 +11,14 @@
  *   - Boolean composition (no `self`, sql-builder-only): `and`, `or`,
  *     `exists`, `notExists`
  *
- * Each `impl` builds the AST node verbatim from today's source-of-truth
- * surfaces (`BuiltinFunctions` in sql-builder; `COMPARISON_METHODS_META`
- * in sql-orm-client). Slice 3 will rewire the legacy consumers to read
- * from this registry; preserving byte-identical AST shapes here is what
- * keeps that deletion a no-op on emitted SQL.
+ * The sql-builder `fns` proxy and the ORM column accessors both source
+ * these impls through the registry; this file is the canonical home for
+ * their lowering — no twin implementation exists elsewhere.
  *
  * Lock-step with the type twin in `../types/operation-types.ts` is
  * enforced via `satisfies QueryOperationTypes<CT>` on the returned
  * literal — a drift in lowering shape vs. type-level signature surfaces
- * as a family-sql typecheck failure rather than a slice-3 SQL-emission
+ * as a family-sql typecheck failure rather than a downstream SQL-emission
  * regression.
  */
 
@@ -55,8 +53,8 @@ const BOOL_FIELD = { codecId: 'pg/bool@1' as const, nullable: false as const };
 
 /**
  * Wrap a relational-core AST node as an `Expression<PgBoolReturn>` —
- * identical wrapping shape to `boolExpr` in
- * `packages/2-sql/4-lanes/sql-builder/src/runtime/functions.ts`.
+ * the canonical `pg/bool@1` return wrapping used by every predicate
+ * factory below.
  */
 function boolExpr(ast: AstExpression): PgBoolReturn {
   return new ExpressionImpl(ast, BOOL_FIELD);
@@ -82,8 +80,9 @@ function isExpressionLike(value: unknown): value is { buildAst(): AstExpression 
 
 /**
  * Resolve a binary-comparison operand into an AST node, threading the
- * column-bound side's {@link CodecRef} to the raw-value side — same
- * shape as `resolveOperand` in sql-builder's `functions.ts`.
+ * column-bound side's {@link CodecRef} to the raw-value side. Used by
+ * `eq` / `neq` / `gt` / `gte` / `lt` / `lte` / `like` to forward the
+ * column's codec onto raw-value `ParamRef`s for encode-side dispatch.
  */
 function resolveOperand(operand: ExprOrVal, otherCodec: CodecRef | undefined): AstExpression {
   if (isExpressionLike(operand)) return operand.buildAst();
@@ -91,8 +90,7 @@ function resolveOperand(operand: ExprOrVal, otherCodec: CodecRef | undefined): A
 }
 
 /**
- * Build a binary AST node with cross-codec resolution — copies the
- * `binaryWithSharedCodec` shape from sql-builder verbatim. Each side
+ * Build a binary AST node with cross-codec resolution. Each side
  * forwards its codec ref so a raw value paired with a column-bound
  * expression picks up the column's codec at param materialisation.
  */
@@ -105,10 +103,10 @@ function binaryWithSharedCodec(a: ExprOrVal, b: ExprOrVal, op: BinaryOp): AstExp
 }
 
 /**
- * Wrap an Expression (via `buildAst`) or fall back to a `LiteralExpr` —
- * matches `toLiteralExpr` in sql-builder's `functions.ts`. Used by
- * `and` / `or` so callers can mix in raw `true` / `false` literals
- * that the SQL planner statically simplifies.
+ * Wrap an Expression (via `buildAst`) or fall back to a `LiteralExpr`.
+ * Used by `and` / `or` so callers can mix in raw `true` / `false`
+ * literals that the SQL planner statically simplifies (e.g.
+ * `TRUE AND x → x`, which it cannot do for an opaque `ParamRef`).
  */
 function toLiteralExpr(value: unknown): AstExpression {
   if (isExpressionLike(value)) return value.buildAst();
@@ -123,9 +121,8 @@ function toLiteralExpr(value: unknown): AstExpression {
 export function sqlFamilyOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
   return {
     // Equality predicates — trait-gated.
-    // `eq` / `neq` preserve the implicit null-coalescing behaviour today
-    // shared between `BuiltinFunctions.eq` (sql-builder/functions.ts:95-99)
-    // and `scalarComparisonMethod('eq')` (sql-orm-client/types.ts:292-298):
+    // `eq` / `neq` preserve the implicit null-coalescing convention the
+    // sql-builder `fns.eq` and ORM `column.eq` accessors both expose:
     // a `null` operand short-circuits to `NullCheckExpr.isNull` /
     // `isNotNull` so users do not have to switch surface to express the
     // common `column.eq(maybeNull)` pattern.
@@ -147,10 +144,10 @@ export function sqlFamilyOperations<CT extends CodecTypesBase>(): QueryOperation
     },
     in: {
       self: { traits: ['equality'] },
-      // Runtime branch on the second arg's shape — same dispatch as
-      // `inOrNotIn` (sql-builder/functions.ts:111-125). The type twin
-      // carries the two overload signatures so callers see the precise
-      // signature; the runtime widens to the union and branches.
+      // Runtime branches on the second arg's shape: an array of values or
+      // a subquery. The type twin carries the two overload signatures so
+      // callers see the precise signature; the runtime widens to the
+      // union and branches.
       impl: ((
         expr: Expression<ScopeField>,
         valuesOrSubquery: Subquery<Record<string, ScopeField>> | ReadonlyArray<ExprOrVal>,

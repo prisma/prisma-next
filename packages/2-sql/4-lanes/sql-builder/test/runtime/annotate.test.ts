@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { sql } from '../../src/runtime/sql';
 import { contract as contractJson } from '../fixtures/contract';
 import type { Contract } from '../fixtures/generated/contract';
+import { testOperations } from './test-helpers';
 
 // Builder annotate tests exercise plan-meta wiring; they don't need
 // real contract validation, so we cast the fixture's typed contract JSON.
@@ -12,7 +13,7 @@ const sqlContract = contractJson as unknown as Contract;
 const stubBase = {
   operations: {},
   codecs: {},
-  queryOperations: { entries: () => ({}) },
+  queryOperations: { entries: () => testOperations },
   types: {},
   applyMutationDefaults: () => [],
 };

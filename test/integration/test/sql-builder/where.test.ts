@@ -62,11 +62,11 @@ describe('integration: WHERE', { timeout: timeouts.databaseOperation }, () => {
     expect(rows[0]!.name).toBe('Alice');
   });
 
-  it('ne(col, null) produces IS NOT NULL', async () => {
+  it('neq(col, null) produces IS NOT NULL', async () => {
     const rows = await runtime().execute(
       db()
         .users.select('id', 'name')
-        .where((f, fns) => fns.ne(f.invited_by_id, null))
+        .where((f, fns) => fns.neq(f.invited_by_id, null))
         .orderBy('id')
         .build(),
     );

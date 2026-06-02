@@ -622,8 +622,8 @@ export default class M extends Migration {
     return [
       this.dataTransform(endContract, 'normalize-user-email', {
         invariantId: 'normalize-user-email',
-        check: () => db.user.select('id').where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')).limit(1),
-        run: () => db.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')),
+        check: () => db.user.select('id').where((f, fns) => fns.neq(f.email, '${NORMALIZED_EMAIL}')).limit(1),
+        run: () => db.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.neq(f.email, '${NORMALIZED_EMAIL}')),
       }),
     ];
   }
@@ -771,8 +771,8 @@ export default class M extends Migration {
     return [
       this.dataTransform(endContract, '${SELF_EDGE_INVARIANT}', {
         invariantId: '${SELF_EDGE_INVARIANT}',
-        check: () => db.user.select('id').where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')).limit(1),
-        run: () => db.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')),
+        check: () => db.user.select('id').where((f, fns) => fns.neq(f.email, '${NORMALIZED_EMAIL}')).limit(1),
+        run: () => db.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.neq(f.email, '${NORMALIZED_EMAIL}')),
       }),
     ];
   }
