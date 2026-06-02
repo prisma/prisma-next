@@ -135,6 +135,40 @@ describe('renderMigrationGraphTree', () => {
     );
   });
 
+  it('renders the node marker when a non-trunk node lands a multi-lane merge', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'A', 'init');
+    const alice = edge('A', 'B', 'alice');
+    const bob = edge('A', 'C', 'bob');
+    const mergeAlice = edge('B', 'D', 'merge_alice');
+    const mergeBob = edge('C', 'D', 'merge_bob');
+    const bobExtra = edge('C', 'E', 'bob_extra');
+    const promote = edge('D', 'E', 'promote');
+    const edges = [init, alice, bob, mergeAlice, mergeBob, bobExtra, promote];
+    const output = tree(edges);
+    expect(output).toBe(
+      [
+        '○   E',
+        '├─╮',
+        '│↑│   promote            D → E',
+        '│ │↑  bob_extra          C → E',
+        '○ │   D',
+        '├─┬─╮',
+        '│↑│ │   merge_alice      B → D',
+        '│ │ │↑  merge_bob        C → D',
+        '○ │ │   B',
+        '│↑│ │   alice            A → B',
+        '│ ├─╯',
+        '│ ○   C',
+        '│ │↑  bob                A → C',
+        '├─╯',
+        '○   A',
+        '│↑  init                 ∅       → A',
+        '∅',
+      ].join('\n'),
+    );
+    expect(treeAscii(edges)).toContain('| *   C');
+  });
+
   it('renders a diamond per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');

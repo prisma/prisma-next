@@ -630,14 +630,20 @@ export function renderMigrationGraphTree(
         renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
       )
       .join('');
-    const prevRow = model.rows[rowIndex - 1];
     let laneSpan = row.cells.length;
     if (row.kind === 'node') {
       const contractHash = row.contractHash ?? EMPTY_CONTRACT_HASH;
-      if (prevRow?.kind === 'merge-connector' || contractHash === EMPTY_CONTRACT_HASH) {
+      if (contractHash === EMPTY_CONTRACT_HASH) {
         laneSpan = 1;
       } else {
-        laneSpan = row.cells.length;
+        let lastActiveColumn = -1;
+        for (let column = row.cells.length - 1; column >= 0; column--) {
+          if (row.cells[column]?.kind !== 'empty') {
+            lastActiveColumn = column;
+            break;
+          }
+        }
+        laneSpan = lastActiveColumn >= 0 ? lastActiveColumn + 1 : 1;
       }
     }
     const labelColumn =
