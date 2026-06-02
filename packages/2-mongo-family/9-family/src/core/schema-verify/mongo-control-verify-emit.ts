@@ -4,7 +4,7 @@ import type {
   SchemaVerificationNode,
   VerifierOutcome,
 } from '@prisma-next/framework-components/control';
-import { verifierDisposition } from '@prisma-next/framework-components/control';
+import { verifierDisposition } from './verifier-disposition';
 
 /**
  * Reconciles a control-policy disposition with the Mongo family's strict-mode

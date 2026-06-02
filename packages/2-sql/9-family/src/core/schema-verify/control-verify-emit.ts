@@ -4,7 +4,7 @@ import type {
   SchemaVerificationNode,
   VerifierOutcome,
 } from '@prisma-next/framework-components/control';
-import { verifierDisposition } from '@prisma-next/framework-components/control';
+import { verifierDisposition } from './verifier-disposition';
 
 /**
  * Grades `issue` under `controlPolicy` and, unless suppressed, pushes both the

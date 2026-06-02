@@ -16,7 +16,6 @@ import type {
   VerificationStatus,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { verifierDisposition } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
@@ -33,6 +32,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import type { CodecControlHooks } from '../migrations/types';
 import { emitIssueAndNodeUnderControlPolicy } from './control-verify-emit';
+import { verifierDisposition } from './verifier-disposition';
 import {
   arraysEqual,
   computeCounts,

@@ -1,68 +1,59 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import type { SchemaIssue, SchemaVerificationNode } from './control-result-types';
+import type { SchemaVerificationNode } from './control-result-types';
 
 export type VerificationStatus = SchemaVerificationNode['status'];
 
 export type VerifierOutcome = VerificationStatus | 'suppress';
 
+/**
+ * Target-neutral classification of a verifier finding, abstracted away from any
+ * one storage model's vocabulary. Each family classifies its own concrete issue
+ * kinds into these categories; the framework only grades the category against a
+ * control policy.
+ *
+ * - `declaredMissing` — a declared object/element is absent from the database.
+ * - `declaredIncompatible` — a declared object/element exists but its shape diverges.
+ * - `valueDrift` — the value set of an existing type drifted (e.g. enum values).
+ * - `extraNestedElement` — an undeclared element nested inside a declared object
+ *   (a SQL column, a document field).
+ * - `extraAuxiliary` — an undeclared auxiliary attached to a declared object
+ *   (a SQL constraint/index, a Mongo index/validator).
+ * - `extraTopLevelObject` — an undeclared top-level object (a SQL table, a
+ *   Mongo collection).
+ */
 export type VerifierIssueCategory =
   | 'declaredMissing'
   | 'declaredIncompatible'
-  | 'typeValueDrift'
-  | 'extraColumn'
-  | 'extraConstraint'
-  | 'extraTable';
+  | 'valueDrift'
+  | 'extraNestedElement'
+  | 'extraAuxiliary'
+  | 'extraTopLevelObject';
 
-export function classifyVerifierIssueKind(kind: SchemaIssue['kind']): VerifierIssueCategory {
-  switch (kind) {
-    case 'extra_column':
-      return 'extraColumn';
-    case 'extra_primary_key':
-    case 'extra_foreign_key':
-    case 'extra_unique_constraint':
-    case 'extra_index':
-    case 'extra_validator':
-    case 'extra_default':
-      return 'extraConstraint';
-    case 'extra_table':
-      return 'extraTable';
-    case 'missing_schema':
-    case 'missing_table':
-    case 'missing_column':
-    case 'type_missing':
-    case 'default_missing':
-      return 'declaredMissing';
-    case 'type_values_mismatch':
-    case 'enum_values_changed':
-      return 'typeValueDrift';
-    case 'type_mismatch':
-    case 'nullability_mismatch':
-    case 'primary_key_mismatch':
-    case 'foreign_key_mismatch':
-    case 'unique_constraint_mismatch':
-    case 'index_mismatch':
-    case 'default_mismatch':
-      return 'declaredIncompatible';
-  }
-}
-
-export function verifierDisposition(
+/**
+ * Grades a target-neutral issue category against a control policy.
+ *
+ * - `observed` warns on everything.
+ * - `tolerated` suppresses only an extra nested element (everything else fails).
+ * - `external` suppresses every extra category and value drift (existence and
+ *   declared-shape divergences still fail).
+ * - `managed` (and any other) fails.
+ */
+export function dispositionForCategory(
   controlPolicy: ControlPolicy,
-  issueKind: SchemaIssue['kind'],
+  category: VerifierIssueCategory,
 ): VerifierOutcome {
   if (controlPolicy === 'observed') {
     return 'warn';
   }
-  const category = classifyVerifierIssueKind(issueKind);
-  if (controlPolicy === 'tolerated' && category === 'extraColumn') {
+  if (controlPolicy === 'tolerated' && category === 'extraNestedElement') {
     return 'suppress';
   }
   if (controlPolicy === 'external') {
     if (
-      category === 'extraColumn' ||
-      category === 'extraConstraint' ||
-      category === 'extraTable' ||
-      category === 'typeValueDrift'
+      category === 'extraNestedElement' ||
+      category === 'extraAuxiliary' ||
+      category === 'extraTopLevelObject' ||
+      category === 'valueDrift'
     ) {
       return 'suppress';
     }

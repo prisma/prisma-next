@@ -111,10 +111,7 @@ export type {
   VerifierIssueCategory,
   VerifierOutcome,
 } from '../control/verifier-disposition';
-export {
-  classifyVerifierIssueKind,
-  verifierDisposition,
-} from '../control/verifier-disposition';
+export { dispositionForCategory } from '../control/verifier-disposition';
 export type {
   ControlMutationDefaultEntry,
   ControlMutationDefaultRegistry,
