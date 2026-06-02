@@ -27,7 +27,6 @@
     "@prisma-next/sql-runtime": "workspace:0.12.0",
     "@prisma-next/sql-schema-ir": "workspace:0.12.0",
     "@prisma-next/utils": "workspace:0.12.0",
-    "@prisma-next/sql-builder": "workspace:0.11.0",
     "arktype": "^2.2.0"
   },
   "devDependencies": {
