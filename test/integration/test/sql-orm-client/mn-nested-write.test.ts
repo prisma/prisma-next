@@ -14,6 +14,7 @@
 //   2. Explicit .select() used in most tests.
 //   3. At least one implicit/default-selection readback.
 
+import type { Char } from '@prisma-next/target-postgres/codec-types';
 import { describe, expect, it } from 'vitest';
 import {
   createReturningUsersCollection,
@@ -22,10 +23,10 @@ import {
 } from './integration-helpers';
 import { seedRoles, seedTags, seedUserRoles, seedUsers, seedUserTags } from './runtime-helpers';
 
-const TAG_RUST = 'tag-rust';
-const TAG_TS = 'tag-typescript';
-const ROLE_ADMIN = 'role-admin';
-const ROLE_EDITOR = 'role-editor';
+const TAG_RUST = 'tag-rust' as Char<36>;
+const TAG_TS = 'tag-typescript' as Char<36>;
+const ROLE_ADMIN = 'role-admin' as Char<36>;
+const ROLE_EDITOR = 'role-editor' as Char<36>;
 
 describe('integration/mn-nested-write', () => {
   // ===========================================================================
