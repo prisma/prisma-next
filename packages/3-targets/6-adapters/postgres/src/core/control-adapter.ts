@@ -15,6 +15,7 @@ import type {
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
+import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
   PrimaryKey,
   SqlColumnIR,
@@ -26,8 +27,8 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import {
-  buildControlTableBootstrapAsts,
-  buildSignMarkerBootstrapAsts,
+  buildControlTableBootstrapQueries,
+  buildSignMarkerBootstrapQueries,
 } from '@prisma-next/target-postgres/contract-free';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
@@ -50,7 +51,7 @@ import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
 function isPostgresDdlNode(node: AnyQueryAst | DdlNode): node is PostgresDdlNode {
-  return node.kind === 'create-table' || node.kind === 'create-schema';
+  return isDdlNode(node);
 }
 
 const POSTGRES_MARKER_TABLE = 'prisma_contract.marker';
@@ -110,12 +111,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly resolveExistingEnumValuesForContract = (contract: Contract<SqlStorage>) =>
     createResolveExistingEnumValues(contract.storage);
 
-  bootstrapControlTableAsts(): readonly DdlNode[] {
-    return buildControlTableBootstrapAsts();
+  bootstrapControlTableQueries(): readonly DdlNode[] {
+    return buildControlTableBootstrapQueries();
   }
 
-  bootstrapSignMarkerAsts(): readonly DdlNode[] {
-    return buildSignMarkerBootstrapAsts();
+  bootstrapSignMarkerQueries(): readonly DdlNode[] {
+    return buildSignMarkerBootstrapQueries();
   }
 
   /**

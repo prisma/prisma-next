@@ -12,6 +12,7 @@ import type {
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
+import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
   PrimaryKey,
   SqlColumnIR,
@@ -23,8 +24,8 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import {
-  buildControlTableBootstrapAsts,
-  buildSignMarkerBootstrapAsts,
+  buildControlTableBootstrapQueries,
+  buildSignMarkerBootstrapQueries,
 } from '@prisma-next/target-sqlite/contract-free';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
@@ -35,7 +36,7 @@ import { renderLoweredDdl } from './ddl-renderer';
 import type { SqliteContract } from './types';
 
 function isSqliteDdlNode(node: AnyQueryAst | DdlNode): node is SqliteDdlNode {
-  return node.kind === 'create-table';
+  return isDdlNode(node);
 }
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';
@@ -112,12 +113,12 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   readonly normalizeDefault = parseSqliteDefault;
   readonly normalizeNativeType = normalizeSqliteNativeType;
 
-  bootstrapControlTableAsts(): readonly DdlNode[] {
-    return buildControlTableBootstrapAsts();
+  bootstrapControlTableQueries(): readonly DdlNode[] {
+    return buildControlTableBootstrapQueries();
   }
 
-  bootstrapSignMarkerAsts(): readonly DdlNode[] {
-    return buildSignMarkerBootstrapAsts();
+  bootstrapSignMarkerQueries(): readonly DdlNode[] {
+    return buildSignMarkerBootstrapQueries();
   }
 
   /**

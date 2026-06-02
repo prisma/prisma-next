@@ -10,6 +10,7 @@ import type {
   RawSqlLiteral,
   SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
+import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
@@ -19,7 +20,7 @@ import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
 function isPostgresDdlNode(node: AnyQueryAst | DdlNode): node is PostgresDdlNode {
-  return node.kind === 'create-table' || node.kind === 'create-schema';
+  return isDdlNode(node);
 }
 
 const defaultCapabilities = Object.freeze({

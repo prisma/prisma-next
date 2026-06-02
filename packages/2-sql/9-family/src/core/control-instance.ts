@@ -240,9 +240,9 @@ export interface SqlControlFamilyInstance
 
   lowerAst(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
 
-  bootstrapControlTableAsts(): readonly DdlNode[];
+  bootstrapControlTableQueries(): readonly DdlNode[];
 
-  bootstrapSignMarkerAsts(): readonly DdlNode[];
+  bootstrapSignMarkerQueries(): readonly DdlNode[];
 
   toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview;
 }
@@ -564,8 +564,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       const controlAdapter = getControlAdapter();
       const lowererContext = { contract };
-      for (const ast of controlAdapter.bootstrapSignMarkerAsts()) {
-        const lowered = controlAdapter.lower(ast, lowererContext);
+      for (const query of controlAdapter.bootstrapSignMarkerQueries()) {
+        const lowered = controlAdapter.lower(query, lowererContext);
         await driver.query(lowered.sql, lowered.params);
       }
 
@@ -671,12 +671,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return getControlAdapter().lower(ast, context);
     },
 
-    bootstrapControlTableAsts(): readonly DdlNode[] {
-      return getControlAdapter().bootstrapControlTableAsts();
+    bootstrapControlTableQueries(): readonly DdlNode[] {
+      return getControlAdapter().bootstrapControlTableQueries();
     },
 
-    bootstrapSignMarkerAsts(): readonly DdlNode[] {
-      return getControlAdapter().bootstrapSignMarkerAsts();
+    bootstrapSignMarkerQueries(): readonly DdlNode[] {
+      return getControlAdapter().bootstrapSignMarkerQueries();
     },
 
     toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {

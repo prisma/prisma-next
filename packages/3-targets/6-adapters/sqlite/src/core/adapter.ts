@@ -33,6 +33,7 @@ import type {
   UpdateAst,
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
@@ -41,7 +42,7 @@ import { renderLoweredDdl } from './ddl-renderer';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
 function isSqliteDdlNode(node: AnyQueryAst | DdlNode): node is SqliteDdlNode {
-  return node.kind === 'create-table';
+  return isDdlNode(node);
 }
 
 const defaultCapabilities = Object.freeze({

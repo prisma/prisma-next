@@ -1,5 +1,6 @@
 import type { ColumnDefault, ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import { isColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { DdlColumn } from '../ast/ddl-types';
 
 export interface DdlColumnOptions {
@@ -23,8 +24,8 @@ export function col(name: string, type: string, options?: DdlColumnOptions): Ddl
   return Object.freeze({
     name,
     type,
-    ...(options?.notNull ? { notNull: true } : {}),
-    ...(options?.primaryKey ? { primaryKey: true } : {}),
-    ...(options?.default !== undefined ? { default: options.default } : {}),
+    ...ifDefined('notNull', options?.notNull),
+    ...ifDefined('primaryKey', options?.primaryKey),
+    ...ifDefined('default', options?.default),
   });
 }

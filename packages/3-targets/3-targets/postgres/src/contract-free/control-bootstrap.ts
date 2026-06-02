@@ -43,10 +43,10 @@ const ledgerTable = createTable({
 
 const controlSchema = createSchema({ schema: 'prisma_contract', ifNotExists: true });
 
-export function buildSignMarkerBootstrapAsts(): readonly DdlNode[] {
+export function buildSignMarkerBootstrapQueries(): readonly DdlNode[] {
   return [controlSchema, markerTable];
 }
 
-export function buildControlTableBootstrapAsts(): readonly DdlNode[] {
+export function buildControlTableBootstrapQueries(): readonly DdlNode[] {
   return [controlSchema, markerTable, ledgerTable];
 }

@@ -292,18 +292,18 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     contract: Contract<SqlStorage>,
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     const lowererContext = { contract };
-    const bootstrapAsts = this.family.bootstrapControlTableAsts();
-    const [schemaAst, ...tableAsts] = bootstrapAsts;
-    if (schemaAst === undefined) {
+    const bootstrapQueries = this.family.bootstrapControlTableQueries();
+    const [schemaQuery, ...tableQueries] = bootstrapQueries;
+    if (schemaQuery === undefined) {
       throw new Error('Postgres control-table bootstrap must include CREATE SCHEMA');
     }
-    await this.executeStatement(driver, this.family.lowerAst(schemaAst, lowererContext));
+    await this.executeStatement(driver, this.family.lowerAst(schemaQuery, lowererContext));
     const legacyDetection = await this.detectLegacyMarkerShape(driver);
     if (!legacyDetection.ok) {
       return legacyDetection;
     }
-    for (const ast of tableAsts) {
-      await this.executeStatement(driver, this.family.lowerAst(ast, lowererContext));
+    for (const query of tableQueries) {
+      await this.executeStatement(driver, this.family.lowerAst(query, lowererContext));
     }
     return okVoid();
   }

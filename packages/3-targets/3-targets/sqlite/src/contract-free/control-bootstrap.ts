@@ -39,10 +39,10 @@ const ledgerTable = createTable({
   columns: ledgerColumns,
 });
 
-export function buildSignMarkerBootstrapAsts(): readonly DdlNode[] {
+export function buildSignMarkerBootstrapQueries(): readonly DdlNode[] {
   return [markerTable];
 }
 
-export function buildControlTableBootstrapAsts(): readonly DdlNode[] {
+export function buildControlTableBootstrapQueries(): readonly DdlNode[] {
   return [markerTable, ledgerTable];
 }

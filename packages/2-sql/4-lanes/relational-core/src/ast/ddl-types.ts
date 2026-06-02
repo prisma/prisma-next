@@ -12,6 +12,16 @@ export interface DdlColumn {
 export abstract class DdlNode {
   abstract readonly kind: string;
 
+  /**
+   * Structural brand: every DDL node answers `true`. Lets {@link isDdlNode}
+   * recognise any `DdlNode` subclass — including target-contributed kinds —
+   * without a central kind registry that subclasses would have to register
+   * into.
+   */
+  isDdlNode(): true {
+    return true;
+  }
+
   protected freeze(): void {
     Object.freeze(this);
   }
@@ -21,13 +31,11 @@ export abstract class DdlNode {
   }
 }
 
-export const ddlAstKinds: ReadonlySet<string> = new Set(['create-table', 'create-schema']);
-
-export function isAnyDdlNode(value: unknown): value is DdlNode {
+export function isDdlNode(value: unknown): value is DdlNode {
   return (
     typeof value === 'object' &&
     value !== null &&
-    'kind' in value &&
-    ddlAstKinds.has((value as { kind: string }).kind)
+    'isDdlNode' in value &&
+    typeof value.isDdlNode === 'function'
   );
 }

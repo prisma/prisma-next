@@ -312,8 +312,8 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       return legacyDetection;
     }
     const lowererContext = { contract };
-    for (const ast of this.family.bootstrapControlTableAsts()) {
-      await this.executeStatement(driver, this.family.lowerAst(ast, lowererContext));
+    for (const query of this.family.bootstrapControlTableQueries()) {
+      await this.executeStatement(driver, this.family.lowerAst(query, lowererContext));
     }
     return okVoid();
   }

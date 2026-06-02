@@ -113,16 +113,16 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ) => readonly string[] | null;
 
   /**
-   * Ordered DDL nodes that bootstrap marker/ledger control tables for migration
+   * Ordered DDL queries that bootstrap marker/ledger control tables for migration
    * runners. Postgres includes `CREATE SCHEMA`; SQLite does not.
    */
-  bootstrapControlTableAsts(): readonly DdlNode[];
+  bootstrapControlTableQueries(): readonly DdlNode[];
 
   /**
-   * Ordered DDL nodes that bootstrap the marker table (and Postgres schema) for
+   * Ordered DDL queries that bootstrap the marker table (and Postgres schema) for
    * `sign` — excludes the ledger table.
    */
-  bootstrapSignMarkerAsts(): readonly DdlNode[];
+  bootstrapSignMarkerQueries(): readonly DdlNode[];
 
   /**
    * Lower a SQL query AST into a target-flavored `{ sql, params }` payload.
