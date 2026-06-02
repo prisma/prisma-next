@@ -1,52 +1,52 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveControl } from '../src/control-policy';
+import { effectiveControlPolicy } from '../src/control-policy';
 
-describe('effectiveControl', () => {
+describe('effectiveControlPolicy', () => {
   describe('precedence: node → default → managed', () => {
     it('returns the node value when both node and default are set', () => {
-      expect(effectiveControl('tolerated', 'external')).toBe('tolerated');
+      expect(effectiveControlPolicy('tolerated', 'external')).toBe('tolerated');
     });
 
     it('returns the default value when node is undefined', () => {
-      expect(effectiveControl(undefined, 'external')).toBe('external');
+      expect(effectiveControlPolicy(undefined, 'external')).toBe('external');
     });
 
     it('returns managed when both are undefined', () => {
-      expect(effectiveControl(undefined, undefined)).toBe('managed');
+      expect(effectiveControlPolicy(undefined, undefined)).toBe('managed');
     });
   });
 
   describe('each policy value resolves through', () => {
     it('resolves managed via node', () => {
-      expect(effectiveControl('managed', undefined)).toBe('managed');
+      expect(effectiveControlPolicy('managed', undefined)).toBe('managed');
     });
 
     it('resolves tolerated via node', () => {
-      expect(effectiveControl('tolerated', undefined)).toBe('tolerated');
+      expect(effectiveControlPolicy('tolerated', undefined)).toBe('tolerated');
     });
 
     it('resolves external via node', () => {
-      expect(effectiveControl('external', undefined)).toBe('external');
+      expect(effectiveControlPolicy('external', undefined)).toBe('external');
     });
 
     it('resolves observed via node', () => {
-      expect(effectiveControl('observed', undefined)).toBe('observed');
+      expect(effectiveControlPolicy('observed', undefined)).toBe('observed');
     });
 
     it('resolves managed via default', () => {
-      expect(effectiveControl(undefined, 'managed')).toBe('managed');
+      expect(effectiveControlPolicy(undefined, 'managed')).toBe('managed');
     });
 
     it('resolves tolerated via default', () => {
-      expect(effectiveControl(undefined, 'tolerated')).toBe('tolerated');
+      expect(effectiveControlPolicy(undefined, 'tolerated')).toBe('tolerated');
     });
 
     it('resolves external via default', () => {
-      expect(effectiveControl(undefined, 'external')).toBe('external');
+      expect(effectiveControlPolicy(undefined, 'external')).toBe('external');
     });
 
     it('resolves observed via default', () => {
-      expect(effectiveControl(undefined, 'observed')).toBe('observed');
+      expect(effectiveControlPolicy(undefined, 'observed')).toBe('observed');
     });
   });
 });

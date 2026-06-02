@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { effectiveControl } from '@prisma-next/contract/types';
+import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import {
   SqlContractSerializerBase,
   type SqlEntityHydrationFactory,
@@ -236,10 +236,10 @@ describe('control-policy round-trip fidelity', () => {
     const enumEntry = ns.enum.Role;
 
     const def = reparsed.defaultControl;
-    expect(effectiveControl(table.control, def)).toBe('external');
-    expect(effectiveControl(idColumn.control, def)).toBe('observed');
-    expect(effectiveControl(emailColumn.control, def)).toBe('tolerated');
-    expect(effectiveControl(enumEntry.control, def)).toBe('managed');
+    expect(effectiveControlPolicy(table.control, def)).toBe('external');
+    expect(effectiveControlPolicy(idColumn.control, def)).toBe('observed');
+    expect(effectiveControlPolicy(emailColumn.control, def)).toBe('tolerated');
+    expect(effectiveControlPolicy(enumEntry.control, def)).toBe('managed');
 
     // Omit-when-default holds: the unset column never grows a control property.
     expect(emailColumn).not.toHaveProperty('control');

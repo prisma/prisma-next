@@ -1,4 +1,4 @@
-import { effectiveControl, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
+import { effectiveControlPolicy, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollationOptions,
@@ -231,8 +231,8 @@ describe('MongoTargetContractSerializer', () => {
 
       const collections = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].collections;
       const def = reparsed.defaultControl;
-      expect(effectiveControl(collections.items.control, def)).toBe('external');
-      expect(effectiveControl(collections.events.control, def)).toBe('tolerated');
+      expect(effectiveControlPolicy(collections.items.control, def)).toBe('external');
+      expect(effectiveControlPolicy(collections.events.control, def)).toBe('tolerated');
       expect(collections.events).not.toHaveProperty('control');
     });
 
