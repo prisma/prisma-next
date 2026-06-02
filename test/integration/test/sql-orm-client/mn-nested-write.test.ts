@@ -308,7 +308,10 @@ describe('integration/mn-nested-write', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
-            roles: (r) => r.create([{ id: ROLE_ADMIN, name: 'Admin' }]),
+            // The type gate forbids `create` on a required-payload junction at
+            // compile time; cast the arg to bypass it and exercise the runtime
+            // guard (defense-in-depth) against a real database.
+            roles: (r) => r.create([{ id: ROLE_ADMIN, name: 'Admin' }] as never),
           }),
         ).rejects.toThrow(/required column.*`level`/);
       });
@@ -333,7 +336,10 @@ describe('integration/mn-nested-write', () => {
             id: 1,
             name: 'Alice',
             email: 'alice@example.com',
-            roles: (r) => r.connect({ id: ROLE_ADMIN }),
+            // The type gate forbids `connect` on a required-payload junction at
+            // compile time; cast the arg to bypass it and exercise the runtime
+            // guard (defense-in-depth).
+            roles: (r) => r.connect({ id: ROLE_ADMIN } as never),
           }),
         ).rejects.toThrow(/required column.*`level`/);
       });
