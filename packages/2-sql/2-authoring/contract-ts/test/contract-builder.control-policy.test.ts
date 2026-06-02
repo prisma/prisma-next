@@ -1,5 +1,5 @@
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
-import { effectiveControl } from '@prisma-next/contract/types';
+import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
@@ -29,7 +29,7 @@ function tableEffectiveControl(
   tableControl: ControlPolicy | undefined,
   defaultControl: ControlPolicy | undefined,
 ): ControlPolicy {
-  return effectiveControl(tableControl, defaultControl);
+  return effectiveControlPolicy(tableControl, defaultControl);
 }
 
 describe('defineContract defaultControl', () => {
