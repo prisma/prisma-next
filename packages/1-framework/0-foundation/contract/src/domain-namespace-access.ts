@@ -5,14 +5,17 @@ import type { ContractModelBase, ContractValueObject } from './domain-types';
 
 /**
  * Models map for the contract's default domain namespace (runtime resolution).
+ * When `defaultNamespaceId` is omitted, the default namespace is inferred.
  */
 export function domainModelsAtDefaultNamespace<TModels extends Record<string, ContractModelBase>>(
   domain: ApplicationDomain<TModels>,
-  defaultNamespaceId: string,
+  defaultNamespaceId?: string,
 ): TModels {
-  const preferredNamespace = domain.namespaces[defaultNamespaceId];
-  if (preferredNamespace !== undefined) {
-    return preferredNamespace.models;
+  if (defaultNamespaceId !== undefined) {
+    const preferredNamespace = domain.namespaces[defaultNamespaceId];
+    if (preferredNamespace !== undefined) {
+      return preferredNamespace.models;
+    }
   }
   const namespaceId = inferDefaultDomainNamespaceId(domain);
   const domainNamespace = domain.namespaces[namespaceId];
@@ -26,16 +29,19 @@ export function domainModelsAtDefaultNamespace<TModels extends Record<string, Co
 
 /**
  * Value objects for the contract's default domain namespace, when present.
+ * When `defaultNamespaceId` is omitted, the default namespace is inferred.
  */
 export function domainValueObjectsAtDefaultNamespace<
   TModels extends Record<string, ContractModelBase>,
 >(
   domain: ApplicationDomain<TModels>,
-  defaultNamespaceId: string,
+  defaultNamespaceId?: string,
 ): Record<string, ContractValueObject> | undefined {
-  const preferredNamespace = domain.namespaces[defaultNamespaceId];
-  if (preferredNamespace !== undefined) {
-    return preferredNamespace.valueObjects;
+  if (defaultNamespaceId !== undefined) {
+    const preferredNamespace = domain.namespaces[defaultNamespaceId];
+    if (preferredNamespace !== undefined) {
+      return preferredNamespace.valueObjects;
+    }
   }
   const namespaceId = inferDefaultDomainNamespaceId(domain);
   return domain.namespaces[namespaceId]?.valueObjects;

@@ -2,8 +2,6 @@ import {
   type Contract,
   type ContractField,
   type ContractValueObject,
-  defaultDomainNamespaceIdForMongo,
-  defaultDomainNamespaceIdForSqlTarget,
   domainModelsAtDefaultNamespace,
   domainValueObjectsAtDefaultNamespace,
   UNBOUND_DOMAIN_NAMESPACE_ID,
@@ -88,18 +86,12 @@ function interpretSqlPsl(schema: string) {
   });
 }
 
-function defaultNamespaceIdFor(contract: Contract): string {
-  return contract.target === 'mongo'
-    ? defaultDomainNamespaceIdForMongo()
-    : defaultDomainNamespaceIdForSqlTarget(contract.target);
-}
-
 function modelsAtDefaultNamespace(contract: Contract) {
-  return domainModelsAtDefaultNamespace(contract.domain, defaultNamespaceIdFor(contract));
+  return domainModelsAtDefaultNamespace(contract.domain);
 }
 
 function valueObjectsAtDefaultNamespace(contract: Contract) {
-  return domainValueObjectsAtDefaultNamespace(contract.domain, defaultNamespaceIdFor(contract));
+  return domainValueObjectsAtDefaultNamespace(contract.domain);
 }
 
 describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {

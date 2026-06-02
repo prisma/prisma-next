@@ -2,7 +2,6 @@ import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
   entry: [
-    'src/exports/default-namespace.ts',
     'src/exports/resolve-storage-table.ts',
     'src/exports/types.ts',
     'src/exports/validators.ts',

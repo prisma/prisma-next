@@ -1,7 +1,4 @@
-import {
-  defaultDomainNamespaceIdForSqlTarget,
-  domainModelsAtDefaultNamespace,
-} from '@prisma-next/contract/types';
+import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
 import { resolvePolymorphismInfo } from '../src/collection-contract';
@@ -212,10 +209,10 @@ describe('mapPolymorphicRow()', () => {
   it('preserves identity-mapped fields (no explicit column mapping)', () => {
     const contract = buildMixedPolyContract();
     // Remove explicit column mappings to create identity-mapped fields
-    const models = domainModelsAtDefaultNamespace(
-      contract.domain,
-      defaultDomainNamespaceIdForSqlTarget(contract.target),
-    ) as unknown as Record<string, Record<string, unknown>>;
+    const models = domainModelsAtDefaultNamespace(contract.domain) as unknown as Record<
+      string,
+      Record<string, unknown>
+    >;
     models['Task']!['storage'] = {
       table: 'tasks',
       fields: { id: {}, title: {}, type: {} },

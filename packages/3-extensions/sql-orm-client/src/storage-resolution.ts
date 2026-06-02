@@ -1,10 +1,8 @@
 import {
   type Contract,
-  defaultDomainNamespaceIdForSqlTarget,
   type ResolvedDomainModel,
   resolveDomainModel,
 } from '@prisma-next/contract/types';
-import { defaultStorageNamespaceIdForSqlTarget } from '@prisma-next/sql-contract/default-namespace';
 import {
   type ResolvedStorageTable,
   resolveStorageTable,
@@ -18,9 +16,7 @@ export function resolveTableForContract(
   contract: Contract<SqlStorage>,
   tableName: string,
 ): ResolvedStorageTable | undefined {
-  return resolveStorageTable(contract.storage, tableName, {
-    defaultNamespaceId: defaultStorageNamespaceIdForSqlTarget(contract.target),
-  });
+  return resolveStorageTable(contract.storage, tableName);
 }
 
 export function requireStorageTableForContract(
@@ -45,9 +41,7 @@ export function resolveDomainModelForContract(
   contract: Contract<SqlStorage>,
   modelName: string,
 ): ResolvedDomainModel | undefined {
-  return resolveDomainModel(contract.domain, modelName, {
-    defaultNamespaceId: defaultDomainNamespaceIdForSqlTarget(contract.target),
-  });
+  return resolveDomainModel(contract.domain, modelName);
 }
 
 export function domainModelNames(contract: Contract<SqlStorage>): string[] {

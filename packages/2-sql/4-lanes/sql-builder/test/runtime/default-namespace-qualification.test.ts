@@ -1,4 +1,3 @@
-import { POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID } from '@prisma-next/sql-contract/default-namespace';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import type { TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -31,7 +30,7 @@ function db() {
 describe('default-namespace table resolution', () => {
   it('stamps the public namespace on TableSource from the flat db proxy', () => {
     const ast = db().users.buildAst() as TableSource;
-    expect(ast.namespaceId).toBe(POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID);
+    expect(ast.namespaceId).toBe('public');
   });
 
   it('carries the namespace coordinate through select, insert, update, and delete plans', () => {

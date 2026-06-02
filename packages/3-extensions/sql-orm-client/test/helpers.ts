@@ -1,6 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import {
-  defaultDomainNamespaceIdForSqlTarget,
   domainModelsAtDefaultNamespace,
   type Contract as FrameworkContract,
 } from '@prisma-next/contract/types';
@@ -69,10 +68,7 @@ export function withPatchedDomainModels<T extends FrameworkContract<SqlStorage>>
   patch: (models: Record<string, unknown>) => Record<string, unknown>,
 ): T {
   const [namespaceId, namespace] = Object.entries(contract.domain.namespaces)[0]!;
-  const models = domainModelsAtDefaultNamespace(
-    contract.domain,
-    defaultDomainNamespaceIdForSqlTarget(contract.target),
-  );
+  const models = domainModelsAtDefaultNamespace(contract.domain);
   return {
     ...contract,
     domain: {

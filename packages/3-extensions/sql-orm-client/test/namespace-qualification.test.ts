@@ -1,7 +1,6 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { Contract, ContractModelBase } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID } from '@prisma-next/sql-contract/default-namespace';
 import type { SqlStorage as SqlStorageType } from '@prisma-next/sql-contract/types';
 import { SqlStorage, type SqlStorageInput, StorageTable } from '@prisma-next/sql-contract/types';
 import type { TableSource } from '@prisma-next/sql-relational-core/ast';
@@ -13,6 +12,8 @@ import type { PostgresContract } from '../../../3-targets/6-adapters/postgres/sr
 import { compileDeleteCount, compileInsertReturning, compileSelect } from '../src/query-plan';
 import { resolveDomainModelForContract } from '../src/storage-resolution';
 import { emptyState } from '../src/types';
+
+const PUBLIC_NAMESPACE_ID = 'public';
 
 const userModel = {
   fields: {
@@ -43,14 +44,14 @@ const publicPostgresContract = {
   storage: new SqlStorage({
     storageHash: 'sha256:test-core-public-orm',
     namespaces: {
-      [POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID]: new PostgresSchema({
-        id: POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID,
+      [PUBLIC_NAMESPACE_ID]: new PostgresSchema({
+        id: PUBLIC_NAMESPACE_ID,
         tables: { users: new StorageTable(usersTableInput) },
       }),
     },
   } as unknown as SqlStorageInput<'sha256:test-core-public-orm'>),
   domain: applicationDomainOf({
-    namespaceId: POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID,
+    namespaceId: PUBLIC_NAMESPACE_ID,
     models: { User: userModel },
   }),
 } as unknown as PostgresContract;

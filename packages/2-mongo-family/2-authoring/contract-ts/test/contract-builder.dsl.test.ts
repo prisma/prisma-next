@@ -1,6 +1,5 @@
 import {
   crossRef,
-  defaultDomainNamespaceIdForMongo,
   domainModelsAtDefaultNamespace,
   domainValueObjectsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
@@ -68,9 +67,7 @@ describe('mongo contract builder', () => {
       users: { kind: 'mongo-collection' },
       posts: { kind: 'mongo-collection' },
     });
-    expect(
-      domainModelsAtDefaultNamespace(contract.domain, defaultDomainNamespaceIdForMongo())['Post'],
-    ).toEqual({
+    expect(domainModelsAtDefaultNamespace(contract.domain)['Post']).toEqual({
       storage: {
         collection: 'posts',
       },
@@ -153,9 +150,7 @@ describe('mongo contract builder', () => {
     expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
       tasks: { kind: 'mongo-collection' },
     });
-    expect(
-      domainValueObjectsAtDefaultNamespace(contract.domain, defaultDomainNamespaceIdForMongo()),
-    ).toEqual({
+    expect(domainValueObjectsAtDefaultNamespace(contract.domain)).toEqual({
       Address: {
         fields: {
           street: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
@@ -163,10 +158,7 @@ describe('mongo contract builder', () => {
         },
       },
     });
-    const models = domainModelsAtDefaultNamespace(
-      contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    );
+    const models = domainModelsAtDefaultNamespace(contract.domain);
     expect(models['Task']!.storage).toEqual({
       collection: 'tasks',
       relations: {
@@ -234,10 +226,7 @@ describe('mongo contract builder', () => {
       models: { Metric },
     });
 
-    expect(
-      domainModelsAtDefaultNamespace(contract.domain, defaultDomainNamespaceIdForMongo())['Metric']
-        ?.fields['value'],
-    ).toEqual({
+    expect(domainModelsAtDefaultNamespace(contract.domain)['Metric']?.fields['value']).toEqual({
       type: { kind: 'scalar', codecId: 'mongo/double@1' },
       nullable: false,
     });

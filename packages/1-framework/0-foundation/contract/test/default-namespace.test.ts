@@ -1,26 +1,29 @@
 import { describe, expect, it } from 'vitest';
+import { DomainNamespaceResolutionError } from '../src/contract-validation-error';
 import {
-  defaultDomainNamespaceIdForMongo,
-  defaultDomainNamespaceIdForSqlTarget,
-  POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
+  inferDefaultDomainNamespaceId,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '../src/default-namespace';
 
-describe('defaultDomainNamespaceIdForSqlTarget', () => {
-  it('uses public for postgres', () => {
-    expect(defaultDomainNamespaceIdForSqlTarget('postgres')).toBe(
-      POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
-    );
-    expect(POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID).toBe('public');
-  });
-
-  it('uses the unbound sentinel for non-postgres SQL targets', () => {
-    expect(defaultDomainNamespaceIdForSqlTarget('sqlite')).toBe(UNBOUND_DOMAIN_NAMESPACE_ID);
+describe('UNBOUND_DOMAIN_NAMESPACE_ID', () => {
+  it('is the late-bound domain sentinel', () => {
+    expect(UNBOUND_DOMAIN_NAMESPACE_ID).toBe('__unbound__');
   });
 });
 
-describe('defaultDomainNamespaceIdForMongo', () => {
-  it('uses the unbound sentinel', () => {
-    expect(defaultDomainNamespaceIdForMongo()).toBe(UNBOUND_DOMAIN_NAMESPACE_ID);
+describe('inferDefaultDomainNamespaceId', () => {
+  it('throws when the domain declares no namespaces', () => {
+    expect(() => inferDefaultDomainNamespaceId({ namespaces: {} })).toThrow(
+      DomainNamespaceResolutionError,
+    );
+  });
+
+  it('returns the sole namespace when only one is declared', () => {
+    expect(inferDefaultDomainNamespaceId({ namespaces: { auth: {} } })).toBe('auth');
+  });
+
+  it('returns the first namespace by insertion order when several are declared', () => {
+    expect(inferDefaultDomainNamespaceId({ namespaces: { auth: {}, public: {} } })).toBe('auth');
+    expect(inferDefaultDomainNamespaceId({ namespaces: { public: {}, auth: {} } })).toBe('public');
   });
 });

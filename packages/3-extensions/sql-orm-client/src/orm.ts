@@ -1,8 +1,4 @@
-import {
-  type Contract,
-  defaultDomainNamespaceIdForSqlTarget,
-  domainModelsAtDefaultNamespace,
-} from '@prisma-next/contract/types';
+import { type Contract, domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from './collection';
@@ -121,10 +117,7 @@ function createCollectionRegistry<
     return registry;
   }
 
-  const models = domainModelsAtDefaultNamespace(
-    contract.domain,
-    defaultDomainNamespaceIdForSqlTarget(contract.target),
-  );
+  const models = domainModelsAtDefaultNamespace(contract.domain);
   for (const [key, collectionClass] of Object.entries(collections)) {
     if (!collectionClass) {
       continue;

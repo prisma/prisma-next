@@ -1,10 +1,6 @@
 import { sqlRuntimeFamilyDescriptor } from '../core/runtime-descriptor';
 
 export {
-  defaultDomainNamespaceIdForSqlTarget,
-  defaultStorageNamespaceIdForSqlTarget,
-  POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
-  POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID,
   type ResolveDomainModelOptions,
   type ResolvedDomainModel,
   type ResolvedStorageTable,

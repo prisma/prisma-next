@@ -28,7 +28,7 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
 
   return new Proxy({} as Db<C>, {
     get(_target, prop: string) {
-      const resolved = resolveTableForFlatName(context.contract.storage, prop, ctx.target);
+      const resolved = resolveTableForFlatName(context.contract.storage, prop);
       if (resolved) {
         return new TableProxyImpl(prop, resolved.table, prop, ctx, resolved.namespaceId);
       }

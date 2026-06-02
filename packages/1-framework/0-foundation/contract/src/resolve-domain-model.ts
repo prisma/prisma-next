@@ -7,25 +7,28 @@ export interface ResolvedDomainModel {
 }
 
 export interface ResolveDomainModelOptions {
-  readonly defaultNamespaceId: string;
+  readonly defaultNamespaceId?: string;
 }
 
 /**
  * Resolve a bare domain model name to its namespace coordinate and model IR.
- * Scans the default namespace first, then every other declared namespace.
+ * Scans the default namespace first (when given), then every other declared
+ * namespace.
  */
 export function resolveDomainModel(
   domain: ApplicationDomain,
   modelName: string,
-  options: ResolveDomainModelOptions,
+  options: ResolveDomainModelOptions = {},
 ): ResolvedDomainModel | undefined {
   const { defaultNamespaceId } = options;
   const namespaces = domain.namespaces;
 
-  const defaultNamespace = namespaces[defaultNamespaceId];
-  const defaultModel = defaultNamespace?.models[modelName];
-  if (defaultModel !== undefined) {
-    return { namespaceId: defaultNamespaceId, model: defaultModel };
+  if (defaultNamespaceId !== undefined) {
+    const defaultNamespace = namespaces[defaultNamespaceId];
+    const defaultModel = defaultNamespace?.models[modelName];
+    if (defaultModel !== undefined) {
+      return { namespaceId: defaultNamespaceId, model: defaultModel };
+    }
   }
 
   for (const namespaceId of Object.keys(namespaces)) {

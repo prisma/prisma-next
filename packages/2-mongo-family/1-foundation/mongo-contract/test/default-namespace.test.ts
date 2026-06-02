@@ -2,7 +2,6 @@ import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/default-names
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import {
-  defaultDomainNamespaceIdForMongo,
   defaultMongoDomainNamespaceId,
   defaultMongoStorageNamespaceId,
 } from '../src/default-namespace';
@@ -11,6 +10,5 @@ describe('mongo default namespace identifiers', () => {
   it('uses the unbound sentinel for storage and domain', () => {
     expect(defaultMongoStorageNamespaceId).toBe(UNBOUND_NAMESPACE_ID);
     expect(defaultMongoDomainNamespaceId).toBe(UNBOUND_DOMAIN_NAMESPACE_ID);
-    expect(defaultDomainNamespaceIdForMongo()).toBe(UNBOUND_DOMAIN_NAMESPACE_ID);
   });
 });

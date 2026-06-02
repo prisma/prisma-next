@@ -2,7 +2,6 @@ import {
   type Contract,
   CrossReferenceSchema,
   crossRef,
-  defaultDomainNamespaceIdForSqlTarget,
   domainModelsAtDefaultNamespace,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
@@ -74,9 +73,6 @@ describe('cross-reference shape round-trip', () => {
     expect(serialized.roots.users).toEqual(rootsCrossRef);
     const serializedModels = domainModelsAtDefaultNamespace(
       (serializer.deserializeContract(serialized) as Contract).domain,
-      defaultDomainNamespaceIdForSqlTarget(
-        (serializer.deserializeContract(serialized) as Contract).target,
-      ),
     );
     expect(serializedModels['User']?.relations?.['posts']?.to).toEqual(relationCrossRef);
     expect(serializedModels['Post']?.base).toEqual(baseCrossRef);

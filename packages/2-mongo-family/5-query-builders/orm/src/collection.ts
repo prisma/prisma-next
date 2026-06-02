@@ -2,7 +2,6 @@ import {
   type ContractField,
   type ContractReferenceRelation,
   type ContractValueObject,
-  defaultDomainNamespaceIdForMongo,
   domainModelsAtDefaultNamespace,
   domainValueObjectsAtDefaultNamespace,
   type PlanMeta,
@@ -173,10 +172,9 @@ class MongoCollectionImpl<
     this.#contract = contract;
     this.#modelName = modelName;
     this.#executor = executor;
-    const model = domainModelsAtDefaultNamespace(
-      contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    )[modelName] as MongoModelDefinition;
+    const model = domainModelsAtDefaultNamespace(contract.domain)[
+      modelName
+    ] as MongoModelDefinition;
     this.#collectionName = resolveCollectionName(model, modelName);
     this.#state = emptyCollectionState();
   }
@@ -184,10 +182,9 @@ class MongoCollectionImpl<
   variant<V extends VariantNames<TContract, ModelName>>(
     variantName: V,
   ): MongoCollection<TContract, ModelName, TIncludes, V> {
-    const model = domainModelsAtDefaultNamespace(
-      this.#contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    )[this.#modelName] as MongoModelDefinition | undefined;
+    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName] as
+      | MongoModelDefinition
+      | undefined;
     if (!model?.discriminator || !model.variants) {
       // No polymorphism metadata on this model — return unchanged. Cast required
       // because TS cannot verify TVariant (the current variant) is assignable to V.
@@ -229,10 +226,9 @@ class MongoCollectionImpl<
   include<K extends ReferenceRelationKeys<TContract, ModelName> & string>(
     relationName: K,
   ): MongoCollection<TContract, ModelName, TIncludes & Record<K, true>, TVariant> {
-    const model = domainModelsAtDefaultNamespace(
-      this.#contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    )[this.#modelName] as MongoModelDefinition;
+    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[
+      this.#modelName
+    ] as MongoModelDefinition;
     const relation = model.relations?.[relationName];
     if (!relation) {
       throw new Error(`Unknown relation "${relationName}" on model "${this.#modelName as string}"`);
@@ -257,10 +253,9 @@ class MongoCollectionImpl<
     }
 
     const targetModelName = ref.to.model;
-    const targetModel = domainModelsAtDefaultNamespace(
-      this.#contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    )[targetModelName] as MongoModelDefinition | undefined;
+    const targetModel = domainModelsAtDefaultNamespace(this.#contract.domain)[targetModelName] as
+      | MongoModelDefinition
+      | undefined;
     if (!targetModel) {
       throw new Error(`Target model "${targetModelName}" not found for relation "${relationName}"`);
     }
@@ -549,10 +544,9 @@ class MongoCollectionImpl<
   }
 
   #compile(): MongoQueryPlan<IncludedRow<TContract, ModelName, TIncludes>> {
-    const model = domainModelsAtDefaultNamespace(
-      this.#contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    )[this.#modelName] as MongoModelDefinition | undefined;
+    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName] as
+      | MongoModelDefinition
+      | undefined;
     if (!model) {
       throw new Error(`Unknown model: "${this.#modelName}".`);
     }
@@ -579,10 +573,9 @@ class MongoCollectionImpl<
   }
 
   #modelFields(): Record<string, ContractField> {
-    const model = domainModelsAtDefaultNamespace(
-      this.#contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    )[this.#modelName] as MongoModelDefinition | undefined;
+    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName] as
+      | MongoModelDefinition
+      | undefined;
     return model?.fields ?? {};
   }
 
@@ -606,10 +599,7 @@ class MongoCollectionImpl<
 
     if (field.type.kind === 'valueObject') {
       const voName = field.type.name;
-      const voDef = domainValueObjectsAtDefaultNamespace(
-        this.#contract.domain,
-        defaultDomainNamespaceIdForMongo(),
-      )?.[voName];
+      const voDef = domainValueObjectsAtDefaultNamespace(this.#contract.domain)?.[voName];
       if (!voDef || value === null) return new MongoParamRef(value);
 
       if (field.many && Array.isArray(value)) {
@@ -717,10 +707,7 @@ class MongoCollectionImpl<
       const raw = value.value;
       if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
         const voName = contractField.type.name;
-        const voDef = domainValueObjectsAtDefaultNamespace(
-          this.#contract.domain,
-          defaultDomainNamespaceIdForMongo(),
-        )?.[voName];
+        const voDef = domainValueObjectsAtDefaultNamespace(this.#contract.domain)?.[voName];
         if (voDef) {
           return this.#wrapValueObject(raw as Record<string, unknown>, voDef);
         }
@@ -738,10 +725,7 @@ class MongoCollectionImpl<
     for (let i = 1; i < parts.length; i++) {
       if (!currentField || currentField.type.kind !== 'valueObject') return value;
       const voName = currentField.type.name;
-      const voDef = domainValueObjectsAtDefaultNamespace(
-        this.#contract.domain,
-        defaultDomainNamespaceIdForMongo(),
-      )?.[voName];
+      const voDef = domainValueObjectsAtDefaultNamespace(this.#contract.domain)?.[voName];
       if (!voDef) return value;
       const partKey = parts[i];
       currentField = partKey ? voDef.fields[partKey] : undefined;
@@ -755,10 +739,7 @@ class MongoCollectionImpl<
       const raw = value.value;
       if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
         const voName = currentField.type.name;
-        const voDef = domainValueObjectsAtDefaultNamespace(
-          this.#contract.domain,
-          defaultDomainNamespaceIdForMongo(),
-        )?.[voName];
+        const voDef = domainValueObjectsAtDefaultNamespace(this.#contract.domain)?.[voName];
         if (voDef) {
           return this.#wrapValueObject(raw as Record<string, unknown>, voDef);
         }
@@ -814,10 +795,9 @@ class MongoCollectionImpl<
 
   #injectDiscriminator(data: Record<string, unknown>): Record<string, unknown> {
     if (!this.#variantName) return data;
-    const model = domainModelsAtDefaultNamespace(
-      this.#contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    )[this.#modelName] as MongoModelDefinition | undefined;
+    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName] as
+      | MongoModelDefinition
+      | undefined;
     if (!model?.discriminator || !model.variants) return data;
     const variantEntry = model.variants[this.#variantName];
     if (!variantEntry) return data;

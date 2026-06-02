@@ -7,10 +7,7 @@
  * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  */
 
-import {
-  defaultDomainNamespaceIdForSqlTarget,
-  domainModelsAtDefaultNamespace,
-} from '@prisma-next/contract/types';
+import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
@@ -37,10 +34,7 @@ describe('demo contract visualization DX', () => {
   it('validated contract exposes model storage field mappings', () => {
     const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
-    const models = domainModelsAtDefaultNamespace(
-      contract.domain,
-      defaultDomainNamespaceIdForSqlTarget(contract.target),
-    ) as Models;
+    const models = domainModelsAtDefaultNamespace(contract.domain) as Models;
     expect(models.User.storage.table).toBe('user');
     expect(models.User.storage.fields.email.column).toBe('email');
     expect(models.Post.storage.fields.userId.column).toBe('userId');
@@ -62,12 +56,7 @@ describe('demo contract visualization DX', () => {
   it('validated contract is traversable for render use-case', () => {
     const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
-    for (const [, model] of Object.entries(
-      domainModelsAtDefaultNamespace(
-        contract.domain,
-        defaultDomainNamespaceIdForSqlTarget(contract.target),
-      ),
-    )) {
+    for (const [, model] of Object.entries(domainModelsAtDefaultNamespace(contract.domain))) {
       const m = blindCast<
         Record<string, unknown>,
         'contract model entries are plain records in render traversal'

@@ -1,7 +1,4 @@
-import {
-  defaultDomainNamespaceIdForMongo,
-  domainModelsAtDefaultNamespace,
-} from '@prisma-next/contract/types';
+import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoModelDefinition,
@@ -151,10 +148,9 @@ export function createLookupFrom<
       const validRoots = Object.keys(contract.roots).join(', ');
       throw new Error(`lookup() unknown root: "${rootName}". Valid roots: ${validRoots}`);
     }
-    const model = domainModelsAtDefaultNamespace(
-      contract.domain,
-      defaultDomainNamespaceIdForMongo(),
-    )[modelName] as MongoModelDefinition | undefined;
+    const model = domainModelsAtDefaultNamespace(contract.domain)[modelName] as
+      | MongoModelDefinition
+      | undefined;
     const foreignCollection = model?.storage?.collection ?? rootName;
     return createLookupBuilder({
       rootName,
@@ -272,9 +268,9 @@ export function extractLookupResult(
         'Returning a hand-rolled options object is not supported.',
     );
   }
-  const model = domainModelsAtDefaultNamespace(contract.domain, defaultDomainNamespaceIdForMongo())[
-    result._model
-  ] as MongoModelDefinition | undefined;
+  const model = domainModelsAtDefaultNamespace(contract.domain)[result._model] as
+    | MongoModelDefinition
+    | undefined;
   const foreignCollection = model?.storage?.collection ?? result._root;
   return {
     foreignCollection,

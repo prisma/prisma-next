@@ -29,7 +29,6 @@ export type {
   RootModelName,
 } from '../contract-types';
 export {
-  defaultDomainNamespaceIdForMongo,
   defaultMongoDomainNamespaceId,
   defaultMongoStorageNamespaceId,
 } from '../default-namespace';

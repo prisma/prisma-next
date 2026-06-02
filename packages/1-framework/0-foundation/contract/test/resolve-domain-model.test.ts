@@ -1,6 +1,5 @@
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
-import { POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID } from '../src/default-namespace';
 import type { ApplicationDomain } from '../src/domain-envelope';
 import type { ContractModelBase } from '../src/domain-types';
 import { resolveDomainModel } from '../src/resolve-domain-model';
@@ -38,7 +37,7 @@ describe('resolveDomainModel', () => {
     });
 
     const resolved = resolveDomainModel(domain, 'User', {
-      defaultNamespaceId: POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
+      defaultNamespaceId: 'public',
     });
 
     expect(resolved).toEqual({ namespaceId: 'public', model: publicUser });
@@ -52,7 +51,7 @@ describe('resolveDomainModel', () => {
     });
 
     const resolved = resolveDomainModel(domain, 'User', {
-      defaultNamespaceId: POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
+      defaultNamespaceId: 'public',
     });
 
     expect(resolved).toEqual({ namespaceId: 'auth', model: authUser });
@@ -75,7 +74,7 @@ describe('resolveDomainModel', () => {
 
     expect(
       resolveDomainModel(domain, 'Missing', {
-        defaultNamespaceId: POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
+        defaultNamespaceId: 'public',
       }),
     ).toBeUndefined();
   });

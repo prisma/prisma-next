@@ -1,11 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
-import {
-  type Contract,
-  defaultDomainNamespaceIdForSqlTarget,
-  domainModelsAtDefaultNamespace,
-} from '@prisma-next/contract/types';
+import { type Contract, domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
@@ -139,12 +135,7 @@ describe('emptyContract', () => {
     if (!result.ok) return;
 
     const contract = result.value;
-    expect(
-      domainModelsAtDefaultNamespace(
-        contract.domain,
-        defaultDomainNamespaceIdForSqlTarget(contract.target),
-      ),
-    ).toEqual({});
+    expect(domainModelsAtDefaultNamespace(contract.domain)).toEqual({});
     expect(contract.targetFamily).toBe('sql');
     expect(contract.target).toBe('postgres');
     expect(contract.extensionPacks).toEqual({});

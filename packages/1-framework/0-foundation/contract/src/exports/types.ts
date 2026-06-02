@@ -7,12 +7,7 @@ export type {
 export { DomainNamespaceResolutionError } from '../contract-validation-error';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
-export {
-  defaultDomainNamespaceIdForMongo,
-  defaultDomainNamespaceIdForSqlTarget,
-  inferDefaultDomainNamespaceId,
-  POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID,
-} from '../default-namespace';
+export { inferDefaultDomainNamespaceId } from '../default-namespace';
 export type {
   ApplicationDomain,
   ApplicationDomainNamespace,

@@ -1,7 +1,4 @@
-import {
-  defaultDomainNamespaceIdForSqlTarget,
-  domainModelsAtDefaultNamespace,
-} from '@prisma-next/contract/types';
+import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../../src/exports/contract-builder';
 
@@ -20,12 +17,7 @@ describe('mongo defineContract wrap', () => {
     }));
     expect(result.target).toBe('mongo');
     expect(result.targetFamily).toBe('mongo');
-    expect(
-      domainModelsAtDefaultNamespace(
-        result.domain,
-        defaultDomainNamespaceIdForSqlTarget(result.target),
-      )['Foo'],
-    ).toBeDefined();
+    expect(domainModelsAtDefaultNamespace(result.domain)['Foo']).toBeDefined();
   });
 
   it('accepts extensionPacks: undefined', () => {
@@ -39,11 +31,6 @@ describe('mongo defineContract wrap', () => {
         Bar: model('Bar', { fields: { id: field.objectId() } }),
       },
     });
-    expect(
-      domainModelsAtDefaultNamespace(
-        result.domain,
-        defaultDomainNamespaceIdForSqlTarget(result.target),
-      )['Bar'],
-    ).toBeDefined();
+    expect(domainModelsAtDefaultNamespace(result.domain)['Bar']).toBeDefined();
   });
 });

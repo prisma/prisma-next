@@ -1,8 +1,4 @@
-import {
-  defaultDomainNamespaceIdForMongo,
-  domainModelsAtDefaultNamespace,
-  type PlanMeta,
-} from '@prisma-next/contract/types';
+import { domainModelsAtDefaultNamespace, type PlanMeta } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
   MongoContract,
@@ -646,9 +642,9 @@ export function createCollectionHandle<
     const validRoots = Object.keys(c.roots).join(', ');
     throw new Error(`Unknown root: "${rootName}". Valid roots: ${validRoots}`);
   }
-  const model = domainModelsAtDefaultNamespace(c.domain, defaultDomainNamespaceIdForMongo())[
-    modelName
-  ] as MongoModelDefinition | undefined;
+  const model = domainModelsAtDefaultNamespace(c.domain)[modelName] as
+    | MongoModelDefinition
+    | undefined;
   if (!model) {
     throw new Error(`Unknown model: "${modelName}" referenced by root "${rootName}".`);
   }

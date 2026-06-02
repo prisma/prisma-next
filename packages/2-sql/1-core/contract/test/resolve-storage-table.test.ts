@@ -1,6 +1,5 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID } from '../src/default-namespace';
 import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { SqlStorage } from '../src/ir/sql-storage';
 import { StorageTable } from '../src/ir/storage-table';
@@ -31,7 +30,7 @@ describe('resolveStorageTable', () => {
     });
 
     const resolved = resolveStorageTable(storage, 'user', {
-      defaultNamespaceId: POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID,
+      defaultNamespaceId: 'public',
     });
 
     expect(resolved).toEqual({ namespaceId: 'public', table: publicUser });
@@ -48,7 +47,7 @@ describe('resolveStorageTable', () => {
     });
 
     const resolved = resolveStorageTable(storage, 'user', {
-      defaultNamespaceId: POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID,
+      defaultNamespaceId: 'public',
     });
 
     expect(resolved).toEqual({ namespaceId: 'auth', table: authOnly });
@@ -83,7 +82,7 @@ describe('resolveStorageTable', () => {
 
     expect(
       resolveStorageTable(storage, 'missing', {
-        defaultNamespaceId: POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID,
+        defaultNamespaceId: 'public',
       }),
     ).toBeUndefined();
   });

@@ -7,7 +7,7 @@ export interface ResolvedStorageTable {
 }
 
 export interface ResolveStorageTableOptions {
-  readonly defaultNamespaceId: string;
+  readonly defaultNamespaceId?: string;
 }
 
 function tableInNamespace(
@@ -26,20 +26,23 @@ function tableInNamespace(
 
 /**
  * Resolve a bare storage table name to its namespace coordinate and table IR.
- * Scans the default namespace first, then every other declared namespace.
+ * Scans the default namespace first (when given), then every other declared
+ * namespace.
  */
 export function resolveStorageTable(
   storage: SqlStorage,
   tableName: string,
-  options: ResolveStorageTableOptions,
+  options: ResolveStorageTableOptions = {},
 ): ResolvedStorageTable | undefined {
   const { defaultNamespaceId } = options;
   const namespaces = storage.namespaces;
 
-  const defaultNamespace = namespaces[defaultNamespaceId];
-  const defaultTable = tableInNamespace(defaultNamespace, tableName);
-  if (defaultTable !== undefined) {
-    return { namespaceId: defaultNamespaceId, table: defaultTable };
+  if (defaultNamespaceId !== undefined) {
+    const defaultNamespace = namespaces[defaultNamespaceId];
+    const defaultTable = tableInNamespace(defaultNamespace, tableName);
+    if (defaultTable !== undefined) {
+      return { namespaceId: defaultNamespaceId, table: defaultTable };
+    }
   }
 
   for (const namespaceId of Object.keys(namespaces)) {

@@ -43,7 +43,6 @@
   ],
   "exports": {
     "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
-    "./default-namespace": "./dist/default-namespace.mjs",
     "./factories": "./dist/factories.mjs",
     "./index-type-validation": "./dist/index-type-validation.mjs",
     "./index-types": "./dist/index-types.mjs",
