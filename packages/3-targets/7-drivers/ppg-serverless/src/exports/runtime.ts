@@ -122,9 +122,9 @@ class PpgServerlessUnboundDriverImpl implements PpgServerlessRuntimeDriver {
 
   async acquireConnection(): Promise<SqlConnection> {
     // Routes to the bound impl, which throws a neutral "not implemented"
-    // error. Long-lived sessions land in a later slice; the wrapper exposes
-    // the seam now so callers see the same surface they will after that
-    // slice ships.
+    // error. The wrapper exposes the seam now so that the surface a caller
+    // sees today is the same surface they will see once long-lived sessions
+    // are wired in — only the bound impl's body changes.
     const delegate = this.#requireDelegate();
     return delegate.acquireConnection();
   }

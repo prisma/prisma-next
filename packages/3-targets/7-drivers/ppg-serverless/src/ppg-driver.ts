@@ -70,11 +70,12 @@ const CLOSED_MESSAGE =
  * Real bound `SqlDriver<PpgBinding>` implementation. Each `execute` / `query`
  * / `executePrepared` call opens a fresh PPG session, runs the statement,
  * and closes the session in `finally` — the canonical one-shot pattern for
- * stateless workloads (WebSocket transport per project decision D1).
+ * stateless workloads (the driver uses WebSocket transport throughout — no
+ * stateless HTTP path is exercised).
  *
  * `acquireConnection()` throws a neutral "not implemented" error: long-lived
- * sessions and the transaction surface are wired in a later slice of this
- * project.
+ * sessions and the transaction surface are not part of this driver's current
+ * surface.
  */
 class PpgServerlessBoundDriverImpl implements SqlDriver<PpgBinding> {
   readonly familyId = 'sql' as const;
@@ -128,10 +129,10 @@ class PpgServerlessBoundDriverImpl implements SqlDriver<PpgBinding> {
     if (this.#closed) {
       return throwingAsyncIterable<Row>(driverError('DRIVER.CLOSED', CLOSED_MESSAGE));
     }
-    // D2: the `handle` cache slot is accepted (the SPI requires it) but neither
+    // The `handle` cache slot is accepted (the SPI requires it) but neither
     // read nor written. PPG has no per-driver prepared-statement registry to
-    // attach to it; collapsing executePrepared into execute keeps the slice
-    // surface tight.
+    // attach to it; collapsing executePrepared into execute is the
+    // structurally-correct simplification for this driver.
     return this.#executeStreaming<Row>(request.sql, request.params);
   }
 
