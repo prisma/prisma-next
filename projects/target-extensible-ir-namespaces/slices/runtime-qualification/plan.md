@@ -1,66 +1,41 @@
-# Dispatch plan: runtime-qualification
+# Dispatch plan: runtime-qualification — default-namespace ownership rework
 
-_Slice spec: [`spec.md`](./spec.md). One PR. Single persistent implementer + reviewer. Sequential — each dispatch builds on the prior's stable hand-off._
+_Slice spec: [`spec.md`](./spec.md). One PR (#670, currently draft). Single persistent implementer + reviewer. Sequential — each dispatch leaves the tree green._
 
-**Shared validation gate** (each dispatch runs the subset covering its surface; the final verification dispatch runs all): `pnpm typecheck` · package-scoped `pnpm test` for touched packages · `pnpm lint:deps` · (final) `pnpm test:packages` + `pnpm test:integration` + `pnpm test:e2e` + `pnpm fixtures:check`.
+The slice's runtime qualification, AST coordinate, qualifying renderers, query-builder type parity, and transitional-helper retirement **already landed** on PR #670 (see spec § Current state). This plan covers only the **R1–R4 rework** that corrects the one architectural defect review found: the per-target default namespace was implemented as framework-owned constants that name a target (`POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID`, `defaultDomainNamespaceIdForSqlTarget`, `defaultStorageNamespaceIdForSqlTarget`, branching on `targetId === 'postgres'` inside target-agnostic packages). The rework moves that one fact onto the **target descriptor** (`defaultNamespaceId`), consumed only by authoring; runtime resolves target-agnostically.
 
-### Dispatch 1: default-namespace foundation
+**Shared validation gate** (each dispatch runs the subset covering its surface; R4 runs all): `pnpm typecheck` · package-scoped `pnpm test` for touched packages · `pnpm lint:deps` · (R4) `pnpm test:packages` + `pnpm test:integration` + `pnpm test:e2e` + `pnpm fixtures:check`.
 
-- **Outcome:** A per-family/target runtime default-namespace identifier is importable (`defaultStorageNamespaceId` / `defaultDomainNamespaceId`, `'public'` for Postgres/SQL, `'__unbound__'` for Mongo/SQLite), mirroring authoring's `POSTGRES_DEFAULT_NAMESPACE_ID` / `defaultSqlNamespaceIdForTarget`; a shared resolver returns the `(namespaceId, table)` for a bare name using **default-namespace-first** ordering; `resolveSingleDomainNamespaceId`'s throw-on-multi behaviour is replaced by default-namespace resolution.
-- **Builds on:** the spec's chosen design.
-- **Hands to:** a stable importable default-namespace API + a `resolveStorageTable(storage, name)` / domain-model equivalent that every downstream dispatch calls instead of insertion-order scans.
-- **Focus:** the constants + resolver only; no renderer or AST changes yet. No re-scattered `'public'` string literals.
+### R1: target-owned default namespace (LANDED — uncommitted)
 
-### Dispatch 2: runtime SQL qualification — DSL path
+- **Outcome:** `TargetPackRef` carries a required `defaultNamespaceId: string`; the three real target descriptors declare it (`postgres` → `'public'`, `sqlite` / `mongo` → `'__unbound__'`); `build-contract.ts` stamps bare model/table namespaces from `definition.target.defaultNamespaceId`; the local `defaultModelNamespaceId(targetId)` / `POSTGRES_DEFAULT_NAMESPACE_ID` with their `targetId === 'postgres'` branch are deleted from authoring. Descriptor tests pin the declared values; `TargetPackRef` literals across the test suite updated.
+- **Builds on:** the corrected design (spec §2).
+- **Hands to:** a target-owned `defaultNamespaceId` authoring already reads — the single source the rest of the rework collapses onto.
+- **Focus:** the descriptor field + authoring rewire + fixtures only. No framework/family helper deletion yet (that is R3, after the last non-authoring consumer is gone). **Status: complete on disk, awaiting commit.**
 
-- **Outcome:** `relational-core` `TableSource` carries a resolved namespace coordinate; the `sql-builder` proxy stamps it from D1's resolver; Postgres + SQLite query renderers qualify FROM/INSERT/UPDATE/DELETE table identifiers via the namespace concretion's `qualifyTable()`. A `db.sql.user` plan emits `"public"."user"` (Postgres) / `"user"` (SQLite). Adapter unit tests updated.
-- **Builds on:** D1's default-namespace resolver.
-- **Hands to:** the namespace-coordinate AST field + qualifying renderers — a stable rendering seam the ORM path reuses verbatim.
-- **Focus:** DSL/proxy path + renderers + adapter tests. Column refs stay alias-qualified (unchanged). No ORM changes here.
+### R2: contract-walking ergonomics (direct `Models` alias)
 
-### Dispatch 3: runtime SQL qualification — ORM path
+- **Outcome:** the emitter emits `type Models = ContractModelDefinitions<Contract>` as a **direct alias** (not the inline `infer` conditional that regressed it); `examples/prisma-next-demo/src/app/ContractView.tsx` walks models through that alias with **no** `domainModelsAtDefaultNamespace(...)` call, **no** `defaultDomainNamespaceIdForSqlTarget(contract.target)` argument, and **no** `as Models` cast. All emitted `contract.d.ts` fixtures regenerated; `fixtures:check` clean.
+- **Builds on:** R1 (target-owned default in place).
+- **Hands to:** a demo that no longer consumes any framework default-namespace helper — clearing the last non-authoring consumer so R3 can delete those helpers without breaking the tree.
+- **Focus:** the `Models` emission in the contract-dts emitter + `ContractView.tsx` + regenerated fixtures. No resolver/helper deletion here. **This dispatch must precede R3** — it removes the demo's dependency on the target-naming helper R3 deletes.
 
-- **Outcome:** `sql-orm-client` query plans stamp the namespace coordinate (reusing D2's AST field + renderers); model/table resolution (`orm.ts`, `collection-contract.ts`) goes through the default domain/storage namespace; ORM-emitted SQL is namespace-qualified. ORM-scoped tests pass.
-- **Builds on:** D2's namespace-coordinate AST field + qualifying renderers.
-- **Hands to:** both runtime query producers (DSL + ORM) emitting qualified SQL.
-- **Focus:** `sql-orm-client` resolution + plan construction; no renderer changes (inherited from D2).
+### R3: delete target-naming defaults; resolvers resolve target-agnostically
 
-### Dispatch 4: query-builder type parity
+- **Outcome:** every framework/family default-namespace helper that names a target is deleted — `POSTGRES_DEFAULT_DOMAIN_NAMESPACE_ID`, `defaultDomainNamespaceIdForSqlTarget`, `defaultDomainNamespaceIdForMongo` (framework `@prisma-next/contract`), `POSTGRES_DEFAULT_STORAGE_NAMESPACE_ID` / `defaultStorageNamespaceIdForSqlTarget` (SQL-family `@prisma-next/sql-contract`), and the Mongo-family re-export — along with their export barrels and tests. The universal `UNBOUND_DOMAIN_NAMESPACE_ID` sentinel stays; `inferDefaultDomainNamespaceId` loses its "prefer `public`" bias (target-agnostic scan: sole namespace, else insertion order). The shared resolvers (`resolveStorageTable`, `resolveDomainModel`) take an **optional** `defaultNamespaceId` and scan when it is absent; the runtime call sites (`sql-builder` `resolve-table.ts`, `sql-orm-client` `storage-resolution.ts`) stop importing the deleted helpers and call the resolvers without a per-target default.
+- **Builds on:** R2 (no non-authoring consumer of the target-naming helpers remains).
+- **Hands to:** a codebase where the only place a target's default namespace is named is the target's own descriptor.
+- **Focus:** deletion + resolver-signature change + the two runtime call sites + their tests. Validation gate extends to **workspace-wide** `pnpm typecheck` + a grep proving the deleted symbols are gone from `packages/`.
 
-- **Outcome:** `query-builder`'s `UnboundTables<C>` / `root.from(...)` types resolve tables across namespaces with default-namespace preference, at parity with `sql-builder`'s `TableNamesAcrossNamespaces`; a Postgres `public` contract type-checks against the flat builder surface (no longer `never`). Type-level tests cover it.
-- **Builds on:** the spec's chosen design (independent of D2/D3 runtime work; ordered after for review locality).
-- **Hands to:** a type-level flat surface consistent with the runtime resolution.
-- **Focus:** `query-builder` types only.
+### R4: ADR 223 amend + full re-verify
 
-### Dispatch 5: retire transitional projection helpers
-
-- **Outcome:** `contractModels` / `contractValueObjects` / `resolveSingleDomainNamespaceId` (runtime) and `ContractModelsMap` / `ContractValueObjectsMap` (type-level) are removed from the foundation `contract` package; all consumers (now namespace-aware after D1–D4) resolve through the default-namespace API; `lint:deps` + `pnpm typecheck` clean.
-- **Builds on:** D1–D4 (every consumer is namespace-aware before the transitional surface is pulled).
-- **Hands to:** a foundation `contract` surface with no transitional single-namespace projection.
-- **Focus:** deletion + final consumer migration; no new behaviour.
-
-### Dispatch 6: Mongo runtime confirmation
-
-- **Outcome:** the Mongo runtime resolves collections via the namespace coordinate; single-namespace (`__unbound__`) is a verified no-op (no qualification syntax); Mongo family tests green.
-- **Builds on:** D1's default-namespace API.
-- **Hands to:** confirmation that the cross-family resolution holds; Mongo unaffected.
-- **Focus:** Mongo family/target runtime only; no Mongo multi-namespace work.
-
-### Dispatch 7: verification, demo, fixtures
-
-- **Outcome:** demo integration SQL expectations updated to qualified identifiers; `examples/prisma-next-demo/src/queries/*` compile and run unchanged; a multi-namespace Postgres contract is queryable end-to-end against PGlite (PDoD7); full gates green (`test:packages` + `test:integration` + `test:e2e` + `fixtures:check`).
-- **Builds on:** D2/D3 qualified SQL; D5 clean surface.
-- **Hands to:** green full-suite signal proving PDoD5/PDoD6/PDoD7.
-- **Focus:** test/fixture/demo expectation updates + the e2e proof; no production logic changes (if a logic gap surfaces, route back to the owning dispatch).
-
-### Dispatch 8: ADR + upgrade instructions
-
-- **Outcome:** a short ADR records the default-namespace family-façade convention (project PDoD8 / OQ2); upgrade instructions recorded via `record-upgrade-instructions` if `examples/` or `packages/3-extensions/` *source* changed.
-- **Builds on:** the settled design from D1–D7.
-- **Hands to:** slice DoD met → PR.
-- **Focus:** docs only.
+- **Outcome:** ADR 223 is amended from the rejected framework-façade framing to the **target-owned default-namespace** convention (descriptor `defaultNamespaceId`; authoring-only consumer; runtime scans). Upgrade instructions re-checked if `examples/` or `packages/3-extensions/` *source* changed by the rework. Full gates green (`test:packages` + `test:integration` + `test:e2e` + `fixtures:check`), proving the rework did not regress the qualified-SQL behaviour D1–D8 established.
+- **Builds on:** the settled rework (R1–R3).
+- **Hands to:** slice DoD met → push, take PR #670 out of draft / re-request review.
+- **Focus:** ADR + upgrade docs + the full-suite proof. No production logic changes (a logic gap routes back to the owning dispatch).
 
 ## Open items
 
-- Project **close-out** (PDoD9/PDoD10: Linear Completed, folder cleanup, predecessor-folder archival) is a project-level step via `drive-close-project` after this slice's PR merges — not a dispatch in this slice.
-- If D2's AST-coordinate change forces touching SQL-plan serialization/fixtures beyond runtime objects, that is a stop-and-report (the spec scoped query plans as runtime, not on-disk).
+- Project **close-out** (Linear Completed, folder cleanup) is a project-level step via `drive-close-project` after this slice's PR merges — not a dispatch here.
+- Multi-namespace bare-name collision ordering (insertion-order, no `public` preference) is accepted for this slice and resolved by TML-2550's explicit-namespace DSL.
+- The prior D1–D8 review history lives in [`reviews/code-review.md`](./reviews/code-review.md) (SATISFIED for the original design); the rework rounds append below it.
