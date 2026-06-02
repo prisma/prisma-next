@@ -9,6 +9,9 @@ catalogs:
     '@prisma/dev':
       specifier: 0.24.7
       version: 0.24.7
+    '@prisma/management-api-sdk':
+      specifier: 1.35.0
+      version: 1.35.0
     '@prisma/ppg':
       specifier: 1.0.1
       version: 1.0.1
@@ -3383,6 +3386,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:0.12.0
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/postgres':
+        specifier: workspace:0.12.0
+        version: link:../postgres
       '@prisma-next/sql-builder':
         specifier: workspace:0.12.0
         version: link:../../2-sql/4-lanes/sql-builder
@@ -4168,6 +4174,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:0.12.0
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/driver-postgres':
+        specifier: workspace:0.12.0
+        version: link:../postgres
       '@prisma-next/errors':
         specifier: workspace:0.12.0
         version: link:../../../1-framework/1-core/errors
@@ -4393,6 +4402,9 @@ importers:
       '@prisma-next/driver-sqlite':
         specifier: workspace:0.12.0
         version: link:../../packages/3-targets/7-drivers/sqlite
+      '@prisma-next/driver-ppg-serverless':
+        specifier: workspace:0.12.0
+        version: link:../../packages/3-targets/7-drivers/ppg-serverless
       '@prisma-next/emitter':
         specifier: workspace:0.12.0
         version: link:../../packages/1-framework/3-tooling/emitter
@@ -4453,6 +4465,9 @@ importers:
       '@prisma-next/postgres':
         specifier: workspace:0.12.0
         version: link:../../packages/3-extensions/postgres
+      '@prisma-next/prisma-postgres-serverless':
+        specifier: workspace:0.12.0
+        version: link:../../packages/3-extensions/prisma-postgres-serverless
       '@prisma-next/psl-parser':
         specifier: workspace:0.12.0
         version: link:../../packages/1-framework/2-authoring/psl-parser
@@ -4514,6 +4529,9 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:0.12.0
         version: link:../../packages/0-config/tsconfig
+      '@prisma/management-api-sdk':
+        specifier: 'catalog:'
+        version: 1.35.0
       '@types/pg':
         specifier: 'catalog:'
         version: 8.20.0
@@ -5976,6 +5994,9 @@ packages:
 
   '@prisma/management-api-sdk@1.29.0':
     resolution: {integrity: sha512-TnrTj+9crmeAV9J/XxjxdPdAsYHWWMLXvre4+G2Ng9gNxuKiUAn7PElezy5Algi2e5WkpbArW6vQvx8f6l+ipg==}
+
+  '@prisma/management-api-sdk@1.35.0':
+    resolution: {integrity: sha512-ugUROU6SkKUhfjZ9LLV3vtryevPxKaqzet36m5ncD4ceI4PPoqNUPyFdhK9uWsdRgxR2peN7Nw2iUvZsc9aqBg==}
 
   '@prisma/ppg@1.0.1':
     resolution: {integrity: sha512-rRRXuPPerXwNWjSA3OE0e/bqXSTfsE82EsMvoiluc0fN0DizQSe3937/Tnl5+DPbxY5rdAOlYjWXG0A2wwTbKA==}
@@ -10864,6 +10885,10 @@ snapshots:
       '@prisma/debug': 7.2.0
 
   '@prisma/management-api-sdk@1.29.0':
+    dependencies:
+      openapi-fetch: 0.14.0
+
+  '@prisma/management-api-sdk@1.35.0':
     dependencies:
       openapi-fetch: 0.14.0
 
