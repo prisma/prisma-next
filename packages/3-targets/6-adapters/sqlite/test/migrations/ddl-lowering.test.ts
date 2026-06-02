@@ -25,7 +25,13 @@ const markerColumns = [
 
 const ledgerColumns = [
   col('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-  col('created_at', 'TEXT', { notNull: true, default: fn("datetime('now')") }),
+  col('created_at', 'TEXT', {
+    notNull: true,
+    default: fn("strftime('%Y-%m-%dT%H:%M:%fZ','now')"),
+  }),
+  col('space', 'TEXT', { notNull: true }),
+  col('migration_name', 'TEXT', { notNull: true }),
+  col('migration_hash', 'TEXT', { notNull: true }),
   col('origin_core_hash', 'TEXT'),
   col('origin_profile_hash', 'TEXT'),
   col('destination_core_hash', 'TEXT', { notNull: true }),

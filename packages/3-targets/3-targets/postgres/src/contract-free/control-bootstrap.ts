@@ -18,6 +18,9 @@ const markerColumns = [
 const ledgerColumns = [
   col('id', 'bigserial', { primaryKey: true }),
   col('created_at', 'timestamptz', { notNull: true, default: fn('now()') }),
+  col('space', 'text', { notNull: true }),
+  col('migration_name', 'text', { notNull: true }),
+  col('migration_hash', 'text', { notNull: true }),
   col('origin_core_hash', 'text'),
   col('origin_profile_hash', 'text'),
   col('destination_core_hash', 'text', { notNull: true }),
