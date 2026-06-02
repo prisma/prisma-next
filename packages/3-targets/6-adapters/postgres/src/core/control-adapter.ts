@@ -31,6 +31,7 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { postgresColumnsCompatible } from '@prisma-next/target-postgres/column-type-compatibility';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -92,6 +93,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * before comparison with contract native types.
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
+
+  /**
+   * Target-supplied compatible-shape relation used under the `external`
+   * control policy. Threading the same relation the migration planner/runner
+   * use keeps runtime verify and migration verify in agreement.
+   */
+  readonly columnsCompatible = postgresColumnsCompatible;
 
   /**
    * Bridges native `PostgresEnumStorageEntry` IR walks against the Postgres
