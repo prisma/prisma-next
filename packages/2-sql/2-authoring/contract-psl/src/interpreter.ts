@@ -23,7 +23,6 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
@@ -229,10 +228,6 @@ const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
  * slot empty (which means the late-bound default at the `StorageTable`
  * layer; emitted JSON omits the field).
  */
-function defaultSqlNamespaceIdForTarget(targetId: string): string {
-  return targetId === 'postgres' ? 'public' : UNBOUND_NAMESPACE_ID;
-}
-
 function resolveNamespaceIdForSqlTarget(input: {
   readonly bucketName: string;
   readonly targetId: string;
@@ -1310,7 +1305,7 @@ function resolvePolymorphism(
   modelNames: Set<string>,
   modelMappings: ReadonlyMap<string, ModelNameMapping>,
   modelNamespaceIds: ReadonlyMap<string, string>,
-  targetId: string,
+  defaultNamespaceId: string,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): Record<string, ContractModel> {
@@ -1416,7 +1411,7 @@ function resolvePolymorphism(
         ...variantModel,
         base: crossRef(
           baseDecl.baseName,
-          modelNamespaceIds.get(baseDecl.baseName) ?? defaultSqlNamespaceIdForTarget(targetId),
+          modelNamespaceIds.get(baseDecl.baseName) ?? defaultNamespaceId,
         ),
         ...(resolvedTable ? { storage: { ...variantModel.storage, table: resolvedTable } } : {}),
       },
@@ -1700,7 +1695,7 @@ export function interpretPslDocumentToSqlContract(
     modelNames,
     modelMappings,
     modelNamespaceIds,
-    input.target.targetId,
+    input.target.defaultNamespaceId,
     sourceId,
     polyDiagnostics,
   );
@@ -1736,7 +1731,7 @@ export function interpretPslDocumentToSqlContract(
             ...(namespaceSlice.valueObjects !== undefined
               ? { valueObjects: namespaceSlice.valueObjects }
               : {}),
-            ...(namespaceId === defaultSqlNamespaceIdForTarget(input.target.targetId) &&
+            ...(namespaceId === input.target.defaultNamespaceId &&
             Object.keys(valueObjects).length > 0
               ? { valueObjects }
               : {}),
