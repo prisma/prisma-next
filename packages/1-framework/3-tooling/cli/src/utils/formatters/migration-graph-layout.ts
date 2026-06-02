@@ -21,6 +21,7 @@ export type StructuralCell =
   | { readonly kind: 'arc-branch-corner' }
   | { readonly kind: 'arc-branch-tee' }
   | { readonly kind: 'arc-land-corner' }
+  | { readonly kind: 'arc-land-tee' }
   | { readonly kind: 'arc-crossing' }
   | { readonly kind: 'arc-land-bridge' }
   | {
@@ -703,6 +704,15 @@ function applySkipRollbackRouting(
       .map((other) => other.backLane);
     const maxCoSourcedLane = Math.max(...coSourcedLanes);
 
+    // Back-lanes of arcs that converge on this same target node. They share the
+    // node's landing row, so each inner lane reads as a `┴` junction (the outer
+    // arcs' horizontal bridge passes through it on the way to the node) and only
+    // the outermost closes the corner with `╯`.
+    const coLandingLanes = routes
+      .filter((other) => other.edge.to === edge.to)
+      .map((other) => other.backLane);
+    const maxCoLandingLane = Math.max(...coLandingLanes);
+
     const sourceRow = result[sourceRowIndex];
     if (sourceRow !== undefined) {
       const cells = sourceRow.cells;
@@ -764,6 +774,7 @@ function applySkipRollbackRouting(
       const existing = cells[backLane];
       if (
         existing?.kind !== 'arc-land-corner' &&
+        existing?.kind !== 'arc-land-tee' &&
         existing?.kind !== 'arc-land-bridge' &&
         existing?.kind !== 'arc-branch-corner' &&
         existing?.kind !== 'arc-branch-tee' &&
@@ -780,6 +791,12 @@ function applySkipRollbackRouting(
       const contractHash = targetRow.contractHash ?? EMPTY_CONTRACT_HASH;
       cells[targetCol] = { kind: 'node', contractHash, arcLand: true };
       for (let lane = targetCol + 1; lane < backLane; lane += 1) {
+        // An inner converging arc's own landing junction: the outer arcs' bridge
+        // passes through it (`┴`) while its own vertical run closes here.
+        if (coLandingLanes.includes(lane)) {
+          cells[lane] = { kind: 'arc-land-tee' };
+          continue;
+        }
         // A bridged lane that carries another arc OR a forward vertical still
         // active at this row must cross over it (`┼`) rather than overwrite it
         // with a bare bridge (`──`).
@@ -788,7 +805,8 @@ function applySkipRollbackRouting(
           existing !== undefined &&
           existing.kind !== 'empty' &&
           existing.kind !== 'horizontal-pass' &&
-          existing.kind !== 'arc-land-bridge';
+          existing.kind !== 'arc-land-bridge' &&
+          existing.kind !== 'arc-land-tee';
         const crossed =
           occupied ||
           routes.some(
@@ -799,7 +817,10 @@ function applySkipRollbackRouting(
           );
         cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'arc-land-bridge' };
       }
-      cells[backLane] = { kind: 'arc-land-corner' };
+      // Inner converging arcs close as a landing tee so the outermost arc's
+      // bridge reads through to the node; only the outermost arc draws `╯`.
+      cells[backLane] =
+        backLane < maxCoLandingLane ? { kind: 'arc-land-tee' } : { kind: 'arc-land-corner' };
       for (const other of routes) {
         if (other.backLane <= backLane) continue;
         if (!routeCrossesRow(other, targetRowIndex, result)) continue;
@@ -807,6 +828,7 @@ function applySkipRollbackRouting(
         const existing = cells[other.backLane];
         if (
           existing?.kind !== 'arc-land-corner' &&
+          existing?.kind !== 'arc-land-tee' &&
           existing?.kind !== 'arc-land-bridge' &&
           existing?.kind !== 'node'
         ) {

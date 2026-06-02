@@ -49,6 +49,7 @@ interface MigrationGraphTreeGlyphPalette {
   readonly arcBranchCorner: string;
   readonly arcBranchTee: string;
   readonly arcLandCorner: string;
+  readonly arcLandTee: string;
   readonly arcCrossing: string;
   readonly arcLandBridge: string;
   readonly horizontalPass: string;
@@ -72,6 +73,7 @@ const UNICODE_PALETTE: MigrationGraphTreeGlyphPalette = {
   arcBranchCorner: '╮ ',
   arcBranchTee: '┬─',
   arcLandCorner: '╯ ',
+  arcLandTee: '┴─',
   arcCrossing: '┼─',
   arcLandBridge: '──',
   horizontalPass: '──',
@@ -95,6 +97,7 @@ const ASCII_PALETTE: MigrationGraphTreeGlyphPalette = {
   arcBranchCorner: '\\ ',
   arcBranchTee: '+-',
   arcLandCorner: '/ ',
+  arcLandTee: '+-',
   arcCrossing: '+-',
   arcLandBridge: '--',
   horizontalPass: '--',
@@ -170,8 +173,10 @@ function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
         lane[column] = column;
         break;
       case 'arc-branch-tee':
-        // An inner co-sourced arc's own back-lane junction: its vertical run
-        // continues below in this column, so it keeps its own column hue.
+      // An inner co-sourced arc's own back-lane junction: its vertical run
+      // continues below in this column, so it keeps its own column hue. The
+      // co-landing tee is the symmetric case (vertical run continues above).
+      case 'arc-land-tee':
         lane[column] = column;
         break;
       case 'arc-crossing':
@@ -381,6 +386,8 @@ function renderCellPair(
       return lane(palette.arcBranchTee);
     case 'arc-land-corner':
       return lane(palette.arcLandCorner);
+    case 'arc-land-tee':
+      return lane(palette.arcLandTee);
     case 'arc-crossing':
       return lane(palette.arcLandBridge);
     case 'arc-land-bridge':

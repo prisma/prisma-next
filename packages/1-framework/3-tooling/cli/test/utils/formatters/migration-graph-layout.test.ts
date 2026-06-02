@@ -1017,6 +1017,7 @@ describe('buildMigrationGraphLayout', () => {
       'arc-branch-corner',
       'arc-branch-tee',
       'arc-land-corner',
+      'arc-land-tee',
       'arc-crossing',
       'arc-land-bridge',
       'edge-lane',
@@ -1027,5 +1028,62 @@ describe('buildMigrationGraphLayout', () => {
         expect(allowedKinds.has(cell.kind)).toBe(true);
       }
     }
+  });
+
+  function convergingChain(): readonly MigrationEdge[] {
+    return [
+      edge(EMPTY_CONTRACT_HASH, 'n0', '00_init'),
+      edge('n0', 'n1', '01_m1'),
+      edge('n1', 'n2', '02_m2'),
+      edge('n2', 'n3', '03_m3'),
+      edge('n3', 'n4', '04_m4'),
+      edge('n4', 'n5', '05_m5'),
+      edge('n5', 'n6', '06_m6'),
+      edge('n3', 'n1', '07_rb_a'),
+      edge('n5', 'n1', '08_rb_b'),
+    ];
+  }
+
+  it('keeps the tip at the top when two skip-rollbacks converge on one target', () => {
+    const model = layout(convergingChain());
+    const nodeHashes = model.rows.filter(isNodeRow).map((row) => row.contractHash);
+    expect(nodeHashes).toEqual(['n6', 'n5', 'n4', 'n3', 'n2', 'n1', 'n0', EMPTY_CONTRACT_HASH]);
+  });
+
+  it('lands two converging skip-rollbacks with a landing tee then a corner', () => {
+    const model = layout(convergingChain());
+    const landing = model.rows.find((r) => r.kind === 'node' && r.contractHash === 'n1');
+    expect(landing).toBeDefined();
+    // node ◂, inner arc closes as a landing tee, outermost arc closes the corner.
+    expect(landing?.cells[0]).toMatchObject({ kind: 'node', arcLand: true });
+    expect(landing?.cells[1]?.kind).toBe('arc-land-tee');
+    expect(landing?.cells[2]?.kind).toBe('arc-land-corner');
+  });
+
+  it('lands three converging skip-rollbacks with two tees then a corner', () => {
+    const model = layout([...convergingChain(), edge('n4', 'n1', '09_rb_c')]);
+    const landing = model.rows.find((r) => r.kind === 'node' && r.contractHash === 'n1');
+    expect(landing).toBeDefined();
+    expect(landing?.cells[0]).toMatchObject({ kind: 'node', arcLand: true });
+    expect(landing?.cells[1]?.kind).toBe('arc-land-tee');
+    expect(landing?.cells[2]?.kind).toBe('arc-land-tee');
+    expect(landing?.cells[3]?.kind).toBe('arc-land-corner');
+  });
+
+  it('keeps a single skip-rollback landing as a bare corner (no tee)', () => {
+    const model = layout([
+      edge(EMPTY_CONTRACT_HASH, 'n0', '00_init'),
+      edge('n0', 'n1', '01_m1'),
+      edge('n1', 'n2', '02_m2'),
+      edge('n2', 'n3', '03_m3'),
+      edge('n3', 'n4', '04_m4'),
+      edge('n4', 'n5', '05_m5'),
+      edge('n5', 'n6', '06_m6'),
+      edge('n5', 'n1', '07_rb_b'),
+    ]);
+    const landing = model.rows.find((r) => r.kind === 'node' && r.contractHash === 'n1');
+    expect(landing?.cells[0]).toMatchObject({ kind: 'node', arcLand: true });
+    expect(landing?.cells[1]?.kind).toBe('arc-land-corner');
+    expect(landing?.cells.some((cell) => cell.kind === 'arc-land-tee')).toBe(false);
   });
 });
