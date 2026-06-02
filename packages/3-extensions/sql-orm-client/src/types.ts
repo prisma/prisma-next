@@ -146,13 +146,23 @@ type LegacyOrderingMethods<Traits> = 'order' extends Traits
 type IsBooleanReturn<Returns, TCodecTypes extends Record<string, unknown>> = Returns extends {
   readonly codecId: infer Id extends string;
 }
-  ? Id extends keyof TCodecTypes
-    ? TCodecTypes[Id] extends { readonly traits: infer T }
-      ? 'boolean' extends T
-        ? true
+  ? // Family-SQL hardcodes `pg/bool@1` as the predicate-return codec id on
+    // every family op (`eq`, `gt`, `like`, `isNull`, etc.) in
+    // `family-sql/src/types/operation-types.ts`. Treat it as a universal
+    // boolean marker so the predicate-return branch fires on every SQL
+    // target — including SQLite, whose `CodecTypes` does not include
+    // `pg/bool@1`. The marker-recognition is target-neutral: Postgres
+    // contracts still resolve through the trait-check below, and the two
+    // branches agree.
+    Id extends 'pg/bool@1'
+    ? true
+    : Id extends keyof TCodecTypes
+      ? TCodecTypes[Id] extends { readonly traits: infer T }
+        ? 'boolean' extends T
+          ? true
+          : false
         : false
       : false
-    : false
   : false;
 
 /**
