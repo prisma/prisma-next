@@ -24,13 +24,15 @@ test('nested create on a relation whose junction has a required payload column i
   expectTypeOf(input).toExtend<Input>();
 });
 
-test('connect remains available on a required-payload junction relation', () => {
+test('connect on a required-payload junction relation is a type error', () => {
   type Input = MutationCreateInput<Contract, 'User'>;
 
   const input: Input = {
     name: 'Alice',
     email: 'alice@test.com',
-    roles: (mutator) => mutator.connect(roleCriterion),
+    roles: (mutator) =>
+      // @ts-expect-error - connect also INSERTs a junction row and can't supply the required `level` payload column
+      mutator.connect(roleCriterion),
   };
 
   expectTypeOf(input).toExtend<Input>();
