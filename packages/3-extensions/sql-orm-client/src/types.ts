@@ -1005,21 +1005,25 @@ type HasRequiredJunctionPayload<
 export interface RelationMutator<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-  CreateDisabled extends boolean = false,
+  LinkWritesDisabled extends boolean = false,
 > {
   create(
-    data: CreateDisabled extends true ? never : MutationCreateInput<TContract, ModelName>,
+    data: LinkWritesDisabled extends true ? never : MutationCreateInput<TContract, ModelName>,
   ): RelationMutationCreate<TContract, ModelName>;
   create(
-    data: CreateDisabled extends true
+    data: LinkWritesDisabled extends true
       ? never
       : readonly MutationCreateInput<TContract, ModelName>[],
   ): RelationMutationCreate<TContract, ModelName>;
   connect(
-    criterion: RelationConnectCriterion<TContract, ModelName>,
+    criterion: LinkWritesDisabled extends true
+      ? never
+      : RelationConnectCriterion<TContract, ModelName>,
   ): RelationMutationConnect<TContract, ModelName>;
   connect(
-    criteria: readonly RelationConnectCriterion<TContract, ModelName>[],
+    criteria: LinkWritesDisabled extends true
+      ? never
+      : readonly RelationConnectCriterion<TContract, ModelName>[],
   ): RelationMutationConnect<TContract, ModelName>;
   disconnect(): RelationMutationDisconnect<TContract, ModelName>;
   disconnect(
