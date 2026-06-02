@@ -54,6 +54,7 @@ export {
   SqlUnboundNamespace,
   StorageColumn,
   StorageTable,
+  storageTableAt,
   toStorageTypeInstance,
   UniqueConstraint,
 } from '../types';
