@@ -1,10 +1,12 @@
+import { type ControlPolicy, effectiveControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   OperationContext,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { VERIFY_CODE_SCHEMA_FAILURE } from '@prisma-next/framework-components/control';
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { MongoCollection, MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { contractToMongoSchemaIR } from '../contract-to-schema';
@@ -35,7 +37,13 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
     schema,
     expectedIR,
   );
-  const { root, issues, counts } = diffMongoSchemas(canonicalLive, canonicalExpected, strict);
+  const collectionControlPolicy = resolveMongoCollectionControlPolicy(contract);
+  const { root, issues, counts } = diffMongoSchemas(
+    canonicalLive,
+    canonicalExpected,
+    strict,
+    collectionControlPolicy,
+  );
 
   const ok = counts.fail === 0;
   const profileHash = typeof contract.profileHash === 'string' ? contract.profileHash : '';
@@ -57,4 +65,14 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
     },
     timings: { total: Date.now() - startTime },
   };
+}
+
+function resolveMongoCollectionControlPolicy(
+  contract: MongoContract,
+): (collectionName: string) => ControlPolicy {
+  const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+  const collections: Record<string, MongoCollection> = namespace?.collections ?? {};
+  const defaultControl = contract.defaultControl;
+  return (collectionName: string) =>
+    effectiveControlPolicy(collections[collectionName]?.control, defaultControl);
 }

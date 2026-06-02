@@ -1,4 +1,8 @@
-import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ControlPolicy,
+  ExecutionMutationDefaultPhases,
+} from '@prisma-next/contract/types';
 import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -113,10 +117,12 @@ export interface ModelNode {
   readonly indexes?: readonly IndexNode[];
   readonly foreignKeys?: readonly ForeignKeyNode[];
   readonly relations?: readonly RelationNode[];
+  readonly control?: ControlPolicy;
 }
 
 export interface ContractDefinition {
   readonly target: TargetPackRef<'sql', string>;
+  readonly defaultControl?: ControlPolicy;
   readonly extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;

@@ -416,6 +416,7 @@ export function buildSqlContractFromDefinition(
 
     const tableInput: StorageTableInput = {
       columns,
+      ...ifDefined('control', semanticModel.control),
       uniques: (semanticModel.uniques ?? []).map((u) => ({
         columns: u.columns,
         ...ifDefined('name', u.name),
@@ -688,6 +689,7 @@ export function buildSqlContractFromDefinition(
   const contract: Contract<SqlStorage> = {
     target,
     targetFamily,
+    ...ifDefined('defaultControl', definition.defaultControl),
     domain: { namespaces: domainNamespaces },
     roots,
     storage,
