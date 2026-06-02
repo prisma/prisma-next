@@ -1,7 +1,9 @@
-import type { ControlPolicy } from '@prisma-next/contract/types';
+import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import { effectiveControl } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
+import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
 import { unboundTables } from './unbound-tables';
@@ -86,11 +88,25 @@ describe('defineContract per-table control', () => {
     }
   });
 
-  expectTypeOf<'external'>().toMatchTypeOf<ControlPolicy>();
+  it('omits per-node control and defaultControl when neither is authored', () => {
+    const built = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      models: {
+        User: model('User', {
+          fields: { id: field.column(int4Column).id() },
+        }).sql({ table: 'app_user' }),
+      },
+    });
+
+    expect(built).not.toHaveProperty('defaultControl');
+    const table = unboundTables(built.storage)['app_user'];
+    expect(table).not.toHaveProperty('control');
+  });
 });
 
 describe('defineContract mixed default and per-table control', () => {
-  it('resolves effective control per table and round-trips', () => {
+  it('resolves effective control per table and round-trips through the canonical deserializer', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
@@ -119,20 +135,18 @@ describe('defineContract mixed default and per-table control', () => {
       'tolerated',
     );
 
-    const roundTripped = JSON.parse(JSON.stringify(built)) as typeof built;
+    const envelope = JSON.parse(JSON.stringify(built)) as unknown;
+    const roundTripped = validateSqlContractFully<Contract<SqlStorage>>(envelope);
     const roundTrippedTables = unboundTables(roundTripped.storage);
-    expect(roundTripped.defaultControl).toBe('external');
-    expect(
-      tableEffectiveControl(roundTrippedTables['app_user']?.control, roundTripped.defaultControl),
-    ).toBe('external');
-    expect(
-      tableEffectiveControl(
-        roundTrippedTables['user_profile']?.control,
-        roundTripped.defaultControl,
-      ),
-    ).toBe('managed');
-    expect(
-      tableEffectiveControl(roundTrippedTables['audit_log']?.control, roundTripped.defaultControl),
-    ).toBe('tolerated');
+    const def = roundTripped.defaultControl;
+
+    expect(def).toBe('external');
+    expect(tableEffectiveControl(roundTrippedTables['app_user']?.control, def)).toBe('external');
+    expect(tableEffectiveControl(roundTrippedTables['user_profile']?.control, def)).toBe('managed');
+    expect(tableEffectiveControl(roundTrippedTables['audit_log']?.control, def)).toBe('tolerated');
+
+    // Omit-when-default holds across the canonical round-trip: the table that
+    // inherits the default never grows a per-node control property.
+    expect(roundTrippedTables['app_user']).not.toHaveProperty('control');
   });
 });
