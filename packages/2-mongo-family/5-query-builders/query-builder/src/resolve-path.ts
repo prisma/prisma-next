@@ -1,4 +1,4 @@
-import type { ContractValueObjectsMap } from '@prisma-next/contract/types';
+import type { ContractValueObjectDefinitions } from '@prisma-next/contract/types';
 import type { MongoContract, MongoModelsMap } from '@prisma-next/mongo-contract';
 import type { DocField } from './types';
 
@@ -145,7 +145,7 @@ type TranslateField<TContract extends MongoContract, F> = F extends {
  * surface stays concrete at instantiation time.
  */
 type VONestedShape<TContract extends MongoContract, VOName extends string> = [
-  ContractValueObjectsMap<TContract>,
+  ContractValueObjectDefinitions<TContract>,
 ] extends [infer VOs extends Record<string, { readonly fields: Record<string, unknown> }>]
   ? VOName extends keyof VOs & string
     ? {

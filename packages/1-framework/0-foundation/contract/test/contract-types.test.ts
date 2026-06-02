@@ -7,7 +7,7 @@ function crossRef(model: string, namespace = 'default') {
 }
 
 import type { Contract } from '../src/contract-types';
-import { contractModels } from '../src/domain-envelope';
+import { domainModelsAtDefaultNamespace } from '../src/domain-namespace-access';
 import type { ContractModel } from '../src/domain-types';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '../src/types';
 
@@ -89,10 +89,12 @@ describe('unified contract types', () => {
   describe('framework consumer compatibility', () => {
     it('framework code reads domain fields from Contract (opaque storage)', () => {
       function frameworkConsumer(contract: Contract): string[] {
-        return Object.entries(contractModels(contract)).map(([name, model]) => {
-          const fieldCount = Object.keys(model.fields).length;
-          return `${name}: ${fieldCount} fields`;
-        });
+        return Object.entries(domainModelsAtDefaultNamespace(contract.domain)).map(
+          ([name, model]) => {
+            const fieldCount = Object.keys(model.fields).length;
+            return `${name}: ${fieldCount} fields`;
+          },
+        );
       }
 
       const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;

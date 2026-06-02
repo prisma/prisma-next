@@ -121,7 +121,10 @@ import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import endContract from './end-contract.json' with { type: 'json' };
+import endContractJson from './end-contract.json' with { type: 'json' };
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+
+const endContract = new PostgresContractSerializer().deserializeContract(endContractJson);
 
 const db = sql({
   context: createExecutionContext({

@@ -8,6 +8,7 @@ import { postgresTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
 
 const postgresTargetDescriptorMetaBase = {
   ...postgresTargetDescriptorMetaRuntime,
+  defaultNamespaceId: 'public',
   authoring: {
     type: postgresAuthoringTypes,
     field: postgresAuthoringFieldPresets,

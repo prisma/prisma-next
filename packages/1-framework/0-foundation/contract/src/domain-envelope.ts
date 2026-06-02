@@ -1,7 +1,6 @@
-import { DomainNamespaceResolutionError } from './contract-validation-error';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
 
-export const UNBOUND_DOMAIN_NAMESPACE_ID = '__unbound__' as const;
+export { UNBOUND_DOMAIN_NAMESPACE_ID } from './default-namespace';
 
 /**
  * One namespace's application-domain entities — models and optional value
@@ -27,61 +26,3 @@ export interface ApplicationDomain<
 export type ContractWithDomain = {
   readonly domain: ApplicationDomain;
 };
-
-export function resolveSingleDomainNamespaceId(
-  domain: ApplicationDomain,
-  namespaceId?: string,
-): string {
-  if (namespaceId !== undefined) {
-    if (!Object.hasOwn(domain.namespaces, namespaceId)) {
-      throw new DomainNamespaceResolutionError(
-        `domain namespace "${namespaceId}" is not present on the contract`,
-      );
-    }
-    return namespaceId;
-  }
-
-  const namespaceIds = Object.keys(domain.namespaces);
-  if (namespaceIds.length === 0) {
-    throw new DomainNamespaceResolutionError('domain has no namespaces');
-  }
-  if (namespaceIds.length > 1) {
-    throw new DomainNamespaceResolutionError(
-      `expected exactly one domain namespace, found ${namespaceIds.length} (${namespaceIds.join(', ')})`,
-    );
-  }
-  const [soleNamespaceId] = namespaceIds;
-  if (soleNamespaceId === undefined) {
-    throw new DomainNamespaceResolutionError('domain has no namespaces');
-  }
-  return soleNamespaceId;
-}
-
-// Transitional single-namespace projection; pending runtime-qualification slice.
-export function contractModels<TModels extends Record<string, ContractModelBase>>(
-  contract: { readonly domain: ApplicationDomain<TModels> },
-  namespaceId?: string,
-): TModels {
-  const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
-  const domainNamespace = contract.domain.namespaces[resolved];
-  if (domainNamespace === undefined) {
-    throw new DomainNamespaceResolutionError(
-      `domain namespace "${resolved}" is not present on the contract`,
-    );
-  }
-  return domainNamespace.models;
-}
-
-export function contractValueObjects<TModels extends Record<string, ContractModelBase>>(
-  contract: { readonly domain: ApplicationDomain<TModels> },
-  namespaceId?: string,
-): Record<string, ContractValueObject> | undefined {
-  const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
-  const domainNamespace = contract.domain.namespaces[resolved];
-  if (domainNamespace === undefined) {
-    throw new DomainNamespaceResolutionError(
-      `domain namespace "${resolved}" is not present on the contract`,
-    );
-  }
-  return domainNamespace.valueObjects;
-}

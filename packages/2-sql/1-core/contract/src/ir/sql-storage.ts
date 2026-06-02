@@ -69,6 +69,13 @@ export interface SqlStorageInput<THash extends string = string> {
 export type SqlNamespace = Namespace & {
   readonly tables: Readonly<Record<string, StorageTable>>;
   readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+  /**
+   * Render a dialect-qualified table reference for runtime SQL emission.
+   * Present on materialised target concretions (`PostgresSchema`,
+   * `SqliteDatabase`, …) and family placeholders; omitted on emitted
+   * contract structural namespace literals (methods are not serialised).
+   */
+  qualifyTable?(tableName: string): string;
 };
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {

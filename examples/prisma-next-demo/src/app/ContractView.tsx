@@ -1,4 +1,3 @@
-import { contractModels } from '@prisma-next/contract/types';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import type { Contract, Models } from '../prisma/contract.d';
 
@@ -134,14 +133,16 @@ export function ContractView({ contract }: { contract: Contract }) {
       <Section title={`Target: ${contract.target}`}>{null}</Section>
 
       <Section title="Models">
-        {Object.entries(contractModels(contract) as Models).map(([modelName, model]) => (
-          <ModelCard key={modelName} modelName={modelName} model={model} />
-        ))}
+        {Object.entries(contract.domain.namespaces).flatMap(([namespaceId, ns]) =>
+          Object.entries(ns.models).map(([modelName, model]) => (
+            <ModelCard key={`${namespaceId}.${modelName}`} modelName={modelName} model={model} />
+          )),
+        )}
       </Section>
 
       <Section title="Tables">
         {Object.values(contract.storage.namespaces).flatMap((ns) =>
-          Object.entries(ns.tables as Record<string, StorageTable>).map(([tableName, table]) => (
+          Object.entries(ns.tables).map(([tableName, table]) => (
             <TableCard key={`${ns.id}.${tableName}`} tableName={tableName} table={table} />
           )),
         )}

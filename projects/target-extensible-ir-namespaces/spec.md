@@ -142,7 +142,7 @@ Two load-bearing properties:
 # Open Questions
 
 1. **Does the close-out absorb the legacy-project-folders cleanup**, or is that a separate housekeeping pass? Working position: **absorb at close-out**.
-2. **Does runtime-qualification produce a long-lived ADR** about the default-namespace family-façade convention? Working position: **likely yes** — "family façade hardcodes its own default namespace" is a convention future families will need.
+2. **Does runtime-qualification produce a long-lived ADR** about default-namespace ownership? Resolved: **yes** — ADR 223 (target-owned default namespace) records that a target declares its default namespace on its descriptor (`defaultNamespaceId`), consumed only by authoring, with target-agnostic runtime resolution.
 3. **Does explicit-dsl produce a long-lived ADR** about the namespace-aware DSL/ORM surface shape? Working position: **likely yes** — but owned by TML-2550 now that explicit-dsl is elevated out of this project.
 
 # References

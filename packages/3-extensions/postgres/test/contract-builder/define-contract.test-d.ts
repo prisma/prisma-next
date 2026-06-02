@@ -1,4 +1,4 @@
-import type { ContractModelsMap } from '@prisma-next/contract/types';
+import type { ContractModelDefinitions } from '@prisma-next/contract/types';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import { expectTypeOf } from 'vitest';
 
@@ -20,7 +20,7 @@ const withModel = defineContract({
   },
 });
 expectTypeOf(withModel.target).toEqualTypeOf<'postgres'>();
-expectTypeOf<ContractModelsMap<typeof withModel>['User']>().not.toBeNever();
+expectTypeOf<ContractModelDefinitions<typeof withModel>['User']>().not.toBeNever();
 
 const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   models: {
@@ -28,4 +28,4 @@ const withFactory = defineContract({}, ({ model: m, field: f }) => ({
   },
 }));
 expectTypeOf(withFactory.target).toEqualTypeOf<'postgres'>();
-expectTypeOf<ContractModelsMap<typeof withFactory>['Post']>().not.toBeNever();
+expectTypeOf<ContractModelDefinitions<typeof withFactory>['Post']>().not.toBeNever();

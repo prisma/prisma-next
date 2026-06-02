@@ -1,25 +1,25 @@
 export type {
   Contract,
   ContractExecutionSection,
-  ContractModelsMap,
-  ContractValueObjectsMap,
+  ContractModelDefinitions,
+  ContractValueObjectDefinitions,
 } from '../contract-types';
 export { DomainNamespaceResolutionError } from '../contract-validation-error';
 export type { ControlPolicy } from '../control-policy';
 export { effectiveControlPolicy } from '../control-policy';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
+export { soleDomainNamespaceId } from '../default-namespace';
 export type {
   ApplicationDomain,
   ApplicationDomainNamespace,
   ContractWithDomain,
 } from '../domain-envelope';
+export { UNBOUND_DOMAIN_NAMESPACE_ID } from '../domain-envelope';
 export {
-  contractModels,
-  contractValueObjects,
-  resolveSingleDomainNamespaceId,
-  UNBOUND_DOMAIN_NAMESPACE_ID,
-} from '../domain-envelope';
+  domainModelsAtDefaultNamespace,
+  domainValueObjectsAtDefaultNamespace,
+} from '../domain-namespace-access';
 export type {
   ContractDiscriminator,
   ContractEmbedRelation,
@@ -41,6 +41,7 @@ export type {
 } from '../domain-types';
 export type { NamespaceId } from '../namespace-id';
 export { asNamespaceId } from '../namespace-id';
+export { type ResolvedDomainModel, resolveDomainModel } from '../resolve-domain-model';
 export type {
   $,
   Brand,

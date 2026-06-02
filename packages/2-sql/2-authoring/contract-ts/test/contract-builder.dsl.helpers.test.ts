@@ -135,6 +135,7 @@ const postgresTargetPack = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
   authoring: {
     type: {
       enum: {

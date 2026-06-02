@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   AggregateExpr,
   AndExpr,
@@ -678,10 +679,15 @@ describe('compileSelect MTI JOINs', () => {
     const plan = compileSelect(contract, 'tasks', emptyState(), 'Task');
 
     expect(plan.ast).toEqual(
-      SelectAst.from(TableSource.named('tasks'))
+      SelectAst.from(TableSource.named('tasks', undefined, UNBOUND_NAMESPACE_ID))
         .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
         .withSelectAllIntent({ table: 'tasks' })
-        .withJoins([JoinAst.left(TableSource.named('features'), featuresJoinOn)]),
+        .withJoins([
+          JoinAst.left(
+            TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
+            featuresJoinOn,
+          ),
+        ]),
     );
   });
 
@@ -705,10 +711,15 @@ describe('compileSelect MTI JOINs', () => {
     const plan = compileSelect(contract, 'tasks', state, 'Task');
 
     expect(plan.ast).toEqual(
-      SelectAst.from(TableSource.named('tasks'))
+      SelectAst.from(TableSource.named('tasks', undefined, UNBOUND_NAMESPACE_ID))
         .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
         .withSelectAllIntent({ table: 'tasks' })
-        .withJoins([JoinAst.inner(TableSource.named('features'), featuresJoinOn)]),
+        .withJoins([
+          JoinAst.inner(
+            TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
+            featuresJoinOn,
+          ),
+        ]),
     );
   });
 
@@ -725,7 +736,7 @@ describe('compileSelect MTI JOINs', () => {
     const plan = compileSelect(contract, 'tasks', state, 'Task');
 
     expect(plan.ast).toEqual(
-      SelectAst.from(TableSource.named('tasks'))
+      SelectAst.from(TableSource.named('tasks', undefined, UNBOUND_NAMESPACE_ID))
         .withProjection(tasksBaseProjection)
         .withSelectAllIntent({ table: 'tasks' }),
     );
@@ -735,7 +746,7 @@ describe('compileSelect MTI JOINs', () => {
     const plan = compileSelect(baseContract, 'users', emptyState(), 'User');
 
     expect(plan.ast).toEqual(
-      SelectAst.from(TableSource.named('users'))
+      SelectAst.from(TableSource.named('users', undefined, 'public'))
         .withProjection(
           projectionFor(baseContract, 'users', ['address', 'email', 'id', 'invited_by_id', 'name']),
         )

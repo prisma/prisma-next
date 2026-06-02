@@ -1,14 +1,19 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type {
+  UnboundTables as SqlBuilderUnboundTables,
+  TableProxyContract,
+} from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { DrainOuterGeneric } from './type-atoms';
 
 /**
- * Resolves the tables in the late-binding (`__unbound__`) namespace of a SQL
- * contract. Builder surfaces address tables by their unqualified name today;
- * the unbound namespace is the slot the target resolves at connection time.
+ * Flat table map for the query-builder surface: every table name declared in
+ * any storage namespace, with colliding names unioned (parity with
+ * `@prisma-next/sql-builder`).
  */
-export type UnboundTables<TContract extends Contract<SqlStorage>> =
-  TContract['storage']['namespaces']['__unbound__']['tables'];
+export type UnboundTables<TContract extends Contract<SqlStorage>> = SqlBuilderUnboundTables<
+  TContract & TableProxyContract
+>;
 
 /**
  * A utility type to extract the output type of a referenced column from a contract.

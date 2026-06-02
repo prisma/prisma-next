@@ -61,10 +61,12 @@ export interface Contract<
   readonly defaultControl?: ControlPolicy;
 }
 
-export type ContractModelsMap<TContract extends Contract> =
+/** Model definitions union carried on a {@link Contract}'s `TModels` type parameter. */
+export type ContractModelDefinitions<TContract extends Contract> =
   TContract extends Contract<StorageBase, infer TModels> ? TModels : never;
 
-type ExactlyOneKey<T extends Record<string, unknown>> = keyof T extends infer Only extends keyof T
+type ExactlyOneNamespace<T extends Record<string, unknown>> = keyof T extends infer Only extends
+  keyof T
   ? [keyof T] extends [Only]
     ? Only
     : never
@@ -78,10 +80,10 @@ type NamespaceValueObjectsOf<TNamespace> = TNamespace extends {
     : Record<never, never>
   : Record<never, never>;
 
-/** Value-object map for the contract's sole domain namespace (type-level single-namespace projection). */
-export type ContractValueObjectsMap<TContract extends Contract> =
+/** Value-object map when the contract declares exactly one domain namespace. */
+export type ContractValueObjectDefinitions<TContract extends Contract> =
   NamespaceValueObjectsOf<
-    TContract['domain']['namespaces'][ExactlyOneKey<TContract['domain']['namespaces']>]
+    TContract['domain']['namespaces'][ExactlyOneNamespace<TContract['domain']['namespaces']>]
   > extends infer Projected
     ? Projected extends Record<string, ContractValueObject>
       ? Projected

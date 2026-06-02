@@ -66,6 +66,13 @@ class SqlBoundNamespace extends NamespaceBase {
     });
     freezeNode(this);
   }
+
+  qualifyTable(tableName: string): string {
+    if (this.id === UNBOUND_NAMESPACE_ID) {
+      return `"${tableName}"`;
+    }
+    return `"${this.id}"."${tableName}"`;
+  }
 }
 
 export function buildSqlNamespace(input: SqlNamespaceTablesInput): SqlNamespace {

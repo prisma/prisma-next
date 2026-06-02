@@ -405,7 +405,9 @@ export function createStubAdapter(): StubAdapter {
   };
 }
 
-export function unboundNamespaceWithTables(tables: Record<string, StorageTableInput>) {
+export function unboundNamespaceWithTables(
+  tables: Record<string, StorageTableInput>,
+): ReturnType<typeof buildSqlNamespace> {
   return buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables });
 }
 

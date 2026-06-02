@@ -19,6 +19,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { type MongoTargetContract, mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import postgres from '@prisma-next/target-postgres/control';
+import postgresPackRef from '@prisma-next/target-postgres/pack';
 import { timeouts } from '@prisma-next/test-utils';
 import { dirname, join } from 'pathe';
 import { describe, expect, it } from 'vitest';
@@ -155,7 +156,7 @@ describe('side-by-side contract examples', () => {
 
       const fixture = await loadFixture(fixtureCase);
       const provider = prismaContract(fixtureCase.contractPslPath, {
-        target: postgres,
+        target: postgresPackRef,
       });
 
       const providerResult = await provider.source.load({

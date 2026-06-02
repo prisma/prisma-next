@@ -16,6 +16,7 @@ const postgresTargetPackRef: TargetPackRef<'sql', 'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 };
 
 const postgresScalarTypeDescriptors = new Map([

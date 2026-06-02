@@ -1,4 +1,4 @@
-import type { Contract, ContractModelsMap } from '@prisma-next/contract/types';
+import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
 import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import type {
   ExtractCodecTypes,
@@ -523,7 +523,7 @@ export type ShorthandWhereFilter<
     | undefined;
 }>;
 
-type ModelsOf<TContract extends Contract<SqlStorage>> = ContractModelsMap<TContract>;
+type ModelsOf<TContract extends Contract<SqlStorage>> = ContractModelDefinitions<TContract>;
 
 type ModelDef<
   TContract extends Contract<SqlStorage>,

@@ -28,6 +28,7 @@ const postgresTargetPack = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  defaultNamespaceId: 'public',
 } as const satisfies PortableTargetPack<'postgres'>;
 
 const sqliteTargetPack = {
@@ -36,6 +37,7 @@ const sqliteTargetPack = {
   familyId: 'sql',
   targetId: 'sqlite',
   version: '0.0.1',
+  defaultNamespaceId: '__unbound__',
 } as const satisfies PortableTargetPack<'sqlite'>;
 
 const uuidColumn = columnDescriptor('sql/char@1', 'character', { length: 36 });
