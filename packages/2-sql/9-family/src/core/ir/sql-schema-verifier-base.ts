@@ -28,6 +28,12 @@ import type {
 export abstract class SqlSchemaVerifierBase<TContract, TSchema>
   implements SchemaVerifier<TContract, TSchema>
 {
+  /**
+   * Target-supplied compatible-shape relation for `external` column checks.
+   * Conservative: identical normalized types, or an explicitly-listed pair.
+   */
+  protected abstract columnsCompatible(declared: string, live: string): boolean;
+
   verifySchema(options: SchemaVerifyOptions<TContract, TSchema>): SchemaVerifyResult {
     const issues: SchemaIssue[] = [];
     issues.push(...this.verifyCommonSqlSchema(options));

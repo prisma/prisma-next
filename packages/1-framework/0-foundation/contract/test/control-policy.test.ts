@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveControlPolicy } from '../src/control-policy';
+import { effectiveControlPolicy, verifierDisposition } from '../src/control-policy';
 
 describe('effectiveControlPolicy', () => {
   describe('precedence: node → default → managed', () => {
@@ -48,5 +48,33 @@ describe('effectiveControlPolicy', () => {
     it('resolves observed via default', () => {
       expect(effectiveControlPolicy(undefined, 'observed')).toBe('observed');
     });
+  });
+});
+
+describe('verifierDisposition', () => {
+  it('fails declared drift under managed', () => {
+    expect(verifierDisposition('managed', 'missing_column')).toBe('fail');
+    expect(verifierDisposition('managed', 'type_mismatch')).toBe('fail');
+    expect(verifierDisposition('managed', 'extra_column')).toBe('fail');
+    expect(verifierDisposition('managed', 'extra_index')).toBe('fail');
+  });
+
+  it('suppresses extra columns only under tolerated', () => {
+    expect(verifierDisposition('tolerated', 'extra_column')).toBe('suppress');
+    expect(verifierDisposition('tolerated', 'missing_column')).toBe('fail');
+    expect(verifierDisposition('tolerated', 'extra_index')).toBe('fail');
+  });
+
+  it('suppresses extra columns and constraints under external', () => {
+    expect(verifierDisposition('external', 'extra_column')).toBe('suppress');
+    expect(verifierDisposition('external', 'extra_index')).toBe('suppress');
+    expect(verifierDisposition('external', 'type_mismatch')).toBe('fail');
+    expect(verifierDisposition('external', 'missing_table')).toBe('fail');
+  });
+
+  it('warns on every kind under observed', () => {
+    expect(verifierDisposition('observed', 'missing_column')).toBe('warn');
+    expect(verifierDisposition('observed', 'extra_column')).toBe('warn');
+    expect(verifierDisposition('observed', 'extra_index')).toBe('warn');
   });
 });

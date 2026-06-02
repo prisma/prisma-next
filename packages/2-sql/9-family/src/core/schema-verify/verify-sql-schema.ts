@@ -6,7 +6,8 @@
  * by migration planners and other tools that need to compare schema states.
  */
 
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract, ControlPolicy } from '@prisma-next/contract/types';
+import { effectiveControlPolicy, verifierDisposition } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   OperationContext,
@@ -29,6 +30,7 @@ import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import type { CodecControlHooks } from '../migrations/types';
+import { pushControlledFinding } from './control-verify-emit';
 import {
   arraysEqual,
   computeCounts,
@@ -37,6 +39,8 @@ import {
   verifyPrimaryKey,
   verifyUniqueConstraints,
 } from './verify-helpers';
+
+export type ColumnsCompatible = (declared: string, live: string) => boolean;
 
 /**
  * Function type for normalizing raw database default expressions into ColumnDefault.
@@ -101,6 +105,11 @@ export interface VerifySqlSchemaOptions {
     enumType: PostgresEnumStorageEntry,
     namespaceId: string,
   ) => readonly string[] | null;
+  /**
+   * Target-supplied compatible-shape relation for `external` column type checks.
+   * Defaults to exact string equality when omitted.
+   */
+  readonly columnsCompatible?: ColumnsCompatible;
 }
 
 /**
@@ -123,6 +132,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     normalizeDefault,
     normalizeNativeType,
     resolveExistingEnumValues,
+    columnsCompatible,
   } = options;
   const startTime = Date.now();
 
@@ -159,6 +169,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
+    ...ifDefined('columnsCompatible', columnsCompatible),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -386,6 +397,7 @@ function verifySchemaTables(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  columnsCompatible?: ColumnsCompatible;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
   const {
     contract,
@@ -396,7 +408,9 @@ function verifySchemaTables(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    columnsCompatible,
   } = options;
+  const contractDefaultControl = contract.defaultControl;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
   const schemaTables = schema.tables;
@@ -414,27 +428,34 @@ function verifySchemaTables(options: {
         );
       }
       const contractTable = contractTableRaw;
+      const tableControl = effectiveControlPolicy(contractTable.control, contractDefaultControl);
       const schemaTable = schemaTables[tableName];
       const tablePath = `storage.namespaces.${namespaceId}.tables.${tableName}`;
 
       if (!schemaTable) {
-        issues.push({
+        const issue: SchemaIssue = {
           kind: 'missing_table',
           table: tableName,
           namespaceId,
           message: `Table "${tableName}" is missing from database`,
-        });
-        rootChildren.push({
-          status: 'fail',
-          kind: 'table',
-          name: `table ${tableName}`,
-          contractPath: tablePath,
-          code: 'missing_table',
-          message: `Table "${tableName}" is missing`,
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        });
+        };
+        pushControlledFinding(
+          tableControl,
+          issue,
+          {
+            status: 'fail',
+            kind: 'table',
+            name: `table ${tableName}`,
+            contractPath: tablePath,
+            code: 'missing_table',
+            message: `Table "${tableName}" is missing`,
+            expected: undefined,
+            actual: undefined,
+            children: [],
+          },
+          issues,
+          rootChildren,
+        );
         continue;
       }
 
@@ -444,6 +465,7 @@ function verifySchemaTables(options: {
         tableName,
         namespaceId,
         tablePath,
+        tableControl,
         issues,
         strict,
         typeMetadataRegistry,
@@ -451,6 +473,7 @@ function verifySchemaTables(options: {
         storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
+        ...ifDefined('columnsCompatible', columnsCompatible),
       });
       rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
     }
@@ -462,26 +485,29 @@ function verifySchemaTables(options: {
         (namespaceId) => contract.storage.namespaces[namespaceId]?.tables[tableName] !== undefined,
       );
       if (!claimed) {
-        // `namespaceId` is intentionally absent: an extra table exists in the
-        // live database but is not claimed by any contract namespace, so there
-        // is no contract coordinate to stamp here. Planners that consume this
-        // issue must handle the unstamped case (drop / quarantine by name).
-        issues.push({
+        const extraTableControl = effectiveControlPolicy(undefined, contractDefaultControl);
+        const issue: SchemaIssue = {
           kind: 'extra_table',
           table: tableName,
           message: `Extra table "${tableName}" found in database (not in contract)`,
-        });
-        rootChildren.push({
-          status: 'fail',
-          kind: 'table',
-          name: `table ${tableName}`,
-          contractPath: `storage.namespaces.*.tables.${tableName}`,
-          code: 'extra_table',
-          message: `Extra table "${tableName}" found`,
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        });
+        };
+        pushControlledFinding(
+          extraTableControl,
+          issue,
+          {
+            status: 'fail',
+            kind: 'table',
+            name: `table ${tableName}`,
+            contractPath: `storage.namespaces.*.tables.${tableName}`,
+            code: 'extra_table',
+            message: `Extra table "${tableName}" found`,
+            expected: undefined,
+            actual: undefined,
+            children: [],
+          },
+          issues,
+          rootChildren,
+        );
       }
     }
   }
@@ -495,6 +521,7 @@ function verifyTableChildren(options: {
   tableName: string;
   namespaceId: string;
   tablePath: string;
+  tableControl: ControlPolicy;
   issues: SchemaIssue[];
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
@@ -502,6 +529,7 @@ function verifyTableChildren(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -509,6 +537,7 @@ function verifyTableChildren(options: {
     tableName,
     namespaceId,
     tablePath,
+    tableControl,
     issues,
     strict,
     typeMetadataRegistry,
@@ -516,6 +545,7 @@ function verifyTableChildren(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    columnsCompatible,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
@@ -524,6 +554,7 @@ function verifyTableChildren(options: {
     tableName,
     namespaceId,
     tablePath,
+    tableControl,
     issues,
     strict,
     typeMetadataRegistry,
@@ -531,6 +562,7 @@ function verifyTableChildren(options: {
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
+    ...ifDefined('columnsCompatible', columnsCompatible),
   });
   if (columnNodes.length > 0) {
     tableChildren.push(buildColumnsNode(tablePath, columnNodes));
@@ -542,6 +574,7 @@ function verifyTableChildren(options: {
       tableName,
       namespaceId,
       tablePath,
+      tableControl,
       issues,
       columnNodes,
     });
@@ -553,11 +586,24 @@ function verifyTableChildren(options: {
       schemaTable.primaryKey,
       tableName,
       namespaceId,
+      tableControl,
       issues,
     );
     if (pkStatus === 'fail') {
       tableChildren.push({
         status: 'fail',
+        kind: 'primaryKey',
+        name: `primary key: ${contractTable.primaryKey.columns.join(', ')}`,
+        contractPath: `${tablePath}.primaryKey`,
+        code: 'primary_key_mismatch',
+        message: 'Primary key mismatch',
+        expected: contractTable.primaryKey,
+        actual: schemaTable.primaryKey,
+        children: [],
+      });
+    } else if (pkStatus === 'warn') {
+      tableChildren.push({
+        status: 'warn',
         kind: 'primaryKey',
         name: `primary key: ${contractTable.primaryKey.columns.join(', ')}`,
         contractPath: `${tablePath}.primaryKey`,
@@ -581,23 +627,29 @@ function verifyTableChildren(options: {
       });
     }
   } else if (schemaTable.primaryKey && strict) {
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'extra_primary_key',
       table: tableName,
       namespaceId,
       message: 'Extra primary key found in database (not in contract)',
-    });
-    tableChildren.push({
-      status: 'fail',
-      kind: 'primaryKey',
-      name: `primary key: ${schemaTable.primaryKey.columns.join(', ')}`,
-      contractPath: `${tablePath}.primaryKey`,
-      code: 'extra_primary_key',
-      message: 'Extra primary key found',
-      expected: undefined,
-      actual: schemaTable.primaryKey,
-      children: [],
-    });
+    };
+    pushControlledFinding(
+      tableControl,
+      issue,
+      {
+        status: 'fail',
+        kind: 'primaryKey',
+        name: `primary key: ${schemaTable.primaryKey.columns.join(', ')}`,
+        contractPath: `${tablePath}.primaryKey`,
+        code: 'extra_primary_key',
+        message: 'Extra primary key found',
+        expected: undefined,
+        actual: schemaTable.primaryKey,
+        children: [],
+      },
+      issues,
+      tableChildren,
+    );
   }
 
   // Verify FK constraints only for FKs with constraint: true.
@@ -611,6 +663,7 @@ function verifyTableChildren(options: {
       tableName,
       namespaceId,
       tablePath,
+      tableControl,
       issues,
       strict,
     );
@@ -624,6 +677,7 @@ function verifyTableChildren(options: {
     tableName,
     namespaceId,
     tablePath,
+    tableControl,
     issues,
     strict,
   );
@@ -648,6 +702,7 @@ function verifyTableChildren(options: {
     tableName,
     namespaceId,
     tablePath,
+    tableControl,
     issues,
     strict,
   );
@@ -662,6 +717,7 @@ function collectContractColumnNodes(options: {
   tableName: string;
   namespaceId: string;
   tablePath: string;
+  tableControl: ControlPolicy;
   issues: SchemaIssue[];
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
@@ -669,6 +725,7 @@ function collectContractColumnNodes(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -676,6 +733,7 @@ function collectContractColumnNodes(options: {
     tableName,
     namespaceId,
     tablePath,
+    tableControl,
     issues,
     strict,
     typeMetadataRegistry,
@@ -683,6 +741,7 @@ function collectContractColumnNodes(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    columnsCompatible,
   } = options;
   const columnNodes: SchemaVerificationNode[] = [];
 
@@ -691,24 +750,30 @@ function collectContractColumnNodes(options: {
     const columnPath = `${tablePath}.columns.${columnName}`;
 
     if (!schemaColumn) {
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'missing_column',
         table: tableName,
         namespaceId,
         column: columnName,
         message: `Column "${tableName}"."${columnName}" is missing from database`,
-      });
-      columnNodes.push({
-        status: 'fail',
-        kind: 'column',
-        name: `${columnName}: missing`,
-        contractPath: columnPath,
-        code: 'missing_column',
-        message: `Column "${columnName}" is missing`,
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
+      };
+      pushControlledFinding(
+        tableControl,
+        issue,
+        {
+          status: 'fail',
+          kind: 'column',
+          name: `${columnName}: missing`,
+          contractPath: columnPath,
+          code: 'missing_column',
+          message: `Column "${columnName}" is missing`,
+          expected: undefined,
+          actual: undefined,
+          children: [],
+        },
+        issues,
+        columnNodes,
+      );
       continue;
     }
 
@@ -720,6 +785,7 @@ function collectContractColumnNodes(options: {
         contractColumn,
         schemaColumn,
         columnPath,
+        tableControl,
         issues,
         strict,
         typeMetadataRegistry,
@@ -727,6 +793,7 @@ function collectContractColumnNodes(options: {
         storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
+        ...ifDefined('columnsCompatible', columnsCompatible),
       }),
     );
   }
@@ -740,31 +807,46 @@ function appendExtraColumnNodes(options: {
   tableName: string;
   namespaceId: string;
   tablePath: string;
+  tableControl: ControlPolicy;
   issues: SchemaIssue[];
   columnNodes: SchemaVerificationNode[];
 }): void {
-  const { contractTable, schemaTable, tableName, namespaceId, tablePath, issues, columnNodes } =
-    options;
+  const {
+    contractTable,
+    schemaTable,
+    tableName,
+    namespaceId,
+    tablePath,
+    tableControl,
+    issues,
+    columnNodes,
+  } = options;
   for (const [columnName, { nativeType }] of Object.entries(schemaTable.columns)) {
     if (!contractTable.columns[columnName]) {
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'extra_column',
         table: tableName,
         namespaceId,
         column: columnName,
         message: `Extra column "${tableName}"."${columnName}" found in database (not in contract)`,
-      });
-      columnNodes.push({
-        status: 'fail',
-        kind: 'column',
-        name: `${columnName}: extra`,
-        contractPath: `${tablePath}.columns.${columnName}`,
-        code: 'extra_column',
-        message: `Extra column "${columnName}" found`,
-        expected: undefined,
-        actual: nativeType,
-        children: [],
-      });
+      };
+      pushControlledFinding(
+        tableControl,
+        issue,
+        {
+          status: 'fail',
+          kind: 'column',
+          name: `${columnName}: extra`,
+          contractPath: `${tablePath}.columns.${columnName}`,
+          code: 'extra_column',
+          message: `Extra column "${columnName}" found`,
+          expected: undefined,
+          actual: nativeType,
+          children: [],
+        },
+        issues,
+        columnNodes,
+      );
     }
   }
 }
@@ -776,6 +858,7 @@ function verifyColumn(options: {
   contractColumn: StorageTable['columns'][string];
   schemaColumn: SqlSchemaIR['tables'][string]['columns'][string];
   columnPath: string;
+  tableControl: ControlPolicy;
   issues: SchemaIssue[];
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
@@ -783,6 +866,7 @@ function verifyColumn(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode {
   const {
     tableName,
@@ -791,12 +875,14 @@ function verifyColumn(options: {
     contractColumn,
     schemaColumn,
     columnPath,
+    tableControl,
     issues,
     strict,
     codecHooks,
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    columnsCompatible,
   } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
@@ -812,8 +898,14 @@ function verifyColumn(options: {
   const schemaNativeType =
     normalizeNativeType?.(schemaColumn.nativeType) ?? schemaColumn.nativeType;
 
-  if (contractNativeType !== schemaNativeType) {
-    issues.push({
+  const typesMatch =
+    contractNativeType === schemaNativeType ||
+    (tableControl === 'external' &&
+      (columnsCompatible?.(contractNativeType, schemaNativeType) ??
+        contractNativeType === schemaNativeType));
+
+  if (!typesMatch) {
+    const issue: SchemaIssue = {
       kind: 'type_mismatch',
       table: tableName,
       namespaceId,
@@ -821,19 +913,23 @@ function verifyColumn(options: {
       expected: contractNativeType,
       actual: schemaNativeType,
       message: `Column "${tableName}"."${columnName}" has type mismatch: expected "${contractNativeType}", got "${schemaNativeType}"`,
-    });
-    columnChildren.push({
-      status: 'fail',
-      kind: 'type',
-      name: 'type',
-      contractPath: `${columnPath}.nativeType`,
-      code: 'type_mismatch',
-      message: `Type mismatch: expected ${contractNativeType}, got ${schemaNativeType}`,
-      expected: contractNativeType,
-      actual: schemaNativeType,
-      children: [],
-    });
-    columnStatus = 'fail';
+    };
+    const disposition = verifierDisposition(tableControl, issue.kind);
+    if (disposition !== 'suppress') {
+      issues.push(issue);
+      columnChildren.push({
+        status: disposition,
+        kind: 'type',
+        name: 'type',
+        contractPath: `${columnPath}.nativeType`,
+        code: 'type_mismatch',
+        message: `Type mismatch: expected ${contractNativeType}, got ${schemaNativeType}`,
+        expected: contractNativeType,
+        actual: schemaNativeType,
+        children: [],
+      });
+      columnStatus = disposition;
+    }
   }
 
   if (resolvedContractColumn.codecId) {
@@ -869,7 +965,7 @@ function verifyColumn(options: {
   }
 
   if (contractColumn.nullable !== schemaColumn.nullable) {
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'nullability_mismatch',
       table: tableName,
       namespaceId,
@@ -877,44 +973,52 @@ function verifyColumn(options: {
       expected: String(contractColumn.nullable),
       actual: String(schemaColumn.nullable),
       message: `Column "${tableName}"."${columnName}" has nullability mismatch: expected ${contractColumn.nullable ? 'nullable' : 'not null'}, got ${schemaColumn.nullable ? 'nullable' : 'not null'}`,
-    });
-    columnChildren.push({
-      status: 'fail',
-      kind: 'nullability',
-      name: 'nullability',
-      contractPath: `${columnPath}.nullable`,
-      code: 'nullability_mismatch',
-      message: `Nullability mismatch: expected ${contractColumn.nullable ? 'nullable' : 'not null'}, got ${schemaColumn.nullable ? 'nullable' : 'not null'}`,
-      expected: contractColumn.nullable,
-      actual: schemaColumn.nullable,
-      children: [],
-    });
-    columnStatus = 'fail';
+    };
+    const disposition = verifierDisposition(tableControl, issue.kind);
+    if (disposition !== 'suppress') {
+      issues.push(issue);
+      columnChildren.push({
+        status: disposition,
+        kind: 'nullability',
+        name: 'nullability',
+        contractPath: `${columnPath}.nullable`,
+        code: 'nullability_mismatch',
+        message: `Nullability mismatch: expected ${contractColumn.nullable ? 'nullable' : 'not null'}, got ${schemaColumn.nullable ? 'nullable' : 'not null'}`,
+        expected: contractColumn.nullable,
+        actual: schemaColumn.nullable,
+        children: [],
+      });
+      columnStatus = disposition;
+    }
   }
 
   if (contractColumn.default) {
     if (!schemaColumn.default) {
       const defaultDescription = describeColumnDefault(contractColumn.default);
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'default_missing',
         table: tableName,
         namespaceId,
         column: columnName,
         expected: defaultDescription,
         message: `Column "${tableName}"."${columnName}" should have default ${defaultDescription} but database has no default`,
-      });
-      columnChildren.push({
-        status: 'fail',
-        kind: 'default',
-        name: 'default',
-        contractPath: `${columnPath}.default`,
-        code: 'default_missing',
-        message: `Default missing: expected ${defaultDescription}`,
-        expected: defaultDescription,
-        actual: undefined,
-        children: [],
-      });
-      columnStatus = 'fail';
+      };
+      const disposition = verifierDisposition(tableControl, issue.kind);
+      if (disposition !== 'suppress') {
+        issues.push(issue);
+        columnChildren.push({
+          status: disposition,
+          kind: 'default',
+          name: 'default',
+          contractPath: `${columnPath}.default`,
+          code: 'default_missing',
+          message: `Default missing: expected ${defaultDescription}`,
+          expected: defaultDescription,
+          actual: undefined,
+          children: [],
+        });
+        columnStatus = disposition;
+      }
     } else if (
       !columnDefaultsEqual(
         contractColumn.default,
@@ -924,9 +1028,8 @@ function verifyColumn(options: {
       )
     ) {
       const expectedDescription = describeColumnDefault(contractColumn.default);
-      // schemaColumn.default is now a raw string, describe it as-is
       const actualDescription = schemaColumn.default;
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'default_mismatch',
         table: tableName,
         namespaceId,
@@ -934,41 +1037,49 @@ function verifyColumn(options: {
         expected: expectedDescription,
         actual: actualDescription,
         message: `Column "${tableName}"."${columnName}" has default mismatch: expected ${expectedDescription}, got ${actualDescription}`,
-      });
-      columnChildren.push({
-        status: 'fail',
-        kind: 'default',
-        name: 'default',
-        contractPath: `${columnPath}.default`,
-        code: 'default_mismatch',
-        message: `Default mismatch: expected ${expectedDescription}, got ${actualDescription}`,
-        expected: expectedDescription,
-        actual: actualDescription,
-        children: [],
-      });
-      columnStatus = 'fail';
+      };
+      const disposition = verifierDisposition(tableControl, issue.kind);
+      if (disposition !== 'suppress') {
+        issues.push(issue);
+        columnChildren.push({
+          status: disposition,
+          kind: 'default',
+          name: 'default',
+          contractPath: `${columnPath}.default`,
+          code: 'default_mismatch',
+          message: `Default mismatch: expected ${expectedDescription}, got ${actualDescription}`,
+          expected: expectedDescription,
+          actual: actualDescription,
+          children: [],
+        });
+        columnStatus = disposition;
+      }
     }
   } else if (strict && schemaColumn.default) {
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'extra_default',
       table: tableName,
       namespaceId,
       column: columnName,
       actual: schemaColumn.default,
       message: `Column "${tableName}"."${columnName}" has default ${schemaColumn.default} in database but contract specifies no default`,
-    });
-    columnChildren.push({
-      status: 'fail',
-      kind: 'default',
-      name: 'default',
-      contractPath: `${columnPath}.default`,
-      code: 'extra_default',
-      message: `Extra default: ${schemaColumn.default}`,
-      expected: undefined,
-      actual: schemaColumn.default,
-      children: [],
-    });
-    columnStatus = 'fail';
+    };
+    const disposition = verifierDisposition(tableControl, issue.kind);
+    if (disposition !== 'suppress') {
+      issues.push(issue);
+      columnChildren.push({
+        status: disposition,
+        kind: 'default',
+        name: 'default',
+        contractPath: `${columnPath}.default`,
+        code: 'extra_default',
+        message: `Extra default: ${schemaColumn.default}`,
+        expected: undefined,
+        actual: schemaColumn.default,
+        children: [],
+      });
+      columnStatus = disposition;
+    }
   }
 
   // Single-pass aggregation for better performance

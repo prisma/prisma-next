@@ -3,6 +3,8 @@
  * These functions verify schema IR against contract requirements.
  */
 
+import type { ControlPolicy } from '@prisma-next/contract/types';
+import { verifierDisposition } from '@prisma-next/contract/types';
 import type {
   SchemaIssue,
   SchemaVerificationNode,
@@ -15,6 +17,7 @@ import type {
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import type { SqlForeignKeyIR, SqlIndexIR, SqlUniqueIR } from '@prisma-next/sql-schema-ir/types';
+import { pushControlledFinding, pushControlledIssueOnly } from './control-verify-emit';
 
 function indexOptionsLooselyEqual(
   a: Record<string, unknown> | undefined,
@@ -135,35 +138,44 @@ export function verifyPrimaryKey(
   schemaPK: PrimaryKey | undefined,
   tableName: string,
   namespaceId: string,
+  tableControl: ControlPolicy,
   issues: SchemaIssue[],
-): 'pass' | 'fail' {
+): 'pass' | 'warn' | 'fail' {
   if (!schemaPK) {
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'primary_key_mismatch',
       table: tableName,
       namespaceId,
       expected: contractPK.columns.join(', '),
       message: `Table "${tableName}" is missing primary key`,
-    });
-    return 'fail';
+    };
+    pushControlledIssueOnly(tableControl, issue, issues);
+    return dispositionToPkStatus(verifierDisposition(tableControl, issue.kind));
   }
 
   if (!arraysEqual(contractPK.columns, schemaPK.columns)) {
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'primary_key_mismatch',
       table: tableName,
       namespaceId,
       expected: contractPK.columns.join(', '),
       actual: schemaPK.columns.join(', '),
       message: `Table "${tableName}" has primary key mismatch: expected columns [${contractPK.columns.join(', ')}], got [${schemaPK.columns.join(', ')}]`,
-    });
-    return 'fail';
+    };
+    pushControlledIssueOnly(tableControl, issue, issues);
+    return dispositionToPkStatus(verifierDisposition(tableControl, issue.kind));
   }
 
-  // Name differences are ignored for semantic satisfaction.
-  // Names are persisted for deterministic DDL and diagnostics but are not identity.
-
   return 'pass';
+}
+
+function dispositionToPkStatus(
+  disposition: ReturnType<typeof verifierDisposition>,
+): 'pass' | 'warn' | 'fail' {
+  if (disposition === 'suppress') {
+    return 'pass';
+  }
+  return disposition;
 }
 
 /**
@@ -179,6 +191,7 @@ export function verifyForeignKeys(
   tableName: string,
   namespaceId: string,
   tablePath: string,
+  tableControl: ControlPolicy,
   issues: SchemaIssue[],
   strict: boolean,
 ): SchemaVerificationNode[] {
@@ -207,52 +220,62 @@ export function verifyForeignKeys(
     });
 
     if (!matchingFK) {
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'foreign_key_mismatch',
         table: tableName,
         namespaceId,
         expected: `${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
         message: `Table "${tableName}" is missing foreign key: ${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
-      });
-      nodes.push({
-        status: 'fail',
-        kind: 'foreignKey',
-        name: `foreignKey(${contractFK.source.columns.join(', ')})`,
-        contractPath: fkPath,
-        code: 'foreign_key_mismatch',
-        message: 'Foreign key missing',
-        expected: contractFK,
-        actual: undefined,
-        children: [],
-      });
+      };
+      pushControlledFinding(
+        tableControl,
+        issue,
+        {
+          status: 'fail',
+          kind: 'foreignKey',
+          name: `foreignKey(${contractFK.source.columns.join(', ')})`,
+          contractPath: fkPath,
+          code: 'foreign_key_mismatch',
+          message: 'Foreign key missing',
+          expected: contractFK,
+          actual: undefined,
+          children: [],
+        },
+        issues,
+        nodes,
+      );
     } else {
       const actionMismatches = getReferentialActionMismatches(contractFK, matchingFK);
       if (actionMismatches.length > 0) {
         const combinedMessage = actionMismatches.map((m) => m.message).join('; ');
         const combinedExpected = actionMismatches.map((m) => m.expected).join(', ');
         const combinedActual = actionMismatches.map((m) => m.actual).join(', ');
-        issues.push({
+        const issue: SchemaIssue = {
           kind: 'foreign_key_mismatch',
           table: tableName,
           namespaceId,
-          // Set indexOrConstraint so the planner classifies this as a non-additive
-          // conflict (existing FK with wrong actions cannot be fixed additively).
           indexOrConstraint: matchingFK.name ?? `fk(${contractFK.source.columns.join(',')})`,
           expected: combinedExpected,
           actual: combinedActual,
           message: `Table "${tableName}" foreign key ${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}: ${combinedMessage}`,
-        });
-        nodes.push({
-          status: 'fail',
-          kind: 'foreignKey',
-          name: `foreignKey(${contractFK.source.columns.join(', ')})`,
-          contractPath: fkPath,
-          code: 'foreign_key_mismatch',
-          message: combinedMessage,
-          expected: contractFK,
-          actual: matchingFK,
-          children: [],
-        });
+        };
+        pushControlledFinding(
+          tableControl,
+          issue,
+          {
+            status: 'fail',
+            kind: 'foreignKey',
+            name: `foreignKey(${contractFK.source.columns.join(', ')})`,
+            contractPath: fkPath,
+            code: 'foreign_key_mismatch',
+            message: combinedMessage,
+            expected: contractFK,
+            actual: matchingFK,
+            children: [],
+          },
+          issues,
+          nodes,
+        );
       } else {
         nodes.push({
           status: 'pass',
@@ -286,24 +309,30 @@ export function verifyForeignKeys(
       });
 
       if (!matchingFK) {
-        issues.push({
+        const issue: SchemaIssue = {
           kind: 'extra_foreign_key',
           table: tableName,
           namespaceId,
           indexOrConstraint: schemaFK.name ?? `fk(${schemaFK.columns.join(',')})`,
           message: `Extra foreign key found in database (not in contract): ${schemaFK.columns.join(', ')} -> ${schemaFK.referencedTable}(${schemaFK.referencedColumns.join(', ')})`,
-        });
-        nodes.push({
-          status: 'fail',
-          kind: 'foreignKey',
-          name: `foreignKey(${schemaFK.columns.join(', ')})`,
-          contractPath: `${tablePath}.foreignKeys[${schemaFK.columns.join(',')}]`,
-          code: 'extra_foreign_key',
-          message: 'Extra foreign key found',
-          expected: undefined,
-          actual: schemaFK,
-          children: [],
-        });
+        };
+        pushControlledFinding(
+          tableControl,
+          issue,
+          {
+            status: 'fail',
+            kind: 'foreignKey',
+            name: `foreignKey(${schemaFK.columns.join(', ')})`,
+            contractPath: `${tablePath}.foreignKeys[${schemaFK.columns.join(',')}]`,
+            code: 'extra_foreign_key',
+            message: 'Extra foreign key found',
+            expected: undefined,
+            actual: schemaFK,
+            children: [],
+          },
+          issues,
+          nodes,
+        );
       }
     }
   }
@@ -329,6 +358,7 @@ export function verifyUniqueConstraints(
   tableName: string,
   namespaceId: string,
   tablePath: string,
+  tableControl: ControlPolicy,
   issues: SchemaIssue[],
   strict: boolean,
 ): SchemaVerificationNode[] {
@@ -349,27 +379,31 @@ export function verifyUniqueConstraints(
       schemaIndexes.find((idx) => idx.unique && arraysEqual(idx.columns, contractUnique.columns));
 
     if (!matchingUnique && !matchingUniqueIndex) {
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'unique_constraint_mismatch',
         table: tableName,
         namespaceId,
         expected: contractUnique.columns.join(', '),
         message: `Table "${tableName}" is missing unique constraint: ${contractUnique.columns.join(', ')}`,
-      });
-      nodes.push({
-        status: 'fail',
-        kind: 'unique',
-        name: `unique(${contractUnique.columns.join(', ')})`,
-        contractPath: uniquePath,
-        code: 'unique_constraint_mismatch',
-        message: 'Unique constraint missing',
-        expected: contractUnique,
-        actual: undefined,
-        children: [],
-      });
+      };
+      pushControlledFinding(
+        tableControl,
+        issue,
+        {
+          status: 'fail',
+          kind: 'unique',
+          name: `unique(${contractUnique.columns.join(', ')})`,
+          contractPath: uniquePath,
+          code: 'unique_constraint_mismatch',
+          message: 'Unique constraint missing',
+          expected: contractUnique,
+          actual: undefined,
+          children: [],
+        },
+        issues,
+        nodes,
+      );
     } else {
-      // Name differences are ignored for semantic satisfaction.
-      // Names are persisted for deterministic DDL and diagnostics but are not identity.
       nodes.push({
         status: 'pass',
         kind: 'unique',
@@ -384,7 +418,6 @@ export function verifyUniqueConstraints(
     }
   }
 
-  // Check for extra uniques in strict mode
   if (strict) {
     for (const schemaUnique of schemaUniques) {
       const matchingUnique = contractUniques.find((u) =>
@@ -392,24 +425,30 @@ export function verifyUniqueConstraints(
       );
 
       if (!matchingUnique) {
-        issues.push({
+        const issue: SchemaIssue = {
           kind: 'extra_unique_constraint',
           table: tableName,
           namespaceId,
           indexOrConstraint: schemaUnique.name ?? `unique(${schemaUnique.columns.join(',')})`,
           message: `Extra unique constraint found in database (not in contract): ${schemaUnique.columns.join(', ')}`,
-        });
-        nodes.push({
-          status: 'fail',
-          kind: 'unique',
-          name: `unique(${schemaUnique.columns.join(', ')})`,
-          contractPath: `${tablePath}.uniques[${schemaUnique.columns.join(',')}]`,
-          code: 'extra_unique_constraint',
-          message: 'Extra unique constraint found',
-          expected: undefined,
-          actual: schemaUnique,
-          children: [],
-        });
+        };
+        pushControlledFinding(
+          tableControl,
+          issue,
+          {
+            status: 'fail',
+            kind: 'unique',
+            name: `unique(${schemaUnique.columns.join(', ')})`,
+            contractPath: `${tablePath}.uniques[${schemaUnique.columns.join(',')}]`,
+            code: 'extra_unique_constraint',
+            message: 'Extra unique constraint found',
+            expected: undefined,
+            actual: schemaUnique,
+            children: [],
+          },
+          issues,
+          nodes,
+        );
       }
     }
   }
@@ -435,6 +474,7 @@ export function verifyIndexes(
   tableName: string,
   namespaceId: string,
   tablePath: string,
+  tableControl: ControlPolicy,
   issues: SchemaIssue[],
   strict: boolean,
 ): SchemaVerificationNode[] {
@@ -461,27 +501,31 @@ export function verifyIndexes(
       schemaUniques.find((u) => arraysEqual(u.columns, contractIndex.columns));
 
     if (!matchingIndex && !matchingUniqueConstraint) {
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'index_mismatch',
         table: tableName,
         namespaceId,
         expected: contractIndex.columns.join(', '),
         message: `Table "${tableName}" is missing index: ${contractIndex.columns.join(', ')}`,
-      });
-      nodes.push({
-        status: 'fail',
-        kind: 'index',
-        name: `index(${contractIndex.columns.join(', ')})`,
-        contractPath: indexPath,
-        code: 'index_mismatch',
-        message: 'Index missing',
-        expected: contractIndex,
-        actual: undefined,
-        children: [],
-      });
+      };
+      pushControlledFinding(
+        tableControl,
+        issue,
+        {
+          status: 'fail',
+          kind: 'index',
+          name: `index(${contractIndex.columns.join(', ')})`,
+          contractPath: indexPath,
+          code: 'index_mismatch',
+          message: 'Index missing',
+          expected: contractIndex,
+          actual: undefined,
+          children: [],
+        },
+        issues,
+        nodes,
+      );
     } else {
-      // Name differences are ignored for semantic satisfaction.
-      // Names are persisted for deterministic DDL and diagnostics but are not identity.
       nodes.push({
         status: 'pass',
         kind: 'index',
@@ -496,10 +540,8 @@ export function verifyIndexes(
     }
   }
 
-  // Check for extra indexes in strict mode
   if (strict) {
     for (const schemaIndex of schemaIndexes) {
-      // Skip unique indexes (they're handled as unique constraints)
       if (schemaIndex.unique) {
         continue;
       }
@@ -510,24 +552,30 @@ export function verifyIndexes(
       );
 
       if (!matchingIndex) {
-        issues.push({
+        const issue: SchemaIssue = {
           kind: 'extra_index',
           table: tableName,
           namespaceId,
           indexOrConstraint: schemaIndex.name ?? `idx(${schemaIndex.columns.join(',')})`,
           message: `Extra index found in database (not in contract): ${schemaIndex.columns.join(', ')}`,
-        });
-        nodes.push({
-          status: 'fail',
-          kind: 'index',
-          name: `index(${schemaIndex.columns.join(', ')})`,
-          contractPath: `${tablePath}.indexes[${schemaIndex.columns.join(',')}]`,
-          code: 'extra_index',
-          message: 'Extra index found',
-          expected: undefined,
-          actual: schemaIndex,
-          children: [],
-        });
+        };
+        pushControlledFinding(
+          tableControl,
+          issue,
+          {
+            status: 'fail',
+            kind: 'index',
+            name: `index(${schemaIndex.columns.join(', ')})`,
+            contractPath: `${tablePath}.indexes[${schemaIndex.columns.join(',')}]`,
+            code: 'extra_index',
+            message: 'Extra index found',
+            expected: undefined,
+            actual: schemaIndex,
+            children: [],
+          },
+          issues,
+          nodes,
+        );
       }
     }
   }

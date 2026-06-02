@@ -23,3 +23,55 @@ export function effectiveControlPolicy(
 ): ControlPolicy {
   return nodeControl ?? defaultControl ?? 'managed';
 }
+
+export type VerifierIssueCategory =
+  | 'declaredMissing'
+  | 'declaredIncompatible'
+  | 'extraColumn'
+  | 'extraConstraint'
+  | 'extraTable';
+
+export type VerifierDisposition = 'fail' | 'warn' | 'suppress';
+
+export function classifyVerifierIssueKind(kind: string): VerifierIssueCategory {
+  switch (kind) {
+    case 'extra_column':
+      return 'extraColumn';
+    case 'extra_primary_key':
+    case 'extra_foreign_key':
+    case 'extra_unique_constraint':
+    case 'extra_index':
+    case 'extra_validator':
+    case 'extra_default':
+      return 'extraConstraint';
+    case 'extra_table':
+      return 'extraTable';
+    case 'missing_schema':
+    case 'missing_table':
+    case 'missing_column':
+    case 'type_missing':
+    case 'default_missing':
+      return 'declaredMissing';
+    default:
+      return 'declaredIncompatible';
+  }
+}
+
+export function verifierDisposition(
+  control: ControlPolicy,
+  issueKind: string,
+): VerifierDisposition {
+  if (control === 'observed') {
+    return 'warn';
+  }
+  const category = classifyVerifierIssueKind(issueKind);
+  if (control === 'tolerated' && category === 'extraColumn') {
+    return 'suppress';
+  }
+  if (control === 'external') {
+    if (category === 'extraColumn' || category === 'extraConstraint') {
+      return 'suppress';
+    }
+  }
+  return 'fail';
+}
