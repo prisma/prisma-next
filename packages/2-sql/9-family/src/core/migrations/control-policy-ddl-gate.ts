@@ -1,4 +1,8 @@
-import { type Contract, type ControlPolicy, effectiveControl } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  type ControlPolicy,
+  effectiveControlPolicy,
+} from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -113,25 +117,25 @@ export function resolveControlForSchemaIssue(
   const defaultControl = contract.defaultControl;
 
   if (issue.kind === 'missing_schema') {
-    return effectiveControl(undefined, defaultControl);
+    return effectiveControlPolicy(undefined, defaultControl);
   }
 
   if (issue.kind === 'type_missing' && issue.typeName) {
     const namespaceId = resolveNamespaceIdForControl(issue);
     const enumEntry = locateNamespaceEnum(contract.storage, namespaceId, issue.typeName);
     if (enumEntry) {
-      return effectiveControl(enumEntry.control, defaultControl);
+      return effectiveControlPolicy(enumEntry.control, defaultControl);
     }
-    return effectiveControl(undefined, defaultControl);
+    return effectiveControlPolicy(undefined, defaultControl);
   }
 
   if ('table' in issue && typeof issue.table === 'string') {
     const namespaceId = resolveNamespaceIdForControl(issue);
     const table = tableAt(contract.storage, namespaceId, issue.table);
-    return effectiveControl(table?.control, defaultControl);
+    return effectiveControlPolicy(table?.control, defaultControl);
   }
 
-  return effectiveControl(undefined, defaultControl);
+  return effectiveControlPolicy(undefined, defaultControl);
 }
 
 function explicitNodeControlForIssue(
@@ -212,7 +216,7 @@ export function shouldEmitFieldEvent(
     return false;
   }
   const table = ctx.newTable ?? ctx.priorTable;
-  const control = effectiveControl(table?.control, contract.defaultControl);
+  const control = effectiveControlPolicy(table?.control, contract.defaultControl);
   return controlPolicyAllowsDdlIntent(control, fieldEventDdlIntent(event));
 }
 
@@ -272,7 +276,7 @@ export function gateCallsByControlPolicy<TCall>(
       continue;
     }
 
-    const policy = effectiveControl(subject.explicitNodeControl, defaultControl);
+    const policy = effectiveControlPolicy(subject.explicitNodeControl, defaultControl);
     const managedOverrideInExternalSpace =
       externalFloor && subject.explicitNodeControl === 'managed';
 
