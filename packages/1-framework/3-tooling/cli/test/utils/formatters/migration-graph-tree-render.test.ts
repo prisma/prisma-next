@@ -347,6 +347,61 @@ describe('renderMigrationGraphTree', () => {
       ∅"
     `);
   });
+
+  function convergingEdges(): readonly MigrationEdge[] {
+    return [
+      edge(EMPTY_CONTRACT_HASH, 'n0', 'init'),
+      edge('n0', 'n1', 'm1'),
+      edge('n1', 'n2', 'm2'),
+      edge('n2', 'n3', 'm3'),
+      edge('n3', 'n4', 'm4'),
+      edge('n4', 'n5', 'm5'),
+      edge('n5', 'n6', 'm6'),
+      edge('n3', 'n1', 'rb_a'),
+      edge('n5', 'n1', 'rb_b'),
+    ];
+  }
+
+  function nodeOrder(rendered: string): string[] {
+    return rendered
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => /^(○|∅)/.test(line))
+      .map((line) => (line === '∅' ? '∅' : (line.split(/\s+/).pop() ?? '')));
+  }
+
+  it('lands two converging skip-rollbacks and keeps the tip at the top', () => {
+    const rendered = tree(convergingEdges());
+    // Tip first, root last — the rollbacks do not perturb the forward order.
+    expect(nodeOrder(rendered)).toEqual(['n6', 'n5', 'n4', 'n3', 'n2', 'n1', 'n0', '∅']);
+    // Both arcs close onto n1: an inner landing tee then the outer corner.
+    const landing = rendered.split('\n').find((line) => line.includes('◂') && line.endsWith('n1'));
+    expect(landing?.startsWith('○◂┴─╯')).toBe(true);
+  });
+
+  it('lands three converging skip-rollbacks onto one target', () => {
+    const rendered = tree([...convergingEdges(), edge('n4', 'n1', 'rb_c')]);
+    expect(nodeOrder(rendered)).toEqual(['n6', 'n5', 'n4', 'n3', 'n2', 'n1', 'n0', '∅']);
+    const landing = rendered.split('\n').find((line) => line.includes('◂') && line.endsWith('n1'));
+    expect(landing?.startsWith('○◂┴─┴─╯')).toBe(true);
+  });
+
+  it('renders a single skip-rollback landing as a bare corner', () => {
+    const rendered = tree([
+      edge(EMPTY_CONTRACT_HASH, 'n0', 'init'),
+      edge('n0', 'n1', 'm1'),
+      edge('n1', 'n2', 'm2'),
+      edge('n2', 'n3', 'm3'),
+      edge('n3', 'n4', 'm4'),
+      edge('n4', 'n5', 'm5'),
+      edge('n5', 'n6', 'm6'),
+      edge('n5', 'n1', 'rb_b'),
+    ]);
+    expect(nodeOrder(rendered)).toEqual(['n6', 'n5', 'n4', 'n3', 'n2', 'n1', 'n0', '∅']);
+    const landing = rendered.split('\n').find((line) => line.includes('◂') && line.endsWith('n1'));
+    expect(landing?.startsWith('○◂╯')).toBe(true);
+    expect(landing).not.toContain('┴');
+  });
 });
 
 describe('renderMigrationGraphTree (ASCII)', () => {
@@ -791,23 +846,23 @@ describe('renderMigrationGraphTree (lane colors)', () => {
   it("colors a routed back-arc's whole horizontal run — bridges and crossings — one hue", () => {
     const colored = tree(skipArcEdges(), { colorize: true });
     const lines = colored.split('\n');
-    // Source-tee row: every horizontal bridge and the closing corner share the
-    // arc's owning back-lane hue (column 3) — not a per-column "rainbow".
-    const teeLine = lines.find((line) => line.includes('ccccccc') && line.includes('╮'));
+    // The outer back-arc (rollback_d_to_b) routes in column 2. Its source-tee
+    // row crosses the inner arc's body and closes the corner; the crossing
+    // bridge and the corner share the arc's own back-lane hue (column 2) — not
+    // a per-column "rainbow".
+    const teeLine = lines.find((line) => line.includes('ddddddd') && line.includes('╮'));
     expect(teeLine).toBeDefined();
-    expect(teeLine).toContain(laneColorForColumn(3)('──'));
-    expect(teeLine).toContain(laneColorForColumn(3)('╮ '));
+    expect(teeLine).toContain(laneColorForColumn(2)('──'));
+    expect(teeLine).toContain(laneColorForColumn(2)('╮ '));
     expect(teeLine).not.toContain(laneColorForColumn(1)('──'));
-    expect(teeLine).not.toContain(laneColorForColumn(2)('──'));
-    expect(stripAnsi(teeLine ?? '')).toContain('────');
-    // Landing row: the ◂ connector, bridge, and ╯ corner share the arc hue;
-    // the landing node ○ keeps its own lane.
-    const landLine = lines.find((line) => line.includes('ddddddd') && line.includes('◂'));
+    expect(stripAnsi(teeLine ?? '')).toContain('───╮');
+    // Landing row: the ◂ connector, crossing bridge, and ╯ corner share the
+    // arc hue; the landing node ○ keeps its own (neutral column-0) lane.
+    const landLine = lines.find((line) => line.includes('bbbbbbb') && line.includes('◂'));
     expect(landLine).toBeDefined();
-    expect(landLine).toContain(laneColorForColumn(1)('○'));
-    expect(landLine).toContain(laneColorForColumn(3)('◂'));
-    expect(landLine).toContain(laneColorForColumn(3)('──'));
-    expect(landLine).toContain(laneColorForColumn(3)('╯ '));
+    expect(landLine).toContain(laneColorForColumn(2)('◂'));
+    expect(landLine).toContain(laneColorForColumn(2)('──'));
+    expect(landLine).toContain(laneColorForColumn(2)('╯ '));
     expect(stripAnsi(landLine ?? '')).toContain('◂──╯');
   });
 });

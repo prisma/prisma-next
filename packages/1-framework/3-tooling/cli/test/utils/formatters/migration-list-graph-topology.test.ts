@@ -181,6 +181,70 @@ describe('classifyMigrationListGraphTopology', () => {
     expect(kind(topology, eAtoB.migrationHash)).toBe('forward');
   });
 
+  it('classifies both converging node-skipping rollbacks as rollback', () => {
+    const init = entry('00_init', null, 'n0');
+    const m1 = entry('01_m1', 'n0', 'n1');
+    const m2 = entry('02_m2', 'n1', 'n2');
+    const m3 = entry('03_m3', 'n2', 'n3');
+    const m4 = entry('04_m4', 'n3', 'n4');
+    const m5 = entry('05_m5', 'n4', 'n5');
+    const m6 = entry('06_m6', 'n5', 'n6');
+    const rbA = entry('07_rb_a', 'n3', 'n1');
+    const rbB = entry('08_rb_b', 'n5', 'n1');
+    const topology = classify([init, m1, m2, m3, m4, m5, m6, rbA, rbB]);
+
+    for (const e of [init, m1, m2, m3, m4, m5, m6]) {
+      expect(kind(topology, e.migrationHash)).toBe('forward');
+    }
+    expect(kind(topology, rbA.migrationHash)).toBe('rollback');
+    expect(kind(topology, rbB.migrationHash)).toBe('rollback');
+    // The chain stays a single forward spine; the rollbacks do not bump degrees.
+    expect(forwardIn(topology, 'n1')).toBe(1);
+    expect(forwardOut(topology, 'n3')).toBe(1);
+    expect(forwardOut(topology, 'n5')).toBe(1);
+  });
+
+  it('classifies three rollbacks converging on one target all as rollback', () => {
+    const init = entry('00_init', null, 'n0');
+    const m1 = entry('01_m1', 'n0', 'n1');
+    const m2 = entry('02_m2', 'n1', 'n2');
+    const m3 = entry('03_m3', 'n2', 'n3');
+    const m4 = entry('04_m4', 'n3', 'n4');
+    const m5 = entry('05_m5', 'n4', 'n5');
+    const m6 = entry('06_m6', 'n5', 'n6');
+    const rbA = entry('07_rb_a', 'n3', 'n1');
+    const rbB = entry('08_rb_b', 'n5', 'n1');
+    const rbC = entry('09_rb_c', 'n4', 'n1');
+    const topology = classify([init, m1, m2, m3, m4, m5, m6, rbA, rbB, rbC]);
+
+    for (const e of [init, m1, m2, m3, m4, m5, m6]) {
+      expect(kind(topology, e.migrationHash)).toBe('forward');
+    }
+    expect(kind(topology, rbA.migrationHash)).toBe('rollback');
+    expect(kind(topology, rbB.migrationHash)).toBe('rollback');
+    expect(kind(topology, rbC.migrationHash)).toBe('rollback');
+    expect(forwardIn(topology, 'n1')).toBe(1);
+  });
+
+  it('classifies the same converging rollbacks regardless of edge input order', () => {
+    const init = entry('00_init', null, 'n0');
+    const m1 = entry('01_m1', 'n0', 'n1');
+    const m2 = entry('02_m2', 'n1', 'n2');
+    const m3 = entry('03_m3', 'n2', 'n3');
+    const m4 = entry('04_m4', 'n3', 'n4');
+    const m5 = entry('05_m5', 'n4', 'n5');
+    const m6 = entry('06_m6', 'n5', 'n6');
+    const rbA = entry('07_rb_a', 'n3', 'n1');
+    const rbB = entry('08_rb_b', 'n5', 'n1');
+    const shuffled = classify([rbB, m4, init, rbA, m6, m1, m5, m2, m3]);
+
+    for (const e of [init, m1, m2, m3, m4, m5, m6]) {
+      expect(kind(shuffled, e.migrationHash)).toBe('forward');
+    }
+    expect(kind(shuffled, rbA.migrationHash)).toBe('rollback');
+    expect(kind(shuffled, rbB.migrationHash)).toBe('rollback');
+  });
+
   it('seeds pure-cycle back-edge lexically when a rooted component is also present', () => {
     const eInit = entry('20250101_init', null, 'hash_root');
     const eNext = entry('20250201_next', 'hash_root', 'hash_tip');
