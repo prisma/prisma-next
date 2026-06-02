@@ -1,5 +1,4 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
-import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
 import type {
   PostgresCreateSchema,
@@ -7,7 +6,6 @@ import type {
   PostgresDdlNode,
   PostgresDdlVisitor,
 } from '@prisma-next/target-postgres/ddl';
-import { buildColumnDefaultSql } from '@prisma-next/target-postgres/planner-ddl-builders';
 import type { PostgresLoweredStatement } from './types';
 
 class PostgresDdlVisitorImpl implements PostgresDdlVisitor<string> {
@@ -24,33 +22,10 @@ class PostgresDdlVisitorImpl implements PostgresDdlVisitor<string> {
   }
 }
 
-function storageColumnFromDdlColumn(column: DdlColumn): StorageColumn {
-  const nativeType = column.type.replace(/\s+primary key$/i, '').trim();
-  return {
-    codecId: 'pg/text@1',
-    nativeType,
-    nullable: !column.notNull,
-  };
-}
-
-function renderColumnDefault(column: DdlColumn): string {
-  if (column.default === undefined) {
+function renderColumnDefault(defaultValue: ColumnDefault | undefined): string {
+  if (defaultValue === undefined) {
     return '';
   }
-  if (column.default.kind === 'function' && column.default.expression === 'now()') {
-    return 'default now()';
-  }
-  if (column.default.kind === 'literal' && typeof column.default.value === 'string') {
-    return `default '${column.default.value}'`;
-  }
-  const plannerSql = buildColumnDefaultSql(column.default, storageColumnFromDdlColumn(column));
-  if (plannerSql.length > 0) {
-    return plannerSql.toLowerCase();
-  }
-  return renderBootstrapDefault(column.default);
-}
-
-function renderBootstrapDefault(defaultValue: ColumnDefault): string {
   if (defaultValue.kind === 'literal') {
     const { value } = defaultValue;
     if (typeof value === 'string') {
@@ -84,7 +59,7 @@ function renderColumn(column: DdlColumn): string {
   if (column.primaryKey) {
     parts.push('primary key');
   }
-  const defaultClause = renderColumnDefault(column);
+  const defaultClause = renderColumnDefault(column.default);
   if (defaultClause.length > 0) {
     parts.push(defaultClause);
   }

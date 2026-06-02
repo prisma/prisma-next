@@ -23,4 +23,39 @@ describe('PostgresCreateTable DDL lowering', () => {
     );
     expect(lowered.params).toEqual([]);
   });
+
+  it('renders each column default shape', () => {
+    const ast = new PostgresCreateTable({
+      table: 'defaults',
+      columns: [
+        { name: 'a', type: 'text', default: { kind: 'literal', value: 'x' } },
+        { name: 'b', type: 'int', default: { kind: 'literal', value: 7 } },
+        { name: 'c', type: 'boolean', default: { kind: 'literal', value: true } },
+        { name: 'd', type: 'text', default: { kind: 'literal', value: null } },
+        { name: 'e', type: 'timestamptz', default: { kind: 'function', expression: 'now()' } },
+        {
+          name: 'f',
+          type: 'uuid',
+          default: { kind: 'function', expression: 'gen_random_uuid()' },
+        },
+        {
+          name: 'g',
+          type: 'bigserial',
+          default: { kind: 'function', expression: 'autoincrement()' },
+        },
+      ],
+    });
+
+    const adapter = createPostgresAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+
+    expect(lowered.sql).toContain("a text default 'x'");
+    expect(lowered.sql).toContain('b int default 7');
+    expect(lowered.sql).toContain('c boolean default true');
+    expect(lowered.sql).toContain('d text default null');
+    expect(lowered.sql).toContain('e timestamptz default now()');
+    expect(lowered.sql).toContain('f uuid default (gen_random_uuid())');
+    expect(lowered.sql).toContain('g bigserial');
+    expect(lowered.sql).not.toContain('autoincrement');
+  });
 });

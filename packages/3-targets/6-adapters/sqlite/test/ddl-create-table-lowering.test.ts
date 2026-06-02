@@ -19,4 +19,33 @@ describe('SqliteCreateTable DDL lowering', () => {
     );
     expect(lowered.params).toEqual([]);
   });
+
+  it('renders each column default shape', () => {
+    const ast = new SqliteCreateTable({
+      table: 'defaults',
+      columns: [
+        { name: 'a', type: 'TEXT', default: { kind: 'literal', value: 'x' } },
+        { name: 'b', type: 'INTEGER', default: { kind: 'literal', value: 7 } },
+        { name: 'c', type: 'INTEGER', default: { kind: 'literal', value: true } },
+        { name: 'd', type: 'TEXT', default: { kind: 'literal', value: null } },
+        { name: 'e', type: 'TEXT', default: { kind: 'function', expression: "datetime('now')" } },
+        {
+          name: 'g',
+          type: 'INTEGER',
+          default: { kind: 'function', expression: 'autoincrement()' },
+        },
+      ],
+    });
+
+    const adapter = createSqliteAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
+
+    expect(lowered.sql).toContain("a TEXT DEFAULT 'x'");
+    expect(lowered.sql).toContain('b INTEGER DEFAULT 7');
+    expect(lowered.sql).toContain('c INTEGER DEFAULT true');
+    expect(lowered.sql).toContain('d TEXT DEFAULT NULL');
+    expect(lowered.sql).toContain("e TEXT DEFAULT (datetime('now'))");
+    expect(lowered.sql).toContain('g INTEGER');
+    expect(lowered.sql).not.toContain('autoincrement');
+  });
 });
