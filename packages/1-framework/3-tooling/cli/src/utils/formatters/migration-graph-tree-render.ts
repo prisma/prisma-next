@@ -382,7 +382,7 @@ function renderCellPair(
     case 'arc-land-corner':
       return lane(palette.arcLandCorner);
     case 'arc-crossing':
-      return lane(palette.arcCrossing);
+      return lane(palette.arcLandBridge);
     case 'arc-land-bridge':
       return lane(palette.arcLandBridge);
     case 'horizontal-pass':

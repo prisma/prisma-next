@@ -234,7 +234,7 @@ describe('renderMigrationGraphTree', () => {
         '○─╮       a94b7b4',
         '│ │↓      rollback_to_phone   a94b7b4 → 73e3abe',
         '│↑│       add_posts           3ee5d20 → a94b7b4',
-        '○─┼─╮     3ee5d20',
+        '○───╮     3ee5d20',
         '│ │ │↓    rollback_to_init    3ee5d20 → ef9de27',
         '│↑│ │     add_bio             73e3abe → 3ee5d20',
         '○◂╯ │     73e3abe',
@@ -469,7 +469,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       "*-\\       a94b7b4
       | |v      rollback_to_phone   a94b7b4 -> 73e3abe
       |^|       add_posts           3ee5d20 -> a94b7b4
-      *-+-\\     3ee5d20
+      *---\\     3ee5d20
       | | |v    rollback_to_init    3ee5d20 -> ef9de27
       |^| |     add_bio             73e3abe -> 3ee5d20
       *</ |     73e3abe
@@ -576,7 +576,7 @@ describe('renderMigrationGraphTree (lane colors)', () => {
   }
 
   // Two node-skipping rollbacks whose back-lanes overlap, producing routed arcs
-  // (`◂` landings, `──` bridges, `╮`/`╯` corners) and an arc crossing (`┼`).
+  // (`◂` landings, `──` bridges, `╮`/`╯` corners) and an arc crossing (`──`).
   function skipArcEdges(): readonly MigrationEdge[] {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaaaaaa', 'init');
     const s1 = edge('aaaaaaa', 'bbbbbbb', 'step_1');
@@ -737,18 +737,16 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(teeLine).toContain(laneColorForColumn(3)('╮ '));
     expect(teeLine).not.toContain(laneColorForColumn(1)('──'));
     expect(teeLine).not.toContain(laneColorForColumn(2)('──'));
-    // Landing row: the ◂ connector, the `┼` crossing, and the ╯ corner all take
-    // the arc's hue (column 3) so the horizontal run reads as one continuous
-    // line; the landing node ○ keeps its own lane. A crossing can only be one
-    // colour, so it follows the arc owning the run rather than reading dim.
+    expect(stripAnsi(teeLine ?? '')).toContain('────');
+    // Landing row: the ◂ connector, bridge, and ╯ corner share the arc hue;
+    // the landing node ○ keeps its own lane.
     const landLine = lines.find((line) => line.includes('ddddddd') && line.includes('◂'));
     expect(landLine).toBeDefined();
     expect(landLine).toContain(laneColorForColumn(1)('○'));
     expect(landLine).toContain(laneColorForColumn(3)('◂'));
-    expect(landLine).toContain(laneColorForColumn(3)('┼─'));
-    // The crossing never reads as a different lane's hue or as a bare/dim glyph.
-    expect(landLine).not.toContain(laneColorForColumn(2)('┼'));
-    expect(stripAnsi(landLine ?? '')).toContain('┼');
+    expect(landLine).toContain(laneColorForColumn(3)('──'));
+    expect(landLine).toContain(laneColorForColumn(3)('╯ '));
+    expect(stripAnsi(landLine ?? '')).toContain('◂──╯');
   });
 });
 
