@@ -6,13 +6,12 @@ import {
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 
 /**
- * Control-relevant facts about a single planner call's target object, as
- * resolved from the target's own IR. `undefined` (no subject) means the
- * call's target could not be positively established — a fail-closed signal:
- * any policy stricter than `managed` drops such a call rather than emitting
- * it.
+ * The target object a control policy governs for a single planner call,
+ * resolved from the target's own IR. `undefined` means the call's target
+ * object could not be positively established — a fail-closed signal: any
+ * policy stricter than `managed` drops such a call rather than emitting it.
  */
-export interface ResolvedControlSubject {
+export interface ControlPolicySubject {
   readonly namespaceId: string;
   readonly explicitNodeControlPolicy?: ControlPolicy;
   readonly table?: string;
@@ -36,7 +35,7 @@ export interface ResolvedControlSubject {
  * Every other default defers to the node's effective control policy.
  */
 function controlPolicyForCall(
-  subject: ResolvedControlSubject | undefined,
+  subject: ControlPolicySubject | undefined,
   defaultControl: ControlPolicy | undefined,
 ): ControlPolicy {
   if (defaultControl === 'external') {
@@ -57,7 +56,7 @@ function controlPolicyForCall(
  */
 function callAllowedUnderControlPolicy(
   policy: ControlPolicy,
-  subject: ResolvedControlSubject | undefined,
+  subject: ControlPolicySubject | undefined,
 ): boolean {
   switch (policy) {
     case 'managed':
@@ -73,13 +72,13 @@ function callAllowedUnderControlPolicy(
 export function filterCallsByControlPolicy<TCall>(options: {
   readonly calls: readonly TCall[];
   readonly contract: Contract<SqlStorage>;
-  readonly resolveSubject: (call: TCall) => ResolvedControlSubject | undefined;
+  readonly resolveControlPolicySubject: (call: TCall) => ControlPolicySubject | undefined;
 }): readonly TCall[] {
   const defaultControl = options.contract.defaultControl;
   const kept: TCall[] = [];
 
   for (const call of options.calls) {
-    const subject = options.resolveSubject(call);
+    const subject = options.resolveControlPolicySubject(call);
     const policy = controlPolicyForCall(subject, defaultControl);
     if (callAllowedUnderControlPolicy(policy, subject)) {
       kept.push(call);

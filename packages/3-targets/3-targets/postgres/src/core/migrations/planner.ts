@@ -23,7 +23,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { postgresColumnsCompatible } from '../column-type-compatibility';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import { resolvePostgresCallControlSubject } from './control-policy';
+import { resolvePostgresCallControlPolicySubject } from './control-policy';
 import { createResolveExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
@@ -180,7 +180,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const filteredFieldEvents = filterCallsByControlPolicy({
       calls: fieldEventPostgresCalls,
       contract: options.contract,
-      resolveSubject: (call) => resolvePostgresCallControlSubject(call, options.contract),
+      resolveControlPolicySubject: (call) =>
+        resolvePostgresCallControlPolicySubject(call, options.contract),
     });
     const calls = [...result.value.calls, ...filteredFieldEvents];
 

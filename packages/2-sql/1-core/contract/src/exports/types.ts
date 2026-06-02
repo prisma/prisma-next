@@ -46,7 +46,6 @@ export {
   ForeignKeyReference,
   Index,
   isPostgresEnumStorageEntry,
-  isStorageTable,
   isStorageTypeInstance,
   POSTGRES_ENUM_KIND,
   PrimaryKey,

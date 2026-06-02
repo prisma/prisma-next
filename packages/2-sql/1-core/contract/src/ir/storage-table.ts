@@ -63,7 +63,3 @@ export class StorageTable extends SqlNode {
     freezeNode(this);
   }
 }
-
-export function isStorageTable(value: unknown): value is StorageTable {
-  return value instanceof StorageTable;
-}

@@ -1,11 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { ResolvedControlSubject } from '@prisma-next/family-sql/control';
+import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type SqlStorage,
   storageTableAt,
 } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { isPostgresSchema } from '../postgres-schema';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 
@@ -78,17 +79,17 @@ interface PostgresCallFields {
 
 function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
   return {
-    ...('schemaName' in call ? { schemaName: call.schemaName } : {}),
-    ...('tableName' in call ? { tableName: call.tableName } : {}),
-    ...('columnName' in call ? { columnName: call.columnName } : {}),
-    ...('typeName' in call ? { typeName: call.typeName } : {}),
+    ...ifDefined('schemaName', 'schemaName' in call ? call.schemaName : undefined),
+    ...ifDefined('tableName', 'tableName' in call ? call.tableName : undefined),
+    ...ifDefined('columnName', 'columnName' in call ? call.columnName : undefined),
+    ...ifDefined('typeName', 'typeName' in call ? call.typeName : undefined),
   };
 }
 
-export function resolvePostgresCallControlSubject(
+export function resolvePostgresCallControlPolicySubject(
   call: PostgresOpFactoryCall,
   contract: Contract<SqlStorage>,
-): ResolvedControlSubject | undefined {
+): ControlPolicySubject | undefined {
   const callFields = postgresCallFields(call);
   const createsNewObject = createsNewTopLevelObject(call);
 
@@ -109,7 +110,7 @@ export function resolvePostgresCallControlSubject(
     const controlPolicy = isPostgresEnumStorageEntry(rawEnum) ? rawEnum.control : undefined;
     return {
       namespaceId,
-      ...(controlPolicy !== undefined ? { explicitNodeControlPolicy: controlPolicy } : {}),
+      ...ifDefined('explicitNodeControlPolicy', controlPolicy),
       typeName: callFields.typeName,
       createsNewObject,
     };
@@ -125,11 +126,9 @@ export function resolvePostgresCallControlSubject(
     const tableControlPolicy = table?.control;
     return {
       namespaceId,
-      ...(tableControlPolicy !== undefined
-        ? { explicitNodeControlPolicy: tableControlPolicy }
-        : {}),
+      ...ifDefined('explicitNodeControlPolicy', tableControlPolicy),
       table: callFields.tableName,
-      ...(callFields.columnName !== undefined ? { column: callFields.columnName } : {}),
+      ...ifDefined('column', callFields.columnName),
       createsNewObject,
     };
   }

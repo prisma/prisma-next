@@ -8,8 +8,8 @@ import {
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
+  type ControlPolicySubject,
   filterCallsByControlPolicy,
-  type ResolvedControlSubject,
 } from '../src/core/migrations/control-policy';
 
 function makeContract(
@@ -38,22 +38,22 @@ function makeContract(
 
 interface FakeCall {
   readonly name: string;
-  readonly subject: ResolvedControlSubject | undefined;
+  readonly subject: ControlPolicySubject | undefined;
 }
 
-function call(name: string, subject: ResolvedControlSubject | undefined): FakeCall {
+function call(name: string, subject: ControlPolicySubject | undefined): FakeCall {
   return { name, subject };
 }
 
 function tableSubject(
-  control: ResolvedControlSubject['explicitNodeControlPolicy'] | undefined,
+  policy: ControlPolicySubject['explicitNodeControlPolicy'] | undefined,
   createsNewObject: boolean,
-): ResolvedControlSubject {
+): ControlPolicySubject {
   return {
     namespaceId: UNBOUND_NAMESPACE_ID,
     table: 'users',
     createsNewObject,
-    ...(control !== undefined ? { explicitNodeControlPolicy: control } : {}),
+    ...(policy !== undefined ? { explicitNodeControlPolicy: policy } : {}),
   };
 }
 
@@ -61,7 +61,7 @@ function filter(calls: readonly FakeCall[], contract: Contract<SqlStorage>): rea
   return filterCallsByControlPolicy({
     calls,
     contract,
-    resolveSubject: (c) => c.subject,
+    resolveControlPolicySubject: (c) => c.subject,
   });
 }
 
@@ -119,12 +119,12 @@ describe('filterCallsByControlPolicy', () => {
 
   describe('external and observed', () => {
     it('drops every call for an external or observed node', () => {
-      for (const control of ['external', 'observed'] as const) {
-        const contract = makeContract({ users: { control, ...tableInput } });
+      for (const policy of ['external', 'observed'] as const) {
+        const contract = makeContract({ users: { control: policy, ...tableInput } });
         const kept = filter(
           [
-            call('createTable', tableSubject(control, true)),
-            call('dropTable', tableSubject(control, false)),
+            call('createTable', tableSubject(policy, true)),
+            call('dropTable', tableSubject(policy, false)),
           ],
           contract,
         );

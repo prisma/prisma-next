@@ -30,7 +30,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
-import { resolvePostgresCallControlSubject } from './control-policy';
+import { resolvePostgresCallControlPolicySubject } from './control-policy';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -932,7 +932,8 @@ export function planIssues(
   const filtered = filterCallsByControlPolicy({
     calls,
     contract: options.toContract,
-    resolveSubject: (call) => resolvePostgresCallControlSubject(call, options.toContract),
+    resolveControlPolicySubject: (call) =>
+      resolvePostgresCallControlPolicySubject(call, options.toContract),
   });
 
   return ok({

@@ -1,10 +1,15 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import type {
+  MigrationOperationPolicy,
+  SchemaIssue,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
+import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import { postgresCreateNamespace } from '../../src/core/postgres-schema';
 
 function makeContract(
@@ -254,5 +259,72 @@ describe('planIssues control policy', () => {
       });
       expect(result.ok).toBe(true);
     });
+  });
+});
+
+// Exercises the gating through `PostgresMigrationPlanner.plan(...)`: the live
+// schema → verify → plan path the planner wires end-to-end, rather than the
+// `planIssues(...)` entry point the suite above calls directly. A `tolerated`
+// table that already exists in the database may grow new objects but never
+// be modified in place, so an add-column for a missing column is non-create
+// DDL and must be suppressed; the same diff under `managed` emits it.
+describe('PostgresMigrationPlanner.plan control-policy gating', () => {
+  const RECONCILIATION_POLICY: MigrationOperationPolicy = {
+    allowedOperationClasses: ['additive', 'widening', 'destructive'],
+  };
+  const nullableColumn = { nativeType: 'text', codecId: 'pg/text@1', nullable: true };
+  const planner = createPostgresMigrationPlanner();
+
+  // The live database already has `users` with only `id`; the contract adds a
+  // nullable `email`, so verify emits a single additive add-column issue.
+  const liveSchemaWithUsersIdOnly: SqlSchemaIR = {
+    tables: {
+      users: {
+        name: 'users',
+        columns: { id: { name: 'id', nativeType: 'text', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        foreignKeys: [],
+        indexes: [],
+      },
+    },
+  };
+
+  function planAddColumn(control: 'managed' | 'tolerated') {
+    const contract = makeContract({
+      users: {
+        control,
+        columns: { id: baseColumn, email: nullableColumn },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = planner.plan({
+      contract,
+      schema: liveSchemaWithUsersIdOnly,
+      policy: RECONCILIATION_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: 'app',
+    });
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') throw new Error('expected planner success');
+    return result.plan;
+  }
+
+  it('suppresses a tolerated table add-column', () => {
+    const plan = planAddColumn('tolerated');
+    expect(plan.operations).toHaveLength(0);
+  });
+
+  it('emits the add-column when the same table is managed', () => {
+    const plan = planAddColumn('managed');
+    expect(plan.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'column.users.email', operationClass: 'additive' }),
+      ]),
+    );
   });
 });
