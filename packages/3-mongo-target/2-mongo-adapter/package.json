@@ -21,6 +21,7 @@
     "@prisma-next/errors": "workspace:0.12.0",
     "@prisma-next/family-mongo": "workspace:0.12.0",
     "@prisma-next/framework-components": "workspace:0.12.0",
+    "@prisma-next/migration-tools": "workspace:0.12.0",
     "@prisma-next/mongo-codec": "workspace:0.12.0",
     "@prisma-next/mongo-contract": "workspace:0.12.0",
     "@prisma-next/mongo-lowering": "workspace:0.12.0",

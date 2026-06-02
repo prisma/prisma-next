@@ -5,11 +5,6 @@ import type {
 } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import {
-  coerceLedgerAppliedAt,
-  ledgerOriginFromStored,
-  operationCountFromStored,
-} from '@prisma-next/family-sql/ledger-read';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
@@ -17,6 +12,7 @@ import {
   type ControlDriverInstance,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
@@ -304,8 +300,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       migrationHash: row.migration_hash,
       from: ledgerOriginFromStored(row.origin_core_hash),
       to: row.destination_core_hash,
-      appliedAt: coerceLedgerAppliedAt(row.created_at),
-      operationCount: operationCountFromStored(row.operations),
+      appliedAt: row.created_at instanceof Date ? row.created_at : new Date(row.created_at),
+      operationCount: Array.isArray(row.operations) ? row.operations.length : 0,
     }));
   }
 

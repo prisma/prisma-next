@@ -27,7 +27,6 @@ import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/sp
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { MongoControlAdapter, MongoControlAdapterDescriptor } from './control-adapter';
 import type { MongoControlExtensionDescriptor } from './control-types';
@@ -79,22 +78,6 @@ function deserializeMongoContract(contractJson: unknown): MongoContract {
  */
 function asValidatedMongoContract(contract: unknown): MongoContract {
   return contract as MongoContract;
-}
-
-function isMongoControlAdapter(value: unknown): value is MongoControlAdapter<'mongo'> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'readMarker' in value &&
-    typeof (value as { readMarker: unknown }).readMarker === 'function' &&
-    'readAllMarkers' in value &&
-    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
-    'readLedger' in value &&
-    typeof blindCast<{ readLedger: unknown }, 'MongoControlAdapter duck-type probe'>(value)
-      .readLedger === 'function' &&
-    'introspectSchema' in value &&
-    typeof (value as { introspectSchema: unknown }).introspectSchema === 'function'
-  );
 }
 
 function buildVerifyResult(opts: {
@@ -172,13 +155,7 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
     if (!adapter) {
       throw new Error('Mongo family requires an adapter descriptor in ControlStack');
     }
-    const controlAdapter = adapter.create(controlStack as ControlStack<'mongo', 'mongo'>);
-    if (!isMongoControlAdapter(controlAdapter)) {
-      throw new Error(
-        'Adapter does not implement MongoControlAdapter (missing readMarker, readAllMarkers, readLedger, or introspectSchema)',
-      );
-    }
-    return controlAdapter;
+    return adapter.create(controlStack as ControlStack<'mongo', 'mongo'>);
   };
 
   // The family-level driver type is `ControlDriverInstance<'mongo', string>`,

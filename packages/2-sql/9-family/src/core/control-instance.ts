@@ -45,7 +45,6 @@ import {
 } from '@prisma-next/sql-runtime';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
@@ -253,26 +252,6 @@ export interface SqlControlFamilyInstance
 
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
-function isSqlControlAdapter<TTargetId extends string>(
-  value: unknown,
-): value is SqlControlAdapter<TTargetId> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'introspect' in value &&
-    typeof (value as { introspect: unknown }).introspect === 'function' &&
-    'readMarker' in value &&
-    typeof (value as { readMarker: unknown }).readMarker === 'function' &&
-    'readAllMarkers' in value &&
-    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
-    'readLedger' in value &&
-    typeof blindCast<{ readLedger: unknown }, 'SqlControlAdapter duck-type probe'>(value)
-      .readLedger === 'function' &&
-    'lower' in value &&
-    typeof (value as { lower: unknown }).lower === 'function'
-  );
-}
-
 interface DescriptorWithStorageTypes {
   readonly targetId?: string | undefined;
   readonly types?:
@@ -369,19 +348,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
-  // Family-instance methods accept `ControlDriverInstance<'sql', string>` —
-  // the family API isn't generic on the target id. Letting `isSqlControlAdapter`
-  // default its type parameter narrows the adapter to `SqlControlAdapter<string>`,
-  // which matches the family-level driver type without any cast at call sites.
-  const getControlAdapter = () => {
-    const controlAdapter = adapter.create(stack);
-    if (!isSqlControlAdapter(controlAdapter)) {
-      throw new Error(
-        'Adapter does not implement SqlControlAdapter (missing introspect, readMarker, readAllMarkers, readLedger, or lower)',
-      );
-    }
-    return controlAdapter;
-  };
+  // Family-instance methods accept `ControlDriverInstance<'sql', string>` — the
+  // family API isn't generic on the target id. The adapter descriptor's `create`
+  // returns the concrete `SqlControlAdapter<TTargetId>`; widening the target id to
+  // `string` here matches the family-level driver type without a per-method probe.
+  const getControlAdapter = (): SqlControlAdapter<string> => adapter.create(stack);
 
   const targetSerializer = (
     target as unknown as {

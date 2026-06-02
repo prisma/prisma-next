@@ -13,6 +13,7 @@ import {
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
+  synthEdges,
   testTimeout,
 } from './fixtures/runner-fixtures';
 
@@ -64,6 +65,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
         {
           space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
           plan: initialPlan.plan,
+          migrationEdges: synthEdges(initialPlan.plan),
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,

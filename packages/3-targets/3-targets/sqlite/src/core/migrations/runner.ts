@@ -636,60 +636,42 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       options.destinationContract.profileHash ??
       plan.destination.storageHash;
     const edges = options.migrationEdges;
-
-    if (edges !== undefined && edges.length > 0) {
-      const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
-      if (totalEdgeOps !== plan.operations.length) {
-        throw new Error(
-          `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
-        );
-      }
-      let offset = 0;
-      const lastIndex = edges.length - 1;
-      for (const [i, edge] of edges.entries()) {
-        const edgeOps = plan.operations.slice(offset, offset + edge.operationCount);
-        offset += edge.operationCount;
-        const isFirst = i === 0;
-        const isLast = i === lastIndex;
-        await this.executeStatement(
-          driver,
-          buildLedgerInsertStatement({
-            space,
-            migrationName: edge.dirName,
-            migrationHash: edge.migrationHash,
-            originStorageHash: edge.from,
-            originProfileHash:
-              isFirst && existingMarker?.storageHash === edge.from
-                ? (existingMarker.profileHash ?? null)
-                : null,
-            destinationStorageHash: edge.to,
-            destinationProfileHash:
-              isLast && edge.to === plan.destination.storageHash ? destinationProfileHash : null,
-            contractJsonBefore: isFirst ? (existingMarker?.contractJson ?? null) : null,
-            contractJsonAfter: isLast ? options.destinationContract : null,
-            operations: edgeOps,
-          }),
-        );
-      }
-      return;
+    const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
+    if (totalEdgeOps !== plan.operations.length) {
+      throw new Error(
+        `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
+      );
     }
-
-    // Synth plans have no authored edges — one row keyed by the plan destination.
-    await this.executeStatement(
-      driver,
-      buildLedgerInsertStatement({
-        space,
-        migrationName: '',
-        migrationHash: plan.destination.storageHash,
-        originStorageHash: existingMarker?.storageHash ?? null,
-        originProfileHash: existingMarker?.profileHash ?? null,
-        destinationStorageHash: plan.destination.storageHash,
-        destinationProfileHash,
-        contractJsonBefore: existingMarker?.contractJson ?? null,
-        contractJsonAfter: options.destinationContract,
-        operations: executedOperations,
-      }),
-    );
+    // The ledger records the operations as executed — idempotency-skipped ops
+    // are substituted with skip records (empty `execute`) by `applyPlan`, so the
+    // journal reflects what actually ran rather than the raw plan.
+    let offset = 0;
+    const lastIndex = edges.length - 1;
+    for (const [i, edge] of edges.entries()) {
+      const edgeOps = executedOperations.slice(offset, offset + edge.operationCount);
+      offset += edge.operationCount;
+      const isFirst = i === 0;
+      const isLast = i === lastIndex;
+      await this.executeStatement(
+        driver,
+        buildLedgerInsertStatement({
+          space,
+          migrationName: edge.dirName,
+          migrationHash: edge.migrationHash,
+          originStorageHash: edge.from === '' ? null : edge.from,
+          originProfileHash:
+            isFirst && existingMarker?.storageHash === edge.from
+              ? (existingMarker.profileHash ?? null)
+              : null,
+          destinationStorageHash: edge.to,
+          destinationProfileHash:
+            isLast && edge.to === plan.destination.storageHash ? destinationProfileHash : null,
+          contractJsonBefore: isFirst ? (existingMarker?.contractJson ?? null) : null,
+          contractJsonAfter: isLast ? options.destinationContract : null,
+          operations: edgeOps,
+        }),
+      );
+    }
   }
 
   private async beginExclusiveTransaction(

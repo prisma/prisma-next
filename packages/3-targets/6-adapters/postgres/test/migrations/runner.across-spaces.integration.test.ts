@@ -14,6 +14,7 @@ import {
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
+  synthEdges,
   testTimeout,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
@@ -130,6 +131,7 @@ describe.sequential('PostgresMigrationRunner.execute', () => {
         {
           space: 'ext',
           plan: buildSuccessfulExtensionPlan(),
+          migrationEdges: synthEdges(buildSuccessfulExtensionPlan()),
           driver: driver!,
           destinationContract: extensionContract,
           policy: INIT_ADDITIVE_POLICY,
@@ -139,6 +141,7 @@ describe.sequential('PostgresMigrationRunner.execute', () => {
         {
           space: 'app',
           plan: buildFailingAppPlan(),
+          migrationEdges: synthEdges(buildFailingAppPlan()),
           driver: driver!,
           destinationContract: extensionContract,
           policy: INIT_ADDITIVE_POLICY,
@@ -185,6 +188,7 @@ describe.sequential('PostgresMigrationRunner.execute', () => {
         {
           space: 'ext',
           plan: buildSuccessfulExtensionPlan(),
+          migrationEdges: synthEdges(buildSuccessfulExtensionPlan()),
           driver: driver!,
           destinationContract: extensionContract,
           policy: INIT_ADDITIVE_POLICY,

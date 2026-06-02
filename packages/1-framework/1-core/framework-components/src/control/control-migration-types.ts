@@ -480,19 +480,16 @@ export interface MigrationRunnerPerSpaceOptions<
    */
   readonly context?: OperationContext;
   /**
-   * Per-edge breakdown from graph-walk planning. When present, runners that
-   * support a per-migration ledger write one row per edge instead of one
-   * collapsed row per apply.
+   * Per-edge breakdown from aggregate planning. Runners write one ledger row
+   * per edge in walk order.
    */
-  readonly migrationEdges?:
-    | ReadonlyArray<{
-        readonly migrationHash: string;
-        readonly dirName: string;
-        readonly from: string;
-        readonly to: string;
-        readonly operationCount: number;
-      }>
-    | undefined;
+  readonly migrationEdges: ReadonlyArray<{
+    readonly migrationHash: string;
+    readonly dirName: string;
+    readonly from: string;
+    readonly to: string;
+    readonly operationCount: number;
+  }>;
 }
 
 export interface MigrationRunner<

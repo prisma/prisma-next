@@ -12,6 +12,7 @@ import {
   formatRunnerFailure,
   frameworkComponents,
   sqliteTargetDescriptor,
+  synthEdges,
   type TestDatabase,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
@@ -46,6 +47,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
         {
           space: result.plan.spaceId ?? APP_SPACE_ID,
           plan: result.plan,
+          migrationEdges: synthEdges(result.plan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -106,6 +108,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
         {
           space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
           plan: initialPlan.plan,
+          migrationEdges: synthEdges(initialPlan.plan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -131,6 +134,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
         {
           space: emptyPlan.spaceId ?? APP_SPACE_ID,
           plan: emptyPlan,
+          migrationEdges: synthEdges(emptyPlan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,

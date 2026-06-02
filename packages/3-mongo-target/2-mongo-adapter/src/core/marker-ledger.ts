@@ -1,5 +1,6 @@
 import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
+import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import {
   RawAggregateCommand,
   RawFindOneAndUpdateCommand,
@@ -11,14 +12,6 @@ import type { Db, Document, UpdateFilter } from 'mongodb';
 const COLLECTION = '_prisma_migrations';
 const MONGO_MARKER_COLLECTION = `_prisma_migrations marker documents in ${COLLECTION}`;
 const MONGO_LEDGER_COLLECTION = `_prisma_migrations ledger documents in ${COLLECTION}`;
-const EMPTY_ORIGIN_HASH = 'sha256:empty';
-
-function ledgerOriginFromStored(from: string): string | null {
-  if (from === '' || from === EMPTY_ORIGIN_HASH) {
-    return null;
-  }
-  return from;
-}
 
 /**
  * Marker doc shape.

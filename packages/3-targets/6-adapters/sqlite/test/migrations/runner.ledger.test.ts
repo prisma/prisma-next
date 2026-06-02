@@ -1,7 +1,10 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
+import {
+  type AggregateMigrationEdgeRef,
+  buildSynthMigrationEdge,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -379,7 +382,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     ]);
   });
 
-  it('writes one synthesised ledger row with space for synth apply without migrationEdges', async () => {
+  it('writes one synthesised ledger row with space for synth apply with a single synth edge', async () => {
     testDb = createTestDatabase();
     const { driver } = testDb;
     const planner = sqliteTargetDescriptor.createPlanner(familyInstance);
@@ -395,6 +398,14 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     });
     if (result.kind !== 'success') throw new Error('expected planner success');
 
+    const synthEdges = [
+      buildSynthMigrationEdge({
+        currentMarkerStorageHash: null,
+        destinationStorageHash: contract.storage.storageHash,
+        operationCount: result.plan.operations.length,
+      }),
+    ];
+
     const executeResult = await runner.execute({
       driver,
       perSpaceOptions: [
@@ -405,6 +416,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
           policy: INIT_ADDITIVE_POLICY,
           frameworkComponents,
           strictVerification: false,
+          migrationEdges: synthEdges,
         },
       ],
     });

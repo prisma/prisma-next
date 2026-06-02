@@ -1,7 +1,10 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
+import {
+  type AggregateMigrationEdgeRef,
+  buildSynthMigrationEdge,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -338,7 +341,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     ]);
   });
 
-  it('writes one synthesised ledger row with space for synth apply without migrationEdges', {
+  it('writes one synthesised ledger row with space for synth apply with a single synth edge', {
     timeout: testTimeout,
   }, async () => {
     const planner = postgresTargetDescriptor.createPlanner(familyInstance);
@@ -354,6 +357,14 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     });
     if (planResult.kind !== 'success') throw new Error('expected planner success');
 
+    const synthEdges = [
+      buildSynthMigrationEdge({
+        currentMarkerStorageHash: null,
+        destinationStorageHash: contract.storage.storageHash,
+        operationCount: planResult.plan.operations.length,
+      }),
+    ];
+
     const executeResult = await runner.execute({
       driver: driver!,
       perSpaceOptions: [
@@ -364,6 +375,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
           policy: INIT_ADDITIVE_POLICY,
           frameworkComponents,
           strictVerification: false,
+          migrationEdges: synthEdges,
         },
       ],
     });

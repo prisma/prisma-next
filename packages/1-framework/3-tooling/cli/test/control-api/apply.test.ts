@@ -10,7 +10,10 @@ import type {
   ContractSpaceMember,
   PerSpacePlan,
 } from '@prisma-next/migration-tools/aggregate';
-import { createContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
+import {
+  buildSynthMigrationEdge,
+  createContractSpaceAggregate,
+} from '@prisma-next/migration-tools/aggregate';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 import { type ApplyAction, applyMigration } from '../../src/control-api/operations/apply';
@@ -61,7 +64,13 @@ function makePerSpacePlan(): PerSpacePlan {
     displayOps: [],
     destinationContract: makeAppMember().contract,
     strategy: 'graph-walk',
-    migrationEdges: [],
+    migrationEdges: [
+      buildSynthMigrationEdge({
+        currentMarkerStorageHash: null,
+        destinationStorageHash: APP_HASH,
+        operationCount: 0,
+      }),
+    ],
     pathDecision: undefined,
   } as unknown as PerSpacePlan;
 }

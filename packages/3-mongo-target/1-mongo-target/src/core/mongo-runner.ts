@@ -57,7 +57,7 @@ export interface MongoMigrationRunnerExecuteOptions {
    */
   readonly projectSchema?: (schema: MongoSchemaIR) => MongoSchemaIR;
   /** Per-edge breakdown from graph-walk planning; drives per-edge ledger writes. */
-  readonly migrationEdges?: readonly AggregateMigrationEdgeRef[] | undefined;
+  readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
 }
 
 export type MongoMigrationRunnerResult = Result<
@@ -104,9 +104,8 @@ export class MongoMigrationRunner {
     const filterEvaluator = new FilterEvaluator();
 
     let operationsExecuted = 0;
-    const executedPlanOps: unknown[] = [];
 
-    for (const [i, operation] of operations.entries()) {
+    for (const operation of operations) {
       options.callbacks?.onOperationStart?.(operation);
       try {
         if (operation.operationClass === 'data') {
@@ -122,7 +121,6 @@ export class MongoMigrationRunner {
           if (result.failure) return result.failure;
           if (result.executed) {
             operationsExecuted += 1;
-            executedPlanOps.push(options.plan.operations[i]);
           }
           continue;
         }
@@ -173,7 +171,6 @@ export class MongoMigrationRunner {
         }
 
         operationsExecuted += 1;
-        executedPlanOps.push(options.plan.operations[i]);
       } finally {
         options.callbacks?.onOperationComplete?.(operation);
       }
@@ -257,7 +254,7 @@ export class MongoMigrationRunner {
         });
       }
 
-      await this.recordLedgerEntries(markerOps, space, options, existingMarker, executedPlanOps);
+      await this.recordLedgerEntries(markerOps, space, options);
     }
 
     return ok({ operationsPlanned: operations.length, operationsExecuted });
@@ -267,45 +264,28 @@ export class MongoMigrationRunner {
     markerOps: MarkerOperations,
     space: string,
     options: MongoMigrationRunnerExecuteOptions,
-    existingMarker: ContractMarkerRecord | null,
-    executedPlanOps: readonly unknown[],
   ): Promise<void> {
     const plan = options.plan;
-    const destination = plan.destination;
     const edges = options.migrationEdges;
-
-    if (edges !== undefined && edges.length > 0) {
-      const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
-      if (totalEdgeOps !== plan.operations.length) {
-        throw new Error(
-          `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
-        );
-      }
-      let offset = 0;
-      for (const edge of edges) {
-        const edgeOps = plan.operations.slice(offset, offset + edge.operationCount);
-        offset += edge.operationCount;
-        await markerOps.writeLedgerEntry(space, {
-          edgeId: `${edge.from}->${edge.to}`,
-          from: edge.from,
-          to: edge.to,
-          migrationName: edge.dirName,
-          migrationHash: edge.migrationHash,
-          operations: edgeOps,
-        });
-      }
-      return;
+    const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
+    if (totalEdgeOps !== plan.operations.length) {
+      throw new Error(
+        `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
+      );
     }
-
-    const originHash = existingMarker?.storageHash ?? '';
-    await markerOps.writeLedgerEntry(space, {
-      edgeId: `${originHash}->${destination.storageHash}`,
-      from: originHash,
-      to: destination.storageHash,
-      migrationName: '',
-      migrationHash: destination.storageHash,
-      operations: executedPlanOps,
-    });
+    let offset = 0;
+    for (const edge of edges) {
+      const edgeOps = plan.operations.slice(offset, offset + edge.operationCount);
+      offset += edge.operationCount;
+      await markerOps.writeLedgerEntry(space, {
+        edgeId: `${edge.from}->${edge.to}`,
+        from: edge.from,
+        to: edge.to,
+        migrationName: edge.dirName,
+        migrationHash: edge.migrationHash,
+        operations: edgeOps,
+      });
+    }
   }
 
   private async executeDataTransform(

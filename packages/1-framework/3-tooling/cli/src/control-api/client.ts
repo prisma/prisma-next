@@ -451,6 +451,7 @@ class ControlClientImpl implements ControlClient {
     return familyInstance.readAllMarkers({ driver });
   }
 
+  /** Reads the per-migration journal for `space` (defaults to the app contract space). */
   async readLedger(space = APP_SPACE_ID): Promise<readonly LedgerEntryRecord[]> {
     const { driver, familyInstance } = await this.ensureConnected();
     return familyInstance.readLedger({ driver, space });

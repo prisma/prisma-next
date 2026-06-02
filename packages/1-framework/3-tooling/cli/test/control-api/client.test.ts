@@ -1,5 +1,5 @@
 import type { ContractSourceProvider } from '@prisma-next/config/config-types';
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, LedgerEntryRecord } from '@prisma-next/contract/types';
 import type { EmitResult } from '@prisma-next/emitter';
 import type {
   ControlAdapterDescriptor,
@@ -68,6 +68,7 @@ function createMockComponents() {
     introspect: async () => ({ tables: [] }),
     deserializeContract: (ir: unknown) => ir as Contract,
     readMarker: async () => null,
+    readLedger: async () => [],
     verify: async (): Promise<VerifyDatabaseResult> => ({
       ok: true,
       summary: 'Verification passed',
@@ -855,6 +856,39 @@ describe('ControlClient progress emission', () => {
       await client.close();
 
       expect(result.ok).toBe(true);
+    });
+  });
+
+  describe('readLedger()', () => {
+    it('returns journal entries from the family instance', async () => {
+      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
+        createMockComponents();
+
+      const expectedEntries: LedgerEntryRecord[] = [
+        {
+          space: 'app',
+          migrationName: '001_init',
+          migrationHash: 'sha256:mig-init',
+          from: null,
+          to: 'sha256:dest',
+          appliedAt: new Date('2024-06-01T12:00:00.000Z'),
+          operationCount: 1,
+        },
+      ];
+      mockFamilyInstance.readLedger = async () => expectedEntries;
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      await client.connect('postgres://test');
+      const entries = await client.readLedger();
+      await client.close();
+
+      expect(entries).toEqual(expectedEntries);
     });
   });
 

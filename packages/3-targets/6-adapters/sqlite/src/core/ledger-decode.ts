@@ -1,13 +1,4 @@
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-
 const DESIGNATOR_LESS_UTC_DATETIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/;
-
-export function ledgerOriginFromStored(originCoreHash: string | null): string | null {
-  if (originCoreHash === null || originCoreHash === '' || originCoreHash === EMPTY_CONTRACT_HASH) {
-    return null;
-  }
-  return originCoreHash;
-}
 
 export function coerceLedgerAppliedAt(value: Date | string): Date {
   if (value instanceof Date) {

@@ -1,16 +1,12 @@
 import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import {
-  coerceLedgerAppliedAt,
-  ledgerOriginFromStored,
-  operationCountFromStored,
-} from '@prisma-next/family-sql/ledger-read';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import {
   APP_SPACE_ID,
   type ControlDriverInstance,
 } from '@prisma-next/framework-components/control';
+import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -30,6 +26,7 @@ import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalize
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
+import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
 import type { SqliteContract } from './types';
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';

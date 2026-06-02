@@ -18,6 +18,7 @@ import {
   familyInstance,
   frameworkComponents,
   sqliteTargetDescriptor,
+  synthEdges,
   type TestDatabase,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
@@ -49,6 +50,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
         {
           space: emptyPlan.spaceId ?? APP_SPACE_ID,
           plan: emptyPlan,
+          migrationEdges: synthEdges(emptyPlan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -76,6 +78,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
         {
           space: failingPlan.spaceId ?? APP_SPACE_ID,
           plan: failingPlan,
+          migrationEdges: synthEdges(failingPlan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -128,6 +131,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
         {
           space: emptyPlan.spaceId ?? APP_SPACE_ID,
           plan: emptyPlan,
+          migrationEdges: synthEdges(emptyPlan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -195,6 +199,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
         {
           space: planWithFailingPostcheck.spaceId ?? APP_SPACE_ID,
           plan: planWithFailingPostcheck,
+          migrationEdges: synthEdges(planWithFailingPostcheck),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -253,6 +258,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
         {
           space: planWithInvalidSql.spaceId ?? APP_SPACE_ID,
           plan: planWithInvalidSql,
+          migrationEdges: synthEdges(planWithInvalidSql),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -308,6 +314,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
         {
           space: emptyPlan.spaceId ?? APP_SPACE_ID,
           plan: emptyPlan,
+          migrationEdges: synthEdges(emptyPlan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -356,6 +363,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
         {
           space: APP_SPACE_ID,
           plan,
+          migrationEdges: synthEdges(plan),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
@@ -411,6 +419,7 @@ describe('SqliteMigrationRunner - Policy Violations', () => {
         {
           space: planWithPolicyViolation.spaceId ?? APP_SPACE_ID,
           plan: planWithPolicyViolation,
+          migrationEdges: synthEdges(planWithPolicyViolation),
           driver,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,

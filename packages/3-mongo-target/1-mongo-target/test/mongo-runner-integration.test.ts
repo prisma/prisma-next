@@ -13,7 +13,10 @@ import type {
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
-import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
+import {
+  type AggregateMigrationEdgeRef,
+  buildSynthMigrationEdge,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
@@ -56,6 +59,16 @@ beforeEach(async () => {
     await db.dropCollection(col['name'] as string);
   }
 });
+
+function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
+  return [
+    buildSynthMigrationEdge({
+      currentMarkerStorageHash: plan.origin?.storageHash,
+      destinationStorageHash: plan.destination.storageHash,
+      operationCount: plan.operations.length,
+    }),
+  ];
+}
 
 function makeContract(
   collections: Record<
@@ -171,6 +184,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       frameworkComponents: [],
@@ -208,6 +222,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -234,6 +249,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -259,6 +275,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -284,6 +301,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -320,6 +338,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -347,6 +366,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -366,6 +386,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -390,6 +411,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -422,6 +444,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['destructive'] },
@@ -444,6 +467,7 @@ describe('MongoMigrationRunner', () => {
     const runner = makeRunner();
     await runner.execute({
       plan: serialized,
+      migrationEdges: synthEdges(plan),
 
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
@@ -531,6 +555,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
+      migrationEdges: synthEdges(makeDataTransformPlan([op])),
       destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
@@ -577,6 +602,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
+      migrationEdges: synthEdges(makeDataTransformPlan([op])),
       destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
@@ -624,6 +650,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
+      migrationEdges: synthEdges(makeDataTransformPlan([op])),
       destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
@@ -668,6 +695,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
+      migrationEdges: synthEdges(makeDataTransformPlan([op])),
       destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       frameworkComponents: [],
@@ -693,6 +721,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
+      migrationEdges: synthEdges(makeDataTransformPlan([op])),
       destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['additive'] },
       frameworkComponents: [],
@@ -770,6 +799,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan,
+      migrationEdges: synthEdges(plan),
       destinationContract: contract,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
       frameworkComponents: [],
@@ -854,6 +884,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
 
     const result1 = await runner.execute({
       plan,
+      migrationEdges: synthEdges(plan),
       destinationContract: bareContract('sha256:retry'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
@@ -868,6 +899,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
 
     const result2 = await runner.execute({
       plan,
+      migrationEdges: synthEdges(plan),
       destinationContract: bareContract('sha256:retry'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,

@@ -4,7 +4,10 @@ import type {
   MigrationPlan,
   MigrationRunnerExecutionChecks,
 } from '@prisma-next/framework-components/control';
-import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
+import {
+  type AggregateMigrationEdgeRef,
+  buildSynthMigrationEdge,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
@@ -210,6 +213,16 @@ function makePlan(ops: readonly AnyMongoMigrationOperation[]): MigrationPlan {
   };
 }
 
+function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
+  return [
+    buildSynthMigrationEdge({
+      currentMarkerStorageHash: plan.origin?.storageHash,
+      destinationStorageHash: plan.destination.storageHash,
+      operationCount: plan.operations.length,
+    }),
+  ];
+}
+
 interface Harness {
   readonly runner: MongoMigrationRunner;
   readonly driver: StubMongoDriver;
@@ -264,8 +277,10 @@ async function execute(
   ops: readonly AnyMongoMigrationOperation[],
   executionChecks?: MigrationRunnerExecutionChecks,
 ) {
+  const plan = makePlan(ops);
   return harness.runner.execute({
-    plan: makePlan(ops),
+    plan,
+    migrationEdges: synthEdges(plan),
     destinationContract: makeContract('sha256:dest'),
     policy: ALL_POLICY,
     frameworkComponents: [],
@@ -457,8 +472,10 @@ describe('MongoMigrationRunner schema verification', () => {
     const { runner, calls } = makeHarnessWithDrift();
     const ddlOp = createCollection('orders');
 
+    const driftPlan = makePlan([ddlOp]);
     const result = await runner.execute({
-      plan: makePlan([ddlOp]),
+      plan: driftPlan,
+      migrationEdges: synthEdges(driftPlan),
       destinationContract: makeContract('sha256:dest'),
       policy: ALL_POLICY,
       frameworkComponents: [],
@@ -508,13 +525,15 @@ describe('MongoMigrationRunner schema verification', () => {
     };
 
     const runner = new MongoMigrationRunner(deps);
+    const noOpPlan: MigrationPlan = {
+      targetId: 'mongo',
+      origin: { storageHash: 'sha256:dest' },
+      destination: { storageHash: 'sha256:dest' },
+      operations: [] as unknown as MigrationPlan['operations'],
+    };
     const result = await runner.execute({
-      plan: {
-        targetId: 'mongo',
-        origin: { storageHash: 'sha256:dest' },
-        destination: { storageHash: 'sha256:dest' },
-        operations: [] as unknown as MigrationPlan['operations'],
-      },
+      plan: noOpPlan,
+      migrationEdges: synthEdges(noOpPlan),
       destinationContract: makeContract('sha256:dest'),
       policy: ALL_POLICY,
       frameworkComponents: [],
@@ -529,8 +548,10 @@ describe('MongoMigrationRunner schema verification', () => {
     const { runner, calls } = makeHarnessWithDrift();
     const ddlOp = createCollection('orders');
 
+    const warnPlan = makePlan([ddlOp]);
     const result = await runner.execute({
-      plan: makePlan([ddlOp]),
+      plan: warnPlan,
+      migrationEdges: synthEdges(warnPlan),
       destinationContract: makeContract('sha256:dest'),
       policy: ALL_POLICY,
       frameworkComponents: [],
@@ -734,17 +755,28 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
     ).rejects.toThrow(/does not match sum of migrationEdges operationCount/);
   });
 
-  it('writes one synthesised ledger entry with empty migration name for synth apply without migrationEdges', async () => {
+  it('writes one synthesised ledger entry with empty migration name for synth apply with a single synth edge', async () => {
     const { runner, ledgerEntries } = makeLedgerHarness();
     const destHash = 'sha256:dest';
+    const plan = makeLedgerPlan([createCollection('ledger_synth')], { destinationHash: destHash });
+    const synthEdges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        dirName: '',
+        migrationHash: destHash,
+        from: '',
+        to: destHash,
+        operationCount: plan.operations.length,
+      },
+    ];
 
     const result = await runner.execute({
-      plan: makeLedgerPlan([createCollection('ledger_synth')], { destinationHash: destHash }),
+      plan,
       destinationContract: makeContract(destHash),
       policy: ALL_POLICY,
       frameworkComponents: [],
       strictVerification: false,
       executionChecks: LEDGER_EXECUTION_CHECKS,
+      migrationEdges: synthEdges,
     });
 
     expect(result.assertOk()).toEqual({ operationsPlanned: 1, operationsExecuted: 1 });

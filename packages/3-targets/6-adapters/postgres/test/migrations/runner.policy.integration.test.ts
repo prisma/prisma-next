@@ -13,6 +13,7 @@ import {
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
+  synthEdges,
   testTimeout,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
@@ -87,6 +88,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
           {
             space: planWithPolicyViolation.spaceId ?? APP_SPACE_ID,
             plan: planWithPolicyViolation,
+            migrationEdges: synthEdges(planWithPolicyViolation),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
@@ -158,6 +160,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
           {
             space: planWithDataOp.spaceId ?? APP_SPACE_ID,
             plan: planWithDataOp,
+            migrationEdges: synthEdges(planWithDataOp),
             driver: driver!,
             destinationContract: contract,
             policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
@@ -239,6 +242,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
           {
             space: planWithDestructiveOp.spaceId ?? APP_SPACE_ID,
             plan: planWithDestructiveOp,
+            migrationEdges: synthEdges(planWithDestructiveOp),
             driver: driver!,
             destinationContract: contract,
             policy: permissivePolicy,
