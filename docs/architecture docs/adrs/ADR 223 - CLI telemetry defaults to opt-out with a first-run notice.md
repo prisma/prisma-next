@@ -46,6 +46,18 @@ The result: the opted-in population skewed heavily toward interactive human firs
 
 The constraint is to widen the collected population without weakening the trust properties the project already committed to: a resettable, system-independent identifier (ADR 216), strict runtime isolation (ADR 217), no transmission of values/paths/identifiers ([`docs/Telemetry.md`](../../Telemetry.md#what-is-not-collected)), and **no silent re-enablement of users who had already opted out** under v0.11.0.
 
+### Prior art
+
+Opt-out-by-default with a one-time first-run disclosure is the established pattern among comparable developer CLIs, and the disclosure-plus-env-opt-out shape below is modelled on it:
+
+- **Next.js** — telemetry is enabled by default; the CLI prints a one-time anonymous-telemetry notice on first collection and is disabled via `next telemetry disable` or `NEXT_TELEMETRY_DISABLED=1`.
+- **.NET CLI** — telemetry on by default, a first-run notice on the very first command, opt-out via `DOTNET_CLI_TELEMETRY_OPTOUT=1`.
+- **Homebrew** — analytics on by default, opt-out via `brew analytics off` or `HOMEBREW_NO_ANALYTICS=1`.
+- **Astro** and **Nuxt** — both default-on with a first-run notice and a `… telemetry disable` / env opt-out.
+- **`DO_NOT_TRACK`** — the cross-tool [community opt-out convention](https://consoledonottrack.com) we additionally honour, so a single env var opts out of every participating tool at once.
+
+The two-signal opt-out (a tool-specific `PRISMA_NEXT_DISABLE_TELEMETRY` plus the shared `DO_NOT_TRACK`) and the stderr first-run notice mirror this prior art rather than inventing a new contract.
+
 ## Decision
 
 ### Default to opt-out

@@ -148,12 +148,12 @@ The default answer is still **Yes**.
 The prompt appears only when all of these are true:
 
 - the answer has not been stored yet (`enableTelemetry` is absent from `config.json`, or the file doesn't exist);
-- `init` is running in interactive mode (stdin is a TTY);
+- `init` is running **interactively**. By default this requires **both** stdin *and* stdout to be TTYs; `--interactive` forces prompting on even when stdin is not a TTY, and `--no-interactive` (or a non-TTY stdout) forces it off. This is the same `deriveCanPrompt` decision the rest of the CLI uses, so the prompt can never appear or disappear out of step with the CLI's interactive-mode behaviour;
 - you haven't passed `--yes` (or any other auto-accept flag);
 - neither `PRISMA_NEXT_DISABLE_TELEMETRY` nor `DO_NOT_TRACK=1` is set;
 - the CLI is not running in a CI environment.
 
-If any of those conditions doesn't hold, the prompt is suppressed. In particular, a **non-interactive `init`** — `--yes`, piped stdin, or `--no-interactive` — does *not* show the prompt; it gets the first-run notice like any other command, and answering "Yes" to the prompt is no longer required for telemetry to be on.
+If any of those conditions doesn't hold, the prompt is suppressed. In particular, a **non-interactive `init`** — `--yes`, `--no-interactive`, piped stdin, or piped stdout — does *not* show the prompt; it gets the first-run notice like any other command, and answering "Yes" to the prompt is no longer required for telemetry to be on.
 
 The prompt is **never re-shown** once `enableTelemetry` is stored — even on a subsequent `prisma-next init`. To change your answer, edit (or delete) `config.json` as described above.
 
