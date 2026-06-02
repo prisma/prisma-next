@@ -978,4 +978,23 @@ describe('renderMigrationGraphLegend', () => {
     expect(stripAnsi(colored)).toContain('aaaaaa -> bbbbbb');
     expect(stripAnsi(colored)).not.toContain('lanes');
   });
+
+  it('dims legend label prose when colorize is on, not the heading or glyphs', () => {
+    const { dim } = createColors({ useColor: true });
+    const colored = renderMigrationGraphLegend({ colorize: true });
+    expect(colored.startsWith('Legend:')).toBe(true);
+    const lines = colored.split('\n');
+    expect(lines[0]).toBe('Legend:');
+    expect(lines[0]).not.toContain('\u001b[2m');
+
+    const firstContent = lines[1] ?? '';
+    const forwardIdx = firstContent.indexOf('forward');
+    expect(forwardIdx).toBeGreaterThan(-1);
+    const dimForward = dim('forward');
+    if (colored.includes(dimForward)) {
+      expect(firstContent.indexOf(dimForward)).toBe(forwardIdx);
+    } else {
+      expect(stripAnsi(colored)).toBe(renderMigrationGraphLegend({ colorize: false }));
+    }
+  });
 });
