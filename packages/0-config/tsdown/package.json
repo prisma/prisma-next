@@ -3,11 +3,11 @@
   "type": "module",
   "private": true,
   "sideEffects": false,
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Base tsdown configuration for the monorepo",
   "license": "MIT",
   "devDependencies": {
-    "@prisma-next/tsconfig": "workspace:0.11.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },
