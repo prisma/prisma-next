@@ -55,4 +55,19 @@ describe('contract DSL type surface', () => {
       });
     }
   });
+
+  it('rejects invalid per-table control at compile time', () => {
+    if (false as boolean) {
+      defineContract({
+        family: bareFamilyPack,
+        target: postgresTargetPack,
+        models: {
+          User: model('User', {
+            fields: { id: field.column(int4Column).id() },
+            // @ts-expect-error invalid control policy literal
+          }).sql({ table: 'app_user', control: 'bogus' }),
+        },
+      });
+    }
+  });
 });

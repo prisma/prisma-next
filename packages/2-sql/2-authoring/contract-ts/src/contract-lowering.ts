@@ -48,7 +48,6 @@ type RuntimeModelSpec = {
   readonly modelName: string;
   readonly tableName: string;
   readonly namespace: string | undefined;
-  readonly control: SqlStageSpec['control'];
   readonly fieldBuilders: Record<string, ScalarFieldBuilder>;
   readonly fieldToColumn: Record<string, string>;
   readonly relations: Record<string, RelationBuilder<RelationState>>;
@@ -615,7 +614,7 @@ function resolveModelNode(
     ...(indexes.length > 0 ? { indexes } : {}),
     ...(foreignKeys.length > 0 ? { foreignKeys } : {}),
     ...(relations.length > 0 ? { relations } : {}),
-    ...ifDefined('control', spec.control),
+    ...ifDefined('control', spec.sqlSpec?.control),
   };
 }
 
@@ -673,7 +672,6 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
       modelName,
       tableName,
       namespace: modelDefinition.stageOne.namespace,
-      control: sqlSpec?.control,
       fieldBuilders,
       fieldToColumn,
       relations: modelDefinition.stageOne.relations,
