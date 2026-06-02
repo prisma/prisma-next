@@ -1,4 +1,5 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,6 +132,130 @@ for (const { spec, variant, metafile } of outputs) {
   for (const { path, bytes } of top) {
     const display = relative(resolve(root, '..', '..'), resolve(root, path));
     console.log(`  ${(bytes / 1024).toFixed(1).padStart(7)} KiB  ${display}`);
+  }
+  console.log('');
+}
+
+// -----------------------------------------------------------------
+// Cloudflare Workers bundles via wrangler.
+//
+// Wrangler uses esbuild internally with Workers-specific settings
+// (workerd/worker conditions, nodejs_compat polyfills, etc). The
+// `--dry-run --outdir <dir>` flow builds without deploying;
+// `--metafile` emits the esbuild metafile next to the bundle so the
+// `why.ts` tracer (see sibling script) can inspect it the same way
+// it inspects esbuild's own output.
+// -----------------------------------------------------------------
+
+interface WranglerSpec {
+  readonly label: string;
+  readonly config: string;
+  readonly outBase: string;
+  /** Wrangler names the output file after the worker entry's basename. */
+  readonly emittedFile: string;
+}
+
+const wranglerBundles: readonly WranglerSpec[] = [
+  {
+    label: 'cf-worker / no-emit (TS contract)',
+    config: 'wrangler.worker.jsonc',
+    outBase: 'dist/cf-worker-no-emit',
+    emittedFile: 'worker.js',
+  },
+  {
+    label: 'cf-worker / emit (contract.json)',
+    config: 'wrangler.worker-emit.jsonc',
+    outBase: 'dist/cf-worker-emit',
+    emittedFile: 'worker-emit.js',
+  },
+];
+
+const wranglerVariants: readonly Variant[] = [
+  { label: 'unminified', minify: false, suffix: '.worker.mjs' },
+  { label: 'minified', minify: true, suffix: '.worker.min.mjs' },
+];
+
+interface WranglerOutput {
+  readonly spec: WranglerSpec;
+  readonly variant: Variant;
+  readonly outfile: string;
+  readonly bytes: number;
+  readonly gzipBytes: number;
+  readonly metafilePath: string;
+}
+
+const wranglerOutputs: WranglerOutput[] = [];
+
+for (const spec of wranglerBundles) {
+  for (const variant of wranglerVariants) {
+    // Wrangler always emits worker.js + worker.js.map + bundle-meta.json +
+    // README.md to the outdir. Use a per-(spec,variant) temp dir so
+    // simultaneous runs don't clobber, then move the two artefacts we want
+    // to stable flat paths matching the esbuild naming convention.
+    const tmpDir = resolve(
+      root,
+      `dist/.wrangler-${spec.outBase.replace('dist/', '')}-${variant.label}`,
+    );
+    await rm(tmpDir, { recursive: true, force: true });
+    await mkdir(tmpDir, { recursive: true });
+
+    const wranglerArgs = [
+      'exec',
+      'wrangler',
+      'deploy',
+      '--dry-run',
+      '--config',
+      spec.config,
+      '--outdir',
+      tmpDir,
+      '--metafile',
+    ];
+    if (variant.minify) wranglerArgs.push('--minify');
+
+    execFileSync('pnpm', wranglerArgs, { cwd: root, stdio: 'inherit' });
+
+    const finalBundle = resolve(root, `${spec.outBase}${variant.suffix}`);
+    const finalMeta = `${finalBundle}.meta.json`;
+    await rename(resolve(tmpDir, spec.emittedFile), finalBundle);
+    await rename(resolve(tmpDir, 'bundle-meta.json'), finalMeta);
+    await rm(tmpDir, { recursive: true, force: true });
+
+    const { size } = await stat(finalBundle);
+    const contents = await readFile(finalBundle);
+    const gzipped = gzipSync(contents, { level: 9 });
+    await writeFile(`${finalBundle}.gz`, gzipped);
+
+    wranglerOutputs.push({
+      spec,
+      variant,
+      outfile: finalBundle,
+      bytes: size,
+      gzipBytes: gzipped.byteLength,
+      metafilePath: finalMeta,
+    });
+  }
+}
+
+console.log('cf-worker bundles (wrangler):');
+console.log(
+  `  ${'entry'.padEnd(40)}  ${'variant'.padEnd(10)}  ${'raw'.padStart(22)}  ${'gzip (level 9)'.padStart(22)}`,
+);
+for (const { spec, variant, bytes, gzipBytes } of wranglerOutputs) {
+  console.log(
+    `  ${spec.label.padEnd(40)}  ${variant.label.padEnd(10)}  ${fmtBytes(bytes)} (${fmtKiB(bytes)})  ${fmtBytes(gzipBytes)} (${fmtKiB(gzipBytes)})`,
+  );
+}
+console.log('');
+for (const { spec, variant, metafilePath } of wranglerOutputs) {
+  if (variant.label !== 'minified') continue;
+  const meta: esbuild.Metafile = JSON.parse(await readFile(metafilePath, 'utf8'));
+  console.log(`top 10 inputs — ${spec.label}:`);
+  const top = Object.entries(meta.inputs)
+    .map(([path, info]) => ({ path, bytes: info.bytes }))
+    .sort((a, b) => b.bytes - a.bytes)
+    .slice(0, 10);
+  for (const { path, bytes } of top) {
+    console.log(`  ${(bytes / 1024).toFixed(1).padStart(7)} KiB  ${path}`);
   }
   console.log('');
 }
