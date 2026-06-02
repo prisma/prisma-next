@@ -953,12 +953,104 @@ export type RelationMutation<TContract extends Contract<SqlStorage>, ModelName e
   | RelationMutationConnect<TContract, ModelName>
   | RelationMutationDisconnect<TContract, ModelName>;
 
-export interface RelationMutator<TContract extends Contract<SqlStorage>, ModelName extends string> {
+type RelationThrough<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> =
+  RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
+    ? RelName extends keyof Rels
+      ? Rels[RelName] extends {
+          readonly through: infer Through extends {
+            readonly table: string;
+            readonly parentColumns: readonly string[];
+            readonly childColumns: readonly string[];
+          };
+        }
+        ? Through
+        : never
+      : never
+    : never;
+
+/**
+ * Resolves a storage table name to its owning domain model by scanning the
+ * model map for the model whose `storage.table` matches. Junction tables
+ * (e.g. `user_roles`) surface their generated model (e.g. `UserRole`) so the
+ * junction's own field nullability/defaults can be inspected.
+ */
+type ModelNameForTable<TContract extends Contract<SqlStorage>, TableName extends string> = {
+  [M in keyof ModelsOf<TContract> & string]: ModelsOf<TContract>[M] extends {
+    readonly storage: { readonly table: TableName };
+  }
+    ? M
+    : never;
+}[keyof ModelsOf<TContract> & string];
+
+/**
+ * A junction field is a *payload* field when its backing column is neither a
+ * parent-side nor a child-side foreign-key column of the join. Those payload
+ * fields are the ones the relation API can't populate from `create`/`connect`.
+ */
+type JunctionPayloadFieldNames<
+  TContract extends Contract<SqlStorage>,
+  JunctionModel extends string,
+  JoinColumns extends string,
+> = {
+  [F in CreateFieldNames<TContract, JunctionModel>]: FieldColumnName<
+    TContract,
+    JunctionModel,
+    F
+  > extends JoinColumns
+    ? never
+    : F;
+}[CreateFieldNames<TContract, JunctionModel>];
+
+/**
+ * True when the relation's junction carries at least one required payload
+ * column — a non-join column that is not nullable and has no default. Such a
+ * relation can't be populated through nested `create`, so its create input is
+ * disabled at the type level (mirroring the runtime guard in
+ * `mutation-executor.ts`).
+ */
+type HasRequiredJunctionPayload<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> =
+  RelationThrough<TContract, ModelName, RelName> extends infer Through extends {
+    readonly table: string;
+    readonly parentColumns: readonly string[];
+    readonly childColumns: readonly string[];
+  }
+    ? ModelNameForTable<TContract, Through['table']> extends infer JunctionModel extends string
+      ? {
+          [F in JunctionPayloadFieldNames<
+            TContract,
+            JunctionModel,
+            Through['parentColumns'][number] | Through['childColumns'][number]
+          >]: IsOptionalCreateField<TContract, JunctionModel, F> extends true ? never : F;
+        }[JunctionPayloadFieldNames<
+          TContract,
+          JunctionModel,
+          Through['parentColumns'][number] | Through['childColumns'][number]
+        >] extends never
+        ? false
+        : true
+      : false
+    : false;
+
+export interface RelationMutator<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  CreateDisabled extends boolean = false,
+> {
   create(
-    data: MutationCreateInput<TContract, ModelName>,
+    data: CreateDisabled extends true ? never : MutationCreateInput<TContract, ModelName>,
   ): RelationMutationCreate<TContract, ModelName>;
   create(
-    data: readonly MutationCreateInput<TContract, ModelName>[],
+    data: CreateDisabled extends true
+      ? never
+      : readonly MutationCreateInput<TContract, ModelName>[],
   ): RelationMutationCreate<TContract, ModelName>;
   connect(
     criterion: RelationConnectCriterion<TContract, ModelName>,
@@ -977,7 +1069,11 @@ type RelationMutationCallback<
   ModelName extends string,
   RelName extends RelationNames<TContract, ModelName>,
 > = (
-  mutator: RelationMutator<TContract, RelatedModelName<TContract, ModelName, RelName> & string>,
+  mutator: RelationMutator<
+    TContract,
+    RelatedModelName<TContract, ModelName, RelName> & string,
+    HasRequiredJunctionPayload<TContract, ModelName, RelName>
+  >,
 ) => RelationMutation<TContract, RelatedModelName<TContract, ModelName, RelName> & string>;
 
 type RelationMutationFields<
