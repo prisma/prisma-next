@@ -71,6 +71,7 @@ import {
   PG_JSON_CODEC_ID,
   PG_JSONB_CODEC_ID,
   PG_NUMERIC_CODEC_ID,
+  PG_TEXT_ARRAY_CODEC_ID,
   PG_TEXT_CODEC_ID,
   PG_TIME_CODEC_ID,
   PG_TIMESTAMP_CODEC_ID,
@@ -99,6 +100,7 @@ const precisionParamsSchema = arktype({
 }) satisfies StandardSchemaV1<PrecisionParams>;
 
 const PG_TEXT_META = { db: { sql: { postgres: { nativeType: 'text' } } } } as const;
+const PG_TEXT_ARRAY_META = { db: { sql: { postgres: { nativeType: 'text[]' } } } } as const;
 const PG_INT4_META = { db: { sql: { postgres: { nativeType: 'integer' } } } } as const;
 const PG_INT2_META = { db: { sql: { postgres: { nativeType: 'smallint' } } } } as const;
 const PG_INT8_META = { db: { sql: { postgres: { nativeType: 'bigint' } } } } as const;
@@ -159,6 +161,47 @@ export const pgTextColumn = () =>
 
 pgTextColumn satisfies ColumnHelperFor<PgTextDescriptor>;
 pgTextColumn satisfies ColumnHelperForStrict<PgTextDescriptor>;
+
+/**
+ * Postgres `text[]` codec. Encode is an identity pass-through: the pg wire
+ * driver serialises a JS `string[]` to a Postgres array literal under the
+ * `$N::text[]` cast the renderer emits from this codec's `text[]` native type,
+ * and decode reads it back as a JS array. Used by the control plane to write
+ * the marker's `invariants` column. Not a user-facing scalar — it is not part
+ * of the authorable `CodecTypes` surface, only the runtime codec registry.
+ */
+export class PgTextArrayCodec extends CodecImpl<
+  typeof PG_TEXT_ARRAY_CODEC_ID,
+  readonly ['equality'],
+  readonly string[],
+  readonly string[]
+> {
+  async encode(value: readonly string[], _ctx: CodecCallContext): Promise<readonly string[]> {
+    return value;
+  }
+  async decode(wire: readonly string[], _ctx: CodecCallContext): Promise<readonly string[]> {
+    return wire;
+  }
+  encodeJson(value: readonly string[]): JsonValue {
+    return [...value];
+  }
+  decodeJson(json: JsonValue): readonly string[] {
+    return Array.isArray(json) ? json.map((entry) => String(entry)) : [];
+  }
+}
+
+export class PgTextArrayDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_TEXT_ARRAY_CODEC_ID;
+  override readonly traits = ['equality'] as const;
+  override readonly targetTypes = ['text[]'] as const;
+  override readonly meta = PG_TEXT_ARRAY_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgTextArrayCodec {
+    return () => new PgTextArrayCodec(this);
+  }
+}
+
+export const pgTextArrayDescriptor = new PgTextArrayDescriptor();
 
 export class PgInt4Codec extends CodecImpl<
   typeof PG_INT4_CODEC_ID,
@@ -1036,4 +1079,5 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgEnumDescriptor,
   pgJsonDescriptor,
   pgJsonbDescriptor,
+  pgTextArrayDescriptor,
 ];

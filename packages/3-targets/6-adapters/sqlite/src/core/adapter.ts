@@ -207,9 +207,18 @@ function renderProjection(
 }
 
 function qualifyTableFromNamespaceCoordinate(
-  table: Pick<TableSource, 'name' | 'namespaceId'>,
+  table: Pick<TableSource, 'name' | 'namespaceId' | 'schema'>,
   contract: SqliteContract,
 ): string {
+  // SQLite has no schema namespacing: control tables are unqualified
+  // (`_prisma_marker` / `_prisma_ledger`). A literal `schema` would be a
+  // contract-free Postgres-shaped coordinate that cannot be rendered here, so
+  // reject it rather than silently emitting an invalid dotted identifier.
+  if (table.schema !== undefined) {
+    throw new Error(
+      `SQLite does not support schema-qualified tables, but table "${table.name}" carries schema "${table.schema}"`,
+    );
+  }
   if (table.namespaceId === undefined) {
     return quoteIdentifier(table.name);
   }
@@ -515,6 +524,8 @@ function renderInsertValue(value: InsertValue): string {
       return '?';
     case 'column-ref':
       return renderColumn(value);
+    case 'raw-expr':
+      return renderExpr(value);
     case 'default-value':
       throw new Error('SQLite does not support DEFAULT as a value in INSERT ... VALUES');
     default:

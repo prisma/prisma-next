@@ -271,9 +271,16 @@ function renderDistinctPrefix(
 }
 
 function qualifyTableFromNamespaceCoordinate(
-  table: Pick<TableSource, 'name' | 'namespaceId'>,
+  table: Pick<TableSource, 'name' | 'namespaceId' | 'schema'>,
   contract: PostgresContract,
 ): string {
+  // A literal `schema` is the contract-free coordinate used by control-plane
+  // DML against fixed tables (e.g. `prisma_contract.marker`). Quote each part
+  // independently so the dotted name renders as `"schema"."name"` rather than
+  // a single quoted identifier.
+  if (table.schema !== undefined) {
+    return `${quoteIdentifier(table.schema)}.${quoteIdentifier(table.name)}`;
+  }
   if (table.namespaceId === undefined) {
     return quoteIdentifier(table.name);
   }
@@ -730,7 +737,11 @@ function getInsertColumnOrder(
   return Object.keys(table.columns);
 }
 
-function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): string {
+function renderInsertValue(
+  value: InsertValue | undefined,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
+): string {
   if (!value || value.kind === 'default-value') {
     return 'DEFAULT';
   }
@@ -741,6 +752,8 @@ function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): 
       return renderParamRef(value, pim);
     case 'column-ref':
       return renderColumn(value);
+    case 'raw-expr':
+      return renderExpr(value, contract, pim);
     // v8 ignore next 4
     default:
       throw new Error(
@@ -778,7 +791,9 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
     const columns = columnOrder.map((column) => quoteIdentifier(column));
     const values = rows
       .map((row) => {
-        const renderedRow = columnOrder.map((column) => renderInsertValue(row[column], pim));
+        const renderedRow = columnOrder.map((column) =>
+          renderInsertValue(row[column], contract, pim),
+        );
         return `(${renderedRow.join(', ')})`;
       })
       .join(', ');
