@@ -1,6 +1,7 @@
 import {
   type Contract,
   type ContractFieldType,
+  type ContractRelationThrough,
   type CrossReference,
   domainModelsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
@@ -198,11 +199,9 @@ export function getCompleteColumnToFieldMap(
   return cached;
 }
 
-interface ResolvedThrough {
-  readonly table: string;
-  readonly parentColumns: readonly string[];
-  readonly childColumns: readonly string[];
-  readonly targetColumns: readonly string[];
+interface ResolvedThrough extends ContractRelationThrough {
+  /** Namespace of the junction table, resolved from storage. */
+  readonly namespaceId?: string;
   readonly requiredPayloadColumns: readonly string[];
 }
 
@@ -276,10 +275,10 @@ function resolveThrough(
     ...castAs<readonly string[]>(parentColumns),
     ...castAs<readonly string[]>(childColumns),
   ]);
-  const junctionTable = unboundTable(contract, table);
+  const resolvedJunction = resolveTableForContract(contract, table);
   const requiredPayloadColumns: string[] = [];
-  if (junctionTable) {
-    for (const [colName, col] of Object.entries(junctionTable.columns)) {
+  if (resolvedJunction) {
+    for (const [colName, col] of Object.entries(resolvedJunction.table.columns)) {
       if (!fkColumnSet.has(colName) && !col.nullable && col.default === undefined) {
         requiredPayloadColumns.push(colName);
       }
@@ -292,6 +291,7 @@ function resolveThrough(
     childColumns: castAs<readonly string[]>(childColumns),
     targetColumns: castAs<readonly string[]>(targetColumns),
     requiredPayloadColumns,
+    ...(resolvedJunction !== undefined ? { namespaceId: resolvedJunction.namespaceId } : {}),
   };
 }
 
