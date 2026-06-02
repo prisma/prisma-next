@@ -82,6 +82,9 @@ function baseConfig(): Record<string, unknown> {
       familyId: TARGET_FAMILY,
       create: vi.fn().mockReturnValue({
         deserializeContract: (json: unknown) => json,
+        readMarker: vi.fn().mockResolvedValue(null),
+        readAllMarkers: vi.fn().mockResolvedValue(new Map()),
+        readLedger: vi.fn().mockResolvedValue([]),
       }),
     },
     target: {
@@ -92,7 +95,10 @@ function baseConfig(): Record<string, unknown> {
       migrations: {},
     },
     adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
-    driver: { kind: 'driver' },
+    driver: {
+      kind: 'driver',
+      create: vi.fn().mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) }),
+    },
     db: { connection: 'postgres://localhost/cross-consumer-test' },
     contract: { output: 'src/prisma/contract.json' },
   };

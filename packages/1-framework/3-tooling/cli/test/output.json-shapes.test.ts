@@ -60,9 +60,6 @@ describe('MigrateResult JSON shape (aggregate-walking)', () => {
         "timings",
       ]
     `);
-    // Pin the canonical perSpace ordering: extensions alphabetically,
-    // then the app. Reordering or accidentally sorting `perSpace` would
-    // break consumers that index by position rather than `spaceId`.
     expect(result.perSpace.map((p) => p.spaceId)).toEqual(['pgvector', 'app']);
   });
 
@@ -79,101 +76,47 @@ describe('MigrateResult JSON shape (aggregate-walking)', () => {
 });
 
 describe('MigrationStatusResult JSON shape', () => {
-  it('matches expected keys in offline mode', () => {
+  it('matches expected keys for the list-shaped wire format', () => {
     const result: MigrationStatusResult = {
       ok: true,
-      mode: 'offline',
-      migrations: [],
-      targetHash: 'sha256:leaf',
-      contractHash: 'sha256:contract',
-      summary: '0 migration(s) on disk',
+      spaces: [
+        {
+          spaceId: 'app',
+          markerHash: 'sha256:marker',
+          targetHash: 'sha256:leaf',
+          migrations: [
+            {
+              dirName: '20260101T1200_init',
+              from: 'sha256:a',
+              to: 'sha256:b',
+              migrationHash: 'sha256:mid',
+              operationCount: 3,
+              createdAt: '2026-01-01T00:00:00.000Z',
+              refs: [],
+              providedInvariants: [],
+              status: 'applied',
+            },
+          ],
+        },
+      ],
+      summary: 'up to date',
       diagnostics: [],
-      requiredInvariants: [],
+      treeSections: [],
     };
     expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
       [
-        "contractHash",
         "diagnostics",
-        "migrations",
-        "mode",
         "ok",
-        "requiredInvariants",
+        "spaces",
         "summary",
-        "targetHash",
+        "treeSections",
       ]
     `);
-  });
-
-  it('matches expected keys in online mode with refs', () => {
-    const result: MigrationStatusResult = {
-      ok: true,
-      mode: 'online',
-      migrations: [],
-      markerHash: 'sha256:marker',
-      targetHash: 'sha256:leaf',
-      contractHash: 'sha256:contract',
-      refs: [{ name: 'production', hash: 'sha256:ref', active: true }],
-      pathDecision: {
-        fromHash: 'sha256:marker',
-        toHash: 'sha256:ref',
-        alternativeCount: 0,
-        tieBreakReasons: [],
-        refName: 'production',
-        requiredInvariants: [],
-        satisfiedInvariants: [],
-        selectedPath: [],
-      },
-      summary: 'At ref "production" target',
-      diagnostics: [],
-      requiredInvariants: [],
-      // Invariant-aware-routing fields are present in online mode even when
-      // the ref declares no invariants (both arrays empty). Pin them in the
-      // wire shape so a regression that drops either marker-derived array
-      // fails this assertion.
-      appliedInvariants: [],
-      missingInvariants: [],
-    };
-    expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
-      [
-        "appliedInvariants",
-        "contractHash",
-        "diagnostics",
-        "markerHash",
-        "migrations",
-        "missingInvariants",
-        "mode",
-        "ok",
-        "pathDecision",
-        "refs",
-        "requiredInvariants",
-        "summary",
-        "targetHash",
-      ]
-    `);
-  });
-
-  it('migration entry shape is stable', () => {
-    const entry: MigrationStatusResult['migrations'][number] = {
-      dirName: '20260101T1200_init',
-      from: 'sha256:a',
-      to: 'sha256:b',
-      migrationHash: 'sha256:mid',
-      operationCount: 3,
-      operationSummary: '3 ops (all additive)',
-      hasDestructive: false,
-      status: 'applied',
-    };
-    expect(Object.keys(entry).sort()).toMatchInlineSnapshot(`
-      [
-        "dirName",
-        "from",
-        "hasDestructive",
-        "migrationHash",
-        "operationCount",
-        "operationSummary",
-        "status",
-        "to",
-      ]
-    `);
+    expect(Object.keys(result.spaces[0]!).sort()).toEqual([
+      'markerHash',
+      'migrations',
+      'spaceId',
+      'targetHash',
+    ]);
   });
 });
