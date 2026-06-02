@@ -60,6 +60,8 @@ export interface IncludeThroughDescriptor {
   readonly targetColumns: readonly string[];
   /** Resolved column names in the parent table that junction.parentColumns reference. */
   readonly parentLocalColumns: readonly string[];
+  /** Namespace of the junction table, resolved from storage. */
+  readonly namespaceId?: string;
 }
 
 export interface IncludeExpr {
