@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import {
   extractCodecControlHooks,
+  filterCallsByControlPolicy,
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
@@ -18,11 +19,14 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import { postgresColumnsCompatible } from '../column-type-compatibility';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
+import { resolvePostgresCallControlPolicySubject } from './control-policy';
 import { createResolveExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
+import type { PostgresOpFactoryCall } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
 import { verifyPostgresNamespacePresence } from './verify-postgres-namespaces';
@@ -53,7 +57,10 @@ export function createPostgresMigrationPlanner(): PostgresMigrationPlanner {
  * uniformly.
  */
 export type PostgresPlanResult =
-  | { readonly kind: 'success'; readonly plan: TypeScriptRenderablePostgresMigration }
+  | {
+      readonly kind: 'success';
+      readonly plan: TypeScriptRenderablePostgresMigration;
+    }
   | SqlPlannerFailureResult;
 
 /**
@@ -164,10 +171,19 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       newContract: options.contract,
       codecHooks,
     });
-    // Codec-emitted calls already conform to `OpFactoryCall` — render +
-    // toOp + importRequirements ride directly through the same emit path
-    // as structural ops, no `RawSqlCall` wrap.
-    const calls = [...result.value.calls, ...fieldEventOps];
+    // Codec hook ops are target-agnostic `OpFactoryCall`; Postgres planning
+    // lifts them at this integration boundary (see field-event-planner JSDoc).
+    const fieldEventPostgresCalls = blindCast<
+      readonly PostgresOpFactoryCall[],
+      'Codec hook ops conform to PostgresOpFactoryCall at the app emitter boundary'
+    >(fieldEventOps);
+    const filteredFieldEvents = filterCallsByControlPolicy({
+      calls: fieldEventPostgresCalls,
+      contract: options.contract,
+      resolveControlPolicySubject: (call) =>
+        resolvePostgresCallControlPolicySubject(call, options.contract),
+    });
+    const calls = [...result.value.calls, ...filteredFieldEvents];
 
     return Object.freeze({
       kind: 'success' as const,
