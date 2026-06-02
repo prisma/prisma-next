@@ -29,6 +29,28 @@ import {
 } from '@prisma-next/target-sqlite/codec-ids';
 import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 
+const CONTROL_CODECS = createControlCodecRegistry(sqliteCodecRegistry);
+
+const MARKER_TABLE = tableRef('_prisma_marker');
+const LEDGER_TABLE = tableRef('_prisma_ledger');
+const NOW = dbExpr("datetime('now')", { codecId: SQLITE_DATETIME_CODEC_ID, nullable: false });
+
+type Lower = (query: AnyQueryAst) => LoweredStatement;
+
+/**
+ * Unions the current invariant set with the incoming one, dedupes, and sorts
+ * ascending so the persisted array is stable and order-independent. The merge
+ * runs in TS (uniform across dialects) rather than SQL-side: SQLite stores
+ * `invariants` as JSON `TEXT` with no array operators, so it accumulate-dedupes
+ * here exactly like Postgres instead of overwriting the column wholesale.
+ */
+function mergeInvariants(
+  current: readonly string[],
+  incoming: readonly string[],
+): readonly string[] {
+  return [...new Set([...current, ...incoming])].sort();
+}
+
 /**
  * Lowers a control-plane DML AST and runs it through the driver. Control DML is
  * contract-free: each value carries its codec at the value site, so encoding
@@ -38,14 +60,6 @@ import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
  * stringify on encode. Returns the result rows so CAS callers can inspect a
  * `RETURNING` projection.
  */
-const CONTROL_CODECS = createControlCodecRegistry(sqliteCodecRegistry);
-
-const MARKER_TABLE = tableRef('_prisma_marker');
-const LEDGER_TABLE = tableRef('_prisma_ledger');
-const NOW = dbExpr("datetime('now')", { codecId: SQLITE_DATETIME_CODEC_ID, nullable: false });
-
-type Lower = (query: AnyQueryAst) => LoweredStatement;
-
 async function execute(
   lower: Lower,
   driver: ControlDriverInstance<'sql', 'sqlite'>,
@@ -114,15 +128,20 @@ export async function updateMarker(
     readonly profileHash: string;
     readonly invariants?: readonly string[];
   },
+  currentInvariants: readonly string[] = [],
 ): Promise<boolean> {
+  const mergedInvariants =
+    destination.invariants === undefined
+      ? undefined
+      : mergeInvariants(currentInvariants, destination.invariants);
   const query = update({
     table: MARKER_TABLE,
     set: {
       core_hash: param(destination.storageHash, { codecId: SQLITE_TEXT_CODEC_ID }),
       profile_hash: param(destination.profileHash, { codecId: SQLITE_TEXT_CODEC_ID }),
       updated_at: NOW,
-      ...(destination.invariants !== undefined
-        ? { invariants: param(destination.invariants, { codecId: SQLITE_JSON_CODEC_ID }) }
+      ...(mergedInvariants !== undefined
+        ? { invariants: param(mergedInvariants, { codecId: SQLITE_JSON_CODEC_ID }) }
         : {}),
     },
     where: AndExpr.of([

@@ -369,12 +369,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<boolean> {
+    const currentInvariants =
+      destination.invariants === undefined
+        ? []
+        : ((await this.readMarker(driver, space))?.invariants ?? []);
     return markerLedgerWrites.updateMarker(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,
       expectedFrom,
       destination,
+      currentInvariants,
     );
   }
 

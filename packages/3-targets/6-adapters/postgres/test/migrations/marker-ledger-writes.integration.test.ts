@@ -101,6 +101,27 @@ describe.sequential('PostgresControlAdapter marker/ledger writes (end-to-end)', 
     expect(marker!.invariants).toEqual(['inv-1']);
   });
 
+  it('updateMarker accumulate-dedupes invariants across advances', {
+    timeout: testTimeout,
+  }, async () => {
+    await adapter.initMarker(driver!, 'app', {
+      storageHash: 'sha256:core',
+      profileHash: 'sha256:prof',
+      invariants: ['inv-b', 'inv-a'],
+    });
+
+    const matched = await adapter.updateMarker(driver!, 'app', 'sha256:core', {
+      storageHash: 'sha256:next',
+      profileHash: 'sha256:prof2',
+      invariants: ['inv-c', 'inv-a'],
+    });
+
+    expect(matched).toBe(true);
+    // Union of the seeded {a,b} and the incoming {a,c}, deduped + sorted.
+    const marker = await adapter.readMarker(driver!, 'app');
+    expect(marker!.invariants).toEqual(['inv-a', 'inv-b', 'inv-c']);
+  });
+
   it('updateMarker returns false (no swap) when expectedFrom does not match', {
     timeout: testTimeout,
   }, async () => {

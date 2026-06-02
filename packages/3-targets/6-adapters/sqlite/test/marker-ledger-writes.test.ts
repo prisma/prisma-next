@@ -67,22 +67,34 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
     expect(params[7]).toBe('["inv-a","inv-b"]');
   });
 
-  it('updateMarker lowers to a CAS UPDATE returning a row, writing the given invariants', async () => {
-    const driver = createCapturingDriver([{ space: 'app' }]);
+  it('updateMarker reads the current invariants and writes the deduped union (no overwrite)', async () => {
+    // The capturing driver returns this row for the internal readMarker probe
+    // and select; SQLite stores invariants as JSON TEXT, so it arrives as a
+    // string and is decoded before the merge.
+    const driver = createCapturingDriver([
+      { core_hash: 'sha256:from', profile_hash: 'sha256:prof', invariants: '["inv-a","inv-b"]' },
+    ]);
     const matched = await adapter.updateMarker(driver, 'app', 'sha256:from', {
       storageHash: 'sha256:to',
       profileHash: 'sha256:prof',
-      invariants: ['inv-a'],
+      invariants: ['inv-b', 'inv-c'],
     });
 
-    const { sql, params } = driver.calls[0]!;
-    expect(sql).toBe(
+    const update = driver.calls.at(-1)!;
+    expect(update.sql).toBe(
       'UPDATE "_prisma_marker" SET "core_hash" = ?, "profile_hash" = ?, ' +
         '"updated_at" = datetime(\'now\'), "invariants" = ? ' +
         'WHERE ("_prisma_marker"."space" = ? AND "_prisma_marker"."core_hash" = ?) ' +
         'RETURNING "_prisma_marker"."space"',
     );
-    expect(params).toEqual(['sha256:to', 'sha256:prof', '["inv-a"]', 'app', 'sha256:from']);
+    // union({a,b}, {b,c}) deduped + sorted, JSON-encoded — not the incoming set verbatim.
+    expect(update.params).toEqual([
+      'sha256:to',
+      'sha256:prof',
+      '["inv-a","inv-b","inv-c"]',
+      'app',
+      'sha256:from',
+    ]);
     expect(matched).toBe(true);
   });
 
@@ -197,6 +209,28 @@ describe('SqliteControlAdapter marker/ledger writes (end-to-end)', () => {
       const marker = await adapter.readMarker(driver, 'app');
       expect(marker!.storageHash).toBe('sha256:next');
       expect(marker!.invariants).toEqual(['inv-1']);
+    });
+  });
+
+  it('updateMarker accumulate-dedupes invariants across advances instead of overwriting', async () => {
+    await withDb(async (driver) => {
+      await adapter.initMarker(driver, 'app', {
+        storageHash: 'sha256:core',
+        profileHash: 'sha256:prof',
+        invariants: ['inv-b', 'inv-a'],
+      });
+
+      const matched = await adapter.updateMarker(driver, 'app', 'sha256:core', {
+        storageHash: 'sha256:next',
+        profileHash: 'sha256:prof2',
+        invariants: ['inv-c', 'inv-a'],
+      });
+      expect(matched).toBe(true);
+
+      // Union of the seeded {a,b} and the incoming {a,c}, deduped + sorted.
+      // An overwrite would leave only the incoming ['inv-a','inv-c'].
+      const marker = await adapter.readMarker(driver, 'app');
+      expect(marker!.invariants).toEqual(['inv-a', 'inv-b', 'inv-c']);
     });
   });
 

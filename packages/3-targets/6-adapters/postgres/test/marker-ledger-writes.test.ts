@@ -47,21 +47,32 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
     expect(params[7]).toEqual(['inv-a', 'inv-b']);
   });
 
-  it('updateMarker lowers to a CAS UPDATE returning a row, writing the given invariants', async () => {
-    const driver = createCapturingDriver([{ space: 'app' }]);
+  it('updateMarker reads the current invariants and writes the deduped union (no overwrite)', async () => {
+    // The capturing driver returns this row for the internal readMarker probe
+    // and select; a Postgres driver yields `invariants` as a string[] already.
+    const driver = createCapturingDriver([
+      { core_hash: 'sha256:from', profile_hash: 'sha256:prof', invariants: ['inv-a', 'inv-b'] },
+    ]);
     const matched = await adapter.updateMarker(driver, 'app', 'sha256:from', {
       storageHash: 'sha256:to',
       profileHash: 'sha256:prof',
-      invariants: ['inv-a'],
+      invariants: ['inv-b', 'inv-c'],
     });
 
-    const { sql, params } = driver.calls[0]!;
-    expect(sql).toBe(
+    const update = driver.calls.at(-1)!;
+    expect(update.sql).toBe(
       'UPDATE "prisma_contract"."marker" SET "core_hash" = $1, "profile_hash" = $2, ' +
         '"updated_at" = now(), "invariants" = $3::text[] ' +
         'WHERE ("marker"."space" = $4 AND "marker"."core_hash" = $5) RETURNING "marker"."space"',
     );
-    expect(params).toEqual(['sha256:to', 'sha256:prof', ['inv-a'], 'app', 'sha256:from']);
+    // union({a,b}, {b,c}) deduped + sorted — not the incoming set verbatim.
+    expect(update.params).toEqual([
+      'sha256:to',
+      'sha256:prof',
+      ['inv-a', 'inv-b', 'inv-c'],
+      'app',
+      'sha256:from',
+    ]);
     expect(matched).toBe(true);
   });
 
