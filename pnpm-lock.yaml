@@ -1493,9 +1493,6 @@ importers:
       '@clack/prompts':
         specifier: ^1.4.0
         version: 1.4.0
-      '@dagrejs/dagre':
-        specifier: ^3.0.0
-        version: 3.0.0
       '@prisma-next/cli-telemetry':
         specifier: workspace:0.12.0
         version: link:../cli-telemetry
