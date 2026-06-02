@@ -238,7 +238,7 @@ function resolveConnectorLaneColors(
       case 'merge-tee':
         if (column === startLane) {
           const served = owner === NEUTRAL_LANE ? column : owner;
-          glyph[column] = served;
+          glyph[column] = column;
           dash[column] = served;
         } else {
           dash[column] = owner === NEUTRAL_LANE ? column : owner;
@@ -247,8 +247,8 @@ function resolveConnectorLaneColors(
         }
         break;
       case 'arc-crossing':
-        glyph[column] = owner === NEUTRAL_LANE ? column : owner;
-        dash[column] = glyph[column];
+        glyph[column] = column;
+        dash[column] = column;
         break;
       case 'horizontal-pass': {
         const served = owner === NEUTRAL_LANE ? column : owner;
