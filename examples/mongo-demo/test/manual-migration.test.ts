@@ -124,6 +124,16 @@ describe('hand-authored migration (20260415_add-posts-author-index)', {
         policy: ALL_POLICY,
         frameworkComponents: [],
         strictVerification: false,
+        migrationEdges: [
+          {
+            migrationHash:
+              'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
+            dirName: 'manual-migration',
+            from: '',
+            to: 'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
+            operationCount: ops.length,
+          },
+        ],
       });
 
       expect(result.ok).toBe(true);
