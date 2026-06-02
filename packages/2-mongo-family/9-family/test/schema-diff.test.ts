@@ -1,3 +1,4 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
@@ -9,6 +10,12 @@ import { describe, expect, it } from 'vitest';
 import { diffMongoSchemas } from '../src/core/schema-diff';
 
 const emptyIR = new MongoSchemaIR([]);
+
+const managedCollectionControl = (): ControlPolicy => 'managed';
+
+function diffMongoSchemasManaged(live: MongoSchemaIR, expected: MongoSchemaIR, strict: boolean) {
+  return diffMongoSchemas(live, expected, strict, managedCollectionControl);
+}
 
 function ir(collections: Record<string, MongoSchemaCollection>): MongoSchemaIR {
   return new MongoSchemaIR(Object.values(collections));
@@ -52,7 +59,7 @@ function validator(
 describe('diffMongoSchemas', () => {
   describe('empty schemas', () => {
     it('returns pass for two empty schemas', () => {
-      const result = diffMongoSchemas(emptyIR, emptyIR, false);
+      const result = diffMongoSchemasManaged(emptyIR, emptyIR, false);
       expect(result.root.status).toBe('pass');
       expect(result.issues).toEqual([]);
       expect(result.counts.fail).toBe(0);
@@ -63,7 +70,7 @@ describe('diffMongoSchemas', () => {
   describe('collections', () => {
     it('returns pass when collections match', () => {
       const schema = ir({ users: coll('users') });
-      const result = diffMongoSchemas(schema, schema, false);
+      const result = diffMongoSchemasManaged(schema, schema, false);
       expect(result.root.status).toBe('pass');
       expect(result.counts.fail).toBe(0);
     });
@@ -71,7 +78,7 @@ describe('diffMongoSchemas', () => {
     it('fails on missing collection', () => {
       const live = emptyIR;
       const expected = ir({ users: coll('users') });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.root.status).toBe('fail');
       expect(result.counts.fail).toBe(1);
@@ -85,7 +92,7 @@ describe('diffMongoSchemas', () => {
     it('warns on extra collection in non-strict mode', () => {
       const live = ir({ users: coll('users') });
       const expected = emptyIR;
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.root.status).toBe('warn');
       expect(result.counts.warn).toBe(1);
@@ -98,7 +105,7 @@ describe('diffMongoSchemas', () => {
     it('fails on extra collection in strict mode', () => {
       const live = ir({ users: coll('users') });
       const expected = emptyIR;
-      const result = diffMongoSchemas(live, expected, true);
+      const result = diffMongoSchemasManaged(live, expected, true);
 
       expect(result.root.status).toBe('fail');
       expect(result.counts.fail).toBe(1);
@@ -115,7 +122,7 @@ describe('diffMongoSchemas', () => {
           indexes: [idx([{ field: 'email', direction: 1 }], { unique: true })],
         }),
       });
-      const result = diffMongoSchemas(schema, schema, false);
+      const result = diffMongoSchemasManaged(schema, schema, false);
       expect(result.counts.fail).toBe(0);
       expect(result.counts.warn).toBe(0);
     });
@@ -127,7 +134,7 @@ describe('diffMongoSchemas', () => {
           indexes: [idx([{ field: 'email', direction: 1 }], { unique: true })],
         }),
       });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.fail).toBe(1);
       expect(result.issues).toEqual([
@@ -140,7 +147,7 @@ describe('diffMongoSchemas', () => {
         users: coll('users', { indexes: [idx([{ field: 'email', direction: 1 }])] }),
       });
       const expected = ir({ users: coll('users') });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.warn).toBe(1);
       expect(result.counts.fail).toBe(0);
@@ -151,7 +158,7 @@ describe('diffMongoSchemas', () => {
         users: coll('users', { indexes: [idx([{ field: 'email', direction: 1 }])] }),
       });
       const expected = ir({ users: coll('users') });
-      const result = diffMongoSchemas(live, expected, true);
+      const result = diffMongoSchemasManaged(live, expected, true);
 
       expect(result.counts.fail).toBe(1);
     });
@@ -163,20 +170,20 @@ describe('diffMongoSchemas', () => {
 
     it('returns pass when both have no validator', () => {
       const schema = ir({ users: coll('users') });
-      const result = diffMongoSchemas(schema, schema, false);
+      const result = diffMongoSchemasManaged(schema, schema, false);
       expect(result.counts.fail).toBe(0);
     });
 
     it('returns pass when validators match', () => {
       const schema = ir({ users: coll('users', { validator: validator(schema1) }) });
-      const result = diffMongoSchemas(schema, schema, false);
+      const result = diffMongoSchemasManaged(schema, schema, false);
       expect(result.counts.fail).toBe(0);
     });
 
     it('fails on missing validator', () => {
       const live = ir({ users: coll('users') });
       const expected = ir({ users: coll('users', { validator: validator(schema1) }) });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.fail).toBe(1);
       expect(result.issues).toEqual([
@@ -187,7 +194,7 @@ describe('diffMongoSchemas', () => {
     it('warns on extra validator in non-strict mode', () => {
       const live = ir({ users: coll('users', { validator: validator(schema1) }) });
       const expected = ir({ users: coll('users') });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.warn).toBe(1);
       expect(result.counts.fail).toBe(0);
@@ -196,7 +203,7 @@ describe('diffMongoSchemas', () => {
     it('fails on extra validator in strict mode', () => {
       const live = ir({ users: coll('users', { validator: validator(schema1) }) });
       const expected = ir({ users: coll('users') });
-      const result = diffMongoSchemas(live, expected, true);
+      const result = diffMongoSchemasManaged(live, expected, true);
 
       expect(result.counts.fail).toBe(1);
     });
@@ -204,7 +211,7 @@ describe('diffMongoSchemas', () => {
     it('fails on schema mismatch', () => {
       const live = ir({ users: coll('users', { validator: validator(schema1) }) });
       const expected = ir({ users: coll('users', { validator: validator(schema2) }) });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.fail).toBe(1);
       expect(result.issues).toEqual([
@@ -215,7 +222,7 @@ describe('diffMongoSchemas', () => {
     it('fails when validationLevel differs', () => {
       const live = ir({ users: coll('users', { validator: validator(schema1, 'moderate') }) });
       const expected = ir({ users: coll('users', { validator: validator(schema1, 'strict') }) });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.fail).toBe(1);
     });
@@ -227,7 +234,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({
         users: coll('users', { validator: validator(schema1, 'strict', 'error') }),
       });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.fail).toBe(1);
     });
@@ -239,20 +246,20 @@ describe('diffMongoSchemas', () => {
 
     it('returns pass when both have no options', () => {
       const schema = ir({ users: coll('users') });
-      const result = diffMongoSchemas(schema, schema, false);
+      const result = diffMongoSchemasManaged(schema, schema, false);
       expect(result.counts.fail).toBe(0);
     });
 
     it('returns pass when options match', () => {
       const schema = ir({ logs: coll('logs', { options: cappedOpts }) });
-      const result = diffMongoSchemas(schema, schema, false);
+      const result = diffMongoSchemasManaged(schema, schema, false);
       expect(result.counts.fail).toBe(0);
     });
 
     it('warns on extra options in non-strict mode', () => {
       const live = ir({ logs: coll('logs', { options: cappedOpts }) });
       const expected = ir({ logs: coll('logs') });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.warn).toBe(1);
       expect(result.counts.fail).toBe(0);
@@ -261,7 +268,7 @@ describe('diffMongoSchemas', () => {
     it('fails on extra options in strict mode', () => {
       const live = ir({ logs: coll('logs', { options: cappedOpts }) });
       const expected = ir({ logs: coll('logs') });
-      const result = diffMongoSchemas(live, expected, true);
+      const result = diffMongoSchemasManaged(live, expected, true);
 
       expect(result.counts.fail).toBe(1);
     });
@@ -269,7 +276,7 @@ describe('diffMongoSchemas', () => {
     it('fails on options mismatch', () => {
       const live = ir({ logs: coll('logs', { options: cappedOpts }) });
       const expected = ir({ logs: coll('logs', { options: differentOpts }) });
-      const result = diffMongoSchemas(live, expected, false);
+      const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.counts.fail).toBe(1);
       expect(result.issues).toEqual([
@@ -293,7 +300,7 @@ describe('diffMongoSchemas', () => {
       });
       const schema = ir({ events: coll('events', { indexes: [richIndex] }) });
 
-      const result = diffMongoSchemas(schema, schema, true);
+      const result = diffMongoSchemasManaged(schema, schema, true);
 
       expect(result.counts.fail).toBe(0);
       expect(result.issues).toEqual([]);
@@ -319,7 +326,7 @@ describe('diffMongoSchemas', () => {
         }),
       });
 
-      const result = diffMongoSchemas(live, expected, true);
+      const result = diffMongoSchemasManaged(live, expected, true);
 
       // Different lookup keys → expected index is missing and live index is
       // extra. Both reach `fail` under strict mode.

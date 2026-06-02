@@ -1,3 +1,4 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import type {
   SchemaIssue,
   SchemaVerificationNode,
@@ -9,11 +10,13 @@ import type {
   MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
 import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
+import { pushMongoControlledFinding } from './schema-verify/mongo-control-verify-emit';
 
 export function diffMongoSchemas(
   live: MongoSchemaIR,
   expected: MongoSchemaIR,
   strict: boolean,
+  collectionControl: (collectionName: string) => ControlPolicy,
 ): {
   root: SchemaVerificationNode;
   issues: SchemaIssue[];
@@ -32,54 +35,72 @@ export function diffMongoSchemas(
     const expectedColl = expected.collection(name);
 
     if (!liveColl && expectedColl) {
-      issues.push({
+      const control = collectionControl(name);
+      const issue: SchemaIssue = {
         kind: 'missing_table',
         table: name,
         message: `Collection "${name}" is missing from the database`,
-      });
-      collectionChildren.push({
-        status: 'fail',
-        kind: 'collection',
-        name,
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${name}`,
-        code: 'MISSING_COLLECTION',
-        message: `Collection "${name}" is missing`,
-        expected: name,
-        actual: null,
-        children: [],
-      });
-      fail++;
+      };
+      const disposition = pushMongoControlledFinding(
+        control,
+        issue,
+        {
+          status: 'fail',
+          kind: 'collection',
+          name,
+          contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${name}`,
+          code: 'MISSING_COLLECTION',
+          message: `Collection "${name}" is missing`,
+          expected: name,
+          actual: null,
+          children: [],
+        },
+        issues,
+        collectionChildren,
+        strict,
+      );
+      if (disposition === 'fail') fail++;
+      else if (disposition === 'warn') warn++;
       continue;
     }
 
     if (liveColl && !expectedColl) {
-      const status = strict ? 'fail' : 'warn';
-      issues.push({
+      const control = collectionControl(name);
+      const issue: SchemaIssue = {
         kind: 'extra_table',
         table: name,
         message: `Extra collection "${name}" exists in the database but not in the contract`,
-      });
-      collectionChildren.push({
-        status,
-        kind: 'collection',
-        name,
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${name}`,
-        code: 'EXTRA_COLLECTION',
-        message: `Extra collection "${name}" found`,
-        expected: null,
-        actual: name,
-        children: [],
-      });
-      if (status === 'fail') fail++;
-      else warn++;
+      };
+      const baseStatus = strict ? 'fail' : 'warn';
+      const disposition = pushMongoControlledFinding(
+        control,
+        issue,
+        {
+          status: baseStatus,
+          kind: 'collection',
+          name,
+          contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${name}`,
+          code: 'EXTRA_COLLECTION',
+          message: `Extra collection "${name}" found`,
+          expected: null,
+          actual: name,
+          children: [],
+        },
+        issues,
+        collectionChildren,
+        strict,
+      );
+      if (disposition === 'fail') fail++;
+      else if (disposition === 'warn') warn++;
       continue;
     }
 
     const lc = liveColl as MongoSchemaCollection;
     const ec = expectedColl as MongoSchemaCollection;
-    const indexChildren = diffIndexes(name, lc, ec, strict, issues);
-    const validatorChildren = diffValidator(name, lc, ec, strict, issues);
-    const optionsChildren = diffOptions(name, lc, ec, strict, issues);
+    const control = collectionControl(name);
+    const indexChildren = diffIndexes(name, lc, ec, strict, control, issues);
+    const validatorChildren = diffValidator(name, lc, ec, strict, control, issues);
+    const optionsChildren = diffOptions(name, lc, ec, strict, control, issues);
     const children = [...indexChildren, ...validatorChildren, ...optionsChildren];
 
     const worstStatus = children.reduce<'pass' | 'warn' | 'fail'>(
@@ -156,6 +177,7 @@ function diffIndexes(
   live: MongoSchemaCollection,
   expected: MongoSchemaCollection,
   strict: boolean,
+  collectionControl: ControlPolicy,
   issues: SchemaIssue[],
 ): SchemaVerificationNode[] {
   const nodes: SchemaVerificationNode[] = [];
@@ -179,46 +201,60 @@ function diffIndexes(
         children: [],
       });
     } else {
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'index_mismatch',
         table: collName,
         indexOrConstraint: formatIndexName(idx),
         message: `Index ${formatIndexName(idx)} missing on collection "${collName}"`,
-      });
-      nodes.push({
-        status: 'fail',
-        kind: 'index',
-        name: formatIndexName(idx),
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${collName}.indexes`,
-        code: 'MISSING_INDEX',
-        message: `Index ${formatIndexName(idx)} missing`,
-        expected: key,
-        actual: null,
-        children: [],
-      });
+      };
+      pushMongoControlledFinding(
+        collectionControl,
+        issue,
+        {
+          status: 'fail',
+          kind: 'index',
+          name: formatIndexName(idx),
+          contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${collName}.indexes`,
+          code: 'MISSING_INDEX',
+          message: `Index ${formatIndexName(idx)} missing`,
+          expected: key,
+          actual: null,
+          children: [],
+        },
+        issues,
+        nodes,
+        strict,
+      );
     }
   }
 
   for (const [key, idx] of liveLookup) {
     if (!expectedLookup.has(key)) {
-      const status = strict ? 'fail' : 'warn';
-      issues.push({
+      const issue: SchemaIssue = {
         kind: 'extra_index',
         table: collName,
         indexOrConstraint: formatIndexName(idx),
         message: `Extra index ${formatIndexName(idx)} on collection "${collName}"`,
-      });
-      nodes.push({
-        status,
-        kind: 'index',
-        name: formatIndexName(idx),
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${collName}.indexes`,
-        code: 'EXTRA_INDEX',
-        message: `Extra index ${formatIndexName(idx)}`,
-        expected: null,
-        actual: key,
-        children: [],
-      });
+      };
+      const baseStatus = strict ? 'fail' : 'warn';
+      pushMongoControlledFinding(
+        collectionControl,
+        issue,
+        {
+          status: baseStatus,
+          kind: 'index',
+          name: formatIndexName(idx),
+          contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${collName}.indexes`,
+          code: 'EXTRA_INDEX',
+          message: `Extra index ${formatIndexName(idx)}`,
+          expected: null,
+          actual: key,
+          children: [],
+        },
+        issues,
+        nodes,
+        strict,
+      );
     }
   }
 
@@ -230,17 +266,21 @@ function diffValidator(
   live: MongoSchemaCollection,
   expected: MongoSchemaCollection,
   strict: boolean,
+  collectionControl: ControlPolicy,
   issues: SchemaIssue[],
 ): SchemaVerificationNode[] {
   if (!live.validator && !expected.validator) return [];
 
   if (expected.validator && !live.validator) {
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'type_missing',
       table: collName,
       message: `Validator missing on collection "${collName}"`,
-    });
-    return [
+    };
+    const nodes: SchemaVerificationNode[] = [];
+    pushMongoControlledFinding(
+      collectionControl,
+      issue,
       {
         status: 'fail',
         kind: 'validator',
@@ -252,19 +292,26 @@ function diffValidator(
         actual: null,
         children: [],
       },
-    ];
+      issues,
+      nodes,
+      strict,
+    );
+    return nodes;
   }
 
   if (!expected.validator && live.validator) {
-    const status = strict ? 'fail' : 'warn';
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'extra_validator',
       table: collName,
       message: `Extra validator on collection "${collName}"`,
-    });
-    return [
+    };
+    const nodes: SchemaVerificationNode[] = [];
+    const baseStatus = strict ? 'fail' : 'warn';
+    pushMongoControlledFinding(
+      collectionControl,
+      issue,
       {
-        status,
+        status: baseStatus,
         kind: 'validator',
         name: 'validator',
         contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${collName}.validator`,
@@ -274,7 +321,11 @@ function diffValidator(
         actual: canonicalize(live.validator.jsonSchema),
         children: [],
       },
-    ];
+      issues,
+      nodes,
+      strict,
+    );
+    return nodes;
   }
 
   const liveVal = live.validator as NonNullable<typeof live.validator>;
@@ -287,14 +338,17 @@ function diffValidator(
     liveVal.validationLevel !== expectedVal.validationLevel ||
     liveVal.validationAction !== expectedVal.validationAction
   ) {
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'type_mismatch',
       table: collName,
       expected: expectedSchema,
       actual: liveSchema,
       message: `Validator mismatch on collection "${collName}"`,
-    });
-    return [
+    };
+    const nodes: SchemaVerificationNode[] = [];
+    pushMongoControlledFinding(
+      collectionControl,
+      issue,
       {
         status: 'fail',
         kind: 'validator',
@@ -314,7 +368,11 @@ function diffValidator(
         },
         children: [],
       },
-    ];
+      issues,
+      nodes,
+      strict,
+    );
+    return nodes;
   }
 
   return [
@@ -337,21 +395,25 @@ function diffOptions(
   live: MongoSchemaCollection,
   expected: MongoSchemaCollection,
   strict: boolean,
+  collectionControl: ControlPolicy,
   issues: SchemaIssue[],
 ): SchemaVerificationNode[] {
   if (!live.options && !expected.options) return [];
 
   if (!expected.options && live.options) {
-    const status = strict ? 'fail' : 'warn';
-    issues.push({
+    const issue: SchemaIssue = {
       kind: 'type_mismatch',
       table: collName,
       actual: canonicalize(live.options),
       message: `Extra collection options on "${collName}"`,
-    });
-    return [
+    };
+    const nodes: SchemaVerificationNode[] = [];
+    const baseStatus = strict ? 'fail' : 'warn';
+    pushMongoControlledFinding(
+      collectionControl,
+      issue,
       {
-        status,
+        status: baseStatus,
         kind: 'options',
         name: 'options',
         contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.collections.${collName}.options`,
@@ -361,7 +423,12 @@ function diffOptions(
         actual: live.options,
         children: [],
       },
-    ];
+      issues,
+      nodes,
+      strict,
+      { legacyNonStrictWarn: true },
+    );
+    return nodes;
   }
 
   if (deepEqual(live.options, expected.options)) {
@@ -380,14 +447,17 @@ function diffOptions(
     ];
   }
 
-  issues.push({
+  const issue: SchemaIssue = {
     kind: 'type_mismatch',
     table: collName,
     expected: canonicalize(expected.options),
     actual: canonicalize(live.options),
     message: `Collection options mismatch on "${collName}"`,
-  });
-  return [
+  };
+  const nodes: SchemaVerificationNode[] = [];
+  pushMongoControlledFinding(
+    collectionControl,
+    issue,
     {
       status: 'fail',
       kind: 'options',
@@ -399,5 +469,9 @@ function diffOptions(
       actual: live.options,
       children: [],
     },
-  ];
+    issues,
+    nodes,
+    strict,
+  );
+  return nodes;
 }

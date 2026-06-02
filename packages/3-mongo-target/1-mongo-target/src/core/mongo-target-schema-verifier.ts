@@ -42,7 +42,9 @@ export class MongoTargetSchemaVerifier extends MongoSchemaVerifierBase<
   }): readonly SchemaIssue[] {
     const expectedIR = contractToMongoSchemaIR(options.contract);
     const { live, expected } = canonicalizeSchemasForVerification(options.schema, expectedIR);
-    const { issues } = diffMongoSchemas(live, expected, false);
+    const collectionControl = (name: string) =>
+      this.collectionControlForName(options.contract, name);
+    const { issues } = diffMongoSchemas(live, expected, false, collectionControl);
     return issues;
   }
 
