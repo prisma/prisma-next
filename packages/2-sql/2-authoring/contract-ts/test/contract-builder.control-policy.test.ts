@@ -85,6 +85,9 @@ describe('defineContract per-table control', () => {
 
       const table = unboundTables(built.storage)['app_user'];
       expect(tableEffectiveControl(table?.control, built.defaultControl)).toBe(control);
+      if (control === 'managed') {
+        expect(table?.control).toBe('managed');
+      }
     }
   });
 
