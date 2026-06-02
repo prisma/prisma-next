@@ -16,8 +16,9 @@ These files are drafted automatically by the [`draft-release-notes`](../../skill
 - **Write for users, not maintainers.** The audience is someone upgrading their app, not the team that shipped the change. Do not carry internal `TML-NNNN:` issue prefixes — link the PR instead.
 - **Categorize** entries under the fixed section order below, and **omit any section that has no entries**.
 - **Lead with breaking changes** — they are what a reader scanning the notes most needs to see.
-- **Link PRs** (e.g. `(#1234)`) and **attribute contributors**, especially first-time ones.
-- **Link migration recipes as absolute, tag-pinned URLs** — `https://github.com/prisma/prisma-next/blob/v<version>/skills/upgrade/prisma-next-upgrade/upgrades/<prev.minor>-to-<head.minor>/` — not repo-relative paths. This file is published verbatim as the GitHub Release body, where repo-relative links do not resolve; pinning to the release tag keeps the link working and rot-proof. (PR `(#NNN)` references stay bare — GitHub auto-links those in a Release body.)
+- **Show the impact of breaking changes with a short before/after example.** For the code-visible breaking changes (contract-shape changes, authoring-surface changes, runtime-option changes), nest a compact `before` / `after` snippet under the prose bullet so a reader can see the change at a glance. Source the snippet from the matching `<prev.minor>-to-<head.minor>` upgrade recipe so it stays accurate. Lead with PSL (```` ```prisma ````) when the change is on the authoring surface; use TS/JSON only when the change is genuinely a TS/emitted-shape change. Operational-only breaks (version floors, peer-dep changes, package removals) need no example.
+- **Link PRs and contributors as absolute markdown links** — `[#1234](https://github.com/prisma/prisma-next/pull/1234)` and `[@handle](https://github.com/handle)`, never bare `#1234` / `@handle`. Bare references only autolink inside the GitHub Release body, **not** when this file is read as a repo file or in PR review; explicit links work in every context. Attribute contributors, especially first-time ones.
+- **Link migration recipes as absolute, tag-pinned URLs** — `https://github.com/prisma/prisma-next/blob/v<version>/skills/upgrade/prisma-next-upgrade/upgrades/<prev.minor>-to-<head.minor>/` — not repo-relative paths. This file is published verbatim as the GitHub Release body, where repo-relative links do not resolve; pinning to the release tag keeps the link working and rot-proof.
 
 The section order is: **Breaking changes → Features → Fixes → New contributors**.
 
@@ -30,27 +31,39 @@ The section order is: **Breaking changes → Features → Fixes → New contribu
 
 Copy this into `docs/releases/v<version>.md` and fill it in, dropping any section with no entries:
 
-```md
+````md
 # v<version>
 
 <optional one- or two-sentence summary of the release's theme>
 
 ## Breaking changes
 
-- **<short title>** — <what changed and what the reader must do>. See the [migration recipe](https://github.com/prisma/prisma-next/blob/v<version>/skills/upgrade/prisma-next-upgrade/upgrades/<prev.minor>-to-<head.minor>/). (#<pr>)
+- **<short title>** — <what changed and what the reader must do>. See the [migration recipe](https://github.com/prisma/prisma-next/blob/v<version>/skills/upgrade/prisma-next-upgrade/upgrades/<prev.minor>-to-<head.minor>/). ([#<pr>](https://github.com/prisma/prisma-next/pull/<pr>))
+
+  Before:
+
+  ```prisma
+  <old shape>
+  ```
+
+  After:
+
+  ```prisma
+  <new shape>
+  ```
 
 ## Features
 
-- <new capability>. (#<pr>)
+- <new capability>. ([#<pr>](https://github.com/prisma/prisma-next/pull/<pr>))
 
 ## Fixes
 
-- <bug fix>. (#<pr>)
+- <bug fix>. ([#<pr>](https://github.com/prisma/prisma-next/pull/<pr>))
 
 ## New contributors
 
-- @<handle> made their first contribution in #<pr>
-```
+- [@<handle>](https://github.com/<handle>) made their first contribution in [#<pr>](https://github.com/prisma/prisma-next/pull/<pr>)
+````
 
 ## See also
 
