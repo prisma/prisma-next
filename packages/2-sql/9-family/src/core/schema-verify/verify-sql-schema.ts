@@ -182,24 +182,39 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   // namespace coordinate — a bare-name aggregation would collapse them
   // (last-write-wins) and verify only one.
   const typeNodes: SchemaVerificationNode[] = [];
+  // Storage-type findings dispatch through the same control policy as tables
+  // and columns: each issue's disposition (fail / warn / suppress) is resolved
+  // from the type's effective control so an `external`/`observed` enum no longer
+  // hard-fails on value drift. `suppress` drops the issue entirely; the node
+  // status is the worst surviving disposition.
   const pushTypeNode = (
     typeName: string,
     contractPath: string,
     typeIssues: readonly SchemaIssue[],
+    control: ControlPolicy,
   ): void => {
-    if (typeIssues.length > 0) {
-      issues.push(...typeIssues);
+    let status: VerificationStatus = 'pass';
+    let code = '';
+    let emitted = 0;
+    for (const issue of typeIssues) {
+      const disposition = verifierDisposition(control, issue.kind);
+      if (disposition === 'suppress') continue;
+      issues.push(issue);
+      emitted += 1;
+      if (code === '') code = issue.kind;
+      if (disposition === 'fail') {
+        status = 'fail';
+      } else if (disposition === 'warn' && status !== 'fail') {
+        status = 'warn';
+      }
     }
     typeNodes.push({
-      status: typeIssues.length > 0 ? 'fail' : 'pass',
+      status,
       kind: 'storageType',
       name: `type ${typeName}`,
       contractPath,
-      code: typeIssues.length > 0 ? (typeIssues[0]?.kind ?? '') : '',
-      message:
-        typeIssues.length > 0
-          ? `${typeIssues.length} issue${typeIssues.length === 1 ? '' : 's'}`
-          : '',
+      code: status === 'pass' ? '' : code,
+      message: emitted > 0 ? `${emitted} issue${emitted === 1 ? '' : 's'}` : '',
       expected: undefined,
       actual: undefined,
       children: [],
@@ -220,6 +235,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
           resolveExistingEnumValues,
           namespaceId: UNBOUND_NAMESPACE_ID,
         }),
+        effectiveControl(typeInstance.control, contract.defaultControl),
       );
     } else if (isStorageTypeInstance(typeInstance)) {
       const hook = codecHooks.get(typeInstance.codecId);
@@ -227,6 +243,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
         typeName,
         `storage.types.${typeName}`,
         hook?.verifyType ? hook.verifyType({ typeName, typeInstance, schema }) : [],
+        effectiveControl(undefined, contract.defaultControl),
       );
     }
   }
@@ -249,12 +266,17 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
           resolveExistingEnumValues,
           namespaceId: nsId,
         }),
+        effectiveControl(entry.control, contract.defaultControl),
       );
     }
   }
 
   if (typeNodes.length > 0) {
-    const typesStatus = typeNodes.some((n) => n.status === 'fail') ? 'fail' : 'pass';
+    const typesStatus: VerificationStatus = typeNodes.some((n) => n.status === 'fail')
+      ? 'fail'
+      : typeNodes.some((n) => n.status === 'warn')
+        ? 'warn'
+        : 'pass';
     rootChildren.push({
       status: typesStatus,
       kind: 'storageTypes',

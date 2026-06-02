@@ -15,6 +15,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
   buildSqlNamespace,
+  type PostgresEnumStorageEntry,
   type ReferentialAction,
   SqlStorage,
   StorageTable,
@@ -41,7 +42,10 @@ export function createTestContract(
   tables: Record<string, StorageTable>,
   extensionPacks: Record<string, unknown> = {},
   storageTypes?: Record<string, import('@prisma-next/sql-contract/types').SqlStorageTypeEntry>,
-  contractOverrides?: { defaultControl?: ControlPolicy },
+  contractOverrides?: {
+    defaultControl?: ControlPolicy;
+    enums?: Record<string, PostgresEnumStorageEntry>;
+  },
 ): Contract<SqlStorage> {
   return {
     target: 'postgres',
@@ -52,7 +56,11 @@ export function createTestContract(
     storage: new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          tables,
+          ...ifDefined('enum', contractOverrides?.enums),
+        }),
       },
       ...ifDefined('types', storageTypes),
     }),

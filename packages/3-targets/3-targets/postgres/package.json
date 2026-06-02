@@ -58,6 +58,7 @@
     "./codec-ids": "./dist/codec-ids.mjs",
     "./codec-types": "./dist/codec-types.mjs",
     "./codecs": "./dist/codecs.mjs",
+    "./column-type-compatibility": "./dist/column-type-compatibility.mjs",
     "./contract-free": "./dist/contract-free.mjs",
     "./control": "./dist/control.mjs",
     "./data-transform": "./dist/data-transform.mjs",

@@ -77,4 +77,17 @@ describe('verifierDisposition', () => {
     expect(verifierDisposition('observed', 'extra_column')).toBe('warn');
     expect(verifierDisposition('observed', 'extra_index')).toBe('warn');
   });
+
+  it('treats type value drift like an external-owned detail', () => {
+    expect(verifierDisposition('managed', 'enum_values_changed')).toBe('fail');
+    expect(verifierDisposition('tolerated', 'enum_values_changed')).toBe('fail');
+    expect(verifierDisposition('external', 'enum_values_changed')).toBe('suppress');
+    expect(verifierDisposition('observed', 'enum_values_changed')).toBe('warn');
+    expect(verifierDisposition('external', 'type_values_mismatch')).toBe('suppress');
+  });
+
+  it('still requires an external type to exist', () => {
+    expect(verifierDisposition('external', 'type_missing')).toBe('fail');
+    expect(verifierDisposition('observed', 'type_missing')).toBe('warn');
+  });
 });

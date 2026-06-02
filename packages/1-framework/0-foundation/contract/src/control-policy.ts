@@ -27,6 +27,7 @@ export function effectiveControlPolicy(
 export type VerifierIssueCategory =
   | 'declaredMissing'
   | 'declaredIncompatible'
+  | 'typeValueDrift'
   | 'extraColumn'
   | 'extraConstraint'
   | 'extraTable';
@@ -52,6 +53,14 @@ export function classifyVerifierIssueKind(kind: string): VerifierIssueCategory {
     case 'type_missing':
     case 'default_missing':
       return 'declaredMissing';
+    // The value set of an existing type (e.g. a Postgres enum). An `external`
+    // owner controls these values, so the framework relinquishes the internal
+    // value set the same way it ignores extra constraints — existence is still
+    // required (`type_missing` stays `declaredMissing`), but value drift on an
+    // external type is not the framework's to police.
+    case 'type_values_mismatch':
+    case 'enum_values_changed':
+      return 'typeValueDrift';
     default:
       return 'declaredIncompatible';
   }
@@ -69,7 +78,11 @@ export function verifierDisposition(
     return 'suppress';
   }
   if (control === 'external') {
-    if (category === 'extraColumn' || category === 'extraConstraint') {
+    if (
+      category === 'extraColumn' ||
+      category === 'extraConstraint' ||
+      category === 'typeValueDrift'
+    ) {
       return 'suppress';
     }
   }
