@@ -18,6 +18,7 @@ import type {
   MigrationRunnerResult,
 } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -33,18 +34,10 @@ import {
   type SqlStatement,
 } from './statement-builders';
 
-interface RunnerConfig {
-  readonly defaultSchema: string;
-}
-
 interface ApplyPlanSuccessValue {
   readonly operationsExecuted: number;
   readonly executedOperations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
 }
-
-const DEFAULT_CONFIG: RunnerConfig = {
-  defaultSchema: 'public',
-};
 
 const LOCK_DOMAIN = 'prisma_next.contract.marker';
 
@@ -58,13 +51,10 @@ function cloneAndFreezeRecord<T extends Record<string, unknown>>(value: T): T {
     if (val === null || val === undefined) {
       cloned[key] = val;
     } else if (Array.isArray(val)) {
-      // Clone array (shallow clone of array elements)
       cloned[key] = Object.freeze([...val]);
     } else if (typeof val === 'object') {
-      // Recursively clone nested objects
       cloned[key] = cloneAndFreezeRecord(val as Record<string, unknown>);
     } else {
-      // Primitives are copied as-is
       cloned[key] = val;
     }
   }
@@ -73,16 +63,12 @@ function cloneAndFreezeRecord<T extends Record<string, unknown>>(value: T): T {
 
 export function createPostgresMigrationRunner(
   family: SqlControlFamilyInstance,
-  config: Partial<RunnerConfig> = {},
 ): SqlMigrationRunner<PostgresPlanTargetDetails> {
-  return new PostgresMigrationRunner(family, { ...DEFAULT_CONFIG, ...config });
+  return new PostgresMigrationRunner(family);
 }
 
 class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDetails> {
-  constructor(
-    private readonly family: SqlControlFamilyInstance,
-    private readonly config: RunnerConfig,
-  ) {}
+  constructor(private readonly family: SqlControlFamilyInstance) {}
 
   /**
    * Body of the migration runner without transaction management. The
@@ -92,7 +78,12 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   async executeOnConnection(
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
   ): Promise<SqlMigrationRunnerResult> {
-    const schema = options.schemaName ?? this.config.defaultSchema;
+    const schema =
+      options.schemaName ??
+      Object.keys(options.destinationContract.storage.namespaces).find(
+        (id) => id !== UNBOUND_NAMESPACE_ID,
+      ) ??
+      UNBOUND_NAMESPACE_ID;
     const driver = options.driver;
     if (options.space !== undefined && options.space !== options.plan.spaceId) {
       throw new Error(

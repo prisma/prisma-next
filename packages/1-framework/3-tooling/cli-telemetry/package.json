@@ -1,14 +1,10 @@
 {
   "name": "@prisma-next/cli-telemetry",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "CLI telemetry client for Prisma Next: detached subprocess sender, gating resolution, user-config store, and consent surface",
-  "files": [
-    "dist",
-    "src"
-  ],
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
@@ -20,21 +16,33 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/config": "workspace:0.11.0",
-    "@prisma-next/utils": "workspace:0.11.0",
+    "@prisma-next/config": "workspace:0.12.0",
+    "@prisma-next/utils": "workspace:0.12.0",
     "arktype": "catalog:",
     "c12": "^3.3.4",
     "pathe": "^2.0.3"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:0.11.0",
-    "@prisma-next/tsconfig": "workspace:0.11.0",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/test-utils": "workspace:0.12.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "exports": {
     ".": {
       "types": "./dist/exports/index.d.mts",
@@ -44,6 +52,9 @@
       "types": "./dist/sender.d.mts",
       "import": "./dist/sender.mjs"
     }
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

@@ -236,7 +236,7 @@ describe('react-router-demo smoke (e2e)', () => {
       expect(updatedContract).toMatchObject({
         storage: {
           namespaces: {
-            __unbound__: {
+            public: {
               tables: {
                 user: {
                   columns: { nickname: expect.anything() },

@@ -1,13 +1,9 @@
 {
   "name": "@prisma-next/emitter",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
-  "files": [
-    "dist",
-    "src"
-  ],
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
@@ -19,23 +15,35 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:0.11.0",
-    "@prisma-next/framework-components": "workspace:0.11.0",
-    "@prisma-next/operations": "workspace:0.11.0",
-    "@prisma-next/ts-render": "workspace:0.11.0",
-    "@prisma-next/utils": "workspace:0.11.0",
+    "@prisma-next/contract": "workspace:0.12.0",
+    "@prisma-next/framework-components": "workspace:0.12.0",
+    "@prisma-next/operations": "workspace:0.12.0",
+    "@prisma-next/ts-render": "workspace:0.12.0",
+    "@prisma-next/utils": "workspace:0.12.0",
     "arktype": "^2.2.0",
     "prettier": "^3.8.3"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:0.11.0",
-    "@prisma-next/tsconfig": "workspace:0.11.0",
+    "@prisma-next/test-utils": "workspace:0.12.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
     "@types/node": "catalog:",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "exports": {
     ".": {
       "types": "./dist/exports/index.d.mts",
@@ -53,6 +61,9 @@
       "types": "./dist/test/utils.d.mts",
       "import": "./dist/test/utils.mjs"
     }
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

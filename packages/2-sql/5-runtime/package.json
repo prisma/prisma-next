@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/sql-runtime",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -16,38 +16,49 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:0.11.0",
-    "@prisma-next/utils": "workspace:0.11.0",
-    "@prisma-next/framework-components": "workspace:0.11.0",
-    "@prisma-next/ids": "workspace:0.11.0",
-    "@prisma-next/operations": "workspace:0.11.0",
-    "@prisma-next/sql-contract": "workspace:0.11.0",
-    "@prisma-next/sql-operations": "workspace:0.11.0",
-    "@prisma-next/sql-relational-core": "workspace:0.11.0",
+    "@prisma-next/contract": "workspace:0.12.0",
+    "@prisma-next/utils": "workspace:0.12.0",
+    "@prisma-next/framework-components": "workspace:0.12.0",
+    "@prisma-next/ids": "workspace:0.12.0",
+    "@prisma-next/operations": "workspace:0.12.0",
+    "@prisma-next/sql-contract": "workspace:0.12.0",
+    "@prisma-next/sql-operations": "workspace:0.12.0",
+    "@prisma-next/sql-relational-core": "workspace:0.12.0",
     "arktype": "^2.2.0"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:0.11.0",
-    "@prisma-next/tsconfig": "workspace:0.11.0",
+    "@prisma-next/test-utils": "workspace:0.12.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
     "@types/pg": "catalog:",
     "pg": "catalog:",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "files": [
     "dist",
     "src"
   ],
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
     "./test/utils": "./dist/test/utils.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "engines": {
+    "node": ">=24"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",

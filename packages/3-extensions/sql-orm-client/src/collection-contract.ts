@@ -4,7 +4,6 @@ import {
   type CrossReference,
   contractModels,
 } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { RelationCardinalityTag } from './types';
 
@@ -36,9 +35,8 @@ export interface PolymorphismInfo {
 }
 
 function unboundTable(contract: Contract<SqlStorage>, tableName: string): StorageTable | undefined {
-  return contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables[tableName] as
-    | StorageTable
-    | undefined;
+  return Object.values(contract.storage.namespaces).find((ns) => ns.tables[tableName] !== undefined)
+    ?.tables[tableName] as StorageTable | undefined;
 }
 
 function modelsOf(contract: Contract<SqlStorage>): ModelsMap {

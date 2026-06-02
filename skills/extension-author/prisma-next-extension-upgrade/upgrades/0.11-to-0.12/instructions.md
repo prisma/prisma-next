@@ -56,6 +56,24 @@ changes:
         - '"hints"'
       anyMatch: true
     script: ./strip-migration-labels-hints.ts
+  - id: extension-public-default-baseline
+    summary: |
+      Published Postgres extension packs' empty default namespace flips `__unbound__` → `public` (`postgres-unbound-schema` → `postgres-schema`), changing the extension's `storageHash`, `migrations/refs/head.json` hash, and each baseline `migration.json` `to` / `migrationHash`. Migration ops are unchanged. Re-emit the contract-space (`pnpm build:contract-space` / `prisma-next contract emit`) and regenerate the install migration baseline so the head ref matches the new contract hash.
+    detection:
+      glob: "**/contract.json"
+      contains:
+        - '"kind": "postgres-unbound-schema"'
+      anyMatch: true
+    script: ./regenerate-extension-public-baseline.ts
+  - id: domain-plane-spi-and-testing-subpath
+    summary: |
+      Contract SPI is namespaced: read models/value objects through `contract.domain.namespaces.<ns>` (helpers: `contractModels()`, `ContractModelsMap`, `ContractValueObjectsMap`) instead of flat `contract.models`. The `@prisma-next/contract/testing` subpath export was removed — test factories (`createContract`, `createSqlContract`, `DUMMY_HASH`, `applicationDomainOf`) now live in `@prisma-next/test-utils`. Run the colocated import codemod and update SPI consumption to the namespaced contract shape.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "@prisma-next/contract/testing"
+      anyMatch: true
+    script: ./migrate-contract-testing-imports.ts
 ---
 
 # 0.11 → 0.12 — Extension-author upgrade instructions
@@ -543,6 +561,113 @@ pnpm exec tsx ./strip-migration-labels-hints.ts --check
 ### Validation
 
 After running the codemod, run your extension's migration-loading tests (the integration suite that applies your install migration, or whatever exercises the on-disk packages). The loader recomputes and verifies each manifest's `migrationHash` on read: a manifest that still carried `labels`/`hints` would have thrown `INVALID_MANIFEST`, and a manifest with a stale hash would fail verification. Once the codemod has run, every manifest loads cleanly and its recomputed hash verifies against the slimmed envelope.
+
+## `extension-public-default-baseline`
+
+Starting at the 0.12 release, Postgres extension packs whose contract-space declares only storage types (no tables) emit their empty default namespace under `public` / `postgres-schema` instead of `__unbound__` / `postgres-unbound-schema`. The on-disk migration ops (`CREATE EXTENSION …`, invariant registration, etc.) are unchanged — only the contract hash envelope moves. Expect diffs in:
+
+- `src/contract.json` / `src/contract.d.ts` — new `storageHash` and namespace keys
+- `migrations/<baseline>/migration.json` — updated `to` and `migrationHash`
+- `migrations/<baseline>/end-contract.json` / `end-contract.d.ts` — regenerated snapshots
+- `migrations/<baseline>/migration.ts` — updated `describe().to` storage hash literal
+- `migrations/refs/head.json` — updated `hash`
+
+### Regenerate contract-space and baseline
+
+Run the colocated script from your extension package root (or monorepo root if it hosts multiple extension packs):
+
+```bash
+pnpm exec tsx ./regenerate-extension-public-baseline.ts
+```
+
+For each extension root whose `src/contract.json` still carries `"kind": "postgres-unbound-schema"`, the script runs `pnpm build:contract-space`, copies `src/contract.{json,d.ts}` into each baseline migration directory as `end-contract.{json,d.ts}`, patches the baseline `migration.ts` `to` hash, self-emits the migration (`pnpm exec tsx migrations/.../migration.ts`), and updates `migrations/refs/head.json`.
+
+Use `--check` to list packs that still need regeneration:
+
+```bash
+pnpm exec tsx ./regenerate-extension-public-baseline.ts --check
+```
+
+Path B baselines (hand-authored install migrations with no planner scaffold) follow the same loop documented in your extension README: edit `describe().to`, then self-emit.
+
+### Validation
+
+Run your extension's test suite and any migration-loading integration tests. Confirm `migrations/refs/head.json` `hash` matches `src/contract.json` `storage.storageHash`, and that the baseline `migration.json` `to` field matches as well.
+
+## `domain-plane-spi-and-testing-subpath`
+
+Starting at the 0.12 release, two SPI changes affect extension authors:
+
+1. **Namespaced domain plane** — stop reading flat `contract.models` / `contract.valueObjects`. Models and value objects live under `contract.domain.namespaces.<ns>`. Use `contractModels(contract)`, `ContractModelsMap<C>`, and `ContractValueObjectsMap<C>` from `@prisma-next/contract/types` for typed access. Storage remains under `contract.storage.namespaces.<ns>` (unchanged shape).
+
+2. **Removed `@prisma-next/contract/testing` subpath** — test factories moved to `@prisma-next/test-utils`. Add `@prisma-next/test-utils` to your extension's `devDependencies` at the same version pin as your other `@prisma-next/*` packages if it is not already present.
+
+### Migrate test imports
+
+Run the colocated codemod from your extension root:
+
+```bash
+pnpm exec tsx ./migrate-contract-testing-imports.ts
+```
+
+It rewrites every `@prisma-next/contract/testing` import to `@prisma-next/test-utils`. Use `--check` for a dry-run:
+
+```bash
+pnpm exec tsx ./migrate-contract-testing-imports.ts --check
+```
+
+Exports are unchanged — only the package path moves:
+
+```diff
+-import { createContract, createSqlContract } from '@prisma-next/contract/testing';
++import { createContract, createSqlContract } from '@prisma-next/test-utils';
+```
+
+Subpath imports such as `@prisma-next/test-utils/typed-expectations` were already on `@prisma-next/test-utils` and are unaffected.
+
+### Update SPI reads to the namespaced domain shape
+
+Walk extension source that constructs or reads contracts directly (tests, control adapters, planners). TypeScript will flag most stale reads after the bump; the mechanical rewrites are:
+
+**Reading models** — use the helper instead of the flat root:
+
+```diff
+-const models = contract.models;
++const models = contractModels(contract);
+```
+
+**Patching models in tests** — nest under the domain namespace:
+
+```diff
+ return {
+   ...contract,
+-  models: patch({ ...contract.models }),
++  domain: {
++    namespaces: {
++      ...contract.domain.namespaces,
++      [namespaceId]: {
++        ...namespace,
++        models: patch({ ...contractModels(contract) }),
++      },
++    },
++  },
+ };
+```
+
+**Hard-coded `__unbound__` namespace lookups for table resolution** — scan all storage namespaces (a table name is unique within the contract's default resolution path):
+
+```diff
+-const table = contract.storage.namespaces['__unbound__']?.tables[tableName];
++const table = Object.values(contract.storage.namespaces).find(
++  (ns) => ns.tables[tableName] !== undefined,
++)?.tables[tableName];
+```
+
+After source updates, re-emit fixture contracts (`pnpm fixtures:emit` or your package's equivalent) so committed `contract.json` / `contract.d.ts` under `test/` pick up `domain.namespaces`.
+
+### Validation
+
+Run `pnpm typecheck && pnpm test` on your extension package. The import codemod is deterministic; remaining errors indicate hand-edits for namespaced domain reads. Regenerated fixture diffs should show `domain.namespaces` and `ContractModelsMap` in emitted types.
 
 ## Validation by execution
 

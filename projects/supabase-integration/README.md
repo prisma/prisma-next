@@ -1,51 +1,53 @@
 # Supabase integration — umbrella project
 
-> **Status: umbrella tracker.** This directory no longer carries a single project spec/plan. The Supabase integration is decomposed into five framework-primitive projects (four new + one already split out) plus an integration project. Each constituent has its own `spec.md` + `plan.md` and its own Linear ticket. The umbrella retains shared artefacts that don't belong to any single constituent: the canonical decisions log, the design-artifact example app, the deferred-items list, and the long-form overview.
+> **Status: umbrella tracker.** This directory no longer carries a single project spec/plan. The Supabase integration is decomposed into six framework-primitive projects plus an integration project. Each constituent has its own `spec.md` + `plan.md` and its own Linear ticket. The umbrella retains shared artefacts that don't belong to any single constituent: the canonical decisions log, the design-artifact example app, the deferred-items list, and the long-form overview.
 
 ## Decomposition
 
-The Supabase integration is delivered through five framework-primitive projects + one integration project. All five framework primitives are independent of each other and depend on TML-2459. The integration project depends on all of them.
+The Supabase integration is delivered through six framework-primitive projects + one integration project. The framework primitives are independent of each other; all depend on the target-extensible IR foundation (TML-2459) — `explicit-namespace-dsl` specifically on its runtime-qualification slice (TML-2605). The integration project depends on all of them.
 
 | Project | Concern | Status | Linear |
 |---|---|---|---|
-| [target-extensible-ir](../target-extensible-ir/spec.md) | Polymorphic Contract IR + Schema IR; `Namespace` framework concept; within-contract cross-namespace FKs | Shaped, implementer-ready | [TML-2459](https://linear.app/prisma-company/issue/TML-2459) |
+| [target-extensible-ir-namespaces](../target-extensible-ir-namespaces/spec.md) | Polymorphic Contract IR + Schema IR; `Namespace` framework concept; within-contract cross-namespace FKs | In progress (runtime-qualification slice TML-2605 remaining) | [TML-2459](https://linear.app/prisma-company/issue/TML-2459) |
 | [control-policy](../control-policy/spec.md) | Framework primitive: `control` field + `ControlPolicy` enum (`managed`/`tolerated`/`external`/`observed`); verifier/planner dispatch tables | Shaped | [TML-2493](https://linear.app/prisma-company/issue/TML-2493) |
 | [cross-contract-refs](../cross-contract-refs/spec.md) | FK references across contract-space boundaries; brand machinery; `supabase:auth.User` PSL grammar; dependency graph + namespace ownership | Shaped | [TML-2500](https://linear.app/prisma-company/issue/TML-2500) |
 | [postgres-rls](../postgres-rls/spec.md) | RLS policies + Postgres roles as target-only IR; `.rls(...)` TS surface + `policy <name> { ... }` PSL surface; content-addressed wire names; verifier + planner | Shaped | [TML-2501](https://linear.app/prisma-company/issue/TML-2501) |
 | [runtime-target-layer](../runtime-target-layer/spec.md) | Export `SqlRuntime`; new `PostgresRuntime extends SqlRuntime`; `withRawConnection` below-middleware accessor; transaction primitive formalisation | Shaped | [TML-2502](https://linear.app/prisma-company/issue/TML-2502) |
+| [explicit-namespace-dsl](../explicit-namespace-dsl/spec.md) | Namespace-aware DSL/ORM query surface (`db.sql.<ns>.<table>`, `db.<ns>.<Model>`); disambiguates colliding cross-namespace names (`auth.users` vs `public.users`); additive on the default-namespace fallback | Shaped — **launch blocker** | [TML-2550](https://linear.app/prisma-company/issue/TML-2550) |
 | [extension-supabase](../extension-supabase/spec.md) | `@prisma-next/extension-supabase` package: shipped contract, typed handles, pack descriptor, `SupabaseRuntime`, example app | Shaped | [TML-2503](https://linear.app/prisma-company/issue/TML-2503) |
 
 ### Dependency graph
 
 ```
-            ┌─────────────────────────┐
-            │ target-extensible-ir    │
-            │ (TML-2459)              │
-            └────────────┬────────────┘
-                         │
-            ┌────────────┴────────────┐
-            │ control-policy          │
-            │ (TML-2493)              │
-            └────────────┬────────────┘
-                         │
-       ┌─────────────────┼─────────────────┐
-       │                 │                 │
-       ▼                 ▼                 ▼
-┌─────────────┐  ┌─────────────┐  ┌────────────────────┐
-│ cross-      │  │ postgres-   │  │ runtime-target-    │
-│ contract-   │  │ rls         │  │ layer              │
-│ refs        │  │             │  │                    │
-└──────┬──────┘  └──────┬──────┘  └─────────┬──────────┘
-       │                │                   │
-       └────────────────┼───────────────────┘
-                        ▼
-            ┌─────────────────────────┐
-            │ extension-supabase      │
-            │ (May 18 launch)         │
-            └─────────────────────────┘
+                        ┌─────────────────────────┐
+                        │ target-extensible-ir    │
+                        │ (TML-2459)              │
+                        └────────────┬────────────┘
+                                     │
+                  ┌──────────────────┴──────────────────┐
+                  ▼                                      ▼
+          ┌───────────────┐               ┌──────────────────────────┐
+          │ control-policy│               │ explicit-namespace-dsl   │
+          │ (TML-2493)    │               │ (TML-2550) — needs the   │
+          └───────┬───────┘               │ runtime-qualification    │
+                  │                        │ slice (TML-2605)         │
+       ┌──────────┼──────────┐            └─────────────┬────────────┘
+       ▼          ▼          ▼                          │
+┌────────────┐┌─────────┐┌────────────────┐            │
+│ cross-     ││postgres-││ runtime-target-│            │
+│ contract-  ││ rls     ││ layer          │            │
+│ refs       ││         ││                │            │
+└──────┬─────┘└────┬────┘└────────┬───────┘            │
+       │           │             │                     │
+       └───────────┴─────────────┴──────────┬──────────┘
+                                             ▼
+                                ┌─────────────────────────┐
+                                │ extension-supabase      │
+                                │ (May 18 launch)         │
+                                └─────────────────────────┘
 ```
 
-The three middle-tier projects (`cross-contract-refs`, `postgres-rls`, `runtime-target-layer`) can ship in any order once `target-extensible-ir` reaches M5b and `control-policy` lands. `extension-supabase` consumes all three.
+The three control-policy-dependent middle-tier projects (`cross-contract-refs`, `postgres-rls`, `runtime-target-layer`) can ship in any order once `target-extensible-ir` reaches M5b and `control-policy` lands. `explicit-namespace-dsl` runs on a parallel track: it depends only on the runtime-qualification slice (TML-2605) of `target-extensible-ir`, not on `control-policy`, so it can be built alongside them. `extension-supabase` consumes all four — and it **cannot ship without `explicit-namespace-dsl`**, because a Supabase app addresses tables in `auth.*` and `public.*` that collide by bare name (both schemas have a `users` table); without the namespace-aware query surface there is no way to reach `auth.users`, and everything collapses into a single namespace. That is the user-facing fudge the integration must not ship.
 
 ## What's in the umbrella directory
 

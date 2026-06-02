@@ -45,6 +45,7 @@ export function timestampNowControlDescriptor(): MutationDefaultGeneratorDescrip
  * `field.temporal.updatedAt()` lower to byte-identical contracts across
  * targets by construction.
  */
+/* @__NO_SIDE_EFFECTS__ */
 export function temporalAuthoringPresets<
   const CodecId extends string,
   const NativeType extends string,

@@ -33,7 +33,7 @@ describe('PSL @@index type and options — integration with real paradedb pack',
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        __unbound__: {
+        public: {
           tables: {
             doc: {
               indexes: [

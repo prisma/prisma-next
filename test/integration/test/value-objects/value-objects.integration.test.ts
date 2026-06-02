@@ -6,7 +6,6 @@ import {
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -190,17 +189,17 @@ describe('value objects: end-to-end SQL pipeline', () => {
     if (!result.ok) throw new Error(`Interpretation failed: ${result.failure.summary}`);
 
     const contract = result.value;
-    const unboundDomain = contract.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!;
-    expect(unboundDomain.valueObjects).toBeDefined();
-    expect(unboundDomain.valueObjects!['Address']).toBeDefined();
+    const publicDomain = contract.domain.namespaces['public']!;
+    expect(publicDomain.valueObjects).toBeDefined();
+    expect(publicDomain.valueObjects!['Address']).toBeDefined();
 
-    const addressVo = unboundDomain.valueObjects!['Address'] as ContractValueObject;
+    const addressVo = publicDomain.valueObjects!['Address'] as ContractValueObject;
     const voFields = addressVo.fields;
     expect(voFields['street']).toBeDefined();
     expect(voFields['city']).toBeDefined();
     expect(voFields['zip']).toBeDefined();
 
-    const userFields = unboundDomain.models['User']!.fields as Record<string, ContractField>;
+    const userFields = publicDomain.models['User']!.fields as Record<string, ContractField>;
     const homeAddressField = userFields['homeAddress']!;
     expect(homeAddressField.type).toEqual({ kind: 'valueObject', name: 'Address' });
     expect(homeAddressField.nullable).toBe(false);
@@ -211,7 +210,7 @@ describe('value objects: end-to-end SQL pipeline', () => {
         { tables: Record<string, { columns: Record<string, { nativeType: string }> }> }
       >;
     };
-    const userTable = storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['user'];
+    const userTable = storage.namespaces['public']!.tables['user'];
     expect(userTable).toBeDefined();
     expect(userTable!.columns['homeAddress']).toBeDefined();
     expect(userTable!.columns['homeAddress']!.nativeType).toBe('jsonb');

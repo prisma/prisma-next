@@ -6,16 +6,16 @@
   "roots": {
     "org_team": {
       "model": "Team",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "team_member": {
       "model": "Member",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Member": {
             "fields": {
@@ -43,7 +43,7 @@
                 },
                 "to": {
                   "model": "Team",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -87,6 +87,10 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "tables": {}
+      },
+      "public": {
+        "id": "public",
         "tables": {
           "org_team": {
             "columns": {
@@ -125,12 +129,12 @@
                 "onUpdate": "cascade",
                 "source": {
                   "columns": ["team_ref"],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "team_member"
                 },
                 "target": {
                   "columns": ["team_id"],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "org_team"
                 }
               }
@@ -152,7 +156,7 @@
         }
       }
     },
-    "storageHash": "sha256:c8a415878513f3a51b811d05d94a010889bb2459ece61b1182211e2ef82751ec"
+    "storageHash": "sha256:5d0fc9f0024b3023bec2a3465d83deedacfb6c02e216ef599bfb7cfef9889b9c"
   },
   "capabilities": {
     "postgres": {

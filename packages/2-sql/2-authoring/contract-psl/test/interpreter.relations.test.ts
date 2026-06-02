@@ -40,7 +40,10 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.roots).toEqual({ user: crossRef('User'), post: crossRef('Post') });
+    expect(result.value.roots).toEqual({
+      user: crossRef('User', 'public'),
+      post: crossRef('Post', 'public'),
+    });
 
     const models = modelsOf(result.value) as Record<
       string,
@@ -48,7 +51,7 @@ model Post {
     >;
     expect(models['User']?.relations).toMatchObject({
       posts: {
-        to: crossRef('Post'),
+        to: crossRef('Post', 'public'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -58,7 +61,7 @@ model Post {
     });
     expect(models['Post']?.relations).toMatchObject({
       user: {
-        to: crossRef('User'),
+        to: crossRef('User', 'public'),
         cardinality: 'N:1',
         on: {
           localFields: ['userId'],
@@ -98,7 +101,7 @@ model Post {
     >;
     expect(models['User']?.relations).toMatchObject({
       authored: {
-        to: crossRef('Post'),
+        to: crossRef('Post', 'public'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -106,7 +109,7 @@ model Post {
         },
       },
       reviewed: {
-        to: crossRef('Post'),
+        to: crossRef('Post', 'public'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -148,10 +151,10 @@ model Member {
     if (!result.ok) return;
 
     expect(result.value.roots).toEqual({
-      user: crossRef('User'),
-      post: crossRef('Post'),
-      team: crossRef('Team'),
-      member: crossRef('Member'),
+      user: crossRef('User', 'public'),
+      post: crossRef('Post', 'public'),
+      team: crossRef('Team', 'public'),
+      member: crossRef('Member', 'public'),
     });
 
     const models = modelsOf(result.value) as Record<
@@ -159,13 +162,13 @@ model Member {
       { relations?: Record<string, unknown> }
     >;
     expect(models['User']?.relations).toMatchObject({
-      posts: { to: crossRef('Post'), cardinality: '1:N' },
+      posts: { to: crossRef('Post', 'public'), cardinality: '1:N' },
     });
     expect(models['Post']?.relations).toMatchObject({
-      user: { to: crossRef('User'), cardinality: 'N:1' },
+      user: { to: crossRef('User', 'public'), cardinality: 'N:1' },
     });
     expect(models['Member']?.relations).toMatchObject({
-      team: { to: crossRef('Team'), cardinality: 'N:1' },
+      team: { to: crossRef('Team', 'public'), cardinality: 'N:1' },
     });
   });
 
@@ -192,7 +195,7 @@ model Member {
     >;
     expect(models['Employee']?.relations).toMatchObject({
       manager: {
-        to: crossRef('Employee'),
+        to: crossRef('Employee', 'public'),
         cardinality: 'N:1',
         on: {
           localFields: ['managerId'],
@@ -200,7 +203,7 @@ model Member {
         },
       },
       reports: {
-        to: crossRef('Employee'),
+        to: crossRef('Employee', 'public'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -265,8 +268,8 @@ model Member {
     if (!result.ok) return;
 
     expect(result.value.roots).toEqual({
-      org_team: crossRef('Team'),
-      team_member: crossRef('Member'),
+      org_team: crossRef('Team', 'public'),
+      team_member: crossRef('Member', 'public'),
     });
 
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);

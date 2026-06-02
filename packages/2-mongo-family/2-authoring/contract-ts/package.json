@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/mongo-contract-ts",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -16,21 +16,29 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/config": "workspace:0.11.0",
-    "@prisma-next/contract": "workspace:0.11.0",
-    "@prisma-next/contract-authoring": "workspace:0.11.0",
-    "@prisma-next/framework-components": "workspace:0.11.0",
-    "@prisma-next/mongo-contract": "workspace:0.11.0",
-    "@prisma-next/utils": "workspace:0.11.0",
+    "@prisma-next/config": "workspace:0.12.0",
+    "@prisma-next/contract": "workspace:0.12.0",
+    "@prisma-next/contract-authoring": "workspace:0.12.0",
+    "@prisma-next/framework-components": "workspace:0.12.0",
+    "@prisma-next/mongo-contract": "workspace:0.12.0",
+    "@prisma-next/utils": "workspace:0.12.0",
     "pathe": "^2.0.3"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:0.11.0",
-    "@prisma-next/tsconfig": "workspace:0.11.0",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/test-utils": "workspace:0.12.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "files": [
     "dist",
@@ -40,6 +48,9 @@
     "./config-types": "./dist/config-types.mjs",
     "./contract-builder": "./dist/contract-builder.mjs",
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

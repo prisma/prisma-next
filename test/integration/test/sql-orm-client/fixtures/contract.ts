@@ -1,5 +1,4 @@
 import { int4Column, jsonbColumn, textColumn } from '@prisma-next/adapter-postgres/column-types';
-import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import { uuidv4 } from '@prisma-next/ids';
@@ -89,19 +88,18 @@ const baseContract = defineContract({
   },
 });
 
-const namespaceId = UNBOUND_DOMAIN_NAMESPACE_ID;
-const unboundNamespace = baseContract.domain.namespaces[namespaceId]!;
-const userModel = unboundNamespace.models['User']!;
+const defaultNamespace = baseContract.domain.namespaces['public']!;
+const userModel = defaultNamespace.models['User']!;
 
 export const contract = {
   ...baseContract,
   domain: {
     namespaces: {
       ...baseContract.domain.namespaces,
-      [namespaceId]: {
-        ...unboundNamespace,
+      public: {
+        ...defaultNamespace,
         models: {
-          ...unboundNamespace.models,
+          ...defaultNamespace.models,
           User: {
             ...userModel,
             fields: {

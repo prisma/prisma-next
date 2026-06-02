@@ -1,4 +1,3 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 
 type StorageLike = {
@@ -10,7 +9,11 @@ type StorageLike = {
 export function unboundTables(
   storage: StorageLike | SqlStorage,
 ): Readonly<Record<string, StorageTable>> {
-  return (storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables ?? {}) as Readonly<
-    Record<string, StorageTable>
-  >;
+  const merged: Record<string, StorageTable> = {};
+  for (const ns of Object.values(storage.namespaces)) {
+    if (ns.tables) {
+      Object.assign(merged, ns.tables);
+    }
+  }
+  return merged;
 }

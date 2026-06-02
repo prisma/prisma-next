@@ -1,7 +1,7 @@
 {
   "from": null,
-  "to": "sha256:39235171df55ec9272b3d1df6666f2c27e20f7d11fd8d8a6fb6c87e1b6e3b9bc",
+  "to": "sha256:5dde71f8985299c9eb464edb00d06e2bdef0501bd30b072a614afb48ed4dc21b",
   "providedInvariants": ["paradedb:install-pg-search-v1"],
   "createdAt": "2026-06-01T00:00:00.000Z",
-  "migrationHash": "sha256:c0ecebc8aa59bf46056e9c5fddd4dd9bffc0664a152b67adbc0c19deb88cb37b"
+  "migrationHash": "sha256:9e41d989a1c9715d67ced43dd0ee4210b06641a6fd78a124b77798d27272e704"
 }

@@ -16,7 +16,7 @@ import {
   compileDeleteReturning,
   compileGroupedAggregate,
   compileInsertReturning,
-  compileSelectWithIncludeStrategy,
+  compileSelectWithIncludes,
   compileUpdateReturning,
   compileUpsertReturning,
 } from '../src/query-plan';
@@ -42,7 +42,7 @@ describe('SQL ORM rich AST query plans', () => {
       )
       .take(5).state;
 
-    const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+    const plan = compileSelectWithIncludes(baseContract, 'users', state);
 
     expect(plan.ast.kind).toBe('select');
     expect(plan.params).toEqual([100, 'Alice']);

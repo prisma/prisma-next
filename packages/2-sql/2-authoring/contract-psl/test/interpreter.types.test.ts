@@ -1,5 +1,4 @@
 import { crossRef } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -77,7 +76,7 @@ model Event {
     });
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             event: {
               columns: {
@@ -125,7 +124,7 @@ model Event {
         },
       },
     });
-    expect(result.value.roots).toEqual({ event: crossRef('Event') });
+    expect(result.value.roots).toEqual({ event: crossRef('Event', 'public') });
   });
 
   it('preserves enum native type names from @@map instead of lowercasing declarations', () => {
@@ -175,8 +174,6 @@ model User {
               values: ['OWNER'],
             },
           },
-        },
-        [UNBOUND_NAMESPACE_ID]: {
           tables: {
             user: {
               columns: {
@@ -199,7 +196,7 @@ model User {
         },
       },
     });
-    expect(result.value.roots).toEqual({ user: crossRef('User') });
+    expect(result.value.roots).toEqual({ user: crossRef('User', 'public') });
   });
 
   it('lowers additional Postgres native type attributes on named types', () => {
@@ -260,7 +257,7 @@ model Event {
     });
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             event: {
               columns: {
@@ -301,7 +298,7 @@ model Event {
         },
       },
     });
-    expect(result.value.roots).toEqual({ event: crossRef('Event') });
+    expect(result.value.roots).toEqual({ event: crossRef('Event', 'public') });
   });
 
   it('lowers a top-level enum into the public namespace enum slot', () => {

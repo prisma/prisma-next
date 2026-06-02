@@ -27,10 +27,6 @@ import {
 } from '../utils/command-helpers';
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import {
-  type GlyphMode,
-  renderMigrationListGraphResult,
-} from '../utils/formatters/migration-list-graph-render';
-import {
   buildMigrationListTopologyBySpace,
   renderMigrationListWithStyle,
 } from '../utils/formatters/migration-list-render';
@@ -43,6 +39,7 @@ import type {
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import type { GlyphMode } from '../utils/glyph-mode';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
@@ -133,12 +130,10 @@ export async function migrationSpaceListEntriesFromAggregate(
 interface MigrationListOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly space?: string;
-  readonly graph?: boolean;
   readonly ascii?: boolean;
 }
 
 export interface MigrationListHumanRenderOptions {
-  readonly graph: boolean;
   readonly glyphMode: GlyphMode;
   readonly useColor: boolean;
 }
@@ -149,9 +144,6 @@ export function renderMigrationListHumanOutput(
 ): string {
   const styler = createAnsiMigrationListStyler({ useColor: options.useColor });
   const topologyBySpaceId = buildMigrationListTopologyBySpace(result);
-  if (options.graph) {
-    return renderMigrationListGraphResult(result, styler, options.glyphMode, topologyBySpaceId);
-  }
   return renderMigrationListWithStyle(result, styler, options.glyphMode, topologyBySpaceId);
 }
 
@@ -268,14 +260,13 @@ export function createMigrationListCommand(): Command {
       '⟲ self), then dirName, then source → destination contract hashes\n' +
       '(7-char git-style). Self-edges show a single hash. Invariants render as\n' +
       '{...}; refs on the destination as (production, db). Pass --space <id>\n' +
-      'to narrow to one contract space. --graph draws the forward spine with\n' +
-      'lane gutters; --ascii forces ASCII glyphs (orthogonal to --no-color).',
+      'to narrow to one contract space. --ascii forces ASCII kind glyphs\n' +
+      '(orthogonal to --no-color).',
   );
   setCommandExamples(command, [
     'prisma-next migration list',
-    'prisma-next migration list --graph',
     'prisma-next migration list --space app',
-    'prisma-next migration list --graph --ascii',
+    'prisma-next migration list --ascii',
     'prisma-next migration list --json',
   ]);
   setCommandSeeAlso(command, [
@@ -287,8 +278,7 @@ export function createMigrationListCommand(): Command {
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--space <id>', 'Narrow output to a single contract space')
-    .option('--graph', 'Draw migration relationships as an annotated tree')
-    .option('--ascii', 'Use ASCII glyphs for --graph (pipe-friendly)')
+    .option('--ascii', 'Use ASCII kind glyphs (pipe-friendly)')
     .action(async (options: MigrationListOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
@@ -299,7 +289,6 @@ export function createMigrationListCommand(): Command {
         } else if (!flags.quiet) {
           ui.output(
             renderMigrationListHumanOutput(listResult, {
-              graph: options.graph === true,
               glyphMode: ui.resolveGlyphMode(options.ascii === true),
               useColor: ui.useColor,
             }),

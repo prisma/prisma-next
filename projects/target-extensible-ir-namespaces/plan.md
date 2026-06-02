@@ -2,7 +2,7 @@
 
 **Spec:** [`projects/target-extensible-ir-namespaces/spec.md`](./spec.md)
 **Linear Project:** [Target-Extensible IR + Namespaces](https://linear.app/prisma-company/project/target-extensible-ir-namespaces-fd69eff8aec6)
-**Purpose** _(from spec)_: Make first-class namespaces and target-extensible IR usable for the downstream Supabase integration. The contract IR reaches its canonical symmetric two-plane shape; runtime SQL and the DSL/ORM surfaces qualify identifiers and dispatch through a default-namespace fallback so existing single-namespace consumers experience zero breakage; the explicit namespace-aware surface (`db.sql.auth.user`) lands later as purely additive work.
+**Purpose** _(from spec)_: Make first-class namespaces and target-extensible IR usable for the downstream Supabase integration. The contract IR reaches its canonical symmetric two-plane shape; runtime SQL and the DSL/ORM surfaces qualify identifiers and dispatch through a default-namespace fallback so existing single-namespace consumers experience zero breakage. The explicit namespace-aware surface (`db.sql.auth.user`) is **elevated out of this project**: it is required (not deferrable) for the Supabase integration — which must address colliding `auth.*` / `public.*` names that the default-namespace fallback cannot disambiguate — but it is purely additive on `runtime-qualification`, so it can run in parallel and must not gate this project's close-out.
 
 ## At a glance
 
@@ -11,7 +11,9 @@ Single sequential stack on top of the closed **contract-ir-planes** substrate ([
 Units are **named, not numbered** — the S-numbering drifted during replanning and bought nothing.
 
 ```text
-domain-plane   →   public-by-default   →   runtime-qualification   →   explicit-dsl (deferrable)
+domain-plane   →   public-by-default   →   runtime-qualification        ← this project closes here
+
+explicit-dsl   —   elevated out: standalone + parallelizable, required for Supabase
 ```
 
 One worktree + branch per slice; slice tickets at pickup.
@@ -68,13 +70,13 @@ One worktree + branch per slice; slice tickets at pickup.
 
 **Depends on.** domain-plane + public-by-default.
 
-#### explicit-dsl — explicit namespace-aware DSL/ORM surface
+#### explicit-dsl — explicit namespace-aware DSL/ORM surface (ELEVATED OUT)
 
-**Unit type:** Slice. **Deferrable.**
+**Unit type:** Slice. **Elevated out of this project** — tracked standalone, parallelizable, does **not** gate close-out.
 
-**Purpose.** `db.sql.<ns>.<table>`, `db.<ns>.<Model>` — additive on runtime-qualification.
+**Purpose.** `db.sql.<ns>.<table>`, `db.<ns>.<Model>` — additive on runtime-qualification. Required (not deferrable) for the Supabase integration: Supabase exposes colliding names across namespaces (`auth.users` alongside `public.users`), which the flat-by-name default-namespace fallback from `runtime-qualification` cannot disambiguate. Because it is purely additive, it can be built in parallel with — and shipped after — this project closes.
 
-**Linear:** [TML-2550](https://linear.app/prisma-company/issue/TML-2550).
+**Linear:** [TML-2550](https://linear.app/prisma-company/issue/TML-2550) (removed from this project; required for the Supabase initiative).
 
 ### Parallel groups
 
@@ -90,7 +92,7 @@ None.
 
 | Project-DoD | Delivered by |
 |---|---|
-| **PDoD1.** All must-ship units delivered; explicit-dsl delivered or deferred | domain-plane + public-by-default + runtime-qualification; explicit-dsl optional |
+| **PDoD1.** All must-ship units delivered | domain-plane + public-by-default + runtime-qualification (explicit-dsl elevated out — no longer a member of this project) |
 | **PDoD2.** Emitted IR matches ADR 221 (symmetric `domain` + `storage` envelopes) | domain-plane |
 | **PDoD3.** Pack-contributed entity kinds (enum exemplar) | contract-ir-planes |
 | **PDoD4.** Postgres public-by-default; `__unbound__` opt-in | public-by-default |
@@ -111,16 +113,17 @@ None.
 contract-ir-planes   ✓ CLOSED  (ADR 221; storage.namespaces on main)
    │
    ▼
-domain-plane ([TML-2751](https://linear.app/prisma-company/issue/TML-2751))   ← IN PROGRESS
+domain-plane ([TML-2751](https://linear.app/prisma-company/issue/TML-2751))   ✓ MERGED (#653)
    │
    ▼
-public-by-default
+public-by-default (TML-2760)   ← PR #662 (green, in review)
    │
    ▼
-runtime-qualification (TML-2605)
-   │
+runtime-qualification (TML-2605)   ← project closes after this
+   ┊
+   ┊  (additive, parallelizable, elevated out — required for Supabase)
    ▼
-explicit-dsl (deferrable, TML-2550)
+explicit-dsl (TML-2550)   — tracked standalone, not a project member
 ```
 
 ## Close-out (required)

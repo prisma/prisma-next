@@ -17,6 +17,7 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { createResolveExistingEnumValues } from './enum-planning';
@@ -39,21 +40,8 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
   readonly frameworkComponents: PlannerFrameworkComponents;
 };
 
-interface PlannerConfig {
-  readonly defaultSchema: string;
-}
-
-const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
-  defaultSchema: 'public',
-};
-
-export function createPostgresMigrationPlanner(
-  config: Partial<PlannerConfig> = {},
-): PostgresMigrationPlanner {
-  return new PostgresMigrationPlanner({
-    ...DEFAULT_PLANNER_CONFIG,
-    ...config,
-  });
+export function createPostgresMigrationPlanner(): PostgresMigrationPlanner {
+  return new PostgresMigrationPlanner();
 }
 
 /**
@@ -84,8 +72,6 @@ export type PostgresPlanResult =
  * authoring surface.
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
-  constructor(private readonly config: PlannerConfig) {}
-
   plan(options: {
     readonly contract: unknown;
     readonly schema: unknown;
@@ -132,7 +118,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
   }
 
   private planSql(options: SqlMigrationPlannerPlanOptions): PostgresPlanResult {
-    const schemaName = options.schemaName ?? this.config.defaultSchema;
+    const schemaName =
+      options.schemaName ??
+      Object.keys(options.contract.storage.namespaces).find((id) => id !== UNBOUND_NAMESPACE_ID) ??
+      UNBOUND_NAMESPACE_ID;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
       return policyResult;

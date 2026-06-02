@@ -77,6 +77,10 @@ export const db = supabase<Contract, TypeMaps>({
 //   db.asUser(jwt).sql.from(Profile).select({ ... }).build()
 //   db.asAnon().sql.from(Profile).select({ ... }).build()
 //   db.asServiceRole().sql.from(Profile).update({ ... }).build()
+//
+// Reaching a table in a named namespace (auth.users alongside public.users)
+// goes through the explicit namespace-aware surface:
+//   db.asUser(jwt).sql.auth.users.select({ ... }).build()
 ```
 
 The TS contract surface is structurally parallel and is described in each constituent project's spec; both PSL and TS lower to the same canonical `contract.json`. Once that JSON exists, the runtime story is identical regardless of which authoring surface produced it.
@@ -87,7 +91,7 @@ That's the user's surface. Everything below explains what the framework does to 
 
 ## What "Supabase integration" actually means
 
-We deliver seven capabilities across five framework-primitive projects plus an integration project. Each capability has a canonical home in one of the constituent project specs.
+We deliver eight capabilities across six framework-primitive projects plus an integration project. Each capability has a canonical home in one of the constituent project specs.
 
 1. **Polymorphic IR + namespaces + within-contract cross-namespace FKs.** [target-extensible-ir](../target-extensible-ir/spec.md). Foundation for everything below — the target-only IR kind seam (RLS uses it), the namespace concept (cross-contract refs and policies need it), and the FK reference carrier (cross-contract refs extends it).
 
@@ -99,9 +103,11 @@ We deliver seven capabilities across five framework-primitive projects plus an i
 
 5. **Runtime target-layer class.** [runtime-target-layer](../runtime-target-layer/spec.md). Export `SqlRuntime`; introduce `class PostgresRuntime extends SqlRuntime` (the missing target layer); add `protected withRawConnection(callback)` below the user middleware chain. The substrate Supabase's runtime uses to enforce role binding structurally rather than procedurally.
 
-6. **The `@prisma-next/extension-supabase` package.** [extension-supabase](../extension-supabase/spec.md). Subpath-only entrypoints: `/pack` (value-imported `ExtensionPack`), `/contract` (hand-authored typed handles — `AuthUser`, `roles`, etc.), `/runtime` (default-export `supabase({...})` factory returning a `SupabaseRuntime` that extends `PostgresRuntime`). The shipped `contract.json` declares `auth`, `storage`, `realtime`, `extensions` schemas with `defaultControl: 'external'`. The runtime exposes `asUser` / `asAnon` / `asServiceRole` role helpers; each issues `SET LOCAL role` / `SET LOCAL request.jwt.claims` below the user-middleware chain (structurally non-bypassable).
+6. **Namespace-aware query surface.** [explicit-namespace-dsl](../explicit-namespace-dsl/spec.md). The explicit `db.sql.<ns>.<table>` / `db.<ns>.<Model>` accessors that let a query reach a table in a *named* namespace. **This is a launch blocker, not a fast-follow.** A Supabase app queries `auth.*` and `public.*` tables that collide by bare name — both schemas ship a `users` table — and the default-namespace fallback (from the runtime-qualification slice, TML-2605) resolves only a single namespace by bare name. Without explicit qualification there is no way to address `auth.users`: every namespace collapses into one flat space, which is the user-facing fudge we refuse to ship. The surface is purely additive on the fallback (default-namespace consumers see zero churn) and depends only on TML-2605, so it runs in parallel with the other primitives rather than gating the IR project's close-out.
 
-7. **Working example app.** [extension-supabase M3](../extension-supabase/plan.md). A committed, runnable example app at `packages/3-extensions/supabase/examples/basic/` that exercises cross-contract FK references to `AuthUser`, RLS policies, the `SupabaseRuntime` factory, and all three role helpers (`asUser` / `asAnon` / `asServiceRole`). **Must-have for launch** — the proof that the integration works end-to-end and the primary onboarding artefact.
+7. **The `@prisma-next/extension-supabase` package.** [extension-supabase](../extension-supabase/spec.md). Subpath-only entrypoints: `/pack` (value-imported `ExtensionPack`), `/contract` (hand-authored typed handles — `AuthUser`, `roles`, etc.), `/runtime` (default-export `supabase({...})` factory returning a `SupabaseRuntime` that extends `PostgresRuntime`). The shipped `contract.json` declares `auth`, `storage`, `realtime`, `extensions` schemas with `defaultControl: 'external'`. The runtime exposes `asUser` / `asAnon` / `asServiceRole` role helpers; each issues `SET LOCAL role` / `SET LOCAL request.jwt.claims` below the user-middleware chain (structurally non-bypassable).
+
+8. **Working example app.** [extension-supabase M3](../extension-supabase/plan.md). A committed, runnable example app at `packages/3-extensions/supabase/examples/basic/` that exercises cross-contract FK references to `AuthUser`, RLS policies, the `SupabaseRuntime` factory, and all three role helpers (`asUser` / `asAnon` / `asServiceRole`). **Must-have for launch** — the proof that the integration works end-to-end and the primary onboarding artefact.
 
 ### Stretch goals
 
@@ -147,7 +153,7 @@ Three things show up in multiple component docs and are worth surfacing here:
 
 - **Layering.** Control policy is a *framework-domain* concept (every target needs it) and lives in its own [`projects/control-policy/`](../control-policy/) project. Cross-contract refs are a *framework-domain* concept (the carrier shape is target-agnostic). RLS is a *Postgres-target-only* concept (the IR kind doesn't exist outside Postgres, and the authoring DSL only surfaces it under a Postgres-conditioned path).
 - **Authoring vs. IR vs. runtime.** Each capability has three faces: how the user writes it (authoring DSL), how it's represented in the canonicalised contract (IR), and how the runtime/planner/verifier act on it. The component docs walk those three layers in order.
-- **TML-2459 carries the IR machinery; control-policy adds the dispatch primitive; the three middle-tier projects add new IR *kinds* and runtime infrastructure.** None of the constituent work requires inventing new framework infrastructure beyond what TML-2459 (3-layer IR + SPIs) and the control-policy project (per-node `control` field + verifier/planner dispatch) provide. Cross-contract-refs, postgres-rls, and runtime-target-layer compose the established shape into Supabase-shaped capabilities; extension-supabase packages them into a deliverable.
+- **TML-2459 carries the IR machinery; control-policy adds the dispatch primitive; the three middle-tier projects add new IR *kinds* and runtime infrastructure.** None of the constituent work requires inventing new framework infrastructure beyond what TML-2459 (3-layer IR + SPIs) and the control-policy project (per-node `control` field + verifier/planner dispatch) provide. Cross-contract-refs, postgres-rls, and runtime-target-layer compose the established shape into Supabase-shaped capabilities; explicit-namespace-dsl adds the namespace-aware query surface on top of the runtime-qualification path; extension-supabase packages them all into a deliverable.
 
 ## Open questions (project-level)
 

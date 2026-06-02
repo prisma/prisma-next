@@ -52,12 +52,12 @@ function existingSchemasFromSchema(schema: SqlSchemaIR): readonly string[] {
  *
  * A namespace's live container is the schema returned by its
  * polymorphic `ddlSchemaName(storage)` method — named schemas resolve
- * to their own id, the unbound singleton projects to `public` (sibling
- * present) or the framework sentinel (sibling absent). Issues are
- * emitted only when the resolved name is a real, creatable schema
- * (not the unbound sentinel) and is missing from the introspected
- * list. `public` is suppressed implicitly because the introspection
- * (or its sensible default) always carries it.
+ * to their own id; the unbound singleton returns `UNBOUND_NAMESPACE_ID`
+ * and is skipped explicitly (late-bound namespaces have no fixed DDL
+ * schema). Issues are emitted only when the resolved name is a real,
+ * creatable schema (not the unbound sentinel) and is missing from the
+ * introspected list. `public` is suppressed implicitly because the
+ * introspection (or its sensible default) always carries it.
  *
  * Each emitted issue stamps `namespaceId` with the contract namespace
  * coordinate so the downstream `mapIssueToCall` re-resolves the DDL

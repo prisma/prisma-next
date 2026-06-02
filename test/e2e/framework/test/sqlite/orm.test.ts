@@ -171,7 +171,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
     });
   });
 
-  describe('includeMany', () => {
+  describe('include', () => {
     it('loads 1:N relation via json_group_array', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
         const users = await ormClient.User.where((u) => u.id.eq(1))

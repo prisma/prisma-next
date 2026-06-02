@@ -1,4 +1,4 @@
 {
-  "hash": "sha256:c0992219c5649447a60c6672771d1cea94d9a8fed488c14b7f773118a900a488",
+  "hash": "sha256:abd6046b098e9dd1d014eb490ca1edfa884631957a4727c76e6d4d1f4e3828be",
   "invariants": ["feature-flags:create-feature_flag-v1"]
 }

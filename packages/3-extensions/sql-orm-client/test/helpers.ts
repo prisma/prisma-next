@@ -1,9 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import {
-  contractModels,
-  type Contract as FrameworkContract,
-  UNBOUND_DOMAIN_NAMESPACE_ID,
-} from '@prisma-next/contract/types';
+import { contractModels, type Contract as FrameworkContract } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type {
   CodecDescriptor,
@@ -63,8 +59,7 @@ export function withPatchedDomainModels<T extends FrameworkContract<SqlStorage>>
   contract: T,
   patch: (models: Record<string, unknown>) => Record<string, unknown>,
 ): T {
-  const namespaceId = UNBOUND_DOMAIN_NAMESPACE_ID;
-  const namespace = contract.domain.namespaces[namespaceId]!;
+  const [namespaceId, namespace] = Object.entries(contract.domain.namespaces)[0]!;
   const models = contractModels(contract);
   return {
     ...contract,
@@ -95,7 +90,9 @@ type MutableDomainModels = Record<
 function unboundDomainModels(raw: {
   domain: { namespaces: Record<string, { models: MutableDomainModels }> };
 }): MutableDomainModels {
-  return raw.domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models;
+  const ns = Object.values(raw.domain.namespaces)[0];
+  if (!ns) throw new Error('no domain namespace found');
+  return ns.models;
 }
 
 const pgVectorCodecStubExtension: SqlRuntimeExtensionDescriptor<'postgres'> = (() => {
@@ -265,17 +262,24 @@ export function buildStiPolyContract(): TestContract {
     base: 'User',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.kind = {
+  const usersStorageTable = Object.values(
+    raw.storage.namespaces as Record<
+      string,
+      { tables: Record<string, { columns: Record<string, unknown> }> }
+    >,
+  ).find((ns) => ns.tables['users'])?.tables['users'];
+  if (!usersStorageTable) throw new Error('users table not found in any storage namespace');
+  usersStorageTable.columns['kind'] = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.role = {
+  usersStorageTable.columns['role'] = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.plan = {
+  usersStorageTable.columns['plan'] = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,

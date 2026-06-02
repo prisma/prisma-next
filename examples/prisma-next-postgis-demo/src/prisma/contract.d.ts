@@ -36,7 +36,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:7a019a635e7114a712b928ce3a4d56e819863adbf5b17f8f5986d3d1a09e2fc3'>;
+  StorageHashBase<'sha256:c77eb5b7cb1c7637b6d0998810e73c1ffee7baab0b1d9f0ed048e3d4fd119ebd'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:c4e18220ce0fd45634a6b4bb622451893186000ee5c7dd1bdb3d0567c7047bd9'>;
 export type ProfileHash =
@@ -95,8 +95,8 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
+        readonly public: {
+          readonly id: 'public';
           readonly kind: 'sql-namespace';
           readonly tables: {
             readonly cafe: {
@@ -282,16 +282,16 @@ type ContractBase = Omit<
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
-    readonly cafe: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Cafe' };
-    readonly route: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Route' };
+    readonly cafe: { readonly namespace: 'public' & NamespaceId; readonly model: 'Cafe' };
+    readonly route: { readonly namespace: 'public' & NamespaceId; readonly model: 'Route' };
     readonly neighborhood: {
-      readonly namespace: '__unbound__' & NamespaceId;
+      readonly namespace: 'public' & NamespaceId;
       readonly model: 'Neighborhood';
     };
   };
   readonly domain: {
     readonly namespaces: {
-      readonly __unbound__: {
+      readonly public: {
         readonly models: {
           readonly Cafe: {
             readonly fields: {

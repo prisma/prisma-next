@@ -27,7 +27,7 @@ const tagId = (s: string): TagId => s as unknown as TagId;
 function buildTagWithUpdatedAtContract(): TestContract {
   const contract = structuredClone(withReturningCapability(getTestContract()));
 
-  const tagModel = contract.domain.namespaces['__unbound__']!.models['Tag'] as
+  const tagModel = contract.domain.namespaces['public']!.models['Tag'] as
     | Record<string, unknown>
     | undefined;
   if (!tagModel) {

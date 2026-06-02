@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/mongo-contract-psl",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -15,31 +15,42 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@prisma-next/config": "workspace:0.11.0",
-    "@prisma-next/contract": "workspace:0.11.0",
-    "@prisma-next/framework-components": "workspace:0.11.0",
-    "@prisma-next/mongo-contract": "workspace:0.11.0",
-    "@prisma-next/psl-parser": "workspace:0.11.0",
-    "@prisma-next/utils": "workspace:0.11.0",
+    "@prisma-next/config": "workspace:0.12.0",
+    "@prisma-next/contract": "workspace:0.12.0",
+    "@prisma-next/framework-components": "workspace:0.12.0",
+    "@prisma-next/mongo-contract": "workspace:0.12.0",
+    "@prisma-next/psl-parser": "workspace:0.12.0",
+    "@prisma-next/utils": "workspace:0.12.0",
     "pathe": "^2.0.3"
   },
   "devDependencies": {
-    "@prisma-next/tsconfig": "workspace:0.11.0",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "files": [
     "dist",
     "src"
   ],
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
     "./provider": "./dist/exports/provider.mjs",
     "./package.json": "./package.json"
   },
-  "types": "./dist/index.d.mts",
+  "engines": {
+    "node": ">=24"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",

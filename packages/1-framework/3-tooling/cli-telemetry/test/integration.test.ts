@@ -255,7 +255,7 @@ describe('cli-telemetry end-to-end via telemetry backend', () => {
   });
 
   it('populates the agent field for Gemini CLI sessions', async () => {
-    await spawnSenderDirect(buildPayload(), { ...process.env, GEMINI_CLI: '1' });
+    await spawnSenderDirect(buildPayload(), { ...envWithoutAgentMarkers(), GEMINI_CLI: '1' });
     const [row] = await harness.awaitRows(1);
     expect(row?.agent).toBe('Gemini CLI');
   });

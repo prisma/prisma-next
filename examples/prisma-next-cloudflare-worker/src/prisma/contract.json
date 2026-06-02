@@ -6,25 +6,25 @@
   "roots": {
     "post": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "task": {
       "model": "Task",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Bug": {
             "base": {
               "model": "Task",
-              "namespace": "__unbound__"
+              "namespace": "public"
             },
             "fields": {
               "severity": {
@@ -58,7 +58,7 @@
           "Feature": {
             "base": {
               "model": "Task",
-              "namespace": "__unbound__"
+              "namespace": "public"
             },
             "fields": {
               "priority": {
@@ -136,7 +136,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -229,7 +229,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -329,7 +329,7 @@
                 },
                 "to": {
                   "model": "Post",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               },
               "tasks": {
@@ -344,7 +344,7 @@
                 },
                 "to": {
                   "model": "Task",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -412,9 +412,21 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "enum": {
+          "user_type": {
+            "codecId": "pg/enum@1",
+            "kind": "postgres-enum",
+            "name": "user_type",
+            "nativeType": "user_type",
+            "values": [
+              "admin",
+              "user"
+            ]
+          }
+        },
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "bug": {
             "columns": {
@@ -488,14 +500,14 @@
                   "columns": [
                     "userId"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "post"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "user"
                 }
               }
@@ -565,14 +577,14 @@
                   "columns": [
                     "userId"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "task"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "user"
                 }
               }
@@ -636,26 +648,9 @@
             "uniques": []
           }
         }
-      },
-      "public": {
-        "enum": {
-          "user_type": {
-            "codecId": "pg/enum@1",
-            "kind": "postgres-enum",
-            "name": "user_type",
-            "nativeType": "user_type",
-            "values": [
-              "admin",
-              "user"
-            ]
-          }
-        },
-        "id": "public",
-        "kind": "postgres-schema",
-        "tables": {}
       }
     },
-    "storageHash": "sha256:9435b25ec7f0adfc63d97c4dbab15f2694f03a5e5a98803ced0741b5aea17fbb"
+    "storageHash": "sha256:4eef850b392aa931148a99c5c12aaf1f705205a36dcc514bc42b0677bb1bbc04"
   },
   "execution": {
     "executionHash": "sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e",

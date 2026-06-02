@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/utils",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -14,19 +14,24 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "devDependencies": {
-    "@prisma-next/tsconfig": "workspace:0.11.0",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "files": [
     "dist",
     "src"
   ],
-  "engines": {
-    "node": ">=20"
-  },
   "exports": {
     "./abortable": "./dist/abortable.mjs",
     "./array-equal": "./dist/array-equal.mjs",
@@ -40,6 +45,9 @@
     "./result": "./dist/result.mjs",
     "./simplify-deep": "./dist/simplify-deep.mjs",
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

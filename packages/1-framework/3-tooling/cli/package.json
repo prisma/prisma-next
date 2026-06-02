@@ -1,13 +1,12 @@
 {
   "name": "@prisma-next/cli",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
-  "files": [
-    "dist",
-    "src"
-  ],
+  "bin": {
+    "prisma-next": "./dist/cli.js"
+  },
   "scripts": {
     "build": "tsdown && node ./scripts/write-cli-js-compat.mjs",
     "test": "vitest run",
@@ -19,21 +18,18 @@
     "record": "tsx scripts/record.ts",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
-  "bin": {
-    "prisma-next": "./dist/cli.js"
-  },
   "dependencies": {
     "@clack/prompts": "^1.4.0",
     "@dagrejs/dagre": "^3.0.0",
-    "@prisma-next/config": "workspace:0.11.0",
-    "@prisma-next/contract": "workspace:0.11.0",
-    "@prisma-next/emitter": "workspace:0.11.0",
-    "@prisma-next/errors": "workspace:0.11.0",
-    "@prisma-next/framework-components": "workspace:0.11.0",
-    "@prisma-next/migration-tools": "workspace:0.11.0",
-    "@prisma-next/psl-printer": "workspace:0.11.0",
-    "@prisma-next/cli-telemetry": "workspace:0.11.0",
-    "@prisma-next/utils": "workspace:0.11.0",
+    "@prisma-next/config": "workspace:0.12.0",
+    "@prisma-next/contract": "workspace:0.12.0",
+    "@prisma-next/emitter": "workspace:0.12.0",
+    "@prisma-next/errors": "workspace:0.12.0",
+    "@prisma-next/framework-components": "workspace:0.12.0",
+    "@prisma-next/migration-tools": "workspace:0.12.0",
+    "@prisma-next/psl-printer": "workspace:0.12.0",
+    "@prisma-next/cli-telemetry": "workspace:0.12.0",
+    "@prisma-next/utils": "workspace:0.12.0",
     "arktype": "^2.2.0",
     "c12": "^3.3.4",
     "ci-info": "^4.3.1",
@@ -50,19 +46,31 @@
     "wrap-ansi": "^10.0.0"
   },
   "devDependencies": {
-    "@prisma-next/sql-contract": "workspace:0.11.0",
-    "@prisma-next/sql-contract-emitter": "workspace:0.11.0",
-    "@prisma-next/sql-contract-ts": "workspace:0.11.0",
-    "@prisma-next/sql-operations": "workspace:0.11.0",
-    "@prisma-next/sql-runtime": "workspace:0.11.0",
-    "@prisma-next/test-utils": "workspace:0.11.0",
-    "@prisma-next/tsconfig": "workspace:0.11.0",
-    "@prisma-next/tsdown": "workspace:0.11.0",
+    "@prisma-next/sql-contract": "workspace:0.12.0",
+    "@prisma-next/sql-contract-emitter": "workspace:0.12.0",
+    "@prisma-next/sql-contract-ts": "workspace:0.12.0",
+    "@prisma-next/sql-operations": "workspace:0.12.0",
+    "@prisma-next/sql-runtime": "workspace:0.12.0",
+    "@prisma-next/test-utils": "workspace:0.12.0",
+    "@prisma-next/tsconfig": "workspace:0.12.0",
+    "@prisma-next/tsdown": "workspace:0.12.0",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "exports": {
     ".": {
       "types": "./dist/exports/index.d.mts",
@@ -156,6 +164,9 @@
       "types": "./dist/exports/control-api.d.mts",
       "import": "./dist/exports/control-api.mjs"
     }
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

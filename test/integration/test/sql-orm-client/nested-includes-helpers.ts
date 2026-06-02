@@ -19,9 +19,10 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
 /**
  * Build a `Collection` whose contract carries the given capability
  * overrides. The runtime itself still uses the default postgres test
- * contract; only `dispatchWithIncludeStrategy` reads from the override,
- * so this is the right knob for exercising both single-query dispatch
- * strategies (lateral / correlated) against the same real database.
+ * contract; the override only changes which capability flags the
+ * contract advertises. Includes always lower to correlated subqueries
+ * regardless of the `lateral` flag, so this knob exists to prove the
+ * flag is inert for include codegen against the same real database.
  */
 export function collectionWithCapabilities<
   ModelName extends keyof ContractModelsMap<TestContract> & string,
@@ -36,12 +37,12 @@ export function collectionWithCapabilities<
   return new Collection({ runtime, context }, modelName as ModelName & string);
 }
 
-// Capability constants used across the strategy-variant suites.
-// Strategy selection reads from `contract.capabilities[targetFamily]`
-// ('sql') and `contract.capabilities[target]` ('postgres'). The shapes
-// below match what `selectIncludeStrategy` looks up — no more, no less,
-// so test intent is unambiguous and a missing capability cannot leak
-// through.
+// Capability fixtures for the include suites. Include codegen always
+// emits correlated subqueries; the `lateral` flag is inert. These two
+// shapes — one advertising `lateral` + `jsonAgg`, one advertising only
+// `jsonAgg` — let the suites assert that both resolve includes in a
+// single correlated SQL execution, and that the lateral flag never
+// produces a lateral join for an include.
 export const LATERAL_CAPABILITIES = {
   postgres: { lateral: true, jsonAgg: true },
 } as const;

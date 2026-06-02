@@ -16,10 +16,10 @@ import {
 } from '../../../../src/commands/init/templates/tsconfig';
 
 // ---------------------------------------------------------------------------
-// FR2.2 — tsconfig.json compiler options for a fresh project
+// tsconfig.json compiler options emitted for a fresh project
 // ---------------------------------------------------------------------------
 
-describe('defaultTsConfig (FR2.2)', () => {
+describe('defaultTsConfig', () => {
   it('emits all required compiler options', () => {
     const parsed = JSON.parse(defaultTsConfig()) as {
       compilerOptions: Record<string, unknown>;
@@ -38,7 +38,7 @@ describe('defaultTsConfig (FR2.2)', () => {
   });
 });
 
-describe('mergeTsConfig (FR2.2 / FR9.3)', () => {
+describe('mergeTsConfig', () => {
   it('adds the required compiler options to a minimal user config', () => {
     const existing = JSON.stringify({ compilerOptions: { strict: true } });
     const merged = JSON.parse(mergeTsConfig(existing)) as {
@@ -82,14 +82,14 @@ describe('mergeTsConfig (FR2.2 / FR9.3)', () => {
     expect(merged.compilerOptions.types).toEqual(['node']);
   });
 
-  it('is idempotent on a previously-merged config (FR9.3)', () => {
+  it('is idempotent on a previously-merged config', () => {
     const first = mergeTsConfig(JSON.stringify({ compilerOptions: { strict: true } }));
     const second = mergeTsConfig(first);
     expect(JSON.parse(second)).toEqual(JSON.parse(first));
   });
 });
 
-describe('mergeTsConfig JSONC support (FR6.1)', () => {
+describe('mergeTsConfig JSONC support', () => {
   it('parses comments and trailing commas', () => {
     const jsonc = [
       '{',
@@ -122,7 +122,7 @@ describe('mergeTsConfig JSONC support (FR6.1)', () => {
     expect(merged).toContain('// important: do not delete this comment');
   });
 
-  it('throws TsConfigParseError on bare unparseable input (FR6.1 error case)', () => {
+  it('throws TsConfigParseError on bare unparseable input', () => {
     expect(() => mergeTsConfig('{ "compilerOptions": ')).toThrow(TsConfigParseError);
   });
 
@@ -132,7 +132,7 @@ describe('mergeTsConfig JSONC support (FR6.1)', () => {
   });
 });
 
-describe('parseTsConfigText (FR6.1)', () => {
+describe('parseTsConfigText', () => {
   it('returns the parsed object for a valid JSONC tsconfig', () => {
     const { config } = parseTsConfigText('{ "compilerOptions": { "strict": true /* ok */ } }');
     expect(config).toEqual({ compilerOptions: { strict: true } });
@@ -144,10 +144,10 @@ describe('parseTsConfigText (FR6.1)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// FR3.1 — .env.example template per target
+// .env.example template per target
 // ---------------------------------------------------------------------------
 
-describe('envExampleContent (FR3.1)', () => {
+describe('envExampleContent', () => {
   it('writes a postgresql:// placeholder for the postgres target', () => {
     const md = envExampleContent('postgres');
     expect(md).toContain('DATABASE_URL=');
@@ -166,7 +166,7 @@ describe('envExampleContent (FR3.1)', () => {
     expect(md).toMatch(/standalone local mongod/i);
   });
 
-  it('documents the minimum supported server version (FR8.2)', () => {
+  it('documents the minimum supported server version', () => {
     expect(envExampleContent('postgres')).toMatch(/Requires PostgreSQL >= \d/);
     expect(envExampleContent('mongo')).toMatch(/Requires MongoDB >= \d/);
   });
@@ -176,7 +176,7 @@ describe('envExampleContent (FR3.1)', () => {
   });
 });
 
-describe('envFileContent (FR3.2)', () => {
+describe('envFileContent', () => {
   it('omits the example-only "Copy this file to `.env`…" intro', () => {
     // The real `.env` is the destination of that copy, so the line
     // would lie if it ended up in the scaffolded `.env` itself.
@@ -204,16 +204,16 @@ describe('envFileContent (FR3.2)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// FR8.1 — minimum server version is declared by the target package and
-// mirrored by the CLI's `MIN_SERVER_VERSION` constant. The constant is
+// The CLI's MIN_SERVER_VERSION constant mirrors the target packages'
+// package.json#prismaNext.minServerVersion fields. The constant is
 // checked into source so we don't pay a workspace-fs read at every CLI
-// startup, but a drift between the two values would silently mislead
-// every freshly-initialised user about which server versions Prisma
-// Next actually supports. This test fails loudly when the two diverge,
-// flagging the bump as a coordinated change.
+// startup, but drift between the two values would silently mislead every
+// freshly-initialised user about which server versions Prisma Next
+// actually supports. This test fails loudly when the two diverge,
+// requiring the bump to be a coordinated change.
 // ---------------------------------------------------------------------------
 
-describe('MIN_SERVER_VERSION mirrors target packages (FR8.1)', () => {
+describe('MIN_SERVER_VERSION mirrors target packages', () => {
   // Resolved relative to this test file so the assertion does not
   // depend on the test runner's `cwd`.
   const REPO_ROOT = join(import.meta.dirname, '../../../../../../../..');
@@ -230,7 +230,7 @@ describe('MIN_SERVER_VERSION mirrors target packages (FR8.1)', () => {
     if (typeof value !== 'string') {
       throw new Error(
         `${packageJsonPath} is missing a string "prismaNext.minServerVersion" field. ` +
-          'FR8.1 requires every target package to declare its minimum server version.',
+          'Every target package must declare its minimum server version.',
       );
     }
     return value;

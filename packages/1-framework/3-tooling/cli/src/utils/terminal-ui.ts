@@ -71,8 +71,8 @@ export class TerminalUI {
   }
 
   /**
-   * Resolve graph glyph mode for `migration list --graph`. `--ascii` forces
-   * ASCII; otherwise delegates to the pure {@link detectGlyphMode} helper.
+   * Resolve glyph mode for migration list/tree output. `--ascii` forces ASCII;
+   * otherwise delegates to the pure {@link detectGlyphMode} helper.
    */
   resolveGlyphMode(forceAscii: boolean): GlyphMode {
     if (forceAscii) {

@@ -1,7 +1,7 @@
 import type { TargetId } from './code-templates';
 
 /**
- * The minimum supported server version for each target (FR8.1). The
+ * The minimum supported server version for each target. The
  * authoritative source of truth is each target package's
  * `package.json#prismaNext.minServerVersion` field — this module
  * mirrors those values and a workspace-level test asserts the two
@@ -9,13 +9,13 @@ import type { TargetId } from './code-templates';
  *
  * Bumping a value here in isolation is **not** safe: edit the
  * corresponding target package's `package.json` first, then mirror
- * here. The scaffold's `.env.example` (FR3.1, FR8.2) and the
- * "Requirements" section of `prisma-next.md` both read from this
- * constant, so a stale value lies to every freshly initialised user.
+ * here. The scaffold's `.env.example` and the "Requirements" section
+ * of `prisma-next.md` both read from this constant, so a stale value
+ * lies to every freshly initialised user.
  */
 export const MIN_SERVER_VERSION: Record<TargetId, string> = {
-  postgres: '14',
-  mongo: '6.0',
+  postgres: '17',
+  mongo: '8.0',
 };
 
 export const TARGET_LABEL: Record<TargetId, string> = {
@@ -41,7 +41,7 @@ function envPlaceholderBody(target: TargetId): string {
     lines.push('DATABASE_URL="postgresql://user:password@localhost:5432/mydb"');
   } else {
     lines.push(
-      '# Standalone local mongod / `docker run mongo:7` — no replica set required for first-run queries.',
+      '# Standalone local mongod / `docker run mongo:8` — no replica set required for first-run queries.',
     );
     lines.push(
       '# Transactions and change streams need a replica set; add ?replicaSet=... only after initiating one.',
@@ -54,7 +54,7 @@ function envPlaceholderBody(target: TargetId): string {
 }
 
 /**
- * Renders the `.env.example` content for a given target (FR3.1):
+ * Renders the `.env.example` content for a given target:
  *
  * - Carries a "Copy this file to `.env`…" intro that only makes sense
  *   for the example file (the real `.env` is the destination of that
@@ -63,8 +63,7 @@ function envPlaceholderBody(target: TargetId): string {
  *   shape (Postgres: standard `postgresql://`, Mongo: `mongodb://` plus
  *   a `mydb` database segment so the lazy facade has a `dbName`).
  * - Carries a `# Requires <db> >= <version>` comment so a fresh user
- *   knows the minimum supported server before they first try to
- *   connect (FR8.2).
+ *   knows the minimum supported server before they first try to connect.
  */
 export function envExampleContent(target: TargetId): string {
   const lines: string[] = [];
@@ -77,10 +76,10 @@ export function envExampleContent(target: TargetId): string {
 
 /**
  * Renders the initial `.env` content for `--write-env` / interactive
- * opt-in (FR3.2). Same placeholder body as `.env.example`, **without**
- * the example file's "Copy this file to `.env`…" intro: the real `.env`
- * is the destination of that copy, so the line would lie. Writing this
- * file is gitignored (FR3.3 ensures `.env` lands in `.gitignore`).
+ * opt-in. Same placeholder body as `.env.example`, **without** the
+ * example file's "Copy this file to `.env`…" intro: the real `.env` is
+ * the destination of that copy, so the line would lie. Writing this
+ * file is gitignored (`.env` lands in `.gitignore` during init).
  */
 export function envFileContent(target: TargetId): string {
   return envPlaceholderBody(target);

@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9435b25ec7f0adfc63d97c4dbab15f2694f03a5e5a98803ced0741b5aea17fbb'>;
+  StorageHashBase<'sha256:4eef850b392aa931148a99c5c12aaf1f705205a36dcc514bc42b0677bb1bbc04'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
 export type ProfileHash =
@@ -84,7 +84,7 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['pg/text@1']['output'];
     readonly displayName: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly kind: CodecTypes['pg/enum@1']['output'];
+    readonly kind: 'admin' | 'user';
     readonly address: AddressOutput | null;
   };
 };
@@ -132,8 +132,8 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
+        readonly public: {
+          readonly id: 'public';
           readonly kind: 'sql-namespace';
           readonly tables: {
             readonly bug: {
@@ -201,12 +201,12 @@ type ContractBase = Omit<
               foreignKeys: readonly [
                 {
                   readonly source: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
+                    readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'post';
                     readonly columns: readonly ['userId'];
                   };
                   readonly target: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
+                    readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'user';
                     readonly columns: readonly ['id'];
                   };
@@ -265,12 +265,12 @@ type ContractBase = Omit<
               foreignKeys: readonly [
                 {
                   readonly source: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
+                    readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'task';
                     readonly columns: readonly ['userId'];
                   };
                   readonly target: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
+                    readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'user';
                     readonly columns: readonly ['id'];
                   };
@@ -322,11 +322,6 @@ type ContractBase = Omit<
             };
           };
         };
-        readonly public: {
-          readonly id: 'public';
-          readonly kind: 'sql-namespace';
-          readonly tables: {};
-        };
       };
       readonly storageHash: StorageHash;
     },
@@ -350,7 +345,7 @@ type ContractBase = Omit<
             readonly stepsToRepro: { readonly column: 'stepsToRepro' };
           };
         };
-        readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+        readonly base: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
       };
       readonly Feature: {
         readonly fields: {
@@ -371,7 +366,7 @@ type ContractBase = Omit<
             readonly targetRelease: { readonly column: 'targetRelease' };
           };
         };
-        readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+        readonly base: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
       };
       readonly Post: {
         readonly fields: {
@@ -398,10 +393,7 @@ type ContractBase = Omit<
         };
         readonly relations: {
           readonly user: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'User';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
             readonly cardinality: 'N:1';
             readonly on: {
               readonly localFields: readonly ['userId'];
@@ -456,10 +448,7 @@ type ContractBase = Omit<
         };
         readonly relations: {
           readonly user: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'User';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
             readonly cardinality: 'N:1';
             readonly on: {
               readonly localFields: readonly ['userId'];
@@ -518,10 +507,7 @@ type ContractBase = Omit<
         };
         readonly relations: {
           readonly posts: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Post';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
             readonly cardinality: '1:N';
             readonly on: {
               readonly localFields: readonly ['id'];
@@ -529,10 +515,7 @@ type ContractBase = Omit<
             };
           };
           readonly tasks: {
-            readonly to: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Task';
-            };
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
             readonly cardinality: '1:N';
             readonly on: {
               readonly localFields: readonly ['id'];
@@ -559,13 +542,13 @@ type ContractBase = Omit<
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
-    readonly user: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
-    readonly post: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
-    readonly task: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+    readonly user: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+    readonly post: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
+    readonly task: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
   };
   readonly domain: {
     readonly namespaces: {
-      readonly __unbound__: {
+      readonly public: {
         readonly models: {
           readonly Bug: {
             readonly fields: {
@@ -586,10 +569,7 @@ type ContractBase = Omit<
                 readonly stepsToRepro: { readonly column: 'stepsToRepro' };
               };
             };
-            readonly base: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Task';
-            };
+            readonly base: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
           };
           readonly Feature: {
             readonly fields: {
@@ -610,10 +590,7 @@ type ContractBase = Omit<
                 readonly targetRelease: { readonly column: 'targetRelease' };
               };
             };
-            readonly base: {
-              readonly namespace: '__unbound__' & NamespaceId;
-              readonly model: 'Task';
-            };
+            readonly base: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
           };
           readonly Post: {
             readonly fields: {
@@ -640,10 +617,7 @@ type ContractBase = Omit<
             };
             readonly relations: {
               readonly user: {
-                readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'User';
-                };
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
                 readonly cardinality: 'N:1';
                 readonly on: {
                   readonly localFields: readonly ['userId'];
@@ -698,10 +672,7 @@ type ContractBase = Omit<
             };
             readonly relations: {
               readonly user: {
-                readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'User';
-                };
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
                 readonly cardinality: 'N:1';
                 readonly on: {
                   readonly localFields: readonly ['userId'];
@@ -760,10 +731,7 @@ type ContractBase = Omit<
             };
             readonly relations: {
               readonly posts: {
-                readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'Post';
-                };
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
                 readonly cardinality: '1:N';
                 readonly on: {
                   readonly localFields: readonly ['id'];
@@ -771,10 +739,7 @@ type ContractBase = Omit<
                 };
               };
               readonly tasks: {
-                readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'Task';
-                };
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
                 readonly cardinality: '1:N';
                 readonly on: {
                   readonly localFields: readonly ['id'];

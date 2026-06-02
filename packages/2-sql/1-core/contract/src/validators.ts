@@ -33,6 +33,7 @@ type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: s
 const literalKindSchema = type("'literal'");
 const functionKindSchema = type("'function'");
 const generatorKindSchema = type("'generator'");
+const ControlPolicySchema = type("'managed' | 'tolerated' | 'external' | 'observed'");
 const generatorIdSchema = type('string').narrow((value, ctx) => {
   return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value) ? true : ctx.mustBe('a flat generator id');
 });
@@ -84,6 +85,7 @@ const StorageColumnSchema = type({
   'typeParams?': 'Record<string, unknown>',
   'typeRef?': 'string',
   'default?': ColumnDefaultSchema,
+  'control?': ControlPolicySchema,
 }).narrow((col, ctx) => {
   if (col.typeParams !== undefined && col.typeRef !== undefined) {
     return ctx.mustBe('a column with either typeParams or typeRef, not both');
@@ -116,6 +118,7 @@ const PostgresEnumTypeSchema = type({
   'name?': 'string',
   'nativeType?': 'string',
   values: type.string.array().readonly(),
+  'control?': ControlPolicySchema,
 });
 
 /** Document-scoped `storage.types`: codec triples only. */
@@ -166,6 +169,7 @@ const StorageTableSchema = type({
   uniques: UniqueConstraintSchema.array().readonly(),
   indexes: IndexSchema.array().readonly(),
   foreignKeys: ForeignKeySchema.array().readonly(),
+  'control?': ControlPolicySchema,
 });
 
 /**
@@ -417,6 +421,7 @@ export function createSqlContractSchema(
     'capabilities?': 'Record<string, Record<string, boolean>>',
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': ContractMetaSchema,
+    'defaultControl?': ControlPolicySchema,
     'roots?': type({ '[string]': CrossReferenceSchema }),
     domain: type({
       namespaces: type({
@@ -461,11 +466,11 @@ export function validateStorage(value: unknown): SqlStorage {
     'arktype validated the JSON envelope but its output type is unknown (ColumnDefault carries runtime-only bigint|Date); bridge to the input shape'
   >(result);
   const namespaces = buildSqlNamespaceMap(validated.namespaces ?? {});
-  // The `__unbound__` brand is made true at construction: if the validated
-  // namespaces omit the late-bound slot (e.g. a contract declaring only named
-  // namespaces), inject the family unbound singleton rather than asserting a
-  // shape that isn't there. Reconstructing the literal lets the branded
-  // `SqlStorageInput['namespaces']` hold with no cast.
+  // Compatibility shim: inject the empty unbound singleton when absent so that
+  // production code paths which address __unbound__ for table metadata have a
+  // slot to read or write into. The `SqlStorageInput['namespaces']` type no
+  // longer requires __unbound__, so this is a runtime convenience, not a type
+  // invariant.
   const unbound = namespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
   return new SqlStorage({
     storageHash: validated.storageHash,

@@ -6,28 +6,28 @@
   "roots": {
     "articles": {
       "model": "Article",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "comments": {
       "model": "Comment",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "posts": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "profiles": {
       "model": "Profile",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "users": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Article": {
             "fields": {
@@ -156,7 +156,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               },
               "comments": {
@@ -171,7 +171,7 @@
                 },
                 "to": {
                   "model": "Comment",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -280,7 +280,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               },
               "invitedUsers": {
@@ -295,7 +295,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               },
               "posts": {
@@ -310,7 +310,7 @@
                 },
                 "to": {
                   "model": "Post",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               },
               "profile": {
@@ -325,7 +325,7 @@
                 },
                 "to": {
                   "model": "Profile",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -353,9 +353,9 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
         "tables": {
           "articles": {
             "columns": {
@@ -511,7 +511,7 @@
         }
       }
     },
-    "storageHash": "sha256:573cf58f9e45190743d645fcb2e68804091456ce8f8eb923f27d449cab4fcbfd"
+    "storageHash": "sha256:44ea8be13beffe9e809eddd97444523af5d42e861ac8a40b4ecffee6b115c212"
   },
   "execution": {
     "executionHash": "sha256:f044f000ac77f18b44684c98aaf941827c8ad714912430a4526a16bd88e955e7",
