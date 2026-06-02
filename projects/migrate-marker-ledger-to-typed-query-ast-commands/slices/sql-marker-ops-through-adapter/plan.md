@@ -31,7 +31,8 @@ These are documented degrees-of-freedom from the slice/project spec; pinned here
 - **Builds on:** D1's `updateMarker`.
 - **Hands to:** the converged merge policy that the cut-over (D4) routes all advance call sites onto.
 - **Focus:** merge policy on the SPI method only. Operator-confirmed behaviour change; surface it in the slice's PR description.
-- **Mechanism:** compute the union+dedupe in the adapter (TS), uniform across dialects — this is precisely why SQLite (JSON-as-`TEXT`, no SQL array ops) can stop overwriting. The implementer wires where the *current* invariant set comes from (the runner already reads the marker pre-advance under the txn+lock; pass it in vs. re-read inside `updateMarker`) and surfaces if that's a non-trivial fork.
+- **Mechanism:** compute the union+dedupe in the adapter (TS), uniform across dialects — this is precisely why SQLite (JSON-as-`TEXT`, no SQL array ops) can stop overwriting.
+- **Current-invariants source — DECIDED (D2 R1 fork): read internally (Option B).** `updateMarker` reads the current marker under the existing txn+advisory lock (reusing the `readMarker` SPI path D3 consolidates), merges in TS, writes back. **Rationale:** keeps the SQL `updateMarker` signature byte-identical to Mongo's (preserves the "symmetric SPI shape" project-DoD item + slice DC-4, verified PASS in D1) and hides the dialect's merge mechanism behind a uniform interface, as the adapter pattern intends. The rejected Option A (thread current invariants in as a param) leaks the storage difference into the signature. The extra read is one `SELECT` during a migration advance — negligible; reusing `readMarker` means no new decode surface.
 
 ### D3 — Read + parser consolidation
 - **Outcome:** the runtime reader, the family `readMarker`, and the SQLite runner's private read collapse into **one** SPI read; the two `parseContractMarkerRow` copies become one. `MarkerReadResult` `no-table`/`absent`/`present` semantics unchanged.
