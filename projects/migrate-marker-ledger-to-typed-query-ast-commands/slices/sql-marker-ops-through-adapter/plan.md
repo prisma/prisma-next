@@ -8,16 +8,23 @@ Refined at pickup (2026-06-02), after `ddl-in-query-ast` (TML-2761, PR #672) mer
 
 - **OQ1 — Upsert.** Collapse the marker insert/update branching to a single `INSERT … ON CONFLICT (space) DO UPDATE SET …` on **both** Postgres and SQLite (both support UPSERT). No capability gate needed for these two targets; if a future target lacks UPSERT, gate then.
 - **OQ2 — "Single SPI" altitude.** Keep the SPI **per-family** (`SqlControlAdapter`). Do **not** hoist a shared cross-family interface unless it falls out for free; the symmetry requirement (matching `MongoControlAdapter`'s method shape) is satisfied by parallel per-family interfaces, not a shared base.
+- **OQ3 (project-level) — contract-free DML builder is D1 work.** Slice 1 shipped only the contract-free *DDL* constructors (`col`/`lit`/`fn`/`createTable`/`createSchema`). The contract-free *DML* builder (insert / upsert / update covering exactly the marker/ledger needs) lands in **D1** as enabling work — it is a Project-DoD item, not scope expansion.
+- **`updated_at` clock source — preserve DB-side time.** The marker/ledger writes keep emitting the database-side time function (`now()` / `datetime('now')`), expressed as a typed value expression (`RawExpr`), **not** an app-server `Date` param. Switching the clock source would be a wire-semantics change the project spec fences off. (Decided at D1 R1 over the implementer's "mirror Mongo `new Date()`" instinct.)
 
-These are documented degrees-of-freedom from the slice spec; pinned here so no dispatch assumes them silently.
+These are documented degrees-of-freedom from the slice/project spec; pinned here so no dispatch assumes them silently.
 
 ## Dispatches (deliver in order)
 
-### D1 — `SqlControlAdapter` marker/ledger **write SPI**
-- **Outcome:** `SqlControlAdapter` exposes `initMarker` / `updateMarker` / `writeLedgerEntry` (symmetric with `MongoControlAdapter`), each building query-AST DML via the slice-1 contract-free constructors and lowering through `adapter.lower()` → driver. Marker DML value codecs (`meta` JSON, `invariants` array, `updated_at` timestamp) attached explicitly at the value site (target-specific). New methods are wired but old raw-string write builders may still exist (cut-over is D4).
-- **Builds on:** slice 1's contract-free constructors + `adapter.lower()` path (bootstrap DDL already routes through it).
-- **Hands to:** the write-SPI surface that D2 (merge policy on `updateMarker`) and D4 (call-site cut-over) consume.
-- **Focus:** the write methods + value-codec attachment, proven by unit tests that the lowered SQL is correct on both dialects. Do **not** yet delete the old builders or migrate their call sites (D4). `INSERT … ON CONFLICT` upsert shape lands here for `initMarker`/`updateMarker` per OQ1.
+### D1 — enabling DML surface + `SqlControlAdapter` marker/ledger **write SPI**
+- **Outcome:** `SqlControlAdapter` exposes `initMarker` / `updateMarker` / `writeLedgerEntry` (symmetric with `MongoControlAdapter`), each building query-AST DML and lowering through `adapter.lower()` → driver. Marker DML value codecs (`meta`/`contract_json` JSON, `invariants` array, `updated_at` timestamp) attached explicitly at the value site (target-specific). New methods are wired but old raw-string write builders may still exist (cut-over is D4).
+- **Enabling surface (resized at D1 R1 — see `reviews/code-review.md § D1 R1`):** D1 also builds the surfaces this requires that slice 1 didn't ship:
+  - **Contract-free DML builder** (insert / upsert / update for the marker/ledger needs), beside the AST (OQ3).
+  - **`TableSource.schema?`** on the core relational-core AST + both renderers (PG qualifies `schema.name`; SQLite asserts schema absent) — to express fixed control-plane tables (`prisma_contract.marker`) contract-free.
+  - **Postgres `text[]` array codec** for `invariants`.
+  - **`updated_at`** stays DB-side time via `RawExpr` (no app-side `Date`).
+- **Builds on:** slice 1's contract-free DDL constructors + `adapter.lower()` path (bootstrap DDL already routes through it).
+- **Hands to:** the write-SPI surface that D2 (merge policy on `updateMarker`) and D4 (call-site cut-over) consume; the contract-free DML builder + `TableSource.schema` that later dispatches reuse.
+- **Focus:** enabling surface + the three write methods + value-codec attachment, proven by unit tests pinning the lowered SQL on both dialects. Do **not** delete the old builders or migrate their call sites (D4). `INSERT … ON CONFLICT (space) DO UPDATE` upsert shape lands here per OQ1. Suggested 2-commit split: (1) enabling AST/builder/codec; (2) SQL write SPI + tests.
 
 ### D2 — Invariant-merge convergence
 - **Outcome:** `updateMarker` computes the unioned, deduped invariant set and emits a plain parameterized `UPDATE` (Postgres keeps merge-dedupe; **SQLite stops overwriting** — both accumulate-dedupe). Runs under the existing migration txn + advisory lock (no new locking). A test pins accumulate-dedupe for **both** Postgres and SQLite. The PR body states the observable SQLite behaviour change.
