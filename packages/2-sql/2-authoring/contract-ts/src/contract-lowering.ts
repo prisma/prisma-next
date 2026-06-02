@@ -614,6 +614,7 @@ function resolveModelNode(
     ...(indexes.length > 0 ? { indexes } : {}),
     ...(foreignKeys.length > 0 ? { foreignKeys } : {}),
     ...(relations.length > 0 ? { relations } : {}),
+    ...ifDefined('control', spec.sqlSpec?.control),
   };
 }
 
@@ -707,6 +708,7 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
 
   return {
     target: definition.target,
+    ...ifDefined('defaultControl', definition.defaultControl),
     ...(definition.extensionPacks ? { extensionPacks: definition.extensionPacks } : {}),
     ...(definition.storageHash ? { storageHash: definition.storageHash } : {}),
     ...(definition.foreignKeyDefaults ? { foreignKeyDefaults: definition.foreignKeyDefaults } : {}),
