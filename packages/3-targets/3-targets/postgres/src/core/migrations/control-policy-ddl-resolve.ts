@@ -8,7 +8,6 @@ import {
 } from '@prisma-next/sql-contract/types';
 import { isPostgresSchema } from '../postgres-schema';
 import type { PostgresOpFactoryCall } from './op-factory-call';
-import { resolveDdlSchemaForNamespace } from './planner-strategies';
 
 function tableAt(
   storage: SqlStorage,
@@ -19,6 +18,18 @@ function tableAt(
   return raw instanceof StorageTable ? raw : undefined;
 }
 
+/**
+ * DDL schema name for a namespace coordinate. Postgres-aware namespaces
+ * dispatch to their polymorphic `ddlSchemaName` override; other coordinates
+ * flow through unchanged. Mirrors `resolveDdlSchemaForNamespace` in
+ * `planner-strategies`, but reads `contract.storage` directly so this resolver
+ * does not have to fabricate a full `StrategyContext`.
+ */
+function ddlSchemaNameForNamespace(contract: Contract<SqlStorage>, namespaceId: string): string {
+  const namespace = contract.storage.namespaces[namespaceId];
+  return isPostgresSchema(namespace) ? namespace.ddlSchemaName(contract.storage) : namespaceId;
+}
+
 function resolveNamespaceIdForTable(
   contract: Contract<SqlStorage>,
   tableName: string,
@@ -27,10 +38,9 @@ function resolveNamespaceIdForTable(
   for (const namespaceId of Object.keys(contract.storage.namespaces)) {
     const table = tableAt(contract.storage, namespaceId, tableName);
     if (!table) continue;
-    const ctx = { toContract: contract } as Parameters<typeof resolveDdlSchemaForNamespace>[0];
     if (
       ddlSchemaName === undefined ||
-      resolveDdlSchemaForNamespace(ctx, namespaceId) === ddlSchemaName
+      ddlSchemaNameForNamespace(contract, namespaceId) === ddlSchemaName
     ) {
       return namespaceId;
     }
@@ -82,12 +92,7 @@ export function postgresCallDdlIntent(call: PostgresOpFactoryCall): DdlIntent | 
     case 'dataTransform':
       return 'alter';
     case 'rawSql': {
-      const op = (
-        call as {
-          op?: { target?: { details?: { objectType?: string } } };
-        }
-      ).op;
-      if (op?.target?.details?.objectType === 'type') {
+      if (call.op.target.details?.objectType === 'type') {
         return 'create';
       }
       return 'alter';
@@ -95,6 +100,27 @@ export function postgresCallDdlIntent(call: PostgresOpFactoryCall): DdlIntent | 
     default:
       return 'alter';
   }
+}
+
+interface PostgresCallFields {
+  readonly schemaName?: string;
+  readonly tableName?: string;
+  readonly columnName?: string;
+  readonly typeName?: string;
+}
+
+/**
+ * Reads the optional coordinate fields off a call. Each `in` check narrows
+ * the discriminated `PostgresOpFactoryCall` union to the members that declare
+ * the field, so every access is statically typed — no cast over the union.
+ */
+function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
+  return {
+    ...('schemaName' in call ? { schemaName: call.schemaName } : {}),
+    ...('tableName' in call ? { tableName: call.tableName } : {}),
+    ...('columnName' in call ? { columnName: call.columnName } : {}),
+    ...('typeName' in call ? { typeName: call.typeName } : {}),
+  };
 }
 
 export function resolvePostgresCallDdlSubject(
@@ -106,12 +132,7 @@ export function resolvePostgresCallDdlSubject(
     return undefined;
   }
 
-  const callFields = call as {
-    schemaName?: string;
-    tableName?: string;
-    columnName?: string;
-    typeName?: string;
-  };
+  const callFields = postgresCallFields(call);
 
   if (call.factoryName === 'createSchema' && callFields.schemaName) {
     const namespaceId = resolveNamespaceIdForDdlSchema(contract, callFields.schemaName);
@@ -127,9 +148,7 @@ export function resolvePostgresCallDdlSubject(
       : UNBOUND_NAMESPACE_ID;
     const ns = contract.storage.namespaces[namespaceId];
     const rawEnum =
-      ns && 'enum' in ns && ns.enum != null
-        ? (ns.enum as Record<string, unknown>)[callFields.typeName]
-        : undefined;
+      ns && 'enum' in ns && ns.enum != null ? ns.enum[callFields.typeName] : undefined;
     const control = isPostgresEnumStorageEntry(rawEnum) ? rawEnum.control : undefined;
     return {
       namespaceId,

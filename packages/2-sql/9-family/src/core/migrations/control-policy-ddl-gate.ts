@@ -102,7 +102,7 @@ function locateNamespaceEnum(
 ): { readonly control?: ControlPolicy } | undefined {
   const ns = storage.namespaces[namespaceId];
   if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
-  const entry = (ns.enum as Record<string, unknown>)[typeName];
+  const entry = ns.enum[typeName];
   return isPostgresEnumStorageEntry(entry) ? entry : undefined;
 }
 
