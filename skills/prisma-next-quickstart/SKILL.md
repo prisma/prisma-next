@@ -195,7 +195,7 @@ pnpm dlx prisma-next init                          # interactive
 pnpm dlx prisma-next init --yes --target postgres --authoring psl
 ```
 
-> **Telemetry is opt-out.** The CLI collects anonymous usage data by default. Interactive `init` asks once (default Yes); non-interactive runs and every other command instead print a one-time notice to **stderr** on first use, then send. Opt out anytime with `DO_NOT_TRACK=1`, `PRISMA_NEXT_DISABLE_TELEMETRY=1`, or `"enableTelemetry": false` in your user config (`prisma-next` config dir, **not** `prisma-next.config.ts`). This is relevant for agent-driven runs — the CLI records that an agent invoked it. What's collected, the per-user config path, and how to fully reset are documented in `docs/Telemetry.md`.
+> **Telemetry is opt-out.** The CLI collects anonymous usage data by default. Every command — including `init` — prints a one-time notice to **stderr** on first use, then sends; there is no interactive consent prompt. Opt out anytime by running `prisma-next telemetry disable`, with `DO_NOT_TRACK=1` or `PRISMA_NEXT_DISABLE_TELEMETRY=1`, or by setting `"enableTelemetry": false` in your user config (`prisma-next` config dir, **not** `prisma-next.config.ts`). Run `prisma-next telemetry status` to see what's currently in effect. This is relevant for agent-driven runs — the CLI records that an agent invoked it. What's collected, the per-user config path, and how to fully reset are documented in `docs/Telemetry.md`.
 
 The flags `init` accepts (run `prisma-next init --help` for the source of truth):
 
