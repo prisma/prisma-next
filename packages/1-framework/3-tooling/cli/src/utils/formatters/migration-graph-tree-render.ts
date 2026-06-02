@@ -1,5 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { bold, createColors } from 'colorette';
+import { bold, createColors, green, yellow } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
 import { laneColorForColumn } from './migration-graph-lane-colors';
@@ -27,11 +27,18 @@ const LABEL_GAP = 2;
  */
 const DB_MARKER_NAME = 'db';
 
+export interface MigrationEdgeAnnotation {
+  readonly status?: 'applied' | 'pending';
+  readonly operationCount?: number;
+  readonly invariants?: readonly string[];
+}
+
 export interface RenderMigrationGraphTreeOptions {
   readonly refsByHash?: ReadonlyMap<string, readonly string[]>;
   readonly dbHash?: string;
   readonly contractHash?: string;
   readonly activeRefName?: string;
+  readonly edgeAnnotationsByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly hashLength?: number;
   readonly colorize: boolean;
   readonly glyphMode?: GlyphMode;
@@ -517,6 +524,24 @@ function createTreeStyler(opts: RenderMigrationGraphTreeOptions): MigrationListS
   };
 }
 
+function formatEdgeStatusSuffix(
+  migrationHash: string,
+  opts: RenderMigrationGraphTreeOptions,
+): string {
+  const annotation = opts.edgeAnnotationsByHash?.get(migrationHash);
+  const status = annotation?.status;
+  if (status === undefined) {
+    return '';
+  }
+  const glyph = status === 'applied' ? '✓' : '⧗';
+  const label = status === 'applied' ? 'applied' : 'pending';
+  if (!opts.colorize) {
+    return `   ${glyph} ${label}`;
+  }
+  const styler = status === 'applied' ? green : yellow;
+  return `   ${styler(`${glyph} ${label}`)}`;
+}
+
 function formatEdgeHashColumn(
   edge: ClassifiedEdge,
   style: MigrationListStyler,
@@ -730,7 +755,8 @@ export function renderMigrationGraphTree(
         : style.dirName;
     const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
-    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}`));
+    const statusSuffix = formatEdgeStatusSuffix(edge.migrationHash, opts);
+    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}${statusSuffix}`));
   }
 
   return lines.join('\n');
@@ -761,6 +787,7 @@ export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptio
     'Legend:',
     `  ${style.kind(node)} contract   ${style.kind(palette.edgeArrow.forward)} forward   ${style.kind(palette.edgeArrow.rollback)} rollback`,
     `  ${style.kind(palette.edgeArrow.self)} migration without schema change`,
+    `  ${green('✓')} applied   ${yellow('⧗')} pending`,
     `  ${style.glyph(palette.emptySource)} empty database (baseline)`,
     `  ${style.refs(['refs'])} ${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`,
     `  ${sampleArrow}   migration from contract aaaaaa to bbbbbb`,

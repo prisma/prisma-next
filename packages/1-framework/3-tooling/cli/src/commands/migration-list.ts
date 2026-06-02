@@ -65,7 +65,7 @@ function compareDirNamesDescending(a: MigrationListEntry, b: MigrationListEntry)
  * keep that output. The app space synthesises its head, so it carries
  * no on-disk `head` ref to restore.
  */
-function listRefsByContractHash(
+export function listRefsByContractHash(
   member: ContractSpaceMember,
 ): ReadonlyMap<string, readonly string[]> {
   const byHash = new Map(refsByContractHash(member.refs));
