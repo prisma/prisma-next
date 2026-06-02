@@ -137,6 +137,7 @@ describe('CLI telemetry bridge', () => {
     const notice = stderrText();
     expect(notice).toContain('Prisma Next collects anonymous CLI usage data, enabled by default');
     expect(notice).toContain(userConfigPath());
+    expect(notice).toContain('https://prisma-next.dev/docs/cli/telemetry');
     expect(notice).toContain('prisma-next telemetry disable');
     expect(notice).toContain('DO_NOT_TRACK=1');
     expect(notice).toContain('PRISMA_NEXT_DISABLE_TELEMETRY=1');
@@ -153,6 +154,20 @@ describe('CLI telemetry bridge', () => {
     fireTelemetryFromPreAction(new Command('init'));
 
     expect(readUserConfig().enableTelemetry).toBeUndefined();
+  });
+
+  it('treats a blank stored installationId as missing — reprints the notice and remints', () => {
+    writeUserConfig({ installationId: '' });
+
+    const outcome = fireTelemetryFromPreAction(new Command('init'));
+
+    expect(outcome).toEqual({ spawned: true });
+    expect(stderrText()).toContain(
+      'Prisma Next collects anonymous CLI usage data, enabled by default',
+    );
+    expect(readUserConfig().installationId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
   });
 
   it('on a second run with a stored id, fires silently without printing a notice', () => {

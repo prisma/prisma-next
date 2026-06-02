@@ -113,7 +113,7 @@ function fireTelemetry(actionCommand: Command, userConfig: UserConfig): Telemetr
 function firstRunNotice(configPath: string): string {
   return [
     'Prisma Next collects anonymous CLI usage data, enabled by default.',
-    "What's collected and why: docs/Telemetry.md.",
+    "What's collected and why: https://prisma-next.dev/docs/cli/telemetry.",
     'Opt out: run "prisma-next telemetry disable", set DO_NOT_TRACK=1 or',
     `PRISMA_NEXT_DISABLE_TELEMETRY=1, or set "enableTelemetry": false in ${configPath}.`,
   ].join(' ');
@@ -165,7 +165,8 @@ export function fireTelemetryFromPreAction(actionCommand: Command): TelemetryRun
   if (!gate.enabled) {
     return gate.outcome;
   }
-  if (gate.userConfig.installationId === undefined) {
+  const storedId = gate.userConfig.installationId;
+  if (typeof storedId !== 'string' || storedId.length === 0) {
     const installationId = discloseAndMintOnFirstRun();
     return fireTelemetry(
       actionCommand,

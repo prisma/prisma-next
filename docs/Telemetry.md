@@ -143,7 +143,7 @@ Because telemetry is on by default, the CLI discloses it the first time it would
 
 On the first command that resolves to *enabled* and has no `installationId` stored yet, the CLI prints a one-time notice to **stderr** (never stdout, so it can't corrupt piped output) and then mints the `installationId` and sends the event. The wording (verbatim, with the resolved absolute path to your config file substituted in) is:
 
-> Prisma Next collects anonymous CLI usage data, enabled by default. What's collected and why: docs/Telemetry.md. Opt out: run "prisma-next telemetry disable", set DO_NOT_TRACK=1 or PRISMA_NEXT_DISABLE_TELEMETRY=1, or set "enableTelemetry": false in &lt;your config.json path&gt;.
+> Prisma Next collects anonymous CLI usage data, enabled by default. What's collected and why: https://prisma-next.dev/docs/cli/telemetry. Opt out: run "prisma-next telemetry disable", set DO_NOT_TRACK=1 or PRISMA_NEXT_DISABLE_TELEMETRY=1, or set "enableTelemetry": false in &lt;your config.json path&gt;.
 
 The notice is **idempotent via the `installationId`**: it prints only while no `installationId` is stored. Once the first enabled send mints the id, every later command sees the stored id and stays silent. Deleting `config.json` clears the id and makes the notice print once more on the next enabled command.
 
