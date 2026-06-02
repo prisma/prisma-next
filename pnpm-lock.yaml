@@ -3410,6 +3410,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:0.12.0
         version: link:../../1-framework/0-foundation/utils
+      '@prisma/ppg':
+        specifier: 'catalog:'
+        version: 1.0.1
       pathe:
         specifier: ^2.0.3
         version: 2.0.3

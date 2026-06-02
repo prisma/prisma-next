@@ -367,6 +367,12 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/3-extensions/prisma-postgres-serverless/src/runtime/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/3-extensions/prisma-postgres-serverless/src/exports/target.ts",
       "domain": "extensions",
       "layer": "adapters",
