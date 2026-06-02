@@ -3,6 +3,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
@@ -110,6 +111,7 @@ describe('integration: rawSql expression in typed builder', {
     });
 
     const stack = createSqlExecutionStack({
+      family: sqlRuntimeFamilyDescriptor,
       target: postgresTarget,
       adapter: postgresAdapter,
       driver: {

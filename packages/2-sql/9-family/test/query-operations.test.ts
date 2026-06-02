@@ -1,7 +1,8 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
 import { extractQueryOperationTypeImports } from '@prisma-next/framework-components/control';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   createExecutionContext,
   type SqlExecutionStack,
@@ -55,8 +56,20 @@ function emptyContract(): Contract<SqlStorage> {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:family-ops-factory-test'),
-    storage: new SqlStorage({ storageHash: coreHash('sha256:family-ops-factory-test') }),
-    models: {},
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:family-ops-factory-test'),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {},
+        }),
+      },
+    }),
+    domain: {
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: { models: {} },
+      },
+    },
     roots: {},
     capabilities: {},
     extensionPacks: {},
@@ -106,6 +119,7 @@ function adapterDescriptor(
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    rawCodecInferer: { inferCodec: () => 'pg/text@1' },
     codecs: () => codecs,
     create(): SqlRuntimeAdapterInstance<'postgres'> {
       return {
