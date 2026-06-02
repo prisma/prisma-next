@@ -3,113 +3,85 @@ import {
   type ControlPolicy,
   effectiveControlPolicy,
 } from '@prisma-next/contract/types';
-import type {
-  MigrationOperationClass,
-  OpFactoryCall,
-  SchemaIssue,
-} from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  isPostgresEnumStorageEntry,
-  type SqlStorage,
-  storageTableAt,
-} from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 
-const ALL_OPERATION_CLASSES: readonly MigrationOperationClass[] = [
-  'additive',
-  'widening',
-  'destructive',
-  'data',
-];
-
-export function controlPolicyAllowedOperationClasses(
-  policy: ControlPolicy,
-): readonly MigrationOperationClass[] {
-  switch (policy) {
-    case 'managed':
-      return ALL_OPERATION_CLASSES;
-    case 'tolerated':
-      return ['additive'];
-    case 'external':
-    case 'observed':
-      return [];
-  }
-}
-
-export function resolveNamespaceId(issue: { readonly namespaceId?: string }): string {
-  return issue.namespaceId ?? UNBOUND_NAMESPACE_ID;
-}
-
-function locateNamespaceEnum(
-  storage: SqlStorage,
-  namespaceId: string,
-  typeName: string,
-): { readonly control?: ControlPolicy } | undefined {
-  const ns = storage.namespaces[namespaceId];
-  if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
-  const entry = ns.enum[typeName];
-  return isPostgresEnumStorageEntry(entry) ? entry : undefined;
-}
-
-export function resolveControlPolicyForSchemaIssue(
-  issue: SchemaIssue,
-  contract: Contract<SqlStorage>,
-): ControlPolicy {
-  const defaultControl = contract.defaultControl;
-
-  if (issue.kind === 'missing_schema') {
-    return effectiveControlPolicy(undefined, defaultControl);
-  }
-
-  if (issue.kind === 'type_missing' && issue.typeName) {
-    const namespaceId = resolveNamespaceId(issue);
-    const enumEntry = locateNamespaceEnum(contract.storage, namespaceId, issue.typeName);
-    if (enumEntry) {
-      return effectiveControlPolicy(enumEntry.control, defaultControl);
-    }
-    return effectiveControlPolicy(undefined, defaultControl);
-  }
-
-  if ('table' in issue && typeof issue.table === 'string') {
-    const namespaceId = resolveNamespaceId(issue);
-    const table = storageTableAt(contract.storage, namespaceId, issue.table);
-    return effectiveControlPolicy(table?.control, defaultControl);
-  }
-
-  return effectiveControlPolicy(undefined, defaultControl);
-}
-
+/**
+ * Control-relevant facts about a single planner call's target object, as
+ * resolved from the target's own IR. `undefined` (no subject) means the
+ * call's target could not be positively established — a fail-closed signal:
+ * any policy stricter than `managed` drops such a call rather than emitting
+ * it.
+ */
 export interface ResolvedControlSubject {
   readonly namespaceId: string;
   readonly explicitNodeControlPolicy?: ControlPolicy;
   readonly table?: string;
   readonly column?: string;
   readonly typeName?: string;
+  /**
+   * Whether the call creates a whole, previously-absent top-level storage
+   * object (e.g. a table or an enum/type), as opposed to modifying an
+   * existing object. This is the only thing `tolerated` permits: it is a
+   * create-if-absent policy, so an op that touches an existing object — add
+   * column, add index/constraint, alter, drop — is never allowed under it.
+   */
+  readonly createsNewObject: boolean;
 }
 
-export function filterCallsByControlPolicy<TCall extends OpFactoryCall>(options: {
+/**
+ * The control policy that governs a single call. The `external` default is an
+ * un-overridable namespace floor: when the contract default is `external`, no
+ * per-object `managed` override can escalate DDL above the floor, so the
+ * policy is forced to `external` regardless of the node's own declaration.
+ * Every other default defers to the node's effective control policy.
+ */
+function controlPolicyForCall(
+  subject: ResolvedControlSubject | undefined,
+  defaultControl: ControlPolicy | undefined,
+): ControlPolicy {
+  if (defaultControl === 'external') {
+    return 'external';
+  }
+  return effectiveControlPolicy(subject?.explicitNodeControlPolicy, defaultControl);
+}
+
+/**
+ * Whether a call is allowed to emit under a given control policy.
+ *
+ * - `managed` — full lifecycle, every op allowed.
+ * - `tolerated` — create-if-absent only: allowed iff the call creates a whole
+ *   new top-level object (and its subject was positively resolved). Anything
+ *   that modifies an existing object, and anything whose subject could not be
+ *   resolved, is suppressed.
+ * - `external` / `observed` — no DDL at all.
+ */
+function callAllowedUnderControlPolicy(
+  policy: ControlPolicy,
+  subject: ResolvedControlSubject | undefined,
+): boolean {
+  switch (policy) {
+    case 'managed':
+      return true;
+    case 'tolerated':
+      return subject?.createsNewObject === true;
+    case 'external':
+    case 'observed':
+      return false;
+  }
+}
+
+export function filterCallsByControlPolicy<TCall>(options: {
   readonly calls: readonly TCall[];
   readonly contract: Contract<SqlStorage>;
   readonly resolveSubject: (call: TCall) => ResolvedControlSubject | undefined;
 }): readonly TCall[] {
   const defaultControl = options.contract.defaultControl;
-  const externalFloor = defaultControl === 'external';
   const kept: TCall[] = [];
 
   for (const call of options.calls) {
-    if (externalFloor) {
-      continue;
-    }
-
     const subject = options.resolveSubject(call);
-    if (subject === undefined) {
-      kept.push(call);
-      continue;
-    }
-
-    const policy = effectiveControlPolicy(subject.explicitNodeControlPolicy, defaultControl);
-    const allowed = controlPolicyAllowedOperationClasses(policy);
-    if (allowed.includes(call.operationClass)) {
+    const policy = controlPolicyForCall(subject, defaultControl);
+    if (callAllowedUnderControlPolicy(policy, subject)) {
       kept.push(call);
     }
   }

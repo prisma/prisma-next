@@ -111,7 +111,7 @@ describe('planIssues control policy', () => {
       },
     });
 
-    it('emits create for missing_table only', () => {
+    it('emits create for an entirely-absent table', () => {
       const { calls } = plan(
         [{ kind: 'missing_table', table: 'users', namespaceId: UNBOUND_NAMESPACE_ID, message: '' }],
         toContract,
@@ -119,11 +119,12 @@ describe('planIssues control policy', () => {
       expect(calls.some((c) => c.factoryName === 'createTable')).toBe(true);
     });
 
-    it('emits add column for an existing table missing a column', () => {
+    it('suppresses add column for an existing table missing a column', () => {
+      const nullableColumn = { nativeType: 'text', codecId: 'pg/text@1', nullable: true };
       const withEmail = makeContract({
         users: {
           control: 'tolerated',
-          columns: { id: baseColumn, email: baseColumn },
+          columns: { id: baseColumn, email: nullableColumn },
           uniques: [],
           indexes: [],
           foreignKeys: [],
@@ -141,7 +142,7 @@ describe('planIssues control policy', () => {
         ],
         withEmail,
       );
-      expect(calls.some((c) => c.factoryName === 'addColumn')).toBe(true);
+      expect(calls).toHaveLength(0);
     });
 
     it('suppresses drop for extra_table', () => {

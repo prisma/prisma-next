@@ -9,6 +9,27 @@ import {
 import { isPostgresSchema } from '../postgres-schema';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 
+/**
+ * Factory calls that create a whole, previously-absent top-level storage
+ * object. Used to decide whether `tolerated` permits a call (it only allows
+ * creating absent objects, never modifying existing ones).
+ *
+ * Deliberately an explicit, closed set rather than a `factoryName`
+ * create/alter/drop classification: it answers exactly one yes/no question
+ * and is fail-closed. Any call not listed here — including future or
+ * extension-contributed factories — is treated as NOT object-creation, so it
+ * is suppressed under `tolerated` rather than permissively emitted.
+ */
+const OBJECT_CREATION_FACTORIES: ReadonlySet<string> = new Set<string>([
+  'createTable',
+  'createEnumType',
+  'createSchema',
+]);
+
+function createsNewTopLevelObject(call: PostgresOpFactoryCall): boolean {
+  return OBJECT_CREATION_FACTORIES.has(call.factoryName);
+}
+
 function ddlSchemaNameForNamespace(contract: Contract<SqlStorage>, namespaceId: string): string {
   const namespace = contract.storage.namespaces[namespaceId];
   return isPostgresSchema(namespace) ? namespace.ddlSchemaName(contract.storage) : namespaceId;
@@ -69,10 +90,12 @@ export function resolvePostgresCallControlSubject(
   contract: Contract<SqlStorage>,
 ): ResolvedControlSubject | undefined {
   const callFields = postgresCallFields(call);
+  const createsNewObject = createsNewTopLevelObject(call);
 
   if (call.factoryName === 'createSchema' && callFields.schemaName) {
     return {
       namespaceId: resolveNamespaceIdForDdlSchema(contract, callFields.schemaName),
+      createsNewObject,
     };
   }
 
@@ -88,6 +111,7 @@ export function resolvePostgresCallControlSubject(
       namespaceId,
       ...(controlPolicy !== undefined ? { explicitNodeControlPolicy: controlPolicy } : {}),
       typeName: callFields.typeName,
+      createsNewObject,
     };
   }
 
@@ -106,12 +130,14 @@ export function resolvePostgresCallControlSubject(
         : {}),
       table: callFields.tableName,
       ...(callFields.columnName !== undefined ? { column: callFields.columnName } : {}),
+      createsNewObject,
     };
   }
 
   if (callFields.schemaName) {
     return {
       namespaceId: resolveNamespaceIdForDdlSchema(contract, callFields.schemaName),
+      createsNewObject,
     };
   }
 
