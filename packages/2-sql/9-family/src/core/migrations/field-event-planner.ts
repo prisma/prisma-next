@@ -25,6 +25,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import { type SqlStorage, type StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { shouldEmitFieldEvent } from './control-policy-ddl-gate';
 import type { CodecControlHooks, FieldEvent, FieldEventContext } from './types';
 
 export interface PlanFieldEventOperationsOptions {
@@ -118,9 +119,30 @@ export function planFieldEventOperations(
   }
 
   const calls: OpFactoryCall[] = [];
-  appendCalls('added', added, options.codecHooks, calls, (e) => e.newField?.codecId);
-  appendCalls('dropped', dropped, options.codecHooks, calls, (e) => e.priorField?.codecId);
-  appendCalls('altered', altered, options.codecHooks, calls, (e) => e.newField?.codecId);
+  appendCalls(
+    'added',
+    added,
+    options.codecHooks,
+    options.newContract,
+    calls,
+    (e) => e.newField?.codecId,
+  );
+  appendCalls(
+    'dropped',
+    dropped,
+    options.codecHooks,
+    options.newContract,
+    calls,
+    (e) => e.priorField?.codecId,
+  );
+  appendCalls(
+    'altered',
+    altered,
+    options.codecHooks,
+    options.newContract,
+    calls,
+    (e) => e.newField?.codecId,
+  );
   return calls;
 }
 
@@ -128,6 +150,7 @@ function appendCalls(
   event: FieldEvent,
   entries: readonly FieldEntry[],
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
+  contract: Contract<SqlStorage>,
   calls: OpFactoryCall[],
   pickCodecId: (entry: FieldEntry) => string | undefined,
 ): void {
@@ -137,6 +160,9 @@ function appendCalls(
     const hook = codecHooks.get(codecId);
     if (!hook?.onFieldEvent) continue;
     const ctx = buildContext(event, entry);
+    if (!shouldEmitFieldEvent(event, ctx, contract)) {
+      continue;
+    }
     const emitted = hook.onFieldEvent(event, ctx);
     for (const call of emitted) calls.push(call);
   }

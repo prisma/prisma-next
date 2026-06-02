@@ -14,6 +14,12 @@ import type {
   MigrationOperationPolicy,
   SqlPlannerConflict,
   SqlPlannerConflictLocation,
+  SqlPlannerControlWarning,
+} from '@prisma-next/family-sql/control';
+import {
+  gateCallsByControlPolicy,
+  shouldEmitSchemaIssue,
+  warningForSuppressedSchemaIssue,
 } from '@prisma-next/family-sql/control';
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
@@ -29,6 +35,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
+import { resolvePostgresCallDdlSubject } from './control-policy-ddl-resolve';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -181,6 +188,7 @@ export interface IssuePlannerOptions {
 
 export interface IssuePlannerValue {
   readonly calls: readonly PostgresOpFactoryCall[];
+  readonly warnings: readonly SqlPlannerControlWarning[];
 }
 
 function toColumnSpec(
@@ -861,8 +869,16 @@ export function planIssues(
 
   const defaultCalls: PostgresOpFactoryCall[] = [];
   const conflicts: SqlPlannerConflict[] = [];
+  const controlWarnings: SqlPlannerControlWarning[] = [];
 
   for (const issue of sorted) {
+    const suppressedWarning = warningForSuppressedSchemaIssue(issue, options.toContract);
+    if (suppressedWarning) {
+      controlWarnings.push(suppressedWarning);
+    }
+    if (!shouldEmitSchemaIssue(issue, options.toContract)) {
+      continue;
+    }
     const result = mapIssueToCall(issue, context);
     if (result.ok) {
       defaultCalls.push(...result.value);
@@ -927,5 +943,14 @@ export function planIssues(
     ...byCategory('foreignKey'),
   ];
 
-  return ok({ calls });
+  const gated = gateCallsByControlPolicy({
+    calls,
+    contract: options.toContract,
+    resolveSubject: (call) => resolvePostgresCallDdlSubject(call, options.toContract),
+  });
+
+  return ok({
+    calls: gated.calls,
+    warnings: Object.freeze([...controlWarnings, ...gated.warnings]),
+  });
 }
