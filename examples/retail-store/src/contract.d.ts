@@ -10,10 +10,10 @@ import type {
 } from '@prisma-next/mongo-contract';
 import type {
   Contract as ContractType,
+  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
-  StorageBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
@@ -1688,6 +1688,6 @@ type ContractBase = Omit<
   readonly profileHash: ProfileHash;
 };
 
-export type Models = Contract extends ContractType<StorageBase, infer TModels> ? TModels : never;
+export type Models = ContractModelDefinitions<Contract>;
 
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;

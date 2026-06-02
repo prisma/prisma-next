@@ -95,10 +95,10 @@ ${importLines.join('\n')}
 ${familyImportLines.join('\n')}
 import type {
   Contract as ContractType,
+  ContractModelDefinitions,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,
-  StorageBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
@@ -136,7 +136,7 @@ ${modelsType}
   readonly profileHash: ProfileHash;
 };
 
-export type Models = Contract extends ContractType<StorageBase, infer TModels> ? TModels : never;
+export type Models = ContractModelDefinitions<Contract>;
 
 ${contractWrapper}
 `;

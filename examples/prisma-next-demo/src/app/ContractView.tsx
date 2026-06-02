@@ -1,7 +1,3 @@
-import {
-  defaultDomainNamespaceIdForSqlTarget,
-  domainModelsAtDefaultNamespace,
-} from '@prisma-next/contract/types';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import type { Contract, Models } from '../prisma/contract.d';
 
@@ -137,14 +133,11 @@ export function ContractView({ contract }: { contract: Contract }) {
       <Section title={`Target: ${contract.target}`}>{null}</Section>
 
       <Section title="Models">
-        {Object.entries(
-          domainModelsAtDefaultNamespace(
-            contract.domain,
-            defaultDomainNamespaceIdForSqlTarget(contract.target),
-          ) as Models,
-        ).map(([modelName, model]) => (
-          <ModelCard key={modelName} modelName={modelName} model={model} />
-        ))}
+        {Object.entries(contract.domain.namespaces).flatMap(([namespaceId, ns]) =>
+          Object.entries(ns.models as Record<string, ContractModel>).map(([modelName, model]) => (
+            <ModelCard key={`${namespaceId}.${modelName}`} modelName={modelName} model={model} />
+          )),
+        )}
       </Section>
 
       <Section title="Tables">
