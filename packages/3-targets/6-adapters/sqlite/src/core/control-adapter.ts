@@ -255,15 +255,15 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   }
 
   /**
-   * Reads per-migration ledger rows for `space` from `_prisma_ledger` in
-   * apply order. Probes `sqlite_master` first so a fresh database without
-   * the ledger table returns `[]` instead of raising "no such table".
+   * Reads per-migration ledger rows from `_prisma_ledger` in apply order.
+   * Probes `sqlite_master` first so a fresh database without the ledger
+   * table returns `[]` instead of raising "no such table".
    */
   async readLedger(
     driver: ControlDriverInstance<'sql', 'sqlite'>,
-    space: string,
+    space?: string,
   ): Promise<readonly LedgerEntryRecord[]> {
-    const ledgerContext = { space, markerLocation: SQLITE_LEDGER_TABLE };
+    const ledgerContext = { space: space ?? '*', markerLocation: SQLITE_LEDGER_TABLE };
     const exists = await withMarkerReadErrorHandling(
       () =>
         driver.query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, [
@@ -277,16 +277,37 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
 
     const result = await withMarkerReadErrorHandling(
       () =>
-        driver.query<{
-          space: string;
-          migration_name: string;
-          migration_hash: string;
-          origin_core_hash: string | null;
-          destination_core_hash: string;
-          operations: unknown;
-          created_at: Date | string;
-        }>(
-          `SELECT
+        space === undefined
+          ? driver.query<{
+              space: string;
+              migration_name: string;
+              migration_hash: string;
+              origin_core_hash: string | null;
+              destination_core_hash: string;
+              operations: unknown;
+              created_at: Date | string;
+            }>(
+              `SELECT
+         space,
+         migration_name,
+         migration_hash,
+         origin_core_hash,
+         destination_core_hash,
+         operations,
+         created_at
+       FROM _prisma_ledger
+       ORDER BY id`,
+            )
+          : driver.query<{
+              space: string;
+              migration_name: string;
+              migration_hash: string;
+              origin_core_hash: string | null;
+              destination_core_hash: string;
+              operations: unknown;
+              created_at: Date | string;
+            }>(
+              `SELECT
          space,
          migration_name,
          migration_hash,
@@ -297,8 +318,8 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
        FROM _prisma_ledger
        WHERE space = ?
        ORDER BY id`,
-          [space],
-        ),
+              [space],
+            ),
       ledgerContext,
     );
 
