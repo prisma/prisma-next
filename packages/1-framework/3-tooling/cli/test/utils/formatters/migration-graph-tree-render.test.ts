@@ -1,6 +1,6 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
-import { createColors } from 'colorette';
+import { createColors, dim } from 'colorette';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { laneColorForColumn } from '../../../src/utils/formatters/migration-graph-lane-colors';
@@ -588,6 +588,41 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     return [init, s1, s2, s3, s4, rollbackEtoA, rollbackDtoB];
   }
 
+  function showcaseEdges(): readonly MigrationEdge[] {
+    const init = edge(EMPTY_CONTRACT_HASH, '3bfce91', '20260601T0719_init');
+    const addName = edge('3bfce91', '419c099', '20260601T0725_add_name');
+    const alicePhone = edge('419c099', 'f5aa17d', '20260601T0725_alice_phone');
+    const bobAvatar = edge('419c099', '935a023', '20260601T0725_bob_avatar');
+    const addBio = edge('83a1ded', '3705eb1', '20260601T0726_add_bio');
+    const addLocale = edge('3705eb1', 'bf158ef', '20260601T0726_add_locale');
+    const fastForward = edge('3bfce91', '83a1ded', '20260601T0726_fast_forward');
+    const mergeAlice = edge('f5aa17d', '83a1ded', '20260601T0726_merge_alice');
+    const mergeBob = edge('935a023', '83a1ded', '20260601T0726_merge_bob');
+    const rollbackAlice = edge('f5aa17d', '3bfce91', '20260601T0727_rollback_alice');
+    const rollbackLocale = edge('bf158ef', '3705eb1', '20260601T0727_rollback_locale');
+    const rollbackUsers = edge('bf158ef', '419c099', '20260601T0727_rollback_users');
+    const hotfix = edge('bf158ef', 'f660984', '20260601T0727_hotfix');
+    const promoteBob = edge('935a023', 'f660984', '20260601T0728_promote_bob');
+    const reapplyNoop = edge('f660984', 'f660984', '20260601T0729_reapply_noop');
+    return [
+      init,
+      addName,
+      alicePhone,
+      bobAvatar,
+      addBio,
+      addLocale,
+      fastForward,
+      mergeAlice,
+      mergeBob,
+      rollbackAlice,
+      rollbackLocale,
+      rollbackUsers,
+      hotfix,
+      promoteBob,
+      reapplyNoop,
+    ];
+  }
+
   it('renders a single-lane linear graph monochrome (column 0 neutral)', () => {
     const colored = tree(linearEdges(), { colorize: true });
     // Nothing to tell column 0 apart from: no palette hue is emitted at all.
@@ -610,21 +645,20 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(colored).not.toContain(laneColorForColumn(1)('│↑'));
   });
 
-  it('colors a branch-connector and a merge-connector run as one served-lane hue', () => {
+  it('colors a startLane tee junction by its own column; the trailing dash by the served lane', () => {
     const colored = tree(diamondEdges(), { colorize: true });
     const lines = colored.split('\n');
-    // Fan-out: the run into column 1 (`├─╮`) is column 1's hue end-to-end — the
-    // leading tee follows the lane it serves rather than reading dim/gray.
     const branchLine = lines.find((line) => line.includes('╮'));
     expect(branchLine).toBeDefined();
-    expect(branchLine).toContain(laneColorForColumn(1)('├─'));
+    expect(branchLine).toContain(dim('├') + laneColorForColumn(1)('─'));
     expect(branchLine).toContain(laneColorForColumn(1)('╮'));
+    expect(branchLine).not.toContain(laneColorForColumn(1)('├'));
     expect(stripAnsi(branchLine ?? '')).toBe('├─╮');
-    // Convergence: the run collapsing into the survivor (`├─╯`) is one hue too.
-    const mergeLine = lines.find((line) => line.includes('╯'));
+    const mergeLine = lines.find((line) => line.includes('╯') && line.includes('├'));
     expect(mergeLine).toBeDefined();
-    expect(mergeLine).toContain(laneColorForColumn(1)('├─'));
+    expect(mergeLine).toContain(dim('├') + laneColorForColumn(1)('─'));
     expect(mergeLine).toContain(laneColorForColumn(1)('╯'));
+    expect(mergeLine).not.toContain(laneColorForColumn(1)('├'));
     expect(stripAnsi(mergeLine ?? '')).toBe('├─╯');
   });
 
@@ -640,12 +674,13 @@ describe('renderMigrationGraphTree (lane colors)', () => {
       [init, addPhone, addPosts, addAvatar, mergePhone, mergePosts, mergeAvatar],
       { colorize: true },
     );
-    // `├─┬─╮`: the leading `├─` reaches the first branch point (column 1), so it
-    // is column 1's hue — never dim/gray — and the closing corner is column 2's.
+    // `├─┬─╮`: the leading `├` sits in column 0 (neutral); its `─` and the
+    // closing corner take the lanes they lead into.
     const fanLine = colored.split('\n').find((line) => line.includes('┬'));
     expect(fanLine).toBeDefined();
-    expect(fanLine).toContain(laneColorForColumn(1)('├─'));
+    expect(fanLine).toContain(dim('├') + laneColorForColumn(1)('─'));
     expect(fanLine).toContain(laneColorForColumn(2)('╮'));
+    expect(fanLine).not.toContain(laneColorForColumn(1)('├'));
   });
 
   it('rotates distinct hues across three lanes on a convergence fan', () => {
@@ -724,6 +759,33 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(fanLine).toContain(laneColorForColumn(1)('┬') + laneColorForColumn(2)('─'));
     // The dash is no longer tinted with the tee's own (left) lane.
     expect(fanLine).not.toContain(laneColorForColumn(1)('┬─'));
+  });
+
+  it('colors showcase connector junctions by their own column, not the served lane', () => {
+    const colored = tree(showcaseEdges(), { colorize: true });
+    const lines = colored.split('\n');
+    const fanRow = lines.find((line) => line.includes('┼') && line.includes('┬'));
+    expect(fanRow).toBeDefined();
+    expect(fanRow).not.toContain(laneColorForColumn(2)('├'));
+    expect(fanRow).toContain(laneColorForColumn(2)('─'));
+    expect(fanRow).toContain(laneColorForColumn(1)('┼─'));
+    expect(fanRow).not.toContain(laneColorForColumn(2)('┼'));
+    const bobMergeRow = lines.find((line) => {
+      const plain = stripAnsi(line);
+      return plain.includes('╯') && plain.includes('├') && !plain.includes('↑');
+    });
+    expect(bobMergeRow).toBeDefined();
+    expect(bobMergeRow).toContain(laneColorForColumn(1)('├'));
+    expect(bobMergeRow).not.toContain(laneColorForColumn(2)('├'));
+    expect(bobMergeRow).toContain(laneColorForColumn(2)('─'));
+    const fastForwardMergeRow = lines.find((line) => stripAnsi(line).startsWith('├─────╯'));
+    expect(fastForwardMergeRow).toBeDefined();
+    expect(fastForwardMergeRow).not.toContain(laneColorForColumn(3)('├'));
+    expect(fastForwardMergeRow).toContain(laneColorForColumn(3)('─'));
+    const addNameMergeRow = lines.find((line) => stripAnsi(line).startsWith('├─╯   '));
+    expect(addNameMergeRow).toBeDefined();
+    expect(addNameMergeRow).not.toContain(laneColorForColumn(1)('├'));
+    expect(addNameMergeRow).toContain(laneColorForColumn(1)('─'));
   });
 
   it("colors a routed back-arc's whole horizontal run — bridges and crossings — one hue", () => {
