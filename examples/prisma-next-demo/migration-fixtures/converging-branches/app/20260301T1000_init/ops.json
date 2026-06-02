@@ -1,40 +1,13 @@
 [
   {
-    "id": "extension.vector",
-    "label": "Enable extension \"vector\"",
-    "summary": "Ensures the vector extension is available for pgvector operations",
-    "operationClass": "additive",
-    "target": {
-      "id": "postgres"
-    },
-    "precheck": [
-      {
-        "description": "verify extension \"vector\" is not already enabled",
-        "sql": "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
-      }
-    ],
-    "execute": [
-      {
-        "description": "create extension \"vector\"",
-        "sql": "CREATE EXTENSION IF NOT EXISTS vector"
-      }
-    ],
-    "postcheck": [
-      {
-        "description": "confirm extension \"vector\" is enabled",
-        "sql": "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
-      }
-    ]
-  },
-  {
     "id": "table.user",
-    "label": "Create table user",
-    "summary": "Creates table user with required columns",
+    "label": "Create table \"user\"",
+    "summary": "Creates table \"user\"",
     "operationClass": "additive",
     "target": {
       "id": "postgres",
       "details": {
-        "schema": "public",
+        "schema": "__unbound__",
         "objectType": "table",
         "name": "user"
       }
@@ -42,19 +15,19 @@
     "precheck": [
       {
         "description": "ensure table \"user\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"user\"') IS NULL"
+        "sql": "SELECT to_regclass('\"user\"') IS NULL"
       }
     ],
     "execute": [
       {
         "description": "create table \"user\"",
-        "sql": "CREATE TABLE \"public\".\"user\" (\n  \"id\" uuid NOT NULL,\n  \"email\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+        "sql": "CREATE TABLE \"user\" (\n  \"email\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
       }
     ],
     "postcheck": [
       {
         "description": "verify table \"user\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"user\"') IS NOT NULL"
+        "sql": "SELECT to_regclass('\"user\"') IS NOT NULL"
       }
     ]
   }

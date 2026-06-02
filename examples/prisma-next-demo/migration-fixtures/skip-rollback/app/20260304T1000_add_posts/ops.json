@@ -1,99 +1,33 @@
 [
   {
-    "id": "dropColumn.user.bio",
-    "label": "Drop column bio from user",
-    "summary": "Drops extra column bio from table user",
-    "operationClass": "destructive",
-    "target": {
-      "id": "postgres",
-      "details": {
-        "schema": "public",
-        "objectType": "column",
-        "name": "bio",
-        "table": "user"
-      }
-    },
-    "precheck": [
-      {
-        "description": "ensure column \"bio\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'bio'\n)"
-      }
-    ],
-    "execute": [
-      {
-        "description": "drop column \"bio\"",
-        "sql": "ALTER TABLE \"public\".\"user\" DROP COLUMN \"bio\""
-      }
-    ],
-    "postcheck": [
-      {
-        "description": "verify column \"bio\" is removed",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'bio'\n)"
-      }
-    ]
-  },
-  {
-    "id": "dropColumn.user.phone",
-    "label": "Drop column phone from user",
-    "summary": "Drops extra column phone from table user",
-    "operationClass": "destructive",
-    "target": {
-      "id": "postgres",
-      "details": {
-        "schema": "public",
-        "objectType": "column",
-        "name": "phone",
-        "table": "user"
-      }
-    },
-    "precheck": [
-      {
-        "description": "ensure column \"phone\" exists",
-        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
-      }
-    ],
-    "execute": [
-      {
-        "description": "drop column \"phone\"",
-        "sql": "ALTER TABLE \"public\".\"user\" DROP COLUMN \"phone\""
-      }
-    ],
-    "postcheck": [
-      {
-        "description": "verify column \"phone\" is removed",
-        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'phone'\n)"
-      }
-    ]
-  },
-  {
-    "id": "table.post",
-    "label": "Create table post",
-    "summary": "Creates table post with required columns",
+    "id": "column.user.posts",
+    "label": "Add column \"posts\" to \"user\"",
     "operationClass": "additive",
     "target": {
       "id": "postgres",
       "details": {
-        "schema": "public",
-        "objectType": "table",
-        "name": "post"
+        "schema": "__unbound__",
+        "objectType": "column",
+        "name": "posts",
+        "table": "user"
       }
     },
     "precheck": [
       {
-        "description": "ensure table \"post\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+        "description": "ensure column \"posts\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = current_schema()\n    AND table_name = 'user'\n    AND column_name = 'posts'\n)"
       }
     ],
     "execute": [
       {
-        "description": "create table \"post\"",
-        "sql": "CREATE TABLE \"public\".\"post\" (\n  \"id\" uuid NOT NULL,\n  \"title\" text NOT NULL,\n  \"userId\" uuid NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+        "description": "add column \"posts\"",
+        "sql": "ALTER TABLE \"user\" ADD COLUMN \"posts\" text"
       }
     ],
     "postcheck": [
       {
-        "description": "verify table \"post\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+        "description": "verify column \"posts\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = current_schema()\n    AND table_name = 'user'\n    AND column_name = 'posts'\n)"
       }
     ]
   }

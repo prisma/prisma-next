@@ -1,65 +1,65 @@
 [
   {
-    "id": "table.category",
-    "label": "Create table category",
-    "summary": "Creates table category with required columns",
+    "id": "column.user.category",
+    "label": "Add column \"category\" to \"user\"",
     "operationClass": "additive",
     "target": {
       "id": "postgres",
       "details": {
-        "schema": "public",
-        "objectType": "table",
-        "name": "category"
+        "schema": "__unbound__",
+        "objectType": "column",
+        "name": "category",
+        "table": "user"
       }
     },
     "precheck": [
       {
-        "description": "ensure table \"category\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"category\"') IS NULL"
+        "description": "ensure column \"category\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = current_schema()\n    AND table_name = 'user'\n    AND column_name = 'category'\n)"
       }
     ],
     "execute": [
       {
-        "description": "create table \"category\"",
-        "sql": "CREATE TABLE \"public\".\"category\" (\n  \"id\" uuid NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+        "description": "add column \"category\"",
+        "sql": "ALTER TABLE \"user\" ADD COLUMN \"category\" text"
       }
     ],
     "postcheck": [
       {
-        "description": "verify table \"category\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"category\"') IS NOT NULL"
+        "description": "verify column \"category\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = current_schema()\n    AND table_name = 'user'\n    AND column_name = 'category'\n)"
       }
     ]
   },
   {
-    "id": "table.settings",
-    "label": "Create table settings",
-    "summary": "Creates table settings with required columns",
+    "id": "column.user.settings",
+    "label": "Add column \"settings\" to \"user\"",
     "operationClass": "additive",
     "target": {
       "id": "postgres",
       "details": {
-        "schema": "public",
-        "objectType": "table",
-        "name": "settings"
+        "schema": "__unbound__",
+        "objectType": "column",
+        "name": "settings",
+        "table": "user"
       }
     },
     "precheck": [
       {
-        "description": "ensure table \"settings\" does not exist",
-        "sql": "SELECT to_regclass('\"public\".\"settings\"') IS NULL"
+        "description": "ensure column \"settings\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = current_schema()\n    AND table_name = 'user'\n    AND column_name = 'settings'\n)"
       }
     ],
     "execute": [
       {
-        "description": "create table \"settings\"",
-        "sql": "CREATE TABLE \"public\".\"settings\" (\n  \"id\" uuid NOT NULL,\n  \"userId\" uuid NOT NULL,\n  \"theme\" text,\n  PRIMARY KEY (\"id\")\n)"
+        "description": "add column \"settings\"",
+        "sql": "ALTER TABLE \"user\" ADD COLUMN \"settings\" text"
       }
     ],
     "postcheck": [
       {
-        "description": "verify table \"settings\" exists",
-        "sql": "SELECT to_regclass('\"public\".\"settings\"') IS NOT NULL"
+        "description": "verify column \"settings\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = current_schema()\n    AND table_name = 'user'\n    AND column_name = 'settings'\n)"
       }
     ]
   }
