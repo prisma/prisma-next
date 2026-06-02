@@ -32,6 +32,7 @@ import {
   MONGO_TEST_SPACE_ID,
 } from '../contract-space-fixture-mongo/constants';
 import mongoTestContractSpaceExtensionDescriptor from '../contract-space-fixture-mongo/control';
+import { synthMigrationEdges } from './synth-migration-edges';
 
 /**
  * Aggregate-level end-to-end test for the Mongo contract-space
@@ -59,6 +60,10 @@ const ALL_POLICY = {
 };
 
 type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>;
+
+function withSynthEdges(entry: Omit<PerSpaceOptions, 'migrationEdges'>): PerSpaceOptions {
+  return { ...entry, migrationEdges: synthMigrationEdges(entry.plan) };
+}
 
 const extContract: MongoContract =
   mongoTestContractSpaceExtensionDescriptor.contractSpace!.contractJson;
@@ -185,7 +190,7 @@ describe('Mongo contract-space aggregate e2e', {
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
     try {
       const perSpaceOptions: readonly PerSpaceOptions[] = [
-        {
+        withSynthEdges({
           space: APP_SPACE_ID,
           plan: {
             targetId: 'mongo',
@@ -197,8 +202,8 @@ describe('Mongo contract-space aggregate e2e', {
           destinationContract: appContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
-        {
+        }),
+        withSynthEdges({
           space: MONGO_TEST_SPACE_ID,
           plan: {
             targetId: 'mongo',
@@ -210,7 +215,7 @@ describe('Mongo contract-space aggregate e2e', {
           destinationContract: extContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
+        }),
       ];
 
       const result = await runner.execute({ driver, perSpaceOptions });
@@ -251,7 +256,7 @@ describe('Mongo contract-space aggregate e2e', {
       const result = await runner.execute({
         driver,
         perSpaceOptions: [
-          {
+          withSynthEdges({
             space: APP_SPACE_ID,
             plan: {
               targetId: 'mongo',
@@ -263,8 +268,8 @@ describe('Mongo contract-space aggregate e2e', {
             destinationContract: appContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
-          },
-          {
+          }),
+          withSynthEdges({
             space: MONGO_TEST_SPACE_ID,
             plan: {
               targetId: 'mongo',
@@ -276,7 +281,7 @@ describe('Mongo contract-space aggregate e2e', {
             destinationContract: extContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
-          },
+          }),
         ],
       });
       expect(result.ok).toBe(true);

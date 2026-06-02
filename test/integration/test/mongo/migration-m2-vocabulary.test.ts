@@ -21,6 +21,7 @@ import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { synthMigrationEdges } from './synth-migration-edges';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -111,14 +112,15 @@ async function planAndApply(
         makeFamily(),
       ),
     );
+    const plan = {
+      targetId: 'mongo',
+      ...(origin ? { origin: { storageHash: origin.storage.storageHash } } : {}),
+      destination: { storageHash: destination.storage.storageHash },
+      operations: serialized,
+    };
     const runResult = await runner.execute({
-      plan: {
-        targetId: 'mongo',
-        ...(origin ? { origin: { storageHash: origin.storage.storageHash } } : {}),
-        destination: { storageHash: destination.storage.storageHash },
-        operations: serialized,
-      },
-
+      plan,
+      migrationEdges: synthMigrationEdges(plan),
       destinationContract: destination,
       policy: ALL_POLICY,
       frameworkComponents: [],

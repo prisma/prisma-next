@@ -21,6 +21,7 @@ import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { synthMigrationEdges } from './synth-migration-edges';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -31,6 +32,10 @@ const EXT_SPACE = 'cipherstash';
 type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'> & {
   readonly strictVerification?: boolean;
 };
+
+function withSynthEdges(entry: Omit<PerSpaceOptions, 'migrationEdges'>): PerSpaceOptions {
+  return { ...entry, migrationEdges: synthMigrationEdges(entry.plan) };
+}
 
 function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
   return createMongoFamilyInstance(
@@ -256,7 +261,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
     try {
       const perSpaceOptions: readonly PerSpaceOptions[] = [
-        {
+        withSynthEdges({
           space: EXT_SPACE,
           plan: {
             targetId: 'mongo',
@@ -268,8 +273,8 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
           destinationContract: extContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
-        {
+        }),
+        withSynthEdges({
           space: APP_SPACE_ID,
           plan: {
             targetId: 'mongo',
@@ -281,7 +286,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
           destinationContract: appContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
+        }),
       ];
 
       const result = await runner.execute({ driver, perSpaceOptions });
@@ -309,7 +314,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
       const result = await runner.execute({
         driver,
         perSpaceOptions: [
-          {
+          withSynthEdges({
             space: APP_SPACE_ID,
             plan: {
               targetId: 'mongo',
@@ -321,7 +326,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
             destinationContract: appContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
-          },
+          }),
         ],
       });
 
@@ -365,7 +370,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
     try {
       const failingPerSpaceOptions: readonly PerSpaceOptions[] = [
-        {
+        withSynthEdges({
           space: EXT_SPACE,
           plan: {
             targetId: 'mongo',
@@ -377,8 +382,8 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
           destinationContract: extContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
-        {
+        }),
+        withSynthEdges({
           space: APP_SPACE_ID,
           plan: {
             targetId: 'mongo',
@@ -390,7 +395,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
           destinationContract: appContractFull,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
+        }),
       ];
 
       const failingResult = await runner.execute({
@@ -415,7 +420,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
       // verify against the full contract passes; app marker advances.
       const appOpsFull = planFor(appContractFull, null);
       const resumePerSpaceOptions: readonly PerSpaceOptions[] = [
-        {
+        withSynthEdges({
           space: EXT_SPACE,
           plan: {
             targetId: 'mongo',
@@ -427,8 +432,8 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
           destinationContract: extContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
-        {
+        }),
+        withSynthEdges({
           space: APP_SPACE_ID,
           plan: {
             targetId: 'mongo',
@@ -440,7 +445,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
           destinationContract: appContractFull,
           policy: ALL_POLICY,
           frameworkComponents: [],
-        },
+        }),
       ];
 
       const resumeResult = await runner.execute({

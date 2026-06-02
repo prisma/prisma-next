@@ -15,6 +15,7 @@ import {
   type MigrationOperationPolicy,
   type MigrationRunnerFailure,
 } from '@prisma-next/framework-components/control';
+import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { field } from '@prisma-next/sqlite/contract-builder';
@@ -82,6 +83,20 @@ function createTestDb() {
 const CONTROL_TABLES = new Set(['_prisma_marker', '_prisma_ledger']);
 const emptySchema: SqlSchemaIR = { tables: {} };
 
+function synthEdges(plan: {
+  readonly origin?: { readonly storageHash: string } | null;
+  readonly destination: { readonly storageHash: string };
+  readonly operations: readonly unknown[];
+}) {
+  return [
+    buildSynthMigrationEdge({
+      currentMarkerStorageHash: plan.origin?.storageHash,
+      destinationStorageHash: plan.destination.storageHash,
+      operationCount: plan.operations.length,
+    }),
+  ];
+}
+
 export interface MigrationResult {
   readonly driver: Driver;
   readonly schema: SqlSchemaIR;
@@ -138,6 +153,7 @@ export async function applyMigration(
           {
             space: APP_SPACE_ID,
             plan: r.plan,
+            migrationEdges: synthEdges(r.plan),
             driver,
             destinationContract: options.origin,
             policy: INIT_ADDITIVE_POLICY,
@@ -170,6 +186,7 @@ export async function applyMigration(
         {
           space: APP_SPACE_ID,
           plan: planResult.plan,
+          migrationEdges: synthEdges(planResult.plan),
           driver,
           destinationContract: options.destination,
           policy,
