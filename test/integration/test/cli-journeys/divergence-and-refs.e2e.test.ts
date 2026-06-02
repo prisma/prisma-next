@@ -13,7 +13,9 @@ import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
+  migrationStatusAppSpace,
   parseJsonOutput,
+  parseMigrationStatusJson,
   runContractEmit,
   runMigrate,
   runMigrationPlanAndEmit,
@@ -72,9 +74,12 @@ withTempDir(({ createTempDir }) => {
         // L.04: status without --ref succeeds — auto-resolves to contract hash (C3)
         const statusAuto = await runMigrationStatus(ctx, ['--json']);
         expect(statusAuto.exitCode, 'L.04: status succeeds').toBe(0);
-        const statusData = parseJsonOutput<{ ok: boolean; targetHash: string }>(statusAuto);
+        const statusData = parseMigrationStatusJson(statusAuto);
         expect(statusData.ok, 'L.04: ok').toBe(true);
-        expect(statusData.targetHash, 'L.04: target is C3 (contract hash)').toBe(c3Hash);
+        expect(
+          migrationStatusAppSpace(statusData).targetHash,
+          'L.04: target is C3 (contract hash)',
+        ).toBe(c3Hash);
 
         // L.05: set ref production=C3
         const refSet = await runRef(ctx, ['set', 'production', c3Hash]);

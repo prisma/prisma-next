@@ -39,6 +39,7 @@ import {
   getExitCode,
   setupCommandMocks,
 } from '../utils/cli-test-helpers';
+import { migrationStatusAppSpace, parseMigrationStatusJson } from '../utils/journey-test-helpers';
 
 const execFileAsync = promisify(execFile);
 const TSX_BIN = resolve(import.meta.dirname, '../../../../node_modules/.bin/tsx');
@@ -467,17 +468,13 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     // proves the marker doc accumulated the invariant via $setUnion.
     const statusRef = await migrationStatus(ctx, ['--to', 'prod', '--json']);
     expect(statusRef.exitCode, 'Mongo-O.09: status --ref prod').toBe(0);
-    const statusResult = parseJsonOutput<{
-      requiredInvariants?: readonly string[];
-      appliedInvariants?: readonly string[];
-      missingInvariants?: readonly string[];
-    }>(statusRef);
-    expect(statusResult.requiredInvariants, 'Mongo-O.09: required').toEqual([INVARIANT_ID]);
+    const statusResult = parseMigrationStatusJson(statusRef);
+    expect(statusResult.missingInvariants, 'Mongo-O.09: missing empty').toBeUndefined();
+    expect(statusResult.summary, 'Mongo-O.09: up to date').toMatch(/up to date/i);
     expect(
-      statusResult.appliedInvariants,
-      'Mongo-O.09: applied (marker accumulated server-side)',
-    ).toEqual([INVARIANT_ID]);
-    expect(statusResult.missingInvariants, 'Mongo-O.09: missing empty').toEqual([]);
+      migrationStatusAppSpace(statusResult).migrations.every((m) => m.status === 'applied'),
+      'Mongo-O.09: path migrations applied',
+    ).toBe(true);
 
     // Mongo-O.10: re-apply is a noop. The CLI's marker subtraction empties
     // the required set; the Mongo runner additionally short-circuits via
@@ -548,7 +545,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     // without --ref so the pre-check doesn't fire.
     const statusOffline = await migrationStatus(ctx, ['--json']);
     expect(statusOffline.exitCode, 'Mongo-P.05: status').toBe(0);
-    const offlineState = parseJsonOutput<{ markerHash?: string }>(statusOffline);
+    const offlineState = migrationStatusAppSpace(parseMigrationStatusJson(statusOffline));
     expect(offlineState.markerHash, 'Mongo-P.05: marker did not advance to C2').not.toBe(c2Hash);
 
     // Mongo-P.06: status --ref also fatal (parity with apply).

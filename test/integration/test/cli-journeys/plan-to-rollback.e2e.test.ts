@@ -18,7 +18,9 @@ import { withTempDir } from '../utils/cli-test-helpers';
 import {
   getLatestMigrationDir,
   type JourneyContext,
+  migrationStatusAppSpace,
   parseJsonOutput,
+  parseMigrationStatusJson,
   runContractEmit,
   runMigrate,
   runMigrationPlanAndEmit,
@@ -106,7 +108,7 @@ withTempDir(({ createTempDir }) => {
         // Status confirms the live marker is back at the baseline.
         const status = await runMigrationStatus(ctx, ['--json']);
         expect(status.exitCode, 'status after rollback').toBe(0);
-        const statusJson = parseJsonOutput<{ markerHash?: string | null }>(status);
+        const statusJson = migrationStatusAppSpace(parseMigrationStatusJson(status));
         expect(statusJson.markerHash, 'status marker = C1').toBe(c1Hash);
       },
       timeouts.spinUpPpgDev,
