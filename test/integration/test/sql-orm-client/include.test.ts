@@ -420,13 +420,13 @@ describe('integration/include', () => {
     timeouts.spinUpPpgDev,
   );
 
-  // TML-2595 worked example: the Pothos `totalCount` shape — a paginated
-  // row branch alongside a count() scalar branch. This is the headline
-  // case that motivated single-query combine emission: one correlated
+  // Worked example: the Pothos `totalCount` shape — a paginated row
+  // branch alongside a count() scalar branch. This is the headline case
+  // that motivated single-query combine emission: one correlated
   // subquery packs both branches; the parent + count + page roll up to
   // one SQL execution per query.
   it(
-    'TML-2595: include().combine({ recent: take(N), count: count() }) resolves in a single execution',
+    'include().combine({ recent: take(N), count: count() }) resolves in a single execution',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
@@ -928,9 +928,8 @@ describe('integration/include', () => {
             ],
           },
         ]);
-        // TML-2594 acceptance: depth-2 on the default postgres test
-        // contract must collapse to a single SQL execution via nested
-        // correlated subqueries.
+        // Depth-2 on the default postgres test contract must collapse to
+        // a single SQL execution via nested correlated subqueries.
         expect(runtime.executions).toHaveLength(1);
       });
     },

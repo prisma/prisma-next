@@ -141,9 +141,9 @@ describe('integration/nested-includes/strategy', () => {
           const ast = execution?.ast;
           expect(isSelectAst(ast)).toBe(true);
           if (!isSelectAst(ast)) return;
-          // No include join is emitted; the include rides on a
-          // SubqueryExpr projection instead.
-          expect((ast.joins ?? []).some((join) => join.lateral)).toBe(false);
+          // No join at all is emitted (a fortiori no lateral join); the
+          // include rides on a `SubqueryExpr` projection instead.
+          expect(ast.joins ?? []).toEqual([]);
           expect(ast.projection.some((item) => item.alias === 'posts')).toBe(true);
           // The lowered SQL carries no LATERAL keyword either.
           expect(execution?.sql).not.toContain('LATERAL');

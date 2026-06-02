@@ -20,7 +20,7 @@ Provide SQLite-specific adapter implementation, codecs, and capabilities. Enable
 
 - **Adapter Implementation**: Implement `Adapter` SPI for SQLite
   - Lower SQL ASTs to SQLite dialect SQL
-  - Render `.include(...)` as correlated subquery with `json_group_array(json_object(...))` for nested array includes
+  - Render JSON aggregation (`json_group_array`, `json_object`) and scalar subqueries
   - Advertise SQLite capabilities (`jsonAgg`, `returning`; no `lateral`, no `enums`)
   - Provide target-specific marker SQL via `readMarkerStatement()` on `AdapterProfile`
   - Map SQLite errors to `RuntimeError` envelope
@@ -91,7 +91,7 @@ flowchart TD
 - Main adapter implementation
 - Lowers SQL ASTs to SQLite SQL with `?` positional parameters
 - Renders joins (INNER, LEFT, RIGHT, FULL) with ON conditions
-- Renders `.include(...)` as correlated subquery with `json_group_array(json_object(...))` for nested array includes
+- Renders JSON aggregation (`json_group_array`, `json_object`) and scalar subqueries
 - Renders DML operations (INSERT, UPDATE, DELETE) with RETURNING clauses
 - Renders ON CONFLICT (DO NOTHING / DO UPDATE SET) for upserts
 - Uses `CAST(expr AS type)` instead of Postgres `::type` syntax
@@ -148,18 +148,18 @@ The adapter declares the following SQLite capabilities:
 
 - **`sql.orderBy: true`** -- Supports ORDER BY clauses
 - **`sql.limit: true`** -- Supports LIMIT clauses
-- **`sql.lateral: false`** -- No LATERAL join support; `.include(...)` uses correlated subqueries
-- **`sql.jsonAgg: true`** -- Supports JSON aggregation via `json_group_array()` for `.include(...)`
+- **`sql.lateral: false`** -- No LATERAL join support
+- **`sql.jsonAgg: true`** -- Supports JSON aggregation via `json_group_array()`
 - **`sql.returning: true`** -- Supports RETURNING clauses for DML operations (SQLite 3.35+)
 - **`sql.enums: false`** -- No native enum support
 
-## Include Support
+## JSON Aggregation
 
-The adapter lowers `.include(...)` for nested array includes using SQLite's `json_group_array()` and `json_object()`:
+The renderer lowers JSON-aggregation AST nodes using SQLite's `json_group_array()` and `json_object()`:
 
-**Lowering Strategy:**
-- Renders `.include(...)` as a correlated subquery with `json_group_array(json_object(...))` to aggregate child rows into a JSON array
-- Uses `COALESCE(..., '[]')` to handle empty results
+- `json_group_array(json_object(...))` inside a scalar subquery aggregates a row set into a JSON array of objects
+- The scalar subquery correlates against the outer row through its WHERE clause
+- `COALESCE(..., '[]')` yields an empty array when the row set is empty
 
 **Example SQL Output:**
 ```sql
