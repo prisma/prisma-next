@@ -24,7 +24,7 @@ describe('buildNoPathSummary', () => {
         refName: undefined,
       }),
     ).toBe(
-      "No migration path from the database state (sha256:aaaaaaaaaaaa) to the application's contract (sha256:bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one.",
+      "No migration path from the database state (aaaaaaaaaaaa) to the application's contract (bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one.",
     );
   });
 
@@ -37,7 +37,7 @@ describe('buildNoPathSummary', () => {
         refName: 'prod',
       }),
     ).toBe(
-      'No migration path from the database state (sha256:aaaaaaaaaaaa) to the target (sha256:bbbbbbbbbbbb via `prod`). Run `prisma-next migration plan --name <name>` to author one, or pass `--to <contract>` to pick a reachable target.',
+      'No migration path from the database state (aaaaaaaaaaaa) to the target (bbbbbbbbbbbb via `prod`). Run `prisma-next migration plan --name <name>` to author one, or pass `--to <contract>` to pick a reachable target.',
     );
   });
 
@@ -50,7 +50,7 @@ describe('buildNoPathSummary', () => {
         refName: undefined,
       }),
     ).toBe(
-      'No migration path from the database state (sha256:aaaaaaaaaaaa) to the target (sha256:bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one, or pass `--to <contract>` to pick a reachable target.',
+      'No migration path from the database state (aaaaaaaaaaaa) to the target (bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one, or pass `--to <contract>` to pick a reachable target.',
     );
   });
 
@@ -63,7 +63,7 @@ describe('buildNoPathSummary', () => {
         refName: undefined,
       }),
     ).toBe(
-      "No migration path from the database state to the application's contract (sha256:bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one.",
+      "No migration path from the database state to the application's contract (bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one.",
     );
   });
 });

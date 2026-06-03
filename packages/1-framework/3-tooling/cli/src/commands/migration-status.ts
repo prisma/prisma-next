@@ -155,9 +155,9 @@ export function buildNoPathSummary(args: {
 }): string {
   const markerPart =
     args.markerHash !== undefined
-      ? `the database state (sha256:${shortDisplayHash(args.markerHash)})`
+      ? `the database state (${shortDisplayHash(args.markerHash)})`
       : 'the database state';
-  const targetShort = `sha256:${shortDisplayHash(args.targetHash)}`;
+  const targetShort = shortDisplayHash(args.targetHash);
   if (!args.explicitTarget) {
     return `No migration path from ${markerPart} to the application's contract (${targetShort}). Run \`prisma-next migration plan --name <name>\` to author one.`;
   }
