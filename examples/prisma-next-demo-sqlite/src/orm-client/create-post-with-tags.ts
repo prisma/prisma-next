@@ -1,5 +1,6 @@
 import type { DefaultModelRow } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
+import { castAs } from '@prisma-next/utils/casts';
 import type { Contract } from '../prisma/contract.d';
 import { createOrmClient } from './client';
 
@@ -24,14 +25,16 @@ export async function ormClientCreatePostWithTags(
 ) {
   const db = createOrmClient(runtime);
   return db.Post.create({
-    id: input.id as PostRow['id'],
+    id: castAs<PostRow['id']>(input.id),
     title: input.title,
-    userId: input.userId as PostRow['userId'],
+    userId: castAs<PostRow['userId']>(input.userId),
     tags: (t) =>
       t.create(
-        input.tags.map((tag) => ({
-          label: tag.label,
-        })) as Array<{ label: TagRow['label'] }>,
+        castAs<Array<{ label: TagRow['label'] }>>(
+          input.tags.map((tag) => ({
+            label: tag.label,
+          })),
+        ),
       ),
   });
 }

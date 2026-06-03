@@ -1,5 +1,6 @@
 import type { DefaultModelRow } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
+import { castAs } from '@prisma-next/utils/casts';
 import type { Contract } from '../prisma/contract.d';
 import { createOrmClient } from './client';
 
@@ -17,13 +18,13 @@ export async function ormClientConnectPostTags(
   runtime: Runtime,
 ) {
   const db = createOrmClient(runtime);
-  const updated = await db.Post.where({ id: postId as PostId }).update({
-    tags: (t) => t.connect(tagIds.map((id) => ({ id: id as TagId }))),
+  const updated = await db.Post.where({ id: castAs<PostId>(postId) }).update({
+    tags: (t) => t.connect(tagIds.map((id) => ({ id: castAs<TagId>(id) }))),
   });
   if (!updated) {
     return null;
   }
   return db.Post.include('tags', (tag) => tag.orderBy((t) => t.label.asc()))
-    .where({ id: postId as PostId })
+    .where({ id: castAs<PostId>(postId) })
     .first();
 }
