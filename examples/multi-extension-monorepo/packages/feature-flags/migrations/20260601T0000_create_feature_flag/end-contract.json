@@ -70,9 +70,7 @@
             "foreignKeys": [],
             "indexes": [],
             "primaryKey": {
-              "columns": [
-                "key"
-              ]
+              "columns": ["key"]
             },
             "uniques": []
           }
