@@ -128,7 +128,7 @@ describe('renderMigrationLogTable with ANSI styler', () => {
     expect(table).toContain(dim(MIGRATION_LIST_FORWARD_EDGE_GLYPH));
     expect(table).toContain(cyanBright('ef9de27'));
     expect(table).toContain(dim('3 ops'));
-    expect(table).toContain(dim('2026-06-03 09:15:00Z'));
+    expect(table).toContain(dim(cyan('2026-06-03 09:15:00Z')));
   });
 
   it('styles the empty source glyph and space column with summary dim', () => {

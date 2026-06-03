@@ -122,7 +122,7 @@ export function renderMigrationLogTable(
   return rows
     .map((row) => {
       const appliedAt =
-        styler.summary(row.appliedAt) + ' '.repeat(appliedAtWidth - row.appliedAt.length);
+        styler.sourceHash(row.appliedAt) + ' '.repeat(appliedAtWidth - row.appliedAt.length);
       const parts = [appliedAt];
       if (showSpace) {
         parts.push(styler.summary(row.space) + ' '.repeat(spaceWidth - row.space.length));
