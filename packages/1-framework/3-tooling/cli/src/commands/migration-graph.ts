@@ -1,9 +1,9 @@
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
-import { type CliStructuredError, errorMigrationGraphLegendHumanOnly } from '../utils/cli-errors';
+import type { CliStructuredError } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   resolveMigrationPaths,
@@ -22,6 +22,7 @@ import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { shouldShowLegend, validateLegendOptions } from '../utils/legend';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 import {
@@ -36,36 +37,6 @@ interface MigrationGraphOptions extends CommonCommandOptions {
   readonly space?: string;
   readonly ascii?: boolean;
   readonly legend?: boolean;
-}
-
-/**
- * The legend is decoration printed alongside the command header on stderr, so
- * it is suppressed for the machine-readable / silent paths (`--json`, `--dot`,
- * `--quiet`) exactly as the header is.
- */
-export function migrationGraphShowsLegend(
-  options: { readonly legend?: boolean; readonly dot?: boolean },
-  flags: GlobalFlags,
-): boolean {
-  return (
-    options.legend === true && options.dot !== true && flags.json !== true && flags.quiet !== true
-  );
-}
-
-export function validateMigrationGraphLegendOptions(
-  options: MigrationGraphOptions,
-  flags: GlobalFlags,
-): Result<void, CliStructuredError> {
-  if (options.legend !== true) {
-    return ok(undefined);
-  }
-  if (flags.json === true) {
-    return notOk(errorMigrationGraphLegendHumanOnly('--json'));
-  }
-  if (options.dot === true) {
-    return notOk(errorMigrationGraphLegendHumanOnly('--dot'));
-  }
-  return ok(undefined);
 }
 
 export interface MigrationGraphTreeSection {
@@ -126,7 +97,7 @@ export async function executeMigrationGraphCommand(
       flags,
     });
     ui.stderr(header);
-    if (migrationGraphShowsLegend(options, flags)) {
+    if (shouldShowLegend(options, flags)) {
       ui.stderr(
         renderMigrationGraphLegend({
           colorize: flags.color !== false,
@@ -244,7 +215,7 @@ export function createMigrationGraphCommand(): Command {
     .action(async (options: MigrationGraphOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
-      const legendValidation = validateMigrationGraphLegendOptions(options, flags);
+      const legendValidation = validateLegendOptions(options, flags);
       if (!legendValidation.ok) {
         process.exit(handleResult(legendValidation, flags, ui));
       }

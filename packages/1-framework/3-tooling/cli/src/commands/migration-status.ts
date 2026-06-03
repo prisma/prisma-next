@@ -49,10 +49,12 @@ import {
   renderMigrationGraphSpaceTree,
 } from '../utils/formatters/migration-graph-space-render';
 import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
+import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-tree-render';
 import type { MigrationListEntry } from '../utils/formatters/migration-list-types';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { shouldShowLegend, validateLegendOptions } from '../utils/legend';
 import type { StatusDiagnostic } from '../utils/migration-types';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
@@ -73,6 +75,7 @@ interface MigrationStatusOptions extends CommonCommandOptions {
   readonly to?: string;
   readonly from?: string;
   readonly space?: string;
+  readonly legend?: boolean;
 }
 
 export interface MigrationStatusMigrationEntry extends MigrationListEntry {
@@ -367,6 +370,15 @@ async function executeMigrationStatusCommand(
       flags,
     });
     ui.stderr(header);
+    if (shouldShowLegend(options, flags)) {
+      ui.stderr(
+        renderMigrationGraphLegend({
+          colorize: flags.color !== false,
+          glyphMode: ui.resolveGlyphMode(false),
+        }),
+      );
+      ui.stderr('');
+    }
   }
 
   const listSpaces = await migrationSpaceListEntriesFromAggregate(aggregate, migrationsDir);
@@ -626,6 +638,7 @@ export function createMigrationStatusCommand(): Command {
     'prisma-next migration status --db $DATABASE_URL',
     'prisma-next migration status --to production --db $DATABASE_URL',
     'prisma-next migration status --from sha256:abc --to production',
+    'prisma-next migration status --legend --from sha256:abc --to production',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration log', oneLiner: 'Show executed migration history' },
@@ -645,9 +658,15 @@ export function createMigrationStatusCommand(): Command {
       '--from <contract>',
       'Origin contract reference; same grammar as --to. Supplying --from switches to offline path computation.',
     )
+    .option('--legend', 'Print a key for the tree glyphs and lane colors')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
+
+      const legendValidation = validateLegendOptions(options, flags);
+      if (!legendValidation.ok) {
+        process.exit(handleResult(legendValidation, flags, ui));
+      }
 
       const result = await executeMigrationStatusCommand(options, flags, ui);
 

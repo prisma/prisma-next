@@ -27,6 +27,7 @@ import {
   setCommandSeeAlso,
 } from '../utils/command-helpers';
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
+import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-tree-render';
 import { renderMigrationListWithStyle } from '../utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
 import type {
@@ -38,6 +39,7 @@ import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import type { GlyphMode } from '../utils/glyph-mode';
+import { shouldShowLegend, validateLegendOptions } from '../utils/legend';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
@@ -129,6 +131,7 @@ interface MigrationListOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly space?: string;
   readonly ascii?: boolean;
+  readonly legend?: boolean;
 }
 
 export interface MigrationListExecuteResult {
@@ -240,6 +243,15 @@ export async function executeMigrationListCommand(
       flags,
     });
     ui.stderr(header);
+    if (shouldShowLegend(options, flags)) {
+      ui.stderr(
+        renderMigrationGraphLegend({
+          colorize: flags.color !== false,
+          glyphMode: ui.resolveGlyphMode(options.ascii === true),
+        }),
+      );
+      ui.stderr('');
+    }
   }
 
   const loaded = await buildReadAggregate(config, { migrationsDir });
@@ -277,6 +289,7 @@ export function createMigrationListCommand(): Command {
     'prisma-next migration list',
     'prisma-next migration list --space app',
     'prisma-next migration list --ascii',
+    'prisma-next migration list --legend',
     'prisma-next migration list --json',
   ]);
   setCommandSeeAlso(command, [
@@ -289,9 +302,14 @@ export function createMigrationListCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--space <id>', 'Narrow output to a single contract space')
     .option('--ascii', 'Use ASCII kind glyphs (pipe-friendly)')
+    .option('--legend', 'Print a key for the tree glyphs and lane colors')
     .action(async (options: MigrationListOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
+      const legendValidation = validateLegendOptions(options, flags);
+      if (!legendValidation.ok) {
+        process.exit(handleResult(legendValidation, flags, ui));
+      }
       const result = await executeMigrationListCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, ({ list, liveContractHash, aggregate }) => {
         if (flags.json) {

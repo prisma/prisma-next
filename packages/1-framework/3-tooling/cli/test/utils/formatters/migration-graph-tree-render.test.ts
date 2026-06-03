@@ -1331,7 +1331,8 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        <contract> (refs) db / contract markers
+        <contract, db> live markers (contract on disk, database state)
+        (prod, staging) user-defined refs
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
@@ -1345,7 +1346,8 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        <contract> (refs) db / contract markers
+        <contract, db> live markers (contract on disk, database state)
+        (prod, staging) user-defined refs
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
@@ -1369,7 +1371,8 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        <contract> (refs) db / contract markers
+        <contract, db> live markers (contract on disk, database state)
+        (prod, staging) user-defined refs
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb
         │ │ │ │ │ │ │   gutter lanes by column (column 0 dim; routed back-arcs one hue)"
     `);
@@ -1384,10 +1387,30 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        <contract> (refs) db / contract markers
+        <contract, db> live markers (contract on disk, database state)
+        (prod, staging) user-defined refs
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb
         | | | | | | |   gutter lanes by column (column 0 dim; routed back-arcs one hue)"
     `);
+  });
+
+  it('renders the marker/ref block as two lines in system-then-ref order', () => {
+    const text = renderMigrationGraphLegend({ colorize: false });
+    const lines = text.split('\n');
+    const markersIdx = lines.findIndex((line) => line.includes('live markers'));
+    const refsIdx = lines.findIndex((line) => line.includes('user-defined refs'));
+    expect(markersIdx).toBeGreaterThan(-1);
+    expect(refsIdx).toBeGreaterThan(markersIdx);
+    expect(lines[markersIdx]).toContain('<contract, db>');
+    expect(lines[refsIdx]).toContain('(prod, staging)');
+  });
+
+  it('does not bold the illustrative marker and ref example names when colorized', () => {
+    const colored = renderMigrationGraphLegend({ colorize: true });
+    const bold = '\u001b[1m';
+    for (const name of ['contract', 'db', 'prod', 'staging'] as const) {
+      expect(colored).not.toContain(`${bold}${name}`);
+    }
   });
 
   it('omits legacy contract-node and data-column legend wording', () => {
@@ -1396,7 +1419,11 @@ describe('renderMigrationGraphLegend', () => {
       expect(text).not.toContain('contract node');
       expect(text).not.toContain('data column');
       expect(text).not.toContain('node overlay');
-      expect(text).toContain('<contract> (refs) db / contract markers');
+      expect(text).not.toContain('db / contract markers');
+      expect(text).toContain('<contract, db>');
+      expect(text).toContain('(prod, staging)');
+      expect(text).toContain('live markers (contract on disk, database state)');
+      expect(text).toContain('user-defined refs');
       expect(text).toContain('migration from contract aaaaaa to bbbbbb');
     }
   });

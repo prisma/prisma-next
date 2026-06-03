@@ -742,16 +742,26 @@ export interface RenderMigrationGraphLegendOptions {
   readonly glyphMode?: GlyphMode;
 }
 
+function formatLegendExampleMarkers(colorize: boolean): string {
+  if (!colorize) {
+    return '<contract, db>';
+  }
+  const open = green('<');
+  const close = green('>');
+  const separator = green(', ');
+  return open + green('contract') + separator + green('db') + close;
+}
+
 /**
- * A compact key for the `--tree` visual language: the contract marker, the
- * in-lane direction arrows, the empty baseline, the `(refs)` overlay (including
- * the reserved `db` live-database and `contract` working-schema markers), and a
+ * A compact key for the tree visual language: the contract node glyph, the
+ * in-lane direction arrows, the empty baseline, the system-marker `<…>` and
+ * user-ref `(…)` bracket conventions (two illustrative example lines), and a
  * worked sample of the data-column `from → to` migration hash arrow.
  *
  * Honors the same glyph palette (unicode vs ASCII) and `colorize` gate as the
  * tree renderer, so the key matches whatever the graph itself drew and stays
  * pipe-safe (zero ANSI when color is off). The caller adds the trailing blank
- * line that separates this stderr key from the graph on stdout.
+ * line that separates this stderr key from the tree on stdout.
  */
 export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptions): string {
   const palette = paletteFor(opts.glyphMode ?? 'unicode');
@@ -763,13 +773,16 @@ export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptio
   const appliedPending = opts.colorize
     ? `  ${green(statusGlyphs.applied)} ${style.summary('applied')}   ${yellow(statusGlyphs.pending)} ${style.summary('pending')}`
     : `  ${statusGlyphs.applied} ${style.summary('applied')}   ${statusGlyphs.pending} ${style.summary('pending')}`;
+  const exampleMarkers = formatLegendExampleMarkers(opts.colorize);
+  const exampleRefs = opts.colorize ? style.refs(['prod', 'staging']) : '(prod, staging)';
   const lines = [
     'Legend:',
     `  ${style.kind(node)} ${style.summary('contract')}   ${style.kind(palette.edgeArrow.forward)} ${style.summary('forward')}   ${style.kind(palette.edgeArrow.rollback)} ${style.summary('rollback')}`,
     `  ${style.kind(palette.edgeArrow.self)} ${style.summary('migration without schema change')}`,
     appliedPending,
     `  ${style.kind(palette.emptySource)} ${style.summary('empty database (baseline)')}`,
-    `  ${style.markers([CONTRACT_MARKER_NAME])} ${style.refs(['refs'])} ${style.summary(`${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`)}`,
+    `  ${exampleMarkers} ${style.summary('live markers (contract on disk, database state)')}`,
+    `  ${exampleRefs} ${style.summary('user-defined refs')}`,
     `  ${sampleArrow}   ${style.summary('migration from contract aaaaaa to bbbbbb')}`,
   ];
   if (opts.colorize) {

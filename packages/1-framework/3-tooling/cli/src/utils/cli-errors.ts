@@ -109,17 +109,17 @@ export function errorRefSetEmptySentinel(hash: string): CliStructuredError {
 }
 
 /**
- * `migration graph --legend` was combined with a machine-readable output flag.
+ * `--legend` was combined with a machine-readable or silent output flag.
  * The legend is human-only decoration on stderr.
  */
-export function errorMigrationGraphLegendHumanOnly(
-  conflictingFlag: '--json' | '--dot',
+export function errorLegendHumanOnly(
+  conflictingFlag: '--json' | '--dot' | '--quiet',
 ): CliStructuredError {
-  return errorRuntime('`--legend` is only available for human-readable graph output', {
+  return errorRuntime('`--legend` is only available for human-readable output', {
     why: `\`--legend\` prints a glyph key to stderr and cannot be combined with ${conflictingFlag}.`,
     fix: `Omit ${conflictingFlag} to print the legend alongside the tree, or omit --legend when using ${conflictingFlag}.`,
     meta: {
-      code: 'MIGRATION.GRAPH_LEGEND_HUMAN_ONLY',
+      code: 'MIGRATION.LEGEND_HUMAN_ONLY',
       conflictingFlag,
     },
   });

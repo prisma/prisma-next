@@ -1,0 +1,299 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import type { Contract } from '@prisma-next/contract/types';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { createSqlContract } from '@prisma-next/test-utils';
+import { join } from 'pathe';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as configLoader from '../../src/config-loader';
+import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
+
+const HASH_ROOT = `sha256:4cb4256${'0'.repeat(57)}`;
+
+const ADDITIVE_OP: MigrationPlanOperation = {
+  id: 'table.users',
+  label: 'Create table users',
+  operationClass: 'additive',
+};
+
+const TEST_APP_CONTRACT = createSqlContract({
+  target: 'postgres',
+  storage: {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: { user: { columns: { id: {} } } },
+      },
+    },
+  },
+});
+
+const identityDeserialize = (json: unknown): Contract => json as Contract;
+
+async function writePackage(migrationsRoot: string, dirName: string): Promise<void> {
+  const pkgDir = join(migrationsRoot, 'app', dirName);
+  const ops = [ADDITIVE_OP];
+  const baseMetadata = {
+    from: null,
+    to: HASH_ROOT,
+    providedInvariants: [] as readonly string[],
+    createdAt: '2026-02-25T14:30:00.000Z',
+  } as Omit<MigrationMetadata, 'migrationHash'>;
+  const metadata: MigrationMetadata = {
+    ...baseMetadata,
+    migrationHash: computeMigrationHash(baseMetadata, ops),
+  };
+  await writeMigrationPackage(pkgDir, metadata, ops);
+}
+
+async function buildFixture(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), 'migration-legend-cmd-'));
+  const migrationsDir = join(cwd, 'migrations');
+  const contractDir = join(cwd, 'src', 'prisma');
+  await mkdir(contractDir, { recursive: true });
+  await writeFile(
+    join(contractDir, 'contract.json'),
+    JSON.stringify({
+      storage: { storageHash: TEST_APP_CONTRACT.storage.storageHash, namespaces: {} },
+      schemaVersion: '1.0.0',
+      target: 'postgres',
+      targetFamily: 'sql',
+    }),
+  );
+  await mkdir(join(migrationsDir, 'app'), { recursive: true });
+  await writePackage(migrationsDir, '20260422T0720_initial');
+  return cwd;
+}
+
+function mockConfig(): void {
+  type LoadedConfig = Awaited<ReturnType<typeof configLoader.loadConfig>>;
+  vi.spyOn(configLoader, 'loadConfig').mockResolvedValue({
+    family: {
+      familyId: 'sql',
+      create: vi.fn().mockReturnValue({
+        deserializeContract: identityDeserialize,
+      }),
+    },
+    target: {
+      id: 'postgres',
+      familyId: 'sql',
+      targetId: 'postgres',
+      kind: 'target',
+    },
+    adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres' },
+    driver: { kind: 'driver' },
+    contract: { output: 'src/prisma/contract.json', source: 'src/prisma/contract.json' },
+    migrations: { dir: 'migrations' },
+    extensionPacks: [],
+  } as unknown as LoadedConfig);
+}
+
+function envelopeCode(consoleOutput: readonly string[]): string | undefined {
+  const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+  if (jsonLine === undefined) {
+    return undefined;
+  }
+  const envelope = JSON.parse(jsonLine) as { meta?: { code?: string } };
+  return envelope.meta?.code;
+}
+
+const createdDirs: string[] = [];
+
+afterEach(async () => {
+  vi.restoreAllMocks();
+  const dirs = createdDirs.splice(0);
+  await Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+describe('migration list --legend', () => {
+  it('prints the key on stderr', async () => {
+    const commandMocks = setupCommandMocks();
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationListCommand } = await import('../../src/commands/migration-list');
+      const exitCode = await executeCommand(createMigrationListCommand(), [
+        '--legend',
+        '--no-color',
+      ]);
+      expect(exitCode).toBe(0);
+      const stderr = commandMocks.consoleErrors.join('\n');
+      expect(stderr).toContain('Legend:');
+      expect(stderr).toContain('<contract, db>');
+      expect(stderr).toContain('(prod, staging)');
+      expect(stderr).toContain('live markers (contract on disk, database state)');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+
+  it('returns MIGRATION.LEGEND_HUMAN_ONLY with --json', async () => {
+    const commandMocks = setupCommandMocks({ isTTY: false });
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationListCommand } = await import('../../src/commands/migration-list');
+      await expect(
+        executeCommand(createMigrationListCommand(), ['--legend', '--json']),
+      ).rejects.toThrow('process.exit called');
+      expect(envelopeCode(commandMocks.consoleOutput)).toBe('MIGRATION.LEGEND_HUMAN_ONLY');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+
+  it('returns MIGRATION.LEGEND_HUMAN_ONLY with --quiet', async () => {
+    const commandMocks = setupCommandMocks({ isTTY: false });
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationListCommand } = await import('../../src/commands/migration-list');
+      await expect(
+        executeCommand(createMigrationListCommand(), ['--legend', '--quiet']),
+      ).rejects.toThrow('process.exit called');
+      expect(envelopeCode(commandMocks.consoleOutput)).toBe('MIGRATION.LEGEND_HUMAN_ONLY');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+
+  it('prints the legend with --space app', async () => {
+    const commandMocks = setupCommandMocks();
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationListCommand } = await import('../../src/commands/migration-list');
+      const exitCode = await executeCommand(createMigrationListCommand(), [
+        '--legend',
+        '--space',
+        'app',
+        '--no-color',
+      ]);
+      expect(exitCode).toBe(0);
+      expect(commandMocks.consoleErrors.join('\n')).toContain('Legend:');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+});
+
+describe('migration status --legend', () => {
+  it('prints the key on stderr', async () => {
+    const commandMocks = setupCommandMocks();
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      const exitCode = await executeCommand(createMigrationStatusCommand(), [
+        '--legend',
+        '--from',
+        EMPTY_CONTRACT_HASH,
+        '--no-color',
+      ]);
+      expect(exitCode).toBe(0);
+      const stderr = commandMocks.consoleErrors.join('\n');
+      expect(stderr).toContain('Legend:');
+      expect(stderr).toContain('user-defined refs');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+
+  it('returns MIGRATION.LEGEND_HUMAN_ONLY with --json', async () => {
+    const commandMocks = setupCommandMocks({ isTTY: false });
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      await expect(
+        executeCommand(createMigrationStatusCommand(), [
+          '--legend',
+          '--from',
+          EMPTY_CONTRACT_HASH,
+          '--json',
+        ]),
+      ).rejects.toThrow('process.exit called');
+      expect(envelopeCode(commandMocks.consoleOutput)).toBe('MIGRATION.LEGEND_HUMAN_ONLY');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+
+  it('returns MIGRATION.LEGEND_HUMAN_ONLY with --quiet', async () => {
+    const commandMocks = setupCommandMocks({ isTTY: false });
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      await expect(
+        executeCommand(createMigrationStatusCommand(), [
+          '--legend',
+          '--from',
+          EMPTY_CONTRACT_HASH,
+          '--quiet',
+        ]),
+      ).rejects.toThrow('process.exit called');
+      expect(envelopeCode(commandMocks.consoleOutput)).toBe('MIGRATION.LEGEND_HUMAN_ONLY');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+
+  it('prints the legend with --space app', async () => {
+    const commandMocks = setupCommandMocks();
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      const exitCode = await executeCommand(createMigrationStatusCommand(), [
+        '--legend',
+        '--from',
+        EMPTY_CONTRACT_HASH,
+        '--space',
+        'app',
+        '--no-color',
+      ]);
+      expect(exitCode).toBe(0);
+      expect(commandMocks.consoleErrors.join('\n')).toContain('Legend:');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+});
