@@ -75,6 +75,27 @@ function refsMap(
   return new Map(entries.map((e) => [e.hash, e.names]));
 }
 
+function migrationDirNameColumns(rendered: string, dirNames: readonly string[]): readonly number[] {
+  const plain = stripAnsi(rendered);
+  return dirNames.map((name) => {
+    const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    const line = plain.split('\n').find((row) => pattern.test(row));
+    if (line === undefined) {
+      throw new Error(`no line for ${name}`);
+    }
+    const match = pattern.exec(line);
+    if (match?.index === undefined) {
+      throw new Error(`dirName ${name} not found in line`);
+    }
+    return match.index;
+  });
+}
+
+function assertMigrationDataColumnsAligned(rendered: string, dirNames: readonly string[]): void {
+  const columns = migrationDirNameColumns(rendered, dirNames);
+  expect(new Set(columns).size).toBe(1);
+}
+
 describe('renderMigrationGraphTree', () => {
   it('renders a linear chain per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
@@ -151,8 +172,8 @@ describe('renderMigrationGraphTree', () => {
       [
         '○   E',
         '├─╮',
-        '│↑│   promote            D → E',
-        '│ │↑  bob_extra          C → E',
+        '│↑│     promote          D → E',
+        '│ │↑    bob_extra        C → E',
         '○ │   D',
         '├─┼─╮',
         '│↑│ │   merge_alice      B → D',
@@ -161,14 +182,40 @@ describe('renderMigrationGraphTree', () => {
         '│↑│ │   alice            A → B',
         '│ ├─╯',
         '│ ○   C',
-        '│ │↑  bob                A → C',
+        '│ │↑    bob              A → C',
         '├─╯',
         '○   A',
-        '│↑  init                 ∅       → A',
+        '│↑      init             ∅       → A',
         '∅',
       ].join('\n'),
     );
     expect(treeAscii(edges)).toContain('| *   C');
+  });
+
+  it('aligns migration data columns on diamond and rollback peel', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');
+    const bob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
+    const mergeAlice = edge('73e3abe', '3b2d98d', 'merge_alice');
+    const mergeBob = edge('6656a6e', '3b2d98d', 'merge_bob');
+    const addBio = edge('73e3abe', '3ee5d20', 'add_bio');
+    const addPosts = edge('3ee5d20', 'a94b7b4', 'add_posts');
+    const rollbackToPhone = edge('a94b7b4', '73e3abe', 'rollback_to_phone');
+    const rollbackToInit = edge('3ee5d20', 'ef9de27', 'rollback_to_init');
+    const edges = [
+      init,
+      alice,
+      bob,
+      mergeAlice,
+      mergeBob,
+      addBio,
+      addPosts,
+      rollbackToPhone,
+      rollbackToInit,
+    ];
+    const dirNames = edges.map((e) => e.dirName);
+    assertMigrationDataColumnsAligned(tree(edges), dirNames);
+    assertMigrationDataColumnsAligned(treeAscii(edges), dirNames);
   });
 
   it('renders a diamond per mockup', () => {
@@ -189,7 +236,7 @@ describe('renderMigrationGraphTree', () => {
         '│ │↑  bob_add_avatar     ef9de27 → 6656a6e',
         '├─╯',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑    init               ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -218,7 +265,7 @@ describe('renderMigrationGraphTree', () => {
         '│ │ │↑  add_avatar       ef9de27 → 6656a6e',
         '├─┴─╯',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑      init             ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -382,7 +429,7 @@ describe('renderMigrationGraphTree', () => {
       │ │↑  bob_add_avatar     ef9de27 → 6656a6e
       ├─╯
       ○   ef9de27
-      │↑  init                 ∅       → ef9de27
+      │↑    init               ∅       → ef9de27
       ∅"
     `);
   });
@@ -516,7 +563,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | |^  bob_add_avatar     ef9de27 -> 6656a6e
       +-/
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^    init               -       -> ef9de27
       -"
     `);
   });
@@ -545,7 +592,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | | |^  add_avatar       ef9de27 -> 6656a6e
       +-+-/
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^      init             -       -> ef9de27
       -"
     `);
   });
@@ -646,7 +693,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | |^  bob_add_avatar     ef9de27 -> 6656a6e
       +-/
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^    init               -       -> ef9de27
       -"
     `);
   });

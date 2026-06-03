@@ -690,6 +690,18 @@ function edgeLabelColumn(row: MigrationGraphGridRow, wideLabelColumn: number | u
   return usesFullRowGutter ? row.cells.length * 2 + LABEL_GAP : (laneIndex + 1) * 2 + LABEL_GAP;
 }
 
+function maxEdgeTreePrefixWidth(
+  rows: readonly MigrationGraphGridRow[],
+  wideLabelColumn: number | undefined,
+): number {
+  let max = 0;
+  for (const row of rows) {
+    if (row.kind !== 'edge' || row.edge === undefined) continue;
+    max = Math.max(max, edgeLabelColumn(row, wideLabelColumn));
+  }
+  return max;
+}
+
 function nodeHasArcDecoration(row: MigrationGraphGridRow): boolean {
   return row.cells.some(
     (cell) => cell.kind === 'node' && (cell.arcTee === true || cell.arcLand === true),
@@ -714,6 +726,9 @@ export function renderMigrationGraphTree(
     )
     .map((row) => row.edge);
   const maxDirNameLen = maxDirNameLength(allEdges);
+  const maxEdgePrefixWidth = maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
+  const edgeDirNameWidth = rowDirNameWidth(maxEdgePrefixWidth, maxDirNameLen, dirNameGap);
+  const edgeDataColumn = maxEdgePrefixWidth + edgeDirNameWidth;
 
   const lines: string[] = [];
 
@@ -757,7 +772,7 @@ export function renderMigrationGraphTree(
     }
     const labelColumn =
       row.kind === 'edge'
-        ? edgeLabelColumn(row, wideLabelColumn)
+        ? maxEdgePrefixWidth
         : wideLabelColumn !== undefined &&
             (nodeHasArcDecoration(row) || row.contractHash !== undefined)
           ? wideLabelColumn
@@ -783,8 +798,11 @@ export function renderMigrationGraphTree(
     } else if (gutter.length < laneSpan * 2) {
       gutter = gutter.padEnd(laneSpan * 2, ' ');
     }
-    const dirNameWidth = rowDirNameWidth(labelColumn, maxDirNameLen, dirNameGap);
-    const dataColumn = labelColumn + dirNameWidth;
+    const dirNameWidth =
+      row.kind === 'edge'
+        ? edgeDirNameWidth
+        : rowDirNameWidth(labelColumn, maxDirNameLen, dirNameGap);
+    const dataColumn = row.kind === 'edge' ? edgeDataColumn : labelColumn + dirNameWidth;
     const gutterPad = padVisible(gutter, labelColumn);
 
     if (row.kind === 'node') {
