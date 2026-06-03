@@ -83,7 +83,9 @@ export type ComputeStorageHashArgs = {
 };
 
 export function computeStorageHash(args: ComputeStorageHashArgs): StorageHashBase<string> {
-  return castAs<StorageHashBase<string>>(sha256(hashContract(args)));
+  return blindCast<StorageHashBase<string>, 'sha256 digest of canonicalized storage'>(
+    sha256(hashContract(args)),
+  );
 }
 
 export function computeExecutionHash(args: {
@@ -91,7 +93,9 @@ export function computeExecutionHash(args: {
   targetFamily: string;
   execution: Record<string, unknown>;
 }): ExecutionHashBase<string> {
-  return castAs<ExecutionHashBase<string>>(sha256(hashContract(args)));
+  return blindCast<ExecutionHashBase<string>, 'sha256 digest of canonicalized execution'>(
+    sha256(hashContract(args)),
+  );
 }
 
 export function computeProfileHash(args: {
@@ -99,5 +103,7 @@ export function computeProfileHash(args: {
   targetFamily: string;
   capabilities: Record<string, Record<string, boolean>>;
 }): ProfileHashBase<string> {
-  return castAs<ProfileHashBase<string>>(sha256(hashContract(args)));
+  return blindCast<ProfileHashBase<string>, 'sha256 digest of canonicalized profile'>(
+    sha256(hashContract(args)),
+  );
 }
