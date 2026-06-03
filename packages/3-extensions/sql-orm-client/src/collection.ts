@@ -266,11 +266,16 @@ export class Collection<
     const whereArg =
       typeof input === 'function'
         ? input(
-            // The runtime accessor exposes the selected variant's fields via
-            // the proxy when `state.variantName` is threaded in, but
-            // `createModelAccessor` is declared to return the base
-            // `ModelAccessor`; the variant widening lives only in the callback
-            // param type, so the value cannot be statically proven to satisfy it.
+            // The variant name is already threaded through the type state
+            // (`State['variantName']`, set by `variant()`); that is what the
+            // callback param's `VariantAwareModelAccessor` reads. The blindCast
+            // remains because `createModelAccessor` is declared to return the
+            // base `ModelAccessor` — its runtime proxy carries the selected
+            // variant's fields when `variantName` is passed, but its *return
+            // type* is not variant-parameterized. Making that return type
+            // variant-aware would ripple into every non-variant caller
+            // (relation predicates, orderBy, etc.), so the widening is kept
+            // callback-param-only and bridged here with a single narrow cast.
             blindCast<
               VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
               'runtime accessor carries the selected variant fields; the variant widening is callback-param-only'
@@ -981,7 +986,9 @@ export class Collection<
     configure: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null>;
   async first(
-    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+    filter: (
+      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+    ) => WhereArg,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null>;
   async first(
@@ -990,7 +997,7 @@ export class Collection<
   ): Promise<Row | null>;
   async first(
     filter?:
-      | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
+      | ((model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null> {

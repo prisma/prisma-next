@@ -420,3 +420,36 @@ test('where without a variant exposes only base fields on the predicate model', 
     }),
   );
 });
+
+// ---------------------------------------------------------------------------
+// `first()` mirrors `where()`: its callback predicate is variant-aware, so
+// `t.variant('X').first(t => t.variantField…)` exposes variant X's fields.
+// ---------------------------------------------------------------------------
+
+declare const tasks: Collection<PolyContract, 'Task'>;
+
+test('first after variant("Feature") exposes the MTI variant field on the predicate model', () => {
+  tasks.variant('Feature').first((task) => {
+    expectTypeOf(task).toHaveProperty('priority');
+    expectTypeOf(task).toHaveProperty('title');
+    return task.priority.gte(3);
+  });
+});
+
+test('first after variant("Bug") exposes the Bug variant field and rejects the other variant field', () => {
+  tasks.variant('Bug').first((task) => {
+    expectTypeOf(task).toHaveProperty('severity');
+    // @ts-expect-error priority belongs to the Feature variant, not Bug
+    task.priority;
+    return task.severity.isNull();
+  });
+});
+
+test('first without a variant exposes only base fields on the predicate model', () => {
+  tasks.first((task) => {
+    expectTypeOf(task).toHaveProperty('title');
+    // @ts-expect-error priority is an MTI variant field, absent on the base predicate model
+    task.priority;
+    return task.title.isNotNull();
+  });
+});
