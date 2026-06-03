@@ -305,7 +305,7 @@ function buildNestedIncludeProjections(
  * out of scope. Remap it to the child alias — the same remap the row builder
  * already applies to `orderBy`/`where`.
  */
-function buildChildPolymorphismArtifacts(
+function buildChildPolymorphismJoinsAndProjection(
   contract: Contract<SqlStorage>,
   include: IncludeExpr,
   childTableAlias: string | undefined,
@@ -407,10 +407,10 @@ function buildIncludeChildRowsSelect(
 
   // When the include target is polymorphic, mirror the parent path: join
   // the MTI variant tables into the correlated subquery's FROM and project
-  // their `variant_table__column` cells so the decoder can resolve each
-  // row's variant. The discriminator + STI variant columns ride the base
-  // projection above.
-  const polyArtifacts = buildChildPolymorphismArtifacts(
+  // their `variant_table__column` columns so the decoder can resolve each
+  // row's variant. The discriminator and STI variant columns are already in
+  // the base projection above, so they need no extra handling here.
+  const polyJoinsAndProjection = buildChildPolymorphismJoinsAndProjection(
     contract,
     include,
     childTableAlias,
@@ -434,7 +434,7 @@ function buildIncludeChildRowsSelect(
   // json_object_expr.
   const childProjection: ReadonlyArray<ProjectionItem> = [
     ...scalarProjection,
-    ...polyArtifacts.projection,
+    ...polyJoinsAndProjection.projection,
     ...nestedProjections,
   ];
 
@@ -443,8 +443,8 @@ function buildIncludeChildRowsSelect(
   )
     .withProjection([...childProjection, ...hiddenOrderProjection])
     .withWhere(whereExpr);
-  if (polyArtifacts.joins.length > 0) {
-    childRows = childRows.withJoins([...polyArtifacts.joins]);
+  if (polyJoinsAndProjection.joins.length > 0) {
+    childRows = childRows.withJoins([...polyJoinsAndProjection.joins]);
   }
 
   if (childState.distinctOn && childState.distinctOn.length > 0) {
@@ -567,12 +567,13 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     childTableRef,
   );
 
-  // Polymorphic target: join the MTI variant tables into the pre-dedup
-  // inner SELECT and carry their `variant_table__column` cells through the
-  // ROW_NUMBER wrap so they reach the outer projection (forwarded by alias
-  // from `distinctAlias` below). The discriminator + STI variant columns
-  // ride the base projection.
-  const polyArtifacts = buildChildPolymorphismArtifacts(
+  // Polymorphic target: join the MTI variant tables into the pre-dedup inner
+  // SELECT and add their `variant_table__column` columns to that SELECT's
+  // projection. The ROW_NUMBER wrap re-selects them by alias so they reach the
+  // outer projection (forwarded from `distinctAlias` below). The discriminator
+  // and STI variant columns are already part of the base projection, so they
+  // need no extra handling here.
+  const polyJoinsAndProjection = buildChildPolymorphismJoinsAndProjection(
     contract,
     include,
     childTableAlias,
@@ -583,12 +584,12 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   )
     .withProjection([
       ...innerScalarProjection,
-      ...polyArtifacts.projection,
+      ...polyJoinsAndProjection.projection,
       ...hiddenOrderProjection,
     ])
     .withWhere(whereExpr);
-  if (polyArtifacts.joins.length > 0) {
-    baseInner = baseInner.withJoins([...polyArtifacts.joins]);
+  if (polyJoinsAndProjection.joins.length > 0) {
+    baseInner = baseInner.withJoins([...polyJoinsAndProjection.joins]);
   }
 
   // `childState.distinct` is non-empty by the `isDistinctNonLeaf` guard
@@ -649,7 +650,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   // Forward the MTI variant columns the inner wrap carried under their
   // `variant_table__column` aliases onto the outer SELECT, now sourced
   // from the deduped distinct alias (their join is gone at this level).
-  const outerPolyProjection = polyArtifacts.projection.map((proj) =>
+  const outerPolyProjection = polyJoinsAndProjection.projection.map((proj) =>
     ProjectionItem.of(proj.alias, ColumnRef.of(distinctAlias, proj.alias), proj.codec),
   );
 
