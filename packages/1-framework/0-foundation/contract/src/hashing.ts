@@ -11,6 +11,27 @@ import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from './type
 
 const SCHEMA_VERSION = '1';
 
+function omitNamespaceKindsForHash(storage: unknown): unknown {
+  if (storage === null || typeof storage !== 'object' || Array.isArray(storage)) {
+    return storage;
+  }
+  const record = storage as Record<string, unknown>;
+  const namespaces = record['namespaces'];
+  if (namespaces === null || typeof namespaces !== 'object' || Array.isArray(namespaces)) {
+    return storage;
+  }
+  const stripped: Record<string, unknown> = {};
+  for (const [nsId, ns] of Object.entries(namespaces as Record<string, unknown>)) {
+    if (ns !== null && typeof ns === 'object' && !Array.isArray(ns)) {
+      const { kind: _kind, ...rest } = ns as Record<string, unknown>;
+      stripped[nsId] = rest;
+    } else {
+      stripped[nsId] = ns;
+    }
+  }
+  return { ...record, namespaces: stripped };
+}
+
 function sha256(content: string): string {
   const hash = createHash('sha256');
   hash.update(content);
@@ -24,6 +45,7 @@ type HashContractSection = Record<string, unknown> & {
 
 function hashContract(section: HashContractSection): string {
   const { shouldPreserveEmpty, sortStorage, ...sectionData } = section;
+  const storageForHash = omitNamespaceKindsForHash(sectionData['storage'] ?? {});
   // Blind cast: the synthesised object is a hash-only stand-in
   // — never returned to callers, never executed as a Contract.
   // `canonicalizeContract` only walks the storage / execution /
@@ -35,13 +57,13 @@ function hashContract(section: HashContractSection): string {
     target: sectionData['target'],
     roots: {},
     domain: { namespaces: {} },
-    storage: sectionData['storage'] ?? {},
     execution: sectionData['execution'],
     extensionPacks: {},
     capabilities: sectionData['capabilities'] ?? {},
     meta: {},
     profileHash: '',
     ...sectionData,
+    storage: storageForHash,
   } as unknown as Contract;
   return canonicalizeContract(contract, {
     schemaVersion: SCHEMA_VERSION,
