@@ -116,4 +116,8 @@ Beyond the canonical project DoD items:
 
 Walk `design-decisions.md` for any decision that hasn't migrated to an ADR. If unmigrated decisions exist that are architecturally durable (cross-cutting, hard to reverse, affect future work), block close-out until they have ADRs — closing with un-ADR'd architectural decisions is a known close-out failure mode.
 
+### Substrate-substitution wire-compat coverage (added 2026-06-03 retro)
+
+When a project introduces a new driver / adapter / runtime substrate that claims wire-compat parity with an existing one (e.g. a serverless driver substituting for the TCP driver against the same database family), **live-wire integration coverage against the substituted backend is a slice-DoD prerequisite, not a project-DoD nice-to-have**. Mocked-driver tests can verify the new substrate's own logic but cannot see column-hydration, error-shape, or protocol-framing gaps at the wire boundary by construction — they shape the row themselves before it crosses the seam. The framework adapter layer often banks on per-column behaviour (e.g. `pg`'s native `text[]` -> JS-array hydration) that mocked tests trivially satisfy but the new substrate may not. Land the live-wire integration test in the slice that introduces the substrate, not in a later validation slice; otherwise wire-compat regressions surface only at project close-out (or first real-user contact) when the cost of pivoting design is highest.
+
 _(Living; add overlays as the team discovers them.)_

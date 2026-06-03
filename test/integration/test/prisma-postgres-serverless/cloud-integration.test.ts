@@ -162,10 +162,8 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
     //                   NOT by `@prisma/ppg`).
     // The `prisma+postgres://…api_key=…` form looks PPG-y because it
     // shares the scheme with `@prisma/dev`'s endpoint, but the wire
-    // protocol underneath is GraphQL/Accelerate, not PPG. This is
-    // the same URL-scheme aliasing trap that bit D1 (see
-    // `projects/ppg-serverless/learnings.md`). For PPG, take the
-    // `pooled` endpoint.
+    // protocol underneath is GraphQL/Accelerate, not PPG. For PPG,
+    // take the `pooled` endpoint.
     const database = response.data.database;
     const conn = database?.connections[0];
     const ppgUrl = conn?.endpoints.pooled?.connectionString;
