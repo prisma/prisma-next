@@ -6,7 +6,9 @@ import {
   domainModelsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import {
+  domainModelTableInNamespace,
   resolveDomainModelForContract,
   resolveTableForContract,
   storageTableForContract,
@@ -40,8 +42,25 @@ export interface PolymorphismInfo {
   readonly mtiVariants: readonly PolymorphismVariantInfo[];
 }
 
-function modelsOf(contract: Contract<SqlStorage>): ModelsMap {
-  return domainModelsAtDefaultNamespace(contract.domain) as ModelsMap;
+// Model map for a model's metadata resolution. When a namespace coordinate is
+// supplied the lookup is scoped to that namespace (`orm.<ns>.<Model>`); without
+// one it falls back to the sole-namespace map, which still throws on a
+// multi-namespace contract because bare-name access is ambiguous there.
+function modelsOf(contract: Contract<SqlStorage>, namespaceId?: string): ModelsMap {
+  if (namespaceId === undefined) {
+    return domainModelsAtDefaultNamespace(contract.domain) as ModelsMap;
+  }
+  const namespace = contract.domain.namespaces[namespaceId];
+  if (namespace === undefined) {
+    throw new Error(`domain namespace "${namespaceId}" is not present on the contract`);
+  }
+  return blindCast<ModelsMap, 'domain namespace models are model entries for this SQL contract'>(
+    namespace.models,
+  );
+}
+
+function metadataCacheKey(modelName: string, namespaceId?: string): string {
+  return namespaceId === undefined ? modelName : `${namespaceId}\u0000${modelName}`;
 }
 
 export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntry | undefined {
@@ -56,29 +75,36 @@ const polymorphismCache = new WeakMap<object, Map<string, PolymorphismInfo | und
 export function resolvePolymorphismInfo(
   contract: Contract<SqlStorage>,
   modelName: string,
+  namespaceId?: string,
 ): PolymorphismInfo | undefined {
   let perContract = polymorphismCache.get(contract);
   if (!perContract) {
     perContract = new Map();
     polymorphismCache.set(contract, perContract);
   }
-  if (perContract.has(modelName)) return perContract.get(modelName);
+  const cacheKey = metadataCacheKey(modelName, namespaceId);
+  if (perContract.has(cacheKey)) return perContract.get(cacheKey);
 
-  const models = modelsOf(contract);
+  const models = modelsOf(contract, namespaceId);
   const model = models[modelName];
   if (!model?.discriminator || !model.variants) {
-    perContract.set(modelName, undefined);
+    perContract.set(cacheKey, undefined);
     return undefined;
   }
 
   const baseTable = model.storage?.table;
   if (!baseTable) {
-    perContract.set(modelName, undefined);
+    perContract.set(cacheKey, undefined);
     return undefined;
   }
 
   const discriminatorField = model.discriminator.field;
-  const discriminatorColumn = resolveFieldToColumn(contract, modelName, discriminatorField);
+  const discriminatorColumn = resolveFieldToColumn(
+    contract,
+    modelName,
+    discriminatorField,
+    namespaceId,
+  );
 
   const variants = new Map<string, PolymorphismVariantInfo>();
   const variantsByValue = new Map<string, PolymorphismVariantInfo>();
@@ -117,7 +143,7 @@ export function resolvePolymorphismInfo(
     mtiVariants,
   };
 
-  perContract.set(modelName, result);
+  perContract.set(cacheKey, result);
   return result;
 }
 
@@ -125,8 +151,9 @@ export function resolveFieldToColumn(
   contract: Contract<SqlStorage>,
   modelName: string,
   fieldName: string,
+  namespaceId?: string,
 ): string {
-  return getFieldToColumnMap(contract, modelName)[fieldName] ?? fieldName;
+  return getFieldToColumnMap(contract, modelName, namespaceId)[fieldName] ?? fieldName;
 }
 
 export interface VariantColumnRef {
@@ -174,42 +201,46 @@ export function resolveVariantFieldColumns(
 export function getFieldToColumnMap(
   contract: Contract<SqlStorage>,
   modelName: string,
+  namespaceId?: string,
 ): Record<string, string> {
   let perContract = fieldToColumnCache.get(contract);
   if (!perContract) {
     perContract = new Map();
     fieldToColumnCache.set(contract, perContract);
   }
-  let cached = perContract.get(modelName);
+  const cacheKey = metadataCacheKey(modelName, namespaceId);
+  let cached = perContract.get(cacheKey);
   if (cached) return cached;
 
-  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  const storageFields = modelsOf(contract, namespaceId)[modelName]?.storage?.fields ?? {};
   cached = {};
   for (const [f, s] of Object.entries(storageFields)) {
     if (s?.column) cached[f] = s.column;
   }
-  perContract.set(modelName, cached);
+  perContract.set(cacheKey, cached);
   return cached;
 }
 
 export function getColumnToFieldMap(
   contract: Contract<SqlStorage>,
   modelName: string,
+  namespaceId?: string,
 ): Record<string, string> {
   let perContract = columnToFieldCache.get(contract);
   if (!perContract) {
     perContract = new Map();
     columnToFieldCache.set(contract, perContract);
   }
-  let cached = perContract.get(modelName);
+  const cacheKey = metadataCacheKey(modelName, namespaceId);
+  let cached = perContract.get(cacheKey);
   if (cached) return cached;
 
-  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  const storageFields = modelsOf(contract, namespaceId)[modelName]?.storage?.fields ?? {};
   cached = {};
   for (const [f, s] of Object.entries(storageFields)) {
     if (s?.column) cached[s.column] = f;
   }
-  perContract.set(modelName, cached);
+  perContract.set(cacheKey, cached);
   return cached;
 }
 
@@ -222,21 +253,23 @@ const completeColumnToFieldCache = new WeakMap<object, Map<string, Record<string
 export function getCompleteColumnToFieldMap(
   contract: Contract<SqlStorage>,
   modelName: string,
+  namespaceId?: string,
 ): Record<string, string> {
   let perContract = completeColumnToFieldCache.get(contract);
   if (!perContract) {
     perContract = new Map();
     completeColumnToFieldCache.set(contract, perContract);
   }
-  let cached = perContract.get(modelName);
+  const cacheKey = metadataCacheKey(modelName, namespaceId);
+  let cached = perContract.get(cacheKey);
   if (cached) return cached;
 
-  const storageFields = modelsOf(contract)[modelName]?.storage?.fields ?? {};
+  const storageFields = modelsOf(contract, namespaceId)[modelName]?.storage?.fields ?? {};
   cached = {};
   for (const [f, s] of Object.entries(storageFields)) {
     cached[s?.column ?? f] = f;
   }
-  perContract.set(modelName, cached);
+  perContract.set(cacheKey, cached);
   return cached;
 }
 
@@ -266,8 +299,9 @@ export function resolveIncludeRelation(
   contract: Contract<SqlStorage>,
   modelName: string,
   relationName: string,
+  namespaceId?: string,
 ): ResolvedIncludeRelation {
-  const relations = resolveModelRelations(contract, modelName);
+  const relations = resolveModelRelations(contract, modelName, namespaceId);
   const relation = relations[relationName];
   if (!relation) {
     throw new Error(`Relation '${relationName}' not found on model '${modelName}'`);
@@ -281,7 +315,7 @@ export function resolveIncludeRelation(
   }
 
   const relatedTableName = resolveModelTableName(contract, relation.to);
-  const localColumn = resolveFieldToColumn(contract, modelName, localField);
+  const localColumn = resolveFieldToColumn(contract, modelName, localField, namespaceId);
   const targetColumn = resolveFieldToColumn(contract, relation.to, targetField);
 
   return {
@@ -326,16 +360,18 @@ const modelRelationsCache = new WeakMap<object, Map<string, Record<string, Resol
 export function resolveModelRelations(
   contract: Contract<SqlStorage>,
   modelName: string,
+  namespaceId?: string,
 ): Record<string, ResolvedRelation> {
   let perContract = modelRelationsCache.get(contract);
   if (!perContract) {
     perContract = new Map();
     modelRelationsCache.set(contract, perContract);
   }
-  const cached = perContract.get(modelName);
+  const cacheKey = metadataCacheKey(modelName, namespaceId);
+  const cached = perContract.get(cacheKey);
   if (cached) return cached;
 
-  const models = modelsOf(contract);
+  const models = modelsOf(contract, namespaceId);
   const relationMap = models[modelName]?.relations ?? {};
   const resolved: Record<string, ResolvedRelation> = {};
 
@@ -374,7 +410,7 @@ export function resolveModelRelations(
     };
   }
 
-  perContract.set(modelName, resolved);
+  perContract.set(cacheKey, resolved);
   return resolved;
 }
 
@@ -389,22 +425,36 @@ export function resolveUpsertConflictColumns(
   contract: Contract<SqlStorage>,
   modelName: string,
   conflictOn: Record<string, unknown> | undefined,
+  namespaceId?: string,
 ): string[] {
   if (conflictOn && typeof conflictOn === 'object') {
     const columns = Object.keys(conflictOn).map((fieldName) =>
-      resolveFieldToColumn(contract, modelName, fieldName),
+      resolveFieldToColumn(contract, modelName, fieldName, namespaceId),
     );
     if (columns.length > 0) {
       return columns;
     }
   }
 
-  const tableName = resolveModelTableName(contract, modelName);
+  const tableName = resolveModelTableName(contract, modelName, namespaceId);
   const primaryKeyColumns = storageTableForContract(contract, tableName).primaryKey?.columns ?? [];
   return [...primaryKeyColumns];
 }
 
-export function resolveModelTableName(contract: Contract<SqlStorage>, modelName: string): string {
+export function resolveModelTableName(
+  contract: Contract<SqlStorage>,
+  modelName: string,
+  namespaceId?: string,
+): string {
+  if (namespaceId !== undefined) {
+    const table = domainModelTableInNamespace(contract, namespaceId, modelName);
+    if (table === undefined) {
+      throw new Error(
+        `Model "${modelName}" has invalid or missing storage.table in namespace "${namespaceId}"`,
+      );
+    }
+    return table;
+  }
   const resolved = resolveDomainModelForContract(contract, modelName);
   if (!resolved) {
     throw new Error(`Model "${modelName}" not found in contract`);
