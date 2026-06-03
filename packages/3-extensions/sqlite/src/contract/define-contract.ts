@@ -7,6 +7,7 @@ import type {
   ModelLike,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { defineContract as baseDefineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
 
 type SqlFamily = typeof sqlFamilyPack;
@@ -71,6 +72,10 @@ export function defineContract<
   },
 ): SqliteResult<Types, Models, ExtensionPacks>;
 
+const sqliteAuthoringDefaults = {
+  createNamespace: sqliteCreateNamespace,
+} as const;
+
 export function defineContract(
   scaffold: Omit<ContractInput, 'family' | 'target'>,
   factory?: (helpers: ComposedAuthoringHelpers<SqlFamily, SqlitePack, undefined>) => {
@@ -80,13 +85,14 @@ export function defineContract(
 ): SqliteResult<TypesConstraint, ModelsConstraint, undefined> {
   const full = {
     ...scaffold,
+    ...sqliteAuthoringDefaults,
     family: sqlFamilyPack,
     target: sqlitePack,
   } as ContractInput;
   if (factory !== undefined) {
     const { types: _t, models: _m, ...scaffoldOnly } = full;
     return baseDefineContract(
-      scaffoldOnly,
+      { ...scaffoldOnly, ...sqliteAuthoringDefaults },
       factory as Parameters<typeof baseDefineContract>[1],
     ) as unknown as SqliteResult<TypesConstraint, ModelsConstraint, undefined>;
   }

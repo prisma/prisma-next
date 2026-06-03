@@ -8,6 +8,11 @@ import {
 } from '../src/core/sqlite-unbound-database';
 
 describe('SqliteUnboundDatabase', () => {
+  it('materializes kind non-enumerably as sqlite-namespace', () => {
+    expect(SqliteUnboundDatabase.instance.kind).toBe('sqlite-namespace');
+    expect(Object.keys(SqliteUnboundDatabase.instance)).not.toContain('kind');
+  });
+
   it('exposes the framework-reserved unbound id as its singleton id', () => {
     expect(SqliteUnboundDatabase.instance.id).toBe(UNBOUND_NAMESPACE_ID);
   });
@@ -50,10 +55,12 @@ describe('SqliteDatabase', () => {
 
 describe('sqliteCreateNamespace factory', () => {
   it('returns the unbound singleton for the framework-reserved sentinel', () => {
-    expect(sqliteCreateNamespace(UNBOUND_NAMESPACE_ID)).toBe(SqliteUnboundDatabase.instance);
+    expect(sqliteCreateNamespace({ id: UNBOUND_NAMESPACE_ID })).toBe(
+      SqliteUnboundDatabase.instance,
+    );
   });
 
   it('rejects every non-unbound coordinate — SQLite contracts cannot declare named namespaces', () => {
-    expect(() => sqliteCreateNamespace('auth')).toThrow(/SQLite has no schema concept/);
+    expect(() => sqliteCreateNamespace({ id: 'auth' })).toThrow(/SQLite has no schema concept/);
   });
 });

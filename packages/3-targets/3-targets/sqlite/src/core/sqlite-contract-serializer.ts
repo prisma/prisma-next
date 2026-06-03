@@ -1,13 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
-import {
-  type Namespace,
-  NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
-} from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import { blindCast } from '@prisma-next/utils/casts';
-import { SqliteDatabase, SqliteUnboundDatabase } from './sqlite-unbound-database';
+import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
+import { buildSqliteNamespace } from './sqlite-unbound-database';
 
 /**
  * SQLite target `ContractSerializer` concretion. Mirrors the Postgres
@@ -28,24 +23,6 @@ export class SqliteContractSerializer extends SqlContractSerializerBase<Contract
       return raw;
     }
     const hydrated = super.hydrateSqlNamespaceEntry(nsId, raw) as SqlNamespaceTablesInput;
-    const { id, entries } = hydrated;
-    const tables = entries?.table ?? {};
-    const emptyTables = Object.keys(tables).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables) {
-      return SqliteUnboundDatabase.instance;
-    }
-    if (id !== UNBOUND_NAMESPACE_ID) {
-      throw new Error(
-        `SqliteContractSerializer: SQLite has no schema concept; the only valid namespace id is "${UNBOUND_NAMESPACE_ID}" (received "${id}").`,
-      );
-    }
-    return new SqliteDatabase({
-      id,
-      entries: {
-        table: blindCast<Readonly<Record<string, StorageTable>>, 'hydrated entries.table slot'>(
-          tables,
-        ),
-      },
-    });
+    return buildSqliteNamespace(hydrated);
   }
 }

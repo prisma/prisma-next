@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig } from '@prisma-next/config/config-types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -13,6 +15,7 @@ export interface PrismaContractOptions {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', string>;
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
 }
 
 /**
@@ -106,6 +109,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
               : undefined,
           ),
           controlMutationDefaults: context.controlMutationDefaults,
+          ...ifDefined('createNamespace', options.createNamespace),
         });
         if (!interpreted.ok) {
           return interpreted;
