@@ -302,6 +302,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'comments';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly body: { readonly column: 'body' };
@@ -327,6 +328,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'items';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly name: { readonly column: 'name' };
@@ -379,6 +381,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'posts';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
@@ -405,6 +408,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'profiles';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly userId: { readonly column: 'user_id' };
@@ -438,6 +442,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'typed_rows';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly active: { readonly column: 'active' };
@@ -492,6 +497,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'users';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly name: { readonly column: 'name' };
@@ -545,6 +551,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'comments';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly body: { readonly column: 'body' };
@@ -570,6 +577,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'items';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly name: { readonly column: 'name' };
@@ -622,6 +630,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'posts';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
@@ -648,6 +657,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'profiles';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly userId: { readonly column: 'user_id' };
@@ -681,6 +691,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'typed_rows';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly active: { readonly column: 'active' };
@@ -735,6 +746,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'users';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly name: { readonly column: 'name' };

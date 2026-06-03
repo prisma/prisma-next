@@ -50,7 +50,8 @@
                   "column": "id"
                 }
               },
-              "table": "audit_event"
+              "table": "audit_event",
+              "namespaceId": "public"
             }
           }
         }
@@ -84,7 +85,9 @@
             "foreignKeys": [],
             "indexes": [],
             "primaryKey": {
-              "columns": ["id"]
+              "columns": [
+                "id"
+              ]
             },
             "uniques": []
           }

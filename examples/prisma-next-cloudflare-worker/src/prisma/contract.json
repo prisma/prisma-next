@@ -52,7 +52,8 @@
                   "column": "stepsToRepro"
                 }
               },
-              "table": "bug"
+              "table": "bug",
+              "namespaceId": "public"
             }
           },
           "Feature": {
@@ -86,7 +87,8 @@
                   "column": "targetRelease"
                 }
               },
-              "table": "feature"
+              "table": "feature",
+              "namespaceId": "public"
             }
           },
           "Post": {
@@ -155,7 +157,8 @@
                   "column": "userId"
                 }
               },
-              "table": "post"
+              "table": "post",
+              "namespaceId": "public"
             }
           },
           "Task": {
@@ -257,7 +260,8 @@
                   "column": "userId"
                 }
               },
-              "table": "task"
+              "table": "task",
+              "namespaceId": "public"
             },
             "variants": {
               "Bug": {
@@ -369,7 +373,8 @@
                   "column": "kind"
                 }
               },
-              "table": "user"
+              "table": "user",
+              "namespaceId": "public"
             }
           }
         },

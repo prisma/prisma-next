@@ -61,6 +61,7 @@
                   "column": "name"
                 }
               },
+              "namespaceId": "public",
               "table": "cafe"
             }
           },
@@ -104,6 +105,7 @@
                   "column": "name"
                 }
               },
+              "namespaceId": "public",
               "table": "neighborhood"
             }
           },
@@ -147,6 +149,7 @@
                   "column": "path"
                 }
               },
+              "namespaceId": "public",
               "table": "route"
             }
           }

@@ -80,6 +80,7 @@
                   "column": "title"
                 }
               },
+              "namespaceId": "public",
               "table": "posts"
             }
           },
@@ -146,6 +147,7 @@
                   "column": "name"
                 }
               },
+              "namespaceId": "public",
               "table": "users"
             }
           }

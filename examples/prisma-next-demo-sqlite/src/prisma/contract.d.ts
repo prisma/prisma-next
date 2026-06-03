@@ -198,6 +198,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'post';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
@@ -244,6 +245,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'user';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly email: { readonly column: 'email' };
@@ -308,6 +310,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'post';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
@@ -354,6 +357,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'user';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly email: { readonly column: 'email' };

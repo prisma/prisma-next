@@ -110,6 +110,7 @@
                   "column": "update_at"
                 }
               },
+              "namespaceId": "public",
               "table": "comment"
             }
           },
@@ -169,6 +170,7 @@
                   "column": "profile"
                 }
               },
+              "namespaceId": "public",
               "table": "embedding"
             }
           },
@@ -222,6 +224,7 @@
                   "column": "scheduled_at"
                 }
               },
+              "namespaceId": "public",
               "table": "event"
             }
           },
@@ -312,6 +315,7 @@
                   "column": "tags"
                 }
               },
+              "namespaceId": "public",
               "table": "literal_defaults"
             }
           },
@@ -450,6 +454,7 @@
                   "column": "starts_at_tz"
                 }
               },
+              "namespaceId": "public",
               "table": "param_types"
             }
           },
@@ -561,6 +566,7 @@
                   "column": "userId"
                 }
               },
+              "namespaceId": "public",
               "table": "post"
             }
           },
@@ -640,6 +646,7 @@
                   "column": "update_at"
                 }
               },
+              "namespaceId": "public",
               "table": "user"
             }
           }

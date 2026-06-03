@@ -70,6 +70,7 @@
                   "column": "post_id"
                 }
               },
+              "namespaceId": "__unbound__",
               "table": "comments"
             }
           },
@@ -110,6 +111,7 @@
                   "column": "name"
                 }
               },
+              "namespaceId": "__unbound__",
               "table": "items"
             }
           },
@@ -191,6 +193,7 @@
                   "column": "views"
                 }
               },
+              "namespaceId": "__unbound__",
               "table": "posts"
             }
           },
@@ -231,6 +234,7 @@
                   "column": "user_id"
                 }
               },
+              "namespaceId": "__unbound__",
               "table": "profiles"
             }
           },
@@ -291,6 +295,7 @@
                   "column": "metadata"
                 }
               },
+              "namespaceId": "__unbound__",
               "table": "typed_rows"
             }
           },
@@ -372,6 +377,7 @@
                   "column": "name"
                 }
               },
+              "namespaceId": "__unbound__",
               "table": "users"
             }
           }

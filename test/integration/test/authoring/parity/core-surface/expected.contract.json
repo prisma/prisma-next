@@ -76,6 +76,7 @@
                   "column": "userId"
                 }
               },
+              "namespaceId": "public",
               "table": "post"
             }
           },
@@ -146,6 +147,7 @@
                   "column": "role"
                 }
               },
+              "namespaceId": "public",
               "table": "user"
             }
           }

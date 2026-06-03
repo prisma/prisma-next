@@ -82,6 +82,7 @@ type ContractBase = ContractShape<
     readonly Shop: {
       readonly storage: {
         readonly table: 'shop';
+        readonly namespaceId: '__unbound__';
         readonly fields: {
           readonly id: { readonly column: 'id' };
           readonly name: { readonly column: 'name' };

@@ -40,7 +40,8 @@
                   "column": "key"
                 }
               },
-              "table": "feature_flag"
+              "table": "feature_flag",
+              "namespaceId": "public"
             }
           }
         }
@@ -69,7 +70,9 @@
             "foreignKeys": [],
             "indexes": [],
             "primaryKey": {
-              "columns": ["key"]
+              "columns": [
+                "key"
+              ]
             },
             "uniques": []
           }

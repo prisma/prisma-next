@@ -72,7 +72,9 @@
             "foreignKeys": [],
             "indexes": [],
             "primaryKey": {
-              "columns": ["id"]
+              "columns": [
+                "id"
+              ]
             },
             "uniques": []
           },
@@ -100,7 +102,9 @@
             "foreignKeys": [],
             "indexes": [],
             "primaryKey": {
-              "columns": ["id"]
+              "columns": [
+                "id"
+              ]
             },
             "uniques": []
           }
@@ -253,7 +257,8 @@
                   "column": "verified"
                 }
               },
-              "table": "account"
+              "table": "account",
+              "namespaceId": "__unbound__"
             }
           },
           "widget": {
@@ -296,7 +301,8 @@
                   "column": "value"
                 }
               },
-              "table": "widget"
+              "table": "widget",
+              "namespaceId": "__unbound__"
             }
           }
         }

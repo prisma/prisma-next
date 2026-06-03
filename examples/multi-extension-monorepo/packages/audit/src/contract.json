@@ -50,7 +50,8 @@
                   "column": "id"
                 }
               },
-              "table": "audit_event"
+              "table": "audit_event",
+              "namespaceId": "public"
             }
           }
         }

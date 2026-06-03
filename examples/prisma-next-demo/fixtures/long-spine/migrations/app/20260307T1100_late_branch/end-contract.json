@@ -113,7 +113,8 @@
                   "column": "tags"
                 }
               },
-              "table": "user"
+              "table": "user",
+              "namespaceId": "__unbound__"
             }
           }
         }
@@ -180,7 +181,9 @@
             "foreignKeys": [],
             "indexes": [],
             "primaryKey": {
-              "columns": ["id"]
+              "columns": [
+                "id"
+              ]
             },
             "uniques": []
           }
