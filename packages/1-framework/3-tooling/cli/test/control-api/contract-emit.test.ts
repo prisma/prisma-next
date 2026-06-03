@@ -246,7 +246,7 @@ describe('executeContractEmit', () => {
     mockedEmit.mockResolvedValueOnce(createEmitResult('hydrated'));
 
     await withMockedConfig(
-      { ...config, family: familyWithHydration as typeof config.family },
+      { ...config, family: familyWithHydration as unknown as typeof config.family },
       async () => {
         await executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
       },
