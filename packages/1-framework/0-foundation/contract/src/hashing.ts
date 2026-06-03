@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
 import {
@@ -11,25 +12,31 @@ import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from './type
 
 const SCHEMA_VERSION = '1';
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+// Storage hashes fingerprint table/column layout, not which target pack emitted a
+// namespace. Persisted contract.json carries namespace `kind` discriminators;
+// authoring-time hashes never included them (IR `kind` is non-enumerable).
 function omitNamespaceKindsForHash(storage: unknown): unknown {
-  if (storage === null || typeof storage !== 'object' || Array.isArray(storage)) {
+  if (!isPlainRecord(storage)) {
     return storage;
   }
-  const record = storage as Record<string, unknown>;
-  const namespaces = record['namespaces'];
-  if (namespaces === null || typeof namespaces !== 'object' || Array.isArray(namespaces)) {
+  const namespaces = storage['namespaces'];
+  if (!isPlainRecord(namespaces)) {
     return storage;
   }
   const stripped: Record<string, unknown> = {};
-  for (const [nsId, ns] of Object.entries(namespaces as Record<string, unknown>)) {
-    if (ns !== null && typeof ns === 'object' && !Array.isArray(ns)) {
-      const { kind: _kind, ...rest } = ns as Record<string, unknown>;
+  for (const [nsId, ns] of Object.entries(namespaces)) {
+    if (isPlainRecord(ns)) {
+      const { kind: _kind, ...rest } = ns;
       stripped[nsId] = rest;
     } else {
       stripped[nsId] = ns;
     }
   }
-  return { ...record, namespaces: stripped };
+  return { ...storage, namespaces: stripped };
 }
 
 function sha256(content: string): string {
@@ -46,13 +53,7 @@ type HashContractSection = Record<string, unknown> & {
 function hashContract(section: HashContractSection): string {
   const { shouldPreserveEmpty, sortStorage, ...sectionData } = section;
   const storageForHash = omitNamespaceKindsForHash(sectionData['storage'] ?? {});
-  // Blind cast: the synthesised object is a hash-only stand-in
-  // — never returned to callers, never executed as a Contract.
-  // `canonicalizeContract` only walks the storage / execution /
-  // capabilities slices, all of which are populated above, so the
-  // missing precise Contract typing on the other slots is
-  // immaterial for the hash result.
-  const contract = {
+  const contract = blindCast<Contract, 'hash-only partial contract for canonicalizeContract'>({
     targetFamily: sectionData['targetFamily'],
     target: sectionData['target'],
     roots: {},
@@ -64,10 +65,10 @@ function hashContract(section: HashContractSection): string {
     profileHash: '',
     ...sectionData,
     storage: storageForHash,
-  } as unknown as Contract;
+  });
   return canonicalizeContract(contract, {
     schemaVersion: SCHEMA_VERSION,
-    serializeContract: (c) => JSON.parse(JSON.stringify(c)) as JsonObject,
+    serializeContract: (c) => castAs<JsonObject>(JSON.parse(JSON.stringify(c))),
     ...ifDefined('shouldPreserveEmpty', shouldPreserveEmpty),
     ...ifDefined('sortStorage', sortStorage),
   });
@@ -82,7 +83,7 @@ export type ComputeStorageHashArgs = {
 };
 
 export function computeStorageHash(args: ComputeStorageHashArgs): StorageHashBase<string> {
-  return sha256(hashContract(args)) as StorageHashBase<string>;
+  return castAs<StorageHashBase<string>>(sha256(hashContract(args)));
 }
 
 export function computeExecutionHash(args: {
@@ -90,7 +91,7 @@ export function computeExecutionHash(args: {
   targetFamily: string;
   execution: Record<string, unknown>;
 }): ExecutionHashBase<string> {
-  return sha256(hashContract(args)) as ExecutionHashBase<string>;
+  return castAs<ExecutionHashBase<string>>(sha256(hashContract(args)));
 }
 
 export function computeProfileHash(args: {
@@ -98,5 +99,5 @@ export function computeProfileHash(args: {
   targetFamily: string;
   capabilities: Record<string, Record<string, boolean>>;
 }): ProfileHashBase<string> {
-  return sha256(hashContract(args)) as ProfileHashBase<string>;
+  return castAs<ProfileHashBase<string>>(sha256(hashContract(args)));
 }
