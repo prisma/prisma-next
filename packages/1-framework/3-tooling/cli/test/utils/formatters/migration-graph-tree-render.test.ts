@@ -1355,13 +1355,13 @@ describe('renderMigrationGraphLegend', () => {
   it('emits zero ANSI when colorize is off', () => {
     const plain = renderMigrationGraphLegend({ colorize: false });
     expect(plain).not.toContain('\u001b[');
-    expect(plain).not.toContain('gutter lanes by column');
   });
 
-  it('tints the lane-color swatches from LANE_COLOR_CYCLE when colorize is on', () => {
-    const colored = renderMigrationGraphLegend({ colorize: true });
-    expect(colored).toContain(laneColorForColumn(1)('│'));
-    expect(stripAnsi(colored)).toContain('gutter lanes by column');
+  it('omits the lane-swatch line in both color and plain modes', () => {
+    for (const colorize of [false, true]) {
+      const text = stripAnsi(renderMigrationGraphLegend({ colorize }));
+      expect(text).not.toContain('gutter lanes by column');
+    }
   });
 
   it('renders the unicode legend with color', () => {
@@ -1373,8 +1373,7 @@ describe('renderMigrationGraphLegend', () => {
         ∅ empty database (baseline)
         <contract, db> live markers (contract on disk, database state)
         (prod, staging) user-defined refs
-        aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb
-        │ │ │ │ │ │ │   gutter lanes by column (column 0 dim; routed back-arcs one hue)"
+        aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
 
@@ -1389,8 +1388,7 @@ describe('renderMigrationGraphLegend', () => {
         - empty database (baseline)
         <contract, db> live markers (contract on disk, database state)
         (prod, staging) user-defined refs
-        aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb
-        | | | | | | |   gutter lanes by column (column 0 dim; routed back-arcs one hue)"
+        aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
 
@@ -1432,7 +1430,6 @@ describe('renderMigrationGraphLegend', () => {
     const colored = renderMigrationGraphLegend({ colorize: true, glyphMode: 'ascii' });
     expect(stripAnsi(colored)).toContain('* contract   ^ forward   v rollback');
     expect(stripAnsi(colored)).toContain('aaaaaa -> bbbbbb');
-    expect(stripAnsi(colored)).toContain('gutter lanes by column');
   });
 
   it('dims legend label prose when colorize is on, not the heading or glyphs', () => {

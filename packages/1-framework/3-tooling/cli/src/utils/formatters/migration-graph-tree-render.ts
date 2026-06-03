@@ -3,7 +3,6 @@ import { bold, createColors, green, yellow } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
 import {
-  LANE_COLOR_CYCLE,
   laneColorForColumn,
   NEUTRAL_LANE_COLUMN,
   type RowArcLaneColors,
@@ -767,7 +766,6 @@ export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptio
   const palette = paletteFor(opts.glyphMode ?? 'unicode');
   const style = createAnsiMigrationListStyler({ useColor: opts.colorize });
   const node = palette.node.trimEnd();
-  const laneBar = palette.verticalPass.trimEnd();
   const sampleArrow = `${style.sourceHash('aaaaaa')} ${style.glyph(palette.forwardArrow)} ${style.destHash('bbbbbb')}`;
   const statusGlyphs = overlayStatusGlyphs(opts.glyphMode ?? 'unicode');
   const appliedPending = opts.colorize
@@ -785,14 +783,5 @@ export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptio
     `  ${exampleRefs} ${style.summary('user-defined refs')}`,
     `  ${sampleArrow}   ${style.summary('migration from contract aaaaaa to bbbbbb')}`,
   ];
-  if (opts.colorize) {
-    const laneSwatches = [
-      style.lane(laneBar),
-      ...LANE_COLOR_CYCLE.map((color) => color(laneBar)),
-    ].join(' ');
-    lines.push(
-      `  ${laneSwatches}   ${style.summary('gutter lanes by column (column 0 dim; routed back-arcs one hue)')}`,
-    );
-  }
   return lines.join('\n');
 }
