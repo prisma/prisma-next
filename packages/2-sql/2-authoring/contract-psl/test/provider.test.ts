@@ -1,9 +1,9 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
 import type { Contract } from '@prisma-next/contract/types';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
-import { applySpecifierDefaultControlPolicy } from '../src/apply-specifier-default-control-policy';
 import { prismaContract } from '../src/exports/provider';
 import {
   createPostgresTestContext,
