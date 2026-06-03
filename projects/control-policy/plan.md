@@ -40,11 +40,11 @@ One substrate slice followed by a parallel fan of consumers. The IR field + seri
 ### Deferrable follow-on
 
 5. **Slice `psl-authoring`** — Linear: TML-2779
-   - **Outcome:** The PSL surface expresses the same per-object override and contract default, lowering to the same IR as the TS path and round-tripping.
-   - **Builds on:** Slice 1's field; mirrors Slice 4's lowering target.
-   - **Hands to:** PSL/TS authoring parity.
-   - **Focus:** In scope — settling the PSL spelling (an open question in the spec) and wiring the interpreter lowering. Out of scope — re-litigating the IR shape, fixed by Slice 1.
-   - **Deferrable:** if the spelling proves load-bearing, this leaves the project as a tracked follow-up (per the spec's PSL open question), keeping the delivered core at four slices.
+   - **Outcome:** The PSL surface expresses the per-object override (`@@control(<policy>)`) lowering to Slice 1's `controlPolicy` IR slot; and PSL/TS authoring parity for the contract default lands at the contract-specifier boundary in `prisma-next.config.ts` (`prismaContract` / `typescriptContract` / `typescriptContractFromPath` / `emptyContract` accept `defaultControlPolicy`, with source-wins precedence). PSL gains no new top-level grammar.
+   - **Builds on:** Slice 1's IR field; Slice 4's TS authoring surface (which the specifier-arg path mirrors); TML-2800's contract-level `defaultControlPolicy` field.
+   - **Hands to:** PSL/TS authoring parity for both per-object and contract-default control policy.
+   - **Focus:** In scope — the new `@@control` interpreter branch in `packages/2-sql/2-authoring/contract-psl/src/interpreter.ts` with five validation diagnostics; PSL → IR → JSON → IR round-trip parity test; `defaultControlPolicy?` added to all four contract specifiers (PSL + SQL TS + Mongo TS) with source-wins precedence applied at load time. Out of scope — per-namespace inheritance (project non-goal); a new top-level PSL block; re-litigating the IR shape.
+   - **Slice scaffolded:** spec + plan + reviews under [`slices/psl-authoring/`](slices/psl-authoring/spec.md). Spelling decisions (`@@control(<policy>)`, lowercase argument; specifier-arg with source-wins precedence) settled in design discussion.
 
 ## Dependencies (external)
 
