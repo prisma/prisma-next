@@ -60,6 +60,7 @@
                   "column": "rating"
                 }
               },
+              "namespaceId": "public",
               "table": "item"
             }
           }

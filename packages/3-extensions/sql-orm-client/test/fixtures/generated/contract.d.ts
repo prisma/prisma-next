@@ -393,6 +393,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'articles';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
@@ -418,6 +419,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'comments';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly body: { readonly column: 'body' };
@@ -472,6 +474,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'posts';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
@@ -508,6 +511,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'profiles';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly userId: { readonly column: 'user_id' };
@@ -533,6 +537,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'tags';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly name: { readonly column: 'name' };
@@ -598,6 +603,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'users';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly name: { readonly column: 'name' };
@@ -652,6 +658,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'articles';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
@@ -677,6 +684,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'comments';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly body: { readonly column: 'body' };
@@ -734,6 +742,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'posts';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
@@ -770,6 +779,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'profiles';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly userId: { readonly column: 'user_id' };
@@ -795,6 +805,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'tags';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly name: { readonly column: 'name' };
@@ -863,6 +874,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'users';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly name: { readonly column: 'name' };

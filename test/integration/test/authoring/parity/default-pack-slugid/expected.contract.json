@@ -30,6 +30,7 @@
                   "column": "id"
                 }
               },
+              "namespaceId": "public",
               "table": "user"
             }
           }

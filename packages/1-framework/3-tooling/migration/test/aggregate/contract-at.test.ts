@@ -33,7 +33,7 @@ function sampleContractJson(storageHash: string): unknown {
                 },
               },
               relations: {},
-              storage: { table: 'users', namespace: 'public' },
+              storage: { namespaceId: '__unbound__', table: 'users', namespace: 'public' },
             },
           },
         },

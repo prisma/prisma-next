@@ -154,7 +154,7 @@ describe('SQL contract validators', () => {
 
     it('throws on invalid fields structure', () => {
       const invalid = {
-        storage: { table: 'user' },
+        storage: { table: 'user', namespaceId: UNBOUND_NAMESPACE_ID },
         fields: 'not-an-object',
         relations: {},
       } as unknown;
@@ -163,7 +163,11 @@ describe('SQL contract validators', () => {
 
     it('validates model without relations', () => {
       const modelWithoutRelations = {
-        storage: { table: 'user', fields: { id: { column: 'id' } } },
+        storage: {
+          table: 'user',
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          fields: { id: { column: 'id' } },
+        },
         fields: {
           id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
         },

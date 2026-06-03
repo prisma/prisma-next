@@ -43,12 +43,16 @@ describe('SqlContractSerializer model validation', () => {
   it('rejects model referencing non-existent table', () => {
     const valid = withContractModels(baseContract, {
       User: {
-        storage: { table: 'NonExistent', fields: { id: { column: 'id' } } },
+        storage: {
+          namespaceId: '__unbound__',
+          table: 'NonExistent',
+          fields: { id: { column: 'id' } },
+        },
         fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
       },
     });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(valid)).toThrow(
-      /references non-existent table "NonExistent"/,
+      /references non-existent table "__unbound__\.NonExistent"/,
     );
   });
 
@@ -57,7 +61,7 @@ describe('SqlContractSerializer model validation', () => {
       baseContract,
       {
         User: {
-          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          storage: { namespaceId: '__unbound__', table: 'User', fields: { id: { column: 'id' } } },
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
         },
       },
@@ -83,7 +87,7 @@ describe('SqlContractSerializer model validation', () => {
   it('throws when model has empty fields object', () => {
     const invalid = withContractModels(baseContract, {
       User: {
-        storage: { table: 'User', fields: {} },
+        storage: { namespaceId: '__unbound__', table: 'User', fields: {} },
         fields: {},
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -97,7 +101,7 @@ describe('SqlContractSerializer model validation', () => {
   it('rejects model field with empty column string', () => {
     const invalid = withContractModels(baseContract, {
       User: {
-        storage: { table: 'User', fields: { id: { column: '' } } },
+        storage: { namespaceId: '__unbound__', table: 'User', fields: { id: { column: '' } } },
         fields: { id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false } },
       },
     });
@@ -109,7 +113,11 @@ describe('SqlContractSerializer model validation', () => {
   it('rejects model field referencing non-existent column', () => {
     const valid = withContractModels(baseContract, {
       User: {
-        storage: { table: 'User', fields: { id: { column: 'nonExistent' } } },
+        storage: {
+          namespaceId: '__unbound__',
+          table: 'User',
+          fields: { id: { column: 'nonExistent' } },
+        },
         fields: { id: { type: { kind: 'scalar', codecId: 'pg/int4@1' }, nullable: false } },
       },
     });
@@ -124,6 +132,7 @@ describe('SqlContractSerializer model validation', () => {
       {
         Post: {
           storage: {
+            namespaceId: '__unbound__',
             table: 'Post',
             fields: {
               id: { column: 'id' },
@@ -143,7 +152,7 @@ describe('SqlContractSerializer model validation', () => {
           },
         },
         User: {
-          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          storage: { namespaceId: '__unbound__', table: 'User', fields: { id: { column: 'id' } } },
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
         },
       },
@@ -183,6 +192,7 @@ describe('SqlContractSerializer model validation', () => {
       {
         User: {
           storage: {
+            namespaceId: '__unbound__',
             table: 'User',
             fields: {
               id: { column: 'id' },
@@ -201,6 +211,7 @@ describe('SqlContractSerializer model validation', () => {
         },
         Post: {
           storage: {
+            namespaceId: '__unbound__',
             table: 'Post',
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
@@ -257,6 +268,7 @@ describe('SqlContractSerializer model validation', () => {
       {
         Post: {
           storage: {
+            namespaceId: '__unbound__',
             table: 'Post',
             fields: {
               id: { column: 'id' },
@@ -276,7 +288,7 @@ describe('SqlContractSerializer model validation', () => {
           },
         },
         User: {
-          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          storage: { namespaceId: '__unbound__', table: 'User', fields: { id: { column: 'id' } } },
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
         },
       },

@@ -200,7 +200,7 @@ describe('filters', () => {
       User: {
         ...(models['User'] as Record<string, unknown>),
         fields: {},
-        storage: { table: 'users' },
+        storage: { namespaceId: 'public', table: 'users' },
       },
     }));
 

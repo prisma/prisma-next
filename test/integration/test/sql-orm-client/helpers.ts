@@ -138,6 +138,7 @@ export function buildMixedPolyContract(): TestContract {
     },
     relations: {},
     storage: {
+      namespaceId: POSTGRES_DEFAULT_NAMESPACE_ID,
       table: 'tasks',
       fields: { id: { column: 'id' }, title: { column: 'title' }, type: { column: 'type' } },
     },
@@ -148,14 +149,22 @@ export function buildMixedPolyContract(): TestContract {
   domainModels['Bug'] = {
     fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
-    storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
+    storage: {
+      namespaceId: POSTGRES_DEFAULT_NAMESPACE_ID,
+      table: 'tasks',
+      fields: { severity: { column: 'severity' } },
+    },
     base: { model: 'Task', namespace: POSTGRES_DEFAULT_NAMESPACE_ID },
   };
 
   domainModels['Feature'] = {
     fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
     relations: {},
-    storage: { table: 'features', fields: { priority: { column: 'priority' } } },
+    storage: {
+      namespaceId: POSTGRES_DEFAULT_NAMESPACE_ID,
+      table: 'features',
+      fields: { priority: { column: 'priority' } },
+    },
     base: { model: 'Task', namespace: POSTGRES_DEFAULT_NAMESPACE_ID },
   };
 
@@ -213,14 +222,22 @@ export function buildStiPolyContract(): TestContract {
   domainModels['Admin'] = {
     fields: { role: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
-    storage: { table: 'users', fields: { role: { column: 'role' } } },
+    storage: {
+      namespaceId: POSTGRES_DEFAULT_NAMESPACE_ID,
+      table: 'users',
+      fields: { role: { column: 'role' } },
+    },
     base: { model: 'User', namespace: POSTGRES_DEFAULT_NAMESPACE_ID },
   };
 
   domainModels['Regular'] = {
     fields: { plan: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
-    storage: { table: 'users', fields: { plan: { column: 'plan' } } },
+    storage: {
+      namespaceId: POSTGRES_DEFAULT_NAMESPACE_ID,
+      table: 'users',
+      fields: { plan: { column: 'plan' } },
+    },
     base: { model: 'User', namespace: POSTGRES_DEFAULT_NAMESPACE_ID },
   };
 

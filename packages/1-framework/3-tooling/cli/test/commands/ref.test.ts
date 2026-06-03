@@ -60,7 +60,7 @@ function contractIRForHash(storageHash: string): ContractIR {
             },
           },
           relations: {},
-          storage: { table: 'users', namespace: 'public' },
+          storage: { namespaceId: '__unbound__', table: 'users', namespace: 'public' },
         },
       },
       roots: {},

@@ -291,6 +291,7 @@ describe('SQL contract factories', () => {
       expect(userModel).toEqual({
         storage: {
           table: 'user',
+          namespaceId: UNBOUND_NAMESPACE_ID,
           fields: {
             id: { column: 'id' },
             email: { column: 'email' },

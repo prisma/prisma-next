@@ -257,7 +257,7 @@ describe('canonicalizeContractToObject', () => {
               name: { type: { kind: 'scalar', codecId: 'text' }, nullable: false },
               age: { type: { kind: 'scalar', codecId: 'int' }, nullable: false },
             },
-            storage: { table: 'users', fields: {} },
+            storage: { namespaceId: '__unbound__', table: 'users', fields: {} },
             relations: {},
           },
         },
@@ -286,7 +286,7 @@ describe('default omission', () => {
         models: {
           User: {
             fields: { id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false } },
-            storage: { table: 'users', fields: {} },
+            storage: { namespaceId: '__unbound__', table: 'users', fields: {} },
             relations: {},
           },
         },
@@ -304,7 +304,7 @@ describe('default omission', () => {
             fields: {
               id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false, generated: false },
             },
-            storage: { table: 'users', fields: {} },
+            storage: { namespaceId: '__unbound__', table: 'users', fields: {} },
             relations: {},
           },
         },
@@ -363,7 +363,7 @@ describe('default omission', () => {
         models: {
           User: {
             fields: { id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false } },
-            storage: { table: 'users', fields: {} },
+            storage: { namespaceId: '__unbound__', table: 'users', fields: {} },
             relations: {},
           },
         },
@@ -473,7 +473,7 @@ describe('default omission', () => {
             fields: {
               id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false, extra: {} },
             },
-            storage: { table: 'users', fields: {} },
+            storage: { namespaceId: '__unbound__', table: 'users', fields: {} },
             relations: {},
           },
         },
@@ -501,7 +501,7 @@ describe('default omission', () => {
             fields: {
               id: { type: { kind: 'scalar', codecId: 'int' }, nullable: false, default: null },
             },
-            storage: { table: 'users', fields: {} },
+            storage: { namespaceId: '__unbound__', table: 'users', fields: {} },
             relations: {},
           },
         },
@@ -567,7 +567,7 @@ describe('index and unique sorting', () => {
                 default: isoString,
               },
             },
-            storage: { table: 'users', fields: {} },
+            storage: { namespaceId: '__unbound__', table: 'users', fields: {} },
             relations: {},
           },
         },

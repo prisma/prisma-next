@@ -137,14 +137,12 @@ describe('assertDescriptorSelfConsistency', () => {
     ).not.toThrow();
   });
 
-  it('strips namespace `kind` discriminators before recomputing', () => {
+  it('accepts on-disk namespace kind discriminators when recomputing', () => {
     // Target serializers (e.g. Postgres) inject a `kind` discriminator
     // into each namespace JSON envelope when writing contract.json.
-    // The authoring-time storage hash is computed against IR class
-    // instances whose `kind` is non-enumerable, so the published hash
-    // never sees `kind`. This test pins the helper's behaviour:
-    // recomputing against on-disk JSON that *does* carry `kind` must
-    // still match the authoring-time hash.
+    // `computeStorageHash` omits namespace `kind` for hashing, so
+    // recomputing against on-disk JSON that carries `kind` still matches
+    // the authoring-time hash.
     const namespacedBody = {
       namespaces: {
         public: {

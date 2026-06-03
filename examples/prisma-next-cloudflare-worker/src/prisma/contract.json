@@ -52,6 +52,7 @@
                   "column": "stepsToRepro"
                 }
               },
+              "namespaceId": "public",
               "table": "bug"
             }
           },
@@ -86,6 +87,7 @@
                   "column": "targetRelease"
                 }
               },
+              "namespaceId": "public",
               "table": "feature"
             }
           },
@@ -155,6 +157,7 @@
                   "column": "userId"
                 }
               },
+              "namespaceId": "public",
               "table": "post"
             }
           },
@@ -257,6 +260,7 @@
                   "column": "userId"
                 }
               },
+              "namespaceId": "public",
               "table": "task"
             },
             "variants": {
@@ -369,6 +373,7 @@
                   "column": "kind"
                 }
               },
+              "namespaceId": "public",
               "table": "user"
             }
           }

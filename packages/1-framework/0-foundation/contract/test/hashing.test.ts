@@ -117,6 +117,33 @@ describe('computeStorageHash', () => {
     });
     expect(hash1).toBe(hash2);
   });
+
+  it('ignores namespace kind discriminators in storage', () => {
+    const tables = {
+      test_box: {
+        columns: {
+          x: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+        },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    };
+    const withoutKind = {
+      namespaces: {
+        public: { id: 'public', tables },
+      },
+    };
+    const withKind = {
+      namespaces: {
+        public: { id: 'public', kind: 'postgres-schema', tables },
+      },
+    };
+    const base = { target: 'postgres', targetFamily: 'sql', ...SQL_HOOKS };
+    expect(computeStorageHash({ ...base, storage: withoutKind })).toBe(
+      computeStorageHash({ ...base, storage: withKind }),
+    );
+  });
 });
 
 describe('computeProfileHash', () => {

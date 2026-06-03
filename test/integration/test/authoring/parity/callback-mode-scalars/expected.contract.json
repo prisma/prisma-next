@@ -76,6 +76,7 @@
                   "column": "userId"
                 }
               },
+              "namespaceId": "public",
               "table": "post"
             }
           },
@@ -166,6 +167,7 @@
                   "column": "score"
                 }
               },
+              "namespaceId": "public",
               "table": "user"
             }
           }

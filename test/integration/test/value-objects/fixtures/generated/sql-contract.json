@@ -111,6 +111,7 @@
             "relations": {},
             "storage": {
               "table": "shop",
+              "namespaceId": "__unbound__",
               "fields": {
                 "id": {
                   "column": "id"

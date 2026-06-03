@@ -302,16 +302,6 @@ function eachStorageTable(storage: NamespacedStorageWalk) {
   );
 }
 
-function findStorageTableByTableName(storage: NamespacedStorageWalk, tableName: string): unknown {
-  for (const ns of Object.values(storage.namespaces)) {
-    const t = ns.tables?.[tableName];
-    if (t !== undefined) {
-      return t;
-    }
-  }
-  return undefined;
-}
-
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -367,6 +357,7 @@ const ModelStorageFieldSchema = type({
 
 const ModelStorageSchema = type({
   table: 'string',
+  namespaceId: 'string',
   fields: type({ '[string]': ModelStorageFieldSchema }),
 });
 
@@ -696,12 +687,19 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
     const models = namespace.models as Record<string, ContractModel<SqlModelStorage>>;
     for (const [modelName, model] of Object.entries(models)) {
       const qualifiedName = `${namespaceId}:${modelName}`;
-      const storageTable = model.storage.table;
+      const storageNamespaceId = model.storage.namespaceId;
+      if (storageNamespaceId !== namespaceId) {
+        throw new ContractValidationError(
+          `Model "${qualifiedName}" storage.namespaceId "${storageNamespaceId}" does not match domain namespace "${namespaceId}"`,
+          'storage',
+        );
+      }
 
-      const rawTable = findStorageTableByTableName(contract.storage, storageTable);
+      const storageTable = model.storage.table;
+      const rawTable = contract.storage.namespaces[storageNamespaceId]?.tables?.[storageTable];
       if (rawTable === undefined) {
         throw new ContractValidationError(
-          `Model "${qualifiedName}" references non-existent table "${storageTable}"`,
+          `Model "${qualifiedName}" references non-existent table "${storageNamespaceId}.${storageTable}"`,
           'storage',
         );
       }

@@ -31,43 +31,6 @@ function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined)
   return `{ ${entries.join('; ')} }`;
 }
 
-/**
- * Name-only lookup that walks every namespace until it finds a table
- * with the given name. Survives this slice only for the two model-side
- * call sites whose `SqlModelStorage.table` is still a bare name without
- * a namespace coordinate; both call sites — and this helper — are
- * deleted by TML-2584, which promotes `SqlModelStorage` to carry the
- * model's namespace id so model→table resolution can use explicit
- * coordinates like the FK-ref site already does.
- */
-function findSqlTable(
-  storage: SqlStorage,
-  tableName: string,
-): { readonly table: StorageTable; readonly namespaceId: string } | undefined {
-  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    const table = ns.tables[tableName] as StorageTable | undefined;
-    if (table !== undefined) {
-      return { table, namespaceId };
-    }
-  }
-  return undefined;
-}
-
-function assertUniqueSqlTableNames(storage: SqlStorage): void {
-  const seen = new Map<string, string>();
-  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    for (const tableName of Object.keys(ns.tables)) {
-      const existing = seen.get(tableName);
-      if (existing !== undefined && existing !== namespaceId) {
-        throw new Error(
-          `Duplicate table name "${tableName}" in namespaces "${existing}" and "${namespaceId}"`,
-        );
-      }
-      seen.set(tableName, namespaceId);
-    }
-  }
-}
-
 export const sqlEmission = {
   id: 'sql',
 
@@ -110,7 +73,18 @@ export const sqlEmission = {
       throw new Error('SQL contract must have storage.namespaces');
     }
 
-    assertUniqueSqlTableNames(storage);
+    const tableNamesSeenAcrossNamespaces = new Map<string, string>();
+    for (const [nsId, ns] of Object.entries(storage.namespaces)) {
+      for (const tableName of Object.keys(ns.tables)) {
+        const existingNs = tableNamesSeenAcrossNamespaces.get(tableName);
+        if (existingNs !== undefined && existingNs !== nsId) {
+          throw new Error(
+            `Duplicate table name "${tableName}" in namespaces "${existingNs}" and "${nsId}"`,
+          );
+        }
+        tableNamesSeenAcrossNamespaces.set(tableName, nsId);
+      }
+    }
 
     const tableNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
@@ -126,14 +100,24 @@ export const sqlEmission = {
         if (!model.storage?.table) {
           throw new Error(`Model "${qualifiedName}" is missing storage.table`);
         }
-
-        const tableName = model.storage.table;
-        const located = findSqlTable(storage, tableName);
-        if (!located) {
-          throw new Error(`Model "${qualifiedName}" references non-existent table "${tableName}"`);
+        if (!model.storage.namespaceId) {
+          throw new Error(`Model "${qualifiedName}" is missing storage.namespaceId`);
+        }
+        if (model.storage.namespaceId !== namespaceId) {
+          throw new Error(
+            `Model "${qualifiedName}" storage.namespaceId "${model.storage.namespaceId}" does not match domain namespace "${namespaceId}"`,
+          );
         }
 
-        const { table } = located;
+        const tableName = model.storage.table;
+        const table = storage.namespaces[namespaceId]?.tables[tableName] as
+          | StorageTable
+          | undefined;
+        if (!table) {
+          throw new Error(
+            `Model "${qualifiedName}" references non-existent table "${namespaceId}.${tableName}"`,
+          );
+        }
         const columnNames = new Set(Object.keys(table.columns));
         const storageFields = model.storage.fields;
         if (!storageFields || Object.keys(storageFields).length === 0) {
@@ -263,7 +247,10 @@ export const sqlEmission = {
     const tableName = sqlModel.storage.table;
     const storageFields = sqlModel.storage.fields;
 
-    const storageParts = [`readonly table: ${serializeValue(tableName)}`];
+    const storageParts = [
+      `readonly table: ${serializeValue(tableName)}`,
+      `readonly namespaceId: ${serializeValue(sqlModel.storage.namespaceId)}`,
+    ];
     if (Object.keys(storageFields).length > 0) {
       const fieldParts: string[] = [];
       for (const [fieldName, field] of Object.entries(storageFields)) {
@@ -291,14 +278,19 @@ export const sqlEmission = {
     if (!storage) return undefined;
 
     const tableName = sqlModel.storage.table;
-    const located = findSqlTable(storage, tableName);
-    if (!located) return undefined;
+    const storageNamespaceId = sqlModel.storage.namespaceId;
+    if (!storageNamespaceId) return undefined;
 
-    const column = located.table.columns[storageField.column];
+    const table = storage.namespaces[storageNamespaceId]?.tables[tableName] as
+      | StorageTable
+      | undefined;
+    if (!table) return undefined;
+
+    const column = table.columns[storageField.column];
     if (!column) return undefined;
 
     if (column.typeRef) {
-      const ns = storage.namespaces[located.namespaceId];
+      const ns = storage.namespaces[storageNamespaceId];
       const nsEnums =
         ns !== undefined && 'enum' in ns
           ? (

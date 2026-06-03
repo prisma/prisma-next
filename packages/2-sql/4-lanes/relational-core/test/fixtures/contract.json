@@ -61,7 +61,8 @@
                 "createdAt": {
                   "column": "createdAt"
                 }
-              }
+              },
+              "namespaceId": "__unbound__"
             },
             "fields": {
               "id": {

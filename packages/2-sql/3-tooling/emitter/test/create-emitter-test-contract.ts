@@ -39,5 +39,19 @@ export function createEmitterTestContract(
   } else {
     merged.storage = normalizeRootSqlStorage({ tables: {} }) ?? { tables: {} };
   }
-  return merged as Contract;
+  const contract = merged as Contract;
+  for (const [namespaceId, ns] of Object.entries(contract.domain.namespaces)) {
+    for (const model of Object.values(ns.models ?? {})) {
+      const storage = model.storage;
+      if (
+        storage !== null &&
+        typeof storage === 'object' &&
+        !Array.isArray(storage) &&
+        !('namespaceId' in storage)
+      ) {
+        Object.assign(storage, { namespaceId });
+      }
+    }
+  }
+  return contract;
 }
