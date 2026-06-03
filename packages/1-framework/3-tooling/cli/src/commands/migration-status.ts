@@ -3,18 +3,13 @@ import type {
   ContractMarkerRecordLike,
   ContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
-import { requireHeadRef } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import {
   errorNoInvariantPath,
   errorUnknownInvariant,
   MigrationToolsError,
 } from '@prisma-next/migration-tools/errors';
-import {
-  findPath,
-  findPathWithDecision,
-  findReachableLeaves,
-} from '@prisma-next/migration-tools/migration-graph';
+import { findPath, findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs } from '@prisma-next/migration-tools/refs';
@@ -108,26 +103,8 @@ function shortDisplayHash(hash: string): string {
   return stripped.slice(0, 12);
 }
 
-function resolveTargetHashForSpace(
-  member: ContractSpaceMember,
-  contractHash: string,
-  activeRefHash: string | undefined,
-): string | undefined {
-  const graph = member.graph();
-  if (activeRefHash !== undefined && graph.nodes.has(activeRefHash)) {
-    return activeRefHash;
-  }
-  if (graph.nodes.has(contractHash)) {
-    return contractHash;
-  }
-  if (graph.nodes.size === 0) {
-    return requireHeadRef(member).hash;
-  }
-  const leaves = findReachableLeaves(graph, EMPTY_CONTRACT_HASH);
-  if (leaves.length === 1) {
-    return leaves[0];
-  }
-  return undefined;
+function resolveTarget(contractHash: string, activeRefHash: string | undefined): string {
+  return activeRefHash ?? contractHash;
 }
 
 function buildStatusMigrations(
@@ -168,6 +145,27 @@ function renderSpaceTree(args: {
 
 function countPending(migrations: readonly MigrationStatusMigrationEntry[]): number {
   return migrations.filter((m) => m.status === 'pending').length;
+}
+
+export function buildNoPathSummary(args: {
+  readonly markerHash: string | undefined;
+  readonly targetHash: string;
+  readonly explicitTarget: boolean;
+  readonly refName: string | undefined;
+}): string {
+  const markerPart =
+    args.markerHash !== undefined
+      ? `the database state (sha256:${shortDisplayHash(args.markerHash)})`
+      : 'the database state';
+  const targetShort = `sha256:${shortDisplayHash(args.targetHash)}`;
+  if (!args.explicitTarget) {
+    return `No migration path from ${markerPart} to the application's contract (${targetShort}). Run \`prisma-next migration plan --name <name>\` to author one.`;
+  }
+  const targetLabel =
+    args.refName !== undefined
+      ? `the target (${targetShort} via \`${args.refName}\`)`
+      : `the target (${targetShort})`;
+  return `No migration path from ${markerPart} to ${targetLabel}. Run \`prisma-next migration plan --name <name>\` to author one, or pass \`--to <contract>\` to pick a reachable target.`;
 }
 
 export function buildStatusHeadline(args: {
@@ -435,8 +433,6 @@ async function executeMigrationStatusCommand(
   let markerCannotReachTarget = false;
   let headlineTargetHash = activeRefHash ?? contractHash;
   let totalPending = 0;
-  let hasAmbiguousTarget = false;
-
   for (const spaceEntry of scopedSpaces) {
     const member = aggregate.space(spaceEntry.spaceId);
     if (member === undefined) {
@@ -444,20 +440,7 @@ async function executeMigrationStatusCommand(
     }
     const graph = member.graph();
     const spaceContractHash = member.contract().storage.storageHash;
-    const targetHash = resolveTargetHashForSpace(member, spaceContractHash, activeRefHash);
-    if (targetHash === undefined) {
-      hasAmbiguousTarget = true;
-      diagnostics.push({
-        code: 'MIGRATION.DIVERGED',
-        severity: 'warn',
-        message: 'There are multiple valid migration paths — you must select a target',
-        hints: [
-          "Use '--to <contract>' to select a target",
-          "Or 'prisma-next ref set <name> <hash>' to create one",
-        ],
-      });
-      continue;
-    }
+    const targetHash = resolveTarget(spaceContractHash, activeRefHash);
     if (spaceEntry.spaceId === aggregate.app.spaceId) {
       headlineTargetHash = targetHash;
     }
@@ -562,16 +545,19 @@ async function executeMigrationStatusCommand(
   }
 
   const appMarkerHash = markersBySpace.get(aggregate.app.spaceId)?.storageHash;
-  const summary = hasAmbiguousTarget
-    ? 'Multiple valid migration paths — select a target with --to'
-    : markerCannotReachTarget
-      ? 'Database marker cannot reach the selected target'
-      : buildStatusHeadline({
-          pendingCount: totalPending,
-          targetHash: headlineTargetHash,
-          markerDiverged,
-          markerHash: appMarkerHash,
-        });
+  const summary = markerCannotReachTarget
+    ? buildNoPathSummary({
+        markerHash: appMarkerHash,
+        targetHash: headlineTargetHash,
+        explicitTarget: options.to !== undefined,
+        refName: activeRefName,
+      })
+    : buildStatusHeadline({
+        pendingCount: totalPending,
+        targetHash: headlineTargetHash,
+        markerDiverged,
+        markerHash: appMarkerHash,
+      });
 
   if (scopedSpaces.every((s) => s.migrations.length === 0)) {
     return ok({

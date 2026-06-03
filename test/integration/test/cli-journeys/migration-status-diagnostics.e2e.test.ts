@@ -208,15 +208,14 @@ withTempDir(({ createTempDir }) => {
      * planned — the contract hash doesn't appear anywhere in the graph.
      *
      * This typically means the developer edited their schema but forgot to
-     * run `migration plan`. The DB is fully up to date with existing
-     * migrations, but a new migration is needed for the latest contract.
-     * The diagnostic should point toward `migration plan`, not `apply`.
+     * run `migration plan`. The DB is still on the last applied migration;
+     * status targets the live contract and reports no migration path to it.
      */
     describe('contract changed since last plan — CONTRACT.AHEAD', () => {
       const db = useDevDatabase();
 
       it(
-        'emit → plan → apply → swap → emit (no plan) → status warns',
+        'emit → plan → apply → swap → emit (no plan) → no path to live contract',
         async () => {
           const ctx: JourneyContext = setupJourney({
             connectionString: db.connectionString,
@@ -239,7 +238,8 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('(contract)');
-          expect(out).toContain('up to date');
+          expect(out).toContain("to the application's contract");
+          expect(out).toContain('prisma-next migration plan --name');
         },
         timeouts.spinUpPpgDev,
       );
@@ -249,17 +249,16 @@ withTempDir(({ createTempDir }) => {
      * Scenario: the database was updated directly via `db update` instead
      * of through the migration system.
      *
-     * The DB marker now matches the current contract hash, but that hash
-     * doesn't correspond to any node in the migration graph — the marker
-     * was moved forward without a migration being applied. The user needs
-     * to either plan a migration to formalize this state, or accept that
-     * their migration history has a gap.
+     * The DB marker matches the live contract after db update, but that
+     * hash may not be a migration-graph node. Status defaults to the live
+     * contract as target (same as migrate); when DB and contract align,
+     * the headline is up to date while MARKER_NOT_IN_HISTORY still warns.
      */
-    describe('DB updated directly — MARKER_NOT_IN_HISTORY', () => {
+    describe('DB updated directly — marker ahead of graph', () => {
       const db = useDevDatabase();
 
       it(
-        'emit → plan → apply → swap → emit → db update → status warns',
+        'emit → plan → apply → swap → emit → db update → up to date with divergence warn',
         async () => {
           const ctx: JourneyContext = setupJourney({
             connectionString: db.connectionString,
@@ -283,7 +282,8 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('Database marker cannot reach the selected target');
+          expect(out).toMatch(/\(db[^)]*contract\)/);
+          expect(out).toContain('up to date');
         },
         timeouts.spinUpPpgDev,
       );
@@ -405,16 +405,15 @@ withTempDir(({ createTempDir }) => {
      * creating a diamond/fork in the graph, and no ref has been set.
      *
      * The migration graph has two reachable leaves from the marker but
-     * the current contract doesn't match either leaf (we swap to a third
-     * contract variant to ensure this). Without a ref to disambiguate,
-     * the system can't decide which path to apply. The user must set a
-     * ref or choose a target explicitly.
+     * the live contract is a third variant (not on either branch). Status
+     * defaults to the live contract as target and reports no path from the
+     * database state to that contract.
      */
-    describe('divergent graph without ref — MIGRATION.DIVERGED', () => {
+    describe('divergent graph — live contract off branches', () => {
       const db = useDevDatabase();
 
       it(
-        'two branches from same base → status warns about multiple paths',
+        'two branches from same base → no path to live contract',
         async () => {
           const ctx: JourneyContext = setupJourney({
             connectionString: db.connectionString,
@@ -460,9 +459,8 @@ withTempDir(({ createTempDir }) => {
           const status = await runMigrationStatus(ctx, ['--json']);
           expect(status.exitCode).toBe(0);
           const json = parseMigrationStatusJson(status);
-          expect(
-            json.diagnostics?.some((diagnostic) => diagnostic.code === 'MIGRATION.DIVERGED'),
-          ).toBe(true);
+          expect(json.summary).toContain("to the application's contract");
+          expect(json.summary).toContain('prisma-next migration plan --name');
         },
         timeouts.spinUpPpgDev,
       );
@@ -533,7 +531,9 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('Database marker cannot reach the selected target');
+          expect(out).toContain('No migration path from the database state');
+          expect(out).toContain('via `production`');
+          expect(out).toContain('prisma-next migration plan');
         },
         timeouts.spinUpPpgDev,
       );
