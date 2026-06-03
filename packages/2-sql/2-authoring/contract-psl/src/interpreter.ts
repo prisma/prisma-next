@@ -8,6 +8,7 @@ import type {
   ContractField,
   ContractModel,
   ContractValueObject,
+  ControlPolicy,
 } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
 import type {
@@ -57,6 +58,7 @@ import {
   mapFieldNamesToColumns,
   parseAttributeFieldList,
   parseConstraintMapArgument,
+  parseControlPolicyAttribute,
   parseMapName,
   parseObjectLiteralStringMap,
   parseQuotedStringLiteral,
@@ -642,6 +644,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     : undefined;
   const hasInlinePrimaryKey = primaryKey !== undefined;
   let blockPrimaryKeyDeclared = false;
+  let controlPolicyDeclared = false;
+  let controlPolicy: ControlPolicy | undefined;
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
   for (const field of model.fields) {
@@ -726,6 +730,27 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
     if (modelAttribute.name === 'discriminator' || modelAttribute.name === 'base') {
+      continue;
+    }
+    if (modelAttribute.name === 'control') {
+      if (controlPolicyDeclared) {
+        diagnostics.push({
+          code: 'PSL_DUPLICATE_ATTRIBUTE',
+          message: `\`@@control\` declared more than once on model "${model.name}".`,
+          sourceId,
+          span: modelAttribute.span,
+        });
+        continue;
+      }
+      const parsed = parseControlPolicyAttribute({
+        attribute: modelAttribute,
+        sourceId,
+        diagnostics,
+      });
+      if (parsed !== undefined) {
+        controlPolicyDeclared = true;
+        controlPolicy = parsed;
+      }
       continue;
     }
     const attributeLabel = `Model "${model.name}" @@${modelAttribute.name}`;
@@ -1098,6 +1123,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
       ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
       ...(foreignKeyNodes.length > 0 ? { foreignKeys: foreignKeyNodes } : {}),
+      ...ifDefined('control', controlPolicy),
     },
     fkRelationMetadata: resultFkRelationMetadata,
     backrelationCandidates: resultBackrelationCandidates,
