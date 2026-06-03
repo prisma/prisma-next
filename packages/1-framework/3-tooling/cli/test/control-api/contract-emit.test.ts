@@ -230,6 +230,32 @@ describe('executeContractEmit', () => {
     });
   });
 
+  it('passes deserializeContract output to emit, not the pre-hydration envelope', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const plainEnvelope = createMockContract();
+    const hydratedContract = {
+      ...plainEnvelope,
+      storageHydrated: true,
+    } as unknown as Contract;
+    const deserializeContract = vi.fn(() => hydratedContract);
+    const config = createSuccessfulConfig(outputJsonPath);
+    const familyWithHydration = {
+      ...config.family,
+      create: () => ({ deserializeContract }),
+    };
+    mockedEmit.mockResolvedValueOnce(createEmitResult('hydrated'));
+
+    await withMockedConfig({ ...config, family: familyWithHydration }, async () => {
+      await executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+    });
+
+    expect(deserializeContract).toHaveBeenCalledOnce();
+    expect(mockedEmit).toHaveBeenCalledOnce();
+    const emitContract = mockedEmit.mock.calls[0]?.[0];
+    expect(emitContract).toBe(hydratedContract);
+    expect(emitContract).not.toBe(plainEnvelope);
+  });
+
   it('serializes overlapping emits per output path so the last submission wins on disk', async () => {
     const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
     const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
