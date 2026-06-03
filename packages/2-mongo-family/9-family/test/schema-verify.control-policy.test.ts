@@ -10,7 +10,7 @@ import { verifyMongoSchema } from '../src/core/schema-verify/verify-mongo-schema
 
 function buildContract(
   collections: Record<string, { control?: 'managed' | 'tolerated' | 'external' | 'observed' }>,
-  defaultControl?: 'managed' | 'tolerated' | 'external' | 'observed',
+  defaultControlPolicy?: 'managed' | 'tolerated' | 'external' | 'observed',
 ): MongoContract {
   const built: Record<string, MongoCollection> = {};
   for (const [name, data] of Object.entries(collections)) {
@@ -37,7 +37,7 @@ function buildContract(
     extensionPacks: {},
     profileHash: 'sha256:profile',
     meta: {},
-    ...(defaultControl !== undefined ? { defaultControl } : {}),
+    ...(defaultControlPolicy !== undefined ? { defaultControlPolicy } : {}),
   } as unknown as MongoContract;
 }
 

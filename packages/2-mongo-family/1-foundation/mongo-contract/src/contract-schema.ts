@@ -390,7 +390,7 @@ export function createMongoContractSchema(
     'capabilities?': 'Record<string, unknown>',
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': 'Record<string, unknown>',
-    'defaultControl?': ControlPolicySchema,
+    'defaultControlPolicy?': ControlPolicySchema,
     'sources?': 'Record<string, unknown>',
     '_generated?': 'Record<string, unknown>',
     domain: type({

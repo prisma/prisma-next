@@ -421,7 +421,7 @@ export function createSqlContractSchema(
     'capabilities?': 'Record<string, Record<string, boolean>>',
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': ContractMetaSchema,
-    'defaultControl?': ControlPolicySchema,
+    'defaultControlPolicy?': ControlPolicySchema,
     'roots?': type({ '[string]': CrossReferenceSchema }),
     domain: type({
       namespaces: type({

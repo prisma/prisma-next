@@ -66,7 +66,7 @@ type ContractDefinition<
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
-  readonly defaultControl?: ControlPolicy;
+  readonly defaultControlPolicy?: ControlPolicy;
   readonly namespaces?: Namespaces;
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: Types;
@@ -89,7 +89,7 @@ type ContractScaffold<
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
-  readonly defaultControl?: ControlPolicy;
+  readonly defaultControlPolicy?: ControlPolicy;
   readonly namespaces?: Namespaces;
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: never;
