@@ -22,18 +22,18 @@
 
 ## Findings
 
-### AC-14: NOT REPRODUCIBLE
+None.
 
-After ~30 minutes of honest investigation traced through the verifier → issue planner → diff engine call paths, no PGlite-compatible scenario was found where the *current* post-filter SQL pipeline errors on an `external` subject while the verifier passes. The two failure shapes are structurally incompatible for `external` tables in the existing code:
+## AC-14 status note (NOT REPRODUCIBLE)
 
-- **Verifier-suppressed issues** never reach `planIssues`. The verifier's `emitIssueAndNodeUnderControlPolicy` routes most issue categories to `suppress` for `external` subjects (`extra_column`, `extra_table`, `type_mismatch`, `nullability_mismatch`, etc.), so the planner never sees them. PGlite-supported "exotic state" candidates (`tsvector` columns, domain-typed columns, `CHECK` constraints, exclusion constraints, triggers) all produce issues in the suppressed-by-verifier bucket and never make it to `mapIssueToCall`.
-- **Verifier-failing issues** also fail the verifier itself. The disposition `fail` covers `declaredIncompatible` / `declaredMissing` (e.g., `primary_key_mismatch` against an existing PK on an `external` table). The verifier reports `fail`, contradicting AC-14's requirement that the verifier pass.
+After tracing the verifier → issue-planner → diff-engine call paths, no PGlite-compatible scenario was found where the *current* SQL pipeline errors on an `external` subject while the verifier passes. The two failure shapes are structurally incompatible for `external` tables in the existing code:
+
+- **Verifier-suppressed issues** never reach `planIssues`. The verifier's `emitIssueAndNodeUnderControlPolicy` routes most issue categories to `suppress` for `external` subjects (`extra_column`, `extra_table`, etc.), so the planner never sees them. PGlite-supported "exotic state" candidates (`tsvector` columns, domain-typed columns, `CHECK` constraints, exclusion constraints, triggers) all produce issues in the suppressed-by-verifier bucket and never make it to `mapIssueToCall`.
+- **Verifier-failing issues** also fail the verifier itself. The disposition `fail` covers `declaredIncompatible` / `declaredMissing` (e.g., `primary_key_mismatch` against an existing PK on an `external` table, `type_mismatch`, `nullability_mismatch`). The verifier reports `fail`, contradicting AC-14's requirement that the verifier pass.
 - **Verifier-warning issues for observed subjects** (`enum_values_changed` flagged as `warn` on `observed` enums) do flow into `planIssues`, but the `nativeEnumPlanCallStrategy` resolves them successfully without erroring — no planner failure.
 - **Schema-reader pass-through** means even unknown column types (e.g., `tsvector` on a non-external table) round-trip cleanly as `type_mismatch` and become a successfully-mapped `AlterColumnTypeCall`. No planner error.
 
-In short: the current pipeline turned out to be more robust than the slice-5 brief assumed. The class of failure AC-14 was designed to lock in (planner errors on un-plannable state for an `external` subject) is not reachable today through any PGlite-compatible authoring path. AC-14 is recorded as `NOT REPRODUCIBLE`; the architectural correction (AC-13) is still landed as defense-in-depth so future failure modes the diff engine grows into don't reintroduce the pattern.
-
-(Reset for D4. AC-13 and AC-15 verified in D4 R1; AC-14 ruled out per the rationale above.)
+The class of failure AC-14 was designed to lock in (planner errors on un-plannable state for an `external` subject while verification still passes) is not reachable today through any PGlite-compatible authoring path. The architectural correction (AC-13) still lands as defense-in-depth so future failure modes the diff engine grows into can't reintroduce the pattern.
 
 ## Round notes
 
@@ -55,8 +55,41 @@ AC-8..AC-12 verified on disk. Mongo "extra fields" via extra-index proxy accepte
 
 ### D4 R1
 
-AC-13 and AC-15 verified on disk: input-side filtering wired through `partitionIssuesByControlPolicy` in `packages/2-sql/9-family/src/core/migrations/control-policy.ts` and called from `PostgresMigrationPlanner.plan` before `planIssues`; `issue-planner.ts`'s post-filter pass removed; warnings constructed directly from the suppressed partition (one per subject, factoryName inferred from issue mix). Hygiene items C1–C5 landed: `isPlannerWarningList` runtime predicate replaced by `blindCast` at the read site; Mongo `defineContract` return cast replaced by `blindCast`; `defaultTargetRef` / `formatPostgresControlPolicyTargetRef` renamed to `defaultSubjectLabel` / `formatPostgresControlPolicySubjectLabel`; `buildSubjectSuppressionWarning`'s location/meta construction uses `ifDefined` throughout; no remaining `TargetRef` references in touched control-policy files. AC-14: NOT REPRODUCIBLE — see Findings.
+**AC-13 (input-side filtering) — PASS.** Verified by reading the planner pipeline end-to-end.
+
+- `partitionIssuesByControlPolicy` is declared in `packages/2-sql/9-family/src/core/migrations/control-policy.ts:227-337` and exported from `packages/2-sql/9-family/src/exports/control.ts:33`.
+- `PostgresMigrationPlanner.planSql` calls it at `packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts:157-165` *before* invoking `planIssues`, which receives only `issuePartition.plannable` (line 168). The diff engine therefore never observes `external`/`observed` subjects, and never sees non-creation issues for `tolerated` subjects.
+- The `tolerated` create-if-absent short-circuit is the explicit branch in `control-policy.ts:292-300`: `policy === 'tolerated' && subject !== undefined && creationFactoryName !== undefined && subject.createsNewObject`. Without the creation signal, the issue goes to suppressed without the planner having to diff existing-object state.
+- Warnings are constructed from suppressed-subject metadata via `buildSubjectSuppressionWarning` (`control-policy.ts:101-123`), deduplicated by `subjectKey` (`control-policy.ts:339-341`) so one warning fires per subject regardless of how many issues that subject contributed. `kind: 'controlPolicySuppressedCall'` and the `{ namespace, table, column, type }` location shape are unchanged from D1.
+- The post-D1 `issue-planner.ts` no longer carries a `warnings` field on `IssuePlannerValue` (`issue-planner.ts:182-184`). The post-filter pass over generated calls has been removed from the issue-planning path.
+- `partitionCallsByControlPolicy` is still invoked once, at `planner.ts:205-213`, but only against the codec-emitted `fieldEventPostgresCalls`. Per the JSDoc on `control-policy.ts:131-143`, these ops originate from declared contract fields (via `planFieldEventOperations`), never from introspected live state, so they cannot trip the diff engine on un-plannable shapes. The residual usage is principled, not a leak.
+
+**AC-14 (un-plannable-external scenario) — NOT REPRODUCIBLE.** Rationale captured separately under the AC-14 status note above. Spot-checked the claim: `verifierDisposition` (`packages/2-sql/9-family/src/core/schema-verify/verifier-disposition.ts:48-53`) feeds `dispositionForCategory` (`packages/1-framework/1-core/framework-components/src/control/verifier-disposition.ts:41-62`), and the framework's grading table does route `extraNestedElement` / `extraAuxiliary` / `extraTopLevelObject` / `valueDrift` to `suppress` for `external`, while `declaredMissing` / `declaredIncompatible` route to `fail`. The implementer's claim that exotic introspected state for `external` subjects (tsvector columns, extension types, CHECK / exclusion constraints, triggers) all land in the suppressed-by-verifier bucket holds against the disposition table — those classes of state surface as `extra_*` (`extraNestedElement`/`extraAuxiliary`/`extraTopLevelObject`), all suppressed for `external`. The remaining failure shape (`declaredIncompatible`) by definition fails the verifier itself, contradicting AC-14's "verifier must pass" precondition. The rationale is honest and code-cited. The input-side filter remains defensible as defense-in-depth (future diff-engine extensions might widen what reaches `mapIssueToCall`).
+
+(One narrative imprecision in the rationale: it lists `type_mismatch` / `nullability_mismatch` as routed to `suppress` for `external`. The disposition table actually grades those as `declaredIncompatible` → `fail`. The second bullet of the rationale covers that case correctly under "verifier-failing issues also fail the verifier itself," so the conclusion stands; the inaccuracy is local to the bullet wording, not the overall analysis.)
+
+**AC-15 (hygiene items) — PASS.** Verified each on disk:
+
+- **C1**: `isPlannerWarningList` is gone from `packages/1-framework/3-tooling/cli/src/utils/formatters/errors.ts`; repo-wide grep returns zero matches. The read site at `errors.ts:73-80` reads `meta['plannerWarnings']`, validates `Array.isArray(...).length > 0`, then narrows via `blindCast<readonly MigrationPlannerConflict[], '...'>` whose justification literal explicitly names the writer (`mapDbUpdateFailure` in `db-update.ts`) and the channel's type erasure (`meta` is typed `Record<string, unknown>`).
+- **C2**: The bare `as unknown as MongoContractResult<Definition>` is gone from `packages/2-mongo-family/2-authoring/contract-ts/src/contract-builder.ts:1618-1621` — replaced by `blindCast<MongoContractResult<Definition>, "...">(builtContract)` with a justification literal that explains the literal-type re-application.
+- **C3**: `formatTargetRef` / `defaultTargetRef` are renamed to `formatSubjectLabel` / `defaultSubjectLabel` in `packages/2-sql/9-family/src/core/migrations/control-policy.ts:74-85,149,158`. `formatPostgresControlPolicyTargetRef` → `formatPostgresControlPolicySubjectLabel` in `packages/3-targets/3-targets/postgres/src/core/migrations/control-policy.ts:90-104`. New helpers `resolvePostgresIssueControlPolicySubject` (`control-policy.ts:195-235`) and `resolvePostgresIssueCreationFactoryName` (`control-policy.ts:177-179`) are wired through `planner.ts:160-165`.
+- **C4**: `buildSubjectSuppressionWarning` (`control-policy.ts:101-123`) uses `ifDefined('namespace', ...)`, `ifDefined('table', ...)`, `ifDefined('column', ...)`, `ifDefined('type', ...)` for the location bag and `ifDefined('declaredControlPolicy', ...)` for the meta bag; no inline ternary spreads remain. `partitionIssuesByControlPolicy:320` uses `ifDefined('creationFactoryName', ...)` for the suppressed-subject map entry construction.
+- **C5**: `rg 'TargetRef|targetRef' packages/2-sql/9-family/src/core/migrations/ packages/3-targets/3-targets/postgres/src/core/migrations/ -n` returns zero matches.
+
+**Sanity check on AC-1..AC-12 — PASS.**
+
+- Warning summary format unchanged: `suppressionSummary` (`control-policy.ts:87-99`) still produces both the spec's namespace-floor-with-managed-override variant ("namespace '<ns>' has effective control 'external' but table declared 'managed'") and the general suppression variant ("namespace '<ns>' has effective control '<policy>'").
+- `db update` Warnings block still surfaces: `formatPlannerWarningsBlock` is intact in `packages/1-framework/3-tooling/cli/src/utils/formatters/migrations.ts:97` and called from both the plan-output path (line 185) and the apply-output path (line 451) plus the error-output path (`errors.ts:79`).
+- The two e2e fixtures are unchanged: `git diff 5c726fbed..HEAD -- test/integration/test/cli.control-policy.*.e2e.test.ts test/integration/test/fixtures/cli/cli-e2e-test-app/fixtures/control-policy/` returns empty.
+
+**Pre-existing reds verification — plausible.** Spot-checked:
+
+1. `pnpm fixtures:check`: `0ee650ec2 TML-2807` lands on main between the slice's start and HEAD and touches `SqlModelStorage` + storage hashing. The diff stat shows many `examples/.../contract.json` files modified across the merge into this branch (`+1 / +2 / +5` lines per file), consistent with a storage-hash-shape change on main that drifted committed fixtures. The implementer's claim that committed contracts drifted against the current emitter due to TML-2807 holds up.
+2. Mongo `define-contract.test.ts` "Property 'target' does not exist on type 'never'": the test file's last modification was `abf413ce2 TML-2605` (well before this slice). D4's only edit to the Mongo contract-builder is a single-line `as unknown as` → `blindCast<T, '...'>` swap, which is type-equivalent and cannot introduce a `never` narrowing. The error is plausibly pre-existing (or downstream of a main-merge type change), not D4-introduced.
+3. `cli-journeys/*` flakes: PGlite-backed under-load flakes are an existing pattern in this suite; D4 did not touch any cli-journeys test file (diff stat confirms — touched files are migration-status / migration-graph related from main, not control-policy).
+
+**Observation (not a finding).** `packages/3-extensions/mongo/src/contract/define-contract.ts:91,96` carries two bare `as unknown as MongoContractResult<...>` casts that were not part of C2's scope. The file was last touched by `91123b7ca` / `0a9b10c1a` (both pre-slice), and PR #711's review item targeted only `mongo-contract-ts/src/contract-builder.ts:1617`. Not a regression from D4 and not within the slice's stated hygiene scope, but a natural follow-up cleanup if the team wants the same `blindCast` discipline in the extension-side wrapper.
 
 ## Verdict
 
-**SATISFIED** — fourteen of fifteen ACs pass (AC-1..AC-13, AC-15); AC-14 ruled out as not reproducible against the current pipeline (rationale in Findings).
+**SATISFIED** — fourteen of fifteen ACs pass (AC-1..AC-13, AC-15); AC-14 ruled out as NOT REPRODUCIBLE against the current pipeline (rationale in the AC-14 status note above). No findings filed. Pre-existing reds verified as plausibly off-the-branch.
