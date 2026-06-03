@@ -31,6 +31,7 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { postgresColumnsCompatible } from '@prisma-next/target-postgres/column-type-compatibility';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -91,6 +92,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * before comparison with contract native types.
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
+
+  /**
+   * Target-supplied compatible-shape relation used under the `external`
+   * control policy. Threading the same relation the migration planner/runner
+   * use keeps runtime verify and migration verify in agreement.
+   */
+  readonly columnsCompatible = postgresColumnsCompatible;
 
   /**
    * Bridges native `PostgresEnumStorageEntry` IR walks against the Postgres
@@ -262,16 +270,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
-   * Reads per-migration ledger rows for `space` from `prisma_contract.ledger`
-   * in apply order. Probes `information_schema.tables` first so a fresh
-   * database without the ledger table returns `[]` instead of raising
-   * "relation does not exist".
+   * Reads per-migration ledger rows from `prisma_contract.ledger` in apply
+   * order. Probes `information_schema.tables` first so a fresh database
+   * without the ledger table returns `[]` instead of raising "relation does
+   * not exist".
    */
   async readLedger(
     driver: ControlDriverInstance<'sql', 'postgres'>,
-    space: string,
+    space?: string,
   ): Promise<readonly LedgerEntryRecord[]> {
-    const ledgerContext = { space, markerLocation: POSTGRES_LEDGER_TABLE };
+    const ledgerContext = { space: space ?? '*', markerLocation: POSTGRES_LEDGER_TABLE };
     const exists = await withMarkerReadErrorHandling(
       () =>
         driver.query(
@@ -286,18 +294,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       return [];
     }
 
-    const result = await withMarkerReadErrorHandling(
-      () =>
-        driver.query<{
-          space: string;
-          migration_name: string;
-          migration_hash: string;
-          origin_core_hash: string | null;
-          destination_core_hash: string;
-          operations: unknown;
-          created_at: Date | string;
-        }>(
-          `select
+    type LedgerQueryRow = {
+      space: string;
+      migration_name: string;
+      migration_hash: string;
+      origin_core_hash: string | null;
+      destination_core_hash: string;
+      operations: unknown;
+      created_at: Date | string;
+    };
+    let sql = `select
          space,
          migration_name,
          migration_hash,
@@ -305,11 +311,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          destination_core_hash,
          operations,
          created_at
-       from prisma_contract.ledger
-       where space = $1
-       order by id`,
-          [space],
-        ),
+       from prisma_contract.ledger`;
+    if (space !== undefined) {
+      sql += `
+       where space = $1`;
+    }
+    sql += `
+       order by id`;
+
+    const result = await withMarkerReadErrorHandling(
+      () => driver.query<LedgerQueryRow>(sql, space === undefined ? undefined : [space]),
       ledgerContext,
     );
 

@@ -96,13 +96,13 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
   }): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
 
   /**
-   * Reads the per-migration ledger journal for `space` in apply order.
-   * Returns an empty array when the ledger table/collection has no rows
-   * for that space (or when the ledger store does not yet exist).
+   * Reads the per-migration ledger journal in apply order. When `space` is
+   * omitted, returns rows for every space. Returns an empty array when the
+   * ledger store does not yet exist or has no matching rows.
    */
   readLedger(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
-    readonly space: string;
+    readonly space?: string;
   }): Promise<readonly LedgerEntryRecord[]>;
 
   introspect(options: {

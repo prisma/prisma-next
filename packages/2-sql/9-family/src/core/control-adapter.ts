@@ -16,7 +16,11 @@ import type {
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
+import type {
+  ColumnsCompatible,
+  DefaultNormalizer,
+  NativeTypeNormalizer,
+} from './schema-verify/verify-sql-schema';
 
 /**
  * SQL control adapter interface for control-plane operations.
@@ -58,13 +62,12 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
 
   /**
-   * Reads the per-migration ledger journal for `space` in apply order.
-   * Returns an empty array when the ledger store does not yet exist or
-   * has no rows for that space.
+   * Reads the per-migration ledger journal in apply order. When `space` is
+   * omitted, returns rows for every space.
    */
   readLedger(
     driver: ControlDriverInstance<'sql', TTarget>,
-    space: string,
+    space?: string,
   ): Promise<readonly LedgerEntryRecord[]>;
 
   /**
@@ -98,6 +101,16 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * before comparison with contract native types during schema verification.
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
+
+  /**
+   * Optional target-supplied compatible-shape relation for column native types.
+   * When provided, schema verification uses it under the `external` control
+   * policy to decide whether a declared column type is compatible with the
+   * live type (instead of exact equality). Threading the same relation the
+   * migration planner/runner use keeps runtime verify and migration verify in
+   * agreement; when omitted, verification falls back to exact equality.
+   */
+  readonly columnsCompatible?: ColumnsCompatible;
 
   /**
    * Optional bridging adapter for resolving the existing values of a

@@ -6,7 +6,7 @@ alwaysApply: false
 
 # No Target-Specific Branches
 
-**CRITICAL**: Never branch on `target` in core code. Target-specific logic belongs in adapters and target packages.
+**CRITICAL**: Never *name a target* in target-agnostic code. This covers two forms of the same mistake: **branching** on a `target` value, and embedding **target-named constants, helpers, or data** in framework/core packages. Target-specific logic *and target-specific facts* belong in adapters and target packages.
 
 **❌ WRONG: Branch on target in core packages**
 
@@ -41,8 +41,39 @@ class PostgresAdapter implements Adapter {
 }
 ```
 
+## Named-target constants and data are the same violation
+
+The branch is the obvious form. The subtler form is a target-agnostic package that *names* a target in a constant, a helper name, or static data — even with no `if` in sight. A `POSTGRES_DEFAULT_NAMESPACE_ID` constant or a `defaultNamespaceIdForSqlTarget()` helper sitting in the framework core is just a branch that has been pre-evaluated: the framework now knows a Postgres-specific fact.
+
+**❌ WRONG: Target-named constant / helper in a target-agnostic package**
+
+```typescript
+// in packages/1-framework/** (target-agnostic)
+export const POSTGRES_DEFAULT_NAMESPACE_ID = 'public';
+
+export function defaultNamespaceIdForSqlTarget(targetId: string): string {
+  return targetId === 'postgres' ? 'public' : '__unbound__';
+}
+```
+
+**✅ CORRECT: The target declares the fact on its descriptor; the framework reads it generically**
+
+```typescript
+// in the target package's descriptor (static data the target owns)
+const postgresDescriptorMeta = {
+  // …
+  defaultNamespaceId: 'public',
+};
+
+// in the target-agnostic consumer — reads the fact, never names the target
+const defaultNamespaceId = target.defaultNamespaceId;
+```
+
+Target-specific *facts* are static target data: they live on the target descriptor, and target-agnostic code consumes them through a uniform field. See [ADR 223 — Target-owned default namespace](../../docs/architecture%20docs/adrs/ADR%20223%20-%20Target-owned%20default%20namespace.md) for the canonical worked example of this distinction (a default namespace is an authoring-time fact the target owns, not a branch the framework evaluates).
+
 ## Why this matters
 
 - Keeps the core target-agnostic (“thin core, fat targets”)
 - Avoids hard-to-extend `if/else` and `switch` ladders as targets grow
 - Improves testability by mocking the adapter interface instead of branching on target
+- A target-named constant in the framework is a layer-purity violation that no `if` statement makes visible — naming the target is the tell, with or without a branch

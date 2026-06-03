@@ -520,6 +520,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
+        ...ifDefined('columnsCompatible', controlAdapter.columnsCompatible),
         ...ifDefined('resolveExistingEnumValues', resolveExistingEnumValues),
       });
     },
@@ -637,7 +638,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
     async readLedger(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
-      readonly space: string;
+      readonly space?: string;
     }): Promise<readonly LedgerEntryRecord[]> {
       return getControlAdapter().readLedger(options.driver, options.space);
     },

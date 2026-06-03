@@ -107,6 +107,12 @@ export type {
   SchemaVerifyResult,
 } from '../control/schema-verifier';
 export type {
+  VerificationStatus,
+  VerifierIssueCategory,
+  VerifierOutcome,
+} from '../control/verifier-disposition';
+export { dispositionForCategory } from '../control/verifier-disposition';
+export type {
   ControlMutationDefaultEntry,
   ControlMutationDefaultRegistry,
   ControlMutationDefaults,

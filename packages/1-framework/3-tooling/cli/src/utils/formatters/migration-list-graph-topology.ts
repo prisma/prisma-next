@@ -1,5 +1,6 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
+import type { MigrationListEntry } from './migration-list-types';
 
 export type MigrationEdgeKind = 'forward' | 'rollback' | 'self';
 
@@ -28,10 +29,30 @@ function bumpDegree(map: Map<string, number>, key: string): void {
   map.set(key, (map.get(key) ?? 0) + 1);
 }
 
-function forwardRootsForDepth(
+function compareNodesRootFirst(a: string, b: string): number {
+  if (a === EMPTY_CONTRACT_HASH) return -1;
+  if (b === EMPTY_CONTRACT_HASH) return 1;
+  return a.localeCompare(b);
+}
+
+/**
+ * Shortest-path distance of each node from the forward roots, over the given
+ * candidate edges. Roots are the in-degree-0 nodes (baseline first, then lex);
+ * a rooted component therefore distances every node by how many forward steps
+ * it sits from a root. A component with no root (a pure cycle) is seeded from
+ * its single lexically-smallest node so the cycle still gets a stable layering.
+ *
+ * Crucially this is *shortest* path, not longest: a backward (rollback) edge
+ * `deep → shallow` never offers a shorter route to the already-shallower
+ * target, so it is inert here. Distances are thus stable whether or not the
+ * rollbacks are still in the candidate set — which is what lets the peel below
+ * tell a genuine back-edge (target strictly shallower than source) apart from a
+ * forward edge that merely happens to share the back-edge's cycle.
+ */
+function forwardDistances(
   nodes: ReadonlySet<string>,
   candidates: readonly NormalizedEdge[],
-): readonly string[] {
+): Map<string, number> {
   const inDegree = new Map<string, number>();
   for (const node of nodes) {
     inDegree.set(node, 0);
@@ -40,44 +61,24 @@ function forwardRootsForDepth(
     bumpDegree(inDegree, edge.to);
   }
 
-  const roots: string[] = [];
-  for (const node of nodes) {
-    if ((inDegree.get(node) ?? 0) === 0) {
-      roots.push(node);
-    }
-  }
-  roots.sort((a, b) => {
-    if (a === EMPTY_CONTRACT_HASH) return -1;
-    if (b === EMPTY_CONTRACT_HASH) return 1;
-    return a.localeCompare(b);
-  });
-  if (roots.length > 0) return roots;
+  const roots = [...nodes].filter((node) => (inDegree.get(node) ?? 0) === 0);
+  roots.sort(compareNodesRootFirst);
+  const seeds = roots.length > 0 ? roots : [...nodes].sort(compareNodesRootFirst).slice(0, 1);
 
-  return [...nodes].sort((a, b) => {
-    if (a === EMPTY_CONTRACT_HASH) return -1;
-    if (b === EMPTY_CONTRACT_HASH) return 1;
-    return a.localeCompare(b);
-  });
-}
-
-function longestPathDepths(
-  nodes: ReadonlySet<string>,
-  candidates: readonly NormalizedEdge[],
-): Map<string, number> {
-  const depth = new Map<string, number>();
-  for (const root of forwardRootsForDepth(nodes, candidates)) {
-    depth.set(root, 0);
+  const dist = new Map<string, number>();
+  for (const seed of seeds) {
+    dist.set(seed, 0);
   }
 
   const maxPasses = nodes.size;
   for (let pass = 0; pass < maxPasses; pass++) {
     let changed = false;
     for (const edge of candidates) {
-      const base = depth.get(edge.from);
+      const base = dist.get(edge.from);
       if (base === undefined) continue;
       const next = base + 1;
-      if (next > (depth.get(edge.to) ?? -1)) {
-        depth.set(edge.to, next);
+      if (next < (dist.get(edge.to) ?? Number.POSITIVE_INFINITY)) {
+        dist.set(edge.to, next);
         changed = true;
       }
     }
@@ -85,12 +86,12 @@ function longestPathDepths(
   }
 
   for (const node of nodes) {
-    if (!depth.has(node)) {
-      depth.set(node, 0);
+    if (!dist.has(node)) {
+      dist.set(node, 0);
     }
   }
 
-  return depth;
+  return dist;
 }
 
 function canReachForward(
@@ -124,45 +125,24 @@ function canReachForward(
   return false;
 }
 
-function isMarginalForwardEdge(
-  nodes: ReadonlySet<string>,
-  candidates: readonly NormalizedEdge[],
-  edge: NormalizedEdge,
-): boolean {
-  const without = candidates.filter((candidate) => candidate !== edge);
-  const depthWithout = longestPathDepths(nodes, without);
-  const depthWith = longestPathDepths(nodes, candidates);
-  const fromDepth = depthWithout.get(edge.from) ?? 0;
-  const toWith = depthWith.get(edge.to) ?? 0;
-  return toWith > fromDepth;
-}
-
-// The first branch is the load-bearing one: a forward edge `from → to` is a
-// disguised node-skipping rollback when, after removing it, `to` can still
-// reach `from` and `from` sits strictly deeper than `to + 1` (a longer path
-// already connects them). This branch fires on every cycle-closing edge, and
-// the caller peels exactly one edge (dirName-max) per iteration before
-// recomputing — so cycles are broken deterministically regardless of edge
-// order. `isMarginalForwardEdge` is only a fallback for the residual case and
-// is reached only while the candidate set is still cyclic.
-function shouldPeelForwardEdge(
-  nodes: ReadonlySet<string>,
-  candidates: readonly NormalizedEdge[],
-  edge: NormalizedEdge,
-): boolean {
-  const without = candidates.filter((candidate) => candidate !== edge);
-  const depthWithout = longestPathDepths(nodes, without);
-  const fromDepth = depthWithout.get(edge.from) ?? 0;
-  const toWithout = depthWithout.get(edge.to) ?? 0;
-
-  if (canReachForward(edge.to, edge.from, without) && fromDepth > toWithout + 1) {
-    return true;
-  }
-
-  return !isMarginalForwardEdge(nodes, candidates, edge);
-}
-
-function peelNonMarginalForwardEdges(
+/**
+ * Demote node-skipping rollbacks left forward by the DFS. An edge `from → to`
+ * is a rollback exactly when both hold:
+ *   1. `to` is a forward-ancestor of `from` — `to` can still reach `from` over
+ *      the other forward edges, so the edge closes a cycle; and
+ *   2. `to` is strictly shallower than `from` (smaller forward distance) — the
+ *      edge points back toward the root rather than advancing history.
+ *
+ * Condition 2 is the discriminator: in a cycle created by a rollback every edge
+ * satisfies condition 1, but only the rollback itself runs deep → shallow. The
+ * forward chain edges run shallow → deep and are never peeled, however many
+ * rollbacks converge on the same target. Tight back-edges whose source and
+ * target sit at the same distance (mutual two-node cycles) are already resolved
+ * by the DFS immediate-parent rule, so they never reach this pass. One edge is
+ * peeled per iteration (dirName-descending tie-break) and distances/reachability
+ * are recomputed, making the outcome independent of edge input order.
+ */
+function peelNodeSkippingRollbacks(
   nodes: ReadonlySet<string>,
   kindByMigrationHash: Map<string, MigrationEdgeKind>,
   nonSelf: readonly NormalizedEdge[],
@@ -170,13 +150,18 @@ function peelNonMarginalForwardEdges(
   let candidates = nonSelf.filter((edge) => kindByMigrationHash.get(edge.hash) === 'forward');
 
   while (candidates.length > 0) {
-    const rollbackCandidates = candidates.filter((edge) =>
-      shouldPeelForwardEdge(nodes, candidates, edge),
-    );
-    if (rollbackCandidates.length === 0) break;
+    const dist = forwardDistances(nodes, candidates);
+    const backEdges = candidates.filter((edge) => {
+      const toDist = dist.get(edge.to) ?? 0;
+      const fromDist = dist.get(edge.from) ?? 0;
+      if (toDist >= fromDist) return false;
+      const without = candidates.filter((candidate) => candidate !== edge);
+      return canReachForward(edge.to, edge.from, without);
+    });
+    if (backEdges.length === 0) break;
 
-    rollbackCandidates.sort(compareDirNameDesc);
-    const rollback = rollbackCandidates[0];
+    backEdges.sort(compareDirNameDesc);
+    const rollback = backEdges[0];
     if (rollback === undefined) break;
 
     kindByMigrationHash.set(rollback.hash, 'rollback');
@@ -187,8 +172,8 @@ function peelNonMarginalForwardEdges(
 /**
  * DFS with dirName-descending traversal. A GRAY target is a rollback only when it
  * is the immediate DFS parent of the source — cross-links to other GRAY nodes
- * stay forward. A follow-up peel pass drops node-skipping rollbacks (target can
- * reach the source on the forward subgraph and sits more than one rank below).
+ * stay forward. A follow-up peel pass demotes node-skipping rollbacks (target is
+ * a forward-ancestor of the source and sits strictly shallower than it).
  */
 function classifyNormalizedEdges(edges: readonly NormalizedEdge[]): MigrationListGraphTopology {
   const nodes = new Set<string>();
@@ -305,7 +290,7 @@ function classifyNormalizedEdges(edges: readonly NormalizedEdge[]): MigrationLis
     runDfsFrom(root);
   }
 
-  peelNonMarginalForwardEdges(nodes, kindByMigrationHash, nonSelf);
+  peelNodeSkippingRollbacks(nodes, kindByMigrationHash, nonSelf);
 
   const forwardInDegree = new Map<string, number>();
   const forwardOutDegree = new Map<string, number>();
@@ -323,8 +308,27 @@ function classifyNormalizedEdges(edges: readonly NormalizedEdge[]): MigrationLis
   };
 }
 
+function canonicalFrom(from: string | null): string {
+  return from ?? EMPTY_CONTRACT_HASH;
+}
+
 /**
- * Classify forward/rollback/self for a `MigrationGraph` edge set.
+ * Classify forward/rollback/self for a Tier-2 `MigrationListEntry[]` edge set.
+ */
+export function classifyMigrationListGraphTopology(
+  entries: readonly MigrationListEntry[],
+): MigrationListGraphTopology {
+  const normalized: NormalizedEdge[] = entries.map((entry) => ({
+    hash: entry.migrationHash,
+    from: canonicalFrom(entry.from),
+    to: entry.to,
+    dirName: entry.dirName,
+  }));
+  return classifyNormalizedEdges(normalized);
+}
+
+/**
+ * Classify forward/rollback/self for a `MigrationGraph` edge set (Tier-3).
  */
 export function classifyMigrationGraphTopology(graph: MigrationGraph): MigrationListGraphTopology {
   const normalized: NormalizedEdge[] = [];

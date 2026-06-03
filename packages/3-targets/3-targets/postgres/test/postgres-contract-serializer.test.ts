@@ -199,7 +199,7 @@ describe('control-policy round-trip fidelity', () => {
     });
     return {
       ...base,
-      defaultControl: 'tolerated',
+      defaultControlPolicy: 'tolerated',
       storage: {
         ...base.storage,
         namespaces: {
@@ -227,7 +227,7 @@ describe('control-policy round-trip fidelity', () => {
     const contract = serializer.deserializeContract(input);
     const reparsed = JSON.parse(JSON.stringify(serializer.serializeContract(contract)));
 
-    expect(reparsed.defaultControl).toBe('tolerated');
+    expect(reparsed.defaultControlPolicy).toBe('tolerated');
 
     const ns = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID];
     const table = ns.tables.user;
@@ -235,7 +235,7 @@ describe('control-policy round-trip fidelity', () => {
     const emailColumn = table.columns.email;
     const enumEntry = ns.enum.Role;
 
-    const def = reparsed.defaultControl;
+    const def = reparsed.defaultControlPolicy;
     expect(effectiveControlPolicy(table.control, def)).toBe('external');
     expect(effectiveControlPolicy(idColumn.control, def)).toBe('observed');
     expect(effectiveControlPolicy(emailColumn.control, def)).toBe('tolerated');

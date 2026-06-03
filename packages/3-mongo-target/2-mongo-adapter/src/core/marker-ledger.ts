@@ -228,29 +228,20 @@ export async function updateMarker(
 }
 
 /**
- * Appends a ledger entry for the given space. Ledger entries co-exist
- * with marker docs in the same collection; marker docs use `_id: <space>`
- * (string), ledger entries use `type: 'ledger'` plus a driver-generated
- * ObjectId. Reads partition the two by filter shape.
- *
- * The same `edgeId` may legitimately recur across different spaces (e.g.
- * a synthetic ∅→head edge on first apply), so the ledger key is
- * `(space, edgeId)` — the doc carries `space` for partitioned reads.
+ * Reads per-migration ledger entries in apply order. When `space` is omitted,
+ * returns rows for every space. Returns `[]` when no ledger documents exist yet.
  */
-/**
- * Reads per-migration ledger entries for `space` in apply order. Returns
- * `[]` when no ledger documents exist for that space yet.
- */
-export async function readLedger(db: Db, space: string): Promise<readonly LedgerEntryRecord[]> {
-  const ledgerContext = { space, markerLocation: MONGO_LEDGER_COLLECTION };
+export async function readLedger(db: Db, space?: string): Promise<readonly LedgerEntryRecord[]> {
+  const ledgerContext = { space: space ?? '*', markerLocation: MONGO_LEDGER_COLLECTION };
+  const matchStage: Record<string, unknown> = { type: 'ledger' };
+  if (space !== undefined) {
+    matchStage['space'] = space;
+  }
   const docs = await withMarkerReadErrorHandling(
     () =>
       executeAggregate(
         db,
-        new RawAggregateCommand(COLLECTION, [
-          { $match: { type: 'ledger', space } },
-          { $sort: { _id: 1 } },
-        ]),
+        new RawAggregateCommand(COLLECTION, [{ $match: matchStage }, { $sort: { _id: 1 } }]),
       ),
     ledgerContext,
   );
@@ -261,10 +252,14 @@ export async function readLedger(db: Db, space: string): Promise<readonly Ledger
     const migrationHash = doc['migrationHash'];
     const from = doc['from'];
     const to = doc['to'];
+    const docSpace = doc['space'];
     if (typeof migrationName !== 'string' || typeof migrationHash !== 'string') {
       continue;
     }
     if (typeof from !== 'string' || typeof to !== 'string') {
+      continue;
+    }
+    if (typeof docSpace !== 'string') {
       continue;
     }
     const appliedAt = doc['appliedAt'];
@@ -277,7 +272,7 @@ export async function readLedger(db: Db, space: string): Promise<readonly Ledger
     const operations = doc['operations'];
     const opList = Array.isArray(operations) ? operations : [];
     entries.push({
-      space,
+      space: docSpace,
       migrationName,
       migrationHash,
       from: ledgerOriginFromStored(from),
