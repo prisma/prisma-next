@@ -178,25 +178,6 @@ export function partitionCallsByControlPolicy<TCall>(options: {
   });
 }
 
-export function filterCallsByControlPolicy<TCall>(options: {
-  readonly calls: readonly TCall[];
-  readonly contract: Contract<SqlStorage>;
-  readonly resolveControlPolicySubject: (call: TCall) => ControlPolicySubject | undefined;
-}): readonly TCall[] {
-  const defaultControlPolicy = options.contract.defaultControlPolicy;
-  const kept: TCall[] = [];
-
-  for (const call of options.calls) {
-    const subject = options.resolveControlPolicySubject(call);
-    const policy = controlPolicyForCall(subject, defaultControlPolicy);
-    if (callAllowedUnderControlPolicy(policy, subject)) {
-      kept.push(call);
-    }
-  }
-
-  return Object.freeze(kept);
-}
-
 /**
  * Partition a list of schema-issue-shaped inputs by the effective control
  * policy of each issue's subject *before* the planner is invoked.

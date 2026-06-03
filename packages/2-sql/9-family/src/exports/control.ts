@@ -28,7 +28,6 @@ export {
 export type { ControlPolicySubject } from '../core/migrations/control-policy';
 export {
   controlPolicyForCall,
-  filterCallsByControlPolicy,
   partitionCallsByControlPolicy,
   partitionIssuesByControlPolicy,
 } from '../core/migrations/control-policy';
