@@ -85,3 +85,68 @@ D1–D4 closed SATISFIED through the build loop but operator review caught three
 ## Validation gate (all dispatches)
 
 `pnpm typecheck` (full) · package-scoped `pnpm test` for `@prisma-next/family-sql` + `@prisma-next/adapter-postgres` + `@prisma-next/adapter-sqlite` (+ any touched target/runtime package) · `pnpm fixtures:check` (byte-identical) · biome on changed files. D4 additionally runs the workspace-wide test command + a `git grep` for the removed symbols.
+
+## Corrective dispatches round 2 (added 2026-06-03 after D5/D6/D7 reviewed at PR #712)
+
+D5/D6/D7 closed SATISFIED but operator review surfaced a deeper miss conditioning D1: the contract-free authoring surface (`relational-core/src/contract-free/dml.ts`) is not actually a query builder — it's option-bag wrappers around the chainable AST class API that already exists. Marker writes that use it thread codec IDs / table names / column refs at every leaf; marker reads use raw SQL strings. See [spec round 2 corrective scope](./spec.md#corrective-scope-round-2-added-2026-06-03-after-corrective-dispatches-d5d6d7-reviewed-at-pr-712), [retros round 2](../../retros.md#2026-06-03-round-2--slice-2-corrective-work-shipped-operator-caught-a-deeper-architectural-miss), and [F21 in failure-modes.md](../../../../drive/calibration/failure-modes.md#f21-implementer-ships-ast-construction-by-hand-wrapped-in-option-bag-factories-instead-of-building-the-fluent-authoring-surface-the-slice-exists-to-deliver).
+
+Three more dispatches, **all to `claude-4.6-sonnet-high-thinking` (mid tier)**. Implementer slot upgraded from `composer-2.5-fast` because the work is design-heavy (architectural taste over mechanical correctness); cheap-tier implementers default to the lowest-cost-to-satisfy interpretation, which on ergonomics slices is the wrong-shape interpretation.
+
+### D8 — Replace `dml.ts` with a real contract-free fluent authoring surface
+
+- **Outcome (property statement — ergonomic):** the contract-free module at `packages/2-sql/4-lanes/relational-core/src/contract-free/` is a fluent authoring surface analogous in *spirit* to `sql-builder`'s contract-bound `sql()` interface, much simpler (no contract, no `ExecutionContext`, no codec-lookup-through-registry indirection). Specifically: typed table declarations carry column metadata at declaration time (`const marker = table('prisma_contract.marker', { space: text(), core_hash: text(), … })`); column proxies expose expression methods (`marker.space.eq(value)` returns an expression; `expr.and(other)`, `expr.or(other)` compose); operations expose a fluent chain (`marker.update().set({…}).where(...).returning(...)`, `marker.insert({…})`, `marker.upsert({…}).onConflict('space').doUpdate({…})` or similar — exact chain shape is the implementer's design call); the chain terminates in an AST node from the existing `relational-core/ast/types.ts` (no new AST classes). The current option-bag wrappers (`insert(table, row)`, `update({…})`, `upsert({…})`) are deleted; `tableRef` / `excludedColumn` / `dbExpr` / `param` survive only as primitives the new builder genuinely needs.
+- **Builds on:** the existing AST class chain (already exposes `.withSet(…)` / `.withWhere(…)` / `.withOnConflict(…)` etc.) and `sql-builder`'s contract-bound surface (the *spirit* reference; do **not** copy its types literally, do **not** import from it — different runtime, no `ExecutionContext`).
+- **Hands to:** D9, which rewrites the marker/ledger code against this surface.
+- **Focus:** real fluent design. The Sonnet implementer makes the actual API design call (`.update().set(…)` vs `.update({…})`; `.where(predicate)` taking an expression vs taking a callback; how `RETURNING` chains; how `ON CONFLICT` chains) — guided by *spirit-of-`sql-builder`*, constrained by *no contract / much simpler*. The brief asserts the ergonomic property; the implementer ships the API.
+- **Reference (spirit, not literal):** read `packages/2-sql/4-lanes/sql-builder/` end-to-end before designing — `src/runtime/sql.ts`, `src/types/db.ts`, `src/types/select-query.ts`, `src/types/mutation-query.ts`, `src/scope.ts`, the runtime `*-impl.ts` files. Note how column proxies expose expression methods, how chains compose, how mutations work. Then design the contract-free analog that delivers the same authoring ergonomics for tables declared literally rather than derived from a contract.
+- **Per-target codec helpers** (`text()`, `int4()`, `jsonb()`, `textArray()`, `timestamptz()`, etc.) live under `@prisma-next/target-postgres/contract-free` and `@prisma-next/target-sqlite/contract-free` so column declarations bind codec IDs at declaration time (no per-call-site codec threading). The implementer designs the column-helper shape (return type, what it exposes, how the column proxy derives) as part of D8.
+- **Vocabulary:** "contract-free" throughout. No "control" anywhere (control-plane is the current consumer, not the abstraction). Folder stays at `relational-core/src/contract-free/` (existing label, no rename).
+- **Sonnet implementer constraints (mid-tier, design-heavy):**
+  - **Read the reference end-to-end before designing.** Don't skim. The shape decisions are load-bearing; the brief gives spirit, the implementer gives the API. The reference is `sql-builder/` — read it; the design call is informed by it.
+  - **Do not introduce new AST classes.** The chain terminates in the existing `InsertAst` / `UpdateAst` / `SelectAst` / etc. Existing renderers stay unchanged; existing `pnpm fixtures:check` stays byte-identical (the lowered SQL is the same; only the *authoring surface* changes).
+  - **Do not import from `sql-builder`** (different runtime, contract-bound types). Mirror the *ergonomic property*, not the implementation.
+  - **No proxies-via-`Proxy`-magic unless it falls out naturally.** Plain objects with typed column-field properties are preferable if they work; the contract-free case (table shape is statically known at declaration) doesn't need the dynamic-proxy machinery `sql-builder` uses for contract-resolved tables.
+  - **Single Sonnet dispatch designs *and* implements D8.** Don't split into "design spike" + "implementation" — Sonnet's strength is holding both together.
+  - **One commit.** Subject: `feat(sql): contract-free fluent authoring surface for control-plane DML (D8, TML-2753)`. Body explains the design decisions (chain shape, column-helper shape, where each piece lives).
+- **Stop conditions:**
+  - If you find the design genuinely cannot work without a new AST shape, HALT and surface — that's a design escape the orchestrator wants to decide.
+  - If you find yourself writing a comment like "this is a stub until the chain is added" or "TODO: fluent surface" or "for now, callers do X by hand" — that's the F21 anti-pattern this dispatch exists to remove. HALT.
+  - If a per-call-site usage example using the new surface still threads codec IDs, table names, or column refs at leaves, the surface hasn't been built. HALT, reconsider, do not ship.
+- **Reviewer DoR (Sonnet reviewer, opus-4-7-thinking-high):**
+  - Write a representative call site using the new surface (e.g. the marker `updateMarker` with CAS-WHERE + invariants merge); judge it readable as a human-author would. The "compiles + tests pass" check is necessary but not sufficient.
+  - Confirm the chain composes (chain depth ≥ 2 in representative usage; no escape hatches that re-introduce the bag-of-options shape).
+  - Confirm column proxies carry codec — no `param(value, { codecId: ... })` at write/read call sites.
+  - Confirm output is existing AST classes; `pnpm fixtures:check` byte-identical.
+
+### D9 — Rewrite marker/ledger writes + reads against the new surface; collapse `marker-read.ts` into `marker-ledger.ts`
+
+- **Outcome (property statement):** marker/ledger writes and reads in `adapter-postgres/src/core/marker-ledger.ts` and `adapter-sqlite/src/core/marker-ledger.ts` are authored against D8's fluent surface. No per-call-site codec / table / column threading at leaves. Marker reads no longer use raw SQL strings via `driver.query(sql, [params])` — the probe + select are authored through D8. Each adapter's marker code is one file (`marker-ledger.ts`), not split across `marker-read.ts` + `marker-ledger-writes.ts`.
+- **Builds on:** D8's authoring surface.
+- **Hands to:** the slice's stated purpose (typed query AST commands for marker/ledger, in spirit).
+- **Focus:** rewrite the consumers; collapse the split. No behaviour change — lowered SQL stays byte-identical (`pnpm fixtures:check` PASS); all existing marker-ledger tests still pin the same observable outcomes.
+- **Probe vs SELECT** — the existence probe (`select 1 from information_schema.tables where table_schema = $1 and table_name = $2` on PG; `sqlite_master` query on SQLite) is target-specific introspection, not marker DML. If D8's surface naturally extends to such queries, author them through it; if not (e.g. these tables aren't user-declared schemas), the implementer surfaces the boundary in the dispatch report so D8 can be extended or the probe can stay raw with the justification recorded.
+- **Sonnet implementer constraints (mid-tier):**
+  - **Do not modify D8's surface.** If you find yourself wanting to bend D8, HALT and surface — that's a D8 issue, not a D9 fix.
+  - **Each adapter's `marker-ledger.ts` is the only marker code file in `<adapter>/src/core/`.** Delete `marker-read.ts`; delete `marker-ledger-writes.ts`; the new `marker-ledger.ts` is the single home.
+  - **No new abstractions in the adapters.** D8 supplied the authoring surface; D9 uses it. No "marker helper" shared between PG and SQLite — only the pure `parseContractMarkerRow` (already shared, retained).
+  - **One commit per adapter** (one for postgres, one for sqlite) OR **one combined commit** — implementer's call, judged by which produces a coherent review.
+
+### D10 — Rename `control-codec-registry` to plane-neutral
+
+- **Outcome (property statement):** no surface in `packages/` is labelled with "control" unless it is genuinely control-plane-specific. The current `control-codec-registry` works in either plane (it doesn't depend on a contract); rename to a plane-neutral label. Suggested: `contractFreeCodecRegistry` / `createContractFreeCodecRegistry` (parallels the contract-free vocabulary used throughout the slice). Implementer may propose a different plane-neutral name if better.
+- **Builds on:** D9's state of the world (rides on the same branch).
+- **Focus:** rename + updating all imports + the export label. No behaviour change.
+- **Sonnet implementer constraints:** rename, period. No refactoring of the registry's internals.
+
+### Validation gate for D8 + D9 + D10 (in addition to the all-dispatches gate above)
+
+- `pnpm fixtures:check` byte-identical (structural changes to authoring surface; lowered SQL stays the same).
+- `pnpm typecheck` clean.
+- `pnpm test:packages` filtered to `@prisma-next/relational-core` + `@prisma-next/family-sql` + `@prisma-next/adapter-postgres` + `@prisma-next/adapter-sqlite` + `@prisma-next/target-postgres` + `@prisma-next/target-sqlite` + `@prisma-next/sql-runtime`.
+- **Per-call-site grep (D9):** `git grep -nE 'BinaryExpr\.(eq|and|or)|ColumnRef\.of\(|AndExpr\.of\(|param\(.*codecId:' packages/3-targets/6-adapters/postgres/src/core/marker-* packages/3-targets/6-adapters/sqlite/src/core/marker-*` returns zero.
+- **Raw-SQL grep (D9):** `git grep -nF 'driver.query(' packages/3-targets/6-adapters/postgres/src/core/marker-* packages/3-targets/6-adapters/sqlite/src/core/marker-*` returns zero outside the fluent surface's `.execute()` (or equivalent terminal) calls.
+- **File collapse (D9):** `marker-read.ts` and `marker-ledger-writes.ts` no longer exist in `adapter-postgres/src/core/` or `adapter-sqlite/src/core/`; `marker-ledger.ts` is the sole marker module in each.
+- **Name grep (D10):** `git grep -n 'control-codec-registry\|controlCodecRegistry\|createControlCodecRegistry' packages/` returns zero.
+- Reviewer check: representative call site (e.g. `updateMarker` with CAS-WHERE) reads cleanly as a downstream human author would.
+
+_Sequencing: D8 → D9 → D10 (D9 depends on D8's shape; D10 is small + independent but rides on D9's branch state to keep PR-on-PR cost down)._

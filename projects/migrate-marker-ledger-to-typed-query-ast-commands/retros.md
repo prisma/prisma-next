@@ -47,3 +47,52 @@ The common pattern across all three: **brief discipline. The orchestrator's brie
 
 Spec + plan updates are appended in the same commit chain as the retro landings (see `slices/sql-marker-ops-through-adapter/spec.md` and `plan.md` revisions).
 
+## 2026-06-03 (round 2) — Slice 2 corrective work shipped, operator caught a deeper architectural miss
+
+**Trigger:** operator-flagged surprise on PR #712 after corrective dispatches D5 / D6 / D7 closed SATISFIED. Five new findings on a single review pass; one is structural and conditions the others.
+
+### What happened
+
+The corrective dispatches landed the three mechanical fixes the round-1 retro identified (PostgresTableSource layering split, adapter-owned readMarker, MarkerStatement deletion). Operator reviewed the resulting code and flagged that the **contract-free authoring surface** (`packages/2-sql/4-lanes/relational-core/src/contract-free/dml.ts`) is not actually a query builder — it's option-bag factory wrappers around a chainable AST class API that already exists, with codec IDs / table names / column names threaded at every call site. Marker writes that *use* this "builder" are 50-line literal-record assemblies; the D6 read path uses raw SQL strings via `driver.query(sql, [params])` and doesn't attempt the AST at all.
+
+Five operator findings on the review pass:
+
+| # | Finding | Surface |
+|---|---|---|
+| 1 | `dml.ts` is a fake builder — `insert(table, row)`, `update({...})`, `upsert({...})` are option-bag wrappers around `InsertAst.into(...).withRows(...).withOnConflict(...)` chain that already chains. | [`packages/2-sql/4-lanes/relational-core/src/contract-free/dml.ts:49,59,81`](../../packages/2-sql/4-lanes/relational-core/src/contract-free/dml.ts) |
+| 2 | Marker write code constructs AST atoms by hand at every leaf (`BinaryExpr.eq(ColumnRef.of(...), param(..., {codecId: ...}))` repeated). Unreadable. | [`packages/3-targets/6-adapters/postgres/src/core/marker-ledger-writes.ts:175-182`](../../packages/3-targets/6-adapters/postgres/src/core/marker-ledger-writes.ts) |
+| 3 | Marker read code is raw SQL strings, not AST. The slice exists to migrate this exact pattern off raw SQL; D6 put it back in. | [`packages/3-targets/6-adapters/postgres/src/core/marker-read.ts:15-26`](../../packages/3-targets/6-adapters/postgres/src/core/marker-read.ts) |
+| 4 | `marker-read.ts` + `marker-ledger-writes.ts` are split across two files; should be one (`marker-ledger.ts`). | adapter cores |
+| 5 | `control-codec-registry` is misnamed — there's nothing control-plane-specific about it, it just happens to be the current consumer. | [`packages/2-sql/5-runtime/src/codecs/control-codec-registry.ts`](../../packages/2-sql/5-runtime/src/codecs/control-codec-registry.ts) |
+
+Plus a meta-finding on this project's own calibration docs: the F19 Dispatch-DoR overlay item I wrote in the round-1 retro enumerates "every caller of either pre-collapse operation" in the brief, which violates Drive's "briefs assert properties, not file lists" principle. The right framing is property-based: *"no reference to the pre-collapse operations survives after this dispatch."*
+
+### Root cause
+
+Finding 1 (and through it, findings 2–4) traces to a single orchestrator-level miss: **the D1 brief framed the win as "use the typed AST" instead of "deliver a fluent authoring surface analogous in spirit to `sql-builder`'s contract-bound `sql()` interface"**. The implementer (composer-2.5-fast) optimised for the literal interpretation — assemble AST nodes — and pattern-cloned Slice 1's atom-constructor shape (`col` / `lit` / `fn` for DDL — correct because DDL is one-shot, non-chainable) into a domain (DML) that genuinely needs a fluent builder. The wrong precedent transferred the wrong ergonomics.
+
+Two layered orchestrator-side mistakes:
+
+1. **Implementer tier was wrong for the work.** composer-2.5-fast is calibrated for mechanical execution against a clear spec; assigning it a *design-heavy* dispatch (where the success criterion is architectural taste over correctness) defaults to the lowest-cost-to-satisfy interpretation. On an ergonomics slice, the lowest-cost-to-satisfy interpretation is the wrong-shape interpretation. **Implementer slot for D8 onwards is now `claude-4.6-sonnet-high-thinking`.**
+2. **F17 property-statement discipline didn't catch this.** F17 already exists ("brief frames the win as mechanics; implementer + reviewer ship wrong-shape work that satisfies it"); the round-1 retro added it. F17 *would* have caught this if my D1 property statement had named the ergonomic property — but I framed it as "use the typed AST," which the implementer literally did. The F17 mitigation needs to extend to ergonomic-slice briefs specifically: when a slice exists to improve authoring ergonomics, the property statement names the *ergonomic property* (typed proxies, chain depth, no per-call-site context threading), not the *transport property* (uses the AST).
+
+Finding 5 (control-codec-registry naming) is independent — a name was chosen for the first consumer rather than for the abstraction's scope. Small standalone fix.
+
+### Landing surfaces
+
+| Lesson | Surface | Entry |
+|---|---|---|
+| Implementer ships AST construction by hand wrapped in option-bag factories instead of building the fluent surface the slice exists to deliver. | [`drive/calibration/failure-modes.md`](../../drive/calibration/failure-modes.md) | **F21** |
+| F19 DoR overlay item rewritten to be property-based (no file enumeration). | [`drive/calibration/dor.md`](../../drive/calibration/dor.md) line 45 | (overlay revised in place) |
+| Implementer-tier choice has architectural consequences: cheap-tier implementers default to the lowest-cost-to-satisfy interpretation; on ergonomics slices, that's the wrong shape. | [`drive/calibration/failure-modes.md`](../../drive/calibration/failure-modes.md) F21 mitigation | (mitigation bullet on tier check) |
+
+### Corrective course (Slice 2-bis, on the same branch)
+
+Three more dispatches, all to `claude-4.6-sonnet-high-thinking`:
+
+- **D8** — replace `dml.ts` wholesale with a real contract-free fluent authoring surface analogous in spirit to `sql-builder` (typed table declarations via `table(...)`; typed column proxies that carry codecs; fluent chain `.update().set(...).where(...).returning(...)`; produces existing AST classes). Per-target codec helpers (`text`, `int4`, `jsonb`, `textArray`, `timestamptz`) live in `@prisma-next/target-postgres/contract-free` + `@prisma-next/target-sqlite/contract-free`. Vocabulary: "contract-free" throughout, no "control."
+- **D9** — rewrite `marker-ledger-writes.ts` + `marker-read.ts` to use the new builder, including the read path; collapse the two files into one `marker-ledger.ts` per adapter (PG + SQLite).
+- **D10** — rename `control-codec-registry` to a plane-neutral name (suggested: `contractFreeCodecRegistry` / `createContractFreeCodecRegistry`). Rides on D9's branch state.
+
+Plus orchestrator-side fixes (this commit): F19 DoR overlay rewritten property-based; F21 added to failure-modes; spec + plan revised with round-2 corrective scope.
+
