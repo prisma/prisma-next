@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createMongoContractSchema } from '../../src/contract-schema';
 import { MongoCollection } from '../../src/ir/mongo-collection';
 
-function minimalContract(opts: { collectionControl?: unknown; defaultControl?: unknown }) {
+function minimalContract(opts: { collectionControl?: unknown; defaultControlPolicy?: unknown }) {
   return {
     targetFamily: 'mongo',
     roots: {},
@@ -18,7 +18,9 @@ function minimalContract(opts: { collectionControl?: unknown; defaultControl?: u
         },
       },
     },
-    ...(opts.defaultControl !== undefined ? { defaultControl: opts.defaultControl } : {}),
+    ...(opts.defaultControlPolicy !== undefined
+      ? { defaultControlPolicy: opts.defaultControlPolicy }
+      : {}),
   };
 }
 
@@ -50,13 +52,15 @@ describe('Mongo contract schema control fields', () => {
     );
   });
 
-  it('accepts a contract carrying defaultControl', () => {
-    expect(schema(minimalContract({ defaultControl: 'managed' })) instanceof type.errors).toBe(
-      false,
-    );
+  it('accepts a contract carrying defaultControlPolicy', () => {
+    expect(
+      schema(minimalContract({ defaultControlPolicy: 'managed' })) instanceof type.errors,
+    ).toBe(false);
   });
 
-  it('rejects a contract carrying a non-ControlPolicy defaultControl', () => {
-    expect(schema(minimalContract({ defaultControl: 'bogus' })) instanceof type.errors).toBe(true);
+  it('rejects a contract carrying a non-ControlPolicy defaultControlPolicy', () => {
+    expect(schema(minimalContract({ defaultControlPolicy: 'bogus' })) instanceof type.errors).toBe(
+      true,
+    );
   });
 });

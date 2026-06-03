@@ -28,17 +28,17 @@ const int4Column = columnDescriptor('pg/int4@1');
 
 function tableEffectiveControl(
   tableControl: ControlPolicy | undefined,
-  defaultControl: ControlPolicy | undefined,
+  defaultControlPolicy: ControlPolicy | undefined,
 ): ControlPolicy {
-  return effectiveControlPolicy(tableControl, defaultControl);
+  return effectiveControlPolicy(tableControl, defaultControlPolicy);
 }
 
-describe('defineContract defaultControl', () => {
-  it('lowers defaultControl to Contract.defaultControl', () => {
+describe('defineContract defaultControlPolicy', () => {
+  it('lowers defaultControlPolicy to Contract.defaultControlPolicy', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
-      defaultControl: 'external',
+      defaultControlPolicy: 'external',
       models: {
         User: model('User', {
           fields: { id: field.column(int4Column).id() },
@@ -46,10 +46,10 @@ describe('defineContract defaultControl', () => {
       },
     });
 
-    expect(built.defaultControl).toBe('external');
+    expect(built.defaultControlPolicy).toBe('external');
   });
 
-  it('omits defaultControl when unset', () => {
+  it('omits defaultControlPolicy when unset', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
@@ -60,7 +60,7 @@ describe('defineContract defaultControl', () => {
       },
     });
 
-    expect(built).not.toHaveProperty('defaultControl');
+    expect(built).not.toHaveProperty('defaultControlPolicy');
   });
 });
 
@@ -85,14 +85,14 @@ describe('defineContract per-table control', () => {
       });
 
       const table = unboundTables(built.storage)['app_user'];
-      expect(tableEffectiveControl(table?.control, built.defaultControl)).toBe(control);
+      expect(tableEffectiveControl(table?.control, built.defaultControlPolicy)).toBe(control);
       if (control === 'managed') {
         expect(table?.control).toBe('managed');
       }
     }
   });
 
-  it('omits per-node control and defaultControl when neither is authored', () => {
+  it('omits per-node control and defaultControlPolicy when neither is authored', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
@@ -103,7 +103,7 @@ describe('defineContract per-table control', () => {
       },
     });
 
-    expect(built).not.toHaveProperty('defaultControl');
+    expect(built).not.toHaveProperty('defaultControlPolicy');
     const table = unboundTables(built.storage)['app_user'];
     expect(table).not.toHaveProperty('control');
   });
@@ -114,7 +114,7 @@ describe('defineContract mixed default and per-table control', () => {
     const built = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
-      defaultControl: 'external',
+      defaultControlPolicy: 'external',
       models: {
         User: model('User', {
           fields: { id: field.column(int4Column).id() },
@@ -129,20 +129,20 @@ describe('defineContract mixed default and per-table control', () => {
     });
 
     const tables = unboundTables(built.storage);
-    expect(tableEffectiveControl(tables['app_user']?.control, built.defaultControl)).toBe(
+    expect(tableEffectiveControl(tables['app_user']?.control, built.defaultControlPolicy)).toBe(
       'external',
     );
-    expect(tableEffectiveControl(tables['user_profile']?.control, built.defaultControl)).toBe(
+    expect(tableEffectiveControl(tables['user_profile']?.control, built.defaultControlPolicy)).toBe(
       'managed',
     );
-    expect(tableEffectiveControl(tables['audit_log']?.control, built.defaultControl)).toBe(
+    expect(tableEffectiveControl(tables['audit_log']?.control, built.defaultControlPolicy)).toBe(
       'tolerated',
     );
 
     const envelope = JSON.parse(JSON.stringify(built)) as unknown;
     const roundTripped = validateSqlContractFully<Contract<SqlStorage>>(envelope);
     const roundTrippedTables = unboundTables(roundTripped.storage);
-    const def = roundTripped.defaultControl;
+    const def = roundTripped.defaultControlPolicy;
 
     expect(def).toBe('external');
     expect(tableEffectiveControl(roundTrippedTables['app_user']?.control, def)).toBe('external');

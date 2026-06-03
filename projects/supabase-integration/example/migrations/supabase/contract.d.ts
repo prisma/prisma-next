@@ -7,7 +7,7 @@ export interface Contract
   extends TypedContract<{
     spaceId: 'supabase';
     namespaces: ['auth', 'storage'];
-    defaultControl: 'external';
+    defaultControlPolicy: 'external';
     models: {
       AuthUser: {
         namespace: 'auth';

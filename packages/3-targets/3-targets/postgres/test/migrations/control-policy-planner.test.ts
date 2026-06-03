@@ -14,7 +14,7 @@ import { postgresCreateNamespace } from '../../src/core/postgres-schema';
 
 function makeContract(
   tables: Record<string, StorageTableInput>,
-  defaultControl?: Contract<SqlStorage>['defaultControl'],
+  defaultControlPolicy?: Contract<SqlStorage>['defaultControlPolicy'],
 ): Contract<SqlStorage> {
   const unboundNs = postgresCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
@@ -33,7 +33,7 @@ function makeContract(
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    ...(defaultControl !== undefined ? { defaultControl } : {}),
+    ...(defaultControlPolicy !== undefined ? { defaultControlPolicy } : {}),
   };
 }
 
@@ -215,7 +215,7 @@ describe('planIssues control policy', () => {
     });
   });
 
-  describe('external defaultControl floor', () => {
+  describe('external defaultControlPolicy floor', () => {
     it('suppresses managed-override object DDL (the floor wins)', () => {
       const toContract = makeContract(
         {

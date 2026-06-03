@@ -43,7 +43,7 @@ export function createTestContract(
   extensionPacks: Record<string, unknown> = {},
   storageTypes?: Record<string, import('@prisma-next/sql-contract/types').SqlStorageTypeEntry>,
   contractOverrides?: {
-    defaultControl?: ControlPolicy;
+    defaultControlPolicy?: ControlPolicy;
     enums?: Record<string, PostgresEnumStorageEntry>;
   },
 ): Contract<SqlStorage> {
@@ -52,7 +52,7 @@ export function createTestContract(
     targetFamily: 'sql',
     roots: {},
     profileHash: profileHash('sha256:test'),
-    ...ifDefined('defaultControl', contractOverrides?.defaultControl),
+    ...ifDefined('defaultControlPolicy', contractOverrides?.defaultControlPolicy),
     storage: new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {

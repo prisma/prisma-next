@@ -32,7 +32,10 @@ import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract'
  * list when no extensions exist over the Mongo family alphabet.
  */
 export abstract class MongoSchemaVerifierBase<
-  TContract extends { readonly storage: MongoStorage; readonly defaultControl?: ControlPolicy },
+  TContract extends {
+    readonly storage: MongoStorage;
+    readonly defaultControlPolicy?: ControlPolicy;
+  },
   TSchema,
 > implements SchemaVerifier<TContract, TSchema>
 {
@@ -47,7 +50,7 @@ export abstract class MongoSchemaVerifierBase<
     contract: TContract,
     collection: MongoCollection | undefined,
   ): ControlPolicy {
-    return effectiveControlPolicy(collection?.control, contract.defaultControl);
+    return effectiveControlPolicy(collection?.control, contract.defaultControlPolicy);
   }
 
   protected collectionControlPolicyForName(

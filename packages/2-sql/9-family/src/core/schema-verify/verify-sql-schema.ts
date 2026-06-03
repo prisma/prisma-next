@@ -237,7 +237,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
           resolveExistingEnumValues,
           namespaceId: UNBOUND_NAMESPACE_ID,
         }),
-        effectiveControlPolicy(typeInstance.control, contract.defaultControl),
+        effectiveControlPolicy(typeInstance.control, contract.defaultControlPolicy),
       );
     } else if (isStorageTypeInstance(typeInstance)) {
       const hook = codecHooks.get(typeInstance.codecId);
@@ -245,7 +245,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
         typeName,
         `storage.types.${typeName}`,
         hook?.verifyType ? hook.verifyType({ typeName, typeInstance, schema }) : [],
-        effectiveControlPolicy(undefined, contract.defaultControl),
+        effectiveControlPolicy(undefined, contract.defaultControlPolicy),
       );
     }
   }
@@ -268,7 +268,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
           resolveExistingEnumValues,
           namespaceId: nsId,
         }),
-        effectiveControlPolicy(entry.control, contract.defaultControl),
+        effectiveControlPolicy(entry.control, contract.defaultControlPolicy),
       );
     }
   }
@@ -432,7 +432,7 @@ function verifySchemaTables(options: {
     normalizeNativeType,
     columnsCompatible,
   } = options;
-  const contractDefaultControl = contract.defaultControl;
+  const contractDefaultControl = contract.defaultControlPolicy;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
   const schemaTables = schema.tables;

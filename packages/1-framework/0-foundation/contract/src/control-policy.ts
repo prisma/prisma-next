@@ -19,7 +19,7 @@ export type ControlPolicy = 'managed' | 'tolerated' | 'external' | 'observed';
  */
 export function effectiveControlPolicy(
   nodeControl: ControlPolicy | undefined,
-  defaultControl: ControlPolicy | undefined,
+  defaultControlPolicy: ControlPolicy | undefined,
 ): ControlPolicy {
-  return nodeControl ?? defaultControl ?? 'managed';
+  return nodeControl ?? defaultControlPolicy ?? 'managed';
 }

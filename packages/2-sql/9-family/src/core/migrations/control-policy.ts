@@ -36,12 +36,12 @@ export interface ControlPolicySubject {
  */
 function controlPolicyForCall(
   subject: ControlPolicySubject | undefined,
-  defaultControl: ControlPolicy | undefined,
+  defaultControlPolicy: ControlPolicy | undefined,
 ): ControlPolicy {
-  if (defaultControl === 'external') {
+  if (defaultControlPolicy === 'external') {
     return 'external';
   }
-  return effectiveControlPolicy(subject?.explicitNodeControlPolicy, defaultControl);
+  return effectiveControlPolicy(subject?.explicitNodeControlPolicy, defaultControlPolicy);
 }
 
 /**
@@ -74,12 +74,12 @@ export function filterCallsByControlPolicy<TCall>(options: {
   readonly contract: Contract<SqlStorage>;
   readonly resolveControlPolicySubject: (call: TCall) => ControlPolicySubject | undefined;
 }): readonly TCall[] {
-  const defaultControl = options.contract.defaultControl;
+  const defaultControlPolicy = options.contract.defaultControlPolicy;
   const kept: TCall[] = [];
 
   for (const call of options.calls) {
     const subject = options.resolveControlPolicySubject(call);
-    const policy = controlPolicyForCall(subject, defaultControl);
+    const policy = controlPolicyForCall(subject, defaultControlPolicy);
     if (callAllowedUnderControlPolicy(policy, subject)) {
       kept.push(call);
     }

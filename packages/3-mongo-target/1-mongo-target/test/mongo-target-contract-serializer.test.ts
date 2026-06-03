@@ -182,7 +182,7 @@ describe('MongoTargetContractSerializer', () => {
         targetFamily: 'mongo' as const,
         target: 'mongo',
         profileHash: 'sha256:test',
-        defaultControl: 'tolerated' as const,
+        defaultControlPolicy: 'tolerated' as const,
         roots: {
           items: { model: 'Item', namespace: UNBOUND_NAMESPACE_ID },
           events: { model: 'Event', namespace: UNBOUND_NAMESPACE_ID },
@@ -227,10 +227,10 @@ describe('MongoTargetContractSerializer', () => {
       const contract = serializer.deserializeContract(makeMixedControlJson());
       const reparsed = JSON.parse(JSON.stringify(serializer.serializeContract(contract)));
 
-      expect(reparsed.defaultControl).toBe('tolerated');
+      expect(reparsed.defaultControlPolicy).toBe('tolerated');
 
       const collections = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].collections;
-      const def = reparsed.defaultControl;
+      const def = reparsed.defaultControlPolicy;
       expect(effectiveControlPolicy(collections.items.control, def)).toBe('external');
       expect(effectiveControlPolicy(collections.events.control, def)).toBe('tolerated');
       expect(collections.events).not.toHaveProperty('control');

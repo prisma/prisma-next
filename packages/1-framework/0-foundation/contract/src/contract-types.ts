@@ -58,7 +58,7 @@ export interface Contract<
   readonly execution?: ContractExecutionSection;
   readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, unknown>;
-  readonly defaultControl?: ControlPolicy;
+  readonly defaultControlPolicy?: ControlPolicy;
 }
 
 /** Model definitions union carried on a {@link Contract}'s `TModels` type parameter. */
