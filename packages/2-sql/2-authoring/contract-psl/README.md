@@ -14,7 +14,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 ## Responsibilities
 
 - Interpret `ParsePslDocumentResult` into SQL `Contract`
-- Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
+- Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`, `@@control`)
 - Interpret SQL timestamp semantics: `DateTime @default(now())` (or the equivalent `temporal.createdAt()` field-preset call) as a storage default, and `temporal.updatedAt()` as an execution mutation default
 - Lower shared constructor expressions in both `types {}` blocks and inline field positions (for example `ShortName = sql.String(length: 35)` and `embedding pgvector.Vector(length: 1536)?`)
 - Lower supported default functions through composed registry inputs
@@ -70,6 +70,10 @@ Supported timestamp authoring surface:
 - `updatedAt temporal.updatedAt()` lowers to `timestampNow` on create and on non-empty update mutations. This is application-side because update-time semantics are mutation-aware, not a database trigger.
 - The Prisma-flavored `@updatedAt` attribute is not supported; references produce `PSL_UNSUPPORTED_FIELD_ATTRIBUTE` with a migration hint pointing at `temporal.updatedAt()`. The hint is suppressed when the field already declares any `temporal.*` preset.
 - `@createdAt` is not supported as a PSL alias.
+
+Model-level control policy:
+
+- `@@control(<policy>)` lowers to the storage table's `control` field. The argument is one positional lowercase literal: `managed`, `tolerated`, `external`, or `observed`. Omit `@@control` to leave per-table control unset (the framework default applies at runtime).
 
 ## Public API
 
