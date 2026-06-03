@@ -250,11 +250,11 @@ export function detectDestructiveChanges(
   for (const namespaceId of namespaceIds) {
     const fromNs = from.namespaces[namespaceId];
     const toNs = to.namespaces[namespaceId];
-    const fromTables = fromNs?.tables;
+    const fromTables = fromNs?.entries.table;
     if (!fromTables) continue;
 
     for (const tableName of Object.keys(fromTables)) {
-      const toTableRaw = toNs?.tables[tableName];
+      const toTableRaw = toNs?.entries.table[tableName];
       if (!(toTableRaw instanceof StorageTable)) {
         conflicts.push({
           kind: 'tableRemoved',
@@ -327,7 +327,7 @@ export function contractToSchemaIR(
     ...((storage.types ?? {}) as ResolvedStorageTypes),
   };
   for (const ns of Object.values(storage.namespaces)) {
-    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    const nsEnums = ns.entries.type;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
         allTypes[k] = v;
@@ -337,10 +337,10 @@ export function contractToSchemaIR(
   const storageTypes = allTypes as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, tableDefRaw] of Object.entries(ns.tables)) {
+    for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table)) {
       if (!(tableDefRaw instanceof StorageTable)) {
         throw new Error(
-          `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.tables.${tableName}`,
+          `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.entries.table.${tableName}`,
         );
       }
       const tableDef = tableDefRaw;
@@ -395,7 +395,7 @@ function deriveAnnotations(
 
   // Top-level `storage.types`: codec-typed entries (vector, decimal, …) keyed
   // by bare `nativeType` (unchanged). Post-S1.B enums live in
-  // `namespaces[*].enum`, not here; a defensive top-level enum is still
+  // `namespaces[*].entries.type`, not here; a defensive top-level enum is still
   // namespace/schema-qualified via the resolver under the unbound coordinate
   // so it never collides on a bare name.
   for (const typeInstance of Object.values((storage.types ?? {}) as ResolvedStorageTypes)) {
@@ -415,7 +415,7 @@ function deriveAnnotations(
   // `readExistingEnumValues` read side, so two namespaces sharing an enum name
   // (or native type) resolve to distinct live-database types.
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    const nsEnums = ns.entries.type;
     if (!nsEnums) continue;
     for (const entry of Object.values(nsEnums)) {
       if (!isPostgresEnumStorageEntry(entry)) continue;

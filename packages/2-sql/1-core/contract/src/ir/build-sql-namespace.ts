@@ -23,17 +23,35 @@ function isMaterializedSqlNamespace(ns: Namespace | SqlNamespaceTablesInput): ns
   return (ns as Namespace).kind === SQL_NAMESPACE_KIND;
 }
 
+function freezeSqlEntries(input: SqlNamespaceTablesInput['entries']): SqlBoundNamespace['entries'] {
+  const table = Object.freeze(
+    Object.fromEntries(
+      Object.entries(input?.table ?? {}).map(([name, t]) => [
+        name,
+        t instanceof StorageTable ? t : new StorageTable(t),
+      ]),
+    ),
+  );
+  const typeSlot = input?.type;
+  if (typeSlot === undefined || Object.keys(typeSlot).length === 0) {
+    return Object.freeze({ table });
+  }
+  return Object.freeze({ table, type: Object.freeze({ ...typeSlot }) });
+}
+
 class SqlBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
-  declare readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
 
   readonly id: string;
-  readonly tables: Readonly<Record<string, StorageTable>>;
+  readonly entries: Readonly<{
+    readonly table: Readonly<Record<string, StorageTable>>;
+    readonly type?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+  }>;
 
   static fromTablesInput(input: SqlNamespaceTablesInput): SqlNamespace {
-    const tableCount = Object.keys(input.tables ?? {}).length;
-    const enumCount = Object.keys(input.enum ?? {}).length;
-    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0 && enumCount === 0) {
+    const tableCount = Object.keys(input.entries?.table ?? {}).length;
+    const typeCount = Object.keys(input.entries?.type ?? {}).length;
+    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0 && typeCount === 0) {
       return castAs<SqlNamespace>(SqlUnboundNamespace.instance);
     }
     return castAs<SqlNamespace>(new SqlBoundNamespace(input));
@@ -42,22 +60,7 @@ class SqlBoundNamespace extends NamespaceBase {
   private constructor(input: SqlNamespaceTablesInput) {
     super();
     this.id = input.id;
-    this.tables = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.tables ?? {}).map(([name, t]) => [
-          name,
-          t instanceof StorageTable ? t : new StorageTable(t),
-        ]),
-      ),
-    );
-    if (input.enum !== undefined && Object.keys(input.enum).length > 0) {
-      Object.defineProperty(this, 'enum', {
-        value: Object.freeze({ ...input.enum }),
-        writable: false,
-        enumerable: true,
-        configurable: false,
-      });
-    }
+    this.entries = freezeSqlEntries(input.entries);
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,

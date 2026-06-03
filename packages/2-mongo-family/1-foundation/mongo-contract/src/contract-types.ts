@@ -63,7 +63,9 @@ export type MongoStorageShape<THash extends string = string> = StorageBase<THash
   readonly namespaces: Record<
     string,
     Namespace & {
-      readonly collections: Readonly<Record<string, MongoCollection>>;
+      readonly entries: Readonly<{
+        readonly collection: Readonly<Record<string, MongoCollection>>;
+      }>;
     }
   >;
 };

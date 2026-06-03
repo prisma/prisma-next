@@ -7,22 +7,29 @@ import type { StorageTable } from '@prisma-next/sql-contract/types';
 
 export type SqliteDatabaseInput = {
   readonly id: string;
-  readonly tables: Readonly<Record<string, StorageTable>>;
+  readonly entries: {
+    readonly table: Readonly<Record<string, StorageTable>>;
+  };
 };
 
 /**
- * SQLite namespace concretion carrying table metadata and unqualified
- * `qualifyTable()` emission for runtime SQL rendering.
+ * SQLite namespace concretion carrying table metadata under
+ * `entries.table` and unqualified `qualifyTable()` emission for runtime
+ * SQL rendering.
  */
 export class SqliteDatabase extends NamespaceBase {
   readonly kind = 'database' as const;
   readonly id: string;
-  readonly tables: Readonly<Record<string, StorageTable>>;
+  readonly entries: Readonly<{
+    readonly table: Readonly<Record<string, StorageTable>>;
+  }>;
 
   constructor(input: SqliteDatabaseInput) {
     super();
     this.id = input.id;
-    this.tables = Object.freeze({ ...input.tables });
+    this.entries = Object.freeze({
+      table: Object.freeze({ ...input.entries.table }),
+    });
     freezeNode(this);
   }
 
@@ -57,11 +64,13 @@ export class SqliteUnboundDatabase extends NamespaceBase {
 
   readonly kind = 'database' as const;
   readonly id = UNBOUND_NAMESPACE_ID;
-  readonly tables: Readonly<Record<string, StorageTable>>;
+  readonly entries: Readonly<{
+    readonly table: Readonly<Record<string, StorageTable>>;
+  }>;
 
   private constructor() {
     super();
-    this.tables = Object.freeze({});
+    this.entries = Object.freeze({ table: Object.freeze({}) });
     freezeNode(this);
   }
 

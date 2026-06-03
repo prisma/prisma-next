@@ -14,8 +14,30 @@ import { escapeLiteral } from './sql-utils';
 
 export interface PostgresSchemaInput {
   readonly id: string;
-  readonly tables?: Record<string, StorageTable | StorageTableInput>;
-  readonly enum?: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
+  readonly entries?: {
+    readonly table?: Record<string, StorageTable | StorageTableInput>;
+    readonly type?: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
+  };
+}
+
+function freezePostgresEntries(input: PostgresSchemaInput['entries']): PostgresSchema['entries'] {
+  const table = Object.freeze(
+    Object.fromEntries(
+      Object.entries(input?.table ?? {}).map(([name, t]) => [
+        name,
+        t instanceof StorageTable ? t : new StorageTable(t),
+      ]),
+    ),
+  );
+  const type = Object.freeze(
+    Object.fromEntries(
+      Object.entries(input?.type ?? {}).map(([name, ty]) => [
+        name,
+        ty instanceof PostgresEnumType ? ty : new PostgresEnumType(ty),
+      ]),
+    ),
+  );
+  return Object.freeze({ table, type });
 }
 
 /**
@@ -24,9 +46,10 @@ export interface PostgresSchemaInput {
  * `namespaces: Record<NamespaceId, PostgresSchema>` map populated by
  * the Postgres PSL interpreter from `namespace { … }` AST buckets.
  *
- * Qualifier emission is the rendering seam: DDL / SQL emission asks the
- * namespace for its qualifier (`"<schema>"`) or for a qualified table
- * name (`"<schema>"."<table>"`) and consumes the result polymorphically.
+ * `entries` holds entity-kind slot maps (`table`, `type`). Qualifier
+ * emission is the rendering seam: DDL / SQL emission asks the namespace
+ * for its qualifier (`"<schema>"`) or for a qualified table name
+ * (`"<schema>"."<table>"`) and consumes the result polymorphically.
  * The unbound singleton below overrides these methods to elide the
  * prefix entirely — call sites stay polymorphic and never branch on
  * `id === UNBOUND_NAMESPACE_ID`.
@@ -43,28 +66,15 @@ export class PostgresSchema extends NamespaceBase {
 
   declare readonly kind: 'schema';
   readonly id: string;
-  readonly tables: Readonly<Record<string, StorageTable>>;
-  readonly enum: Readonly<Record<string, PostgresEnumType>>;
+  readonly entries: Readonly<{
+    readonly table: Readonly<Record<string, StorageTable>>;
+    readonly type?: Readonly<Record<string, PostgresEnumType>>;
+  }>;
 
   constructor(input: PostgresSchemaInput) {
     super();
     this.id = input.id;
-    this.tables = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.tables ?? {}).map(([name, t]) => [
-          name,
-          t instanceof StorageTable ? t : new StorageTable(t),
-        ]),
-      ),
-    );
-    this.enum = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.enum ?? {}).map(([name, ty]) => [
-          name,
-          ty instanceof PostgresEnumType ? ty : new PostgresEnumType(ty),
-        ]),
-      ),
-    );
+    this.entries = freezePostgresEntries(input.entries);
     Object.defineProperty(this, 'kind', {
       value: 'schema',
       writable: false,
@@ -198,7 +208,7 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  */
 export function postgresCreateNamespace(input: SqlNamespaceTablesInput): PostgresSchema {
   if (input.id === UNBOUND_NAMESPACE_ID) {
-    return new PostgresUnboundSchema(input);
+    return new PostgresUnboundSchema({ id: UNBOUND_NAMESPACE_ID, entries: input.entries });
   }
-  return new PostgresSchema(input);
+  return new PostgresSchema({ id: input.id, entries: input.entries });
 }

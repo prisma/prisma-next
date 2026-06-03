@@ -29,9 +29,9 @@ import { type Type, type } from 'arktype';
 const NamespaceRawSchema = type({
   id: 'string',
   'kind?': 'string',
-  // Undeclared keys (`tables`, `enum`, and any pack-contributed slot maps)
-  // intentionally pass through; the slot loop below iterates them by name.
-  '+': 'ignore',
+  entries: type({
+    '+': 'ignore',
+  }),
 });
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -172,69 +172,66 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       return raw;
     }
     const rawRecord = isPlainRecord(raw) ? raw : {};
+    if (
+      Object.hasOwn(rawRecord, 'tables') ||
+      Object.hasOwn(rawRecord, 'enum') ||
+      Object.hasOwn(rawRecord, 'collections')
+    ) {
+      throw new ContractValidationError(
+        'Namespace envelope uses deprecated flat slot keys; expected `entries: { table?, type? }`',
+        'structural',
+      );
+    }
     const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
     const parsed = NamespaceRawSchema({ ...rawRecord, id });
     if (parsed instanceof type.errors) {
       const messages = parsed.map((p: { message: string }) => p.message).join('; ');
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
     }
-    const result: Record<string, unknown> = { id };
+    const entriesInput: NonNullable<SqlNamespaceTablesInput['entries']> = {};
+    const entriesRaw = parsed.entries;
+    if (entriesRaw !== undefined && typeof entriesRaw === 'object' && entriesRaw !== null) {
+      for (const [slotKey, slotValue] of Object.entries(entriesRaw)) {
+        if (slotValue === null || typeof slotValue !== 'object') continue;
 
-    for (const [propertyKey, slotValue] of Object.entries(parsed)) {
-      if (propertyKey === 'id') continue;
-      if (slotValue === null || typeof slotValue !== 'object') continue;
-
-      if (propertyKey === 'tables') {
-        result['tables'] = Object.fromEntries(
-          Object.entries(slotValue as Record<string, unknown>).map(([tableName, table]) => [
-            tableName,
-            table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
-          ]),
-        );
-        continue;
-      }
-
-      const hydratedSlot = Object.fromEntries(
-        Object.entries(slotValue as Record<string, unknown>).map(([entryName, entry]) => {
-          if (typeof entry !== 'object' || entry === null) {
-            return [entryName, entry];
-          }
-          const kind = (entry as { kind?: unknown }).kind;
-          if (typeof kind === 'string') {
-            const factory = this.entityTypeRegistry.get(kind);
-            if (factory !== undefined) {
-              return [entryName, factory(entry)];
-            }
-          }
-          return [entryName, entry];
-        }),
-      );
-      if (Object.keys(hydratedSlot).length > 0) {
-        result[propertyKey] = hydratedSlot;
-      }
-    }
-
-    const enumRaw = rawRecord['enum'];
-    if (enumRaw !== undefined && typeof enumRaw === 'object' && enumRaw !== null) {
-      for (const entry of Object.values(enumRaw as Record<string, unknown>)) {
-        if (typeof entry !== 'object' || entry === null) continue;
-        const kind = (entry as { kind?: unknown }).kind;
-        if (typeof kind === 'string' && this.entityTypeRegistry.get(kind) === undefined) {
-          throw new ContractValidationError(
-            `Entry kind '${kind}' has no registered hydration factory.`,
-            'structural',
+        if (slotKey === 'table') {
+          entriesInput.table = Object.fromEntries(
+            Object.entries(slotValue as Record<string, unknown>).map(([tableName, table]) => [
+              tableName,
+              table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
+            ]),
           );
+          continue;
+        }
+
+        const hydratedSlot = Object.fromEntries(
+          Object.entries(slotValue as Record<string, unknown>).map(([entryName, entry]) => {
+            if (typeof entry !== 'object' || entry === null) {
+              return [entryName, entry];
+            }
+            const kind = (entry as { kind?: unknown }).kind;
+            if (typeof kind === 'string') {
+              const factory = this.entityTypeRegistry.get(kind);
+              if (factory !== undefined) {
+                return [entryName, factory(entry)];
+              }
+              if (slotKey === 'type' && this.entityTypeRegistry.get(kind) === undefined) {
+                throw new ContractValidationError(
+                  `Entry kind '${kind}' has no registered hydration factory.`,
+                  'structural',
+                );
+              }
+            }
+            return [entryName, entry];
+          }),
+        );
+        if (slotKey === 'type') {
+          entriesInput.type = hydratedSlot;
         }
       }
     }
 
-    const tables = (result['tables'] ?? {}) as Record<string, StorageTable>;
-    const enumSlot = result['enum'] as NonNullable<SqlNamespaceTablesInput['enum']> | undefined;
-    return {
-      ...result,
-      tables,
-      ...(enumSlot !== undefined ? { enum: enumSlot } : {}),
-    } as SqlNamespaceTablesInput;
+    return { id, entries: entriesInput };
   }
 
   protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {

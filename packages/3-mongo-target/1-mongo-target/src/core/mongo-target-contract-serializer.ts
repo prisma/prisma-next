@@ -10,7 +10,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const { storage, ...rest } = validated;
     const namespaces = Object.fromEntries(
       Object.entries(storage.namespaces).map(([nsId, nsData]) => {
-        const collections = nsData.collections;
+        const collections = nsData.entries.collection;
         const collectionCount = Object.keys(collections).length;
         if (nsId === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
           return [nsId, MongoTargetUnboundDatabase.instance];
@@ -19,7 +19,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
           nsId,
           new MongoTargetDatabase({
             id: nsData.id,
-            collections,
+            entries: { collection: collections },
           }),
         ];
       }),
@@ -36,13 +36,13 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const namespacesJson: Record<string, JsonObject> = {};
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
       const collectionsOut: Record<string, JsonObject> = {};
-      for (const [collName, coll] of Object.entries(ns.collections)) {
+      for (const [collName, coll] of Object.entries(ns.entries.collection)) {
         collectionsOut[collName] = JSON.parse(JSON.stringify(coll)) as JsonObject;
       }
       namespacesJson[nsId] = {
         id: ns.id,
         kind: 'mongo-database',
-        collections: collectionsOut,
+        entries: { collection: collectionsOut },
       };
     }
     return {
@@ -51,13 +51,6 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
         storageHash: String(storage.storageHash),
         namespaces: namespacesJson,
       },
-      // `rest` carries Contract fields typed against framework interfaces
-      // (e.g. `ContractExecutionSection`) that TypeScript can't structurally
-      // prove are JSON-compatible without a per-field re-validation pass.
-      // The runtime invariant is that an emitted MongoTargetContract has
-      // already been through validation and contains only JSON-safe values,
-      // so the two-step cast is intentional. Mirrors the pattern in
-      // PostgresContractSerializer.serializeContract.
     } as unknown as JsonObject;
   }
 }

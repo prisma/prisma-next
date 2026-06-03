@@ -122,8 +122,7 @@ export function resolvePostgresCallControlPolicySubject(
       ? resolveNamespaceIdForDdlSchema(contract, callFields.schemaName)
       : UNBOUND_NAMESPACE_ID;
     const ns = contract.storage.namespaces[namespaceId];
-    const rawEnum =
-      ns && 'enum' in ns && ns.enum != null ? ns.enum[callFields.typeName] : undefined;
+    const rawEnum = ns?.entries.type?.[callFields.typeName];
     const controlPolicy = isPostgresEnumStorageEntry(rawEnum) ? rawEnum.control : undefined;
     return {
       namespaceId,

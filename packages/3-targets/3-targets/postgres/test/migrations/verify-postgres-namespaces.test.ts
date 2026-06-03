@@ -14,13 +14,13 @@ function makeContract(
   const unboundEntry =
     options.useUnbound || !namespaceIds.includes(UNBOUND_NAMESPACE_ID)
       ? PostgresUnboundSchema.instance
-      : new PostgresSchema({ id: UNBOUND_NAMESPACE_ID, tables: {} });
+      : new PostgresSchema({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
   const namespaces: SqlStorageInput['namespaces'] = {
     [UNBOUND_NAMESPACE_ID]: unboundEntry,
     ...Object.fromEntries(
       namespaceIds
         .filter((id) => id !== UNBOUND_NAMESPACE_ID)
-        .map((id) => [id, new PostgresSchema({ id, tables: {} })]),
+        .map((id) => [id, new PostgresSchema({ id, entries: { table: {} } })]),
     ),
   };
   return {

@@ -30,11 +30,9 @@ export class SqliteContractSerializer extends SqlContractSerializerBase<Contract
     if (raw instanceof NamespaceBase) {
       return raw;
     }
-    const hydrated = super.hydrateSqlNamespaceEntry(nsId, raw) as {
-      id: string;
-      tables: Readonly<Record<string, StorageTable>>;
-    };
-    const { id, tables } = hydrated;
+    const hydrated = super.hydrateSqlNamespaceEntry(nsId, raw) as SqlNamespaceTablesInput;
+    const { id, entries } = hydrated;
+    const tables = entries?.table ?? {};
     const emptyTables = Object.keys(tables).length === 0;
     if (id === UNBOUND_NAMESPACE_ID && emptyTables) {
       return SqliteUnboundDatabase.instance;
@@ -44,6 +42,9 @@ export class SqliteContractSerializer extends SqlContractSerializerBase<Contract
         `SqliteContractSerializer: SQLite has no schema concept; the only valid namespace id is "${UNBOUND_NAMESPACE_ID}" (received "${id}").`,
       );
     }
-    return new SqliteDatabase({ id, tables });
+    return new SqliteDatabase({
+      id,
+      entries: { table: tables as Readonly<Record<string, StorageTable>> },
+    });
   }
 }

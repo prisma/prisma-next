@@ -73,8 +73,7 @@ function locateNamespaceTypeInStorage(
   typeName: string,
 ): unknown {
   const ns = storage.namespaces[namespaceId];
-  if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
-  return (ns.enum as Record<string, unknown>)[typeName];
+  return ns?.entries.type?.[typeName];
 }
 
 // ============================================================================

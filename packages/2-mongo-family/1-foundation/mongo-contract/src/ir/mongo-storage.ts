@@ -9,17 +9,20 @@ import type { MongoCollection, MongoCollectionInput } from './mongo-collection';
 
 export interface MongoNamespaceCollectionsInput {
   readonly id: string;
-  readonly collections?: Record<string, MongoCollection | MongoCollectionInput>;
+  readonly entries?: {
+    readonly collection?: Record<string, MongoCollection | MongoCollectionInput>;
+  };
 }
 
-// Mongo concretions always store `MongoCollection` instances in
-// `collections` (Mongo idiom — distinct from the SQL family's `tables`).
-// Narrowing the namespace map here lets target/family-level consumers
-// iterate `namespaces[*].collections[*]` and recover the concrete
-// collection type without the framework's wider `Namespace` tripping
-// them up.
+// Mongo concretions store `MongoCollection` instances under
+// `entries.collection` (Mongo idiom — distinct from the SQL family's
+// `entries.table`). Narrowing the namespace map here lets target/family-
+// level consumers iterate collection slots and recover the concrete type
+// without the framework's wider `Namespace` tripping them up.
 export type MongoNamespace = Namespace & {
-  readonly collections: Readonly<Record<string, MongoCollection>>;
+  readonly entries: Readonly<{
+    readonly collection: Readonly<Record<string, MongoCollection>>;
+  }>;
 };
 
 export interface MongoStorageInput<THash extends string = string> {

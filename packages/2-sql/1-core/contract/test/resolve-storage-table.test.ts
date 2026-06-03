@@ -23,8 +23,8 @@ describe('resolveStorageTable', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test',
       namespaces: {
-        public: buildSqlNamespace({ id: 'public', tables: {} }),
-        auth: buildSqlNamespace({ id: 'auth', tables: { user: authOnly } }),
+        public: buildSqlNamespace({ id: 'public', entries: { table: {} } }),
+        auth: buildSqlNamespace({ id: 'auth', entries: { table: { user: authOnly } } }),
       },
     });
 
@@ -40,7 +40,7 @@ describe('resolveStorageTable', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: { users },
+          entries: { table: { users } },
         }),
       },
     });
@@ -54,7 +54,7 @@ describe('resolveStorageTable', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test',
       namespaces: {
-        public: buildSqlNamespace({ id: 'public', tables: {} }),
+        public: buildSqlNamespace({ id: 'public', entries: { table: {} } }),
       },
     });
 

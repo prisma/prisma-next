@@ -14,7 +14,7 @@ function makeContract(
 ): Contract<SqlStorage> {
   const unboundNs = postgresCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    tables,
+    entries: { table: tables },
   });
   return {
     target: 'postgres',

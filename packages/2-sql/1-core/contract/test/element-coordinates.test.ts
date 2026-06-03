@@ -16,7 +16,7 @@ describe('elementCoordinates with SqlStorage', () => {
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:element-coordinates-sql'),
       namespaces: {
-        app: buildSqlNamespace({ id: 'app', tables: { users: emptyTableInput } }),
+        app: buildSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } }),
       },
     });
 
@@ -24,7 +24,7 @@ describe('elementCoordinates with SqlStorage', () => {
     expect(coordinates).toContainEqual({
       plane: 'storage',
       namespaceId: 'app',
-      entityKind: 'tables',
+      entityKind: 'table',
       entityName: 'users',
     });
   });

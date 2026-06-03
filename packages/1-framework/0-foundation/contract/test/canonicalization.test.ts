@@ -42,15 +42,15 @@ function canonicalizeContract(
 }
 
 const sqlPreserveEmptyPatterns = [
-  ['storage', 'namespaces', '*', 'tables'],
-  ['storage', 'namespaces', '*', 'tables', '*'],
-  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
-  ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', 'namespaces', '*', 'entries', 'table'],
+  ['storage', 'namespaces', '*', 'entries', 'table', '*'],
+  ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
   ['storage', 'types', '*', 'typeParams'],
 ] as const satisfies readonly PathPattern[];
 
 const sqlSortTargets = [
-  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+  { path: ['namespaces', '*', 'entries', 'table', '*'], arrayKeys: ['indexes', 'uniques'] },
 ] as const satisfies readonly NamedArraySortTarget[];
 
 const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
@@ -99,7 +99,7 @@ function unboundStorage(tables: Record<string, unknown>): Record<string, unknown
   return {
     storageHash: 'sha256:stub',
     namespaces: {
-      [UNBOUND]: { id: UNBOUND, tables },
+      [UNBOUND]: { id: UNBOUND, entries: { table: tables } },
     },
   };
 }
@@ -113,7 +113,7 @@ function drill(obj: Record<string, unknown>, ...keys: string[]): Record<string, 
 }
 
 function unboundTables(result: Record<string, unknown>): Record<string, unknown> {
-  return drill(result, 'storage', 'namespaces', UNBOUND, 'tables');
+  return drill(result, 'storage', 'namespaces', UNBOUND, 'entries', 'table');
 }
 
 function drillDomainModel(
@@ -339,13 +339,13 @@ describe('default omission', () => {
     expect(result['meta']).toEqual({});
   });
 
-  it('strips empty storage.namespaces[X].tables without a shouldPreserveEmpty hook', () => {
+  it('strips empty storage.namespaces[X].entries.table without a shouldPreserveEmpty hook', () => {
     const result = canonicalizeContractToObject(minimal({ storage: unboundStorage({}) }));
     const ns = drill(result, 'storage', 'namespaces', UNBOUND) as Record<string, unknown>;
     expect(ns).not.toHaveProperty('tables');
   });
 
-  it('preserves empty storage.namespaces[].tables when shouldPreserveEmpty hook returns true', () => {
+  it('preserves empty storage.namespaces[].entries.table when shouldPreserveEmpty hook returns true', () => {
     const result = canonicalizeContractToObject(minimal({ storage: unboundStorage({}) }), {
       shouldPreserveEmpty: sqlPreserveEmpty,
     });
@@ -637,7 +637,7 @@ describe('index and unique sorting', () => {
     expect((storage['namespaces'] as Record<string, unknown>)['broken']).toBeNull();
   });
 
-  it('passes namespaces without a tables map through unchanged (e.g. Mongo)', () => {
+  it('passes namespaces without a table slot through unchanged (e.g. Mongo)', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
@@ -645,7 +645,7 @@ describe('index and unique sorting', () => {
           namespaces: {
             [UNBOUND]: {
               id: UNBOUND,
-              collections: { posts: { columns: {} } },
+              entries: { collection: { posts: { columns: {} } } },
             },
           },
         },
@@ -653,7 +653,8 @@ describe('index and unique sorting', () => {
     );
     const ns = drill(result, 'storage', 'namespaces', UNBOUND);
     expect(ns).not.toHaveProperty('tables');
-    expect(ns['collections']).toEqual({ posts: {} });
+    expect(ns).not.toHaveProperty('collections');
+    expect(drill(ns, 'entries', 'collection')).toEqual({ posts: {} });
   });
 });
 

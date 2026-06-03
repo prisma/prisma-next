@@ -152,7 +152,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     >),
   };
   for (const ns of Object.values(contract.storage.namespaces)) {
-    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    const nsEnums = ns.entries.type;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
         allStorageTypesMap[k] = v;
@@ -254,13 +254,13 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   for (const nsId of Object.keys(contract.storage.namespaces)) {
     const ns = contract.storage.namespaces[nsId];
     if (!ns) continue;
-    const nsEnums = ns.enum;
+    const nsEnums = ns.entries.type;
     if (!nsEnums) continue;
     for (const [typeName, entry] of Object.entries(nsEnums)) {
       if (!isPostgresEnumStorageEntry(entry)) continue;
       pushTypeNode(
         typeName,
-        `storage.namespaces.${nsId}.enum.${typeName}`,
+        `storage.namespaces.${nsId}.entries.type.${typeName}`,
         verifyEnumType({
           typeName,
           typeInstance: entry,
@@ -443,10 +443,10 @@ function verifySchemaTables(options: {
   for (const namespaceId of namespaceIds) {
     const ns = contract.storage.namespaces[namespaceId];
     if (!ns) continue;
-    for (const [tableName, contractTableRaw] of Object.entries(ns.tables)) {
+    for (const [tableName, contractTableRaw] of Object.entries(ns.entries.table)) {
       if (!(contractTableRaw instanceof StorageTable)) {
         throw new Error(
-          `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.tables.${tableName}`,
+          `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.entries.table.${tableName}`,
         );
       }
       const contractTable = contractTableRaw;
@@ -455,7 +455,7 @@ function verifySchemaTables(options: {
         contractDefaultControl,
       );
       const schemaTable = schemaTables[tableName];
-      const tablePath = `storage.namespaces.${namespaceId}.tables.${tableName}`;
+      const tablePath = `storage.namespaces.${namespaceId}.entries.table.${tableName}`;
 
       if (!schemaTable) {
         const issue: SchemaIssue = {
@@ -507,7 +507,8 @@ function verifySchemaTables(options: {
   if (strict) {
     for (const tableName of Object.keys(schemaTables)) {
       const claimed = namespaceIds.some(
-        (namespaceId) => contract.storage.namespaces[namespaceId]?.tables[tableName] !== undefined,
+        (namespaceId) =>
+          contract.storage.namespaces[namespaceId]?.entries.table[tableName] !== undefined,
       );
       if (!claimed) {
         const extraTableControlPolicy = effectiveControlPolicy(undefined, contractDefaultControl);
@@ -523,7 +524,7 @@ function verifySchemaTables(options: {
             status: 'fail',
             kind: 'table',
             name: `table ${tableName}`,
-            contractPath: `storage.namespaces.*.tables.${tableName}`,
+            contractPath: `storage.namespaces.*.entries.table.${tableName}`,
             code: 'extra_table',
             message: `Extra table "${tableName}" found`,
             expected: undefined,

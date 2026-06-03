@@ -58,8 +58,10 @@ export function createTestContract(
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables,
-          ...ifDefined('enum', contractOverrides?.enums),
+          entries: {
+            table: tables,
+            ...ifDefined('type', contractOverrides?.enums),
+          },
         }),
       },
       ...ifDefined('types', storageTypes),

@@ -19,9 +19,11 @@ const fixtureStorageBody = {
   namespaces: {
     [UNBOUND_NAMESPACE_ID]: {
       id: UNBOUND_NAMESPACE_ID,
-      collections: {
-        fixture_box: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+      entries: {
+        collection: {
+          fixture_box: {
+            indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+          },
         },
       },
     },

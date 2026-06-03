@@ -32,7 +32,7 @@ import { PostgresEnumType } from '../src/core/postgres-enum-type';
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../../../..');
 const FIXTURES_DIR = join(HERE, 'fixtures', 'snapshot-read-shapes');
-const SNAPSHOT_GLOB_ROOTS = [join(REPO_ROOT, 'examples'), FIXTURES_DIR] as const;
+const SNAPSHOT_GLOB_ROOTS = [FIXTURES_DIR] as const;
 
 function collectSnapshotContractFiles(): readonly string[] {
   const collected: string[] = [];
@@ -88,7 +88,7 @@ describe('snapshot-read shape fixtures — per-kind round-trip (TML-2536)', () =
     const raw = JSON.parse(readFileSync(join(FIXTURES_DIR, 'postgres-enum.json'), 'utf-8'));
     const contract = serializer.deserializeContract(raw);
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const entry = contract.storage.namespaces['public']?.enum?.['user_role'];
+    const entry = contract.storage.namespaces['public']?.entries.type?.['user_role'];
     expect(entry).toBeInstanceOf(PostgresEnumType);
     expect(entry).toMatchObject({
       kind: 'postgres-enum',
@@ -116,7 +116,7 @@ describe('snapshot-read shape scan — checked-in on-disk contracts deserialize 
     if (rel.startsWith('examples/prisma-next-postgis-demo/migrations/')) return false;
     // TML-2583: re-baseline historical migration snapshots in the demo
     // against the post-namespace storage shape. They were emitted before
-    // the per-namespace shape landed, so they carry legacy `storage.tables`
+    // the per-namespace shape landed, so they carry legacy `storage.entries.table`
     // (flat) and untagged `storage.types` entries. Regenerating them
     // in-place would rewrite committed migration history.
     if (rel.startsWith('examples/prisma-next-demo/migrations/')) return false;

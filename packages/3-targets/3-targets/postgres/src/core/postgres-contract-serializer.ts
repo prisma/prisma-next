@@ -91,22 +91,22 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     if (raw instanceof NamespaceBase) {
       return raw;
     }
-    const hydrated = super.hydrateSqlNamespaceEntry(nsId, raw) as {
-      id: string;
-      tables: Readonly<Record<string, StorageTable>>;
-      enum?: Readonly<Record<string, PostgresEnumType>>;
-    };
-    const { id, tables, enum: hydratedNsEnums } = hydrated;
+    const hydrated = super.hydrateSqlNamespaceEntry(nsId, raw) as SqlNamespaceTablesInput;
+    const { id, entries } = hydrated;
+    const tables = entries?.table ?? {};
+    const typeSlot = entries?.type;
 
     const emptyTables = Object.keys(tables).length === 0;
-    const emptyEnums = !hydratedNsEnums || Object.keys(hydratedNsEnums).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyEnums) {
+    const emptyTypes = !typeSlot || Object.keys(typeSlot).length === 0;
+    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes) {
       return PostgresSchema.unbound;
     }
     return new PostgresSchema({
       id,
-      tables,
-      ...(hydratedNsEnums !== undefined ? { enum: hydratedNsEnums } : {}),
+      entries: {
+        table: tables,
+        ...(typeSlot !== undefined ? { type: typeSlot as Record<string, PostgresEnumType> } : {}),
+      },
     });
   }
 
@@ -117,30 +117,25 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       if (isPostgresSchema(ns)) {
         namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
       } else {
-        // Family-level SqlUnboundNamespace or other family-built SQL
-        // namespaces haven't been promoted to a PostgresSchema instance
-        // yet (e.g. they came straight from the TS builder before a target
-        // `createNamespace` factory ran). Serialise them as postgres-schema /
-        // postgres-unbound-schema so the round-trip through
-        // deserializeContract hydrates them back into PostgresSchema
-        // instances.
         const isUnboundSlot = nsId === UNBOUND_NAMESPACE_ID;
-        const nsEnums = (ns as { readonly enum?: Readonly<Record<string, unknown>> }).enum ?? {};
+        const typeSlot = ns.entries.type ?? {};
         namespacesJson[nsId] = {
           id: nsId,
           kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
-          tables: Object.fromEntries(
-            Object.entries(ns.tables).map(([tableName, table]) => [
-              tableName,
-              this.serializeJsonValue(table) as JsonObject,
-            ]),
-          ),
-          enum: Object.fromEntries(
-            Object.entries(nsEnums).map(([typeName, entry]) => [
-              typeName,
-              this.serializeJsonValue(entry) as JsonObject,
-            ]),
-          ),
+          entries: {
+            table: Object.fromEntries(
+              Object.entries(ns.entries.table).map(([tableName, table]) => [
+                tableName,
+                this.serializeJsonValue(table) as JsonObject,
+              ]),
+            ),
+            type: Object.fromEntries(
+              Object.entries(typeSlot).map(([typeName, entry]) => [
+                typeName,
+                this.serializeJsonValue(entry) as JsonObject,
+              ]),
+            ),
+          },
         };
       }
     }
@@ -163,18 +158,20 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
 
   private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
     const tablesOut: Record<string, JsonObject> = {};
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    for (const [tableName, table] of Object.entries(ns.entries.table)) {
       tablesOut[tableName] = this.serializeJsonValue(table) as JsonObject;
     }
-    const enumOut: Record<string, JsonObject> = {};
-    for (const [typeName, ty] of Object.entries(ns.enum)) {
-      enumOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
+    const typeOut: Record<string, JsonObject> = {};
+    for (const [typeName, ty] of Object.entries(ns.entries.type ?? {})) {
+      typeOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
     }
     return {
       id: ns.id,
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
-      tables: tablesOut,
-      enum: enumOut,
+      entries: {
+        table: tablesOut,
+        type: typeOut,
+      },
     };
   }
 

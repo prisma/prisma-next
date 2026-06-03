@@ -13,8 +13,8 @@ describe('SqliteUnboundDatabase', () => {
   });
 
   it('carries an empty frozen tables map', () => {
-    expect(SqliteUnboundDatabase.instance.tables).toEqual({});
-    expect(Object.isFrozen(SqliteUnboundDatabase.instance.tables)).toBe(true);
+    expect(SqliteUnboundDatabase.instance.entries.table).toEqual({});
+    expect(Object.isFrozen(SqliteUnboundDatabase.instance.entries.table)).toBe(true);
   });
 
   it('elides every qualifier — SQLite has no schema concept and emits unqualified DDL', () => {
@@ -31,15 +31,17 @@ describe('SqliteDatabase', () => {
   it('qualifies table names without a schema prefix for runtime SQL rendering', () => {
     const database = new SqliteDatabase({
       id: UNBOUND_NAMESPACE_ID,
-      tables: {
-        user: new StorageTable({
-          columns: {
-            id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        }),
+      entries: {
+        table: {
+          user: new StorageTable({
+            columns: {
+              id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          }),
+        },
       },
     });
     expect(database.qualifyTable('user')).toBe('"user"');

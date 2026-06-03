@@ -12,8 +12,11 @@ function minimalContract(opts: { collectionControl?: unknown; defaultControlPoli
       namespaces: {
         main: {
           id: 'main',
-          collections: {
-            users: opts.collectionControl !== undefined ? { control: opts.collectionControl } : {},
+          entries: {
+            collection: {
+              users:
+                opts.collectionControl !== undefined ? { control: opts.collectionControl } : {},
+            },
           },
         },
       },

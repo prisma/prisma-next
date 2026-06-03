@@ -366,7 +366,20 @@ export function createMongoNamespaceEnvelopeSchema(
     '+': 'reject',
     id: 'string',
     'kind?': 'string',
-    'collections?': type({ '[string]': collectionEntrySchema(fragments) }),
+    entries: type({
+      'collection?': type({ '[string]': collectionEntrySchema(fragments) }),
+    }),
+  }).narrow((ns, ctx) => {
+    if (typeof ns !== 'object' || ns === null || Array.isArray(ns)) {
+      return ctx.mustBe('an object');
+    }
+    if (Object.hasOwn(ns, 'collections') || Object.hasOwn(ns, 'tables')) {
+      return ctx.reject({
+        expected:
+          'namespace must use `entries: { collection? }`; flat `collections` / `tables` keys are no longer accepted',
+      });
+    }
+    return true;
   }) as Type<unknown>;
 }
 

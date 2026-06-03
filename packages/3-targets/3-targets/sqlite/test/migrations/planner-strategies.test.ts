@@ -17,11 +17,11 @@ import {
 } from '../../src/core/migrations/planner-strategies';
 
 function makeContract(
-  overrides: { tables?: Record<string, StorageTableInput> } = {},
+  overrides: { entries?: { table?: Record<string, StorageTableInput> } } = {},
 ): Contract<SqlStorage> {
   const unboundNs = buildSqlNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    tables: overrides.tables ?? {},
+    entries: { table: overrides.entries?.table ?? {} },
   });
   return {
     target: 'sqlite',
@@ -75,21 +75,23 @@ describe('recreateTableStrategy', () => {
 
   it('classifies pure default_mismatch as widening', () => {
     const contract = makeContract({
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            email: {
-              nativeType: 'text',
-              codecId: 'sqlite/text@1',
-              nullable: true,
-              default: { kind: 'literal', value: '' },
+      entries: {
+        table: {
+          user: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              email: {
+                nativeType: 'text',
+                codecId: 'sqlite/text@1',
+                nullable: true,
+                default: { kind: 'literal', value: '' },
+              },
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     });
@@ -115,16 +117,18 @@ describe('recreateTableStrategy', () => {
 
   it('classifies type_mismatch as destructive', () => {
     const contract = makeContract({
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+      entries: {
+        table: {
+          user: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     });
@@ -151,21 +155,23 @@ describe('recreateTableStrategy', () => {
 
   it('destructive wins over widening when both kinds occur on same table', () => {
     const contract = makeContract({
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            email: {
-              nativeType: 'text',
-              codecId: 'sqlite/text@1',
-              nullable: true,
-              default: { kind: 'literal', value: '' },
+      entries: {
+        table: {
+          user: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              email: {
+                nativeType: 'text',
+                codecId: 'sqlite/text@1',
+                nullable: true,
+                default: { kind: 'literal', value: '' },
+              },
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     });
@@ -195,16 +201,18 @@ describe('recreateTableStrategy', () => {
 
   it('relaxing nullability (NOT NULL → nullable) is widening, tightening is destructive', () => {
     const contract = makeContract({
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+      entries: {
+        table: {
+          user: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     });
@@ -248,20 +256,26 @@ describe('recreateTableStrategy', () => {
 
   it('groups issues by table and emits one RecreateTableCall per affected table', () => {
     const contract = makeContract({
-      tables: {
-        a: {
-          columns: { id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false } },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        b: {
-          columns: { id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false } },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
+      entries: {
+        table: {
+          a: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          b: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
         },
       },
     });
@@ -342,16 +356,18 @@ describe('nullabilityTighteningBackfillStrategy', () => {
 
   it("returns no_match for relaxing nullability under 'data' policy", () => {
     const contract = makeContract({
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+      entries: {
+        table: {
+          user: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     });
@@ -377,16 +393,18 @@ describe('nullabilityTighteningBackfillStrategy', () => {
 
   it("emits DataTransformCall per tightened column under 'data' policy without consuming the issue", () => {
     const contract = makeContract({
-      tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false }, // contract: NOT NULL
+      entries: {
+        table: {
+          user: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false }, // contract: NOT NULL
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     });

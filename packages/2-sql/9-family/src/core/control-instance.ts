@@ -73,7 +73,7 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
       { readonly tables?: Readonly<Record<string, unknown>> }
     >;
     for (const ns of Object.values(namespaces)) {
-      const tbls = ns.tables;
+      const tbls = ns.entries.table;
       if (typeof tbls !== 'object' || tbls === null) continue;
       for (const table of Object.values(tbls)) {
         if (

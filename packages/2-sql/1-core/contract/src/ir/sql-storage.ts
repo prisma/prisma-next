@@ -16,7 +16,7 @@ import {
  * Polymorphic value type for document-scoped `SqlStorage.types` entries
  * (codec aliases / parameterised native type registrations). Postgres
  * native enum registrations live under
- * `storage.namespaces[namespaceId].enum` instead.
+ * `storage.namespaces[namespaceId].entries.type` instead.
  */
 export type SqlStorageTypeEntry =
   | StorageTypeInstance
@@ -25,8 +25,10 @@ export type SqlStorageTypeEntry =
 
 export interface SqlNamespaceTablesInput {
   readonly id: string;
-  readonly tables?: Record<string, StorageTable | StorageTableInput>;
-  readonly enum?: Record<string, PostgresEnumStorageEntry>;
+  readonly entries?: {
+    readonly table?: Record<string, StorageTable | StorageTableInput>;
+    readonly type?: Record<string, PostgresEnumStorageEntry>;
+  };
 }
 
 export interface SqlStorageInput<THash extends string = string> {
@@ -58,17 +60,17 @@ export interface SqlStorageInput<THash extends string = string> {
  * responsibility (so the family base does not import target-specific
  * subclasses).
  */
-// SQL concretions always store `StorageTable`-shaped values in `tables`.
-// `tables` is a SQL-family idiom — the framework `Namespace` contract no
-// longer mandates this field; Mongo namespaces carry `collections`
-// instead. The `tables` slot uses the same narrowing as every other
-// SQL namespace; the wider `Record<string, object>` on `StorageTable` is
-// only there so emitted `contract.d.ts` table literals (which lack the
-// runtime `kind` discriminator on `StorageTable`) structurally satisfy
-// the slot without a class-instance check.
+// SQL concretions store `StorageTable` values under `entries.table`.
+// Mongo namespaces carry `entries.collection` instead. The wider
+// `Record<string, object>` on `StorageTable` is only there so emitted
+// `contract.d.ts` table literals (which lack the runtime `kind`
+// discriminator on `StorageTable`) structurally satisfy the slot without
+// a class-instance check.
 export type SqlNamespace = Namespace & {
-  readonly tables: Readonly<Record<string, StorageTable>>;
-  readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+  readonly entries: Readonly<{
+    readonly table: Readonly<Record<string, StorageTable>>;
+    readonly type?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+  }>;
   /**
    * Render a dialect-qualified table reference for runtime SQL emission.
    * Present on materialised target concretions (`PostgresSchema`,
@@ -103,7 +105,7 @@ export function storageTableAt(
   namespaceId: string,
   tableName: string,
 ): StorageTable | undefined {
-  return storage.namespaces[namespaceId]?.tables?.[tableName];
+  return storage.namespaces[namespaceId]?.entries.table?.[tableName];
 }
 
 /**

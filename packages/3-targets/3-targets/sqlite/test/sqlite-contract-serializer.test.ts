@@ -8,7 +8,12 @@ import sqliteControlTargetDescriptor from '../src/core/control-target';
 import { SqliteContractSerializer } from '../src/core/sqlite-contract-serializer';
 
 function makeValidContractJson() {
-  return createSqlContract({ target: 'sqlite' });
+  return createSqlContract({
+    target: 'sqlite',
+    storage: {
+      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } } },
+    },
+  });
 }
 
 function makeContractWithTablesJson() {
@@ -18,16 +23,18 @@ function makeContractWithTablesJson() {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'INTEGER', codecId: 'sqlite/integer@1', nullable: false },
-                email: { nativeType: 'TEXT', codecId: 'sqlite/text@1', nullable: false },
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  id: { nativeType: 'INTEGER', codecId: 'sqlite/integer@1', nullable: false },
+                  email: { nativeType: 'TEXT', codecId: 'sqlite/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -46,7 +53,7 @@ describe('SqliteContractSerializer', () => {
     const serializer = new SqliteContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({});
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table).toEqual({});
   });
 
   it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
@@ -54,7 +61,7 @@ describe('SqliteContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const userTable = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['user'] as
+    const userTable = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table['user'] as
       | StorageTable
       | undefined;
     expect(userTable).toBeInstanceOf(StorageTable);
@@ -73,11 +80,11 @@ describe('SqliteContractSerializer', () => {
     const json = serializer.serializeContract(contract);
     const reparsed = JSON.parse(JSON.stringify(json));
     expect(reparsed.storage).not.toHaveProperty('kind');
-    expect(reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user).not.toHaveProperty(
+    expect(reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].entries.table.user).not.toHaveProperty(
       'kind',
     );
     expect(
-      reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user.columns.id,
+      reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].entries.table.user.columns.id,
     ).not.toHaveProperty('kind');
   });
 });
@@ -91,22 +98,24 @@ describe('control-policy round-trip fidelity', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
-              tables: {
-                user: {
-                  columns: {
-                    id: {
-                      nativeType: 'INTEGER',
-                      codecId: 'sqlite/integer@1',
-                      nullable: false,
-                      control: 'observed',
+              entries: {
+                table: {
+                  user: {
+                    columns: {
+                      id: {
+                        nativeType: 'INTEGER',
+                        codecId: 'sqlite/integer@1',
+                        nullable: false,
+                        control: 'observed',
+                      },
+                      email: { nativeType: 'TEXT', codecId: 'sqlite/text@1', nullable: false },
                     },
-                    email: { nativeType: 'TEXT', codecId: 'sqlite/text@1', nullable: false },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
+                    control: 'external',
                   },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                  control: 'external',
                 },
               },
             },
@@ -124,7 +133,7 @@ describe('control-policy round-trip fidelity', () => {
 
     expect(reparsed.defaultControlPolicy).toBe('tolerated');
 
-    const table = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user;
+    const table = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].entries.table.user;
     const def = reparsed.defaultControlPolicy;
     expect(effectiveControlPolicy(table.control, def)).toBe('external');
     expect(effectiveControlPolicy(table.columns.id.control, def)).toBe('observed');
