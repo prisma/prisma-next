@@ -1,5 +1,6 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { bold, cyan, cyanBright, dim } from 'colorette';
+import stringWidth from 'string-width';
 import { describe, expect, it } from 'vitest';
 import {
   MIGRATION_LIST_EMPTY_SOURCE,
@@ -200,6 +201,25 @@ describe('renderMigrationLogTable', () => {
     expect(extractMigration(lines[2]!).length).toBe(extractMigration(lines[3]!).length);
     expect(extractMigration(lines[2]!).trim()).toBe(longName);
     expect(extractChange(lines[2]!).length).toBe(extractChange(lines[3]!).length);
+  });
+
+  it('aligns columns when migration names use wide characters', () => {
+    const wideName = '20260301_日本語';
+    const table = renderMigrationLogTable(
+      [
+        entry({ migrationName: wideName, appliedAt: new Date('2026-06-01T08:00:00.000Z') }),
+        entry({ migrationName: '01_a', appliedAt: new Date('2026-06-02T08:00:00.000Z') }),
+      ],
+      { utc: true },
+    );
+    const lines = table.split('\n');
+    const changeVisualStart = (line: string) => {
+      const idx = line.indexOf(MIGRATION_LIST_FORWARD_EDGE_GLYPH);
+      return stringWidth(line.slice(0, idx));
+    };
+    expect(changeVisualStart(lines[2]!)).toBe(changeVisualStart(lines[3]!));
+    expect(lines[2]!).toContain(wideName);
+    expect(lines[3]!).toContain('01_a');
   });
 
   it('aligns columns when space names are long', () => {

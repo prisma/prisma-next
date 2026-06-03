@@ -96,7 +96,7 @@ function padVisible(text: string, targetWidth: number): string {
 }
 
 function columnWidth(values: readonly string[]): number {
-  return values.reduce((max, value) => Math.max(max, value.length), 0);
+  return values.reduce((max, value) => Math.max(max, stringWidth(value)), 0);
 }
 
 function padDividerCell(valueWidth: number): string {
