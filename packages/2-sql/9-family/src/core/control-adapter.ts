@@ -71,11 +71,26 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ): Promise<readonly LedgerEntryRecord[]>;
 
   /**
+   * Inserts the initial marker row for `space` (`INSERT` only). Fails when a
+   * row for that space already exists. Used by `sign()` so concurrent first-time
+   * stamps cannot silently overwrite each other. `updated_at` is DB-side
+   * (`now()` / `datetime('now')`). Mirrors `MongoControlAdapter.initMarker`.
+   */
+  insertMarker(
+    driver: ControlDriverInstance<'sql', TTarget>,
+    space: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<void>;
+
+  /**
    * Writes the initial marker row for `space` as an upsert (`INSERT … ON
    * CONFLICT (space) DO UPDATE SET …`), so re-stamping a space overwrites the
    * existing row rather than failing. `updated_at` is stamped with a DB-side
    * time expression (`now()` / `datetime('now')`), never an app-side clock.
-   * Mirrors `MongoControlAdapter.initMarker`.
    */
   initMarker(
     driver: ControlDriverInstance<'sql', TTarget>,

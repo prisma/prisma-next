@@ -4,6 +4,7 @@ import {
   type AnyQueryAst,
   BinaryExpr,
   ColumnRef,
+  type InsertValue,
   type LoweredStatement,
   ProjectionItem,
 } from '@prisma-next/sql-relational-core/ast';
@@ -80,6 +81,41 @@ async function execute(
   return result.rows;
 }
 
+function markerInsertRow(
+  space: string,
+  destination: {
+    readonly storageHash: string;
+    readonly profileHash: string;
+    readonly invariants?: readonly string[];
+  },
+): Readonly<Record<string, InsertValue>> {
+  return {
+    space: param(space, { codecId: SQLITE_TEXT_CODEC_ID }),
+    core_hash: param(destination.storageHash, { codecId: SQLITE_TEXT_CODEC_ID }),
+    profile_hash: param(destination.profileHash, { codecId: SQLITE_TEXT_CODEC_ID }),
+    contract_json: param(null, { codecId: SQLITE_JSON_CODEC_ID }),
+    canonical_version: param(null, { codecId: SQLITE_INTEGER_CODEC_ID }),
+    updated_at: NOW,
+    app_tag: param(null, { codecId: SQLITE_TEXT_CODEC_ID }),
+    meta: param({}, { codecId: SQLITE_JSON_CODEC_ID }),
+    invariants: param(destination.invariants ?? [], { codecId: SQLITE_JSON_CODEC_ID }),
+  };
+}
+
+/** Insert-only initial stamp; fails when the space row already exists. */
+export async function insertMarker(
+  lower: Lower,
+  driver: ControlDriverInstance<'sql', 'sqlite'>,
+  space: string,
+  destination: {
+    readonly storageHash: string;
+    readonly profileHash: string;
+    readonly invariants?: readonly string[];
+  },
+): Promise<void> {
+  await execute(lower, driver, insert(MARKER_TABLE, markerInsertRow(space, destination)));
+}
+
 export async function initMarker(
   lower: Lower,
   driver: ControlDriverInstance<'sql', 'sqlite'>,
@@ -90,19 +126,10 @@ export async function initMarker(
     readonly invariants?: readonly string[];
   },
 ): Promise<void> {
+  const row = markerInsertRow(space, destination);
   const query = upsert({
     table: MARKER_TABLE,
-    row: {
-      space: param(space, { codecId: SQLITE_TEXT_CODEC_ID }),
-      core_hash: param(destination.storageHash, { codecId: SQLITE_TEXT_CODEC_ID }),
-      profile_hash: param(destination.profileHash, { codecId: SQLITE_TEXT_CODEC_ID }),
-      contract_json: param(null, { codecId: SQLITE_JSON_CODEC_ID }),
-      canonical_version: param(null, { codecId: SQLITE_INTEGER_CODEC_ID }),
-      updated_at: NOW,
-      app_tag: param(null, { codecId: SQLITE_TEXT_CODEC_ID }),
-      meta: param({}, { codecId: SQLITE_JSON_CODEC_ID }),
-      invariants: param(destination.invariants ?? [], { codecId: SQLITE_JSON_CODEC_ID }),
-    },
+    row,
     conflictColumns: ['space'],
     set: {
       core_hash: excludedColumn('core_hash'),

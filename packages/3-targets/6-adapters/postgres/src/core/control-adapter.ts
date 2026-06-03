@@ -302,6 +302,23 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * builder, lowered through {@link lower} and executed on the driver. See the
    * `SqlControlAdapter.initMarker` contract.
    */
+  async insertMarker(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    space: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<void> {
+    await markerLedgerWrites.insertMarker(
+      (query) => this.lower(query, { contract: undefined }),
+      driver,
+      space,
+      destination,
+    );
+  }
+
   async initMarker(
     driver: ControlDriverInstance<'sql', 'postgres'>,
     space: string,

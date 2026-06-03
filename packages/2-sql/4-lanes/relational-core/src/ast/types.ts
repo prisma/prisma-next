@@ -337,6 +337,9 @@ export class TableSource extends FromSource {
 
   constructor(name: string, alias?: string, namespaceId?: string, schema?: string) {
     super();
+    if (namespaceId !== undefined && schema !== undefined) {
+      throw new Error('TableSource cannot carry both namespaceId and schema');
+    }
     this.name = name;
     this.alias = alias;
     this.namespaceId = namespaceId;
@@ -1932,7 +1935,7 @@ export type AnyExpression =
   | RawExpr;
 export type AnyParamRef = ParamRef | PreparedParamRef;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
-export type AnyInsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr;
+export type AnyInsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr | RawExpr;
 export type AnyOperationArg = AnyExpression | ParamRef | PreparedParamRef | LiteralExpr;
 
 export const queryAstKinds: ReadonlySet<string> = new Set<AnyQueryAst['kind']>([

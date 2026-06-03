@@ -602,7 +602,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       let previousHashes: { storageHash?: string; profileHash?: string } | undefined;
 
       if (!existingMarker) {
-        await controlAdapter.initMarker(driver, APP_SPACE_ID, {
+        await controlAdapter.insertMarker(driver, APP_SPACE_ID, {
           storageHash: contractStorageHash,
           profileHash: contractProfileHash,
         });

@@ -42,6 +42,25 @@ function createMemoryDriver() {
 describe('SqliteControlAdapter marker/ledger write lowering', () => {
   const adapter = new SqliteControlAdapter();
 
+  it('insertMarker lowers to a plain insert with DB-side updated_at', async () => {
+    const driver = createCapturingDriver();
+    await adapter.insertMarker(driver, 'app', {
+      storageHash: 'sha256:core',
+      profileHash: 'sha256:prof',
+    });
+
+    const { sql, params } = driver.calls[0]!;
+    expect(sql).toBe(
+      'INSERT INTO "_prisma_marker" ("space", "core_hash", "profile_hash", "contract_json", ' +
+        '"canonical_version", "updated_at", "app_tag", "meta", "invariants") ' +
+        "VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)",
+    );
+    expect(sql).not.toContain('ON CONFLICT');
+    expect(params[0]).toBe('app');
+    expect(params[1]).toBe('sha256:core');
+    expect(params[2]).toBe('sha256:prof');
+  });
+
   it('initMarker lowers to an upsert keyed on space with DB-side updated_at', async () => {
     const driver = createCapturingDriver();
     await adapter.initMarker(driver, 'app', {

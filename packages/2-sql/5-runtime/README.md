@@ -23,7 +23,7 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 - **Mutation Default Generator Composition**: Assemble execution default generators from composed target/adapter/extension contributors
 - **No Implicit Generator Baseline**: Runtime resolves generator ids only from composed contributors (no built-in runtime fallback table)
 - **SQL Context Creation**: Create runtime contexts with SQL contracts, adapters, and codecs
-- **SQL Marker Management**: Provide SQL statements for reading/writing contract markers
+- **SQL Marker Management**: Provide SQL statements for reading contract markers (writes go through the control adapter SPI)
 - **Codec Encoding/Decoding**: Encode parameters and decode rows using SQL codec registries
 - **Codec Validation**: Validate that codec registries contain all required codecs
 - **SQL Family Adapter**: Implement `RuntimeFamilyAdapter` for SQL contracts (defined in `runtime-spi.ts`)
@@ -124,6 +124,9 @@ const runtime = createRuntime({
 - `validateCodecRegistryCompleteness` - Codec validation
 - `extractCodecIds` - Extract codec IDs from a contract
 - `validateContractCodecMappings` - Validate contract codec mappings against registry
+- `createControlCodecRegistry` - Registry for contract-free control DML (codec refs on value sites)
+- `deriveParamMetadata` - Walk a control DML AST and collect per-value codec metadata for encoding
+- `encodeParamsWithMetadata` - Encode lowered control DML parameters through their codecs
 
 ### SQL Marker
 
