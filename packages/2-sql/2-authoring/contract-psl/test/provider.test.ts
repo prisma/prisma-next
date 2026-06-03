@@ -1,7 +1,9 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import type { Contract } from '@prisma-next/contract/types';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
+import { applySpecifierDefaultControlPolicy } from '../src/apply-specifier-default-control-policy';
 import { prismaContract } from '../src/exports/provider';
 import {
   createPostgresTestContext,
@@ -50,6 +52,69 @@ describe('prismaContract provider helper', () => {
     it('does not rewrite filenames that merely end in "schema"', () => {
       const contract = prismaContract('./prisma/my-schema.prisma', baseOptions);
       expect(contract.output).toBe('./prisma/my-schema.json');
+    });
+  });
+
+  describe('defaultControlPolicy specifier precedence', () => {
+    it('applies the specifier default when the interpreted contract omits one', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-policy-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const config = prismaContract('./schema.prisma', {
+        ...baseOptions,
+        defaultControlPolicy: 'external',
+      });
+      const result = await config.source.load(
+        createPostgresTestContext({ resolvedInputs: [schemaPath] }),
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.defaultControlPolicy).toBe('external');
+    });
+
+    it('leaves defaultControlPolicy unset when the specifier omits it', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-policy-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(
+        schemaPath,
+        `model User {
+  id Int @id
+}
+`,
+        'utf-8',
+      );
+
+      process.chdir(tempDir);
+      const config = prismaContract('./schema.prisma', baseOptions);
+      const result = await config.source.load(
+        createPostgresTestContext({ resolvedInputs: [schemaPath] }),
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).not.toHaveProperty('defaultControlPolicy');
+    });
+
+    it('keeps an existing defaultControlPolicy on the loaded contract', () => {
+      const loaded = {
+        targetFamily: 'sql',
+        target: 'postgres',
+        defaultControlPolicy: 'managed',
+      } as Contract;
+      const applied = applySpecifierDefaultControlPolicy(loaded, 'external');
+      expect(applied.defaultControlPolicy).toBe('managed');
     });
   });
 
