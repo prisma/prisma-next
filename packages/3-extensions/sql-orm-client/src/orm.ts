@@ -96,7 +96,11 @@ export function orm<
 
   type AnyCollection = Collection<TContract, string, unknown, CollectionTypeState>;
 
-  function buildCollection(modelName: string, tableName?: string): AnyCollection {
+  function buildCollection(
+    modelName: string,
+    tableName?: string,
+    namespaceId?: string,
+  ): AnyCollection {
     const CollectionClass = collectionRegistry.get(modelName) ?? Collection;
     const CollectionCtor = blindCast<
       new (
@@ -109,6 +113,7 @@ export function orm<
     return new CollectionCtor(ctx, modelName, {
       registry: collectionRegistry,
       ...(tableName !== undefined ? { tableName } : {}),
+      ...(namespaceId !== undefined ? { namespaceId } : {}),
     });
   }
 
@@ -151,6 +156,7 @@ export function orm<
           const collection = buildCollection(
             modelProp,
             domainModelTableInNamespace(contract, namespaceId, modelProp),
+            namespaceId,
           );
           facetCache.set(modelProp, collection);
           return collection;

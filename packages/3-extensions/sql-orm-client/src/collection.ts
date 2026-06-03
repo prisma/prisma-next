@@ -203,6 +203,8 @@ export class Collection<
   /** @internal */
   readonly tableName: string;
   /** @internal */
+  readonly namespaceId: string | undefined;
+  /** @internal */
   readonly state: CollectionState;
   /** @internal */
   readonly registry: ReadonlyMap<string, CollectionConstructor<TContract>>;
@@ -217,7 +219,9 @@ export class Collection<
     this.ctx = ctx;
     this.contract = ctx.context.contract;
     this.modelName = modelName;
-    this.tableName = options.tableName ?? resolveModelTableName(this.contract, modelName);
+    this.namespaceId = options.namespaceId;
+    this.tableName =
+      options.tableName ?? resolveModelTableName(this.contract, modelName, options.namespaceId);
     this.state = options.state ?? emptyState();
     this.registry = options.registry ?? new Map<string, CollectionConstructor<TContract>>();
     this.includeRefinementMode = options.includeRefinementMode ?? false;
@@ -346,7 +350,12 @@ export class Collection<
       >;
     }
 
-    const columnName = resolveFieldToColumn(this.contract, this.modelName, discriminator.field);
+    const columnName = resolveFieldToColumn(
+      this.contract,
+      this.modelName,
+      discriminator.field,
+      this.namespaceId,
+    );
     const filter = BinaryExpr.eq(
       ColumnRef.of(this.tableName, columnName),
       LiteralExpr.of(variantEntry.value),
@@ -445,7 +454,12 @@ export class Collection<
     >,
     State
   > {
-    const relation = resolveIncludeRelation(this.contract, this.modelName, relationName as string);
+    const relation = resolveIncludeRelation(
+      this.contract,
+      this.modelName,
+      relationName as string,
+      this.namespaceId,
+    );
 
     let nestedState = emptyState();
     let scalarSelector: IncludeScalar<unknown> | undefined;
@@ -663,7 +677,12 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('sum()');
-    const columnName = resolveFieldToColumn(this.contract, this.modelName, field as string);
+    const columnName = resolveFieldToColumn(
+      this.contract,
+      this.modelName,
+      field as string,
+      this.namespaceId,
+    );
     return createIncludeScalar<number | null>('sum', this.state, columnName);
   }
 
@@ -682,7 +701,12 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('avg()');
-    const columnName = resolveFieldToColumn(this.contract, this.modelName, field as string);
+    const columnName = resolveFieldToColumn(
+      this.contract,
+      this.modelName,
+      field as string,
+      this.namespaceId,
+    );
     return createIncludeScalar<number | null>('avg', this.state, columnName);
   }
 
@@ -700,7 +724,12 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('min()');
-    const columnName = resolveFieldToColumn(this.contract, this.modelName, field as string);
+    const columnName = resolveFieldToColumn(
+      this.contract,
+      this.modelName,
+      field as string,
+      this.namespaceId,
+    );
     return createIncludeScalar<number | null>('min', this.state, columnName);
   }
 
@@ -718,7 +747,12 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('max()');
-    const columnName = resolveFieldToColumn(this.contract, this.modelName, field as string);
+    const columnName = resolveFieldToColumn(
+      this.contract,
+      this.modelName,
+      field as string,
+      this.namespaceId,
+    );
     return createIncludeScalar<number | null>('max', this.state, columnName);
   }
 
@@ -1262,14 +1296,18 @@ export class Collection<
     const variantName = this.state.variantName;
     if (!variantName) return null;
 
-    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName);
+    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName, this.namespaceId);
     if (!polyInfo) return null;
 
     const variant = polyInfo.variants.get(variantName);
     if (!variant || variant.strategy !== 'mti') return null;
 
-    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName);
-    const variantFieldToColumn = getFieldToColumnMap(this.contract, variant.modelName);
+    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName, this.namespaceId);
+    const variantFieldToColumn = getFieldToColumnMap(
+      this.contract,
+      variant.modelName,
+      this.namespaceId,
+    );
     const pkColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
 
     return {
@@ -1377,7 +1415,7 @@ export class Collection<
       return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
     }
 
-    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName);
+    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName, this.namespaceId);
     if (!polyInfo) {
       return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
     }
@@ -1387,8 +1425,12 @@ export class Collection<
       return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
     }
 
-    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName);
-    const variantFieldToColumn = getFieldToColumnMap(this.contract, variant.modelName);
+    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName, this.namespaceId);
+    const variantFieldToColumn = getFieldToColumnMap(
+      this.contract,
+      variant.modelName,
+      this.namespaceId,
+    );
     const mergedFieldToColumn = { ...baseFieldToColumn, ...variantFieldToColumn };
 
     return data.map((row) => {
@@ -1510,6 +1552,7 @@ export class Collection<
       this.contract,
       this.modelName,
       input.conflictOn as Record<string, unknown> | undefined,
+      this.namespaceId,
     );
     if (conflictColumns.length === 0) {
       throw new Error(`upsert() for model "${this.modelName}" requires conflict columns`);
@@ -1936,7 +1979,7 @@ export class Collection<
     createValues: Record<string, unknown>,
     conflictColumns: readonly string[],
   ): Record<string, unknown> {
-    const columnToField = getColumnToFieldMap(this.contract, this.modelName);
+    const columnToField = getColumnToFieldMap(this.contract, this.modelName, this.namespaceId);
     const criterion: Record<string, unknown> = {};
 
     for (const columnName of conflictColumns) {
@@ -1993,7 +2036,7 @@ export class Collection<
     if (!firstRow) {
       return null;
     }
-    const columnToField = getColumnToFieldMap(this.contract, this.modelName);
+    const columnToField = getColumnToFieldMap(this.contract, this.modelName, this.namespaceId);
     const criterion: Record<string, unknown> = {};
     for (const column of identityColumns) {
       const fieldName = columnToField[column] ?? column;
@@ -2072,6 +2115,7 @@ export class Collection<
     const Ctor = this.constructor as CollectionConstructor<TContract>;
     return new Ctor({ ...this.ctx, runtime }, this.modelName, {
       tableName: this.tableName,
+      namespaceId: this.namespaceId,
       state: this.state,
       registry: this.registry,
       includeRefinementMode: this.includeRefinementMode,
@@ -2093,6 +2137,7 @@ export class Collection<
     const Ctor = this.constructor as CollectionConstructor<TContract>;
     return new Ctor(this.ctx, this.modelName, {
       tableName: this.tableName,
+      namespaceId: this.namespaceId,
       state,
       registry: this.registry,
       includeRefinementMode: this.includeRefinementMode,
