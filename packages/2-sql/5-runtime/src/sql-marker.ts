@@ -1,5 +1,4 @@
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
 
 export { APP_SPACE_ID };
 
@@ -38,20 +37,3 @@ export const ensureTableStatement: SqlStatement = {
   )`,
   params: [],
 };
-
-export function readContractMarker(space: string): MarkerStatement {
-  return {
-    sql: `select
-      core_hash,
-      profile_hash,
-      contract_json,
-      canonical_version,
-      updated_at,
-      app_tag,
-      meta,
-      invariants
-    from prisma_contract.marker
-    where space = $1`,
-    params: [space],
-  };
-}

@@ -2,7 +2,7 @@ export type {
   AfterExecuteResult,
   RuntimeLog as Log,
 } from '@prisma-next/framework-components/runtime';
-export type { MarkerReadResult, MarkerStatement } from '@prisma-next/sql-relational-core/ast';
+export type { MarkerReadResult } from '@prisma-next/sql-relational-core/ast';
 export { createControlCodecRegistry } from '../codecs/control-codec-registry';
 export { deriveParamMetadata, encodeParamsWithMetadata } from '../codecs/encoding';
 export {
@@ -58,7 +58,6 @@ export {
   APP_SPACE_ID,
   ensureSchemaStatement,
   ensureTableStatement,
-  readContractMarker,
 } from '../sql-marker';
 export type {
   CreateRuntimeOptions,
