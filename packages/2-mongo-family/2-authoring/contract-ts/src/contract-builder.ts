@@ -533,31 +533,22 @@ type MongoDomainNamespaceFromDefinition<Definition> = Simplify<
   } & MaybeValueObjectsSection<DefinitionValueObjects<Definition>>
 >;
 
-type MaybeDefaultControlPolicySection<Definition> = Definition extends {
-  readonly defaultControlPolicy: infer Policy;
-}
-  ? Policy extends ControlPolicy
-    ? { readonly defaultControlPolicy: Policy }
-    : EmptyObject
-  : EmptyObject;
-
-type MongoContractBaseFromDefinition<Definition> = Simplify<
-  {
-    readonly target: DefinitionTargetId<Definition>;
-    readonly targetFamily: DefinitionFamilyId<Definition>;
-    readonly roots: DefinitionRoots<Definition>;
-    readonly domain: {
-      readonly namespaces: {
-        readonly [K in typeof UNBOUND_NAMESPACE_ID]: MongoDomainNamespaceFromDefinition<Definition>;
-      };
+type MongoContractBaseFromDefinition<Definition> = Simplify<{
+  readonly target: DefinitionTargetId<Definition>;
+  readonly targetFamily: DefinitionFamilyId<Definition>;
+  readonly roots: DefinitionRoots<Definition>;
+  readonly domain: {
+    readonly namespaces: {
+      readonly [K in typeof UNBOUND_NAMESPACE_ID]: MongoDomainNamespaceFromDefinition<Definition>;
     };
-    readonly storage: DefinitionStorage<Definition>;
-    readonly capabilities: Record<string, never>;
-    readonly extensionPacks: DefinitionExtensionPacks<Definition>;
-    readonly profileHash: ProfileHashBase<string>;
-    readonly meta: Record<string, never>;
-  } & MaybeDefaultControlPolicySection<Definition>
->;
+  };
+  readonly storage: DefinitionStorage<Definition>;
+  readonly capabilities: Record<string, never>;
+  readonly extensionPacks: DefinitionExtensionPacks<Definition>;
+  readonly profileHash: ProfileHashBase<string>;
+  readonly meta: Record<string, never>;
+  readonly defaultControlPolicy?: ControlPolicy;
+}>;
 
 type CodecTypesFromDefinition<Definition> = MongoCodecTypes &
   MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
