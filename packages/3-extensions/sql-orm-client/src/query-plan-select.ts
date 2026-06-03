@@ -1172,8 +1172,11 @@ export function compileSelect(
   tableName: string,
   state: CollectionState,
   modelName?: string,
+  namespaceId?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const polyInfo = modelName ? resolvePolymorphismInfo(contract, modelName) : undefined;
+  const polyInfo = modelName
+    ? resolvePolymorphismInfo(contract, modelName, namespaceId)
+    : undefined;
   const mtiArtifacts =
     polyInfo && polyInfo.mtiVariants.length > 0
       ? buildMtiJoins(contract, polyInfo, state.variantName)
@@ -1200,12 +1203,15 @@ export function compileSelectWithIncludes(
   tableName: string,
   state: CollectionState,
   modelName?: string,
+  namespaceId?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
   const includeJoins: JoinAst[] = [];
   const includeProjection: ProjectionItem[] = [];
   const topLevelWhere = buildStateWhere(contract, tableName, state);
 
-  const polyInfo = modelName ? resolvePolymorphismInfo(contract, modelName) : undefined;
+  const polyInfo = modelName
+    ? resolvePolymorphismInfo(contract, modelName, namespaceId)
+    : undefined;
   if (polyInfo && polyInfo.mtiVariants.length > 0) {
     const mtiArtifacts = buildMtiJoins(contract, polyInfo, state.variantName);
     includeJoins.push(...mtiArtifacts.joins);

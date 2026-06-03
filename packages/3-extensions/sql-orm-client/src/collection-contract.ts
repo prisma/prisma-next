@@ -63,7 +63,19 @@ function metadataCacheKey(modelName: string, namespaceId?: string): string {
   return namespaceId === undefined ? modelName : `${namespaceId}\u0000${modelName}`;
 }
 
-export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntry | undefined {
+export function modelOf(
+  contract: Contract<SqlStorage>,
+  name: string,
+  namespaceId?: string,
+): ModelEntry | undefined {
+  if (namespaceId !== undefined) {
+    const model = contract.domain.namespaces[namespaceId]?.models[name];
+    return model === undefined
+      ? undefined
+      : blindCast<ModelEntry, 'domain namespace model is a model entry for this SQL contract'>(
+          model,
+        );
+  }
   const resolved = resolveDomainModelForContract(contract, name);
   return resolved?.model as ModelEntry | undefined;
 }

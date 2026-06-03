@@ -283,11 +283,18 @@ export class Collection<
             blindCast<
               VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
               'runtime accessor carries the selected variant fields; the variant widening is callback-param-only'
-            >(createModelAccessor(this.ctx.context, this.modelName, this.state.variantName)),
+            >(
+              createModelAccessor(
+                this.ctx.context,
+                this.modelName,
+                this.namespaceId,
+                this.state.variantName,
+              ),
+            ),
           )
         : isWhereDirectInput(input)
           ? input
-          : shorthandToWhereExpr(this.ctx.context, this.modelName, input);
+          : shorthandToWhereExpr(this.ctx.context, this.modelName, input, this.namespaceId);
     const filter = normalizeWhereArg(whereArg, { contract: this.contract });
 
     if (!filter) {
@@ -569,7 +576,12 @@ export class Collection<
     >,
     State
   > {
-    const selectedFields = mapFieldsToColumns(this.contract, this.modelName, fields);
+    const selectedFields = mapFieldsToColumns(
+      this.contract,
+      this.modelName,
+      fields,
+      this.namespaceId,
+    );
 
     return this.#cloneWithRow<
       SimplifyDeep<
@@ -604,7 +616,7 @@ export class Collection<
       | ((model: ModelAccessor<TContract, ModelName>) => OrderByItem)
       | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByItem>,
   ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
-    const accessor = createModelAccessor(this.ctx.context, this.modelName);
+    const accessor = createModelAccessor(this.ctx.context, this.modelName, this.namespaceId);
     const selectors = Array.isArray(selection) ? selection : [selection];
     const nextOrders = selectors.map((selector) =>
       selector(accessor as ModelAccessor<TContract, ModelName>),
@@ -634,7 +646,12 @@ export class Collection<
       ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
     ],
   >(...fields: Fields): GroupedCollection<TContract, ModelName, Fields> {
-    const groupByColumns = mapFieldsToColumns(this.contract, this.modelName, fields);
+    const groupByColumns = mapFieldsToColumns(
+      this.contract,
+      this.modelName,
+      fields,
+      this.namespaceId,
+    );
 
     return new GroupedCollection(this.ctx, this.modelName, {
       tableName: this.tableName,
@@ -852,6 +869,7 @@ export class Collection<
       this.contract,
       this.modelName,
       cursorValues as Readonly<Record<string, unknown>>,
+      this.namespaceId,
     );
 
     if (Object.keys(mappedCursor).length === 0) {
@@ -877,7 +895,12 @@ export class Collection<
       ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
     ],
   >(...fields: Fields): Collection<TContract, ModelName, Row, State> {
-    const distinctFields = mapFieldsToColumns(this.contract, this.modelName, fields);
+    const distinctFields = mapFieldsToColumns(
+      this.contract,
+      this.modelName,
+      fields,
+      this.namespaceId,
+    );
 
     return this.#clone({
       distinct: distinctFields,
@@ -1412,17 +1435,23 @@ export class Collection<
   #mapCreateRows(data: readonly Record<string, unknown>[]): Record<string, unknown>[] {
     const variantName = this.state.variantName;
     if (!variantName) {
-      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+      return data.map((row) =>
+        mapModelDataToStorageRow(this.contract, this.modelName, row, this.namespaceId),
+      );
     }
 
     const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName, this.namespaceId);
     if (!polyInfo) {
-      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+      return data.map((row) =>
+        mapModelDataToStorageRow(this.contract, this.modelName, row, this.namespaceId),
+      );
     }
 
     const variant = polyInfo.variants.get(variantName);
     if (!variant) {
-      return data.map((row) => mapModelDataToStorageRow(this.contract, this.modelName, row));
+      return data.map((row) =>
+        mapModelDataToStorageRow(this.contract, this.modelName, row, this.namespaceId),
+      );
     }
 
     const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName, this.namespaceId);
@@ -1543,7 +1572,12 @@ export class Collection<
     const mappedCreateRows = this.#mapCreateRows([input.create as Record<string, unknown>]);
     const createValues = mappedCreateRows[0] ?? {};
     applyCreateDefaults(this.ctx, this.tableName, [createValues]);
-    const updateValues = mapModelDataToStorageRow(this.contract, this.modelName, input.update);
+    const updateValues = mapModelDataToStorageRow(
+      this.contract,
+      this.modelName,
+      input.update,
+      this.namespaceId,
+    );
     const hasUpdateValues = Object.keys(updateValues).length > 0;
     if (hasUpdateValues) {
       applyUpdateDefaults(this.ctx, this.tableName, updateValues);
@@ -1719,7 +1753,12 @@ export class Collection<
   ): AsyncIterableResult<Row> {
     assertReturningCapability(this.contract, 'updateAll()');
 
-    const mappedData = mapModelDataToStorageRow(this.contract, this.modelName, data);
+    const mappedData = mapModelDataToStorageRow(
+      this.contract,
+      this.modelName,
+      data,
+      this.namespaceId,
+    );
     if (Object.keys(mappedData).length === 0) {
       const generator = async function* (): AsyncGenerator<Row, void, unknown> {};
       return new AsyncIterableResult(generator());
@@ -1769,7 +1808,12 @@ export class Collection<
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<number> {
-    const mappedData = mapModelDataToStorageRow(this.contract, this.modelName, data);
+    const mappedData = mapModelDataToStorageRow(
+      this.contract,
+      this.modelName,
+      data,
+      this.namespaceId,
+    );
     if (Object.keys(mappedData).length === 0) {
       return 0;
     }
@@ -1920,6 +1964,7 @@ export class Collection<
           state: collection.state,
           tableName: collection.tableName,
           modelName: collection.modelName,
+          namespaceId: collection.namespaceId,
         }).toArray();
         const deletePlan = mergeAnnotations(
           compileDeleteCount(collection.contract, collection.tableName, collection.state.filters),
@@ -2053,6 +2098,7 @@ export class Collection<
         this.ctx.context,
         this.modelName,
         criterion as ShorthandWhereFilter<TContract, ModelName>,
+        this.namespaceId,
       ) ?? null
     );
   }
@@ -2069,6 +2115,7 @@ export class Collection<
       this.ctx.context,
       this.modelName,
       criterion as ShorthandWhereFilter<TContract, ModelName>,
+      this.namespaceId,
     );
     if (!whereExpr) {
       throw new Error(
@@ -2090,6 +2137,7 @@ export class Collection<
       state: resultState,
       tableName: this.tableName,
       modelName: this.modelName,
+      namespaceId: this.namespaceId,
     });
     return rows[0] ?? null;
   }
@@ -2172,6 +2220,7 @@ export class Collection<
       state: this.state,
       tableName: this.tableName,
       modelName: this.modelName,
+      namespaceId: this.namespaceId,
     });
   }
 

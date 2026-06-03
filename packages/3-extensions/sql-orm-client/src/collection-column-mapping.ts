@@ -6,8 +6,9 @@ export function mapFieldsToColumns(
   contract: Contract<SqlStorage>,
   modelName: string,
   fieldNames: readonly string[],
+  namespaceId?: string,
 ): string[] {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName);
+  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
   return fieldNames.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
 }
 
@@ -15,8 +16,9 @@ export function mapCursorValuesToColumns(
   contract: Contract<SqlStorage>,
   modelName: string,
   cursorValues: Readonly<Record<string, unknown>>,
+  namespaceId?: string,
 ): Record<string, unknown> {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName);
+  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
   const mappedCursor: Record<string, unknown> = {};
 
   for (const [fieldName, value] of Object.entries(cursorValues)) {

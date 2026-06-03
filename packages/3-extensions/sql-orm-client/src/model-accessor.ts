@@ -45,12 +45,13 @@ export function createModelAccessor<
 >(
   context: ExecutionContext<TContract>,
   modelName: ModelName,
+  namespaceId?: string,
   variantName?: string,
 ): ModelAccessor<TContract, ModelName> {
   const contract = context.contract;
-  const fieldToColumn = getFieldToColumnMap(contract, modelName);
-  const tableName = resolveModelTableName(contract, modelName);
-  const modelRelations = resolveModelRelations(contract, modelName);
+  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
+  const tableName = resolveModelTableName(contract, modelName, namespaceId);
+  const modelRelations = resolveModelRelations(contract, modelName, namespaceId);
   // When a variant is selected, MTI variant-owned fields resolve to a
   // `ColumnRef` qualified against the variant table the read path joins into
   // the correlated child SELECT. STI variant columns live on the base table

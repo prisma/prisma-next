@@ -20,12 +20,13 @@ export function stripHiddenMappedFields(
   modelName: string,
   mapped: Record<string, unknown>,
   hiddenColumns: readonly string[],
+  namespaceId?: string,
 ): void {
   if (hiddenColumns.length === 0) {
     return;
   }
 
-  const columnToField = getColumnToFieldMap(contract, modelName);
+  const columnToField = getColumnToFieldMap(contract, modelName, namespaceId);
   for (const hiddenColumn of hiddenColumns) {
     const fieldName = columnToField[hiddenColumn] ?? hiddenColumn;
     delete mapped[fieldName];
@@ -36,10 +37,11 @@ export function createRowEnvelope(
   contract: Contract<SqlStorage>,
   modelName: string,
   raw: Record<string, unknown>,
+  namespaceId?: string,
 ): RowEnvelope {
   return {
     raw,
-    mapped: mapStorageRowToModelFields(contract, modelName, raw),
+    mapped: mapStorageRowToModelFields(contract, modelName, raw, namespaceId),
   };
 }
 
@@ -47,8 +49,9 @@ export function mapStorageRowToModelFields(
   contract: Contract<SqlStorage>,
   modelName: string,
   row: Record<string, unknown>,
+  namespaceId?: string,
 ): Record<string, unknown> {
-  const columnToField = getColumnToFieldMap(contract, modelName);
+  const columnToField = getColumnToFieldMap(contract, modelName, namespaceId);
   if (Object.keys(columnToField).length === 0) {
     return { ...row };
   }
@@ -132,8 +135,9 @@ export function mapModelDataToStorageRow(
   contract: Contract<SqlStorage>,
   modelName: string,
   row: Record<string, unknown>,
+  namespaceId?: string,
 ): Record<string, unknown> {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName);
+  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
   const mapped: Record<string, unknown> = {};
   for (const [fieldName, value] of Object.entries(row)) {
     if (value === undefined) {

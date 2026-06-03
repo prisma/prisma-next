@@ -59,18 +59,19 @@ export function dispatchCollectionRows<Row>(options: {
   state: CollectionState;
   tableName: string;
   modelName: string;
+  namespaceId?: string | undefined;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, modelName } = options;
-  const polyInfo = resolvePolymorphismInfo(contract, modelName);
+  const { contract, runtime, state, tableName, modelName, namespaceId } = options;
+  const polyInfo = resolvePolymorphismInfo(contract, modelName, namespaceId);
 
   if (state.includes.length === 0) {
-    const compiled = compileSelect(contract, tableName, state, modelName);
+    const compiled = compileSelect(contract, tableName, state, modelName, namespaceId);
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
     const mapper = polyInfo
       ? (rawRow: Record<string, unknown>) =>
           mapPolymorphicRow(contract, modelName, polyInfo, rawRow, state.variantName) as Row
       : (rawRow: Record<string, unknown>) =>
-          mapStorageRowToModelFields(contract, modelName, rawRow) as Row;
+          mapStorageRowToModelFields(contract, modelName, rawRow, namespaceId) as Row;
     return mapResultRows(source, mapper);
   }
 
@@ -86,8 +87,9 @@ function dispatchWithIncludes<Row>(options: {
   state: CollectionState;
   tableName: string;
   modelName: string;
+  namespaceId?: string | undefined;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, modelName } = options;
+  const { contract, runtime, state, tableName, modelName, namespaceId } = options;
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
@@ -102,6 +104,7 @@ function dispatchWithIncludes<Row>(options: {
           selectedFields: parentSelectedForQuery,
         },
         modelName,
+        namespaceId,
       );
 
       const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(
@@ -112,11 +115,11 @@ function dispatchWithIncludes<Row>(options: {
         return;
       }
 
-      const polyInfo = resolvePolymorphismInfo(contract, modelName);
+      const polyInfo = resolvePolymorphismInfo(contract, modelName, namespaceId);
       const parentRows = parentRowsRaw.map((row) => {
         const mapped = polyInfo
           ? mapPolymorphicRow(contract, modelName, polyInfo, row, state.variantName)
-          : mapStorageRowToModelFields(contract, modelName, row);
+          : mapStorageRowToModelFields(contract, modelName, row, namespaceId);
         return { raw: row, mapped } as RowEnvelope;
       });
 
