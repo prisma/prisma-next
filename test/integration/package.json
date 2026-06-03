@@ -44,7 +44,9 @@
     "@prisma-next/sql-runtime": "workspace:0.12.0",
     "@prisma-next/target-postgres": "workspace:0.12.0",
     "@prisma-next/adapter-mongo": "workspace:0.12.0",
+    "@prisma-next/adapter-sqlite": "workspace:0.12.0",
     "@prisma-next/driver-mongo": "workspace:0.12.0",
+    "@prisma-next/driver-sqlite": "workspace:0.12.0",
     "@prisma-next/family-mongo": "workspace:0.12.0",
     "@prisma-next/mongo": "workspace:0.12.0",
     "@prisma-next/mongo-codec": "workspace:0.12.0",
@@ -57,6 +59,7 @@
     "@prisma-next/mongo-query-ast": "workspace:0.12.0",
     "@prisma-next/mongo-runtime": "workspace:0.12.0",
     "@prisma-next/target-mongo": "workspace:0.12.0",
+    "@prisma-next/target-sqlite": "workspace:0.12.0",
     "@prisma-next/utils": "workspace:0.12.0",
     "@prisma-next/vite-plugin-contract-emit": "workspace:0.12.0",
     "arktype": "catalog:"
