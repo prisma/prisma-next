@@ -172,6 +172,7 @@
                   "column": "version"
                 }
               },
+              "namespaceId": "public",
               "table": "telemetry_event"
             }
           }

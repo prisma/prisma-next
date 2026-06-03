@@ -63,7 +63,9 @@ describe('emitter', () => {
       const ir = createTestContract({
         models: {
           User: {
-            storage: { namespaceId: '__unbound__', table: 'user',
+            storage: {
+              namespaceId: '__unbound__',
+              table: 'user',
               fields: {
                 id: { column: 'id' },
                 email: { column: 'email' },
