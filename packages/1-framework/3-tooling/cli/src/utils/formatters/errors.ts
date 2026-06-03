@@ -1,22 +1,11 @@
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
+import { blindCast } from '@prisma-next/utils/casts';
 import { red } from 'colorette';
 
 import type { CliErrorConflict, CliErrorEnvelope } from '../cli-errors';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
 import { formatPlannerWarningsBlock } from './migrations';
-
-function isPlannerWarningList(value: unknown): value is readonly MigrationPlannerConflict[] {
-  if (!Array.isArray(value) || value.length === 0) {
-    return false;
-  }
-  return value.every((item) => {
-    if (typeof item !== 'object' || item === null) {
-      return false;
-    }
-    return typeof Reflect.get(item, 'summary') === 'string';
-  });
-}
 
 /**
  * Formats error output for human-readable display.
@@ -82,8 +71,12 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
     lines.push(formatDimText(error.docsUrl));
   }
   const plannerWarnings = error.meta?.['plannerWarnings'];
-  if (isPlannerWarningList(plannerWarnings)) {
-    lines.push(...formatPlannerWarningsBlock(plannerWarnings, useColor));
+  if (Array.isArray(plannerWarnings) && plannerWarnings.length > 0) {
+    const typedWarnings = blindCast<
+      readonly MigrationPlannerConflict[],
+      'mapDbUpdateFailure (db-update.ts) writes meta.plannerWarnings as MigrationPlannerConflict[]; meta is typed Record<string, unknown> so the channel erases the element type'
+    >(plannerWarnings);
+    lines.push(...formatPlannerWarningsBlock(typedWarnings, useColor));
   }
   if (isVerbose(flags, 2) && error.meta) {
     lines.push(`${formatDimText(`  Meta: ${JSON.stringify(error.meta, null, 2)}`)}`);

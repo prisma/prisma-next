@@ -51,6 +51,7 @@ import {
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 // `canonicalStringify` rejects non-plain objects so a `Map` or class
@@ -1614,7 +1615,10 @@ function buildContractFromDefinition<
     meta: {},
   } satisfies MongoContract;
 
-  return builtContract as unknown as MongoContractResult<Definition>;
+  return blindCast<
+    MongoContractResult<Definition>,
+    "builtContract satisfies MongoContract erases Definition's literal type parameters; MongoContractResult<Definition> re-applies them so callers see the precise model/value-object/roots/namespace shapes"
+  >(builtContract);
 }
 
 export function defineContract<
