@@ -1,0 +1,26 @@
+import mongoAdapter from '@prisma-next/adapter-mongo/control';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import mongoDriver from '@prisma-next/driver-mongo/control';
+import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
+import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
+import { contract } from './contract';
+
+export default defineConfig({
+  family: mongoFamilyDescriptor,
+  target: mongoTargetDescriptor,
+  adapter: mongoAdapter,
+  driver: mongoDriver,
+  extensionPacks: [],
+  contract: {
+    source: {
+      load: async () => ({ ok: true as const, value: contract }),
+    },
+    output: 'output/contract.json',
+  },
+  db: {
+    connection: '{{MONGO_URI}}',
+  },
+  migrations: {
+    dir: 'migrations',
+  },
+});
