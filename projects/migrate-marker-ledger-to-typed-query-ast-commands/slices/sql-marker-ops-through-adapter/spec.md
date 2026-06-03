@@ -40,6 +40,25 @@ One reviewer holds it: this slice migrates *all* SQL marker/ledger DML call site
 - [ ] The three raw-SQL write builders and the duplicate read/parse paths are removed, not wrapped.
 - [ ] A test pins accumulate-dedupe invariant-merge for **both** Postgres and SQLite.
 - [ ] `SqlControlAdapter` marker-write surface matches `MongoControlAdapter`'s shape.
+- [ ] **(Added 2026-06-03)** Generic `TableSource` carries no target-specific fields; Postgres schema-qualification is expressed via `PostgresTableSource extends TableSource` in the postgres target package (mirroring Slice 1's `PostgresCreateTable` pattern). See [`.agents/rules/no-target-branches.mdc` § AST class fields are the same violation](../../../../.agents/rules/no-target-branches.mdc).
+- [ ] **(Added 2026-06-03)** Each adapter owns `readMarker(driver, space)` end-to-end inside its own package. `family-sql/verify.ts` calls `adapter.readMarker(...)` and is unaware of probes, statements, or row decoders. `MarkerStatement`, `MarkerReadShape`, `MarkerReadQueryable`, and `readMarkerResult` no longer exist. Only `parseContractMarkerRow` (a pure parser) is shared. See [F18 in `drive/calibration/failure-modes.md`](../../../../drive/calibration/failure-modes.md#f18-inverted-abstraction-shared-orchestrator-in-family-layer-takes-adapter-implementation-detail-fragments-via-an-interface).
+- [ ] **(Added 2026-06-03)** `sign()` and the migration runner each use the marker primitive that matches *their* contract: `sign()` calls `insertMarker` (insert-only, fail-loudly on duplicate); the migration runner's idempotent re-apply calls `initMarker` (upsert). Already implemented at `5da812ac0` after CodeRabbit caught the race; retro lesson [F19](../../../../drive/calibration/failure-modes.md#f19-single-primitive-collapse-changes-semantics-for-some-callers-but-not-others).
+
+## Corrective scope (added 2026-06-03 after PR #712 review)
+
+Three architectural mistakes shipped under the original plan and were caught at operator review. Corrective dispatches land on the same branch (PR stays open); see updated `plan.md` for D5 + D6. Lessons landed in:
+
+- [`projects/migrate-marker-ledger-to-typed-query-ast-commands/retros.md`](../../retros.md) — the retro entry.
+- [`drive/calibration/failure-modes.md`](../../../../drive/calibration/failure-modes.md) — new entries **F16** (self-acknowledged layering violation), **F17** (brief frames win as mechanics), **F18** (inverted abstraction over adapter fragments), **F19** (single-primitive collapse changes semantics for some callers).
+- [`drive/calibration/dor.md`](../../../../drive/calibration/dor.md) — Dispatch-DoR overlay items on property-statement framing, per-caller contract enumeration, and generic "trace each API change through callers" reviewer prompts.
+- [`drive/code/README.md`](../../../../drive/code/README.md) — three new repo-specific smells for reviewers to flag.
+- [`.agents/rules/no-target-branches.mdc`](../../../../.agents/rules/no-target-branches.mdc) — new section "AST class fields are the same violation" (worked PostgresTableSource example).
+
+The three corrections, in order:
+
+1. **Revert `TableSource.schema?` (generic core); introduce `PostgresTableSource extends TableSource` (postgres target).** The generic SQL core stays target-agnostic. Postgres-specific schema qualification reaches the renderer via a target-contributed subclass, mirroring Slice 1's `PostgresCreateTable` (which is the canonical pattern). The contract-free DML builder in `relational-core` is reshaped so generic `tableRef` / `insert` / `update` / `upsert` do not accept `schema`; postgres-specific schema-qualified DML construction lives in the postgres target package's contract-free surface (e.g. `@prisma-next/target-postgres/contract-free`). Marker/ledger write helpers in `adapter-postgres` adopt the new subclass.
+2. **Read path: each adapter owns `readMarker(driver, space)` end-to-end.** Delete `MarkerStatement` / `MarkerReadShape` / `MarkerReadQueryable` / `readMarkerResult` from `packages/2-sql/9-family/src/core/verify.ts`. Both adapter packages (`adapter-postgres`, `adapter-sqlite`) gain a self-contained marker read flow (probe → select → decode → parse → tag) in their own package, returning a `MarkerReadResult` to the family. `family-sql/verify.ts` calls `adapter.readMarker(driver, APP_SPACE_ID)` and consumes the tagged result; the runtime adapter's existing `readMarker` (already adapter-owned) stays as-is. The **only** shared piece is `parseContractMarkerRow` (a pure parser over a typed row shape) — that's a genuine cross-dialect commonality. The 10–20 lines of "duplicated" orchestration between PG and SQLite are the right kind of duplication: the cost of giving each adapter end-to-end control over its operation.
+3. **`sign()` race already fixed at `5da812ac0`.** No further code change. Done condition above pins the resolved shape; retro lesson F19 is the durable output.
 
 ## Open Questions
 

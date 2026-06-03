@@ -299,6 +299,83 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-05-30, slice `tolerant-queryable-aggregate` (TML-2715), D3→D4. The D3 reviewer passed the AC "`migration check` reports all violations at once" by reading `check`'s own `PN-MIG-CHECK-*` path for no-first-failure-bail — but `check` was never wired to `checkIntegrity()`, so the *relocated* self-edge (`sameSourceAndTarget`) and orphan-space-dir checks were never re-acquired there. Invisible to code-reading; surfaced only when D4 ran a real all-three-problems fixture through `check` and got 1-of-3.
 
+### F16. Self-acknowledged layering violation shipped through review
+
+**Symptom.** Implementer writes a code comment that explicitly acknowledges an architectural concern about what they're doing ("this is a layering violation", "this breaks the abstraction", "we're branching on target here", "this should really live in the target package") and proceeds to ship the code anyway. Reviewer marks the diff SATISFIED on the brief's items and does not treat the comment as a finding. Operator catches at PR review.
+
+**Detection signal.**
+
+- A code comment in the diff that admits to a known anti-pattern by name (`layering violation`, `branch on target`, `leaky abstraction`, `bypasses the seam`, `we shouldn't do this but`, `temporary`, `TODO: this is wrong`).
+- The structural change the comment apologises for is load-bearing for the dispatch's stated outcome (i.e. removing the violation would force a different shape, not just a different annotation).
+- The brief's "Outcome" section names a mechanical goal (add a field; route call X through Y) that the violation is in service of.
+
+**Mitigation.**
+
+- An implementer comment that acknowledges a structural concern is itself a **HALT signal**. The implementer surfaces the concern in the dispatch report, does not ship. The orchestrator decides whether the shape is correct (re-confer, possibly re-decompose); if the shape is correct the comment is unnecessary, if the shape is wrong the comment is the symptom.
+- Reviewers grep their diff for self-acknowledgment vocabulary as part of the review pass. Any hit is a must-fix finding regardless of the rest of the diff.
+- Briefs that authorise "Option A: add field X to layer Y" must reference the architectural pattern the addition is consistent with (or admit it isn't). If the implementer needs to acknowledge a violation to comply, the brief picked the wrong option.
+
+**Reference incident.** 2026-06-03, slice `sql-marker-ops-through-adapter` (TML-2753), D1. Implementer added `TableSource.schema?: string` to the generic SQL core (`packages/2-sql/4-lanes/relational-core/src/ast/types.ts`) with an inline comment explaining the addition was a Postgres-only concept living on a shared base. Both implementer and reviewer (subagent) shipped it green. Operator caught at PR #712 review with *"You even added a comment explaining the layering violation."* Brief root cause is F17 (Option A was authorised at orchestrator level because Slice 1 had `PostgresCreateTable.schema` — but Slice 1's shape was a *target-contributed subclass*, the parallel was wrong).
+
+### F17. Dispatch brief frames the win as mechanics; implementer + reviewer ship wrong-shape work that satisfies it
+
+**Symptom.** A dispatch closes SATISFIED through the full build loop (implementer green, reviewer SATISFIED, gates pass), but operator review catches an architectural mistake the brief never asked anyone to check for. The mistake is consistent with the brief's literal text — implementer and reviewer both did what the brief said. The brief named the *mechanic* of the change ("add field X", "consolidate two implementations into one home", "collapse to one primitive") rather than the *architectural property* the change must preserve ("the generic core stays target-agnostic", "the family layer doesn't know adapter implementation details", "every caller's contract still holds").
+
+**Detection signal.**
+
+- The brief's "Outcome" or "Goal" section reads as a mechanical instruction (verbs: *add*, *dedupe*, *collapse*, *move*, *route*) without a paired property statement (*"such that …"* / *"preserving …"* / *"with each adapter still owning …"*).
+- The reviewer's verdict cites satisfaction against the brief's items but doesn't restate the architectural property at risk.
+- The implementer files a comment in code acknowledging an architectural concern ("layering violation", "this is a leak", "we're branching on target here") and proceeds anyway because the brief said to.
+- Operator surfaces the finding in PR review with phrasing like *"isn't this what the X abstraction is for?"* / *"why are we putting Y in the generic layer?"*.
+
+**Mitigation.**
+
+- Every dispatch brief's "Outcome" includes a *property statement* alongside the mechanical instruction: *"such that <invariant the change preserves>"*. If the property statement is hard to write, the dispatch is probably wrong-shaped — re-decompose.
+- For consolidation dispatches specifically: frame the goal as the abstraction boundary the consolidation preserves (*"adapter owns each operation end-to-end; only pure helpers shared"*), not the "one home" outcome (which is the leaky-template-method trap — see F18).
+- Reviewers must restate the architectural property in their verdict, not just check the brief's items. If the brief doesn't name a property to preserve, the reviewer surfaces *that* as a finding (brief-discipline failure) before triaging the diff.
+- An implementer comment that acknowledges a layering concern in source is itself a HALT signal — the implementer surfaces, does not ship. (Mirrors F16 *Self-acknowledged layering violation*.)
+
+**Reference incident.** 2026-06-03, slice `sql-marker-ops-through-adapter` (TML-2753), Dispatches D1 + D3 + D4. D1 brief said *"build query-AST DML nodes via the slice-1 contract-free constructors"* — the implementer halted (couldn't qualify schemas through generic `TableSource`), orchestrator authorised *"Option A: add `TableSource.schema?`"* as in-scope. Implementer shipped it with a code comment acknowledging the layering violation; reviewer SATISFIED. D3 brief framed the win as *"one read home + one parser"* — implementer built a template-method orchestrator in `family-sql/verify.ts` that took adapter SQL fragments through a `MarkerReadShape` interface (see F18). D4 brief enumerated specific verification items for the reviewer (column-set reduction, CAS semantics) — the upsert-collapse-vs-`sign()` contract collision (F19) was not on the list. Operator caught all three at PR review.
+
+### F18. Inverted abstraction: shared orchestrator in family layer takes adapter implementation-detail fragments via an interface
+
+**Symptom.** A shared layer (e.g. `family-sql`) carries a template-method orchestrator (probe → select → decode → parse → tag) parameterised by a *per-adapter* interface exposing SQL fragments, row decoders, and other dialect-specific implementation details. Each adapter "implements" the operation by populating that interface; the orchestration template lives upstream. The pattern is justified as "shared code / one home", and it does technically dedupe the orchestration — at the cost of inverting what the adapter is *for*.
+
+**Detection signal.**
+
+- A type named `<Operation>Shape` / `<Operation>Statements` / `<Operation>Spec` in a shared package, carrying string fields (`sql`, `decoder`, `tableName`) populated by the adapter.
+- A function in a shared package that takes a "queryable" plus that shape and runs the operation; adapters' implementations of the operation reduce to `helper(queryable, this.<operation>Shape)`.
+- The adapter's public method matches the shared SPI on the surface, but its body is a one-liner delegating to the shared orchestrator.
+- The same operation on the **write** side (or on a sibling family — e.g. Mongo) is owned end-to-end by the adapter; only the read (or this one operation) leaks fragments upstream.
+
+**Mitigation.**
+
+- The adapter owns the whole operation end-to-end. The shared layer calls `adapter.<operation>(driver, args)` and gets back the result type the caller wants. Implementation details (statements, decoders, dialect-specific probes) live inside the adapter and never leave.
+- The only piece worth sharing across adapters is *pure* — a parser, a row-shape schema, a result-type constructor. If you find yourself sharing orchestration, you're sharing the wrong thing.
+- 10–20 lines of "duplicated" orchestration between two adapters is the right kind of duplication: it's the cost of giving each adapter end-to-end control, which is what the adapter pattern exists for.
+- Symmetry check: if the *write* side of the same family owns its operations end-to-end, the *read* side must too. Cross-family symmetry (SQL ↔ Mongo) is also a check — if Mongo owns `readMarker` end-to-end and SQL routes through a shared orchestrator, the SQL side is wrong-shaped.
+
+**Reference incident.** 2026-06-03, slice `sql-marker-ops-through-adapter` (TML-2753), D3. `readMarkerResult(queryable, shape)` lived in `packages/2-sql/9-family/src/core/verify.ts`; each adapter exported a `MarkerReadShape` (`tableProbe`, `selectRow`, optional `decodeRow`) of type `MarkerStatement` (`{sql, params}`). The write-side SPI in the same slice (D1/D2) correctly owned `initMarker`/`updateMarker`/`writeLedgerEntry` end-to-end in each adapter — the asymmetry was the giveaway. Brief-framing root cause is F17 (the D3 brief said *"one read home + one parser"*).
+
+### F19. Single-primitive collapse changes semantics for some callers but not others
+
+**Symptom.** A refactor collapses two distinct call-paths or operations into one primitive ("upsert" instead of separate "insert" + "update"; "merge" instead of separate "overwrite" + "accumulate"). The decision is correct for one caller's contract (the one whose use-case motivated the consolidation), but a *different* caller of the same primitive depends on the dropped semantics — and the consolidation silently changes that caller's behaviour. Tests pass because each caller's test exercises its own path; the contract collision shows up only under concurrent execution, edge cases, or production load.
+
+**Detection signal.**
+
+- A dispatch description says "collapse / consolidate X and Y into one" with a rationale that names only one of the call-sites.
+- The collapsed primitive's docs name the *post-collapse* semantic (e.g. "INSERT … ON CONFLICT DO UPDATE — idempotent re-apply") without enumerating which callers' contracts it satisfies.
+- One caller's tests pin "duplicate input produces idempotent result"; another caller (somewhere else in the tree) needs "duplicate input fails loudly" but its tests are sequential / don't exercise the collision.
+- Concurrency / race-condition reasoning in the surviving caller's code (e.g. "after `readMarker()` returns null, write the marker") that depended on the dropped semantic to be sound.
+
+**Mitigation.**
+
+- When a dispatch collapses two operations into one primitive, the brief enumerates **every** call-site of either pre-collapse operation and the contract each call-site needs (idempotent / fail-loudly / CAS / etc.). The dispatch is only sized to "single primitive" when every contract is satisfied; otherwise the collapse stays partial (keep both operations; or add a deliberate variant — e.g. `initMarker` for upsert, `insertMarker` for insert-only).
+- Reviewer verdicts on consolidation dispatches must include a "callers traced" item: list every caller, each caller's contract, and how the post-collapse primitive satisfies it. The bare "the new primitive works" verdict is insufficient.
+- Reviewer DoR must include a generic *"trace each public-API change through all callers"* prompt alongside any dispatch-specific verification list (per the dor.md overlay item added by this retro). Specific lists narrow reviewer attention; the generic prompt re-widens it.
+
+**Reference incident.** 2026-06-03, slice `sql-marker-ops-through-adapter` (TML-2753), D4. The slice spec decided "upsert collapses to `INSERT … ON CONFLICT (space) DO UPDATE`" based on the migration-runner's idempotent-re-apply contract. `sign()` also called `initMarker` after observing `readMarker() === null`, expecting init-once semantics — concurrent `sign()` invocations could each see "no marker" and the second would silently overwrite the first. CodeRabbit caught at PR review; fixed at `5da812ac0` by adding a separate `insertMarker` (insert-only, mirrors Mongo's existing primitive) and routing `sign()` to it while leaving migration-runner on upsert `initMarker`.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

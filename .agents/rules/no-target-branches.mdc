@@ -71,9 +71,57 @@ const defaultNamespaceId = target.defaultNamespaceId;
 
 Target-specific *facts* are static target data: they live on the target descriptor, and target-agnostic code consumes them through a uniform field. See [ADR 223 — Target-owned default namespace](../../docs/architecture%20docs/adrs/ADR%20223%20-%20Target-owned%20default%20namespace.md) for the canonical worked example of this distinction (a default namespace is an authoring-time fact the target owns, not a branch the framework evaluates).
 
+## AST class fields are the same violation
+
+The branch-as-`if`, the target-named constant, and the **target-specific field on a generic AST class** are three forms of the same mistake. An optional field on a shared core AST class that exists only because *one* target needs it is just a branch the renderer evaluates per-target — the field name encodes the target's existence into the generic class.
+
+**❌ WRONG: Target-specific field on a generic core AST class**
+
+```typescript
+// in packages/2-sql/4-lanes/relational-core (generic SQL core)
+export class TableSource extends ExprBase {
+  readonly name: string;
+  readonly schema?: string; // ← Postgres has schemas; SQLite doesn't. Generic core now knows.
+  // …
+}
+```
+
+The renderer downstream is forced into a per-target branch:
+
+```typescript
+// Postgres renderer uses schema
+const qualifiedName = source.schema ? `"${source.schema}"."${source.name}"` : `"${source.name}"`;
+
+// SQLite renderer rejects schema
+if (source.schema !== undefined) throw new Error('SQLite tables have no schema');
+```
+
+Both renderers are now branching on a generic-core field whose presence is a Postgres-only fact. The branch isn't in the core, but the field is — and the field exists *because* of the target distinction.
+
+**✅ CORRECT: Target-contributed AST subclass in the target package**
+
+```typescript
+// in packages/2-sql/4-lanes/relational-core (stays generic)
+export class TableSource extends ExprBase {
+  readonly name: string;
+  // …
+}
+
+// in packages/3-targets/3-targets/postgres (target-contributed)
+export class PostgresTableSource extends TableSource {
+  readonly schema?: string;
+  // …
+}
+```
+
+The Postgres renderer reaches `PostgresTableSource` via the same double-dispatch the Slice 1 DDL visitor uses. The SQLite renderer never sees the schema-qualified form because SQLite code doesn't produce it. The generic core stays target-agnostic.
+
+This mirrors the established three-layer polymorphic IR pattern (`packages/2-sql/4-lanes/relational-core/src/ast/ddl-types.ts` defines the family DDL base; `PostgresCreateTable extends DdlNode` lives in the postgres target package, not in core). When a new field is needed and only one target uses it, the right move is *almost always* a target-contributed subclass, never an optional field on the generic base.
+
 ## Why this matters
 
 - Keeps the core target-agnostic (“thin core, fat targets”)
 - Avoids hard-to-extend `if/else` and `switch` ladders as targets grow
 - Improves testability by mocking the adapter interface instead of branching on target
 - A target-named constant in the framework is a layer-purity violation that no `if` statement makes visible — naming the target is the tell, with or without a branch
+- A target-specific *field* on a generic AST class is a branch the renderer evaluates, just pre-encoded into the class — the field's presence is the layer-purity violation
