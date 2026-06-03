@@ -114,6 +114,23 @@ export function errorRefSetEmptySentinel(hash: string): CliStructuredError {
  * any fs work — the input is syntactically rejected the same way an on-disk
  * directory with that name would be skipped by the enumerator.
  */
+/**
+ * `migration graph --legend` was combined with a machine-readable output flag.
+ * The legend is human-only decoration on stderr.
+ */
+export function errorMigrationGraphLegendHumanOnly(
+  conflictingFlag: '--json' | '--dot',
+): CliStructuredError {
+  return errorRuntime('`--legend` is only available for human-readable graph output', {
+    why: `\`--legend\` prints a glyph key to stderr and cannot be combined with ${conflictingFlag}.`,
+    fix: `Omit ${conflictingFlag} to print the legend alongside the tree, or omit --legend when using ${conflictingFlag}.`,
+    meta: {
+      code: 'MIGRATION.GRAPH_LEGEND_HUMAN_ONLY',
+      conflictingFlag,
+    },
+  });
+}
+
 export function errorInvalidSpaceId(spaceId: string): CliStructuredError {
   return errorRuntime(`Invalid contract space id: ${spaceId}`, {
     why: 'Contract space ids must match [a-z][a-z0-9_-]{0,63} (lowercase, starts with a letter, max 64 characters — the rule applied to every on-disk space directory).',

@@ -1156,17 +1156,49 @@ describe('renderMigrationGraphLegend', () => {
     `);
   });
 
-  it('emits zero ANSI when colorize is off; content is unchanged by the colorize gate', () => {
+  it('emits zero ANSI when colorize is off', () => {
     const plain = renderMigrationGraphLegend({ colorize: false });
     expect(plain).not.toContain('\u001b[');
-    // The colorize gate only adds styling — the visible content is identical.
-    expect(stripAnsi(renderMigrationGraphLegend({ colorize: true }))).toBe(plain);
+    expect(plain).not.toContain('gutter lanes by column');
   });
 
-  it('drops the old lane sample, data-column, and "node" wording', () => {
+  it('tints the lane-color swatches from LANE_COLOR_CYCLE when colorize is on', () => {
+    const colored = renderMigrationGraphLegend({ colorize: true });
+    expect(colored).toContain(laneColorForColumn(1)('│'));
+    expect(stripAnsi(colored)).toContain('gutter lanes by column');
+  });
+
+  it('renders the unicode legend with color', () => {
+    expect(stripAnsi(renderMigrationGraphLegend({ colorize: true }))).toMatchInlineSnapshot(`
+      "Legend:
+        ○ contract   ↑ forward   ↓ rollback
+        ⟲ migration without schema change
+        ✓ applied   ⧗ pending
+        ∅ empty database (baseline)
+        (refs) db / contract markers
+        aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb
+        │ │ │ │ │ │ │   gutter lanes by column (column 0 dim; routed back-arcs one hue)"
+    `);
+  });
+
+  it('renders the ASCII legend with color', () => {
+    expect(
+      stripAnsi(renderMigrationGraphLegend({ colorize: true, glyphMode: 'ascii' })),
+    ).toMatchInlineSnapshot(`
+      "Legend:
+        * contract   ^ forward   v rollback
+        @ migration without schema change
+        + applied   > pending
+        - empty database (baseline)
+        (refs) db / contract markers
+        aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb
+        | | | | | | |   gutter lanes by column (column 0 dim; routed back-arcs one hue)"
+    `);
+  });
+
+  it('omits legacy contract-node and data-column legend wording', () => {
     for (const colorize of [false, true]) {
       const text = stripAnsi(renderMigrationGraphLegend({ colorize }));
-      expect(text).not.toContain('lanes');
       expect(text).not.toContain('contract node');
       expect(text).not.toContain('data column');
       expect(text).not.toContain('node overlay');
@@ -1179,7 +1211,7 @@ describe('renderMigrationGraphLegend', () => {
     const colored = renderMigrationGraphLegend({ colorize: true, glyphMode: 'ascii' });
     expect(stripAnsi(colored)).toContain('* contract   ^ forward   v rollback');
     expect(stripAnsi(colored)).toContain('aaaaaa -> bbbbbb');
-    expect(stripAnsi(colored)).not.toContain('lanes');
+    expect(stripAnsi(colored)).toContain('gutter lanes by column');
   });
 
   it('dims legend label prose when colorize is on, not the heading or glyphs', () => {
@@ -1196,8 +1228,6 @@ describe('renderMigrationGraphLegend', () => {
     const dimForward = dim('forward');
     if (colored.includes(dimForward)) {
       expect(firstContent.indexOf(dimForward)).toBe(forwardIdx);
-    } else {
-      expect(stripAnsi(colored)).toBe(renderMigrationGraphLegend({ colorize: false }));
     }
 
     // The leading glyph markers (○, ↑, ↓, ⟲, ∅) stay bright like the other kind

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { migrationGraphShowsLegend } from '../../src/commands/migration-graph';
+import {
+  migrationGraphShowsLegend,
+  validateMigrationGraphLegendOptions,
+} from '../../src/commands/migration-graph';
 import { renderMigrationGraphLegend } from '../../src/utils/formatters/migration-graph-tree-render';
 import type { GlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
@@ -12,14 +15,36 @@ describe('migrationGraphShowsLegend', () => {
     expect(migrationGraphShowsLegend({ legend: true }, PRETTY)).toBe(true);
   });
 
-  it('suppresses the legend for --json, --dot, and --quiet', () => {
-    expect(migrationGraphShowsLegend({ legend: true }, JSON_FLAGS)).toBe(false);
-    expect(migrationGraphShowsLegend({ legend: true, dot: true }, PRETTY)).toBe(false);
+  it('suppresses the legend under --quiet', () => {
     expect(migrationGraphShowsLegend({ legend: true }, { ...PRETTY, quiet: true })).toBe(false);
   });
 
   it('stays hidden without --legend', () => {
     expect(migrationGraphShowsLegend({}, PRETTY)).toBe(false);
+  });
+});
+
+describe('validateMigrationGraphLegendOptions', () => {
+  it('rejects --legend with --json', () => {
+    const result = validateMigrationGraphLegendOptions({ legend: true }, JSON_FLAGS);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('--legend');
+      expect(result.failure.why).toContain('--json');
+    }
+  });
+
+  it('rejects --legend with --dot', () => {
+    const result = validateMigrationGraphLegendOptions({ legend: true, dot: true }, PRETTY);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('--legend');
+      expect(result.failure.why).toContain('--dot');
+    }
+  });
+
+  it('accepts --legend on the pretty tree path', () => {
+    expect(validateMigrationGraphLegendOptions({ legend: true }, PRETTY).ok).toBe(true);
   });
 });
 
@@ -46,7 +71,7 @@ describe('migration graph legend stream split', () => {
     expect(stderrText).toContain('pending');
     expect(stderrText).toContain('(refs) db / contract markers');
     expect(stderrText).toContain('migration from contract aaaaaa to bbbbbb');
-    expect(stderrText).not.toContain('lanes');
+    expect(stderrText).not.toContain('gutter lanes by column');
     expect(stderr.at(-1)).toBe('');
     expect(outputSpy).not.toHaveBeenCalled();
     stderrSpy.mockRestore();

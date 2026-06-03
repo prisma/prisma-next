@@ -1,9 +1,9 @@
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { ok, type Result } from '@prisma-next/utils/result';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
-import type { CliStructuredError } from '../utils/cli-errors';
+import { type CliStructuredError, errorMigrationGraphLegendHumanOnly } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   resolveMigrationPaths,
@@ -48,6 +48,22 @@ export function migrationGraphShowsLegend(
   return (
     options.legend === true && options.dot !== true && flags.json !== true && flags.quiet !== true
   );
+}
+
+export function validateMigrationGraphLegendOptions(
+  options: MigrationGraphOptions,
+  flags: GlobalFlags,
+): Result<void, CliStructuredError> {
+  if (options.legend !== true) {
+    return ok(undefined);
+  }
+  if (flags.json === true) {
+    return notOk(errorMigrationGraphLegendHumanOnly('--json'));
+  }
+  if (options.dot === true) {
+    return notOk(errorMigrationGraphLegendHumanOnly('--dot'));
+  }
+  return ok(undefined);
 }
 
 export interface MigrationGraphTreeSection {
@@ -209,6 +225,10 @@ export function createMigrationGraphCommand(): Command {
     .action(async (options: MigrationGraphOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
+      const legendValidation = validateMigrationGraphLegendOptions(options, flags);
+      if (!legendValidation.ok) {
+        process.exit(handleResult(legendValidation, flags, ui));
+      }
       const result = await executeMigrationGraphCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, (graphResult) => {
         if (options.dot) {

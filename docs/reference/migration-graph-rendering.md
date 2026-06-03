@@ -163,10 +163,10 @@ per-column lane colors. The lane-color row is shown only when color is enabled.
 
 The legend honors the active glyph palette (`--ascii` swaps to `* ^ v @ -`) and
 the same `colorize` gate as the renderer. It is decoration: it prints to
-**stderr** alongside the command header, so `migration graph --tree --legend |
-…` still pipes pure graph output on stdout. `--legend` **implies `--tree`** (it
-describes the tree language), and is suppressed under `--json` / `--dot` /
-`--quiet`. Implementation: `renderMigrationGraphLegend` in
+**stderr** alongside the command header, so `migration graph --legend | …` still
+pipes pure graph output on stdout. Combining `--legend` with `--json` or `--dot`
+is rejected (human-only). Under `--quiet`, the legend is omitted like the
+command header. Implementation: `renderMigrationGraphLegend` in
 `migration-graph-tree-render.ts`; lane hues come from
 `migration-graph-lane-colors.ts`.
 
