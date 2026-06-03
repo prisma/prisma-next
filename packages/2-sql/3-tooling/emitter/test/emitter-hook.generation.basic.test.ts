@@ -23,7 +23,9 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { namespaceId: '__unbound__', table: 'user',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'user',
             fields: {
               id: { column: 'id' },
             },
@@ -60,7 +62,11 @@ describe('sql-target-family-hook', () => {
       const ir = createContract({
         models: {
           User: {
-            storage: { namespaceId: '__unbound__', table: 'user', fields: { id: { column: 'id' } } },
+            storage: {
+              namespaceId: '__unbound__',
+              table: 'user',
+              fields: { id: { column: 'id' } },
+            },
             fields: {
               id: { nullable: false, type: { kind: 'scalar', codecId: 'sql/int@1' } },
             },
@@ -102,7 +108,11 @@ describe('sql-target-family-hook', () => {
       const ir = createContract({
         models: {
           User: {
-            storage: { namespaceId: '__unbound__', table: 'user', fields: { id: { column: 'id' } } },
+            storage: {
+              namespaceId: '__unbound__',
+              table: 'user',
+              fields: { id: { column: 'id' } },
+            },
             fields: {
               id: { nullable: false, type: { kind: 'scalar', codecId: 'sql/int@1' } },
             },
@@ -134,7 +144,9 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { namespaceId: '__unbound__', table: 'user',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'user',
             fields: {
               id: { column: 'id' },
             },
@@ -525,7 +537,9 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { namespaceId: '__unbound__', table: 'user',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'user',
             fields: {
               id: { column: 'id' },
               email: { column: 'email' },
@@ -570,7 +584,9 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { namespaceId: '__unbound__', table: 'user',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'user',
             fields: {
               id: { column: 'id' },
               email: { column: 'nonexistent' },
@@ -609,7 +625,9 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { namespaceId: '__unbound__', table: 'nonexistent',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'nonexistent',
             fields: {
               id: { column: 'id' },
             },
@@ -668,7 +686,9 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { namespaceId: '__unbound__', table: 'user',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'user',
             fields: {
               id: { column: 'id' },
             },
@@ -711,7 +731,9 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         Embedding: {
-          storage: { namespaceId: '__unbound__', table: 'embedding',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'embedding',
             fields: {
               vector: { column: 'vector' },
             },
@@ -905,7 +927,11 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         Tag: {
-          storage: { namespaceId: '__unbound__', table: 'tags', fields: { id: { column: 'id' }, name: { column: 'name' } } },
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'tags',
+            fields: { id: { column: 'id' }, name: { column: 'name' } },
+          },
           fields: {
             id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
             name: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
@@ -965,7 +991,11 @@ describe('sql-target-family-hook', () => {
       const ir = createContract({
         models: {
           User: {
-            storage: { namespaceId: '__unbound__', table: 'user', fields: { id: { column: 'id' } } },
+            storage: {
+              namespaceId: '__unbound__',
+              table: 'user',
+              fields: { id: { column: 'id' } },
+            },
             fields: {
               id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
             },
@@ -1020,7 +1050,9 @@ describe('sql-target-family-hook', () => {
       const ir = createContract({
         models: {
           User: {
-            storage: { namespaceId: '__unbound__', table: 'user',
+            storage: {
+              namespaceId: '__unbound__',
+              table: 'user',
               fields: {
                 id: { column: 'id' },
                 homeAddress: { column: 'home_address' },
@@ -1068,7 +1100,9 @@ describe('sql-target-family-hook', () => {
       const ir = createContract({
         models: {
           User: {
-            storage: { namespaceId: '__unbound__', table: 'user',
+            storage: {
+              namespaceId: '__unbound__',
+              table: 'user',
               fields: {
                 id: { column: 'id' },
                 addresses: { column: 'addresses' },

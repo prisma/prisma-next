@@ -32,7 +32,11 @@ describe('cross-reference shape round-trip', () => {
               on: { localFields: ['id'], targetFields: ['authorId'] },
             },
           },
-          storage: { namespaceId: '__unbound__', table: 'user', fields: { kind: { column: 'kind' } } },
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'user',
+            fields: { kind: { column: 'kind' } },
+          },
         },
         Post: {
           fields: {},
