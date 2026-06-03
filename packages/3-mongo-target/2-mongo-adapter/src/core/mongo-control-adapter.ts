@@ -78,7 +78,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
 
   async readLedger(
     driver: ControlDriverInstance<'mongo', 'mongo'>,
-    space: string,
+    space?: string,
   ): Promise<readonly LedgerEntryRecord[]> {
     return readLedger(extractDb(driver), space);
   }

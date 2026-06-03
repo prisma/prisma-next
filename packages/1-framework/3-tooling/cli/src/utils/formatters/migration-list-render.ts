@@ -1,16 +1,12 @@
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import type { GlyphMode } from '../glyph-mode';
+import { buildMigrationGraphLayout } from './migration-graph-layout';
+import { buildMigrationGraphRows } from './migration-graph-rows';
 import {
-  computeMigrationDirNameWidth,
-  formatMigrationDataColumn,
-  migrationListEmptySource,
-  migrationListForwardArrow,
-  migrationListKindGlyph,
-} from './migration-list-data-column';
-import {
-  classifyMigrationListGraphTopology,
-  type MigrationEdgeKind,
-  type MigrationListGraphTopology,
-} from './migration-list-graph-topology';
+  type MigrationEdgeAnnotation,
+  renderMigrationGraphTree,
+} from './migration-graph-tree-render';
 import type { MigrationListEntry, MigrationListResult } from './migration-list-types';
 
 export type { GlyphMode } from '../glyph-mode';
@@ -62,42 +58,88 @@ export const IDENTITY_MIGRATION_LIST_STYLER: MigrationListStyler = {
   emptyState: (text) => text,
 };
 
-function resolveEdgeKind(
-  migrationHash: string,
-  kindByMigrationHash: ReadonlyMap<string, MigrationEdgeKind>,
-): MigrationEdgeKind {
-  return kindByMigrationHash.get(migrationHash) ?? 'forward';
+function canonicalFrom(from: string | null): string {
+  return from ?? EMPTY_CONTRACT_HASH;
 }
 
-function formatMigrationRow(
-  migration: MigrationListEntry,
-  dirNameWidth: number,
-  edgeKind: MigrationEdgeKind,
-  glyphMode: GlyphMode,
-  style: MigrationListStyler,
-): string {
-  const kindColumn = `${style.kind(migrationListKindGlyph(glyphMode, edgeKind))} `;
-  const data = formatMigrationDataColumn(migration, {
-    dirNameWidth,
-    edgeKind,
-    style,
-    forwardArrow: migrationListForwardArrow(glyphMode),
-    emptySource: migrationListEmptySource(glyphMode),
-  });
-  return `${kindColumn}${data}`;
+export function migrationGraphFromListEntries(
+  entries: readonly MigrationListEntry[],
+): MigrationGraph {
+  const nodes = new Set<string>();
+  const forwardChain = new Map<string, MigrationEdge[]>();
+  const reverseChain = new Map<string, MigrationEdge[]>();
+  const migrationByHash = new Map<string, MigrationEdge>();
+
+  for (const entry of entries) {
+    const from = canonicalFrom(entry.from);
+    const edge: MigrationEdge = {
+      from,
+      to: entry.to,
+      migrationHash: entry.migrationHash,
+      dirName: entry.dirName,
+      createdAt: entry.createdAt,
+      invariants: entry.providedInvariants,
+    };
+    nodes.add(from);
+    nodes.add(entry.to);
+    const forward = forwardChain.get(from);
+    if (forward) forward.push(edge);
+    else forwardChain.set(from, [edge]);
+    const reverse = reverseChain.get(entry.to);
+    if (reverse) reverse.push(edge);
+    else reverseChain.set(entry.to, [edge]);
+    migrationByHash.set(entry.migrationHash, edge);
+  }
+
+  return { nodes, forwardChain, reverseChain, migrationByHash };
+}
+
+export function buildEdgeAnnotationsByHashFromListEntries(
+  entries: readonly MigrationListEntry[],
+): ReadonlyMap<string, MigrationEdgeAnnotation> {
+  const annotations = new Map<string, MigrationEdgeAnnotation>();
+  for (const entry of entries) {
+    annotations.set(entry.migrationHash, {
+      operationCount: entry.operationCount,
+      invariants: entry.providedInvariants,
+    });
+  }
+  return annotations;
+}
+
+export function buildRefsByHashFromListEntries(
+  entries: readonly MigrationListEntry[],
+): ReadonlyMap<string, readonly string[]> {
+  const refsByHash = new Map<string, readonly string[]>();
+  for (const entry of entries) {
+    if (entry.refs.length > 0) {
+      refsByHash.set(entry.to, entry.refs);
+    }
+  }
+  return refsByHash;
 }
 
 function formatEmptyStateLine(spaceId: string, style: MigrationListStyler): string {
   return style.emptyState(`There are no migrations in migrations/${spaceId}/ yet`);
 }
 
-function renderSpaceBlock(
+function indentTreeBlock(treeOutput: string, indent: string): string {
+  if (treeOutput.length === 0) {
+    return treeOutput;
+  }
+  return treeOutput
+    .split('\n')
+    .map((line) => (line.length === 0 ? line : `${indent}${line}`))
+    .join('\n');
+}
+
+function renderSpaceTreeBlock(
   spaceId: string,
   migrations: readonly MigrationListEntry[],
   multiSpace: boolean,
   glyphMode: GlyphMode,
-  kindByMigrationHash: ReadonlyMap<string, MigrationEdgeKind>,
   style: MigrationListStyler,
+  colorize: boolean,
 ): readonly string[] {
   if (migrations.length === 0) {
     const emptyLine = formatEmptyStateLine(spaceId, style);
@@ -107,50 +149,44 @@ function renderSpaceBlock(
     return [style.spaceHeading(`${spaceId}:`), `  ${emptyLine}`];
   }
 
-  const dirNameWidth = computeMigrationDirNameWidth(migrations);
-  const rows = migrations.map((entry) =>
-    formatMigrationRow(
-      entry,
-      dirNameWidth,
-      resolveEdgeKind(entry.migrationHash, kindByMigrationHash),
-      glyphMode,
-      style,
-    ),
-  );
+  const graph = migrationGraphFromListEntries(migrations);
+  const rowModel = buildMigrationGraphRows(graph);
+  const layout = buildMigrationGraphLayout(rowModel);
+  const treeOutput = renderMigrationGraphTree(layout, {
+    refsByHash: buildRefsByHashFromListEntries(migrations),
+    edgeAnnotationsByHash: buildEdgeAnnotationsByHashFromListEntries(migrations),
+    colorize,
+    glyphMode,
+  });
+
   if (!multiSpace) {
-    return rows;
+    return treeOutput.length === 0 ? [] : [treeOutput];
   }
-  return [style.spaceHeading(`${spaceId}:`), ...rows.map((row) => `  ${row}`)];
+
+  const indented = indentTreeBlock(treeOutput, '  ');
+  return [style.spaceHeading(`${spaceId}:`), indented];
 }
 
-export function buildMigrationListTopologyBySpace(
-  result: MigrationListResult,
-): ReadonlyMap<string, MigrationListGraphTopology> {
-  const topologyBySpaceId = new Map<string, MigrationListGraphTopology>();
-  for (const space of result.spaces) {
-    topologyBySpaceId.set(space.spaceId, classifyMigrationListGraphTopology(space.migrations));
-  }
-  return topologyBySpaceId;
+export interface RenderMigrationListWithStyleOptions {
+  readonly colorize?: boolean;
 }
 
 /**
- * Compose the styled `migration list` output. The renderer is
- * presentation-neutral — every token passes through `style` before
- * landing in the output, so the same composition serves the pure-text
- * path ({@link renderMigrationList} via
- * {@link IDENTITY_MIGRATION_LIST_STYLER}) and the ANSI-styled CLI path
- * (via the ANSI styler the CLI shell wires up).
+ * Compose the styled `migration list` human output via the shared tree
+ * renderer. Each on-disk migration is one edge row with package-fact
+ * annotations; refs decorate destination contract nodes.
+ *
+ * `options.colorize` must match whether `style` emits ANSI (e.g. both true for
+ * `createAnsiMigrationListStyler({ useColor: true })`).
  */
 export function renderMigrationListWithStyle(
   result: MigrationListResult,
   style: MigrationListStyler,
   glyphMode: GlyphMode = 'unicode',
-  topologyBySpaceId: ReadonlyMap<
-    string,
-    MigrationListGraphTopology
-  > = buildMigrationListTopologyBySpace(result),
+  options: RenderMigrationListWithStyleOptions = {},
 ): string {
   const multiSpace = result.spaces.length > 1;
+  const colorize = options.colorize ?? false;
   const lines: string[] = [];
 
   for (let index = 0; index < result.spaces.length; index++) {
@@ -158,18 +194,14 @@ export function renderMigrationListWithStyle(
     if (index > 0) {
       lines.push('');
     }
-    const topology = topologyBySpaceId.get(space.spaceId);
-    const kindByMigrationHash =
-      topology?.kindByMigrationHash ??
-      classifyMigrationListGraphTopology(space.migrations).kindByMigrationHash;
     lines.push(
-      ...renderSpaceBlock(
+      ...renderSpaceTreeBlock(
         space.spaceId,
         space.migrations,
         multiSpace,
         glyphMode,
-        kindByMigrationHash,
         style,
+        colorize,
       ),
     );
   }

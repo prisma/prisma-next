@@ -35,10 +35,10 @@ export interface MigrationEdgeAnnotation {
 
 export interface RenderMigrationGraphTreeOptions {
   readonly refsByHash?: ReadonlyMap<string, readonly string[]>;
+  readonly edgeAnnotationsByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly dbHash?: string;
   readonly contractHash?: string;
   readonly activeRefName?: string;
-  readonly edgeAnnotationsByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly hashLength?: number;
   readonly colorize: boolean;
   readonly glyphMode?: GlyphMode;
@@ -585,23 +585,39 @@ function createTreeStyler(opts: RenderMigrationGraphTreeOptions): MigrationListS
   };
 }
 
-function formatEdgeStatusSuffix(
+function formatEdgeAnnotationSuffix(
   migrationHash: string,
   opts: RenderMigrationGraphTreeOptions,
+  style: MigrationListStyler,
 ): string {
   const annotation = opts.edgeAnnotationsByHash?.get(migrationHash);
-  const status = annotation?.status;
-  if (status === undefined) {
+  if (annotation === undefined) {
     return '';
   }
-  const glyphs = overlayStatusGlyphs(opts.glyphMode ?? 'unicode');
-  const glyph = status === 'applied' ? glyphs.applied : glyphs.pending;
-  const label = status === 'applied' ? 'applied' : 'pending';
-  if (!opts.colorize) {
-    return `   ${glyph} ${label}`;
+  const segments: string[] = [];
+  const status = annotation.status;
+  if (status !== undefined) {
+    const glyphs = overlayStatusGlyphs(opts.glyphMode ?? 'unicode');
+    const glyph = status === 'applied' ? glyphs.applied : glyphs.pending;
+    const label = status === 'applied' ? 'applied' : 'pending';
+    if (!opts.colorize) {
+      segments.push(`${glyph} ${label}`);
+    } else {
+      const styler = status === 'applied' ? green : yellow;
+      segments.push(styler(`${glyph} ${label}`));
+    }
   }
-  const styler = status === 'applied' ? green : yellow;
-  return `   ${styler(`${glyph} ${label}`)}`;
+  if (annotation.operationCount !== undefined) {
+    segments.push(`${annotation.operationCount} ops`);
+  }
+  if (annotation.invariants !== undefined && annotation.invariants.length > 0) {
+    segments.push(style.invariants(annotation.invariants));
+  }
+  if (segments.length === 0) {
+    return '';
+  }
+  const prefix = status !== undefined ? '   ' : '  ';
+  return `${prefix}${segments.join('  ')}`;
 }
 
 function formatEdgeHashColumn(
@@ -817,8 +833,8 @@ export function renderMigrationGraphTree(
         : style.dirName;
     const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
-    const statusSuffix = formatEdgeStatusSuffix(edge.migrationHash, opts);
-    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}${statusSuffix}`));
+    const annotationSuffix = formatEdgeAnnotationSuffix(edge.migrationHash, opts, style);
+    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}${annotationSuffix}`));
   }
 
   return lines.join('\n');

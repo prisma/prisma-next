@@ -152,10 +152,90 @@ line only):
 - **A ref's declared required invariants** → `ref show` (ref metadata); `status`
   surfaces only the *missing* set relative to the DB (TML-2772).
 
-## Open / under discussion
+### D11 — One shared edge-annotation overlay on the tree renderer (TML-2748 + TML-2768)
 
-- `status` multi-space rendering detail (N annotated per-space sections vs. a
-  compact per-space summary) — settle at TML-2748 pickup.
-- `log` name-mapping when the on-disk package is gone (show hashes) or ambiguous
-  (parallel edges) — settle at TML-2770 pickup; the ledger's own migration name
-  (D7) makes this largely moot.
+D1 said `list`/`graph`/`status` share the tree and diverge only in annotations.
+This pins the *mechanism*. The tree renderer already carries **node** overlays
+(`refsByHash`, `contractHash`, `dbHash`, `activeRefName` on
+`RenderMigrationGraphTreeOptions`). The commands that annotate **migrations**
+(`list`'s package facts, `status`'s applied/pending) add **one** new optional
+input, keyed by the join key every migration already has — `ClassifiedEdge.migrationHash`:
+
+```ts
+interface MigrationEdgeAnnotation {
+  readonly status?: 'applied' | 'pending';        // status overlay
+  readonly operationCount?: number;               // list package fact
+  readonly invariants?: readonly string[];         // list package fact
+}
+// new field on RenderMigrationGraphTreeOptions:
+readonly edgeAnnotationsByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
+```
+
+The renderer draws whatever is present: `status: 'applied'` → green `✓` on the
+migration row; `'pending'` → yellow `⧗`; `operationCount`/`invariants` → appended
+to the migration row's data column; absent ⇒ plain. `refs` stay **node** overlays
+(`refsByHash`) for every command (`list` shows refs today and keeps them).
+
+Each command populates only its own keys, so the field is **additive** and the two
+slices that touch it (`list`→tree TML-2768, `status` TML-2748) don't collide:
+whichever lands first introduces `edgeAnnotationsByHash` + `MigrationEdgeAnnotation`
+with the full type above; the other rebases onto it. To minimise even that, **land
+TML-2768 first** where schedules allow — it's the slice that naturally introduces
+edge annotations (package facts), and `status` then only adds the `status` key.
+
+Overlay ownership per command (refining D1): `list` → `operationCount` +
+`invariants` (edge) and `refs` (node); `graph` → `refsByHash` + `contractHash`
+(node); `status` → `status` (edge) + `dbHash` (node, the real DB marker, shown
+iff a DB is connected). No command shows the `(db)` marker offline.
+
+### D12 — `log` is a single flat table across all spaces, not per-space sections (TML-2770)
+
+`log` answers "what actually ran, and when?" from the DB ledger. The ledger is
+**already one flat table** in storage — each row carries its `space`. The read API
+was needlessly scoped per-space (`readLedger(space)`); this slice makes the space
+argument **optional** so `readLedger()` (unscoped) returns the whole table directly
+(adapters drop the space filter when it's omitted). `log` reads that flat table,
+orders by `appliedAt` ascending (apply order), and shows a `space` column **only
+when more than one space** contributes rows. It is **not** space-sectioned: no
+`--space` flag, no per-space headings (KISS — "just render what's in the ledger"). Rows are
+uniform: the same edge recurring (apply → rollback → re-apply) simply appears as
+repeated rows; `log` does **not** semantically classify apply vs rollback vs
+re-apply (that needs graph analysis a DB-sourced command shouldn't do). The
+`from → to` direction and repetition reveal the timeline to the reader.
+
+### D13 — Timestamp rendering: local in human output, UTC in machine output (TML-2770)
+
+`appliedAt` renders in the **local timezone** in human/TTY output (with offset
+for unambiguity, e.g. `2026-06-02 16:37:31 +02:00`); `--utc` switches human
+output to UTC (`2026-06-02 16:37:31Z`). `--json` and any non-TTY/machine output
+always emit ISO-8601 UTC (`2026-06-02T14:37:31.000Z`) regardless of `--utc`
+(machine output is timezone-stable by contract; `--utc` only affects the human
+renderer). Non-TTY already auto-switches to JSON, so a piped `log` is UTC by
+construction.
+
+## Resolved open items (were under discussion)
+
+- `status` multi-space rendering → **full annotated per-space sections** (each
+  space its own tree + overlay), headings only when >1 space, matching `list`/
+  `graph` policy D4 (D6 / S-decisions at TML-2748 pickup). Not a compact summary.
+- `log` name-mapping → **use the ledger's own `migration_name`** (D7); no on-disk
+  lookup, so the "package gone / ambiguous" question is moot (D12).
+
+## Delivery: three parallel slices off the ledger foundation
+
+With the ledger foundation (D7, TML-2769) merged, three slices run in parallel,
+each its own branch/PR:
+
+1. **`list` renders the tree** (TML-2768) — human output adopts the shared tree
+   with package-fact edge annotations (D11); JSON stays the flat package array
+   (D2/D3). Introduces `edgeAnnotationsByHash` on the renderer.
+2. **`status` = tree + DB-state overlay** (TML-2748) — renders the shared tree
+   directly via the `graph --tree` engine + the `status` edge annotation (D6,
+   D11), `--from`/`--to` (D9), `--space` (D4); deletes dagre and makes the tree
+   the default (`--tree` flag dropped, D5).
+3. **`log` reads the ledger** (TML-2770) — flat single-table apply history (D8,
+   D12, D13).
+
+Each slice's `spec.md` carries the locked design + dispatch plan with **no open
+questions** (every edge case pre-decided). `slices/edges-on-plan` and
+`slices/empty-origin-as-null` remain deferred ledger cleanups (TML-2774).

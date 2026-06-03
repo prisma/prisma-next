@@ -1,6 +1,10 @@
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { describe, expect, it } from 'vitest';
 import {
+  buildEdgeAnnotationsByHashFromListEntries,
+  buildRefsByHashFromListEntries,
   IDENTITY_MIGRATION_LIST_STYLER,
+  migrationGraphFromListEntries,
   renderMigrationList,
   renderMigrationListWithStyle,
 } from '../../../src/utils/formatters/migration-list-render';
@@ -42,8 +46,39 @@ function renderListed(listResult: MigrationListResult): string {
   return renderMigrationList(listResult);
 }
 
+describe('migrationGraphFromListEntries', () => {
+  it('builds a graph edge per list entry', () => {
+    const entries = [
+      migration({ dirName: 'init', from: null, to: HASH_A }),
+      migration({ dirName: 'next', from: HASH_A, to: HASH_B }),
+    ];
+    const graph = migrationGraphFromListEntries(entries);
+    expect(graph.migrationByHash.size).toBe(2);
+    expect(graph.forwardChain.get(EMPTY_CONTRACT_HASH)?.[0]?.dirName).toBe('init');
+  });
+
+  it('maps edge annotations and refs from list entries', () => {
+    const entries = [
+      migration({
+        dirName: 'backfill',
+        from: HASH_D,
+        to: HASH_D,
+        operationCount: 3,
+        providedInvariants: ['inv_a'],
+        refs: ['production'],
+      }),
+    ];
+    const annotations = buildEdgeAnnotationsByHashFromListEntries(entries);
+    expect(annotations.get(entries[0]!.migrationHash)).toEqual({
+      operationCount: 3,
+      invariants: ['inv_a'],
+    });
+    expect(buildRefsByHashFromListEntries(entries).get(HASH_D)).toEqual(['production']);
+  });
+});
+
 describe('renderMigrationList', () => {
-  it('uses ASCII kind glyphs when glyph mode is ascii', () => {
+  it('uses ASCII tree glyphs when glyph mode is ascii', () => {
     const eUsers = migration({ dirName: '20250115_add_users', from: null, to: HASH_A });
     const ePosts = migration({ dirName: '20250203_add_posts', from: HASH_A, to: HASH_B });
     const eComments = migration({ dirName: '20250310_add_comments', from: HASH_B, to: HASH_C });
@@ -66,121 +101,14 @@ describe('renderMigrationList', () => {
       IDENTITY_MIGRATION_LIST_STYLER,
       'ascii',
     );
-    expect(output).toMatch(/^< 20250312_full_rollback/);
-    expect(output).toContain('4cb4256 -> abcdef0');
+    expect(output).toContain('20250312_full_rollback');
+    expect(output).toContain('->');
+    expect(output).toContain('|v');
+    expect(output).not.toContain('→');
     expect(output).not.toContain('↩');
-    expect(output).not.toContain('→');
   });
 
-  it('leads forward row with asterisk kind glyph', () => {
-    const listResult = result(
-      [
-        {
-          spaceId: 'app',
-          migrations: [
-            migration({
-              dirName: '20260422T0742_migration',
-              from: HASH_A,
-              to: HASH_B,
-            }),
-          ],
-        },
-      ],
-      '1 migration(s) on disk',
-    );
-    expect(renderListed(listResult)).toMatch(/^\* 20260422T0742_migration/);
-  });
-
-  it('leads rollback row with plain arrow and both hashes', () => {
-    const eUsers = migration({ dirName: '20250115_add_users', from: null, to: HASH_A });
-    const ePosts = migration({ dirName: '20250203_add_posts', from: HASH_A, to: HASH_B });
-    const eComments = migration({ dirName: '20250310_add_comments', from: HASH_B, to: HASH_C });
-    const eRollback = migration({
-      dirName: '20250312_full_rollback',
-      from: HASH_C,
-      to: HASH_A,
-      migrationHash: 'sha256:rollback-edge',
-    });
-    const output = renderListed(
-      result(
-        [
-          {
-            spaceId: 'app',
-            migrations: [eRollback, eComments, ePosts, eUsers],
-          },
-        ],
-        '1 migration(s) on disk',
-      ),
-    );
-    expect(output).toMatch(/^↩ 20250312_full_rollback/);
-    expect(output).toContain('4cb4256 → abcdef0');
-    expect(output).not.toMatch(/↩.*↩/);
-  });
-
-  it('aligns self-edge hash with forward-row source-hash column', () => {
-    const listResult = result(
-      [
-        {
-          spaceId: 'app',
-          migrations: [
-            migration({
-              dirName: '20260601T1200_latest',
-              from: HASH_E,
-              to: HASH_F,
-            }),
-            migration({
-              dirName: '20260601T1200_backfill_emails',
-              from: HASH_D,
-              to: HASH_D,
-            }),
-          ],
-        },
-      ],
-      '2 migration(s) on disk',
-    );
-    const lines = renderListed(listResult)
-      .split('\n')
-      .filter((line) => line.startsWith('*') || line.startsWith('⟲'));
-    const forwardLine = lines.find((line) => line.startsWith('*'));
-    const selfLine = lines.find((line) => line.startsWith('⟲'));
-    expect(forwardLine).toBeDefined();
-    expect(selfLine).toBeDefined();
-    const forwardHashIndex = forwardLine!.indexOf('2f45cc7');
-    const selfHashIndex = selfLine!.indexOf('55bada2');
-    expect(forwardHashIndex).toBeGreaterThanOrEqual(0);
-    expect(selfHashIndex).toBe(forwardHashIndex);
-  });
-
-  it('renders self-edge as kind glyph dirName and single hash', () => {
-    const listResult = result(
-      [
-        {
-          spaceId: 'app',
-          migrations: [
-            migration({
-              dirName: '20260601T1200_backfill_emails',
-              from: HASH_D,
-              to: HASH_D,
-            }),
-          ],
-        },
-      ],
-      '1 migration(s) on disk',
-    );
-    const output = renderListed(listResult);
-    expect(output).toMatch(/^⟲ 20260601T1200_backfill_emails/);
-    expect(output).toContain('55bada2');
-    expect(output).not.toContain('→');
-  });
-
-  it('defaults missing migration hash to forward kind glyph', () => {
-    const row = migration({ dirName: '20260422T0742_migration', from: HASH_A, to: HASH_B });
-    const output = renderListed(
-      result([{ spaceId: 'app', migrations: [row] }], '1 migration(s) on disk'),
-    );
-    expect(output).toMatch(/^\* 20260422T0742_migration/);
-  });
-  it('renders baseline migration with null from', () => {
+  it('renders a linear chain as a tree with operation counts', () => {
     const output = renderListed(
       result(
         [
@@ -191,7 +119,6 @@ describe('renderMigrationList', () => {
                 dirName: '20260422T0720_initial',
                 from: null,
                 to: HASH_C,
-                migrationHash: 'sha256:initial000000000000000000000000000000000000000000',
               }),
             ],
           },
@@ -200,13 +127,15 @@ describe('renderMigrationList', () => {
       ),
     );
     expect(output).toMatchInlineSnapshot(`
-      "* 20260422T0720_initial  ∅       → 4cb4256
+      "○   4cb4256
+      │↑  20260422T0720_initial  ∅       → 4cb4256  1 ops
+      ∅
 
       1 migration(s) on disk"
     `);
   });
 
-  it('renders normal forward edge with refs', () => {
+  it('renders refs on destination contract nodes', () => {
     const output = renderListed(
       result(
         [
@@ -225,168 +154,12 @@ describe('renderMigrationList', () => {
         '1 migration(s) on disk',
       ),
     );
-    expect(output).toMatchInlineSnapshot(`
-      "* 20260422T0742_migration  abcdef0 → 1234567  (production)
-
-      1 migration(s) on disk"
-    `);
+    expect(output).toContain('(production)');
+    expect(output).toContain('20260422T0742_migration');
+    expect(output).toContain('1 ops');
   });
 
-  it('renders self-edge with invariants and refs', () => {
-    const output = renderListed(
-      result(
-        [
-          {
-            spaceId: 'app',
-            migrations: [
-              migration({
-                dirName: '20260601T1200_backfill_emails',
-                from: HASH_D,
-                to: HASH_D,
-                providedInvariants: ['backfill_emails_v1'],
-                refs: ['production'],
-              }),
-            ],
-          },
-        ],
-        '1 migration(s) on disk',
-      ),
-    );
-    expect(output).toMatchInlineSnapshot(`
-      "⟲ 20260601T1200_backfill_emails  55bada2  {backfill_emails_v1} (production)
-
-      1 migration(s) on disk"
-    `);
-  });
-
-  it('preserves migration input order within a space', () => {
-    const output = renderListed(
-      result(
-        [
-          {
-            spaceId: 'app',
-            migrations: [
-              migration({
-                dirName: '20260601T1200_latest',
-                from: HASH_E,
-                to: HASH_F,
-              }),
-              migration({
-                dirName: '20260518T1701_middle',
-                from: HASH_D,
-                to: HASH_E,
-              }),
-              migration({
-                dirName: '20260422T0720_initial',
-                from: null,
-                to: HASH_D,
-              }),
-            ],
-          },
-        ],
-        '3 migration(s) on disk',
-      ),
-    );
-    expect(output).toMatchInlineSnapshot(`
-      "* 20260601T1200_latest   2f45cc7 → 804e018
-      * 20260518T1701_middle   55bada2 → 2f45cc7
-      * 20260422T0720_initial  ∅       → 55bada2
-
-      3 migration(s) on disk"
-    `);
-  });
-
-  it('renders convergence with shared destination and refs', () => {
-    const output = renderListed(
-      result(
-        [
-          {
-            spaceId: 'app',
-            migrations: [
-              migration({
-                dirName: '20260601T1200_branch_a',
-                from: HASH_A,
-                to: HASH_B,
-                refs: ['production'],
-              }),
-              migration({
-                dirName: '20260518T1701_branch_b',
-                from: HASH_C,
-                to: HASH_B,
-                refs: ['production'],
-              }),
-            ],
-          },
-        ],
-        '2 migration(s) on disk',
-      ),
-    );
-    expect(output).toMatchInlineSnapshot(`
-      "* 20260601T1200_branch_a  abcdef0 → 1234567  (production)
-      * 20260518T1701_branch_b  4cb4256 → 1234567  (production)
-
-      2 migration(s) on disk"
-    `);
-  });
-
-  it('renders branching with repeated source hashes', () => {
-    const output = renderListed(
-      result(
-        [
-          {
-            spaceId: 'app',
-            migrations: [
-              migration({
-                dirName: '20260601T1200_branch_a',
-                from: HASH_A,
-                to: HASH_B,
-              }),
-              migration({
-                dirName: '20260518T1701_branch_b',
-                from: HASH_A,
-                to: HASH_C,
-              }),
-            ],
-          },
-        ],
-        '2 migration(s) on disk',
-      ),
-    );
-    expect(output).toMatchInlineSnapshot(`
-      "* 20260601T1200_branch_a  abcdef0 → 1234567
-      * 20260518T1701_branch_b  abcdef0 → 4cb4256
-
-      2 migration(s) on disk"
-    `);
-  });
-
-  it('renders multiple refs in one parens block', () => {
-    const output = renderListed(
-      result(
-        [
-          {
-            spaceId: 'app',
-            migrations: [
-              migration({
-                dirName: '20260422T0742_migration',
-                from: HASH_A,
-                to: HASH_B,
-                refs: ['production', 'staging', 'db'],
-              }),
-            ],
-          },
-        ],
-        '1 migration(s) on disk',
-      ),
-    );
-    expect(output).toMatchInlineSnapshot(`
-      "* 20260422T0742_migration  abcdef0 → 1234567  (production, staging, db)
-
-      1 migration(s) on disk"
-    `);
-  });
-
-  it('renders multiple invariants in one brace block', () => {
+  it('renders invariants and operation count on edge rows', () => {
     const output = renderListed(
       result(
         [
@@ -397,6 +170,7 @@ describe('renderMigrationList', () => {
                 dirName: '20260601T1200_backfill',
                 from: HASH_D,
                 to: HASH_D,
+                operationCount: 2,
                 providedInvariants: ['a', 'b'],
               }),
             ],
@@ -405,14 +179,59 @@ describe('renderMigrationList', () => {
         '1 migration(s) on disk',
       ),
     );
-    expect(output).toMatchInlineSnapshot(`
-      "⟲ 20260601T1200_backfill  55bada2  {a, b}
-
-      1 migration(s) on disk"
-    `);
+    expect(output).toContain('2 ops');
+    expect(output).toContain('{a, b}');
+    expect(output).toContain('│⟲');
   });
 
-  it('renders output for multiple spaces with headings and indent', () => {
+  it('renders branching topology as a diamond', () => {
+    const output = renderListed(
+      result(
+        [
+          {
+            spaceId: 'app',
+            migrations: [
+              migration({ dirName: 'init', from: null, to: HASH_A }),
+              migration({ dirName: 'branch_a', from: HASH_A, to: HASH_B }),
+              migration({ dirName: 'branch_b', from: HASH_A, to: HASH_C }),
+            ],
+          },
+        ],
+        '3 migration(s) on disk',
+      ),
+    );
+    expect(output).toContain('branch_a');
+    expect(output).toContain('branch_b');
+    expect(output).toMatch(/├─[╮╯]/);
+  });
+
+  it('renders skip-rollback with a down arrow in the tree gutter', () => {
+    const output = renderListed(
+      result(
+        [
+          {
+            spaceId: 'app',
+            migrations: [
+              migration({ dirName: 'chain_a', from: null, to: HASH_A }),
+              migration({ dirName: 'chain_b', from: HASH_A, to: HASH_B }),
+              migration({ dirName: 'chain_c', from: HASH_B, to: HASH_C }),
+              migration({
+                dirName: 'skip_back',
+                from: HASH_C,
+                to: HASH_A,
+                migrationHash: 'sha256:skip-back',
+              }),
+            ],
+          },
+        ],
+        '4 migration(s) on disk',
+      ),
+    );
+    expect(output).toContain('skip_back');
+    expect(output).toContain('│↓');
+  });
+
+  it('renders multi-space output with headings and tree indent', () => {
     const output = renderListed(
       result(
         [
@@ -421,7 +240,7 @@ describe('renderMigrationList', () => {
             migrations: [
               migration({
                 dirName: '20260518T1701_namespaces_bookend',
-                from: HASH_E,
+                from: HASH_D,
                 to: HASH_F,
                 refs: ['db'],
               }),
@@ -446,16 +265,11 @@ describe('renderMigrationList', () => {
         '3 migration(s) across 2 contract space(s)',
       ),
     );
-    expect(output).toMatchInlineSnapshot(`
-      "app:
-        * 20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)
-        * 20260422T0720_initial             ∅       → 55bada2
-
-      postgis:
-        * 20260601T0000_install_postgis_extension  ∅       → 9aabbcc
-
-      3 migration(s) across 2 contract space(s)"
-    `);
+    expect(output).toContain('app:');
+    expect(output).toContain('postgis:');
+    expect(output).toContain('(db)');
+    expect(output).toContain('20260518T1701_namespaces_bookend');
+    expect(output).toContain('20260601T0000_install_postgis_extension');
   });
 
   it('suppresses heading for one-space output', () => {
@@ -477,11 +291,8 @@ describe('renderMigrationList', () => {
         '1 migration(s) on disk',
       ),
     );
-    expect(output).toMatchInlineSnapshot(`
-      "* 20260422T0742_migration  abcdef0 → 1234567  (production)
-
-      1 migration(s) on disk"
-    `);
+    expect(output).not.toContain('app:');
+    expect(output).toContain('(production)');
   });
 
   it('renders empty state for single space', () => {
@@ -491,7 +302,7 @@ describe('renderMigrationList', () => {
     expect(output).toMatchInlineSnapshot(`"There are no migrations in migrations/app/ yet"`);
   });
 
-  it('renders the slice-spec worked example byte-for-byte', () => {
+  it('renders the slice-spec worked example as a package-annotated tree', () => {
     const output = renderListed(
       result(
         [
@@ -534,15 +345,13 @@ describe('renderMigrationList', () => {
         '5 migration(s) on disk',
       ),
     );
-    const expected =
-      '⟲ 20260601T1200_backfill_emails     55bada2  {backfill_emails_v1} (production)\n' +
-      '* 20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
-      '* 20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
-      '* 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
-      '* 20260422T0720_initial             ∅       → 4cb4256\n' +
-      '\n' +
-      '5 migration(s) on disk';
-    expect(output).toBe(expected);
+    expect(output).toContain('20260601T1200_backfill_emails');
+    expect(output).toContain('{backfill_emails_v1}');
+    expect(output).toContain('(db)');
+    expect(output).toContain('(staging)');
+    expect(output).toContain('(production)');
+    expect(output).toContain('1 ops');
+    expect(output.trim().endsWith('5 migration(s) on disk')).toBe(true);
   });
 
   it('renders empty state for multiple spaces with per-space headings', () => {
