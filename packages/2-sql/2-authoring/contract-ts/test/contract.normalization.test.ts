@@ -238,7 +238,9 @@ describe('SqlContractSerializer structural validation', () => {
           },
         },
         Post: {
-          storage: { namespaceId: '__unbound__', table: 'Post',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'Post',
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
           fields: {
@@ -313,7 +315,9 @@ describe('SqlContractSerializer structural validation', () => {
           },
         },
         Post: {
-          storage: { namespaceId: '__unbound__', table: 'Post',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'Post',
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
           fields: {

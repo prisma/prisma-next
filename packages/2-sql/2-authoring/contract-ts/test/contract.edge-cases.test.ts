@@ -33,7 +33,11 @@ describe('SqlContractSerializer edge cases', () => {
           __unbound__: {
             models: {
               User: {
-                storage: { namespaceId: '__unbound__', table: 'user', fields: { id: { column: 'id' } } },
+                storage: {
+                  namespaceId: '__unbound__',
+                  table: 'user',
+                  fields: { id: { column: 'id' } },
+                },
                 fields: {
                   id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
                 },
@@ -174,7 +178,9 @@ describe('SqlContractSerializer edge cases', () => {
           },
         },
         Post: {
-          storage: { namespaceId: '__unbound__', table: 'post',
+          storage: {
+            namespaceId: '__unbound__',
+            table: 'post',
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
           fields: {
