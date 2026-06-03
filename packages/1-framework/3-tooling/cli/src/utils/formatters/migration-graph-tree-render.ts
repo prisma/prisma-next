@@ -258,10 +258,12 @@ interface ConnectorLaneColors {
  * than tinting the dash with the left lane. The leading tee at `startLane` (the
  * fork/merge origin) and pure horizontal segments inherit the nearest branch
  * point to their right whole-cell, so the run into a branch — or collapsing
- * into a merge corner — stays continuous. Pass-through verticals outside the
- * run keep their own column (column 0 stays neutral).
+ * into a merge corner — stays continuous. An `arc-crossing` keeps its junction
+ * glyph at its own column but re-anchors `owner` like an intermediate tee so
+ * dashes on both sides lead into the nearest branch on their right. Pass-through
+ * verticals outside the run keep their own column (column 0 stays neutral).
  */
-function resolveConnectorLaneColors(
+export function resolveConnectorLaneColors(
   cells: readonly StructuralCell[],
   startLane: number,
 ): ConnectorLaneColors {
@@ -291,7 +293,8 @@ function resolveConnectorLaneColors(
         break;
       case 'arc-crossing':
         glyph[column] = column;
-        dash[column] = column;
+        dash[column] = owner === NEUTRAL_LANE ? column : owner;
+        owner = column;
         break;
       case 'horizontal-pass': {
         const served = owner === NEUTRAL_LANE ? column : owner;

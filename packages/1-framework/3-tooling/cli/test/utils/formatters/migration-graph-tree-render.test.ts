@@ -4,11 +4,13 @@ import { createColors, dim } from 'colorette';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { laneColorForColumn } from '../../../src/utils/formatters/migration-graph-lane-colors';
+import type { StructuralCell } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphRows } from '../../../src/utils/formatters/migration-graph-rows';
 import {
   renderMigrationGraphLegend,
   renderMigrationGraphTree,
+  resolveConnectorLaneColors,
 } from '../../../src/utils/formatters/migration-graph-tree-render';
 
 const { bold: forcedBold } = createColors({ useColor: true });
@@ -822,9 +824,12 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     const fanRow = lines.find((line) => line.includes('┼') && line.includes('┬'));
     expect(fanRow).toBeDefined();
     expect(fanRow).not.toContain(laneColorForColumn(2)('├'));
+    expect(fanRow).toContain(laneColorForColumn(1)('─'));
+    expect(fanRow).toContain(laneColorForColumn(1)('┼'));
     expect(fanRow).toContain(laneColorForColumn(2)('─'));
-    expect(fanRow).toContain(laneColorForColumn(1)('┼─'));
+    expect(fanRow).toContain(laneColorForColumn(2)('┬'));
     expect(fanRow).not.toContain(laneColorForColumn(2)('┼'));
+    expect(fanRow).not.toContain(laneColorForColumn(1)('┼─'));
     const bobMergeRow = lines.find((line) => {
       const plain = stripAnsi(line);
       return plain.includes('╯') && plain.includes('├') && !plain.includes('↑');
@@ -925,6 +930,22 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(landLine).toContain(laneColorForColumn(2)('──'));
     expect(landLine).toContain(laneColorForColumn(2)('╯ '));
     expect(stripAnsi(landLine ?? '')).toContain('◂──╯');
+  });
+});
+
+describe('resolveConnectorLaneColors', () => {
+  it('colours arc-crossing dashes by the branch point immediately on their right', () => {
+    const cells: readonly StructuralCell[] = [
+      { kind: 'branch-tee' },
+      { kind: 'arc-crossing' },
+      { kind: 'branch-tee' },
+      { kind: 'branch-corner' },
+    ];
+    const { glyph, dash } = resolveConnectorLaneColors(cells, 0);
+    expect([...glyph]).toEqual([0, 1, 2, 3]);
+    expect(dash[0]).toBe(1);
+    expect(dash[1]).toBe(2);
+    expect(dash[2]).toBe(3);
   });
 });
 
