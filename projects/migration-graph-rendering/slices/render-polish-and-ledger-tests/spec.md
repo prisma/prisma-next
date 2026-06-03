@@ -1,0 +1,395 @@
+# Slice: render-polish-and-ledger-tests
+
+_Parent project `projects/migration-graph-rendering/`. Outcome: close the four follow-ups on the just-merged read-command family in one PR — unify pretty rendering across `list`/`status`/`graph` (D1 enforcement, locked trunk-choice rule), align migration data columns, color the gutter + add `--legend`, and close the two open test-coverage gaps in the ledger journal._
+
+_Tracking: [TML-2812](https://linear.app/prisma-company/issue/TML-2812) (lead) + [TML-2811](https://linear.app/prisma-company/issue/TML-2811) + [TML-2773](https://linear.app/prisma-company/issue/TML-2773) + [TML-2774](https://linear.app/prisma-company/issue/TML-2774) (open items only). Supersedes the on-disk slice drafts `unify-pretty-rendering` and `lane-colors-and-legend`._
+
+## At a glance
+
+```
+$ migration list                                   $ migration status                                  $ migration graph
+
+app:                                               app:                                                app:
+  ○  1375f13                          (contract)     ○  1375f13                  (db, contract)         ○  1375f13                          (contract)
+  │↑ 20260603_migration  ∅       → 1375f13  10 ops   │↑ 20260603_migration  ∅       → 1375f13  ✓ applied │↑ 20260603_migration  ∅       → 1375f13  10 ops
+  │  ○  f7a8eb5                       (prod)         │  ○  f7a8eb5               (prod)                 │  ○  f7a8eb5                       (prod)
+  │  │↑ 20260518_bookend  6cee614 → f7a8eb5  0 ops   │  │↑ 20260518_bookend  6cee614 → f7a8eb5  ⧗ pending │  │↑ 20260518_bookend  6cee614 → f7a8eb5  0 ops
+  │  …                                               │  …                                                │  …
+  ├──╯                                               ├──╯                                                ├──╯
+  ∅                                                  ∅                                                   ∅
+
+pgvector:                                          pgvector:                                           pgvector:
+  ○  29059df                  (head, db, contract)    ○  29059df                  (head, db, contract)    ○  29059df                  (head, db, contract)
+  │↑ install_vector_v1  ∅ → 29059df  1 ops  {pgvector:install-vector-v1}   │↑ install_vector_v1  ∅ → 29059df  1 ops  {pgvector:install-vector-v1}  ✓ applied   │↑ install_vector_v1  ∅ → 29059df  1 ops  {pgvector:install-vector-v1}
+  ∅                                                  ∅                                                   ∅
+
+7 migrations across 2 contract spaces              up to date                                          7 nodes, 6 edges
+```
+
+Same input, three commands, byte-identical per-space sections — modulo `status`'s applied/pending overlay column and per-command footer. Three column-aligned migration rows per space; lane glyphs (`│ ├ ╯`) carry per-column color; the `○` node glyph takes its lane color while direction arrows (`↑ ↓ ⟲`) stay bright. `migration graph --legend` prints a key to stderr; `--ascii` / `NO_COLOR` / piped output stay text-clean.
+
+## What this slice closes
+
+Six independent follow-ups, all surfaced after the read-command-family slices ([#704](https://github.com/prisma/prisma-next/pull/704) `log` / [#705](https://github.com/prisma/prisma-next/pull/705) `status` / [#706](https://github.com/prisma/prisma-next/pull/706) `list`→tree) merged. Bundled because items 1–3 + 6 touch the same handful of rendering modules (`migration-graph-rows.ts`, `migration-graph-tree-render.ts`, `migration-list-data-column.ts`, `migration-list-styler.ts`), item 4 is a small test-coverage gap that should not orphan its own PR, and item 5 plus the no-path-guard half of item 6 are coupled one-line edits in `migration-status.ts`. One reviewer holds them in one sitting.
+
+1. **Unify pretty rendering** ([TML-2812](https://linear.app/prisma-company/issue/TML-2812)) — same DB state, same on-disk migrations: `list` / `status` / `graph` produce **byte-identical** pretty rendering of the per-space sections, modulo `status`'s overlay column and per-command footer. Closes the gap between project decision D1 ("one shared graphical renderer, command-specific annotations") and the on-disk reality where the three commands diverge in (a) **trunk choice** (live-contract chain vs historical-ref chain), (b) **per-row data** (full vs overlay-only vs none), and (c) **space iteration** (`graph` silently scopes to one space).
+2. **Column alignment** ([TML-2811](https://linear.app/prisma-company/issue/TML-2811)) — pad the tree-prefix to a consistent visible width per render block so `dirName` starts at the same column on every migration row, regardless of how deep that row sits in the tree drawing.
+3. **Colored lanes + `--legend`** ([TML-2773](https://linear.app/prisma-company/issue/TML-2773)) — `git log --graph`-style per-column coloring of the gutter; routed back-arcs colored as one hue per arc; node glyph `○` colored by lane; direction arrows stay bright; opt-in `--legend` block on `migration graph`.
+4. **Ledger op-count test coverage** ([TML-2774](https://linear.app/prisma-company/issue/TML-2774) items 3 + 5, the two open follow-ups) — one cross-target table-driven harness asserting SQL + Mongo emit the same `operationCount` per applied edge for the same plan (including a skipped-op apply); covers the Postgres op-count-mismatch throw path that's currently uncovered.
+5. **`migration status` default target + no-path wording** (D21, surfaced during QA) — fix `resolveTargetHashForSpace` so the default target is the live contract whenever there is one (matching `migrate`'s default and preventing the "(db, contract) ... cannot reach the selected target" contradiction); reword the no-path summary to name the actual missing thing (a migration path), name both endpoints, and lead with `migration plan` as the fix.
+6. **System-marker rendering + fresh-DB no-path** (D22, surfaced post-D6) — render system markers (`contract`, `db`) in `<>` brackets to distinguish them syntactically from user-managed refs (`()`); fix the `markerHash !== undefined` guard in the path check so a fresh DB with the live contract disconnected from `∅` reports the no-path summary instead of "up to date".
+7. **Cross-space data-column alignment + contract-node refs adjacent to hash + right-justified from-hash column** (D23, surfaced post-D7) — three coupled padding rules at the row→string join in the renderer.
+8. **Cross-space dirName alignment + capitalised "Up to date"** (D24, surfaced post-D8 QA) — extend D23's cross-space alignment to the dirName column too; capitalise the no-pending-no-error summary headline.
+9. **Trunk-choice rule honors `contractHash` for connected components** (D25, surfaced post-D8 QA) — fix the leaf-selection / rank step in `migration-graph-rows.ts` so the chain ending at the live contract wins the trunk position even when both chains share `∅`. D14 was specced; the algorithm wasn't fully wired.
+10. **Legend wording + universal `--legend` across graph-drawing commands** (D26, surfaced post-D11 QA) — replace the marker/ref legend line with two parallel lines following D22's `<>` / `()` convention; hoist the legend helpers out of `migration-graph.ts` and wire `--legend` into `migration list` and `migration status`.
+
+## Locked decisions
+
+### D14 — Trunk-choice rule: live-contract chain (carried from project decisions)
+
+The trunk is the chain containing the **live contract** — the contract emitted from the on-disk schema, the same contract `migrate` defaults to advancing toward when no `--to` is passed. Disconnected sub-graphs render as side-branches indented one level. `list` already implements this via its `contractHash` argument to `buildMigrationGraphRows`; `status` and `graph` adopt it by passing the same value at their call sites. The trunk-choice algorithm itself is not parametrised by command — there's one rule, one input, three call sites that pass the same input.
+
+### D15 — Per-row data shape, with one overlay knob
+
+Every migration row, in every command, renders `dirName · from → to · N ops · {invariants}` (the full shape `list` uses today). `status` appends one overlay column at the right end — `✓ applied` / `⧗ pending` / blank. The shared `edgeAnnotationsByHash` contract introduced in D11 already carries the surface needed; `graph` adopts the list overlay verbatim, and `status` extends it (rather than replacing it) by composing a "list overlay + status column" annotation builder.
+
+### D16 — Space iteration: all spaces by default in all three commands
+
+`graph` adopts the all-spaces-by-default policy `list` and `status` already use (D4). `--space <id>` narrows uniformly. Each space renders as a per-space section with a `<spaceId>:` heading when more than one space is present.
+
+### D17 — Column alignment: per-render-block, not global
+
+Within a single render block (one space's per-space section, or a single-space rendering), compute the maximum visible width of the tree-prefix across all migration rows in the block, then right-pad each row's tree-prefix to that width before appending the data block. **Per-render-block, not global** — each space's tree depth may differ; alignment across spaces is not asserted (call it out if a future spec wants it). Visible-width calculation operates on rendered glyphs, not raw byte length, so wide / dim characters don't drift; padding is plain whitespace, not styled. Non-migration rows (contract nodes, blank/connector rows) are unaffected — only migration data rows participate in the alignment.
+
+### D18 — Lane coloring rules (locked from the start; no post-D1 refinement dispatch)
+
+Six rules, all locked, all implemented in one dispatch:
+
+1. **Vertical lanes (`│`) and structural connectors (`├ ┤ ╮ ╯ ┴ ┬ ┼`)** are colored by their column index, using a rotating palette over `colorette` hues.
+2. **Column 0 stays uncolored** (default neutral / dim lane style); the palette rotates over columns ≥ 1. The single-lane linear case is therefore effectively monochrome.
+3. **Routed back-arcs render in a single hue** (their owning back-lane color) across the whole arc — vertical back-lane, horizontal bridges, corners, `◂` landing. **Crossings (`┼`) stay dim/neutral** so neither overlapping arc "steals" the cell.
+4. **Contract node glyph (`○`)** takes its column's lane color (column-0-neutral rule applies). In the `○◂` / `○─` arc-pair node markers, the `○` half takes the node's lane color and the connector half follows rule 3.
+5. **Direction arrows (`↑ ↓ ⟲`) stay bright** — they encode direction, not branch identity, so they pop against the colored gutter.
+6. **Data columns (`dirName`, `from → to`, `(refs)`)** are unchanged — color is a gutter / node-marker concern only.
+
+The palette is a 6-hue rotating `colorette` cycle (implementer's choice of hues; constraint: legible on both light and dark terminals, no clash with the green `(refs)` overlay or cyan hashes that would render adjacent tokens indistinguishable). Color is fully gated on the existing `colorize` flag — `--no-color` / `NO_COLOR` / non-TTY / piped output emits zero ANSI and existing plain-text goldens stay byte-identical.
+
+### D19 — `--legend` placement and gating
+
+A `--legend` boolean option on `migration graph` only (not `list`, not `status`). When set: print a legend block to **stderr** so stdout stays pure graph output and `migration graph | …` pipes cleanly. The legend honors the active glyph palette (unicode vs `--ascii`) and `colorize` state — the lane-color key only renders when `colorize` is true. `--legend` does **not** auto-enable any other flag (the original draft proposed auto-enabling `--tree`; that flag was already retired in the `status` slice, so there's nothing to auto-enable).
+
+### D21 — `migration status` default target is the live contract; no-path wording is path-shaped, not marker-shaped
+
+Two coupled fixes on `migration status`'s no-path failure mode, both surfaced during QA of this slice and folded in rather than spilled to follow-up tickets (the wording change is a one-line edit; the picker change is a 4-line edit; neither warrants a separate PR).
+
+**Picker (D14 alignment, radically simplified).** `migration status` has exactly **one** target per invocation. If the user passed `--to <ref-or-hash>`, that's it. Otherwise it's the application's contract (`contractHash`). End of story. The picker collapses to a one-liner:
+
+```ts
+function resolveTarget(
+  contractHash: string,
+  activeRefHash: string | undefined,
+): string {
+  return activeRefHash ?? contractHash;
+}
+```
+
+That deletes today's "graph membership" guard (`graph.nodes.has(activeRefHash)` / `graph.nodes.has(contractHash)`) and the single-leaf / head-ref fallbacks. The contract envelope can fail to read; the existing `CONTRACT.UNREADABLE` diagnostic already covers that case and `contractHash` defaults to `EMPTY_CONTRACT_HASH` when it does — the simplified picker returns that value and the no-path summary fires naturally, no special-casing needed.
+
+This also kills the dead `'Multiple valid migration paths — select a target with --to'` summary branch, the `MIGRATION.DIVERGED` diagnostic, and the `hasAmbiguousTarget` guard in `executeMigrationStatusCommand`'s loop. They are unreachable once the picker is total. Imports of `requireHeadRef` and `findReachableLeaves` in `migration-status.ts` are no longer used and get removed (other callers in the framework are unaffected — those helpers stay in their home modules).
+
+**Wording (no-path summary).** "Database marker cannot reach the selected target" mis-frames the failure: markers don't reach, paths exist or don't; "selected" implies the user picked. Three context-aware variants:
+
+- No `--to` (default = live contract): `No migration path from the database state (sha256:abc1234) to the application's contract (sha256:def5678). Run \`prisma-next migration plan --name <name>\` to author one.`
+- `--to <ref>`: `No migration path from the database state (sha256:abc1234) to the target (sha256:def5678 via \`prod\`). Run \`prisma-next migration plan --name <name>\` to author one, or pass \`--to <contract>\` to pick a reachable target.`
+- `--to <hash>`: same as the ref variant minus `via \`<ref>\``.
+
+Lead-fix is `migration plan` — the most common cause of the failure is "no migration has been authored from the DB state to the live contract yet", and `plan` is what the user needs. The `--to <contract>` alternative only appears when `--to` was explicit (telling someone who didn't pick a target to "pick a different target" is incoherent).
+
+### D22 — System markers (`<contract>`, `<db>`) render in angle brackets; user refs (`(prod)`) keep their parentheses
+
+Two coupled fixes folded in after D6 surfaced (a) a fresh-DB false-"up to date" and (b) a `(db, db, contract)` collision when a user-authored ref happens to be named `db` (a real possibility — `db` is already the CLI namespace, so reserving it as a ref name is off the table).
+
+**Bracket syntax (data-source distinction).** Refs are **user-managed pointers persisted on disk** (under the migrations dir, edited via `prisma-next ref set`). The `contract` and `db` markers are **system-inferred pointers** — `contract` from the contract envelope on disk, `db` from the database marker record. They are categorically different things; rendering should reflect that.
+
+- System markers render in **angle brackets**: `<contract, db>`.
+- User refs render in **parentheses**: `(prod, staging)`.
+- Both pairs can appear on the same contract node when both have content. When they do, system markers render first, then user refs, separated by one space: `<contract, db> (prod)`. When only one pair has content, render only that pair.
+- Inside `<>`, names are sorted with `contract` first then `db` (`<contract, db>`, never `<db, contract>`) — keeps `<contract>` adjacent to the data block in the common case where only it is present.
+- Inside `()`, refs are sorted alphabetically (today's behaviour; unchanged).
+- A `db` ref and the system `db` marker are **not deduped**. If both resolve to the same hash, they render together: `<db> (db)`. Different sources of truth, both surfaced.
+
+**Styling (unchanged surface area, just two new brackets).** `<contract>` is bold green (preserved from today's `CONTRACT_MARKER_NAME` convention). `<db>` is plain green. Refs in `()` are plain green; the active ref is bold green (preserved). Brackets `<` `>` `(` `)` take the same hue as their bracket's contents. Plain-text (`colorize: false`) goldens stay byte-identical except for the `<>` characters replacing `()` around system markers.
+
+**Fresh-DB no-path detection.** Today's path-existence check at `migration-status.ts:458` is gated on `markerHash !== undefined`, so a fresh database (no marker recorded yet) skips the check entirely. Combined with `pendingCount === 0` when the live contract is disconnected from `∅`, the headline falls through to "up to date" — wrong, the DB is at `∅`, the live contract is unreachable. Fix: drop the `markerHash !== undefined` clause; let the check run against `originHash = markerHash ?? EMPTY_CONTRACT_HASH`. The `markerHash !== targetHash` predicate becomes `originHash !== targetHash`. The no-path summary fires correctly, with the same wording variants D21 already locked.
+
+### D23 — Cross-space data-column alignment, contract-node markers/refs adjacent to hash, right-justified from-hash column
+
+Three coupled rendering polish fixes surfaced post-D7 QA. Each is a small targeted edit at the row→string join point in the renderer.
+
+**Cross-space alignment (supersedes D17).** D17 specified per-render-block alignment ("each space's tree depth may differ; alignment across spaces is not asserted") and listed cross-space alignment as a follow-up. The follow-up is in. The new rule: compute `maxEdgeTreePrefixWidth` across **every migration row in every per-space block** in the current rendering, then pad every migration row to that single global width. Single-space renderings collapse to today's behaviour (one block contributes all the rows). The unified pipeline (D1) makes this a single-pass change at the layout module's entry point — collect all rows from all spaces first, compute the global max, hand the global width to the per-space tree-renderer.
+
+**Contract-node markers/refs adjacent to hash.** Today contract-node rows are padded to align their `<markers> (refs)` text with the migration-data column ([dirName][from→to][ops][invariants]). That alignment is wasteful: markers and refs only ever appear on contract-node rows, never on migration rows, so there is no column they need to share. New rule: contract-node rows render `<tree-prefix><hash><LABEL_GAP-spaces><markers> (refs)`, with no padding between the hash and the markers/refs block. The existing `LABEL_GAP` constant (currently 2) provides the visual separation. Migration rows keep the cross-space-aligned data column from rule 1 — only contract-node rows lose the padding.
+
+**Right-justified from-hash column.** Today the from-hash column in the migration data block is left-padded (the value sits at the left of a fixed-width pad, trailing spaces fill to the `→`). Effect with regular 7-char hashes: invisible. Effect with `∅` (one char): six trailing spaces, then `→`, which reads as a gap. New rule: switch the from-hash column to right-padding (right-justified value). Regular hashes are unchanged (they fill the column). `∅` lands flush against the `→`. The to-hash column stays left-justified (it's followed by other tokens, not preceded by a glyph that should hug it).
+
+Goldens regenerate mechanically. Plain-text (`colorize: false`) goldens see whitespace-only changes per the three rules. The lane-color goldens (D3) and the legend goldens (D4) are unaffected (color is orthogonal to padding).
+
+### D24 — Cross-space dirName alignment + capitalised "Up to date"
+
+Two trivial follow-ups surfaced post-D8 QA. Each is one independent change in one helper.
+
+**Cross-space dirName alignment.** D23 / D8 aligned the **tree-prefix** width globally across per-space blocks but left the **dirName** column padded to each space's local max. That means the from-hash column (which sits immediately after dirName) lands at different absolute column positions across spaces — defeating the visual goal of cross-space alignment for everything *after* the tree-prefix. Extend the rule: compute a single global max dirName width across every migration row in every per-space block in the current rendering, pad every migration row's dirName to that width. Single-space renderings collapse to today's behaviour. Same orchestration point D8 used (`computeGlobalMaxEdgeTreePrefixWidth` + `renderMigrationGraphSpaceTrees`), parameterised with a parallel `globalMaxDirNameWidth`.
+
+**Capitalised "Up to date".** `buildStatusHeadline` currently emits the literal `'up to date'`. Change to `'Up to date'`. Sentences in the summary line start capitalised; this is the only outlier.
+
+### D25 — Trunk-choice rule honors `contractHash` for connected components too (D14 enforcement)
+
+D14 locked the trunk-choice rule: the trunk is the chain containing the **live contract**. D1 was meant to enforce this by threading `liveContractHash` through to `buildMigrationGraphRows` as `contractHash`. The threading works. The algorithm doesn't.
+
+**Bug.** `cli/src/utils/formatters/migration-graph-rows.ts` has two paths that consume `contractHash`:
+
+- `detachedContractHash`: when `contractHash` is not in `graph.nodes`, it's prepended as its own single-node component at the front. ✅ (works as expected.)
+- `layerNodesByLongestForwardPath`: when `contractHash` IS in the graph (connected to the rest), this function ranks nodes by longest-forward-path-from-root and emits tips-first with lex tie-break. **It does not consider `contractHash` at all.** Whichever leaf has the highest forward-path rank wins the trunk position.
+
+The user's demo: `app` space has two leaves descending from `∅`:
+
+- `f7a8eb5` (4 hops from `∅` via the historical-namespaces chain) — rank 4.
+- `1375f13` (1 hop from `∅` via the new `20260603T1537_migration`) — rank 1.
+
+Live contract is `1375f13`. By D14, `1375f13` should be the trunk's tip. By the algorithm's longest-path heuristic, `f7a8eb5` wins (rank 4 > rank 1) and the historical chain renders as the trunk; `1375f13` peels off as a side-branch.
+
+**Fix.** Bias the rank/leaf-selection step toward the chain ending at `contractHash`. The intervention is in `migration-graph-rows.ts`. Two acceptable shapes — implementer picks whichever reads cleaner:
+
+1. **Rank boost.** When `contractHash` is non-empty and present in the component being layered, boost its rank to `currentMax + 1` after the longest-path pass. The tips-first sort then emits it first, the layout assigns it column 0, and its ancestors back to the nearest fork point sit on column 0 too.
+2. **Leaf preference.** Adjust `compareNodesTipsFirst` to take a "preferred-leaf" hint (= `contractHash` when the live contract is a leaf in this component). The hint wins the rank-tied lex tie-break, and the rank-boost path falls out as the same algorithm.
+
+Either way, single-node components, components without `contractHash` in them, and components where `contractHash === EMPTY_CONTRACT_HASH` keep today's behaviour.
+
+**Mid-chain edge case.** If `contractHash` is mid-chain (it has descendants — i.e. someone authored migrations beyond the live contract), the trunk should still anchor on the live contract, but the descendants render *above* it as a forward-extension side-branch. The implementer should either (a) handle this case by boosting only when `contractHash` is a leaf in the component, treating the non-leaf case as today's longest-path heuristic, or (b) handle it explicitly with a sensible layout. Option (a) is simpler and covers the common cases. Document the chosen behaviour in the dispatch's final report.
+
+### D26 — Legend wording follows D22's bracket convention; `--legend` is universal across graph-drawing commands
+
+D7 introduced the system-marker / user-ref split (`<contract, db>` for live markers, `(prod, staging)` for user-defined refs). The legend's marker/ref line still describes them with the old single-line collapse: `<contract> (refs) db / contract markers`. That misses the teaching opportunity — the legend exists precisely to teach the bracket convention.
+
+**Wording.** Replace the single marker/ref line with two parallel lines:
+
+```
+  <contract, db>    live markers (contract on disk, database state)
+  (prod, staging)   user-defined refs
+```
+
+Notes:
+- The example bracket contents (`contract, db` and `prod, staging`) are illustrative literal strings in the key — they're not pulled from the user's actual project state.
+- The styling pipeline must NOT apply the active-ref bold treatment to either example; a legend key isn't a graph node and there is no "active ref" in this context.
+- The right column wording carries the conceptual split: live = inferred from external sources (contract file on disk; database marker); refs = user-managed.
+
+**Universality.** With D1's unified rendering pipeline, `migration list` and `migration status` both draw the same tree as `migration graph`. `--legend` should work on all three commands.
+
+The current helpers in `commands/migration-graph.ts` (`migrationGraphShowsLegend`, `validateMigrationGraphLegendOptions`) and `utils/cli-errors.ts` (`errorMigrationGraphLegendHumanOnly`, error code `MIGRATION.GRAPH_LEGEND_HUMAN_ONLY`) are graph-command-specific by name. Hoist and rename:
+
+- `migrationGraphShowsLegend` → `shouldShowLegend` (or similar) in a shared utils module.
+- `validateMigrationGraphLegendOptions` → `validateLegendOptions` in the same shared module.
+- `errorMigrationGraphLegendHumanOnly` → `errorLegendHumanOnly`; error message drops "graph" ("`--legend` is only available for human-readable output"); error code becomes `MIGRATION.LEGEND_HUMAN_ONLY`.
+
+Then wire `--legend` into `migration list` and `migration status` with the same option declaration and the same suppression rules: blocked when combined with `--json` / `--dot` / `--quiet`; printed alongside the human header on stderr only when the command is producing human output.
+
+**Out of scope.** No changes to the legend's *content* beyond the marker/ref line replacement — the contract / forward / rollback / self / applied / pending / empty-database / lane-swatch lines stay byte-identical.
+
+### D20 — Op-count parity is a cross-target obligation, asserted by one harness
+
+The SQL family and Mongo target both emit a `LedgerEntryRecord.operationCount` per applied edge. The contract: for the same plan applied successfully, every backend records the same `operationCount` per edge (including a skipped-op apply path, where the SQL adapter records `executedOperations` after idempotency skip-records and Mongo records planned ops). One table-driven harness in a shared test surface drives a representative plan through every backend (Postgres, SQLite, Mongo, family-sql synth) and asserts per-edge `operationCount` equality. The Postgres op-count-mismatch throw path (currently uncovered; SQLite + Mongo are covered) gains a targeted unit test in the same dispatch.
+
+## Acceptance
+
+- For any single input (same DB state, same on-disk migrations), `migration list`, `migration status`, and `migration graph` produce **byte-identical** pretty rendering of the per-space sections, modulo `status`'s overlay column and per-command footer. Asserted by a shared snapshot test that pipes the same fixture through all three renderers and diffs only the overlay column + footer.
+- Trunk choice in all three commands: the chain containing the live contract is the trunk; historical-ref chains render as indented side-branches.
+- Space iteration: all three commands render every on-disk space by default; `--space <id>` narrows uniformly; multi-space renderings carry `<spaceId>:` headings; the demo's `pgvector` space appears in `migration graph` output (regression test for the silent-elision bug surfaced during QA).
+- Per-row data: `dirName · from → to · N ops · {invariants}` appears on every migration row in every command; `status` appends `✓ applied` / `⧗ pending`.
+- Column alignment: in any rendering, the migration data block (dirName onward) starts at the same column offset for every migration row in that per-space section, including non-linear graphs (branches, rollback peels) and `--ascii` mode.
+- Lane coloring: a colorized snapshot over a multi-lane fixture (kitchen-sink: diamond + routed back-arc + 3-way fan) asserts (a) lane color rotates by column index, (b) column 0 stays neutral, (c) each routed back-arc is one hue across all its owned cells while crossings stay neutral, (d) node `○` matches its lane color while arrows stay bright. Plain-text (`colorize: false`) goldens for every existing fixture remain byte-identical.
+- `--legend`: snapshot coverage for `migration graph --legend` in unicode + `--ascii` × color on/off (4 cases), printed to stderr; stdout unchanged. `--json` / `--dot` paths reject `--legend` cleanly (legend is human-only).
+- Op-count parity harness: one table-driven test exercises the same plan through Postgres, SQLite, Mongo, and the family-sql synth path and asserts per-edge `operationCount` equality. The Postgres op-count-mismatch throw path has a unit test covering the throw.
+- `migration status` default target + no-path wording (D21): when `--to` is not provided, the picker returns the live contract for any non-empty `contractHash`. With the demo state (DB at live contract `1375f13`, disconnected historical chain ending at `f7a8eb5` reachable via `prod`), `migration status` (no flags) reports `up to date`. With `--to prod` against the same state, the no-path summary reads "No migration path from the database state (sha256:1375f13) to the target (sha256:f7a8eb5 via `prod`). Run `prisma-next migration plan --name <name>` to author one, or pass `--to <contract>` to pick a reachable target." Unit tests pin all three wording variants. The two existing e2e tests in `migration-status-diagnostics.e2e.test.ts` that assert the old wording are updated to assert the new wording (and the post-`db update` scenario is updated to assert `up to date`, since the picker now correctly defaults to the live contract).
+- D22 — system-marker rendering: every existing tree golden / snapshot covering system markers (`contract`, `db`) is regenerated with `<contract>` / `<db>` in place of `(contract)` / `(db)`. User refs (e.g. `(prod)`) keep their parentheses. A new test in the tree renderer's unit suite pins the four cases: only system markers, only user refs, both, and a `db`-named user ref colliding with the system `db` marker (renders as `<db> (db)`). Plain-text (`colorize: false`) and `--ascii` paths stay byte-identical to today modulo the bracket characters.
+- D22 — fresh-DB no-path detection: a new e2e in `migration-status-diagnostics.e2e.test.ts` exercises `db drop` + emit-only contract (no migration plans the live contract from `∅`) + `migration status` (no flags) and asserts the no-path summary against the live contract, not "up to date".
+- CI green: full `pnpm test:packages` plus `pnpm test:integration` plus `pnpm test:e2e`. `pnpm fixtures:check` clean. The demo (`migration list` / `status` / `graph` against the disconnected-historical-chain demo state) renders consistently across the three commands.
+
+## Out of scope
+
+- **JSON shape unification.** `graph`'s `{ nodes, edges }` stays; `list` / `status` per-space arrays stay. JSON consumers diverge by design (project decisions D2 / D3).
+- **Retiring or aliasing `migration graph`.** After this slice, `graph` and `list` produce identical pretty output; their JSON shapes still differ. Whether `graph` should remain a separate top-level command is a future call — deferred per operator. File a follow-up if/when the answer is clear.
+- **`edges-on-plan` and `empty-origin-as-null`.** The two on-disk slice drafts under `projects/migration-graph-rendering/slices/` are explicitly **not** in this slice. Neither is in TML-2774's tracked scope. The empty-origin work is also genuinely heavy — `EMPTY_CONTRACT_HASH` is wired into the `MigrationGraph` node-keying, walk algorithms, integrity checks, and ref parsing — and the operator already ruled in the TML-2769 review that the constant's value is "not our fight." File standalone tickets if either is picked up.
+- **Trunk-choice extensibility.** This slice locks one rule (live-contract spine). A future `--trunk <ref>` flag is conceivable but not asked for here.
+- ~~**Cross-space alignment.**~~ — supersedes D17 in D23 (cross-space alignment is now in scope; pad to a single global `maxEdgeTreePrefixWidth` across every migration row in every per-space block).
+
+## Pre-investigated edge cases
+
+| Edge case | Disposition |
+|---|---|
+| `--no-color` / `NO_COLOR` / non-TTY / piped | No lane colors; legend prints plain. `colorize` already short-circuits to the identity styler. Existing plain-text goldens stay byte-identical. |
+| `--ascii` | Lane coloring still applies (color is orthogonal to glyph palette); the legend uses the ASCII glyph palette and reads `paletteFor(glyphMode)` from the same source as the renderer. |
+| Lane freed and reused by a later branch | Keeps its column's color — `git log --graph` style; no per-branch identity tracking. The only exception is routed back-arcs (rule 3 above). |
+| Single-space rendering | No `<spaceId>:` heading (existing convention preserved). |
+| Single-lane linear graph | Effectively monochrome (column 0 stays neutral). |
+| Demo's stale historical-ref chain (the `prod` ref pointing at `f7a8eb5`, disconnected from the live `1375f13` chain) | Renders as a side-branch in all three commands. Pinned by a snapshot over the demo state. |
+
+## References
+
+- Project: `projects/migration-graph-rendering/` (decisions D1/D2/D3/D4/D11/D14).
+- Source modules touched: `packages/1-framework/3-tooling/cli/src/utils/formatters/{migration-graph-rows,migration-graph-tree-render,migration-graph-layout,migration-graph-lane-colors,migration-list-data-column,migration-list-render}.ts`, `packages/1-framework/3-tooling/cli/src/commands/{migration-list,migration-status,migration-graph}.ts`.
+- Test surface for op-count parity: a new shared harness in `packages/1-framework/3-tooling/migration/test/` driving Postgres + SQLite (via the SQL family), Mongo (target), and the family-sql synth path; the PG op-count-mismatch throw test lives in `packages/3-targets/3-targets/postgres/test/`.
+- Linear: TML-2812 (lead, project), TML-2811, TML-2773, TML-2774. TML-2767 closed as superseded by TML-2812.
+
+## Dispatch plan
+
+Eight dispatches. D1–D4 sit on the rendering surface (`packages/1-framework/3-tooling/cli/src/utils/formatters/`) and serialise — D2 builds on the unified pipeline D1 establishes, D3's lane-color selector is reused by D4's legend renderer. D5 sits on a different surface (`packages/1-framework/3-tooling/migration/test/` + the per-target test directories) and parallelises with the rendering work. D6 sits on `cli/src/commands/migration-status.ts` (no overlap with D1–D5's surfaces) and parallelises freely. D7 spans `migration-graph-tree-render.ts` + `migration-list-styler.ts` (system-marker brackets) plus a one-line edit in `migration-status.ts` (fresh-DB guard); it lands after D1–D4 and D6 so its golden regenerations don't conflict. D8 lands the three padding rules from D23 — cross-space alignment (touches the layout entry point that orchestrates per-space rendering), contract-node refs/markers adjacent to hash (touches the contract-node row builder in `migration-graph-tree-render.ts`), and right-justified from-hash column (touches `migration-list-data-column.ts`) — after D7's golden regenerations have settled.
+
+### Dispatch 1: unify the rendering pipeline across `list` / `status` / `graph`
+
+- **Outcome:** All three commands route through the same `buildMigrationGraphRows` → `buildMigrationGraphLayout` → `renderMigrationGraphTree` pipeline with the same trunk-choice input (live-contract chain, D14), the same per-row data overlay shape (`dirName · from → to · N ops · {invariants}`, D15), and the same space iteration policy (all on-disk spaces by default, `--space <id>` to narrow, D16). `migration graph` now renders the demo's `pgvector` space; `migration status` adopts the live-contract trunk; `migration status`'s overlay column composes onto the list overlay (rather than replacing it). A shared snapshot test pipes one fixture through all three renderers and asserts byte-identical per-space sections modulo `status`'s overlay column + per-command footer.
+- **Builds on:** This spec; the existing shared pipeline (already called from all three commands today) + the `edgeAnnotationsByHash` contract from D11.
+- **Hands to:** A unified call-site shape that the next dispatches build on. Trunk + per-row + space-iteration tests green; existing per-command goldens regenerated mechanically; D11 overlay extended in `cli/src/commands/migration-status-overlay.ts` to compose the list overlay with the status column.
+- **Focus:** Behavioral unification only. No styling change (lane color is D3); no alignment change (D2); no test-coverage work (D5).
+
+### Dispatch 2: align migration data columns per render block
+
+- **Outcome:** In any per-space section produced by `list` / `status` / `graph`, the migration data block (dirName onward) starts at the same column offset on every migration row, regardless of how deep that row sits in the tree drawing. Computed per render block (D17): max visible width of the tree-prefix across migration rows in that block, right-padded with plain whitespace. Operates on visible glyph width, not raw byte length, so wide / dim / ANSI-styled glyphs don't drift. Non-migration rows (contract nodes, blank/connector rows) are unaffected. A new test over a deliberately non-linear fixture (rollback peel + diamond) asserts alignment in default + `--ascii` modes.
+- **Builds on:** Dispatch 1's unified pipeline. The padding logic lives at the row→string join point in `migration-graph-tree-render.ts` (or its data-column helper).
+- **Hands to:** Aligned data columns in all three commands; existing goldens regenerate mechanically (whitespace-only diffs); the kitchen-sink fixture pins the rule.
+- **Focus:** Whitespace padding. No semantic change, no styling change. Only the join point between tree-prefix and data block changes.
+
+### Dispatch 3: per-column lane coloring with all six rules locked
+
+- **Outcome:** When `colorize` is true, the tree gutter renders per D18 — vertical lanes + connectors colored by column index over a 6-hue rotating palette (column 0 neutral, columns ≥ 1 colored), routed back-arcs single-hue per arc, crossings dim/neutral, node `○` matching its lane color, direction arrows staying bright, data columns unchanged. Plain-text (`colorize: false`) output is byte-identical to today across every existing fixture. A colorized snapshot over a kitchen-sink fixture asserts each of the six rules explicitly.
+- **Builds on:** Dispatch 2 (same files, same join point — the alignment-padded layout is what the colorizer wraps). The existing `migration-graph-lane-colors.ts` module.
+- **Hands to:** Colored gutter behind `colorize`; a column→color selector + a per-arc-id color resolver exported from the lane-colors module for D4's legend renderer to reuse. Plain-text goldens unchanged.
+- **Focus:** Lane + node-marker coloring. No legend (D4); no layout-model change; no new flag.
+
+### Dispatch 4: `--legend` flag on `migration graph`
+
+- **Outcome:** `migration graph --legend` prints a palette-aware, color-aware legend block to **stderr** (D19), describing the glyph language (`○ ↑ ↓ ⟲ ∅ → (refs)`) and the lane-color cycle (only when `colorize` is true, reusing dispatch 3's selector). `--legend` is rejected with a clear error on `--json` / `--dot` (legend is human-only). `--ascii` swaps the legend's glyph palette to match. Snapshot coverage for the four cases (unicode + ascii × color on / off). `--help` examples and the reference doc mention `--legend`.
+- **Builds on:** Dispatch 3's exported color selector. The existing `createMigrationGraphCommand` flag plumbing in `cli/src/commands/migration-graph.ts`.
+- **Hands to:** New flag + legend renderer landed; legend goldens green; plain-text + colorized graph goldens from D3 unchanged; `--json` / `--dot` regression-green.
+- **Focus:** Flag + legend block + docs. No change to lane-color mechanics.
+
+### Dispatch 5: cross-target op-count parity harness + Postgres throw test
+
+- **Outcome:** One table-driven harness drives a representative plan (greenfield baseline + a multi-edge apply, including a path that exercises an idempotency-skipped op) through Postgres, SQLite, Mongo, and the family-sql synth strategy, and asserts per-edge `LedgerEntryRecord.operationCount` equality across every backend (D20). A separate unit test in the Postgres adapter covers the op-count-mismatch throw path that's currently uncovered (SQLite + Mongo are covered).
+- **Builds on:** This spec + the merged ledger journal (TML-2769). No dependency on D1–D4.
+- **Hands to:** TML-2774 items 3 + 5 closed; ledger-journal cross-target invariant pinned in CI.
+- **Focus:** Test coverage on the migration runners' ledger writes. No production-code change unless the harness surfaces a real parity bug, in which case the dispatch reports back rather than fixing in-line (a parity bug is its own ticket).
+
+### Dispatch 6: `migration status` default target + no-path wording
+
+- **Outcome:** Two coupled fixes per D21, both in `cli/src/commands/migration-status.ts`. (a) Picker collapses to `activeRefHash ?? contractHash` — explicit `--to` wins, otherwise the application's contract. The dead `MIGRATION.DIVERGED` diagnostic + `hasAmbiguousTarget` guard + `'Multiple valid migration paths'` summary branch are removed. Unused imports (`requireHeadRef`, `findReachableLeaves`) drop out. (b) The no-path summary is replaced by a context-aware builder `buildNoPathSummary({ markerHash, targetHash, explicitTarget, refName })` exported alongside `buildStatusHeadline`, with three variants: no `--to` (default → "the application's contract (…)"), `--to <ref>` ("the target (… via \`<ref>\`)"), `--to <hash>` ("the target (…)"). Lead-fix is `migration plan --name <name>`; the `--to <contract>` alternative appears only when `--to` was explicit.
+- **Builds on:** This spec. No dependency on D1–D5; touches `migration-status.ts` only, which D1 already adapted but does not re-enter for this fix.
+- **Hands to:**
+  - Picker change locked behind unit tests for the simplified two-line semantics: (i) `activeRefHash` non-undefined → returned regardless of `contractHash`; (ii) `activeRefHash` undefined → `contractHash` returned (including the `EMPTY_CONTRACT_HASH` case).
+  - Wording change locked behind unit tests for all three variants (`buildNoPathSummary({...})` exposed alongside `buildStatusHeadline` for direct testing).
+  - The two e2e assertions in `test/integration/test/cli-journeys/migration-status-diagnostics.e2e.test.ts` updated: the post-`db update` scenario (line ~286) now asserts `up to date` (picker correctly defaults to the live contract; DB matches it); the marker-on-wrong-branch + `--to production` scenario (line ~536) now asserts the new wording with the `via \`production\`` ref name. Any tests relying on the deleted `MIGRATION.DIVERGED` diagnostic / `'Multiple valid migration paths'` summary are deleted (the operator is comfortable removing the diagnostic; the simplified picker makes it unreachable).
+- **Focus:** Picker simplification and message clarity in `migration-status.ts`. No change to overlay computation, no change to render pipeline, no new flags. Do **not** introduce a new ticket for either change — both land in this PR.
+
+### Dispatch 7: system-marker brackets + fresh-DB no-path guard
+
+- **Outcome:** Two coupled fixes per D22.
+
+  (a) **System markers in `<>`.** In `cli/src/utils/formatters/migration-graph-tree-render.ts`, the `overlayNamesForContract` function (currently merging refs + `db` + `contract` into one list) splits into two lists: a system-marker list (`<contract, db>`) and a ref list (`(prod, staging)`). Both are rendered when populated; markers render first, refs second, separated by one space. Inside `<>`, names are sorted with `contract` before `db`. Inside `()`, refs sort alphabetically (today's behaviour). Names are **not** deduped across the two lists — a user ref named `db` and the system `db` marker render as `<db> (db)` when they coincide on a hash. The styler in `cli/src/utils/formatters/migration-list-styler.ts` gains a `markers` formatter parallel to its `refs` formatter; `<contract>` stays bold-green, `<db>` plain-green, `(refname)` plain-green, active ref bold-green. Brackets take the same hue as their contents.
+
+  (b) **Fresh-DB no-path guard.** In `cli/src/commands/migration-status.ts`, the path-existence check around line 458 drops the `markerHash !== undefined` clause and replaces `markerHash !== targetHash` with `originHash !== targetHash` (where `originHash = markerHash ?? EMPTY_CONTRACT_HASH` is already computed). The `markerInGraph` clause stays — when the marker is `undefined`, `markerInGraph` is already `true` per its current definition.
+
+- **Builds on:** D6 (uses `buildNoPathSummary` for the fresh-DB path-failure case) and D1–D4 (which establish the unified rendering pipeline this dispatch's golden regenerations sit on top of). The styler split touches the same module D2's column-alignment changes touched but lands cleanly because alignment is a row-level concern and bracket rendering is a name-list concern.
+- **Hands to:**
+  - **Unit tests** (`migration-graph-tree-render.test.ts`): four cases — only system markers, only user refs, both, and the `<db> (db)` collision. Plus existing snapshots regenerated mechanically (whitespace-clean: `(contract)` → `<contract>` / `(db)` → `<db>`).
+  - **Styler unit test** (`migration-list-styler.test.ts` if it exists, otherwise an inline test in the renderer's suite): assert the four styling cases — `<contract>` bold-green, `<db>` plain-green, `(prod)` plain-green, `(prod)` (active) bold-green — including bracket characters carrying their content's hue.
+  - **E2E** (`migration-status-diagnostics.e2e.test.ts`): one new scenario — `db drop` + emit a contract that has no migration plans into it + `migration status` (no flags) → asserts `'No migration path from the database state'` and `"to the application's contract"` substrings, NOT `'up to date'`.
+  - Existing snapshots: every renderer / command golden that covers system markers regenerates mechanically (single-string replace `\bcontract\b` → `<contract>` and `\bdb\b` → `<db>` *only when those names appear inside today's `(...)` ref list*; user-ref `(db)` / `(contract)` strings stay parenthesised). The dispatch reports the count of regenerated snapshots in its final summary so the operator can spot-check.
+- **Focus:** Two surgical edits — bracket syntax in the renderer + styler, one-line guard fix in `migration-status.ts`. No change to the column-alignment math, lane coloring, legend, or no-path wording (those are all locked in earlier dispatches).
+- **Hard constraint:** Touch only `migration-graph-tree-render.ts`, `migration-list-styler.ts`, `migration-status.ts`, the matching test files, and snapshot fixtures regenerated mechanically as a result. **No other production files.** If a downstream consumer breaks (e.g. an extension or example app asserts on the `(contract)` rendering), report it and stop — do not file a ticket and do not fix in-line.
+
+### Dispatch 8: cross-space alignment + contract-node refs adjacent to hash + right-justified from-hash
+
+- **Outcome:** Three padding rules from D23, all in the renderer:
+
+  (a) **Cross-space alignment.** `maxEdgeTreePrefixWidth` is computed across every migration row in every per-space block in the current rendering (one global value), then handed to the per-space tree-renderer. Single-space renderings collapse to today's behaviour. The orchestration point is the layout module's entry — the function that today renders one space's block in isolation needs a shared "max-width" input, and the multi-space wrapper computes it across all blocks before invoking each one.
+
+  (b) **Contract-node refs/markers adjacent to hash.** Contract-node rows render `<tree-prefix><hash><LABEL_GAP-spaces><markers> (refs)` with no padding between the hash and the markers/refs. Migration rows are unaffected — they keep the cross-space-aligned data column from rule (a). Implementation: the contract-node row builder in `migration-graph-tree-render.ts` writes the markers/refs token immediately after the hash + `LABEL_GAP` instead of advancing to the data-column offset.
+
+  (c) **Right-justified from-hash column.** In `migration-list-data-column.ts`, the from-hash field switches from left-padding to right-padding (i.e., the value sits at the right edge of the fixed-width column, leading spaces fill to the left). Regular hashes fill the column → unchanged visually. `∅` lands flush against the `→`. The to-hash column stays left-justified.
+
+- **Builds on:** D1 (unified rendering pipeline gives a single layout entry that can compute the global width), D2 (the per-block alignment logic D8 is generalising), D7 (its `<contract>` / `<db>` brackets are the markers token D8 places adjacent to the hash). No dependency on D3/D4/D5/D6.
+
+- **Hands to:**
+  - **Unit tests** for cross-space alignment: a multi-space fixture with deliberately different tree depths (e.g. a 4-row `app:` block plus a 1-row `pgvector:` block) — assert that both spaces' `dirName` columns start at the same column offset (the deeper one's offset wins). Today's per-block test (D2) regression-pins single-space behaviour.
+  - **Unit tests** for contract-node ref placement: a contract node with `<contract>`, with `<contract, db> (prod)`, with no markers/refs (renders just `<hash>`). Each case asserts the markers/refs sit at `<hash>` + `LABEL_GAP` spaces, NOT at the data-column offset.
+  - **Unit tests** for the right-justified from-hash column: one row with `∅` from, one row with a regular hash from. Assert that in both cases, the `→` lands at the same column offset.
+  - **E2E**: existing scenarios pass (whitespace-only diff in goldens, regenerate mechanically). No new e2e needed.
+  - Existing snapshots regenerate mechanically.
+
+- **Focus:** Whitespace-only changes at three specific join points (layout entry width-computation, contract-row builder, from-hash padder). No semantic, color, or content changes.
+
+- **Hard constraint:** Touch only the three named source files (`migration-graph-tree-render.ts`, the multi-space orchestration point — likely `migration-graph-space-render.ts` or the layout module — and `migration-list-data-column.ts`), their unit tests, and snapshot fixtures regenerated mechanically. No other production files. If you find that the cross-space orchestration requires a wider refactor than a single-pass max-width computation handed down via prop, stop and report — do not refactor the layout module structurally.
+
+### Dispatch 9: cross-space dirName alignment + capitalised "Up to date"
+
+- **Outcome:** Two trivial follow-ups per D24, both in surfaces D8 already touched.
+
+  (a) **Cross-space dirName alignment.** Mirror D8's `globalMaxEdgeTreePrefixWidth` for dirName: compute a single global max dirName width across every migration row in every per-space block in the current rendering, then pad every migration row's dirName to that width. Reuse the orchestration point D8 introduced (`computeGlobalMaxEdgeTreePrefixWidth` / `renderMigrationGraphSpaceTrees`); add a parallel `globalMaxDirNameWidth` parameter and threading. Wire it through the same three caller sites D8 wired (`migration-list-render.ts`, `migration-graph.ts`, `migration-status.ts`).
+
+  (b) **Capitalised "Up to date".** In `cli/src/commands/migration-status.ts`, `buildStatusHeadline`'s `pendingCount === 0` branch returns the literal `'up to date'`. Change to `'Up to date'`. One character.
+
+- **Builds on:** D8 (the orchestration plumbing); the rest of the slice is unaffected.
+
+- **Hands to:**
+  - **Unit tests:** extend the cross-space test from D8 to also assert that the from-hash column lands at the same absolute column offset across the two per-space blocks. The test from D8 today asserts the dirName start position (governed by tree-prefix width); add an additional assertion on the `→` arrow position (governed by tree-prefix width + dirName width + from-hash width — equality across blocks proves dirName is aligned globally).
+  - One unit test for the capitalisation: extend `format-status-summary.test.ts`'s `'reports up to date when nothing is pending'` test to assert `'Up to date'`.
+  - **E2E:** existing scenarios pass (whitespace + capitalisation only; goldens regenerate mechanically).
+  - Existing snapshots regenerate mechanically (the multi-space goldens now show globally-aligned from-hash columns; `'up to date'` snapshots flip to `'Up to date'`).
+
+- **Focus:** Two surgical edits — one paralleling D8's existing pattern, one a single-character literal. No structural change.
+
+- **Hard constraint:** Touch only `migration-graph-tree-render.ts`, `migration-graph-space-render.ts`, `migration-list-render.ts`, `migration-graph.ts`, `migration-status.ts` (same set as D8), their unit tests, and snapshot fixtures regenerated mechanically. No other production files. If you find a non-whitespace-or-capitalisation snapshot diff, stop and report.
+
+### Dispatch 11: trunk-choice rule honors `contractHash` for connected components
+
+- **Outcome:** D25's algorithmic fix in `cli/src/utils/formatters/migration-graph-rows.ts`. After D11 lands, the demo's `app` space renders with `1375f13` as the trunk's tip and the historical chain ending at `f7a8eb5` as the side-branch, in all three commands (`list` / `status` / `graph`). Single-node components, components without `contractHash` in them, and components where `contractHash === EMPTY_CONTRACT_HASH` are unchanged.
+
+- **Builds on:** D8/D9/D10 (this dispatch's whitespace-only goldens regenerate cleanly on top of the alignment changes); D1 (the unified pipeline already threads `liveContractHash` to `buildMigrationGraphRows`). No dependency on D2/D3/D4/D5/D6/D7.
+
+- **Hands to:**
+  - **Unit tests** in `migration-graph-rows.test.ts` (or wherever the row-model tests live) covering: (i) two leaves shared root, `contractHash` is the shorter-chain leaf → live-contract leaf wins trunk; (ii) two leaves shared root, `contractHash === undefined` → today's longest-path heuristic wins (regression-pin); (iii) `contractHash === EMPTY_CONTRACT_HASH` → today's heuristic (regression-pin); (iv) `contractHash` not in the graph → detached-contract path unchanged (regression-pin).
+  - **Renderer integration** in `migration-graph-tree-render.test.ts` over the demo's app-space topology fixture (or a synthetic equivalent): assert the rendered tree has `<contract-hash>` at the top, on column 0, with the historical chain peeling off as a side-branch.
+  - **Snapshots** regenerate mechanically for any existing fixture whose topology has multiple leaves sharing a root with `contractHash` set; goldens with `contractHash === undefined` or detached-contract topology stay byte-identical.
+
+- **Focus:** Algorithmic fix in one helper (`layerNodesByLongestForwardPath` and/or its surrounding caller). Keep the change local; no refactor of the layout module beyond what's needed to bias the rank/leaf-selection toward `contractHash`.
+
+- **Mid-chain edge case:** Per D25, if `contractHash` has descendants in its component (mid-chain), prefer the simpler implementation (only bias when `contractHash` is a leaf; treat non-leaf as today's heuristic) and document the choice in the dispatch's final report.
+
+- **Hard constraint:** Touch only `migration-graph-rows.ts` (and `migration-list-graph-topology.ts` if it contains the topology classifier the rank step depends on), their unit tests, and snapshot fixtures regenerated mechanically. No other production files. If you find that the rank-boost approach requires a wider refactor of the layout module's column-assignment, stop and report — do not restructure the layout.
+
+### Dispatch 12: legend wording + universal `--legend`
+
+- **Outcome:** D26's two changes:
+  1. The legend's marker/ref line collapses (`<contract> (refs) db / contract markers`) is replaced with two parallel lines following D22's bracket convention:
+
+     ```
+       <contract, db>    live markers (contract on disk, database state)
+       (prod, staging)   user-defined refs
+     ```
+
+  2. The legend helpers are hoisted out of `commands/migration-graph.ts` into a shared utils module, renamed to drop the "graph" prefix, and wired into `migration list` and `migration status` with identical suppression rules (blocked when combined with `--json` / `--dot` / `--quiet`; printed alongside the human header on stderr).
+
+- **Builds on:** D7 (bracket convention), D11 (trunk fix is settled). Independent of D8/D9/D10's whitespace fixes.
+
+- **Hands to:**
+  - **Renderer:** `migration-graph-tree-render.ts` — replace the single marker/ref line with the two-line block. The example contents (`contract, db` and `prod, staging`) are literal strings; the active-ref bold treatment must NOT apply to either example.
+  - **Helpers hoisted:** `migrationGraphShowsLegend` → `shouldShowLegend`; `validateMigrationGraphLegendOptions` → `validateLegendOptions`; `errorMigrationGraphLegendHumanOnly` → `errorLegendHumanOnly`; error code `MIGRATION.GRAPH_LEGEND_HUMAN_ONLY` → `MIGRATION.LEGEND_HUMAN_ONLY`; error message drops "graph". Move them out of `commands/migration-graph.ts` and `utils/cli-errors.ts` (where appropriate) into a shared module — `utils/legend.ts` is fine, or fold into `utils/formatters/`. Pick whichever fits the existing layering.
+  - **Command wiring:** `migration list` and `migration status` get a `--legend` option declaration matching `migration graph`'s, the same `validateLegendOptions` invocation in their `.action(...)`, the same `shouldShowLegend(...)` gate in their command body, and the same call to `renderMigrationGraphLegend` (or the renamed equivalent) when the gate passes.
+  - **Tests:**
+    - **Unit** in `migration-graph-tree-render.test.ts`: legend snapshot updates for the two-line marker/ref block; assert the example strings are not bolded.
+    - **Command tests** for `migration list` and `migration status`: `--legend` prints the key on stderr; `--legend --json` returns the new error; `--legend --quiet` returns the same error; combined with `--space <id>` legend still prints (single-space mode doesn't suppress it). Mirror whatever assertions `migration graph`'s legend tests already have.
+    - **`--help` output** for list/status now mentions `--legend` — update help-output goldens if they exist.
+  - **Snapshots / inline goldens** regenerate mechanically. Inspect the legend diff: every change should be the marker/ref line replacement (and possibly help-text additions for `--legend` on list/status). Anything else is a regression — STOP and report.
+
+- **Focus:** Two narrowly-scoped changes — a wording update in one renderer function, and a code-move-plus-wiring of three small helpers across three command files. No algorithmic logic changes.
+
+- **Hard constraint:** Touch only the renderer file (`migration-graph-tree-render.ts`), the legend-helpers source (`commands/migration-graph.ts`, `utils/cli-errors.ts`, plus the new shared utils file), the three command files (`migration-graph.ts`, `migration-list.ts`, `migration-status.ts`), and their tests. No other production files.

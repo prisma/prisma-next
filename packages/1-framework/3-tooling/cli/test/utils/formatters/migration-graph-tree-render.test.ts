@@ -1,17 +1,19 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
-import { createColors, dim } from 'colorette';
+import { bold, createColors, dim, green } from 'colorette';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { laneColorForColumn } from '../../../src/utils/formatters/migration-graph-lane-colors';
 import type { StructuralCell } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphRows } from '../../../src/utils/formatters/migration-graph-rows';
+import { renderMigrationGraphSpaceTrees } from '../../../src/utils/formatters/migration-graph-space-render';
 import {
   renderMigrationGraphLegend,
   renderMigrationGraphTree,
   resolveConnectorLaneColors,
 } from '../../../src/utils/formatters/migration-graph-tree-render';
+import { MIGRATION_LIST_HASH_WIDTH } from '../../../src/utils/formatters/migration-list-data-column';
 
 const { bold: forcedBold } = createColors({ useColor: true });
 
@@ -75,6 +77,139 @@ function refsMap(
   return new Map(entries.map((e) => [e.hash, e.names]));
 }
 
+function migrationDirNameColumns(rendered: string, dirNames: readonly string[]): readonly number[] {
+  const plain = stripAnsi(rendered);
+  return dirNames.map((name) => {
+    const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    const line = plain.split('\n').find((row) => pattern.test(row));
+    if (line === undefined) {
+      throw new Error(`no line for ${name}`);
+    }
+    const match = pattern.exec(line);
+    if (match?.index === undefined) {
+      throw new Error(`dirName ${name} not found in line`);
+    }
+    return match.index;
+  });
+}
+
+function assertMigrationDataColumnsAligned(rendered: string, dirNames: readonly string[]): void {
+  const columns = migrationDirNameColumns(rendered, dirNames);
+  expect(new Set(columns).size).toBe(1);
+}
+
+function arrowColumnOffset(line: string): number {
+  const plain = stripAnsi(line);
+  const idx = plain.indexOf('→');
+  if (idx === -1) {
+    throw new Error('arrow not found in line');
+  }
+  return idx;
+}
+
+function tokenStartOffset(line: string, token: string): number {
+  const plain = stripAnsi(line);
+  const idx = plain.indexOf(token);
+  if (idx === -1) {
+    throw new Error(`token ${token} not found in line`);
+  }
+  return idx;
+}
+
+const LABEL_GAP = 2;
+
+describe('renderMigrationGraphTree (D23 padding rules)', () => {
+  it('aligns migration dirName columns across spaces with different tree depths', () => {
+    const appInit = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const appAlice = edge('ef9de27', '73e3abe', 'alice_add_phone');
+    const appBob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
+    const appMergeAlice = edge('73e3abe', '3b2d98d', 'merge_alice');
+    const appMergeBob = edge('6656a6e', '3b2d98d', 'merge_bob');
+
+    const pgInit = edge(EMPTY_CONTRACT_HASH, '29059df', 'install_vector_v1');
+
+    const [appTree, pgTree] = renderMigrationGraphSpaceTrees([
+      {
+        graph: graph([appInit, appAlice, appBob, appMergeAlice, appMergeBob]),
+        migrations: [],
+        liveContractHash: '3b2d98d',
+        glyphMode: 'unicode',
+        colorize: false,
+      },
+      {
+        graph: graph([pgInit]),
+        migrations: [],
+        liveContractHash: '29059df',
+        glyphMode: 'unicode',
+        colorize: false,
+      },
+    ]);
+    if (appTree === undefined || pgTree === undefined) {
+      throw new Error('expected two rendered space trees');
+    }
+
+    const appDirName = migrationDirNameColumns(appTree, ['merge_alice', 'init']);
+    const pgDirName = migrationDirNameColumns(pgTree, ['install_vector_v1']);
+    expect(appDirName[0]!).toBe(pgDirName[0]!);
+
+    const appMergeLine = stripAnsi(
+      appTree.split('\n').find((row) => row.includes('merge_alice')) ?? '',
+    );
+    const pgInstallLine = stripAnsi(
+      pgTree.split('\n').find((row) => row.includes('install_vector_v1')) ?? '',
+    );
+    expect(arrowColumnOffset(appMergeLine)).toBe(arrowColumnOffset(pgInstallLine));
+  });
+
+  it('places contract-node markers adjacent to the hash with LABEL_GAP', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const edges = [init, addPosts];
+
+    const contractOnly = tree(edges, {
+      colorize: false,
+      contractHash: 'a94b7b4',
+    });
+    const contractOnlyLine = stripAnsi(contractOnly.split('\n')[0] ?? '');
+    expect(contractOnlyLine).toBe('○   a94b7b4  <contract>');
+    expect(tokenStartOffset(contractOnlyLine, '<contract>')).toBe(
+      tokenStartOffset(contractOnlyLine, 'a94b7b4') + MIGRATION_LIST_HASH_WIDTH + LABEL_GAP,
+    );
+
+    const markersAndRefs = tree(edges, {
+      colorize: false,
+      refsByHash: refsMap([{ hash: 'a94b7b4', names: ['prod'] }]),
+      dbHash: 'a94b7b4',
+      contractHash: 'a94b7b4',
+    });
+    const markersLine = stripAnsi(markersAndRefs.split('\n')[0] ?? '');
+    expect(markersLine).toBe('○   a94b7b4  <contract, db> (prod)');
+    expect(tokenStartOffset(markersLine, '<contract, db>')).toBe(
+      tokenStartOffset(markersLine, 'a94b7b4') + MIGRATION_LIST_HASH_WIDTH + LABEL_GAP,
+    );
+
+    const hashOnly = tree(edges, { colorize: false });
+    const hashOnlyLine = stripAnsi(hashOnly.split('\n')[0] ?? '');
+    expect(hashOnlyLine).toBe('○   a94b7b4');
+    expect(hashOnlyLine).not.toMatch(/\s+$/);
+  });
+
+  it('right-justifies the from-hash column so the arrow lands at a fixed column', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const bookend = edge('6cee614', 'f7a8eb5', 'bookend');
+    const output = tree([init, bookend], { colorize: false });
+    const lines = stripAnsi(output)
+      .split('\n')
+      .filter((line) => line.includes('→'));
+    const initLine = lines.find((line) => line.includes('init'));
+    const bookendLine = lines.find((line) => line.includes('bookend'));
+    expect(initLine).toBeDefined();
+    expect(bookendLine).toBeDefined();
+    expect(arrowColumnOffset(initLine ?? '')).toBe(arrowColumnOffset(bookendLine ?? ''));
+    expect(initLine).toContain('      ∅ →');
+  });
+});
+
 describe('renderMigrationGraphTree', () => {
   it('renders a linear chain per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
@@ -84,7 +219,7 @@ describe('renderMigrationGraphTree', () => {
         '○   a94b7b4',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -102,15 +237,70 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   c0ffee0              (contract)',
+        '○   c0ffee0  <contract>',
         '',
-        '○   a94b7b4              (main, db)',
+        '○   a94b7b4  <db> (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
+  });
+
+  it('renders only system markers in angle brackets', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    expect(
+      tree([init], {
+        colorize: false,
+        dbHash: 'ef9de27',
+        contractHash: 'ef9de27',
+      }),
+    ).toContain('<contract, db>');
+  });
+
+  it('renders only user refs in parentheses', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    expect(
+      tree([init], {
+        colorize: false,
+        refsByHash: refsMap([{ hash: 'ef9de27', names: ['prod', 'staging'] }]),
+      }),
+    ).toContain('(prod, staging)');
+  });
+
+  it('renders system markers before user refs when both are present', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    expect(
+      tree([init, addPosts], {
+        colorize: false,
+        refsByHash: refsMap([{ hash: 'a94b7b4', names: ['prod'] }]),
+        dbHash: 'a94b7b4',
+        contractHash: 'a94b7b4',
+      }),
+    ).toContain('<contract, db> (prod)');
+  });
+
+  it('renders colliding system db marker and user ref named db separately', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    expect(
+      tree([init], {
+        colorize: false,
+        refsByHash: refsMap([{ hash: 'ef9de27', names: ['db'] }]),
+        dbHash: 'ef9de27',
+      }),
+    ).toContain('<db> (db)');
+  });
+
+  it('emphasizes the contract system marker in colorized output', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const colored = tree([init], {
+      colorize: true,
+      contractHash: 'ef9de27',
+    });
+    expect(colored).toContain(green('<') + bold(green('contract')) + green('>'));
+    expect(colored).not.toContain(bold(green('db')));
   });
 
   it('renders node overlays for refs, db, and contract per mockup', () => {
@@ -128,10 +318,35 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   a94b7b4              (main, contract)',
+        '○   a94b7b4  <contract> (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
-        '○   ef9de27              (prod, db)',
-        '│↑  init                 ∅       → ef9de27',
+        '○   ef9de27  <db> (prod)',
+        '│↑  init                       ∅ → ef9de27',
+        '∅',
+      ].join('\n'),
+    );
+  });
+
+  it('places the live-contract leaf on the trunk for a two-leaf shared-root graph', () => {
+    const historical1 = edge(EMPTY_CONTRACT_HASH, '76c1bd5', 'historical_1');
+    const historical2 = edge('76c1bd5', '5618dca', 'historical_2');
+    const historical3 = edge('5618dca', '6cee614', 'historical_3');
+    const historical4 = edge('6cee614', 'f7a8eb5', 'historical_4');
+    const live = edge(EMPTY_CONTRACT_HASH, '1375f13', 'live_migration');
+    const edges = [historical1, historical2, historical3, historical4, live];
+    expect(tree(edges, { colorize: false, contractHash: '1375f13' })).toBe(
+      [
+        '○   1375f13  <contract>',
+        '│↑    live_migration           ∅ → 1375f13',
+        '│ ○   f7a8eb5',
+        '│ │↑  historical_4       6cee614 → f7a8eb5',
+        '│ ○   6cee614',
+        '│ │↑  historical_3       5618dca → 6cee614',
+        '│ ○   5618dca',
+        '│ │↑  historical_2       76c1bd5 → 5618dca',
+        '│ ○   76c1bd5',
+        '│ │↑  historical_1             ∅ → 76c1bd5',
+        '├─╯',
         '∅',
       ].join('\n'),
     );
@@ -151,24 +366,50 @@ describe('renderMigrationGraphTree', () => {
       [
         '○   E',
         '├─╮',
-        '│↑│   promote            D → E',
-        '│ │↑  bob_extra          C → E',
+        '│↑│     promote                D → E',
+        '│ │↑    bob_extra              C → E',
         '○ │   D',
         '├─┼─╮',
-        '│↑│ │   merge_alice      B → D',
-        '│ │ │↑  merge_bob        C → D',
+        '│↑│ │   merge_alice            B → D',
+        '│ │ │↑  merge_bob              C → D',
         '○ │ │   B',
-        '│↑│ │   alice            A → B',
+        '│↑│ │   alice                  A → B',
         '│ ├─╯',
         '│ ○   C',
-        '│ │↑  bob                A → C',
+        '│ │↑    bob                    A → C',
         '├─╯',
         '○   A',
-        '│↑  init                 ∅       → A',
+        '│↑      init                   ∅ → A',
         '∅',
       ].join('\n'),
     );
     expect(treeAscii(edges)).toContain('| *   C');
+  });
+
+  it('aligns migration data columns on diamond and rollback peel', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');
+    const bob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
+    const mergeAlice = edge('73e3abe', '3b2d98d', 'merge_alice');
+    const mergeBob = edge('6656a6e', '3b2d98d', 'merge_bob');
+    const addBio = edge('73e3abe', '3ee5d20', 'add_bio');
+    const addPosts = edge('3ee5d20', 'a94b7b4', 'add_posts');
+    const rollbackToPhone = edge('a94b7b4', '73e3abe', 'rollback_to_phone');
+    const rollbackToInit = edge('3ee5d20', 'ef9de27', 'rollback_to_init');
+    const edges = [
+      init,
+      alice,
+      bob,
+      mergeAlice,
+      mergeBob,
+      addBio,
+      addPosts,
+      rollbackToPhone,
+      rollbackToInit,
+    ];
+    const dirNames = edges.map((e) => e.dirName);
+    assertMigrationDataColumnsAligned(tree(edges), dirNames);
+    assertMigrationDataColumnsAligned(treeAscii(edges), dirNames);
   });
 
   it('renders a diamond per mockup', () => {
@@ -189,7 +430,7 @@ describe('renderMigrationGraphTree', () => {
         '│ │↑  bob_add_avatar     ef9de27 → 6656a6e',
         '├─╯',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑    init                     ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -218,7 +459,7 @@ describe('renderMigrationGraphTree', () => {
         '│ │ │↑  add_avatar       ef9de27 → 6656a6e',
         '├─┴─╯',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑      init                   ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -242,7 +483,7 @@ describe('renderMigrationGraphTree', () => {
         '○◂╯ │     73e3abe',
         '│↑  │     add_phone           ef9de27 → 73e3abe',
         '○◂──╯     ef9de27',
-        '│↑        init                ∅       → ef9de27',
+        '│↑        init                      ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -263,7 +504,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  add_phone            ef9de27 → 73e3abe',
         '│↓  rollback_phone       73e3abe → ef9de27',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -279,7 +520,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  next                 aaaaaaa → bbbbbbb',
         '│⟲  noop                 aaaaaaa → aaaaaaa',
         '○   aaaaaaa',
-        '│↑  init                 ∅       → aaaaaaa',
+        '│↑  init                       ∅ → aaaaaaa',
         '∅',
       ].join('\n'),
     );
@@ -323,7 +564,7 @@ describe('renderMigrationGraphTree', () => {
         '○   3b2d98d',
         '│↑  20260303_add_phone   ef9de27 → 3b2d98d  2 ops  {phone_present}',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27  5 ops',
+        '│↑  init                       ∅ → ef9de27  5 ops',
         '∅',
       ].join('\n'),
     );
@@ -363,7 +604,7 @@ describe('renderMigrationGraphTree', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "○   cd5c15b              (main, contract)
+      "○   cd5c15b  <contract> (main)
       ├─╮
       │↑│   merge_2a           0276f92 → cd5c15b
       │ │↑  merge_2b           a94b7b4 → cd5c15b
@@ -382,7 +623,7 @@ describe('renderMigrationGraphTree', () => {
       │ │↑  bob_add_avatar     ef9de27 → 6656a6e
       ├─╯
       ○   ef9de27
-      │↑  init                 ∅       → ef9de27
+      │↑    init                     ∅ → ef9de27
       ∅"
     `);
   });
@@ -451,7 +692,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       "*   a94b7b4
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^  init                       - -> ef9de27
       -"
     `);
   });
@@ -467,12 +708,12 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'c0ffee0',
       }),
     ).toMatchInlineSnapshot(`
-      "*   c0ffee0              (contract)
+      "*   c0ffee0  <contract>
 
-      *   a94b7b4              (main, db)
+      *   a94b7b4  <db> (main)
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^  init                       - -> ef9de27
       -"
     `);
   });
@@ -491,10 +732,10 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'a94b7b4',
       }),
     ).toMatchInlineSnapshot(`
-      "*   a94b7b4              (main, contract)
+      "*   a94b7b4  <contract> (main)
       |^  add_posts            ef9de27 -> a94b7b4
-      *   ef9de27              (prod, db)
-      |^  init                 -       -> ef9de27
+      *   ef9de27  <db> (prod)
+      |^  init                       - -> ef9de27
       -"
     `);
   });
@@ -516,7 +757,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | |^  bob_add_avatar     ef9de27 -> 6656a6e
       +-/
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^    init                     - -> ef9de27
       -"
     `);
   });
@@ -545,7 +786,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | | |^  add_avatar       ef9de27 -> 6656a6e
       +-+-/
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^      init                   - -> ef9de27
       -"
     `);
   });
@@ -569,7 +810,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       *</ |     73e3abe
       |^  |     add_phone           ef9de27 -> 73e3abe
       *<--/     ef9de27
-      |^        init                -       -> ef9de27
+      |^        init                      - -> ef9de27
       -"
     `);
   });
@@ -588,7 +829,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  add_phone            ef9de27 -> 73e3abe
       |v  rollback_phone       73e3abe -> ef9de27
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^  init                       - -> ef9de27
       -"
     `);
   });
@@ -602,7 +843,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  next                 aaaaaaa -> bbbbbbb
       |@  noop                 aaaaaaa -> aaaaaaa
       *   aaaaaaa
-      |^  init                 -       -> aaaaaaa
+      |^  init                       - -> aaaaaaa
       -"
     `);
   });
@@ -627,7 +868,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "*   cd5c15b              (main, contract)
+      "*   cd5c15b  <contract> (main)
       +-\\
       |^|   merge_2a           0276f92 -> cd5c15b
       | |^  merge_2b           a94b7b4 -> cd5c15b
@@ -646,7 +887,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | |^  bob_add_avatar     ef9de27 -> 6656a6e
       +-/
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^    init                     - -> ef9de27
       -"
     `);
   });
@@ -862,10 +1103,11 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(fanRow).toBeDefined();
     expect(fanRow).not.toContain(laneColorForColumn(2)('├'));
     expect(fanRow).toContain(laneColorForColumn(1)('─'));
-    expect(fanRow).toContain(laneColorForColumn(1)('┼'));
+    expect(fanRow).toContain(dim('┼'));
+    expect(fanRow).not.toContain(laneColorForColumn(1)('┼'));
+    expect(fanRow).not.toContain(laneColorForColumn(2)('┼'));
     expect(fanRow).toContain(laneColorForColumn(2)('─'));
     expect(fanRow).toContain(laneColorForColumn(2)('┬'));
-    expect(fanRow).not.toContain(laneColorForColumn(2)('┼'));
     expect(fanRow).not.toContain(laneColorForColumn(1)('┼─'));
     const bobMergeRow = lines.find((line) => {
       const plain = stripAnsi(line);
@@ -968,6 +1210,101 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(landLine).toContain(laneColorForColumn(2)('╯ '));
     expect(stripAnsi(landLine ?? '')).toContain('◂──╯');
   });
+
+  function kitchenSinkEdges(): readonly MigrationEdge[] {
+    const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
+    const addPhone = edge('root', 'n1', 'add_phone');
+    const emailDefault = edge('n1', 'n2', 'email_default');
+    const changeDefault = edge('n2', 'n3', 'change_default');
+    const addPosts = edge('n3', 'n4', 'add_posts');
+    const addComments = edge('n4', 'n5', 'add_comments');
+    const kitchenSink = edge('n5', 'tip_long', 'kitchen_sink');
+    const rollback = edge('tip_long', 'n5', 'rollback');
+    const widenEmail = edge('root', 's1', 'widen_email');
+    const migration = edge('s1', 'tip_short', 'migration');
+    return [
+      init,
+      addPhone,
+      emailDefault,
+      changeDefault,
+      addPosts,
+      addComments,
+      kitchenSink,
+      rollback,
+      widenEmail,
+      migration,
+    ];
+  }
+
+  function threeWayFanEdges(): readonly MigrationEdge[] {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const addAvatar = edge('ef9de27', '6656a6e', 'add_avatar');
+    const mergePhone = edge('73e3abe', '3116048', 'merge_phone');
+    const mergePosts = edge('a94b7b4', '3116048', 'merge_posts');
+    const mergeAvatar = edge('6656a6e', '3116048', 'merge_avatar');
+    return [init, addPhone, addPosts, addAvatar, mergePhone, mergePosts, mergeAvatar];
+  }
+
+  it('kitchen-sink colorized snapshot asserts all six lane-color rules', () => {
+    const fixtures: readonly {
+      readonly name: string;
+      readonly edges: readonly MigrationEdge[];
+    }[] = [
+      { name: 'diamond', edges: diamondEdges() },
+      { name: 'routed-back-arc', edges: skipArcEdges() },
+      { name: 'three-way-fan', edges: threeWayFanEdges() },
+      { name: 'kitchen-sink', edges: kitchenSinkEdges() },
+    ];
+
+    for (const { edges } of fixtures) {
+      const plain = tree(edges, { colorize: false });
+      const colored = tree(edges, { colorize: true });
+      expect(colored.split('\n').map(stripAnsi)).toEqual(plain.split('\n').map(stripAnsi));
+    }
+
+    const diamondColored = tree(diamondEdges(), { colorize: true });
+    expect(diamondColored).toContain(laneColorForColumn(1)('│ '));
+    expect(diamondColored.split('\n')[0]).toMatch(/^○/);
+
+    const fanColored = tree(threeWayFanEdges(), { colorize: true });
+    expect(new Set([1, 2].map((column) => laneColorForColumn(column)('│ '))).size).toBe(2);
+    for (const column of [1, 2]) {
+      expect(fanColored).toContain(laneColorForColumn(column)('│ '));
+    }
+
+    const showcaseColored = tree(showcaseEdges(), { colorize: true });
+    const crossingRow = showcaseColored
+      .split('\n')
+      .find((line) => line.includes('┼') && line.includes('┬'));
+    expect(crossingRow).toBeDefined();
+    expect(crossingRow).toContain(dim('┼'));
+    expect(crossingRow).not.toContain(laneColorForColumn(1)('┼'));
+
+    const skipColored = tree(skipArcEdges(), { colorize: true });
+    const landLine = skipColored
+      .split('\n')
+      .find((line) => line.includes('bbbbbbb') && line.includes('◂'));
+    expect(landLine).toContain(laneColorForColumn(2)('◂'));
+    expect(landLine).toContain(laneColorForColumn(2)('──'));
+
+    const branchNode = diamondColored
+      .split('\n')
+      .find((line) => line.includes('6656a6e') && !line.includes('→'));
+    expect(branchNode).toContain(laneColorForColumn(1)('○ '));
+
+    const branchEdge = diamondColored.split('\n').find((line) => line.includes('bob_add_avatar'));
+    expect(branchEdge).toContain(laneColorForColumn(1)('↑'));
+
+    const sinkColored = tree(kitchenSinkEdges(), { colorize: true });
+    const shortBranchNode = sinkColored
+      .split('\n')
+      .find((line) => line.includes('tip_sho') && !line.includes('→'));
+    expect(shortBranchNode).toContain(laneColorForColumn(1)('○ '));
+    expect(sinkColored).toMatch(/kitchen_sink/);
+    expect(sinkColored).toMatch(/rollback/);
+  });
 });
 
 describe('resolveConnectorLaneColors', () => {
@@ -994,7 +1331,8 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        (refs) db / contract markers
+        <contract, db> live markers (contract on disk, database state)
+        (prod, staging) user-defined refs
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
@@ -1008,26 +1346,82 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        (refs) db / contract markers
+        <contract, db> live markers (contract on disk, database state)
+        (prod, staging) user-defined refs
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
 
-  it('emits zero ANSI when colorize is off; content is unchanged by the colorize gate', () => {
+  it('emits zero ANSI when colorize is off', () => {
     const plain = renderMigrationGraphLegend({ colorize: false });
     expect(plain).not.toContain('\u001b[');
-    // The colorize gate only adds styling — the visible content is identical.
-    expect(stripAnsi(renderMigrationGraphLegend({ colorize: true }))).toBe(plain);
   });
 
-  it('drops the old lane sample, data-column, and "node" wording', () => {
+  it('omits the lane-swatch line in both color and plain modes', () => {
     for (const colorize of [false, true]) {
       const text = stripAnsi(renderMigrationGraphLegend({ colorize }));
-      expect(text).not.toContain('lanes');
+      expect(text).not.toContain('gutter lanes by column');
+    }
+  });
+
+  it('renders the unicode legend with color', () => {
+    expect(stripAnsi(renderMigrationGraphLegend({ colorize: true }))).toMatchInlineSnapshot(`
+      "Legend:
+        ○ contract   ↑ forward   ↓ rollback
+        ⟲ migration without schema change
+        ✓ applied   ⧗ pending
+        ∅ empty database (baseline)
+        <contract, db> live markers (contract on disk, database state)
+        (prod, staging) user-defined refs
+        aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
+    `);
+  });
+
+  it('renders the ASCII legend with color', () => {
+    expect(
+      stripAnsi(renderMigrationGraphLegend({ colorize: true, glyphMode: 'ascii' })),
+    ).toMatchInlineSnapshot(`
+      "Legend:
+        * contract   ^ forward   v rollback
+        @ migration without schema change
+        + applied   > pending
+        - empty database (baseline)
+        <contract, db> live markers (contract on disk, database state)
+        (prod, staging) user-defined refs
+        aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
+    `);
+  });
+
+  it('renders the marker/ref block as two lines in system-then-ref order', () => {
+    const text = renderMigrationGraphLegend({ colorize: false });
+    const lines = text.split('\n');
+    const markersIdx = lines.findIndex((line) => line.includes('live markers'));
+    const refsIdx = lines.findIndex((line) => line.includes('user-defined refs'));
+    expect(markersIdx).toBeGreaterThan(-1);
+    expect(refsIdx).toBeGreaterThan(markersIdx);
+    expect(lines[markersIdx]).toContain('<contract, db>');
+    expect(lines[refsIdx]).toContain('(prod, staging)');
+  });
+
+  it('does not bold the illustrative marker and ref example names when colorized', () => {
+    const colored = renderMigrationGraphLegend({ colorize: true });
+    const bold = '\u001b[1m';
+    for (const name of ['contract', 'db', 'prod', 'staging'] as const) {
+      expect(colored).not.toContain(`${bold}${name}`);
+    }
+  });
+
+  it('omits legacy contract-node and data-column legend wording', () => {
+    for (const colorize of [false, true]) {
+      const text = stripAnsi(renderMigrationGraphLegend({ colorize }));
       expect(text).not.toContain('contract node');
       expect(text).not.toContain('data column');
       expect(text).not.toContain('node overlay');
-      expect(text).toContain('(refs) db / contract markers');
+      expect(text).not.toContain('db / contract markers');
+      expect(text).toContain('<contract, db>');
+      expect(text).toContain('(prod, staging)');
+      expect(text).toContain('live markers (contract on disk, database state)');
+      expect(text).toContain('user-defined refs');
       expect(text).toContain('migration from contract aaaaaa to bbbbbb');
     }
   });
@@ -1036,7 +1430,6 @@ describe('renderMigrationGraphLegend', () => {
     const colored = renderMigrationGraphLegend({ colorize: true, glyphMode: 'ascii' });
     expect(stripAnsi(colored)).toContain('* contract   ^ forward   v rollback');
     expect(stripAnsi(colored)).toContain('aaaaaa -> bbbbbb');
-    expect(stripAnsi(colored)).not.toContain('lanes');
   });
 
   it('dims legend label prose when colorize is on, not the heading or glyphs', () => {
@@ -1053,8 +1446,6 @@ describe('renderMigrationGraphLegend', () => {
     const dimForward = dim('forward');
     if (colored.includes(dimForward)) {
       expect(firstContent.indexOf(dimForward)).toBe(forwardIdx);
-    } else {
-      expect(stripAnsi(colored)).toBe(renderMigrationGraphLegend({ colorize: false }));
     }
 
     // The leading glyph markers (○, ↑, ↓, ⟲, ∅) stay bright like the other kind
@@ -1064,6 +1455,18 @@ describe('renderMigrationGraphLegend', () => {
 });
 
 describe('renderMigrationGraphTree status overlay', () => {
+  it('renders operation counts before status overlay labels', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const annotations = new Map([
+      [init.migrationHash, { operationCount: 3, status: 'applied' as const }],
+    ]);
+    const output = tree([init], {
+      colorize: false,
+      edgeAnnotationsByHash: annotations,
+    });
+    expect(output).toMatch(/3 ops\s+✓ applied/);
+  });
+
   it('appends applied and pending labels on migration rows', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');

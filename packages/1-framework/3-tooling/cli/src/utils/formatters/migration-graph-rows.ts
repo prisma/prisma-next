@@ -173,10 +173,19 @@ function compareNodesTipsFirst(a: string, b: string, rank: ReadonlyMap<string, n
  * at the same rank — stable across edge-insertion order and correct under
  * diamonds, cross-links, and rollbacks.
  */
+function maxRank(rank: ReadonlyMap<string, number>): number {
+  let max = 0;
+  for (const value of rank.values()) {
+    if (value > max) max = value;
+  }
+  return max;
+}
+
 function layerNodesByLongestForwardPath(
   componentNodes: ReadonlySet<string>,
   topology: MigrationListGraphTopology,
   graph: MigrationGraph,
+  contractHash: string | undefined,
 ): readonly string[] {
   const forwardOut = new Map<string, string[]>();
 
@@ -224,6 +233,15 @@ function layerNodesByLongestForwardPath(
     }
   }
 
+  if (
+    contractHash !== undefined &&
+    contractHash !== EMPTY_CONTRACT_HASH &&
+    componentNodes.has(contractHash) &&
+    (forwardOut.get(contractHash) ?? []).length === 0
+  ) {
+    rank.set(contractHash, maxRank(rank) + 1);
+  }
+
   return [...componentNodes].sort((a, b) => compareNodesTipsFirst(a, b, rank));
 }
 
@@ -262,6 +280,99 @@ function detachedContractHash(
     : undefined;
 }
 
+function isForwardLeaf(node: string, edges: readonly ClassifiedEdge[]): boolean {
+  return !edges.some((e) => e.kind === 'forward' && e.from === node && e.from !== e.to);
+}
+
+function forwardReachableFrom(
+  start: string,
+  forwardTo: ReadonlyMap<string, readonly string[]>,
+): ReadonlySet<string> {
+  const reachable = new Set<string>([start]);
+  const queue = [start];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (node === undefined) continue;
+    for (const next of forwardTo.get(node) ?? []) {
+      if (!reachable.has(next)) {
+        reachable.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return reachable;
+}
+
+function buildForwardToMap(edges: readonly ClassifiedEdge[]): Map<string, string[]> {
+  const forwardTo = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (edge.kind !== 'forward' || edge.from === edge.to) continue;
+    const bucket = forwardTo.get(edge.from);
+    if (bucket) bucket.push(edge.to);
+    else forwardTo.set(edge.from, [edge.to]);
+  }
+  return forwardTo;
+}
+
+function sortEdgesForContractHashTrunk(
+  edges: ClassifiedEdge[],
+  contractHash: string | undefined,
+): ClassifiedEdge[] {
+  if (
+    contractHash === undefined ||
+    contractHash === EMPTY_CONTRACT_HASH ||
+    !isForwardLeaf(contractHash, edges)
+  ) {
+    return edges;
+  }
+
+  const preferredLeaf = contractHash;
+  const forwardTo = buildForwardToMap(edges);
+  const reachability = new Map<string, ReadonlySet<string>>();
+  function canReachContractHash(from: string): boolean {
+    let cached = reachability.get(from);
+    if (cached === undefined) {
+      cached = forwardReachableFrom(from, forwardTo);
+      reachability.set(from, cached);
+    }
+    return cached.has(preferredLeaf);
+  }
+
+  function trunkBias(edge: ClassifiedEdge): number {
+    if (edge.kind !== 'forward' || edge.from === edge.to) return 0;
+    if (edge.to === preferredLeaf) return 2;
+    if (canReachContractHash(edge.to)) return 1;
+    return 0;
+  }
+
+  return edges
+    .map((edge, index) => ({ edge, index, bias: trunkBias(edge) }))
+    .sort((a, b) => {
+      if (a.edge.from !== b.edge.from) return a.index - b.index;
+      if (a.bias !== b.bias) return b.bias - a.bias;
+      return a.index - b.index;
+    })
+    .map(({ edge }) => edge);
+}
+
+function rebuildEdgeLookupMaps(edges: readonly ClassifiedEdge[]): {
+  edgesByFrom: Map<string, ClassifiedEdge[]>;
+  edgesByTo: Map<string, ClassifiedEdge[]>;
+} {
+  const edgesByFrom = new Map<string, ClassifiedEdge[]>();
+  const edgesByTo = new Map<string, ClassifiedEdge[]>();
+  for (const classified of edges) {
+    const fromBucket = edgesByFrom.get(classified.from);
+    if (fromBucket) fromBucket.push(classified);
+    else edgesByFrom.set(classified.from, [classified]);
+
+    const toBucket = edgesByTo.get(classified.to);
+    if (toBucket) toBucket.push(classified);
+    else edgesByTo.set(classified.to, [classified]);
+  }
+  return { edgesByFrom, edgesByTo };
+}
+
 export function buildMigrationGraphRows(
   graph: MigrationGraph,
   options: BuildMigrationGraphRowsOptions = {},
@@ -284,30 +395,22 @@ export function buildMigrationGraphRows(
 
   // 2. Build classified edge list
   const edges: ClassifiedEdge[] = [];
-  const edgesByFrom = new Map<string, ClassifiedEdge[]>();
-  const edgesByTo = new Map<string, ClassifiedEdge[]>();
 
   for (const edgeList of graph.forwardChain.values()) {
     for (const edge of edgeList) {
       const kind = topology.kindByMigrationHash.get(edge.migrationHash) ?? 'forward';
-      const classified: ClassifiedEdge = {
+      edges.push({
         migrationHash: edge.migrationHash,
         from: edge.from,
         to: edge.to,
         dirName: edge.dirName,
         kind,
-      };
-      edges.push(classified);
-
-      const fromBucket = edgesByFrom.get(edge.from);
-      if (fromBucket) fromBucket.push(classified);
-      else edgesByFrom.set(edge.from, [classified]);
-
-      const toBucket = edgesByTo.get(edge.to);
-      if (toBucket) toBucket.push(classified);
-      else edgesByTo.set(edge.to, [classified]);
+      });
     }
   }
+
+  const sortedEdges = sortEdgesForContractHashTrunk(edges, options.contractHash);
+  const { edgesByFrom, edgesByTo } = rebuildEdgeLookupMaps(sortedEdges);
 
   // 3. Find weakly-connected components (ordered: EMPTY first, then lex)
   const components = weaklyConnectedComponents(graph);
@@ -318,7 +421,12 @@ export function buildMigrationGraphRows(
     if (i > 0) nodes.push(null);
     const component = components[i];
     if (component === undefined) continue;
-    const ordered = layerNodesByLongestForwardPath(component, topology, graph);
+    const ordered = layerNodesByLongestForwardPath(
+      component,
+      topology,
+      graph,
+      options.contractHash,
+    );
     for (const node of ordered) {
       nodes.push(node);
     }
@@ -332,5 +440,10 @@ export function buildMigrationGraphRows(
     nodes.unshift(detached);
   }
 
-  return { nodes, edges, edgesByFrom, edgesByTo };
+  return {
+    nodes,
+    edges: sortedEdges,
+    edgesByFrom,
+    edgesByTo,
+  };
 }

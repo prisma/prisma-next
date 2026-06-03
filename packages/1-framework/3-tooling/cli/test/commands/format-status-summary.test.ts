@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildNoPathSummary,
   buildStatusHeadline,
   formatStatusSummary,
   type MigrationStatusResult,
@@ -8,10 +9,64 @@ import {
 const baseResult: MigrationStatusResult = {
   ok: true,
   spaces: [],
-  summary: 'up to date',
+  summary: 'Up to date',
   diagnostics: [],
   treeSections: [],
 };
+
+describe('buildNoPathSummary', () => {
+  it('names the live contract when no --to was passed', () => {
+    expect(
+      buildNoPathSummary({
+        markerHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        targetHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        explicitTarget: false,
+        refName: undefined,
+      }),
+    ).toBe(
+      "No migration path from the database state (aaaaaaaaaaaa) to the application's contract (bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one.",
+    );
+  });
+
+  it('names the ref when --to resolved via ref', () => {
+    expect(
+      buildNoPathSummary({
+        markerHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        targetHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        explicitTarget: true,
+        refName: 'prod',
+      }),
+    ).toBe(
+      'No migration path from the database state (aaaaaaaaaaaa) to the target (bbbbbbbbbbbb via `prod`). Run `prisma-next migration plan --name <name>` to author one, or pass `--to <contract>` to pick a reachable target.',
+    );
+  });
+
+  it('omits via ref when --to was a raw hash', () => {
+    expect(
+      buildNoPathSummary({
+        markerHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        targetHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        explicitTarget: true,
+        refName: undefined,
+      }),
+    ).toBe(
+      'No migration path from the database state (aaaaaaaaaaaa) to the target (bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one, or pass `--to <contract>` to pick a reachable target.',
+    );
+  });
+
+  it('omits marker parenthetical when marker hash is unknown', () => {
+    expect(
+      buildNoPathSummary({
+        markerHash: undefined,
+        targetHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        explicitTarget: false,
+        refName: undefined,
+      }),
+    ).toBe(
+      "No migration path from the database state to the application's contract (bbbbbbbbbbbb). Run `prisma-next migration plan --name <name>` to author one.",
+    );
+  });
+});
 
 describe('buildStatusHeadline', () => {
   it('reports up to date when nothing is pending', () => {
@@ -22,7 +77,7 @@ describe('buildStatusHeadline', () => {
         markerDiverged: false,
         markerHash: 'sha256:abc',
       }),
-    ).toBe('up to date');
+    ).toBe('Up to date');
   });
 
   it('names the migrate target when migrations are pending', () => {
@@ -46,7 +101,7 @@ describe('formatStatusSummary', () => {
       },
       false,
     );
-    expect(out).toContain('up to date');
+    expect(out).toContain('Up to date');
     expect(out).toContain('missing invariant(s): users-have-email');
   });
 

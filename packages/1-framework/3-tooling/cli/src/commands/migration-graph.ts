@@ -1,4 +1,5 @@
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -11,46 +12,66 @@ import {
   setCommandSeeAlso,
 } from '../utils/command-helpers';
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
-import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
-import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
 import {
-  renderMigrationGraphLegend,
-  renderMigrationGraphTree,
-} from '../utils/formatters/migration-graph-tree-render';
+  computeGlobalMaxDirNameWidth,
+  computeGlobalMaxEdgeTreePrefixWidth,
+  indentMigrationGraphTreeBlock,
+  renderMigrationGraphSpaceTree,
+} from '../utils/formatters/migration-graph-space-render';
+import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-tree-render';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
-import type { StatusRef } from '../utils/migration-types';
+import { shouldShowLegend, validateLegendOptions } from '../utils/legend';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import {
+  listRefsByContractHash,
+  migrationSpaceListEntriesFromAggregate,
+  runMigrationList,
+} from './migration-list';
 
 interface MigrationGraphOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly dot?: boolean;
+  readonly space?: string;
   readonly ascii?: boolean;
   readonly legend?: boolean;
 }
 
-/**
- * The legend is decoration printed alongside the command header on stderr, so
- * it is suppressed for the machine-readable / silent paths (`--json`, `--dot`,
- * `--quiet`) exactly as the header is.
- */
-export function migrationGraphShowsLegend(
-  options: { readonly legend?: boolean; readonly dot?: boolean },
-  flags: GlobalFlags,
-): boolean {
-  return (
-    options.legend === true && options.dot !== true && flags.json !== true && flags.quiet !== true
-  );
+export interface MigrationGraphTreeSection {
+  readonly spaceId: string;
+  readonly tree: string;
+  readonly showHeading: boolean;
 }
 
 export interface MigrationGraphResult {
   readonly ok: true;
+  /** App-space graph for `--json` / `--dot` (unchanged machine output). */
   readonly graph: MigrationGraph;
-  readonly contractHash: string | null;
-  readonly refs: readonly StatusRef[];
+  readonly treeSections: readonly MigrationGraphTreeSection[];
   readonly summary: string;
+}
+
+function computeGraphSummary(graph: MigrationGraph): string {
+  return `${graph.nodes.size} node(s), ${graph.migrationByHash.size} edge(s)`;
+}
+
+export function formatMigrationGraphHumanOutput(result: MigrationGraphResult): string {
+  const sections: string[] = [];
+  for (const section of result.treeSections) {
+    if (section.showHeading) {
+      sections.push(`${section.spaceId}:`);
+    }
+    if (section.tree.length > 0) {
+      sections.push(section.tree);
+    } else {
+      sections.push('(no migrations)');
+    }
+    sections.push('');
+  }
+  sections.push(result.summary);
+  return sections.join('\n').trimEnd();
 }
 
 export async function executeMigrationGraphCommand(
@@ -59,7 +80,7 @@ export async function executeMigrationGraphCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationGraphResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, appMigrationsRelative, migrationsDir } = resolveMigrationPaths(
+  const { configPath, migrationsRelative, migrationsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -70,12 +91,13 @@ export async function executeMigrationGraphCommand(
       description: 'Show the migration graph topology',
       details: [
         { label: 'config', value: configPath },
-        { label: 'migrations', value: appMigrationsRelative },
+        { label: 'migrations', value: migrationsRelative },
+        ...(options.space !== undefined ? [{ label: 'space', value: options.space }] : []),
       ],
       flags,
     });
     ui.stderr(header);
-    if (migrationGraphShowsLegend(options, flags)) {
+    if (shouldShowLegend(options, flags)) {
       ui.stderr(
         renderMigrationGraphLegend({
           colorize: flags.color !== false,
@@ -91,20 +113,72 @@ export async function executeMigrationGraphCommand(
     return loaded;
   }
 
-  const { aggregate, contractHash } = loaded.value;
-  const graph = aggregate.app.graph();
-  const refs: readonly StatusRef[] = Object.entries(aggregate.app.refs).map(([name, entry]) => ({
-    name,
-    hash: entry.hash,
-    active: false,
-  }));
+  const { aggregate, contractHash: liveContractHash } = loaded.value;
+  const appGraph = aggregate.app.graph();
+
+  const listSpaces = await migrationSpaceListEntriesFromAggregate(aggregate, migrationsDir);
+  const listResult = runMigrationList({
+    spaces: listSpaces,
+    ...ifDefined('spaceFilter', options.space),
+  });
+  if (!listResult.ok) {
+    return listResult;
+  }
+
+  const scopedSpaces = listResult.value.spaces;
+  const showSpaceHeadings = scopedSpaces.length > 1;
+  const glyphMode = ui.resolveGlyphMode(options.ascii === true);
+  const colorize = flags.color !== false;
+
+  const globalLayoutInputs = showSpaceHeadings
+    ? scopedSpaces
+        .filter((spaceEntry) => spaceEntry.migrations.length > 0)
+        .map((spaceEntry) => ({
+          graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+          liveContractHash,
+        }))
+    : [];
+  const globalMaxEdgeTreePrefixWidth =
+    globalLayoutInputs.length > 0
+      ? computeGlobalMaxEdgeTreePrefixWidth(globalLayoutInputs)
+      : undefined;
+  const globalMaxDirNameWidth =
+    globalLayoutInputs.length > 0 ? computeGlobalMaxDirNameWidth(globalLayoutInputs) : undefined;
+
+  const treeSections: MigrationGraphTreeSection[] = [];
+  for (const spaceEntry of scopedSpaces) {
+    const member = aggregate.space(spaceEntry.spaceId);
+    if (member === undefined) {
+      continue;
+    }
+    const graph = member.graph();
+    const tree =
+      spaceEntry.migrations.length === 0
+        ? ''
+        : renderMigrationGraphSpaceTree({
+            graph,
+            migrations: spaceEntry.migrations,
+            liveContractHash,
+            glyphMode,
+            colorize,
+            refsByHash: listRefsByContractHash(member),
+            ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
+            ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
+          });
+    const displayTree =
+      showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;
+    treeSections.push({
+      spaceId: spaceEntry.spaceId,
+      tree: displayTree,
+      showHeading: showSpaceHeadings,
+    });
+  }
 
   return ok({
     ok: true,
-    graph,
-    contractHash,
-    refs,
-    summary: `${graph.nodes.size} node(s), ${graph.migrationByHash.size} edge(s)`,
+    graph: appGraph,
+    treeSections,
+    summary: computeGraphSummary(appGraph),
   });
 }
 
@@ -124,6 +198,7 @@ export function createMigrationGraphCommand(): Command {
     'prisma-next migration graph --dot',
     'prisma-next migration graph --ascii',
     'prisma-next migration graph --legend',
+    'prisma-next migration graph --space app',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
@@ -133,12 +208,17 @@ export function createMigrationGraphCommand(): Command {
   ]);
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--space <id>', 'Narrow output to a single contract space')
     .option('--dot', 'Output in Graphviz DOT format')
     .option('--ascii', 'Use ASCII glyphs (pipe-friendly)')
     .option('--legend', 'Print a key for the tree glyphs and lane colors')
     .action(async (options: MigrationGraphOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
+      const legendValidation = validateLegendOptions(options, flags);
+      if (!legendValidation.ok) {
+        process.exit(handleResult(legendValidation, flags, ui));
+      }
       const result = await executeMigrationGraphCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, (graphResult) => {
         if (options.dot) {
@@ -159,32 +239,19 @@ export function createMigrationGraphCommand(): Command {
             migrationHash: e.migrationHash,
           }));
           ui.output(
-            JSON.stringify({ ok: true, nodes, edges, summary: graphResult.summary }, null, 2),
+            JSON.stringify(
+              {
+                ok: true,
+                nodes,
+                edges,
+                summary: `${graphResult.graph.nodes.size} node(s), ${graphResult.graph.migrationByHash.size} edge(s)`,
+              },
+              null,
+              2,
+            ),
           );
         } else if (!flags.quiet) {
-          const refsByHash = new Map<string, string[]>();
-          for (const ref of graphResult.refs) {
-            const existing = refsByHash.get(ref.hash);
-            refsByHash.set(ref.hash, existing ? [...existing, ref.name] : [ref.name]);
-          }
-          const rowModel = buildMigrationGraphRows(graphResult.graph, {
-            ...(graphResult.contractHash !== null
-              ? { contractHash: graphResult.contractHash }
-              : {}),
-          });
-          const layout = buildMigrationGraphLayout(rowModel);
-          const activeRef = graphResult.refs.find((ref) => ref.active);
-          const treeOutput = renderMigrationGraphTree(layout, {
-            refsByHash,
-            ...(graphResult.contractHash !== null
-              ? { contractHash: graphResult.contractHash }
-              : {}),
-            ...(activeRef !== undefined ? { activeRefName: activeRef.name } : {}),
-            colorize: flags.color !== false,
-            glyphMode: ui.resolveGlyphMode(options.ascii === true),
-          });
-          ui.output(treeOutput);
-          ui.output(`\n${graphResult.summary}`);
+          ui.output(formatMigrationGraphHumanOutput(graphResult));
         }
       });
       process.exit(exitCode);

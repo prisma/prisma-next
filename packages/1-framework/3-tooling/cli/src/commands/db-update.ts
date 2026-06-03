@@ -71,7 +71,12 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
     return errorRunnerFailed(failure.summary, {
       why: failure.why ?? 'Migration runner failed',
       fix,
-      ...ifDefined('meta', failure.meta),
+      meta: {
+        ...failure.meta,
+        ...(failure.warnings && failure.warnings.length > 0
+          ? { plannerWarnings: failure.warnings }
+          : {}),
+      },
     });
   }
 
@@ -236,6 +241,7 @@ async function executeDbUpdateCommand(
           : undefined,
       ),
       ...ifDefined('perSpace', result.value.perSpace),
+      ...ifDefined('warnings', result.value.warnings),
       advancedRef: refAdvancementFields.advancedRef,
       plannedAdvanceRef: refAdvancementFields.plannedAdvanceRef,
       summary: result.value.summary,

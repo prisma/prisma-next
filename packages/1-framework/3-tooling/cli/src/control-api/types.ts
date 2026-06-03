@@ -395,6 +395,7 @@ export interface DbInitSuccess {
    */
   readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly summary: string;
+  readonly warnings?: ReadonlyArray<MigrationPlannerConflict>;
 }
 
 /**
@@ -410,6 +411,7 @@ export interface DbInitFailure {
   readonly summary: string;
   readonly why: string | undefined;
   readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
+  readonly warnings?: ReadonlyArray<MigrationPlannerConflict>;
   readonly meta: Record<string, unknown> | undefined;
   readonly marker?: {
     readonly storageHash?: string;
@@ -465,6 +467,7 @@ export interface DbUpdateSuccess {
    */
   readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly summary: string;
+  readonly warnings?: ReadonlyArray<MigrationPlannerConflict>;
 }
 
 /**
@@ -480,6 +483,7 @@ export interface DbUpdateFailure {
   readonly summary: string;
   readonly why: string | undefined;
   readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
+  readonly warnings?: ReadonlyArray<MigrationPlannerConflict>;
   readonly meta: Record<string, unknown> | undefined;
 }
 

@@ -1,23 +1,22 @@
-# `migration graph --tree` — condensed annotated-tree rendering
+# `migration graph` — condensed annotated-tree rendering
 
-This document is the rendering contract for `migration graph --tree`: how it draws the
-offline migration graph as a condensed annotated tree, the row/grid model, the glyph
-palette (Unicode and ASCII), routed back-arcs, and its relationship to the other
-migration views. It is reference material for anyone maintaining or extending the
-`--tree` output.
+This document is the rendering contract for the human-readable `migration graph`
+output: how it draws the offline migration graph as a condensed annotated tree, the
+row/grid model, the glyph palette (Unicode and ASCII), routed back-arcs, and its
+relationship to the other migration views. It is reference material for anyone
+maintaining or extending the tree renderer.
 
 ## Problem framing
 
-`migration graph` (without `--tree`) renders a **node graph** laid out by dagre:
-contracts are nodes, migrations are edges between them. That answers “what is the
-whole topology?” including markers and back-edges drawn as graph geometry.
+`migration graph` (default human output) renders a **condensed annotated tree** in
+the spirit of `git log --graph`, with **one contract node row per hash** and **one
+migration row per edge**, both carrying the same `dirName` and `from → to` data
+column as the flat list. The gutter is a multi-lane box-drawing spine (forward
+branches, merge joins, and routed rollback arcs).
 
-`migration graph --tree` is a different drawing contract: a **condensed annotated
-tree** in the spirit of `git log --graph`, but with **one contract node row per hash**
-and **one migration row per edge**, both carrying the same `dirName` and
-`from → to` data column as the flat list. The gutter is a multi-lane box-drawing
-spine (forward branches, merge joins, and routed rollback arcs) rather than dagre
-coordinates.
+`--json` and `--dot` are machine-readable alternatives: JSON exports the graph
+structure; DOT feeds GraphViz for a node-graph layout. The human tree renderer
+does not use dagre or `graph-render.ts`.
 
 ## The model
 
@@ -155,32 +154,23 @@ when color is enabled.
 
 ## Legend (`--legend`)
 
-`migration graph --legend` prints a compact key for the tree's visual language —
-the contract-node marker, the in-lane direction arrows (`↑` / `↓` / `⟲`), the
-empty baseline (`∅`), the data-column arrow (`→`), the `(refs)` overlay
-(including the reserved `db` and `contract` markers), and the rotating
-per-column lane colors. The lane-color row is shown only when color is enabled.
+`--legend` prints a compact key for the tree's visual language — the contract-node marker, the in-lane direction arrows (`↑` / `↓` / `⟲`), the empty baseline (`∅`), the data-column arrow (`→`), the system markers and user-defined refs (`<contract, db>` for live markers; `(prod, staging)` for user-defined refs), and the rotating per-column lane colors. The lane-color row is shown only when color is enabled.
 
-The legend honors the active glyph palette (`--ascii` swaps to `* ^ v @ -`) and
-the same `colorize` gate as the renderer. It is decoration: it prints to
-**stderr** alongside the command header, so `migration graph --tree --legend |
-…` still pipes pure graph output on stdout. `--legend` **implies `--tree`** (it
-describes the tree language), and is suppressed under `--json` / `--dot` /
-`--quiet`. Implementation: `renderMigrationGraphLegend` in
-`migration-graph-tree-render.ts`; lane hues come from
-`migration-graph-lane-colors.ts`.
+The flag is available on every command that draws the tree — `migration list`, `migration graph`, and `migration status` — and behaves identically across all three. The legend honors the active glyph palette (`--ascii` swaps to `* ^ v @ -`) and the same `colorize` gate as the renderer. It is decoration: it prints to **stderr** alongside the command header, so `migration list --legend | …` still pipes pure tree output on stdout. Combining `--legend` with `--json`, `--dot`, or `--quiet` is rejected (human-only).
+
+Implementation: `renderMigrationGraphLegend` in `migration-graph-tree-render.ts`; the `shouldShowLegend` / `validateLegendOptions` helpers live in `utils/legend.ts`; lane hues come from `migration-graph-lane-colors.ts`.
 
 ## Relationship to the other views
 
 | Command | Rows | Gutter |
 |---|---|---|
-| `migration list` | migrations | none (flat) |
-| `migration graph` (default) | dagre node graph | full topology via GraphViz |
-| `migration graph --tree` | **nodes + migrations** | forward spine + routed back-arcs |
+| `migration list` | nodes + migrations (tree) | forward spine + routed back-arcs |
+| `migration graph` (default) | nodes + migrations (tree) | forward spine + routed back-arcs |
+| `migration graph --json` / `--dot` | structured / GraphViz | n/a (machine-readable) |
 
-`--tree` does **not** use `graph-render.ts` / dagre. It reuses the same
-`MigrationGraph` input as the default renderer but a separate row → grid → text
-pipeline. `--json` and `--dot` are unaffected.
+`migration list`, `migration status`, and `migration graph` share the same tree
+renderer (`migration-graph-space-render.ts` → `migration-graph-tree-render.ts`).
+`--json` and `--dot` bypass the tree pipeline entirely.
 
 ## Worked cases
 
@@ -214,5 +204,6 @@ The same fixture in ASCII (`--ascii` / `glyphMode: 'ascii'`):
 
 - **Demo fixture loading** — golden tests use synthetic graphs only; fixture-backed
   snapshots are a separate follow-on.
-- **Default dagre renderer** — `graph-render.ts`, `graph-migration-mapper.ts`, and
-  `--dot` output are unchanged by `--tree` / `--ascii`.
+- **Legacy dagre renderer** — `graph-render.ts`, `graph-migration-mapper.ts`, and
+  `--dot` output are separate from the human tree pipeline; `--ascii` affects tree
+  glyphs only.

@@ -270,9 +270,11 @@ export type SqlPlannerConflictKind =
   | 'indexIncompatible'
   | 'foreignKeyConflict'
   | 'missingButNonAdditive'
-  | 'unsupportedOperation';
+  | 'unsupportedOperation'
+  | 'controlPolicySuppressedCall';
 
 export interface SqlPlannerConflictLocation {
+  readonly namespace?: string;
   readonly table?: string;
   readonly column?: string;
   readonly index?: string;

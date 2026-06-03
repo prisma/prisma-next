@@ -109,6 +109,23 @@ export function errorRefSetEmptySentinel(hash: string): CliStructuredError {
 }
 
 /**
+ * `--legend` was combined with a machine-readable or silent output flag.
+ * The legend is human-only decoration on stderr.
+ */
+export function errorLegendHumanOnly(
+  conflictingFlag: '--json' | '--dot' | '--quiet',
+): CliStructuredError {
+  return errorRuntime('`--legend` is only available for human-readable output', {
+    why: `\`--legend\` prints a glyph key to stderr and cannot be combined with ${conflictingFlag}.`,
+    fix: `Omit ${conflictingFlag} to print the legend alongside the tree, or omit --legend when using ${conflictingFlag}.`,
+    meta: {
+      code: 'MIGRATION.LEGEND_HUMAN_ONLY',
+      conflictingFlag,
+    },
+  });
+}
+
+/**
  * `--space <id>` was given a value that doesn't satisfy the contract-space
  * naming rule (`[a-z][a-z0-9_-]{0,63}` per `isValidSpaceId`). Fires before
  * any fs work — the input is syntactically rejected the same way an on-disk

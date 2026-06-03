@@ -3,18 +3,13 @@ import type {
   ContractMarkerRecordLike,
   ContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
-import { requireHeadRef } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import {
   errorNoInvariantPath,
   errorUnknownInvariant,
   MigrationToolsError,
 } from '@prisma-next/migration-tools/errors';
-import {
-  findPath,
-  findPathWithDecision,
-  findReachableLeaves,
-} from '@prisma-next/migration-tools/migration-graph';
+import { findPath, findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs } from '@prisma-next/migration-tools/refs';
@@ -47,16 +42,19 @@ import {
   loadContractRawSafely,
   refusePackageCorruptionOnAggregate,
 } from '../utils/contract-space-aggregate-loader';
-import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
-import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
 import {
-  type MigrationEdgeAnnotation,
-  renderMigrationGraphTree,
-} from '../utils/formatters/migration-graph-tree-render';
+  computeGlobalMaxDirNameWidth,
+  computeGlobalMaxEdgeTreePrefixWidth,
+  indentMigrationGraphTreeBlock,
+  renderMigrationGraphSpaceTree,
+} from '../utils/formatters/migration-graph-space-render';
+import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
+import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-tree-render';
 import type { MigrationListEntry } from '../utils/formatters/migration-list-types';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { shouldShowLegend, validateLegendOptions } from '../utils/legend';
 import type { StatusDiagnostic } from '../utils/migration-types';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
@@ -77,6 +75,7 @@ interface MigrationStatusOptions extends CommonCommandOptions {
   readonly to?: string;
   readonly from?: string;
   readonly space?: string;
+  readonly legend?: boolean;
 }
 
 export interface MigrationStatusMigrationEntry extends MigrationListEntry {
@@ -112,26 +111,8 @@ function shortDisplayHash(hash: string): string {
   return stripped.slice(0, 12);
 }
 
-function resolveTargetHashForSpace(
-  member: ContractSpaceMember,
-  contractHash: string,
-  activeRefHash: string | undefined,
-): string | undefined {
-  const graph = member.graph();
-  if (activeRefHash !== undefined && graph.nodes.has(activeRefHash)) {
-    return activeRefHash;
-  }
-  if (graph.nodes.has(contractHash)) {
-    return contractHash;
-  }
-  if (graph.nodes.size === 0) {
-    return requireHeadRef(member).hash;
-  }
-  const leaves = findReachableLeaves(graph, EMPTY_CONTRACT_HASH);
-  if (leaves.length === 1) {
-    return leaves[0];
-  }
-  return undefined;
+function resolveTarget(contractHash: string, activeRefHash: string | undefined): string {
+  return activeRefHash ?? contractHash;
 }
 
 function buildStatusMigrations(
@@ -146,33 +127,61 @@ function buildStatusMigrations(
 
 function renderSpaceTree(args: {
   readonly member: ContractSpaceMember;
-  readonly contractHash: string;
+  readonly liveContractHash: string;
+  readonly migrations: readonly MigrationListEntry[];
   readonly markerHash: string | undefined;
   readonly showDbMarker: boolean;
-  readonly targetHash: string;
-  readonly edgeAnnotations: ReadonlyMap<string, MigrationEdgeAnnotation>;
+  readonly statusOverlay: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly colorize: boolean;
   readonly glyphMode: 'unicode' | 'ascii';
+  readonly globalMaxEdgeTreePrefixWidth?: number;
+  readonly globalMaxDirNameWidth?: number;
 }): string {
   const graph = args.member.graph();
   if (graph.nodes.size === 0) {
     return '';
   }
-  const refsByHash = listRefsByContractHash(args.member);
-  const rowModel = buildMigrationGraphRows(graph, { contractHash: args.contractHash });
-  const layout = buildMigrationGraphLayout(rowModel);
-  return renderMigrationGraphTree(layout, {
-    refsByHash,
-    ...(args.showDbMarker && args.markerHash !== undefined ? { dbHash: args.markerHash } : {}),
-    contractHash: args.contractHash,
-    edgeAnnotationsByHash: args.edgeAnnotations,
+  return renderMigrationGraphSpaceTree({
+    graph,
+    migrations: args.migrations,
+    liveContractHash: args.liveContractHash,
+    refsByHash: listRefsByContractHash(args.member),
+    statusOverlayByHash: args.statusOverlay,
     colorize: args.colorize,
     glyphMode: args.glyphMode,
+    ...(args.showDbMarker && args.markerHash !== undefined ? { dbHash: args.markerHash } : {}),
+    ...(args.globalMaxEdgeTreePrefixWidth !== undefined
+      ? { globalMaxEdgeTreePrefixWidth: args.globalMaxEdgeTreePrefixWidth }
+      : {}),
+    ...(args.globalMaxDirNameWidth !== undefined
+      ? { globalMaxDirNameWidth: args.globalMaxDirNameWidth }
+      : {}),
   });
 }
 
 function countPending(migrations: readonly MigrationStatusMigrationEntry[]): number {
   return migrations.filter((m) => m.status === 'pending').length;
+}
+
+export function buildNoPathSummary(args: {
+  readonly markerHash: string | undefined;
+  readonly targetHash: string;
+  readonly explicitTarget: boolean;
+  readonly refName: string | undefined;
+}): string {
+  const markerPart =
+    args.markerHash !== undefined
+      ? `the database state (${shortDisplayHash(args.markerHash)})`
+      : 'the database state';
+  const targetShort = shortDisplayHash(args.targetHash);
+  if (!args.explicitTarget) {
+    return `No migration path from ${markerPart} to the application's contract (${targetShort}). Run \`prisma-next migration plan --name <name>\` to author one.`;
+  }
+  const targetLabel =
+    args.refName !== undefined
+      ? `the target (${targetShort} via \`${args.refName}\`)`
+      : `the target (${targetShort})`;
+  return `No migration path from ${markerPart} to ${targetLabel}. Run \`prisma-next migration plan --name <name>\` to author one, or pass \`--to <contract>\` to pick a reachable target.`;
 }
 
 export function buildStatusHeadline(args: {
@@ -185,7 +194,7 @@ export function buildStatusHeadline(args: {
     return `Database marker ${shortDisplayHash(args.markerHash)} is not in the on-disk migration graph`;
   }
   if (args.pendingCount === 0) {
-    return 'up to date';
+    return 'Up to date';
   }
   return `${args.pendingCount} pending — run \`prisma-next migrate --to ${shortDisplayHash(args.targetHash)}\``;
 }
@@ -361,6 +370,15 @@ async function executeMigrationStatusCommand(
       flags,
     });
     ui.stderr(header);
+    if (shouldShowLegend(options, flags)) {
+      ui.stderr(
+        renderMigrationGraphLegend({
+          colorize: flags.color !== false,
+          glyphMode: ui.resolveGlyphMode(false),
+        }),
+      );
+      ui.stderr('');
+    }
   }
 
   const listSpaces = await migrationSpaceListEntriesFromAggregate(aggregate, migrationsDir);
@@ -440,7 +458,21 @@ async function executeMigrationStatusCommand(
   let markerCannotReachTarget = false;
   let headlineTargetHash = activeRefHash ?? contractHash;
   let totalPending = 0;
-  let hasAmbiguousTarget = false;
+
+  const globalLayoutInputs = showSpaceHeadings
+    ? scopedSpaces
+        .filter((spaceEntry) => spaceEntry.migrations.length > 0)
+        .map((spaceEntry) => ({
+          graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+          liveContractHash: contractHash,
+        }))
+    : [];
+  const globalMaxEdgeTreePrefixWidth =
+    globalLayoutInputs.length > 0
+      ? computeGlobalMaxEdgeTreePrefixWidth(globalLayoutInputs)
+      : undefined;
+  const globalMaxDirNameWidth =
+    globalLayoutInputs.length > 0 ? computeGlobalMaxDirNameWidth(globalLayoutInputs) : undefined;
 
   for (const spaceEntry of scopedSpaces) {
     const member = aggregate.space(spaceEntry.spaceId);
@@ -449,20 +481,7 @@ async function executeMigrationStatusCommand(
     }
     const graph = member.graph();
     const spaceContractHash = member.contract().storage.storageHash;
-    const targetHash = resolveTargetHashForSpace(member, spaceContractHash, activeRefHash);
-    if (targetHash === undefined) {
-      hasAmbiguousTarget = true;
-      diagnostics.push({
-        code: 'MIGRATION.DIVERGED',
-        severity: 'warn',
-        message: 'There are multiple valid migration paths — you must select a target',
-        hints: [
-          "Use '--to <contract>' to select a target",
-          "Or 'prisma-next ref set <name> <hash>' to create one",
-        ],
-      });
-      continue;
-    }
+    const targetHash = resolveTarget(spaceContractHash, activeRefHash);
     if (spaceEntry.spaceId === aggregate.app.spaceId) {
       headlineTargetHash = targetHash;
     }
@@ -477,9 +496,8 @@ async function executeMigrationStatusCommand(
     if (
       connected &&
       !usingFromOverride &&
-      markerHash !== undefined &&
       markerInGraph &&
-      markerHash !== targetHash &&
+      originHash !== targetHash &&
       findPath(graph, originHash, targetHash) === null
     ) {
       markerCannotReachTarget = true;
@@ -511,13 +529,15 @@ async function executeMigrationStatusCommand(
     });
     const tree = renderSpaceTree({
       member,
-      contractHash: spaceContractHash,
+      liveContractHash: contractHash,
+      migrations: spaceEntry.migrations,
       markerHash,
       showDbMarker,
-      targetHash,
-      edgeAnnotations: annotations,
+      statusOverlay: annotations,
       colorize,
       glyphMode,
+      ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
+      ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
     });
     const migrations = buildStatusMigrations(spaceEntry.migrations, annotations);
     const pending = countPending(migrations);
@@ -529,9 +549,11 @@ async function executeMigrationStatusCommand(
       targetHash,
       migrations,
     });
+    const displayTree =
+      showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;
     treeSections.push({
       spaceId: spaceEntry.spaceId,
-      tree,
+      tree: displayTree,
       showHeading: showSpaceHeadings,
     });
   }
@@ -567,16 +589,19 @@ async function executeMigrationStatusCommand(
   }
 
   const appMarkerHash = markersBySpace.get(aggregate.app.spaceId)?.storageHash;
-  const summary = hasAmbiguousTarget
-    ? 'Multiple valid migration paths — select a target with --to'
-    : markerCannotReachTarget
-      ? 'Database marker cannot reach the selected target'
-      : buildStatusHeadline({
-          pendingCount: totalPending,
-          targetHash: headlineTargetHash,
-          markerDiverged,
-          markerHash: appMarkerHash,
-        });
+  const summary = markerCannotReachTarget
+    ? buildNoPathSummary({
+        markerHash: appMarkerHash,
+        targetHash: headlineTargetHash,
+        explicitTarget: options.to !== undefined,
+        refName: activeRefName,
+      })
+    : buildStatusHeadline({
+        pendingCount: totalPending,
+        targetHash: headlineTargetHash,
+        markerDiverged,
+        markerHash: appMarkerHash,
+      });
 
   if (scopedSpaces.every((s) => s.migrations.length === 0)) {
     return ok({
@@ -613,6 +638,7 @@ export function createMigrationStatusCommand(): Command {
     'prisma-next migration status --db $DATABASE_URL',
     'prisma-next migration status --to production --db $DATABASE_URL',
     'prisma-next migration status --from sha256:abc --to production',
+    'prisma-next migration status --legend --from sha256:abc --to production',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration log', oneLiner: 'Show executed migration history' },
@@ -632,9 +658,15 @@ export function createMigrationStatusCommand(): Command {
       '--from <contract>',
       'Origin contract reference; same grammar as --to. Supplying --from switches to offline path computation.',
     )
+    .option('--legend', 'Print a key for the tree glyphs and lane colors')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
+
+      const legendValidation = validateLegendOptions(options, flags);
+      if (!legendValidation.ok) {
+        process.exit(handleResult(legendValidation, flags, ui));
+      }
 
       const result = await executeMigrationStatusCommand(options, flags, ui);
 

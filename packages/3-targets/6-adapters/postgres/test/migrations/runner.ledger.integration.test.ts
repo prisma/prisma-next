@@ -173,6 +173,61 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     ]);
   });
 
+  it('throws when migrationEdges operationCount sum does not match plan.operations length', {
+    timeout: testTimeout,
+  }, async () => {
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const destHash = contract.storage.storageHash;
+    const edges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        migrationHash: 'sha256:mig-single',
+        dirName: '001_single',
+        from: EMPTY_CONTRACT_HASH,
+        to: destHash,
+        operationCount: 2,
+      },
+    ];
+    const plan = createLedgerTestPlan<PostgresPlanTargetDetails>({
+      destinationHash: destHash,
+      operations: [
+        {
+          id: 'edge.single.op',
+          label: 'single edge op',
+          operationClass: 'additive',
+          target: {
+            id: 'postgres',
+            details: { schema: 'public', objectType: 'table', name: 'user' },
+          },
+          precheck: [],
+          execute: [],
+          postcheck: [{ description: 'ok', sql: 'SELECT TRUE' }],
+        },
+      ],
+      migrationEdges: edges,
+    });
+
+    await expect(
+      runner.execute({
+        driver: driver!,
+        perSpaceOptions: [
+          {
+            space: LEDGER_TEST_SPACE_ID,
+            plan,
+            driver: driver!,
+            destinationContract: contract,
+            policy: INIT_ADDITIVE_POLICY,
+            frameworkComponents,
+            strictVerification: false,
+            migrationEdges: edges,
+          },
+        ],
+      }),
+    ).rejects.toThrow(/does not match sum of migrationEdges operationCount/);
+
+    const ledger = await ledgerAdapter.readLedger(driver!, LEDGER_TEST_SPACE_ID);
+    expect(ledger).toEqual([]);
+  });
+
   it('writes N ledger rows in walk order for multi-edge apply with ops and contract_json on endpoints only', {
     timeout: testTimeout,
   }, async () => {

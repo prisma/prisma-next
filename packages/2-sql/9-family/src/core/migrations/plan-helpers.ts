@@ -111,10 +111,26 @@ export function createMigrationPlan<TTargetDetails>(
 
 export function plannerSuccess<TTargetDetails>(
   plan: SqlMigrationPlan<TTargetDetails>,
+  warnings?: readonly SqlPlannerConflict[],
 ): SqlPlannerSuccessResult<TTargetDetails> {
   return Object.freeze({
     kind: 'success',
     plan,
+    ...(warnings && warnings.length > 0
+      ? {
+          warnings: Object.freeze(
+            warnings.map((conflict) =>
+              Object.freeze({
+                kind: conflict.kind,
+                summary: conflict.summary,
+                ...(conflict.why ? { why: conflict.why } : {}),
+                ...(conflict.location ? { location: Object.freeze({ ...conflict.location }) } : {}),
+                ...(conflict.meta ? { meta: cloneRecord(conflict.meta) } : {}),
+              }),
+            ),
+          ),
+        }
+      : {}),
   });
 }
 

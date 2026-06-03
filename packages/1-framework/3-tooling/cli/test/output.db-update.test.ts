@@ -128,6 +128,37 @@ describe('formatMigrationPlanOutput', () => {
     expect(stripped).not.toContain('├');
   });
 
+  it('prints a Warnings block when planner warnings are present', () => {
+    const result = createPlanResult({
+      plan: { targetId: 'postgres', destination: { storageHash: 'sha256:same' }, operations: [] },
+      summary: 'Planned 0 operation(s)',
+      warnings: [
+        {
+          kind: 'controlPolicySuppressedCall',
+          summary:
+            "control policy suppressed: createTable(auth.users) — namespace 'auth' has effective control 'external' but table declared 'managed'",
+        },
+      ],
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+
+    expect(stripped).toContain('Planned 0 operation(s)');
+    expect(stripped).toContain('Warnings:');
+    expect(stripped).toContain('control policy suppressed: createTable(auth.users)');
+  });
+
+  it('omits the Warnings block when warnings are absent', () => {
+    const result = createPlanResult({
+      plan: { targetId: 'postgres', destination: { storageHash: 'sha256:same' }, operations: [] },
+      summary: 'Planned 0 operation(s)',
+    });
+    const stripped = stripAnsi(
+      formatMigrationPlanOutput(result, parseGlobalFlags({ 'no-color': true })),
+    );
+    expect(stripped).not.toContain('Warnings:');
+  });
+
   it('shows destructive warning when operations contain destructive class', () => {
     const result = createPlanResult();
     const flags = parseGlobalFlags({ 'no-color': true });
@@ -198,6 +229,25 @@ describe('formatMigrationPlanOutput', () => {
 });
 
 describe('formatMigrationApplyOutput', () => {
+  it('prints a Warnings block when planner warnings are present', () => {
+    const result = createApplyResult({
+      execution: { operationsPlanned: 0, operationsExecuted: 0 },
+      summary: 'Database already matches contract',
+      warnings: [
+        {
+          kind: 'controlPolicySuppressedCall',
+          summary:
+            "control policy suppressed: createTable(auth.users) — namespace 'auth' has effective control 'external' but table declared 'managed'",
+        },
+      ],
+    });
+    const stripped = stripAnsi(
+      formatMigrationApplyOutput(result, parseGlobalFlags({ 'no-color': true })),
+    );
+    expect(stripped).toContain('Warnings:');
+    expect(stripped).toContain('control policy suppressed: createTable(auth.users)');
+  });
+
   it('shows executed operation count', () => {
     const result = createApplyResult();
     const flags = parseGlobalFlags({ 'no-color': true });

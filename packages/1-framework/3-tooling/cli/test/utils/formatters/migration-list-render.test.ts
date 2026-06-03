@@ -128,7 +128,7 @@ describe('renderMigrationList', () => {
     );
     expect(output).toMatchInlineSnapshot(`
       "○   4cb4256
-      │↑  20260422T0720_initial  ∅       → 4cb4256  1 ops
+      │↑  20260422T0720_initial        ∅ → 4cb4256  1 ops
       ∅
 
       1 migration(s) on disk"

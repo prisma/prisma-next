@@ -5,6 +5,7 @@ import type {
   ControlExtensionDescriptor,
   ControlFamilyInstance,
   MigrationOperationPolicy,
+  MigrationPlannerConflict,
   MigrationPlanOperation,
   OperationPreview,
   TargetMigrationsCapability,
@@ -32,7 +33,12 @@ import type {
   OnControlProgress,
   PerSpaceExecutionEntry,
 } from '../types';
-import { applyMigration, buildPerSpaceBreakdown, collectOrdered } from './apply';
+import {
+  applyMigration,
+  buildPerSpaceBreakdown,
+  collectOrdered,
+  type OrderedResolution,
+} from './apply';
 import { stripOperations } from './migration-helpers';
 
 /**
@@ -175,6 +181,7 @@ export async function executeApply<TFamilyId extends string, TTargetId extends s
   onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'ok' });
 
   const orderedResolutions = collectOrdered(planResult.value.applyOrder, planResult.value.perSpace);
+  const plannerWarnings = aggregatePlannerWarnings(orderedResolutions);
 
   // The destination's structural shape comes from the app's plan — its
   // `destination` is the storage hash users see in CLI output.
@@ -202,6 +209,7 @@ export async function executeApply<TFamilyId extends string, TTargetId extends s
       preview,
       perSpace,
       summary,
+      ...ifDefined('warnings', plannerWarnings),
     });
   }
 
@@ -228,6 +236,7 @@ export async function executeApply<TFamilyId extends string, TTargetId extends s
       summary: applied.failure.summary,
       ...ifDefined('why', applied.failure.why),
       meta: applied.failure.meta,
+      ...ifDefined('warnings', plannerWarnings),
     });
   }
 
@@ -246,7 +255,15 @@ export async function executeApply<TFamilyId extends string, TTargetId extends s
     operationsExecuted: applied.value.totalOpsExecuted,
     perSpace: applied.value.perSpace,
     summary,
+    ...ifDefined('warnings', plannerWarnings),
   });
+}
+
+function aggregatePlannerWarnings(
+  orderedResolutions: readonly OrderedResolution[],
+): readonly MigrationPlannerConflict[] | undefined {
+  const warnings = orderedResolutions.flatMap((r) => r.entry.warnings ?? []);
+  return warnings.length > 0 ? warnings : undefined;
 }
 
 /**
@@ -339,6 +356,7 @@ function wrapPlanResult(args: {
   readonly preview: OperationPreview | undefined;
   readonly perSpace: readonly PerSpaceExecutionEntry[];
   readonly summary: string;
+  readonly warnings?: readonly MigrationPlannerConflict[];
 }): DbInitResult | DbUpdateResult {
   const success: DbInitSuccess | DbUpdateSuccess = {
     mode: 'plan',
@@ -352,6 +370,7 @@ function wrapPlanResult(args: {
     },
     perSpace: args.perSpace,
     summary: args.summary,
+    ...ifDefined('warnings', args.warnings),
   };
   return ok(success);
 }
@@ -363,6 +382,7 @@ function wrapApplyResult(args: {
   readonly operationsExecuted: number;
   readonly perSpace: readonly PerSpaceExecutionEntry[];
   readonly summary: string;
+  readonly warnings?: readonly MigrationPlannerConflict[];
 }): DbInitResult | DbUpdateResult {
   const success: DbInitSuccess | DbUpdateSuccess = {
     mode: 'apply',
@@ -380,6 +400,7 @@ function wrapApplyResult(args: {
       : { storageHash: args.destination.storageHash },
     perSpace: args.perSpace,
     summary: args.summary,
+    ...ifDefined('warnings', args.warnings),
   };
   return ok(success);
 }
@@ -388,6 +409,7 @@ function buildRunnerFailure(args: {
   readonly summary: string;
   readonly why?: string;
   readonly meta: Record<string, unknown>;
+  readonly warnings?: readonly MigrationPlannerConflict[];
 }): DbInitResult | DbUpdateResult {
   const failure: DbInitFailure | DbUpdateFailure = {
     code: 'RUNNER_FAILED',
@@ -395,6 +417,7 @@ function buildRunnerFailure(args: {
     why: args.why,
     meta: args.meta,
     conflicts: undefined,
+    ...ifDefined('warnings', args.warnings),
   };
   return notOk(failure) as DbInitResult | DbUpdateResult;
 }

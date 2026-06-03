@@ -2,7 +2,17 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { bold, createColors, green, yellow } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
-import { laneColorForColumn } from './migration-graph-lane-colors';
+import {
+  laneColorForColumn,
+  NEUTRAL_LANE_COLUMN,
+  type RowArcLaneColors,
+  resolveConnectorLaneColors,
+  resolveRowArcLaneColors,
+  stylerForLaneColumn,
+} from './migration-graph-lane-colors';
+
+export { resolveConnectorLaneColors } from './migration-graph-lane-colors';
+
 import type {
   MigrationGraphGridModel,
   MigrationGraphGridRow,
@@ -13,10 +23,15 @@ import {
   MIGRATION_LIST_HASH_WIDTH,
   migrationListEmptySource,
   migrationListForwardArrow,
+  padFromHashColumn,
 } from './migration-list-data-column';
 import type { MigrationEdgeKind } from './migration-list-graph-topology';
 import type { MigrationListStyler } from './migration-list-render';
-import { CONTRACT_MARKER_NAME, createAnsiMigrationListStyler } from './migration-list-styler';
+import {
+  CONTRACT_MARKER_NAME,
+  createAnsiMigrationListStyler,
+  formatContractNodeOverlays,
+} from './migration-list-styler';
 
 const LABEL_GAP = 2;
 
@@ -40,8 +55,11 @@ export interface RenderMigrationGraphTreeOptions {
   readonly contractHash?: string;
   readonly activeRefName?: string;
   readonly hashLength?: number;
+  readonly globalMaxEdgeTreePrefixWidth?: number;
+  readonly globalMaxDirNameWidth?: number;
   readonly colorize: boolean;
   readonly glyphMode?: GlyphMode;
+  readonly styler?: MigrationListStyler;
 }
 
 interface MigrationGraphTreeGlyphPalette {
@@ -135,13 +153,6 @@ function arrowForEdgeKind(
 }
 
 /**
- * The leftmost lane (column 0) renders with the neutral dim lane style rather
- * than a palette hue — in the common single-lane case it has nothing to be told
- * apart from. Used as the "no owning arc" sentinel during colour resolution.
- */
-const NEUTRAL_LANE = 0;
-
-/**
  * Forced bold for branch-coloured names. A branched name pairs its lane hue
  * (also forced, via {@link laneColorForColumn}) with bold; both must emit even
  * when colorette's ambient TTY detection is off, so the colorized branch name
@@ -149,194 +160,12 @@ const NEUTRAL_LANE = 0;
  */
 const { bold: forcedBold } = createColors({ useColor: true });
 
-/**
- * The colour-source column for each cell of a row, resolved together because a
- * routed back-arc spans columns and must read as **one hue** rather than a
- * per-column "rainbow". An arc's horizontal bridges, corners, and node-pair
- * connector all take the arc's owning back-lane column (the corner that closes
- * the arc), not the column they pass through.
- */
-interface RowLaneColors {
-  /** Colour column for a cell's structural glyph (lane / spine / arc body). */
-  readonly lane: readonly number[];
-  /** Colour column for a node arc-pair's connector half (`◂` / `─`). */
-  readonly connector: readonly number[];
-  /**
-   * Colour column for the trailing `─` of a landing tee (`┴─`). The junction
-   * (`lane`) keeps its own column; the dash leads into the next converging arc.
-   */
-  readonly dash: readonly number[];
-}
-
-/**
- * Resolve per-cell colour columns for a row. Scanning right-to-left lets each
- * arc segment inherit the hue of the arc it leads into.
- *
- * On a converging-landing line (`○◂──────┴─┴─╯`), every horizontal dash segment
- * takes the hue of the **nearest landing anchor** — the next `arc-land-tee` or
- * `arc-land-corner` — to its right, i.e. the branch it leads into: the bridge
- * run leads into the first converging arc, and each tee's trailing `─` leads
- * into the next arc out. Tee/corner junction glyphs keep their own column hue.
- * This mirrors the forward connector's `┬─` rule (see
- * {@link resolveConnectorLaneColors}). A single (non-converging) landing has
- * only the corner as an anchor, so its whole horizontal run reads as one hue.
- *
- * The source side (`○─`, `arc-branch-tee`, `arc-branch-corner`) and pure
- * horizontal passes are unaffected: they track the nearest corner to the right
- * (`arcCorner`), so a routed back-arc's source fan still reads as one hue. A
- * crossing can only be one colour, so it takes the arc owning the horizontal
- * run at this row; the crossed vertical lane is occluded at that one cell and
- * reappears on the next row.
- */
-function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
-  const lane = new Array<number>(cells.length);
-  const connector = new Array<number>(cells.length);
-  const dash = new Array<number>(cells.length);
-  let arcCorner = NEUTRAL_LANE;
-  let landingAnchor = NEUTRAL_LANE;
-  for (let column = cells.length - 1; column >= 0; column--) {
-    const cell = cells[column];
-    connector[column] = landingAnchor !== NEUTRAL_LANE ? landingAnchor : arcCorner;
-    switch (cell?.kind) {
-      case 'arc-branch-corner':
-        arcCorner = column;
-        lane[column] = column;
-        dash[column] = column;
-        break;
-      case 'arc-land-corner':
-        arcCorner = column;
-        landingAnchor = column;
-        lane[column] = column;
-        dash[column] = column;
-        break;
-      // An inner co-sourced arc's own back-lane junction: its vertical run
-      // continues below in this column, so the whole `┬─` keeps its own column.
-      case 'arc-branch-tee':
-        lane[column] = column;
-        dash[column] = column;
-        break;
-      // The symmetric co-landing junction: the `┴` keeps its own column (its
-      // vertical run continues above), but the trailing `─` leads into the next
-      // converging arc — the nearest landing anchor still to its right.
-      case 'arc-land-tee':
-        lane[column] = column;
-        dash[column] = landingAnchor === NEUTRAL_LANE ? column : landingAnchor;
-        landingAnchor = column;
-        break;
-      case 'arc-crossing':
-      case 'arc-land-bridge': {
-        const served = landingAnchor !== NEUTRAL_LANE ? landingAnchor : arcCorner;
-        lane[column] = served;
-        dash[column] = served;
-        break;
-      }
-      case 'horizontal-pass':
-        lane[column] = arcCorner === NEUTRAL_LANE ? column : arcCorner;
-        dash[column] = lane[column] ?? column;
-        break;
-      case 'node':
-        lane[column] = column;
-        dash[column] = column;
-        arcCorner = NEUTRAL_LANE;
-        landingAnchor = NEUTRAL_LANE;
-        break;
-      default:
-        lane[column] = column;
-        dash[column] = column;
-        arcCorner = NEUTRAL_LANE;
-        landingAnchor = NEUTRAL_LANE;
-    }
-  }
-  return { lane, connector, dash };
-}
-
-/**
- * Per-cell colour for a forward branch/merge connector row, split into the
- * cell's junction `glyph` and its trailing `dash`. A connector's horizontal run
- * is one logical line (a fork into new lanes, or a merge into a surviving lane)
- * and reads best as the colour of the lane each segment serves — not dim-gray
- * or a per-pass-through-column "rainbow".
- */
-interface ConnectorLaneColors {
-  /** Colour column for a cell's junction glyph (`├` / `┬` / `┴` / `╮` / `╯`). */
-  readonly glyph: readonly number[];
-  /** Colour column for a tee's trailing `─` — the branch it leads into. */
-  readonly dash: readonly number[];
-}
-
-/**
- * Resolve per-cell connector colours. Scanning right-to-left, a corner or an
- * intermediate tee anchors its own lane (its junction glyph takes that column),
- * but a tee's **trailing dash leads into the branch on its right** (the next
- * branch point), so `┬─` reads as "this lane, then on toward the next" rather
- * than tinting the dash with the left lane. The leading tee at `startLane` (the
- * fork/merge origin) and pure horizontal segments inherit the nearest branch
- * point to their right whole-cell, so the run into a branch — or collapsing
- * into a merge corner — stays continuous. An `arc-crossing` keeps its junction
- * glyph at its own column but re-anchors `owner` like an intermediate tee so
- * dashes on both sides lead into the nearest branch on their right. Pass-through
- * verticals outside the run keep their own column (column 0 stays neutral).
- */
-export function resolveConnectorLaneColors(
-  cells: readonly StructuralCell[],
-  startLane: number,
-): ConnectorLaneColors {
-  const glyph = new Array<number>(cells.length);
-  const dash = new Array<number>(cells.length);
-  let owner = NEUTRAL_LANE;
-  for (let column = cells.length - 1; column >= 0; column--) {
-    const cell = cells[column];
-    switch (cell?.kind) {
-      case 'branch-corner':
-      case 'merge-corner':
-        owner = column;
-        glyph[column] = column;
-        dash[column] = column;
-        break;
-      case 'branch-tee':
-      case 'merge-tee':
-        if (column === startLane) {
-          const served = owner === NEUTRAL_LANE ? column : owner;
-          glyph[column] = column;
-          dash[column] = served;
-        } else {
-          dash[column] = owner === NEUTRAL_LANE ? column : owner;
-          glyph[column] = column;
-          owner = column;
-        }
-        break;
-      case 'arc-crossing':
-        glyph[column] = column;
-        dash[column] = owner === NEUTRAL_LANE ? column : owner;
-        owner = column;
-        break;
-      case 'horizontal-pass': {
-        const served = owner === NEUTRAL_LANE ? column : owner;
-        glyph[column] = served;
-        dash[column] = served;
-        break;
-      }
-      default:
-        glyph[column] = column;
-        dash[column] = column;
-    }
-  }
-  return { glyph, dash };
-}
-
-/**
- * Style a structural glyph by its resolved colour column. Column 0 and the
- * neutral sentinel render dim (`style.lane`); columns ≥ 1 take a palette hue.
- */
 function laneStylerForColumn(
   colorColumn: number,
   colorize: boolean,
   style: MigrationListStyler,
 ): (text: string) => string {
-  if (!colorize || colorColumn <= NEUTRAL_LANE) {
-    return (text) => style.lane(text);
-  }
-  return laneColorForColumn(colorColumn);
+  return stylerForLaneColumn(colorColumn, colorize, style.lane);
 }
 
 /**
@@ -351,10 +180,25 @@ function branchStylerOrDefault(
   colorize: boolean,
   fallback: (text: string) => string,
 ): (text: string) => string {
-  if (!colorize || column <= NEUTRAL_LANE) {
+  if (!colorize || column <= NEUTRAL_LANE_COLUMN) {
     return fallback;
   }
   return laneColorForColumn(column);
+}
+
+/**
+ * Render a crossing tee (`┼─`): the junction stays dim/neutral so neither arc
+ * steals the cell; the trailing dash takes the served lane hue.
+ */
+function renderArcCrossing(
+  pair: string,
+  dashColumn: number,
+  colorize: boolean,
+  style: MigrationListStyler,
+): string {
+  const junction = colorize ? style.lane : (text: string) => text;
+  const dash = laneStylerForColumn(dashColumn, colorize, style);
+  return junction(pair.slice(0, 1)) + dash(pair.slice(1));
 }
 
 /**
@@ -398,7 +242,7 @@ function renderNodeMarkerPair(
 function renderCellPair(
   cell: StructuralCell,
   column: number,
-  colors: RowLaneColors,
+  colors: RowArcLaneColors,
   colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
@@ -407,7 +251,7 @@ function renderCellPair(
   const lane = laneStylerForColumn(laneColumn, colorize, style);
   switch (cell.kind) {
     case 'node': {
-      const arcColumn = colors.connector[column] ?? NEUTRAL_LANE;
+      const arcColumn = colors.connector[column] ?? NEUTRAL_LANE_COLUMN;
       if (cell.arcLand === true) {
         return renderNodeMarkerPair(palette.arcLand, column, arcColumn, colorize, style);
       }
@@ -512,7 +356,7 @@ function renderConnectorRow(
           out += lane(palette.horizontalPass);
           break;
         case 'arc-crossing':
-          out += renderConnectorTee(palette.arcCrossing, glyphColumn, dashColumn, colorize, style);
+          out += renderArcCrossing(palette.arcCrossing, dashColumn, colorize, style);
           break;
         default:
           out += '  ';
@@ -552,26 +396,41 @@ function abbreviateHash(hash: string, hashLength: number, emptySource: string): 
 
 const MIN_HASH_DATA_COLUMN = 25;
 
+interface ContractOverlayNames {
+  readonly markers: readonly string[];
+  readonly refs: readonly string[];
+}
+
 function overlayNamesForContract(
   contractHash: string,
   opts: RenderMigrationGraphTreeOptions,
-): readonly string[] {
-  const names: string[] = [];
+): ContractOverlayNames {
+  const markers: string[] = [];
+  const refs: string[] = [];
   const userRefs = opts.refsByHash?.get(contractHash);
   if (userRefs) {
-    names.push(...[...userRefs].sort((a, b) => a.localeCompare(b)));
-  }
-  if (opts.dbHash === contractHash) {
-    names.push(DB_MARKER_NAME);
+    refs.push(...[...userRefs].sort((a, b) => a.localeCompare(b)));
   }
   if (opts.contractHash === contractHash && contractHash !== EMPTY_CONTRACT_HASH) {
-    names.push(CONTRACT_MARKER_NAME);
+    markers.push(CONTRACT_MARKER_NAME);
   }
-  return names;
+  if (opts.dbHash === contractHash) {
+    markers.push(DB_MARKER_NAME);
+  }
+  markers.sort((a, b) => {
+    if (a === CONTRACT_MARKER_NAME) {
+      return -1;
+    }
+    if (b === CONTRACT_MARKER_NAME) {
+      return 1;
+    }
+    return a.localeCompare(b);
+  });
+  return { markers, refs };
 }
 
 function createTreeStyler(opts: RenderMigrationGraphTreeOptions): MigrationListStyler {
-  const base = createAnsiMigrationListStyler({ useColor: opts.colorize });
+  const base = opts.styler ?? createAnsiMigrationListStyler({ useColor: opts.colorize });
   const activeRefName = opts.activeRefName;
   if (!opts.colorize || activeRefName === undefined) {
     return base;
@@ -595,6 +454,12 @@ function formatEdgeAnnotationSuffix(
     return '';
   }
   const segments: string[] = [];
+  if (annotation.operationCount !== undefined) {
+    segments.push(`${annotation.operationCount} ops`);
+  }
+  if (annotation.invariants !== undefined && annotation.invariants.length > 0) {
+    segments.push(style.invariants(annotation.invariants));
+  }
   const status = annotation.status;
   if (status !== undefined) {
     const glyphs = overlayStatusGlyphs(opts.glyphMode ?? 'unicode');
@@ -607,17 +472,10 @@ function formatEdgeAnnotationSuffix(
       segments.push(styler(`${glyph} ${label}`));
     }
   }
-  if (annotation.operationCount !== undefined) {
-    segments.push(`${annotation.operationCount} ops`);
-  }
-  if (annotation.invariants !== undefined && annotation.invariants.length > 0) {
-    segments.push(style.invariants(annotation.invariants));
-  }
   if (segments.length === 0) {
     return '';
   }
-  const prefix = status !== undefined ? '   ' : '  ';
-  return `${prefix}${segments.join('  ')}`;
+  return `  ${segments.join('  ')}`;
 }
 
 function formatEdgeHashColumn(
@@ -628,13 +486,16 @@ function formatEdgeHashColumn(
 ): string {
   if (edge.kind === 'self') {
     const hash = abbreviateHash(edge.from, hashLength, palette.emptySource);
-    return `${style.sourceHash(hash)} ${style.glyph(palette.forwardArrow)} ${style.destHash(hash)}`;
+    const source = padFromHashColumn(style.sourceHash(hash), hashLength);
+    return `${source} ${style.glyph(palette.forwardArrow)} ${style.destHash(hash)}`;
   }
   const source =
     edge.from === EMPTY_CONTRACT_HASH
-      ? style.glyph(palette.emptySource) +
-        ' '.repeat(Math.max(0, hashLength - palette.emptySource.length))
-      : style.sourceHash(abbreviateHash(edge.from, hashLength, palette.emptySource));
+      ? padFromHashColumn(style.glyph(palette.emptySource), hashLength)
+      : padFromHashColumn(
+          style.sourceHash(abbreviateHash(edge.from, hashLength, palette.emptySource)),
+          hashLength,
+        );
   const arrow = style.glyph(palette.forwardArrow);
   const dest = style.destHash(abbreviateHash(edge.to, hashLength, palette.emptySource));
   return `${source} ${arrow} ${dest}`;
@@ -691,6 +552,35 @@ function edgeLabelColumn(row: MigrationGraphGridRow, wideLabelColumn: number | u
   return usesFullRowGutter ? row.cells.length * 2 + LABEL_GAP : (laneIndex + 1) * 2 + LABEL_GAP;
 }
 
+function maxEdgeTreePrefixWidth(
+  rows: readonly MigrationGraphGridRow[],
+  wideLabelColumn: number | undefined,
+): number {
+  let max = 0;
+  for (const row of rows) {
+    if (row.kind !== 'edge' || row.edge === undefined) continue;
+    max = Math.max(max, edgeLabelColumn(row, wideLabelColumn));
+  }
+  return max;
+}
+
+export function computeMaxEdgeTreePrefixWidthForLayout(model: MigrationGraphGridModel): number {
+  const wideLabelColumn = gridUsesSkipRollbackArcs(model.rows)
+    ? gridWidthForModel(model.rows) * 2 + 4
+    : undefined;
+  return maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
+}
+
+export function computeMaxDirNameLengthForLayout(model: MigrationGraphGridModel): number {
+  const allEdges = model.rows
+    .filter(
+      (row): row is MigrationGraphGridRow & { edge: ClassifiedEdge } =>
+        row.kind === 'edge' && row.edge !== undefined,
+    )
+    .map((row) => row.edge);
+  return maxDirNameLength(allEdges);
+}
+
 function nodeHasArcDecoration(row: MigrationGraphGridRow): boolean {
   return row.cells.some(
     (cell) => cell.kind === 'node' && (cell.arcTee === true || cell.arcLand === true),
@@ -715,6 +605,10 @@ export function renderMigrationGraphTree(
     )
     .map((row) => row.edge);
   const maxDirNameLen = maxDirNameLength(allEdges);
+  const effectiveMaxDirNameLen = opts.globalMaxDirNameWidth ?? maxDirNameLen;
+  const maxEdgePrefixWidth =
+    opts.globalMaxEdgeTreePrefixWidth ?? maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
+  const edgeDirNameWidth = rowDirNameWidth(maxEdgePrefixWidth, effectiveMaxDirNameLen, dirNameGap);
 
   const lines: string[] = [];
 
@@ -734,7 +628,7 @@ export function renderMigrationGraphTree(
       continue;
     }
 
-    const cellColors = resolveRowLaneColors(row.cells);
+    const cellColors = resolveRowArcLaneColors(row.cells);
     let gutter = row.cells
       .map((cell, column) =>
         renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
@@ -758,7 +652,7 @@ export function renderMigrationGraphTree(
     }
     const labelColumn =
       row.kind === 'edge'
-        ? edgeLabelColumn(row, wideLabelColumn)
+        ? maxEdgePrefixWidth
         : wideLabelColumn !== undefined &&
             (nodeHasArcDecoration(row) || row.contractHash !== undefined)
           ? wideLabelColumn
@@ -784,8 +678,10 @@ export function renderMigrationGraphTree(
     } else if (gutter.length < laneSpan * 2) {
       gutter = gutter.padEnd(laneSpan * 2, ' ');
     }
-    const dirNameWidth = rowDirNameWidth(labelColumn, maxDirNameLen, dirNameGap);
-    const dataColumn = labelColumn + dirNameWidth;
+    const dirNameWidth =
+      row.kind === 'edge'
+        ? edgeDirNameWidth
+        : rowDirNameWidth(labelColumn, maxDirNameLen, dirNameGap);
     const gutterPad = padVisible(gutter, labelColumn);
 
     if (row.kind === 'node') {
@@ -798,24 +694,24 @@ export function renderMigrationGraphTree(
           )
           .join('');
         const emptyGutter = palette.emptySource.padEnd(2, ' ') + trailingLanes;
-        const overlayNames = overlayNamesForContract(contractHash, opts);
-        if (overlayNames.length === 0) {
+        const overlays = overlayNamesForContract(contractHash, opts);
+        if (overlays.markers.length === 0 && overlays.refs.length === 0) {
           lines.push(trimTrailingWhitespace(emptyGutter));
           continue;
         }
-        const overlay = style.refs(overlayNames);
-        lines.push(trimTrailingWhitespace(`${padVisible(emptyGutter, dataColumn)}${overlay}`));
+        const overlay = formatContractNodeOverlays(style, overlays.markers, overlays.refs);
+        lines.push(trimTrailingWhitespace(`${emptyGutter}${' '.repeat(LABEL_GAP)}${overlay}`));
         continue;
       }
       const hashText = style.sourceHash(
         abbreviateHash(contractHash, hashLength, palette.emptySource),
       );
-      const overlayNames = overlayNamesForContract(contractHash, opts);
-      const overlayPad =
-        overlayNames.length > 0
-          ? ' '.repeat(Math.max(0, dataColumn - labelColumn - stringWidth(hashText)))
-          : '';
-      const overlay = overlayNames.length > 0 ? style.refs(overlayNames) : '';
+      const overlays = overlayNamesForContract(contractHash, opts);
+      const hasOverlays = overlays.markers.length > 0 || overlays.refs.length > 0;
+      const overlayPad = hasOverlays ? ' '.repeat(LABEL_GAP) : '';
+      const overlay = hasOverlays
+        ? formatContractNodeOverlays(style, overlays.markers, overlays.refs)
+        : '';
       lines.push(trimTrailingWhitespace(`${gutterPad}${hashText}${overlayPad}${overlay}`));
       continue;
     }
@@ -828,7 +724,7 @@ export function renderMigrationGraphTree(
     // A branched name keeps its bold (via `style.dirName`) and adds the lane
     // hue, so it reads as one with its lane/arrow; column-0 names stay bold-only.
     const dirNameStyler =
-      opts.colorize && laneIndex > NEUTRAL_LANE
+      opts.colorize && laneIndex > NEUTRAL_LANE_COLUMN
         ? (text: string) => forcedBold(laneColorForColumn(laneIndex)(text))
         : style.dirName;
     const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
@@ -845,16 +741,26 @@ export interface RenderMigrationGraphLegendOptions {
   readonly glyphMode?: GlyphMode;
 }
 
+function formatLegendExampleMarkers(colorize: boolean): string {
+  if (!colorize) {
+    return '<contract, db>';
+  }
+  const open = green('<');
+  const close = green('>');
+  const separator = green(', ');
+  return open + green('contract') + separator + green('db') + close;
+}
+
 /**
- * A compact key for the `--tree` visual language: the contract marker, the
- * in-lane direction arrows, the empty baseline, the `(refs)` overlay (including
- * the reserved `db` live-database and `contract` working-schema markers), and a
+ * A compact key for the tree visual language: the contract node glyph, the
+ * in-lane direction arrows, the empty baseline, the system-marker `<…>` and
+ * user-ref `(…)` bracket conventions (two illustrative example lines), and a
  * worked sample of the data-column `from → to` migration hash arrow.
  *
  * Honors the same glyph palette (unicode vs ASCII) and `colorize` gate as the
  * tree renderer, so the key matches whatever the graph itself drew and stays
  * pipe-safe (zero ANSI when color is off). The caller adds the trailing blank
- * line that separates this stderr key from the graph on stdout.
+ * line that separates this stderr key from the tree on stdout.
  */
 export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptions): string {
   const palette = paletteFor(opts.glyphMode ?? 'unicode');
@@ -865,13 +771,17 @@ export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptio
   const appliedPending = opts.colorize
     ? `  ${green(statusGlyphs.applied)} ${style.summary('applied')}   ${yellow(statusGlyphs.pending)} ${style.summary('pending')}`
     : `  ${statusGlyphs.applied} ${style.summary('applied')}   ${statusGlyphs.pending} ${style.summary('pending')}`;
-  return [
+  const exampleMarkers = formatLegendExampleMarkers(opts.colorize);
+  const exampleRefs = opts.colorize ? style.refs(['prod', 'staging']) : '(prod, staging)';
+  const lines = [
     'Legend:',
     `  ${style.kind(node)} ${style.summary('contract')}   ${style.kind(palette.edgeArrow.forward)} ${style.summary('forward')}   ${style.kind(palette.edgeArrow.rollback)} ${style.summary('rollback')}`,
     `  ${style.kind(palette.edgeArrow.self)} ${style.summary('migration without schema change')}`,
     appliedPending,
     `  ${style.kind(palette.emptySource)} ${style.summary('empty database (baseline)')}`,
-    `  ${style.refs(['refs'])} ${style.summary(`${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`)}`,
+    `  ${exampleMarkers} ${style.summary('live markers (contract on disk, database state)')}`,
+    `  ${exampleRefs} ${style.summary('user-defined refs')}`,
     `  ${sampleArrow}   ${style.summary('migration from contract aaaaaa to bbbbbb')}`,
-  ].join('\n');
+  ];
+  return lines.join('\n');
 }

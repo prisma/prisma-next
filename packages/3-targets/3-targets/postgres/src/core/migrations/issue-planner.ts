@@ -15,7 +15,6 @@ import type {
   SqlPlannerConflict,
   SqlPlannerConflictLocation,
 } from '@prisma-next/family-sql/control';
-import { filterCallsByControlPolicy } from '@prisma-next/family-sql/control';
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
@@ -30,7 +29,6 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
-import { resolvePostgresCallControlPolicySubject } from './control-policy';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -929,14 +927,5 @@ export function planIssues(
     ...byCategory('foreignKey'),
   ];
 
-  const filtered = filterCallsByControlPolicy({
-    calls,
-    contract: options.toContract,
-    resolveControlPolicySubject: (call) =>
-      resolvePostgresCallControlPolicySubject(call, options.toContract),
-  });
-
-  return ok({
-    calls: filtered,
-  });
+  return ok({ calls });
 }
