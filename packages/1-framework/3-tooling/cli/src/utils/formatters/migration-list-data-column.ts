@@ -15,3 +15,8 @@ export function migrationListForwardArrow(glyphMode: GlyphMode): string {
 export function migrationListEmptySource(glyphMode: GlyphMode): string {
   return glyphMode === 'ascii' ? MIGRATION_LIST_ASCII_EMPTY_SOURCE : MIGRATION_LIST_EMPTY_SOURCE;
 }
+
+export function abbreviateContractHash(hash: string): string {
+  const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
+  return stripped.slice(0, MIGRATION_LIST_HASH_WIDTH);
+}
