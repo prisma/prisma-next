@@ -684,7 +684,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
     async readLedger(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
-      readonly space: string;
+      readonly space?: string;
     }): Promise<readonly LedgerEntryRecord[]> {
       return getControlAdapter().readLedger(options.driver, options.space);
     },

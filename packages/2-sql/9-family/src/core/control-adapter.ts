@@ -62,13 +62,12 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
 
   /**
-   * Reads the per-migration ledger journal for `space` in apply order.
-   * Returns an empty array when the ledger store does not yet exist or
-   * has no rows for that space.
+   * Reads the per-migration ledger journal in apply order. When `space` is
+   * omitted, returns rows for every space.
    */
   readLedger(
     driver: ControlDriverInstance<'sql', TTarget>,
-    space: string,
+    space?: string,
   ): Promise<readonly LedgerEntryRecord[]>;
 
   /**

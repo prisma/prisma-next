@@ -689,7 +689,7 @@ export function buildSqlContractFromDefinition(
   const contract: Contract<SqlStorage> = {
     target,
     targetFamily,
-    ...ifDefined('defaultControl', definition.defaultControl),
+    ...ifDefined('defaultControlPolicy', definition.defaultControlPolicy),
     domain: { namespaces: domainNamespaces },
     roots,
     storage,

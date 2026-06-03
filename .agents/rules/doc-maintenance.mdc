@@ -5,6 +5,7 @@ alwaysApply: true
 ---
 
 - Whenever you receive a correction or correct a mistake, make sure it's documented in .cursor/rules either by updating an existing doc or adding a new one
+- **An ADR records the *decision*; the subsystem/reference doc records the *current shape*. They are separate obligations.** When a change alters a documented system shape or contract (IR shape, emitted-type surface, render path, public type alias), update the relevant doc under `docs/architecture docs/subsystems/` (and any worked examples it contains) in the same change — not only the ADR. Landing the ADR does **not** discharge the obligation to refresh the reference docs a fresh contributor reads; a subsystem doc that still shows the pre-change shape is actively misleading even when the ADR is correct.
 - Whenever you make changes to a package, make sure its docs stay up to date.
   - **User-facing packages**: keep `README.md` focused on what the package does, when to use it, and a few concrete examples. Avoid internal implementation detail unless it materially affects usage.
   - **Contributor details**: put responsibilities/dependencies/architecture diagrams/internal exports in `DEVELOPING.md` (or `CONTRIBUTING.md`) within that package, and add a short link from `README.md`.

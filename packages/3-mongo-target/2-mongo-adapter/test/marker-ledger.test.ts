@@ -464,6 +464,46 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       },
     ]);
   });
+
+  it('returns rows for every space when space is omitted', async () => {
+    await writeLedgerEntry(db, APP, {
+      edgeId: 'edge-app',
+      from: 'sha256:empty',
+      to: 'sha256:app-dest',
+      migrationName: '001_app',
+      migrationHash: 'sha256:mig-app',
+      operations: [{ id: 'app.op' }],
+    });
+    await writeLedgerEntry(db, EXT, {
+      edgeId: 'edge-ext',
+      from: 'sha256:empty',
+      to: 'sha256:ext-dest',
+      migrationName: '001_ext',
+      migrationHash: 'sha256:mig-ext',
+      operations: [{ id: 'ext.op' }],
+    });
+
+    const all = await readLedger(db);
+    expectReadLedger(all, [
+      {
+        space: APP,
+        migrationName: '001_app',
+        migrationHash: 'sha256:mig-app',
+        from: null,
+        to: 'sha256:app-dest',
+        operationCount: 1,
+      },
+      {
+        space: EXT,
+        migrationName: '001_ext',
+        migrationHash: 'sha256:mig-ext',
+        from: null,
+        to: 'sha256:ext-dest',
+        operationCount: 1,
+      },
+    ]);
+    expect(await readLedger(db, APP)).toHaveLength(1);
+  });
 });
 
 describe('writeLedgerEntry', { timeout: timeouts.databaseOperation }, () => {

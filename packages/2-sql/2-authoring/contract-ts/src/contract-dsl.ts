@@ -1218,7 +1218,7 @@ export type ContractInput<
   readonly naming?: NamingConfig;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
-  readonly defaultControl?: ControlPolicy;
+  readonly defaultControlPolicy?: ControlPolicy;
   /**
    * Declared namespace coordinates the contract recognises. Per-model
    * `namespace` references must reference an entry in this list (or the

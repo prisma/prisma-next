@@ -144,14 +144,17 @@ describe('renderMigrationListWithStyle', () => {
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
+      'unicode',
+      { colorize: true },
     );
-    const expectedRow =
-      `⟲ ${bold('20260601T1200_backfill_emails')}  ` +
-      `${dim(cyan('55bada2'))}` +
-      `  ${yellow('{backfill_emails_v1}')} ` +
-      `${green('(') + [green('production'), green('db')].join(green(', ')) + green(')')}`;
-    const expected = `${expectedRow}\n\n${dim('1 migration(s) on disk')}`;
-    expect(styled).toBe(expected);
+    expect(styled).toContain(bold('20260601T1200_backfill_emails'));
+    expect(styled).toContain(dim(cyan('55bada2')));
+    expect(styled).toContain(yellow('{backfill_emails_v1}'));
+    expect(styled).toContain(green('production'));
+    expect(styled).toContain(green('db'));
+    expect(styled).toContain(dim('1 migration(s) on disk'));
+    expect(styled).toContain('│⟲');
+    expect(styled).toContain('1 ops');
   });
 
   it('styles the cross-space heading and per-space rows with the correct palette', () => {
@@ -177,10 +180,12 @@ describe('renderMigrationListWithStyle', () => {
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
+      'unicode',
+      { colorize: true },
     );
     expect(styled).toContain(bold('app:'));
     expect(styled).toContain(bold('postgis:'));
-    expect(styled).toContain(`${dim('∅')}      `);
+    expect(styled).toContain(dim('∅'));
     expect(styled).toContain(cyanBright('4cb4256'));
     expect(styled).toContain(dim('→'));
     expect(styled).toContain(dim('1 migration(s) across 2 contract space(s)'));
@@ -212,6 +217,8 @@ describe('renderMigrationListWithStyle', () => {
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
+      'unicode',
+      { colorize: true },
     );
 
     function stripAnsi(s: string): string {

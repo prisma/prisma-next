@@ -234,15 +234,14 @@ describe('runMigrationList — slice-spec worked example', () => {
     const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
-    const expected =
-      '⟲ 20260601T1200_backfill_emails     55bada2  {backfill_emails_v1} (production)\n' +
-      '* 20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
-      '* 20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
-      '* 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
-      '* 20260422T0720_initial             ∅       → 4cb4256\n' +
-      '\n' +
-      '5 migration(s) on disk';
-    expect(renderListed(result.value)).toBe(expected);
+    const human = renderListed(result.value);
+    expect(human).toContain('20260601T1200_backfill_emails');
+    expect(human).toContain('{backfill_emails_v1}');
+    expect(human).toContain('(db)');
+    expect(human).toContain('(staging)');
+    expect(human).toContain('(production)');
+    expect(human).toContain('1 ops');
+    expect(human.trim().endsWith('5 migration(s) on disk')).toBe(true);
   });
 
   it('renders every on-disk migration as exactly one row (row-count guarantee)', async () => {
@@ -306,15 +305,50 @@ describe('runMigrationList — slice-spec worked example', () => {
     expect(renderedDirs).toHaveLength(specs.length);
     expect(result.value.summary).toBe(`${specs.length} migration(s) on disk`);
 
-    // Human pass — confirm every dirName lands on its own row, no
-    // dedup, no silent omission. Count rows directly.
+    // Human pass — every dirName appears on an edge row in the tree.
     const human = renderListed(result.value);
-    const rows = human.split('\n').filter((line) => /^(\s*)?[*↩⟲] \d{8}T\d{4}_/.test(line));
-    expect(rows).toHaveLength(specs.length);
+    const edgeRows = human.split('\n').filter((line) => /│[↑↓⟲]/.test(line));
+    expect(edgeRows).toHaveLength(specs.length);
     for (const spec of specs) {
       expect(human).toContain(spec.dirName);
     }
     expect(human.trim().endsWith(`${specs.length} migration(s) on disk`)).toBe(true);
+  });
+
+  it('locks list tree layout for a linear chain (golden)', async () => {
+    const { migrationsRoot } = await setupFixture();
+
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0720_initial',
+      from: null,
+      to: HASH_4cb4256,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0742_migration',
+      from: HASH_4cb4256,
+      to: HASH_55bada2,
+    });
+
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const human = renderListed(result.value);
+    expect(human).toBe(
+      [
+        '○   55bada2',
+        '│↑  20260422T0742_migration  4cb4256 → 55bada2  1 ops',
+        '○   4cb4256',
+        '│↑  20260422T0720_initial    ∅       → 4cb4256  1 ops',
+        '∅',
+        '',
+        '2 migration(s) on disk',
+      ].join('\n'),
+    );
+    expect(human).toContain('20260422T0720_initial');
+    expect(human).toContain('20260422T0742_migration');
+    expect(human.trim().endsWith('2 migration(s) on disk')).toBe(true);
   });
 
   it('renders multi-contract-space output with per-space heading and 2-space indent', async () => {
@@ -355,17 +389,32 @@ describe('runMigrationList — slice-spec worked example', () => {
     const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
-    const expected =
-      'app:\n' +
-      '  * 20260518T1701_namespaces_bookend  55bada2 → 804e018  (db)\n' +
-      '  * 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
-      '  * 20260422T0720_initial             ∅       → 4cb4256\n' +
-      '\n' +
-      'postgis:\n' +
-      '  * 20260601T0000_install_postgis_extension  ∅       → 9aabbcc  (db)\n' +
-      '\n' +
-      '4 migration(s) across 2 contract space(s)';
-    expect(renderListed(result.value)).toBe(expected);
+    const human = renderListed(result.value);
+    expect(human).toBe(
+      [
+        'app:',
+        '  ○   804e018                           (db)',
+        '  │↑  20260518T1701_namespaces_bookend  55bada2 → 804e018  1 ops',
+        '  ○   55bada2                           (production)',
+        '  │↑  20260422T0742_migration           4cb4256 → 55bada2  1 ops',
+        '  ○   4cb4256',
+        '  │↑  20260422T0720_initial             ∅       → 4cb4256  1 ops',
+        '  ∅',
+        '',
+        'postgis:',
+        '  ○   9aabbcc                                  (db)',
+        '  │↑  20260601T0000_install_postgis_extension  ∅       → 9aabbcc  1 ops',
+        '  ∅',
+        '',
+        '4 migration(s) across 2 contract space(s)',
+      ].join('\n'),
+    );
+    expect(human).toContain('app:');
+    expect(human).toContain('postgis:');
+    expect(human).toContain('20260518T1701_namespaces_bookend');
+    expect(human).toContain('20260601T0000_install_postgis_extension');
+    expect(human).toContain('(db)');
+    expect(human).toContain('(production)');
     expect(result.value.summary).toBe('4 migration(s) across 2 contract space(s)');
   });
 
@@ -397,8 +446,10 @@ describe('runMigrationList — slice-spec worked example', () => {
       expect(m.refs).toEqual(['production']);
     }
     const human = renderListed(result.value);
-    const matches = [...human.matchAll(/\(production\)/g)];
-    expect(matches).toHaveLength(2);
+    const productionOnNode = [...human.matchAll(/○.*\(production\)/g)];
+    expect(productionOnNode).toHaveLength(1);
+    expect(human).toContain('20260101T0000_left');
+    expect(human).toContain('20260101T0001_right');
   });
 
   it('renders useless self-edge (from === to, zero providedInvariants) as a `⟲` row with empty decoration', async () => {
@@ -424,11 +475,11 @@ describe('runMigrationList — slice-spec worked example', () => {
     expect(entry?.providedInvariants).toEqual([]);
     expect(entry?.refs).toEqual([]);
 
-    // The `⟲` row has hash-width pad in the destination slot and no
-    // decoration block at all. Trailing newline + summary follows.
-    const expected =
-      '⟲ 20260101T0000_useless_self_edge  4cb4256\n' + '\n' + '1 migration(s) on disk';
-    expect(renderListed(result.value)).toBe(expected);
+    const human = renderListed(result.value);
+    expect(human).toContain('│⟲  20260101T0000_useless_self_edge');
+    expect(human).toContain('0 ops');
+    expect(human).not.toContain('{');
+    expect(human.trim().endsWith('1 migration(s) on disk')).toBe(true);
   });
 
   it('renders self-edge with invariants as `⟲ … {invariant_id}`', async () => {
@@ -449,9 +500,9 @@ describe('runMigrationList — slice-spec worked example', () => {
     ]);
 
     const human = renderListed(result.value);
-    expect(human).toMatch(/^⟲ 20260601T1200_backfill_emails/);
-    expect(human).toMatch(/55bada2 {2}\{backfill_emails_v1\}/);
-    expect(human).not.toContain('→');
+    expect(human).toContain('│⟲  20260601T1200_backfill_emails');
+    expect(human).toContain('{backfill_emails_v1}');
+    expect(human).toContain('1 ops');
   });
 
   it('renders the empty-state line when the migrations directory does not exist', async () => {
@@ -507,8 +558,9 @@ describe('runMigrationList — slice-spec worked example', () => {
     const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
     const human = renderListed(result.value);
-    expect(human).toMatch(/^↩ 20260106T0000_skip_back/m);
-    expect(human).toContain('* 20260101T0002_chain_c');
+    expect(human).toContain('20260106T0000_skip_back');
+    expect(human).toContain('↓');
+    expect(human).toContain('20260101T0002_chain_c');
   });
 });
 
@@ -791,10 +843,10 @@ describe('runMigrationList — per-space topology classification', () => {
     const appBlock = flat.split('\n\next:')[0] ?? '';
     const extBlock = flat.split('\n\next:')[1]?.split('\n\n')[0] ?? '';
 
-    expect(appBlock).not.toContain('↩');
-    expect(appBlock).toContain('* 20260101T0001_app_fwd');
-    expect(extBlock).not.toContain('↩');
-    expect(extBlock).toContain('* 20260101T0001_ext_fwd');
+    expect(appBlock).not.toContain('│↓');
+    expect(appBlock).toContain('20260101T0001_app_fwd');
+    expect(extBlock).not.toContain('│↓');
+    expect(extBlock).toContain('20260101T0001_ext_fwd');
   });
 });
 
@@ -841,6 +893,7 @@ describe('migration list glyph mode', () => {
       useColor: false,
     });
     expect(ascii).toContain('->');
+    expect(ascii).toContain('|^');
     expect(ascii).not.toContain('→');
   });
 
@@ -861,6 +914,18 @@ describe('migration list glyph mode', () => {
       (text: string): string =>
         `${open}${text}${close}`;
     vi.doMock('colorette', () => ({
+      createColors: () => ({
+        bold: wrapSgr('\u001b[1m', '\u001b[22m'),
+        dim: wrapSgr('\u001b[2m', '\u001b[22m'),
+        cyan: wrapSgr('\u001b[36m', '\u001b[39m'),
+        cyanBright: wrapSgr('\u001b[96m', '\u001b[39m'),
+        yellow: wrapSgr('\u001b[33m', '\u001b[39m'),
+        green: wrapSgr('\u001b[32m', '\u001b[39m'),
+        greenBright: wrapSgr('\u001b[92m', '\u001b[39m'),
+        magenta: wrapSgr('\u001b[35m', '\u001b[39m'),
+        blueBright: wrapSgr('\u001b[94m', '\u001b[39m'),
+        red: wrapSgr('\u001b[31m', '\u001b[39m'),
+      }),
       bold: wrapSgr('\u001b[1m', '\u001b[22m'),
       dim: wrapSgr('\u001b[2m', '\u001b[22m'),
       cyan: wrapSgr('\u001b[36m', '\u001b[39m'),
@@ -886,6 +951,7 @@ describe('migration list glyph mode', () => {
       });
       expect(output).toContain('\u001b[');
       expect(output).toContain('->');
+      expect(output).toMatch(/\|.*\^/);
       expect(output).not.toContain('→');
     } finally {
       vi.doUnmock('colorette');

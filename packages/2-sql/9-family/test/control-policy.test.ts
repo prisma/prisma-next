@@ -14,7 +14,7 @@ import {
 
 function makeContract(
   tables: Record<string, StorageTableInput>,
-  defaultControl?: Contract<SqlStorage>['defaultControl'],
+  defaultControlPolicy?: Contract<SqlStorage>['defaultControlPolicy'],
 ): Contract<SqlStorage> {
   const storage = new SqlStorage({
     storageHash: coreHash('sha256:test'),
@@ -32,7 +32,7 @@ function makeContract(
     capabilities: {},
     extensionPacks: {},
     meta: {},
-    ...(defaultControl !== undefined ? { defaultControl } : {}),
+    ...(defaultControlPolicy !== undefined ? { defaultControlPolicy } : {}),
   };
 }
 

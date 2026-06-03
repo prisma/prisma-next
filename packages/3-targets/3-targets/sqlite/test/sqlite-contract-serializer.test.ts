@@ -113,7 +113,7 @@ describe('control-policy round-trip fidelity', () => {
           },
         },
       }),
-      defaultControl: 'tolerated',
+      defaultControlPolicy: 'tolerated',
     };
   }
 
@@ -122,10 +122,10 @@ describe('control-policy round-trip fidelity', () => {
     const contract = serializer.deserializeContract(makeMixedControlContractJson());
     const reparsed = JSON.parse(JSON.stringify(serializer.serializeContract(contract)));
 
-    expect(reparsed.defaultControl).toBe('tolerated');
+    expect(reparsed.defaultControlPolicy).toBe('tolerated');
 
     const table = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user;
-    const def = reparsed.defaultControl;
+    const def = reparsed.defaultControlPolicy;
     expect(effectiveControlPolicy(table.control, def)).toBe('external');
     expect(effectiveControlPolicy(table.columns.id.control, def)).toBe('observed');
     expect(effectiveControlPolicy(table.columns.email.control, def)).toBe('tolerated');

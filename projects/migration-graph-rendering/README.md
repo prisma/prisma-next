@@ -32,23 +32,37 @@ but not blocked by, the consolidation project (TML-2739).
    [`slices/list-renders-tree/spec.md`](./slices/list-renders-tree/spec.md)
    ([TML-2768](https://linear.app/prisma-company/issue/TML-2768)). `list`'s
    pretty/TTY output adopts the shared tree renderer (package-annotated); its
-   `--json` and future text-only formats stay flat for tooling. Completes the
-   intent of TML-2697.
+   `--json` stays flat for tooling. Introduces the shared `edgeAnnotationsByHash`
+   overlay (D11) that `status` extends. Completes the intent of TML-2697. Runs in
+   parallel with slices 6–7; land first where possible (D11).
 
 The project has broadened from the `graph` renderer into the whole **migration
 read-command family** (`list` / `graph` / `status` / `log`). Cross-cutting design
 decisions (the command-family model, shared renderer, space policy, `list`/`graph`
 split, the ledger foundation) live in [`decisions.md`](./decisions.md).
 
-Further slices, all sequenced after TML-2748 unless noted:
-
-5. **Ledger foundation** ([TML-2769](https://linear.app/prisma-company/issue/TML-2769), blocks 6–7) —
+5. **Ledger foundation** ([TML-2769](https://linear.app/prisma-company/issue/TML-2769)) —
    make the on-apply ledger readable; store migration hash + name; add
-   `readLedger`. Control-plane (all targets).
-6. **`status` = `list` + DB-state overlay** ([TML-2748](https://linear.app/prisma-company/issue/TML-2748)) —
-   applied/pending overlay, `--from`/`--to`, delete dagre, `--tree` becomes default.
-7. **`log` reads the ledger** ([TML-2770](https://linear.app/prisma-company/issue/TML-2770)) —
-   flat executed history (no tree), real order + timestamps + rollbacks.
+   `readLedger`. Control-plane (all targets). **Merged** (PR #665).
+6. **`status` = shared tree + DB-state overlay** —
+   [`slices/status-db-overlay/spec.md`](./slices/status-db-overlay/spec.md)
+   ([TML-2748](https://linear.app/prisma-company/issue/TML-2748)). Renders the
+   shared tree directly via the `graph --tree` engine + an applied/pending edge
+   overlay (`status` key on D11's `edgeAnnotationsByHash`) + the `(db)` node
+   marker; `--from`/`--to` (D9), `--space` (D4); applied comes from the ledger
+   (resolves [TML-2130](https://linear.app/prisma-company/issue/TML-2130)); deletes
+   dagre and makes the tree the default for `graph` (drops `--tree`).
+7. **`log` reads the ledger** —
+   [`slices/log-reads-ledger/spec.md`](./slices/log-reads-ledger/spec.md)
+   ([TML-2770](https://linear.app/prisma-company/issue/TML-2770)). Flat,
+   chronological, single-table apply history straight from the DB ledger (all
+   spaces merged; no tree, no per-space sections); local-time human output with a
+   `--utc` flag, ISO-UTC JSON.
+
+Slices 4, 6, and 7 run **in parallel** off the merged ledger foundation, each on
+its own branch/PR. The only shared surface is the tree renderer's
+`edgeAnnotationsByHash` field (D11), touched by 4 and 6 (additively); `log` (7)
+shares none of it.
 
 Future siblings (not core): `migration path --from X --to Y`
 ([TML-2771](https://linear.app/prisma-company/issue/TML-2771)) and `ref show`
@@ -62,13 +76,6 @@ Presentation polish (independent of the sequence above):
   per-column colored gutter and an opt-in `--legend` key. Presentation-only;
   touches the tree renderer + the `graph` command, behind unchanged layout and
   `--json`/`--dot`.
-- **Converging back-arcs** —
-  [`slices/converging-back-arcs/spec.md`](./slices/converging-back-arcs/spec.md)
-  ([TML-2793](https://linear.app/prisma-company/issue/TML-2793)). Bug follow-up:
-  two or more node-skipping rollbacks converging on the **same** target node break
-  the routed back-arc layer — only one arc lands and the tip falls out of order.
-  The source-side has co-sourced tee handling; the target-side needs the analogous
-  co-landing handling (plus an ordering check). Layout/routing-only.
 
 Ledger cleanups (follow-ups from the TML-2769 / PR #665 review; sequenced after the ledger foundation):
 

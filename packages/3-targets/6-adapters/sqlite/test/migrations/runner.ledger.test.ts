@@ -439,4 +439,78 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     const storedSynthOps = JSON.parse(rows[0]!.operations) as unknown[];
     expect(ledger[0]!.operationCount).toBe(storedSynthOps.length);
   });
+
+  it('returns rows for every space when space is omitted', async () => {
+    testDb = createTestDatabase();
+    const { driver } = testDb;
+    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+    const destHash = contract.storage.storageHash;
+    const edges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        migrationHash: 'sha256:mig-single',
+        dirName: '001_single',
+        from: EMPTY_CONTRACT_HASH,
+        to: destHash,
+        operationCount: 1,
+      },
+    ];
+    const plan = createLedgerTestPlan({
+      destinationHash: destHash,
+      operations: [
+        {
+          id: 'edge.single.op',
+          label: 'single edge op',
+          operationClass: 'additive',
+          target: {
+            id: 'sqlite',
+            details: { schema: 'main', objectType: 'table', name: 'user' },
+          },
+          precheck: [],
+          execute: [],
+          postcheck: [{ description: 'ok', sql: 'SELECT 1' }],
+        },
+      ],
+      migrationEdges: edges,
+    });
+
+    const result = await runner.execute({
+      driver,
+      perSpaceOptions: [
+        {
+          space: LEDGER_TEST_SPACE_ID,
+          plan,
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+          migrationEdges: edges,
+        },
+      ],
+    });
+    if (!result.ok) throw new Error(formatRunnerFailure(result.failure));
+
+    await driver.query(
+      `INSERT INTO _prisma_ledger (
+         space, migration_name, migration_hash, origin_core_hash, destination_core_hash,
+         contract_json_before, contract_json_after, operations, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        'audit',
+        '002_audit',
+        'sha256:audit-mig',
+        EMPTY_CONTRACT_HASH,
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        null,
+        null,
+        '[]',
+        new Date().toISOString(),
+      ],
+    );
+
+    const all = await ledgerAdapter.readLedger(driver);
+    expect(all).toHaveLength(2);
+    expect(all.map((entry) => entry.space)).toEqual([LEDGER_TEST_SPACE_ID, 'audit']);
+    expect(await ledgerAdapter.readLedger(driver, LEDGER_TEST_SPACE_ID)).toHaveLength(1);
+  });
 });

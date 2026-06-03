@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   writeRefPaired: vi.fn(),
   readMarker: vi.fn(),
+  readLedger: vi.fn(),
   connect: vi.fn(),
   close: vi.fn(),
   schemaVerify: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock('../../src/control-api/client', () => ({
   createControlClient: vi.fn(() => ({
     connect: mocks.connect,
     readMarker: mocks.readMarker,
+    readLedger: mocks.readLedger,
     close: mocks.close,
     schemaVerify: mocks.schemaVerify,
     sign: mocks.sign,
@@ -161,19 +163,17 @@ function migrationGraphJson(result: {
   return JSON.stringify({ ok: true, nodes, edges, summary: result.summary }, null, 2);
 }
 
-function migrationLogJson(result: {
-  ok: true;
-  markerHash: string | null;
-  applied: readonly {
-    dirName: string;
-    from: string;
-    to: string;
+function migrationLogJson(
+  result: readonly {
+    space: string;
+    migrationName: string;
     migrationHash: string;
+    from: string | null;
+    to: string;
+    appliedAt: string;
     operationCount: number;
-    createdAt: string;
-  }[];
-  summary: string;
-}): string {
+  }[],
+): string {
   return JSON.stringify(result, null, 2);
 }
 
@@ -249,13 +249,32 @@ describe('read commands --json golden', () => {
     );
   });
 
-  it('pins migration log --json for marker at chain tip', async () => {
+  it('pins migration log --json for ledger apply history', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'read-cmd-log-json-'));
     createdDirs.push(cwd);
     const contractPath = await writeContract(cwd, HASH_B);
     const { dirInit, dirNext } = await writeLinearMigrations(join(cwd, 'migrations'));
     mocks.loadConfig.mockResolvedValue(baseConfig(contractPath));
-    mocks.readMarker.mockResolvedValue({ storageHash: HASH_B });
+    mocks.readLedger.mockResolvedValue([
+      {
+        space: 'app',
+        migrationName: dirInit,
+        migrationHash: 'sha256:init-mig',
+        from: null,
+        to: HASH_A,
+        appliedAt: new Date('2026-03-01T08:00:00.000Z'),
+        operationCount: 1,
+      },
+      {
+        space: 'app',
+        migrationName: dirNext,
+        migrationHash: 'sha256:next-mig',
+        from: HASH_A,
+        to: HASH_B,
+        appliedAt: new Date('2026-03-02T08:00:00.000Z'),
+        operationCount: 1,
+      },
+    ]);
 
     const flags = parseGlobalFlags({ json: true, quiet: true });
     const ui = createTerminalUI(flags);
@@ -267,15 +286,17 @@ describe('read commands --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const json = migrationLogJson(result.value);
-    const parsed = JSON.parse(json) as {
-      applied: Array<{ dirName: string; migrationHash: string }>;
-    };
-    expect(parsed.applied).toHaveLength(2);
-    expect(parsed.applied.map((e) => e.dirName).sort()).toEqual([dirInit, dirNext].sort());
-    expect(json).toContain('"markerHash": "' + HASH_B + '"');
-    expect(json).toContain('"summary": "2 migration(s) applied"');
-    expect(json).toContain('"ok": true');
+    const json = migrationLogJson(
+      result.value.map(({ appliedAt, ...rest }) => ({
+        ...rest,
+        appliedAt: appliedAt.toISOString(),
+      })),
+    );
+    const parsed = JSON.parse(json) as Array<{ migrationName: string; appliedAt: string }>;
+    expect(parsed).toHaveLength(2);
+    expect(parsed.map((entry) => entry.migrationName)).toEqual([dirInit, dirNext]);
+    expect(parsed[0]!.appliedAt).toBe('2026-03-01T08:00:00.000Z');
+    expect(json).not.toContain('markerHash');
   });
 
   it('pins ref set --json when resolving a migration dir name', async () => {

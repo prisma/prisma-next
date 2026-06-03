@@ -162,7 +162,7 @@ describe('verifySqlSchema control policy', () => {
 
   it('ignores an extra live table under external', () => {
     const contract = createTestContract({ user: userTable() }, {}, undefined, {
-      defaultControl: 'external',
+      defaultControlPolicy: 'external',
     });
     const schema = createTestSchemaIR({
       user: userSchema(),
@@ -254,9 +254,9 @@ describe('verifySqlSchema enum dispatch on control policy', () => {
     expect(result.schema.issues.some((i) => i.kind === 'type_missing')).toBe(true);
   });
 
-  it('inherits contract defaultControl for enum drift', () => {
+  it('inherits contract defaultControlPolicy for enum drift', () => {
     const contract = createTestContract({}, {}, undefined, {
-      defaultControl: 'observed',
+      defaultControlPolicy: 'observed',
       enums: { role: enumEntry(['admin', 'user']) },
     });
     const result = verifySqlSchema({
