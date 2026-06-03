@@ -1,3 +1,5 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
+import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type {
   SchemaIssue,
   SchemaVerifier,
@@ -5,7 +7,8 @@ import type {
   SchemaVerifyResult,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { MongoStorage } from '@prisma-next/mongo-contract';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract';
 
 /**
  * Mongo family `SchemaVerifier` abstract base. Commits the Mongo family
@@ -29,7 +32,10 @@ import type { MongoStorage } from '@prisma-next/mongo-contract';
  * list when no extensions exist over the Mongo family alphabet.
  */
 export abstract class MongoSchemaVerifierBase<
-  TContract extends { readonly storage: MongoStorage },
+  TContract extends {
+    readonly storage: MongoStorage;
+    readonly defaultControlPolicy?: ControlPolicy;
+  },
   TSchema,
 > implements SchemaVerifier<TContract, TSchema>
 {
@@ -38,6 +44,22 @@ export abstract class MongoSchemaVerifierBase<
     issues.push(...this.verifyCommonMongoSchema(options));
     issues.push(...this.verifyTargetExtensions(options));
     return { ok: issues.length === 0, issues };
+  }
+
+  protected effectiveCollectionControlPolicy(
+    contract: TContract,
+    collection: MongoCollection | undefined,
+  ): ControlPolicy {
+    return effectiveControlPolicy(collection?.control, contract.defaultControlPolicy);
+  }
+
+  protected collectionControlPolicyForName(
+    contract: TContract,
+    collectionName: string,
+  ): ControlPolicy {
+    const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    const collection = namespace?.collections[collectionName];
+    return this.effectiveCollectionControlPolicy(contract, collection);
   }
 
   protected verifyCommonMongoSchema(

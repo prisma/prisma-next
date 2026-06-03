@@ -520,6 +520,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
+        ...ifDefined('columnsCompatible', controlAdapter.columnsCompatible),
         ...ifDefined('resolveExistingEnumValues', resolveExistingEnumValues),
       });
     },

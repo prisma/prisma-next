@@ -57,14 +57,14 @@ function storageWithTable(control?: unknown) {
   };
 }
 
-function minimalContract(defaultControl?: unknown) {
+function minimalContract(defaultControlPolicy?: unknown) {
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: 'sha256:profile',
     domain: { namespaces: { main: { models: {} } } },
     storage: { storageHash: 'sha256:test' },
-    ...(defaultControl !== undefined ? { defaultControl } : {}),
+    ...(defaultControlPolicy !== undefined ? { defaultControlPolicy } : {}),
   };
 }
 
@@ -145,14 +145,14 @@ describe('PostgresEnumTypeSchema control field', () => {
   });
 });
 
-describe('SQL contract schema defaultControl', () => {
+describe('SQL contract schema defaultControlPolicy', () => {
   const schema = createSqlContractSchema();
 
-  it('accepts a contract carrying defaultControl', () => {
+  it('accepts a contract carrying defaultControlPolicy', () => {
     expect(schema(minimalContract('observed')) instanceof type.errors).toBe(false);
   });
 
-  it('rejects a contract carrying a non-ControlPolicy defaultControl', () => {
+  it('rejects a contract carrying a non-ControlPolicy defaultControlPolicy', () => {
     expect(schema(minimalContract('bogus')) instanceof type.errors).toBe(true);
   });
 });

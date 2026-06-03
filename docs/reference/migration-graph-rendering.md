@@ -76,6 +76,9 @@ lanes instead of a single adjacent `↓`:
 - **Landing** — node row with `○◂` / `*<` (arc land) plus `╯` / `/ ` corner, or
   `◂╯` / `*</` composite on one row when the landing shares cells with the spine.
 - **Co-sourced arcs** — `┬─` / `+-` when two back-arcs share a branch point.
+- **Converging arcs** — when two or more back-arcs land on the *same* node, the inner
+  lanes read as a landing tee `┴─` / `+-` (the outer arcs' bridges pass through to the
+  node) and only the outermost lane closes the corner `╯` / `/ `.
 
 Adjacent rollbacks (target is the node directly below on the spine) stay a plain `↓` /
 `v` in the primary lane — no arc routing.

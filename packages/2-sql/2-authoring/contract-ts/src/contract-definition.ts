@@ -122,7 +122,7 @@ export interface ModelNode {
 
 export interface ContractDefinition {
   readonly target: TargetPackRef<'sql', string>;
-  readonly defaultControl?: ControlPolicy;
+  readonly defaultControlPolicy?: ControlPolicy;
   readonly extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;

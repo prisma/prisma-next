@@ -5,6 +5,7 @@ export default defineConfig({
     'src/exports/codec-ids.ts',
     'src/exports/codec-types.ts',
     'src/exports/codecs.ts',
+    'src/exports/column-type-compatibility.ts',
     'src/exports/control.ts',
     'src/exports/contract-free.ts',
     'src/exports/data-transform.ts',

@@ -1,9 +1,0 @@
-{"role":"user","message":{"content":[{"type":"text","text":"Add a configurable retry policy to the adapter runtime. Shape it as a project."}]}}
-{"role":"assistant","message":{"content":[{"type":"text","text":"This is a multi-slice project. Writing the project spec."},{"type":"tool_use","name":"Write","input":{"path":"projects/retry-policy/spec.md","contents":"# Retry policy\n..."}}]}}
-{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"path":"projects/retry-policy/plan.md","contents":"# Plan\n3 slices..."}}]}}
-{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"path":"projects/retry-policy/slices/contract/spec.md","contents":"# Slice: contract\n..."}}]}}
-{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Task","input":{"description":"Build the retry-policy contract","subagent_type":"generalPurpose","model":"claude-4.6-sonnet-high-thinking"}}]}}
-{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"path":"projects/retry-policy/slices/runtime/spec.md","contents":"# Slice: runtime\n..."}}]}}
-{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Task","input":{"description":"Wire the runtime to honour the policy","subagent_type":"generalPurpose","model":"claude-4.6-sonnet-high-thinking"}}]}}
-{"role":"user","message":{"content":[{"type":"text","text":"Make sure non-idempotent ops are never retried."}]}}
-{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Task","input":{"description":"Adapter opt-in with a default policy","subagent_type":"generalPurpose","model":"claude-4.6-sonnet-high-thinking"}}]}}

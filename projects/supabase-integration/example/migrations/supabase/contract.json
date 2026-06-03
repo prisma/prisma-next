@@ -2,7 +2,7 @@
   "$schema": "https://prisma-next.io/contract.schema.json",
   "spaceId": "supabase",
   "target": "postgres",
-  "defaultControl": "external",
+  "defaultControlPolicy": "external",
   "namespaces": ["auth", "storage"],
   "models": {
     "AuthUser": {
