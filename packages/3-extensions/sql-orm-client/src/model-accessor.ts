@@ -55,8 +55,10 @@ export function createModelAccessor<
   // `ColumnRef` qualified against the variant table the read path joins into
   // the correlated child SELECT. STI variant columns live on the base table
   // and never appear here, so base resolution is untouched. Gating strictly
-  // on `variantName` keeps the common base-predicate path byte-for-byte
-  // unchanged.
+  // on `variantName` means the no-variant path (`variantName === undefined`)
+  // produces exactly the same accessor it did before variant support was
+  // added: an empty `variantFieldColumns`, so every field falls through to the
+  // base-table column resolution below.
   const variantFieldColumns: Record<string, VariantColumnRef> = variantName
     ? resolveVariantFieldColumns(contract, modelName, variantName)
     : {};
