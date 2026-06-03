@@ -18,12 +18,25 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
 //   4. a nested include through a poly target (Parent -> tasks(poly) -> child);
 //   5. relationship-level implicit-default selection (no `.select(...)`).
 //
-// As in the sibling file, the poly models are patched in at runtime and are
-// absent from the static `TestContract` Models type, so minimal cast
-// interfaces drive `.include('<polyRel>')` / `.select` / `.orderBy` and read
-// the rows back. Fixtures stay LOCAL here (the `build*Contract` helpers below
-// deep-clone the shared poly contracts before mutating) so the shared
-// `helpers.ts` builders — and the sibling tests' hand-rolled DDL — stay stable.
+// As in the sibling file, the poly models (and the relationship models wired
+// to them below) are patched onto a real emitted contract at runtime: there is
+// no `.psl` source for these test-only shapes, so they are absent from the
+// static `TestContract` Models type. The real `Collection`/`include` types are
+// driven by that static Models type, so `.include('<polyRel>')` on a
+// runtime-only relation does not type-check against them. These minimal cast
+// interfaces (`IncludeRoot`/`IncludeRefinement`/`BaseRow`) are the deliberate
+// stand-in for the fluent surface under test; they mirror only the methods
+// these tests call. The base contract IS the emitted fixture — `build*Contract`
+// deserialize `getTestContract()` (the real emitted contract) and patch the
+// extra models on top — so the contract shape is real even though the static
+// type can't name the patched relations.
+//
+// `RawContract`/`MutableModel`/`RawTable` below are the matching write-side
+// stand-in: the patched relationship models and their storage tables are added
+// as plain JSON onto the deserialized contract. We keep these LOCAL (rather
+// than the helpers' own mutation types) because the relationship wiring here is
+// specific to these scenarios and we don't want to widen the shared helper
+// surface for one file's fixtures.
 //
 // Ordering is ALWAYS by a base-table column (`id`): TML-2782 makes orderBy on
 // an MTI variant column throw. Poly result columns are asserted at their
@@ -57,7 +70,10 @@ interface IncludeRoot {
       relation: string,
       refine?: (collection: IncludeRefinement) => IncludeRefinement,
     ): IncludeRoot;
-    all(): { toArray(): Promise<Record<string, unknown>[]> };
+    // `.all()` returns an awaitable result (the real Collection returns an
+    // `AsyncIterableResult`, which is `PromiseLike<Row[]>`), so `await` alone
+    // collects the rows — no `.toArray()` needed.
+    all(): PromiseLike<Record<string, unknown>[]>;
   };
 }
 
@@ -410,8 +426,7 @@ describe('integration/polymorphism-include-relationships', () => {
           .include('comments', (comments) =>
             comments.select('id', 'body', 'taskId').orderBy((comment) => comment.id.asc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         // The bug row (base-only) and the feature row (base + features variant
         // table) each correlate their `comments` by the base `id`. No-select on
@@ -487,8 +502,7 @@ describe('integration/polymorphism-include-relationships', () => {
           .select('id', 'subject')
           .orderBy((ticket) => ticket.id.asc())
           .include('owner')
-          .all()
-          .toArray();
+          .all();
 
         // `owner` is a single object (or null), not an array. Each owner is
         // variant-mapped: the admin carries `role`, the regular carries `plan`.
@@ -579,8 +593,7 @@ describe('integration/polymorphism-include-relationships', () => {
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
           .include('tasks', (tasks) => tasks.orderBy((task) => task.id.asc()))
-          .all()
-          .toArray();
+          .all();
 
         // No-select on the poly include → full default per-variant shape.
         // The bug row carries `severity`, the feature row carries `priority`
@@ -667,8 +680,7 @@ describe('integration/polymorphism-include-relationships', () => {
               .orderBy((task) => task.id.asc())
               .include('reporter', (reporter) => reporter.select('id', 'name')),
           )
-          .all()
-          .toArray();
+          .all();
 
         // The poly child rows are variant-mapped (bug carries `severity`,
         // feature carries `priority`) AND each carries the nested `reporter`
@@ -742,8 +754,7 @@ describe('integration/polymorphism-include-relationships', () => {
           .select('id', 'name')
           .orderBy((account) => account.id.asc())
           .include('members', (members) => members.orderBy((member) => member.id.asc()))
-          .all()
-          .toArray();
+          .all();
 
         // No `.select(...)` on the poly include — the deliberate
         // implicit-default exception in the whole-shape rule. The admin row
@@ -824,8 +835,7 @@ describe('integration/polymorphism-include-relationships', () => {
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
           .include('tasks', (tasks) => tasks.orderBy((task) => task.id.asc()))
-          .all()
-          .toArray();
+          .all();
 
         // No `.select(...)` on the poly include — implicit-default exception.
         // The bug row carries `severity`, the feature row carries `priority`
