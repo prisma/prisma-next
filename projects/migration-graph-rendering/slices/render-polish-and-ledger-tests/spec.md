@@ -40,6 +40,7 @@ Six independent follow-ups, all surfaced after the read-command-family slices ([
 6. **System-marker rendering + fresh-DB no-path** (D22, surfaced post-D6) — render system markers (`contract`, `db`) in `<>` brackets to distinguish them syntactically from user-managed refs (`()`); fix the `markerHash !== undefined` guard in the path check so a fresh DB with the live contract disconnected from `∅` reports the no-path summary instead of "up to date".
 7. **Cross-space data-column alignment + contract-node refs adjacent to hash + right-justified from-hash column** (D23, surfaced post-D7) — three coupled padding rules at the row→string join in the renderer.
 8. **Cross-space dirName alignment + capitalised "Up to date"** (D24, surfaced post-D8 QA) — extend D23's cross-space alignment to the dirName column too; capitalise the no-pending-no-error summary headline.
+9. **Trunk-choice rule honors `contractHash` for connected components** (D25, surfaced post-D8 QA) — fix the leaf-selection / rank step in `migration-graph-rows.ts` so the chain ending at the live contract wins the trunk position even when both chains share `∅`. D14 was specced; the algorithm wasn't fully wired.
 
 ## Locked decisions
 
@@ -139,6 +140,31 @@ Two trivial follow-ups surfaced post-D8 QA. Each is one independent change in on
 **Cross-space dirName alignment.** D23 / D8 aligned the **tree-prefix** width globally across per-space blocks but left the **dirName** column padded to each space's local max. That means the from-hash column (which sits immediately after dirName) lands at different absolute column positions across spaces — defeating the visual goal of cross-space alignment for everything *after* the tree-prefix. Extend the rule: compute a single global max dirName width across every migration row in every per-space block in the current rendering, pad every migration row's dirName to that width. Single-space renderings collapse to today's behaviour. Same orchestration point D8 used (`computeGlobalMaxEdgeTreePrefixWidth` + `renderMigrationGraphSpaceTrees`), parameterised with a parallel `globalMaxDirNameWidth`.
 
 **Capitalised "Up to date".** `buildStatusHeadline` currently emits the literal `'up to date'`. Change to `'Up to date'`. Sentences in the summary line start capitalised; this is the only outlier.
+
+### D25 — Trunk-choice rule honors `contractHash` for connected components too (D14 enforcement)
+
+D14 locked the trunk-choice rule: the trunk is the chain containing the **live contract**. D1 was meant to enforce this by threading `liveContractHash` through to `buildMigrationGraphRows` as `contractHash`. The threading works. The algorithm doesn't.
+
+**Bug.** `cli/src/utils/formatters/migration-graph-rows.ts` has two paths that consume `contractHash`:
+
+- `detachedContractHash`: when `contractHash` is not in `graph.nodes`, it's prepended as its own single-node component at the front. ✅ (works as expected.)
+- `layerNodesByLongestForwardPath`: when `contractHash` IS in the graph (connected to the rest), this function ranks nodes by longest-forward-path-from-root and emits tips-first with lex tie-break. **It does not consider `contractHash` at all.** Whichever leaf has the highest forward-path rank wins the trunk position.
+
+The user's demo: `app` space has two leaves descending from `∅`:
+
+- `f7a8eb5` (4 hops from `∅` via the historical-namespaces chain) — rank 4.
+- `1375f13` (1 hop from `∅` via the new `20260603T1537_migration`) — rank 1.
+
+Live contract is `1375f13`. By D14, `1375f13` should be the trunk's tip. By the algorithm's longest-path heuristic, `f7a8eb5` wins (rank 4 > rank 1) and the historical chain renders as the trunk; `1375f13` peels off as a side-branch.
+
+**Fix.** Bias the rank/leaf-selection step toward the chain ending at `contractHash`. The intervention is in `migration-graph-rows.ts`. Two acceptable shapes — implementer picks whichever reads cleaner:
+
+1. **Rank boost.** When `contractHash` is non-empty and present in the component being layered, boost its rank to `currentMax + 1` after the longest-path pass. The tips-first sort then emits it first, the layout assigns it column 0, and its ancestors back to the nearest fork point sit on column 0 too.
+2. **Leaf preference.** Adjust `compareNodesTipsFirst` to take a "preferred-leaf" hint (= `contractHash` when the live contract is a leaf in this component). The hint wins the rank-tied lex tie-break, and the rank-boost path falls out as the same algorithm.
+
+Either way, single-node components, components without `contractHash` in them, and components where `contractHash === EMPTY_CONTRACT_HASH` keep today's behaviour.
+
+**Mid-chain edge case.** If `contractHash` is mid-chain (it has descendants — i.e. someone authored migrations beyond the live contract), the trunk should still anchor on the live contract, but the descendants render *above* it as a forward-extension side-branch. The implementer should either (a) handle this case by boosting only when `contractHash` is a leaf in the component, treating the non-leaf case as today's longest-path heuristic, or (b) handle it explicitly with a sensible layout. Option (a) is simpler and covers the common cases. Document the chosen behaviour in the dispatch's final report.
 
 ### D20 — Op-count parity is a cross-target obligation, asserted by one harness
 
@@ -293,3 +319,20 @@ Eight dispatches. D1–D4 sit on the rendering surface (`packages/1-framework/3-
 - **Focus:** Two surgical edits — one paralleling D8's existing pattern, one a single-character literal. No structural change.
 
 - **Hard constraint:** Touch only `migration-graph-tree-render.ts`, `migration-graph-space-render.ts`, `migration-list-render.ts`, `migration-graph.ts`, `migration-status.ts` (same set as D8), their unit tests, and snapshot fixtures regenerated mechanically. No other production files. If you find a non-whitespace-or-capitalisation snapshot diff, stop and report.
+
+### Dispatch 11: trunk-choice rule honors `contractHash` for connected components
+
+- **Outcome:** D25's algorithmic fix in `cli/src/utils/formatters/migration-graph-rows.ts`. After D11 lands, the demo's `app` space renders with `1375f13` as the trunk's tip and the historical chain ending at `f7a8eb5` as the side-branch, in all three commands (`list` / `status` / `graph`). Single-node components, components without `contractHash` in them, and components where `contractHash === EMPTY_CONTRACT_HASH` are unchanged.
+
+- **Builds on:** D8/D9/D10 (this dispatch's whitespace-only goldens regenerate cleanly on top of the alignment changes); D1 (the unified pipeline already threads `liveContractHash` to `buildMigrationGraphRows`). No dependency on D2/D3/D4/D5/D6/D7.
+
+- **Hands to:**
+  - **Unit tests** in `migration-graph-rows.test.ts` (or wherever the row-model tests live) covering: (i) two leaves shared root, `contractHash` is the shorter-chain leaf → live-contract leaf wins trunk; (ii) two leaves shared root, `contractHash === undefined` → today's longest-path heuristic wins (regression-pin); (iii) `contractHash === EMPTY_CONTRACT_HASH` → today's heuristic (regression-pin); (iv) `contractHash` not in the graph → detached-contract path unchanged (regression-pin).
+  - **Renderer integration** in `migration-graph-tree-render.test.ts` over the demo's app-space topology fixture (or a synthetic equivalent): assert the rendered tree has `<contract-hash>` at the top, on column 0, with the historical chain peeling off as a side-branch.
+  - **Snapshots** regenerate mechanically for any existing fixture whose topology has multiple leaves sharing a root with `contractHash` set; goldens with `contractHash === undefined` or detached-contract topology stay byte-identical.
+
+- **Focus:** Algorithmic fix in one helper (`layerNodesByLongestForwardPath` and/or its surrounding caller). Keep the change local; no refactor of the layout module beyond what's needed to bias the rank/leaf-selection toward `contractHash`.
+
+- **Mid-chain edge case:** Per D25, if `contractHash` has descendants in its component (mid-chain), prefer the simpler implementation (only bias when `contractHash` is a leaf; treat non-leaf as today's heuristic) and document the choice in the dispatch's final report.
+
+- **Hard constraint:** Touch only `migration-graph-rows.ts` (and `migration-list-graph-topology.ts` if it contains the topology classifier the rank step depends on), their unit tests, and snapshot fixtures regenerated mechanically. No other production files. If you find that the rank-boost approach requires a wider refactor of the layout module's column-assignment, stop and report — do not restructure the layout.
