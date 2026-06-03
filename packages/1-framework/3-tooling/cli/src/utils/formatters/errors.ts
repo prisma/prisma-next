@@ -1,8 +1,11 @@
+import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
+import { blindCast } from '@prisma-next/utils/casts';
 import { red } from 'colorette';
 
 import type { CliErrorConflict, CliErrorEnvelope } from '../cli-errors';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
+import { formatPlannerWarningsBlock } from './migrations';
 
 /**
  * Formats error output for human-readable display.
@@ -66,6 +69,14 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
   }
   if (error.docsUrl && isVerbose(flags, 1)) {
     lines.push(formatDimText(error.docsUrl));
+  }
+  const plannerWarnings = error.meta?.['plannerWarnings'];
+  if (Array.isArray(plannerWarnings) && plannerWarnings.length > 0) {
+    const typedWarnings = blindCast<
+      readonly MigrationPlannerConflict[],
+      'mapDbUpdateFailure (db-update.ts) writes meta.plannerWarnings as MigrationPlannerConflict[]; meta is typed Record<string, unknown> so the channel erases the element type'
+    >(plannerWarnings);
+    lines.push(...formatPlannerWarningsBlock(typedWarnings, useColor));
   }
   if (isVerbose(flags, 2) && error.meta) {
     lines.push(`${formatDimText(`  Meta: ${JSON.stringify(error.meta, null, 2)}`)}`);

@@ -26,7 +26,11 @@ export {
   detectDestructiveChanges,
 } from '../core/migrations/contract-to-schema-ir';
 export type { ControlPolicySubject } from '../core/migrations/control-policy';
-export { filterCallsByControlPolicy } from '../core/migrations/control-policy';
+export {
+  controlPolicyForCall,
+  partitionCallsByControlPolicy,
+  partitionIssuesByControlPolicy,
+} from '../core/migrations/control-policy';
 export type { PlanFieldEventOperationsOptions } from '../core/migrations/field-event-planner';
 export { planFieldEventOperations } from '../core/migrations/field-event-planner';
 export {

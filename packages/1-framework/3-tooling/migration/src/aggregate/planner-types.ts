@@ -118,6 +118,7 @@ export interface PerSpacePlan {
   readonly displayOps: readonly MigrationPlanOperation[];
   readonly destinationContract: Contract;
   readonly strategy: 'graph-walk' | 'synth';
+  readonly warnings?: readonly MigrationPlannerConflict[];
   /**
    * Per-edge breakdown of the chain. Graph-walk plans carry one entry per
    * authored edge; synth and at-head plans carry a single synthesised edge.

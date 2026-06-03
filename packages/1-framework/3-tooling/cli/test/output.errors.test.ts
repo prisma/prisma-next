@@ -88,3 +88,31 @@ describe('formatErrorOutput - conflicts', () => {
     expect(stripped).toContain('[constraint] Fourth conflict');
   });
 });
+
+describe('formatErrorOutput - planner warnings on apply failure', () => {
+  it('prints a Warnings block when meta carries plannerWarnings', () => {
+    const error: CliErrorEnvelope = {
+      ...baseError,
+      code: 'PN-RUN-3020',
+      domain: 'RUN',
+      summary: 'Database schema does not satisfy contract (1 failure)',
+      why: 'The resulting database schema does not satisfy the destination contract.',
+      fix: 'Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`',
+      meta: {
+        plannerWarnings: [
+          {
+            kind: 'controlPolicySuppressedCall',
+            summary:
+              "control policy suppressed: createTable(auth.sessions) — namespace 'auth' has effective control 'external' but table declared 'managed'",
+          },
+        ],
+      },
+    };
+
+    const stripped = stripAnsi(formatErrorOutput(error, parseGlobalFlags({ 'no-color': true })));
+
+    expect(stripped).toContain('Warnings:');
+    expect(stripped).toContain('control policy suppressed: createTable(auth.sessions)');
+    expect(stripped).toContain('Database schema does not satisfy contract');
+  });
+});

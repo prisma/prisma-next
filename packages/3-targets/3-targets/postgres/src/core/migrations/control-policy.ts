@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
+import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
@@ -86,6 +87,22 @@ function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
   };
 }
 
+export function formatPostgresControlPolicySubjectLabel(
+  factoryName: string,
+  subject: ControlPolicySubject | undefined,
+  contract: Contract<SqlStorage>,
+): string {
+  if (subject?.table) {
+    const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
+    return `${factoryName}(${ddlSchema}.${subject.table})`;
+  }
+  if (subject?.typeName) {
+    const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
+    return `${factoryName}(${ddlSchema}.${subject.typeName})`;
+  }
+  return factoryName;
+}
+
 export function resolvePostgresCallControlPolicySubject(
   call: PostgresOpFactoryCall,
   contract: Contract<SqlStorage>,
@@ -136,6 +153,80 @@ export function resolvePostgresCallControlPolicySubject(
   if (callFields.schemaName) {
     return {
       namespaceId: resolveNamespaceIdForDdlSchema(contract, callFields.schemaName),
+      createsNewObject,
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * Issue kinds that describe the absence of a whole, top-level Postgres
+ * object — the same kinds `createsNewTopLevelObject` recognises for calls.
+ * Used by {@link resolvePostgresIssueCreationFactoryName} to decide whether
+ * a `tolerated` subject permits the issue to flow into the planner
+ * (create-if-absent) and to seed the suppressed-subject warning's
+ * `factoryName` when the planner is skipped.
+ */
+const POSTGRES_ISSUE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.freeze({
+  missing_schema: 'createSchema',
+  missing_table: 'createTable',
+  type_missing: 'createEnumType',
+});
+
+export function resolvePostgresIssueCreationFactoryName(issue: SchemaIssue): string | undefined {
+  return POSTGRES_ISSUE_CREATION_FACTORY[issue.kind];
+}
+
+/**
+ * Resolve the control-policy subject coordinate for a single
+ * {@link SchemaIssue}. Mirrors the resolution `resolvePostgresCallControlPolicySubject`
+ * performs for a generated DDL call, but works *off the issue* — so the
+ * planner can partition issues by effective policy before the diff engine
+ * runs. `createsNewObject` is derived from the issue's kind: schema/table/
+ * type-missing issues describe a brand-new top-level object; everything else
+ * touches an existing object.
+ *
+ * An `extra_table` issue carries no contract namespace coordinate (the table
+ * isn't in any contract namespace), so the subject's `namespaceId` falls
+ * back to {@link UNBOUND_NAMESPACE_ID}; the call-side resolver does the same
+ * for the `DropTableCall` it produces.
+ */
+export function resolvePostgresIssueControlPolicySubject(
+  issue: SchemaIssue,
+  contract: Contract<SqlStorage>,
+): ControlPolicySubject | undefined {
+  const createsNewObject = POSTGRES_ISSUE_CREATION_FACTORY[issue.kind] !== undefined;
+
+  if (issue.kind === 'missing_schema' && issue.namespaceId) {
+    return { namespaceId: issue.namespaceId, createsNewObject };
+  }
+
+  if ('typeName' in issue && issue.typeName) {
+    const namespaceId =
+      'namespaceId' in issue && issue.namespaceId ? issue.namespaceId : UNBOUND_NAMESPACE_ID;
+    const ns = contract.storage.namespaces[namespaceId];
+    const rawEnum = ns && 'enum' in ns && ns.enum != null ? ns.enum[issue.typeName] : undefined;
+    const controlPolicy = isPostgresEnumStorageEntry(rawEnum) ? rawEnum.control : undefined;
+    return {
+      namespaceId,
+      ...ifDefined('explicitNodeControlPolicy', controlPolicy),
+      typeName: issue.typeName,
+      createsNewObject,
+    };
+  }
+
+  if ('table' in issue && issue.table) {
+    const namespaceId =
+      'namespaceId' in issue && issue.namespaceId
+        ? issue.namespaceId
+        : resolveNamespaceIdForTable(contract, issue.table, undefined);
+    const table = storageTableAt(contract.storage, namespaceId, issue.table);
+    return {
+      namespaceId,
+      ...ifDefined('explicitNodeControlPolicy', table?.control),
+      table: issue.table,
+      ...ifDefined('column', 'column' in issue ? issue.column : undefined),
       createsNewObject,
     };
   }

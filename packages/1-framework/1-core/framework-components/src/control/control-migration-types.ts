@@ -279,6 +279,7 @@ export interface MigrationPlannerConflict {
 export interface MigrationPlannerSuccessResult {
   readonly kind: 'success';
   readonly plan: MigrationPlanWithAuthoringSurface;
+  readonly warnings?: readonly MigrationPlannerConflict[];
 }
 
 /**
