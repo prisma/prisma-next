@@ -2,11 +2,12 @@ import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlannerPlanOptions,
+  SqlPlannerConflict,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
 import {
   extractCodecControlHooks,
-  filterCallsByControlPolicy,
+  partitionCallsByControlPolicy,
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
@@ -23,7 +24,10 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { postgresColumnsCompatible } from '../column-type-compatibility';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import { resolvePostgresCallControlPolicySubject } from './control-policy';
+import {
+  formatPostgresControlPolicyTargetRef,
+  resolvePostgresCallControlPolicySubject,
+} from './control-policy';
 import { createResolveExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
@@ -60,6 +64,7 @@ export type PostgresPlanResult =
   | {
       readonly kind: 'success';
       readonly plan: TypeScriptRenderablePostgresMigration;
+      readonly warnings?: readonly SqlPlannerConflict[];
     }
   | SqlPlannerFailureResult;
 
@@ -177,13 +182,20 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       readonly PostgresOpFactoryCall[],
       'Codec hook ops conform to PostgresOpFactoryCall at the app emitter boundary'
     >(fieldEventOps);
-    const filteredFieldEvents = filterCallsByControlPolicy({
+    const fieldEventPartition = partitionCallsByControlPolicy({
       calls: fieldEventPostgresCalls,
       contract: options.contract,
       resolveControlPolicySubject: (call) =>
         resolvePostgresCallControlPolicySubject(call, options.contract),
+      resolveFactoryName: (call) => call.factoryName,
+      formatTargetRef: (factoryName, subject) =>
+        formatPostgresControlPolicyTargetRef(factoryName, subject, options.contract),
     });
-    const calls = [...result.value.calls, ...filteredFieldEvents];
+    const calls = [...result.value.calls, ...fieldEventPartition.kept];
+    const warnings: SqlPlannerConflict[] = [
+      ...(result.value.warnings ?? []),
+      ...fieldEventPartition.warnings,
+    ];
 
     return Object.freeze({
       kind: 'success' as const,
@@ -195,6 +207,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         },
         options.spaceId,
       ),
+      ...(warnings.length > 0 ? { warnings: Object.freeze(warnings) } : {}),
     });
   }
 

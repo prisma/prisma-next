@@ -4,6 +4,7 @@ import {
   effectiveControlPolicy,
 } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlPlannerConflict } from './types';
 
 /**
  * The target object a control policy governs for a single planner call,
@@ -34,7 +35,7 @@ export interface ControlPolicySubject {
  * policy is forced to `external` regardless of the node's own declaration.
  * Every other default defers to the node's effective control policy.
  */
-function controlPolicyForCall(
+export function controlPolicyForCall(
   subject: ControlPolicySubject | undefined,
   defaultControlPolicy: ControlPolicy | undefined,
 ): ControlPolicy {
@@ -67,6 +68,94 @@ function callAllowedUnderControlPolicy(
     case 'observed':
       return false;
   }
+}
+
+function defaultTargetRef(factoryName: string, subject: ControlPolicySubject | undefined): string {
+  if (subject?.table) {
+    return `${factoryName}(${subject.table})`;
+  }
+  if (subject?.typeName) {
+    return `${factoryName}(${subject.typeName})`;
+  }
+  return factoryName;
+}
+
+function suppressionSummary(
+  targetRef: string,
+  subject: ControlPolicySubject | undefined,
+  effectivePolicy: ControlPolicy,
+): string {
+  const namespace = subject?.namespaceId ?? 'unknown';
+  const declared = subject?.explicitNodeControlPolicy;
+  if (effectivePolicy === 'external' && declared === 'managed') {
+    return `control policy suppressed: ${targetRef} — namespace '${namespace}' has effective control 'external' but table declared 'managed'`;
+  }
+  const declaredSuffix = declared ? ` but table declared '${declared}'` : '';
+  return `control policy suppressed: ${targetRef} — namespace '${namespace}' has effective control '${effectivePolicy}'${declaredSuffix}`;
+}
+
+function buildSuppressionWarning<TCall>(
+  call: TCall,
+  subject: ControlPolicySubject | undefined,
+  effectivePolicy: ControlPolicy,
+  resolveFactoryName: (call: TCall) => string,
+  formatTargetRef: (factoryName: string, subject: ControlPolicySubject | undefined) => string,
+): SqlPlannerConflict {
+  const factoryName = resolveFactoryName(call);
+  const targetRef = formatTargetRef(factoryName, subject);
+  return {
+    kind: 'controlPolicySuppressedCall',
+    summary: suppressionSummary(targetRef, subject, effectivePolicy),
+    location: {
+      ...(subject?.namespaceId ? { namespace: subject.namespaceId } : {}),
+      ...(subject?.table ? { table: subject.table } : {}),
+      ...(subject?.column ? { column: subject.column } : {}),
+      ...(subject?.typeName ? { type: subject.typeName } : {}),
+    },
+    meta: {
+      controlPolicy: effectivePolicy,
+      factoryName,
+      ...(subject?.explicitNodeControlPolicy
+        ? { declaredControlPolicy: subject.explicitNodeControlPolicy }
+        : {}),
+    },
+  };
+}
+
+export function partitionCallsByControlPolicy<TCall>(options: {
+  readonly calls: readonly TCall[];
+  readonly contract: Contract<SqlStorage>;
+  readonly resolveControlPolicySubject: (call: TCall) => ControlPolicySubject | undefined;
+  readonly resolveFactoryName: (call: TCall) => string;
+  readonly formatTargetRef?: (
+    factoryName: string,
+    subject: ControlPolicySubject | undefined,
+  ) => string;
+}): {
+  readonly kept: readonly TCall[];
+  readonly warnings: readonly SqlPlannerConflict[];
+} {
+  const defaultControlPolicy = options.contract.defaultControlPolicy;
+  const formatTargetRef = options.formatTargetRef ?? defaultTargetRef;
+  const kept: TCall[] = [];
+  const warnings: SqlPlannerConflict[] = [];
+
+  for (const call of options.calls) {
+    const subject = options.resolveControlPolicySubject(call);
+    const policy = controlPolicyForCall(subject, defaultControlPolicy);
+    if (callAllowedUnderControlPolicy(policy, subject)) {
+      kept.push(call);
+    } else {
+      warnings.push(
+        buildSuppressionWarning(call, subject, policy, options.resolveFactoryName, formatTargetRef),
+      );
+    }
+  }
+
+  return Object.freeze({
+    kept: Object.freeze(kept),
+    warnings: Object.freeze(warnings),
+  });
 }
 
 export function filterCallsByControlPolicy<TCall>(options: {

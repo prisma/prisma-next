@@ -163,6 +163,15 @@ describe('planner helpers', () => {
     expect(success).toEqual({ kind: 'success', plan });
     expect(Object.isFrozen(success)).toBe(true);
 
+    const warning = {
+      kind: 'controlPolicySuppressedCall' as const,
+      summary: 'control policy suppressed: createTable(users)',
+      meta: { controlPolicy: 'external', factoryName: 'createTable' },
+    };
+    const successWithWarnings = plannerSuccess(plan, [warning]);
+    expect(successWithWarnings.warnings).toEqual([warning]);
+    expect(plannerSuccess(plan, [])).toEqual({ kind: 'success', plan });
+
     const conflict = {
       kind: 'typeMismatch',
       summary: 'Column "user"."email" has mismatched type',

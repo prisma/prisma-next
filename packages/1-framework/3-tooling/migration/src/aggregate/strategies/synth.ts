@@ -120,6 +120,9 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
       displayOps: synthedPlan.operations,
       destinationContract: input.member.contract(),
       strategy: 'synth',
+      ...(plannerResult.warnings && plannerResult.warnings.length > 0
+        ? { warnings: plannerResult.warnings }
+        : {}),
       migrationEdges: [
         buildSynthMigrationEdge({
           currentMarkerStorageHash: input.currentMarker?.storageHash,

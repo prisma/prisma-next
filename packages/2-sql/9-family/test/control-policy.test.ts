@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type ControlPolicySubject,
   filterCallsByControlPolicy,
+  partitionCallsByControlPolicy,
 } from '../src/core/migrations/control-policy';
 
 function makeContract(
@@ -153,6 +154,30 @@ describe('filterCallsByControlPolicy', () => {
     it('drops an unresolved-subject call (fail-closed)', () => {
       const kept = filter([call('createExtension', undefined)], externalDefault);
       expect(kept).toHaveLength(0);
+    });
+
+    it('surfaces a controlPolicySuppressedCall warning for managed override under external default', () => {
+      const { kept, warnings } = partitionCallsByControlPolicy({
+        calls: [call('createTable', tableSubject('managed', true))],
+        contract: externalDefault,
+        resolveControlPolicySubject: (c) => c.subject,
+        resolveFactoryName: (c) => c.name,
+      });
+      expect(kept).toHaveLength(0);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]?.kind).toBe('controlPolicySuppressedCall');
+      expect(warnings[0]?.location).toMatchObject({
+        namespace: UNBOUND_NAMESPACE_ID,
+        table: 'users',
+      });
+      expect(warnings[0]?.meta).toMatchObject({
+        controlPolicy: 'external',
+        factoryName: 'createTable',
+        declaredControlPolicy: 'managed',
+      });
+      expect(warnings[0]?.summary).toContain(
+        "namespace '__unbound__' has effective control 'external' but table declared 'managed'",
+      );
     });
   });
 });

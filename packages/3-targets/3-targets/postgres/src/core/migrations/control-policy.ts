@@ -86,6 +86,22 @@ function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
   };
 }
 
+export function formatPostgresControlPolicyTargetRef(
+  factoryName: string,
+  subject: ControlPolicySubject | undefined,
+  contract: Contract<SqlStorage>,
+): string {
+  if (subject?.table) {
+    const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
+    return `${factoryName}(${ddlSchema}.${subject.table})`;
+  }
+  if (subject?.typeName) {
+    const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
+    return `${factoryName}(${ddlSchema}.${subject.typeName})`;
+  }
+  return factoryName;
+}
+
 export function resolvePostgresCallControlPolicySubject(
   call: PostgresOpFactoryCall,
   contract: Contract<SqlStorage>,

@@ -1,4 +1,7 @@
-import type { OperationPreview } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlannerConflict,
+  OperationPreview,
+} from '@prisma-next/framework-components/control';
 import { cyan, green, yellow } from 'colorette';
 
 import type { PerSpaceExecutionEntry } from '../../control-api/types';
@@ -85,9 +88,22 @@ export interface MigrationCommandResult {
   readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
   readonly plannedAdvanceRef?: { readonly name: string; readonly hash: string } | null;
   readonly summary: string;
+  readonly warnings?: readonly MigrationPlannerConflict[];
   readonly timings: {
     readonly total: number;
   };
+}
+
+function formatPlannerWarningsBlock(
+  warnings: readonly MigrationPlannerConflict[],
+  useColor: boolean,
+): readonly string[] {
+  const formatDimText = (text: string) => formatDim(useColor, text);
+  const lines: string[] = ['', 'Warnings:'];
+  for (const warning of warnings) {
+    lines.push(`  ${formatDimText(`- ${warning.summary}`)}`);
+  }
+  return lines;
 }
 
 /**
@@ -163,6 +179,10 @@ export function formatMigrationPlanOutput(
     );
   } else {
     lines.push(`${formatGreen('✔')} Planned ${operationCount} operation(s)`);
+  }
+
+  if (result.warnings && result.warnings.length > 0) {
+    lines.push(...formatPlannerWarningsBlock(result.warnings, useColor));
   }
 
   const formatYellow = createColorFormatter(useColor, yellow);
@@ -425,6 +445,10 @@ export function formatMigrationApplyOutput(
       );
     } else {
       lines.push(`${formatGreen('✔')} Applied ${executed} operation(s)`);
+    }
+
+    if (result.warnings && result.warnings.length > 0) {
+      lines.push(...formatPlannerWarningsBlock(result.warnings, useColor));
     }
 
     // Per-space breakdown — replaces the single ambiguous `Signature:`

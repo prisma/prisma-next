@@ -395,6 +395,7 @@ export interface DbInitSuccess {
    */
   readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly summary: string;
+  readonly warnings?: ReadonlyArray<MigrationPlannerConflict>;
 }
 
 /**
@@ -465,6 +466,7 @@ export interface DbUpdateSuccess {
    */
   readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly summary: string;
+  readonly warnings?: ReadonlyArray<MigrationPlannerConflict>;
 }
 
 /**
