@@ -40,8 +40,8 @@
                   "column": "id"
                 }
               },
-              "table": "app_user",
-              "namespaceId": "public"
+              "namespaceId": "public",
+              "table": "app_user"
             }
           }
         }

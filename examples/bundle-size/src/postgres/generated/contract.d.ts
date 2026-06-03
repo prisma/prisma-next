@@ -95,6 +95,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'Note';
+          readonly namespaceId: 'public';
           readonly fields: { readonly id: { readonly column: 'id' } };
         };
       };
@@ -125,6 +126,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'Note';
+              readonly namespaceId: 'public';
               readonly fields: { readonly id: { readonly column: 'id' } };
             };
           };
