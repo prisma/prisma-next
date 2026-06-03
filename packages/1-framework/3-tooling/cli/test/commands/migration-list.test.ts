@@ -192,7 +192,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     //   20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)
     //   20260422T0748_migration           55bada2 → 2f45cc7  (staging)
     //   20260422T0742_migration           4cb4256 → 55bada2  (production)
-    //   20260422T0720_initial             ∅       → 4cb4256
+    //   20260422T0720_initial                   ∅ → 4cb4256
     await writePackage(migrationsRoot, {
       spaceId: 'app',
       dirName: '20260422T0720_initial',
@@ -341,7 +341,7 @@ describe('runMigrationList — slice-spec worked example', () => {
         '○   55bada2',
         '│↑  20260422T0742_migration  4cb4256 → 55bada2  1 ops',
         '○   4cb4256',
-        '│↑  20260422T0720_initial    ∅       → 4cb4256  1 ops',
+        '│↑  20260422T0720_initial          ∅ → 4cb4256  1 ops',
         '∅',
         '',
         '2 migration(s) on disk',
@@ -394,17 +394,17 @@ describe('runMigrationList — slice-spec worked example', () => {
     expect(human).toBe(
       [
         'app:',
-        '  ○   804e018                           (db)',
+        '  ○   804e018  (db)',
         '  │↑  20260518T1701_namespaces_bookend  55bada2 → 804e018  1 ops',
-        '  ○   55bada2                           (production)',
+        '  ○   55bada2  (production)',
         '  │↑  20260422T0742_migration           4cb4256 → 55bada2  1 ops',
         '  ○   4cb4256',
-        '  │↑  20260422T0720_initial             ∅       → 4cb4256  1 ops',
+        '  │↑  20260422T0720_initial                   ∅ → 4cb4256  1 ops',
         '  ∅',
         '',
         'postgis:',
-        '  ○   9aabbcc                                  (db)',
-        '  │↑  20260601T0000_install_postgis_extension  ∅       → 9aabbcc  1 ops',
+        '  ○   9aabbcc  (db)',
+        '  │↑  20260601T0000_install_postgis_extension        ∅ → 9aabbcc  1 ops',
         '  ∅',
         '',
         '4 migration(s) across 2 contract space(s)',

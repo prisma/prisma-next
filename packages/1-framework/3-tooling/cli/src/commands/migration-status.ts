@@ -42,7 +42,10 @@ import {
   loadContractRawSafely,
   refusePackageCorruptionOnAggregate,
 } from '../utils/contract-space-aggregate-loader';
-import { renderMigrationGraphSpaceTree } from '../utils/formatters/migration-graph-space-render';
+import {
+  computeGlobalMaxEdgeTreePrefixWidth,
+  renderMigrationGraphSpaceTree,
+} from '../utils/formatters/migration-graph-space-render';
 import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
 import type { MigrationListEntry } from '../utils/formatters/migration-list-types';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -126,6 +129,7 @@ function renderSpaceTree(args: {
   readonly statusOverlay: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly colorize: boolean;
   readonly glyphMode: 'unicode' | 'ascii';
+  readonly globalMaxEdgeTreePrefixWidth?: number;
 }): string {
   const graph = args.member.graph();
   if (graph.nodes.size === 0) {
@@ -140,6 +144,9 @@ function renderSpaceTree(args: {
     colorize: args.colorize,
     glyphMode: args.glyphMode,
     ...(args.showDbMarker && args.markerHash !== undefined ? { dbHash: args.markerHash } : {}),
+    ...(args.globalMaxEdgeTreePrefixWidth !== undefined
+      ? { globalMaxEdgeTreePrefixWidth: args.globalMaxEdgeTreePrefixWidth }
+      : {}),
   });
 }
 
@@ -433,6 +440,18 @@ async function executeMigrationStatusCommand(
   let markerCannotReachTarget = false;
   let headlineTargetHash = activeRefHash ?? contractHash;
   let totalPending = 0;
+
+  const globalMaxEdgeTreePrefixWidth = showSpaceHeadings
+    ? computeGlobalMaxEdgeTreePrefixWidth(
+        scopedSpaces
+          .filter((spaceEntry) => spaceEntry.migrations.length > 0)
+          .map((spaceEntry) => ({
+            graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+            liveContractHash: contractHash,
+          })),
+      )
+    : undefined;
+
   for (const spaceEntry of scopedSpaces) {
     const member = aggregate.space(spaceEntry.spaceId);
     if (member === undefined) {
@@ -495,6 +514,7 @@ async function executeMigrationStatusCommand(
       statusOverlay: annotations,
       colorize,
       glyphMode,
+      ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
     });
     const migrations = buildStatusMigrations(spaceEntry.migrations, annotations);
     const pending = countPending(migrations);

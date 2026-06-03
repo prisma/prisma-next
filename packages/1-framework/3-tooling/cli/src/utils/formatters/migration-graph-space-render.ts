@@ -3,6 +3,7 @@ import type { GlyphMode } from '../glyph-mode';
 import { buildMigrationGraphLayout } from './migration-graph-layout';
 import { buildMigrationGraphRows } from './migration-graph-rows';
 import {
+  computeMaxEdgeTreePrefixWidthForLayout,
   type MigrationEdgeAnnotation,
   renderMigrationGraphTree,
 } from './migration-graph-tree-render';
@@ -40,9 +41,29 @@ export interface RenderMigrationGraphSpaceTreeInput {
   readonly statusOverlayByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly dbHash?: string;
   readonly styler?: MigrationListStyler;
+  readonly globalMaxEdgeTreePrefixWidth?: number;
 }
 
-export function renderMigrationGraphSpaceTree(input: RenderMigrationGraphSpaceTreeInput): string {
+export interface ComputeGlobalMaxEdgeTreePrefixWidthInput {
+  readonly graph: MigrationGraph;
+  readonly liveContractHash: string;
+}
+
+export function computeGlobalMaxEdgeTreePrefixWidth(
+  inputs: readonly ComputeGlobalMaxEdgeTreePrefixWidthInput[],
+): number {
+  let globalMax = 0;
+  for (const input of inputs) {
+    const rowModel = buildMigrationGraphRows(input.graph, {
+      contractHash: input.liveContractHash,
+    });
+    const layout = buildMigrationGraphLayout(rowModel);
+    globalMax = Math.max(globalMax, computeMaxEdgeTreePrefixWidthForLayout(layout));
+  }
+  return globalMax;
+}
+
+function renderMigrationGraphSpaceTreeInternal(input: RenderMigrationGraphSpaceTreeInput): string {
   const rowModel = buildMigrationGraphRows(input.graph, {
     contractHash: input.liveContractHash,
   });
@@ -60,7 +81,26 @@ export function renderMigrationGraphSpaceTree(input: RenderMigrationGraphSpaceTr
     glyphMode: input.glyphMode,
     ...(input.dbHash !== undefined ? { dbHash: input.dbHash } : {}),
     ...(input.styler !== undefined ? { styler: input.styler } : {}),
+    ...(input.globalMaxEdgeTreePrefixWidth !== undefined
+      ? { globalMaxEdgeTreePrefixWidth: input.globalMaxEdgeTreePrefixWidth }
+      : {}),
   });
+}
+
+export function renderMigrationGraphSpaceTree(input: RenderMigrationGraphSpaceTreeInput): string {
+  return renderMigrationGraphSpaceTreeInternal(input);
+}
+
+export function renderMigrationGraphSpaceTrees(
+  inputs: readonly RenderMigrationGraphSpaceTreeInput[],
+): readonly string[] {
+  const globalMax = inputs.length > 1 ? computeGlobalMaxEdgeTreePrefixWidth(inputs) : undefined;
+  return inputs.map((input) =>
+    renderMigrationGraphSpaceTreeInternal({
+      ...input,
+      ...(globalMax !== undefined ? { globalMaxEdgeTreePrefixWidth: globalMax } : {}),
+    }),
+  );
 }
 
 export function indentMigrationGraphTreeBlock(treeOutput: string, indent: string): string {

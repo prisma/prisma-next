@@ -24,6 +24,7 @@ import {
   MIGRATION_LIST_HASH_WIDTH,
   migrationListEmptySource,
   migrationListForwardArrow,
+  padFromHashColumn,
 } from './migration-list-data-column';
 import type { MigrationEdgeKind } from './migration-list-graph-topology';
 import type { MigrationListStyler } from './migration-list-render';
@@ -55,6 +56,7 @@ export interface RenderMigrationGraphTreeOptions {
   readonly contractHash?: string;
   readonly activeRefName?: string;
   readonly hashLength?: number;
+  readonly globalMaxEdgeTreePrefixWidth?: number;
   readonly colorize: boolean;
   readonly glyphMode?: GlyphMode;
   readonly styler?: MigrationListStyler;
@@ -484,13 +486,16 @@ function formatEdgeHashColumn(
 ): string {
   if (edge.kind === 'self') {
     const hash = abbreviateHash(edge.from, hashLength, palette.emptySource);
-    return `${style.sourceHash(hash)} ${style.glyph(palette.forwardArrow)} ${style.destHash(hash)}`;
+    const source = padFromHashColumn(style.sourceHash(hash), hashLength);
+    return `${source} ${style.glyph(palette.forwardArrow)} ${style.destHash(hash)}`;
   }
   const source =
     edge.from === EMPTY_CONTRACT_HASH
-      ? style.glyph(palette.emptySource) +
-        ' '.repeat(Math.max(0, hashLength - palette.emptySource.length))
-      : style.sourceHash(abbreviateHash(edge.from, hashLength, palette.emptySource));
+      ? padFromHashColumn(style.glyph(palette.emptySource), hashLength)
+      : padFromHashColumn(
+          style.sourceHash(abbreviateHash(edge.from, hashLength, palette.emptySource)),
+          hashLength,
+        );
   const arrow = style.glyph(palette.forwardArrow);
   const dest = style.destHash(abbreviateHash(edge.to, hashLength, palette.emptySource));
   return `${source} ${arrow} ${dest}`;
@@ -559,6 +564,13 @@ function maxEdgeTreePrefixWidth(
   return max;
 }
 
+export function computeMaxEdgeTreePrefixWidthForLayout(model: MigrationGraphGridModel): number {
+  const wideLabelColumn = gridUsesSkipRollbackArcs(model.rows)
+    ? gridWidthForModel(model.rows) * 2 + 4
+    : undefined;
+  return maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
+}
+
 function nodeHasArcDecoration(row: MigrationGraphGridRow): boolean {
   return row.cells.some(
     (cell) => cell.kind === 'node' && (cell.arcTee === true || cell.arcLand === true),
@@ -583,9 +595,9 @@ export function renderMigrationGraphTree(
     )
     .map((row) => row.edge);
   const maxDirNameLen = maxDirNameLength(allEdges);
-  const maxEdgePrefixWidth = maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
+  const maxEdgePrefixWidth =
+    opts.globalMaxEdgeTreePrefixWidth ?? maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
   const edgeDirNameWidth = rowDirNameWidth(maxEdgePrefixWidth, maxDirNameLen, dirNameGap);
-  const edgeDataColumn = maxEdgePrefixWidth + edgeDirNameWidth;
 
   const lines: string[] = [];
 
@@ -659,7 +671,6 @@ export function renderMigrationGraphTree(
       row.kind === 'edge'
         ? edgeDirNameWidth
         : rowDirNameWidth(labelColumn, maxDirNameLen, dirNameGap);
-    const dataColumn = row.kind === 'edge' ? edgeDataColumn : labelColumn + dirNameWidth;
     const gutterPad = padVisible(gutter, labelColumn);
 
     if (row.kind === 'node') {
@@ -678,7 +689,7 @@ export function renderMigrationGraphTree(
           continue;
         }
         const overlay = formatContractNodeOverlays(style, overlays.markers, overlays.refs);
-        lines.push(trimTrailingWhitespace(`${padVisible(emptyGutter, dataColumn)}${overlay}`));
+        lines.push(trimTrailingWhitespace(`${emptyGutter}${' '.repeat(LABEL_GAP)}${overlay}`));
         continue;
       }
       const hashText = style.sourceHash(
@@ -686,9 +697,7 @@ export function renderMigrationGraphTree(
       );
       const overlays = overlayNamesForContract(contractHash, opts);
       const hasOverlays = overlays.markers.length > 0 || overlays.refs.length > 0;
-      const overlayPad = hasOverlays
-        ? ' '.repeat(Math.max(0, dataColumn - labelColumn - stringWidth(hashText)))
-        : '';
+      const overlayPad = hasOverlays ? ' '.repeat(LABEL_GAP) : '';
       const overlay = hasOverlays
         ? formatContractNodeOverlays(style, overlays.markers, overlays.refs)
         : '';

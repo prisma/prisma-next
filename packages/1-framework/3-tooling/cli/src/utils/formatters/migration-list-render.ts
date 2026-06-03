@@ -2,6 +2,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import type { GlyphMode } from '../glyph-mode';
 import {
+  computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
 } from './migration-graph-space-render';
@@ -131,6 +132,7 @@ function renderSpaceTreeBlock(
   colorize: boolean,
   liveContractHash: string,
   graphForSpace: (spaceId: string) => MigrationGraph | undefined,
+  globalMaxEdgeTreePrefixWidth?: number,
 ): readonly string[] {
   if (migrations.length === 0) {
     const emptyLine = formatEmptyStateLine(spaceId, style);
@@ -149,6 +151,7 @@ function renderSpaceTreeBlock(
     colorize,
     refsByHash: buildRefsByHashFromListEntries(migrations),
     styler: style,
+    ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
   });
 
   if (!multiSpace) {
@@ -183,6 +186,16 @@ export function renderMigrationListWithStyle(
   const colorize = options.colorize ?? false;
   const liveContractHash = options.liveContractHash ?? EMPTY_CONTRACT_HASH;
   const graphForSpace = options.graphForSpace ?? (() => undefined);
+  const globalMaxEdgeTreePrefixWidth = multiSpace
+    ? computeGlobalMaxEdgeTreePrefixWidth(
+        result.spaces
+          .filter((space) => space.migrations.length > 0)
+          .map((space) => ({
+            graph: graphForSpace(space.spaceId) ?? migrationGraphFromListEntries(space.migrations),
+            liveContractHash,
+          })),
+      )
+    : undefined;
   const lines: string[] = [];
 
   for (let index = 0; index < result.spaces.length; index++) {
@@ -200,6 +213,7 @@ export function renderMigrationListWithStyle(
         colorize,
         liveContractHash,
         graphForSpace,
+        globalMaxEdgeTreePrefixWidth,
       ),
     );
   }

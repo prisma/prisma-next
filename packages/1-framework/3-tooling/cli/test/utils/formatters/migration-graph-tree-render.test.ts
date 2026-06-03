@@ -7,11 +7,13 @@ import { laneColorForColumn } from '../../../src/utils/formatters/migration-grap
 import type { StructuralCell } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphRows } from '../../../src/utils/formatters/migration-graph-rows';
+import { renderMigrationGraphSpaceTrees } from '../../../src/utils/formatters/migration-graph-space-render';
 import {
   renderMigrationGraphLegend,
   renderMigrationGraphTree,
   resolveConnectorLaneColors,
 } from '../../../src/utils/formatters/migration-graph-tree-render';
+import { MIGRATION_LIST_HASH_WIDTH } from '../../../src/utils/formatters/migration-list-data-column';
 
 const { bold: forcedBold } = createColors({ useColor: true });
 
@@ -96,6 +98,110 @@ function assertMigrationDataColumnsAligned(rendered: string, dirNames: readonly 
   expect(new Set(columns).size).toBe(1);
 }
 
+function arrowColumnOffset(line: string): number {
+  const plain = stripAnsi(line);
+  const idx = plain.indexOf('→');
+  if (idx === -1) {
+    throw new Error('arrow not found in line');
+  }
+  return idx;
+}
+
+function tokenStartOffset(line: string, token: string): number {
+  const plain = stripAnsi(line);
+  const idx = plain.indexOf(token);
+  if (idx === -1) {
+    throw new Error(`token ${token} not found in line`);
+  }
+  return idx;
+}
+
+const LABEL_GAP = 2;
+
+describe('renderMigrationGraphTree (D23 padding rules)', () => {
+  it('aligns migration dirName columns across spaces with different tree depths', () => {
+    const appInit = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const appAlice = edge('ef9de27', '73e3abe', 'alice_add_phone');
+    const appBob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
+    const appMergeAlice = edge('73e3abe', '3b2d98d', 'merge_alice');
+    const appMergeBob = edge('6656a6e', '3b2d98d', 'merge_bob');
+
+    const pgInit = edge(EMPTY_CONTRACT_HASH, '29059df', 'install_vector_v1');
+
+    const [appTree, pgTree] = renderMigrationGraphSpaceTrees([
+      {
+        graph: graph([appInit, appAlice, appBob, appMergeAlice, appMergeBob]),
+        migrations: [],
+        liveContractHash: '3b2d98d',
+        glyphMode: 'unicode',
+        colorize: false,
+      },
+      {
+        graph: graph([pgInit]),
+        migrations: [],
+        liveContractHash: '29059df',
+        glyphMode: 'unicode',
+        colorize: false,
+      },
+    ]);
+    if (appTree === undefined || pgTree === undefined) {
+      throw new Error('expected two rendered space trees');
+    }
+
+    const appDirName = migrationDirNameColumns(appTree, ['merge_alice', 'init']);
+    const pgDirName = migrationDirNameColumns(pgTree, ['install_vector_v1']);
+    expect(appDirName[0]!).toBe(pgDirName[0]!);
+  });
+
+  it('places contract-node markers adjacent to the hash with LABEL_GAP', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const edges = [init, addPosts];
+
+    const contractOnly = tree(edges, {
+      colorize: false,
+      contractHash: 'a94b7b4',
+    });
+    const contractOnlyLine = stripAnsi(contractOnly.split('\n')[0] ?? '');
+    expect(contractOnlyLine).toBe('○   a94b7b4  <contract>');
+    expect(tokenStartOffset(contractOnlyLine, '<contract>')).toBe(
+      tokenStartOffset(contractOnlyLine, 'a94b7b4') + MIGRATION_LIST_HASH_WIDTH + LABEL_GAP,
+    );
+
+    const markersAndRefs = tree(edges, {
+      colorize: false,
+      refsByHash: refsMap([{ hash: 'a94b7b4', names: ['prod'] }]),
+      dbHash: 'a94b7b4',
+      contractHash: 'a94b7b4',
+    });
+    const markersLine = stripAnsi(markersAndRefs.split('\n')[0] ?? '');
+    expect(markersLine).toBe('○   a94b7b4  <contract, db> (prod)');
+    expect(tokenStartOffset(markersLine, '<contract, db>')).toBe(
+      tokenStartOffset(markersLine, 'a94b7b4') + MIGRATION_LIST_HASH_WIDTH + LABEL_GAP,
+    );
+
+    const hashOnly = tree(edges, { colorize: false });
+    const hashOnlyLine = stripAnsi(hashOnly.split('\n')[0] ?? '');
+    expect(hashOnlyLine).toBe('○   a94b7b4');
+    expect(hashOnlyLine).not.toMatch(/\s+$/);
+  });
+
+  it('right-justifies the from-hash column so the arrow lands at a fixed column', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const bookend = edge('6cee614', 'f7a8eb5', 'bookend');
+    const output = tree([init, bookend], { colorize: false });
+    const lines = stripAnsi(output)
+      .split('\n')
+      .filter((line) => line.includes('→'));
+    const initLine = lines.find((line) => line.includes('init'));
+    const bookendLine = lines.find((line) => line.includes('bookend'));
+    expect(initLine).toBeDefined();
+    expect(bookendLine).toBeDefined();
+    expect(arrowColumnOffset(initLine ?? '')).toBe(arrowColumnOffset(bookendLine ?? ''));
+    expect(initLine).toContain('      ∅ →');
+  });
+});
+
 describe('renderMigrationGraphTree', () => {
   it('renders a linear chain per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
@@ -105,7 +211,7 @@ describe('renderMigrationGraphTree', () => {
         '○   a94b7b4',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -123,12 +229,12 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   c0ffee0              <contract>',
+        '○   c0ffee0  <contract>',
         '',
-        '○   a94b7b4              <db> (main)',
+        '○   a94b7b4  <db> (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -204,10 +310,10 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   a94b7b4              <contract> (main)',
+        '○   a94b7b4  <contract> (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
-        '○   ef9de27              <db> (prod)',
-        '│↑  init                 ∅       → ef9de27',
+        '○   ef9de27  <db> (prod)',
+        '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -227,20 +333,20 @@ describe('renderMigrationGraphTree', () => {
       [
         '○   E',
         '├─╮',
-        '│↑│     promote          D → E',
-        '│ │↑    bob_extra        C → E',
+        '│↑│     promote                D → E',
+        '│ │↑    bob_extra              C → E',
         '○ │   D',
         '├─┼─╮',
-        '│↑│ │   merge_alice      B → D',
-        '│ │ │↑  merge_bob        C → D',
+        '│↑│ │   merge_alice            B → D',
+        '│ │ │↑  merge_bob              C → D',
         '○ │ │   B',
-        '│↑│ │   alice            A → B',
+        '│↑│ │   alice                  A → B',
         '│ ├─╯',
         '│ ○   C',
-        '│ │↑    bob              A → C',
+        '│ │↑    bob                    A → C',
         '├─╯',
         '○   A',
-        '│↑      init             ∅       → A',
+        '│↑      init                   ∅ → A',
         '∅',
       ].join('\n'),
     );
@@ -291,7 +397,7 @@ describe('renderMigrationGraphTree', () => {
         '│ │↑  bob_add_avatar     ef9de27 → 6656a6e',
         '├─╯',
         '○   ef9de27',
-        '│↑    init               ∅       → ef9de27',
+        '│↑    init                     ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -320,7 +426,7 @@ describe('renderMigrationGraphTree', () => {
         '│ │ │↑  add_avatar       ef9de27 → 6656a6e',
         '├─┴─╯',
         '○   ef9de27',
-        '│↑      init             ∅       → ef9de27',
+        '│↑      init                   ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -344,7 +450,7 @@ describe('renderMigrationGraphTree', () => {
         '○◂╯ │     73e3abe',
         '│↑  │     add_phone           ef9de27 → 73e3abe',
         '○◂──╯     ef9de27',
-        '│↑        init                ∅       → ef9de27',
+        '│↑        init                      ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -365,7 +471,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  add_phone            ef9de27 → 73e3abe',
         '│↓  rollback_phone       73e3abe → ef9de27',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27',
+        '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
     );
@@ -381,7 +487,7 @@ describe('renderMigrationGraphTree', () => {
         '│↑  next                 aaaaaaa → bbbbbbb',
         '│⟲  noop                 aaaaaaa → aaaaaaa',
         '○   aaaaaaa',
-        '│↑  init                 ∅       → aaaaaaa',
+        '│↑  init                       ∅ → aaaaaaa',
         '∅',
       ].join('\n'),
     );
@@ -425,7 +531,7 @@ describe('renderMigrationGraphTree', () => {
         '○   3b2d98d',
         '│↑  20260303_add_phone   ef9de27 → 3b2d98d  2 ops  {phone_present}',
         '○   ef9de27',
-        '│↑  init                 ∅       → ef9de27  5 ops',
+        '│↑  init                       ∅ → ef9de27  5 ops',
         '∅',
       ].join('\n'),
     );
@@ -465,7 +571,7 @@ describe('renderMigrationGraphTree', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "○   cd5c15b              <contract> (main)
+      "○   cd5c15b  <contract> (main)
       ├─╮
       │↑│   merge_2a           0276f92 → cd5c15b
       │ │↑  merge_2b           a94b7b4 → cd5c15b
@@ -484,7 +590,7 @@ describe('renderMigrationGraphTree', () => {
       │ │↑  bob_add_avatar     ef9de27 → 6656a6e
       ├─╯
       ○   ef9de27
-      │↑    init               ∅       → ef9de27
+      │↑    init                     ∅ → ef9de27
       ∅"
     `);
   });
@@ -553,7 +659,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       "*   a94b7b4
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^  init                       - -> ef9de27
       -"
     `);
   });
@@ -569,12 +675,12 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'c0ffee0',
       }),
     ).toMatchInlineSnapshot(`
-      "*   c0ffee0              <contract>
+      "*   c0ffee0  <contract>
 
-      *   a94b7b4              <db> (main)
+      *   a94b7b4  <db> (main)
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^  init                       - -> ef9de27
       -"
     `);
   });
@@ -593,10 +699,10 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'a94b7b4',
       }),
     ).toMatchInlineSnapshot(`
-      "*   a94b7b4              <contract> (main)
+      "*   a94b7b4  <contract> (main)
       |^  add_posts            ef9de27 -> a94b7b4
-      *   ef9de27              <db> (prod)
-      |^  init                 -       -> ef9de27
+      *   ef9de27  <db> (prod)
+      |^  init                       - -> ef9de27
       -"
     `);
   });
@@ -618,7 +724,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | |^  bob_add_avatar     ef9de27 -> 6656a6e
       +-/
       *   ef9de27
-      |^    init               -       -> ef9de27
+      |^    init                     - -> ef9de27
       -"
     `);
   });
@@ -647,7 +753,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | | |^  add_avatar       ef9de27 -> 6656a6e
       +-+-/
       *   ef9de27
-      |^      init             -       -> ef9de27
+      |^      init                   - -> ef9de27
       -"
     `);
   });
@@ -671,7 +777,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       *</ |     73e3abe
       |^  |     add_phone           ef9de27 -> 73e3abe
       *<--/     ef9de27
-      |^        init                -       -> ef9de27
+      |^        init                      - -> ef9de27
       -"
     `);
   });
@@ -690,7 +796,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  add_phone            ef9de27 -> 73e3abe
       |v  rollback_phone       73e3abe -> ef9de27
       *   ef9de27
-      |^  init                 -       -> ef9de27
+      |^  init                       - -> ef9de27
       -"
     `);
   });
@@ -704,7 +810,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       |^  next                 aaaaaaa -> bbbbbbb
       |@  noop                 aaaaaaa -> aaaaaaa
       *   aaaaaaa
-      |^  init                 -       -> aaaaaaa
+      |^  init                       - -> aaaaaaa
       -"
     `);
   });
@@ -729,7 +835,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "*   cd5c15b              <contract> (main)
+      "*   cd5c15b  <contract> (main)
       +-\\
       |^|   merge_2a           0276f92 -> cd5c15b
       | |^  merge_2b           a94b7b4 -> cd5c15b
@@ -748,7 +854,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
       | |^  bob_add_avatar     ef9de27 -> 6656a6e
       +-/
       *   ef9de27
-      |^    init               -       -> ef9de27
+      |^    init                     - -> ef9de27
       -"
     `);
   });

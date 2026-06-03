@@ -13,6 +13,7 @@ import {
 } from '../utils/command-helpers';
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import {
+  computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
 } from '../utils/formatters/migration-graph-space-render';
@@ -157,6 +158,17 @@ export async function executeMigrationGraphCommand(
   const glyphMode = ui.resolveGlyphMode(options.ascii === true);
   const colorize = flags.color !== false;
 
+  const globalMaxEdgeTreePrefixWidth = showSpaceHeadings
+    ? computeGlobalMaxEdgeTreePrefixWidth(
+        scopedSpaces
+          .filter((spaceEntry) => spaceEntry.migrations.length > 0)
+          .map((spaceEntry) => ({
+            graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+            liveContractHash,
+          })),
+      )
+    : undefined;
+
   const treeSections: MigrationGraphTreeSection[] = [];
   for (const spaceEntry of scopedSpaces) {
     const member = aggregate.space(spaceEntry.spaceId);
@@ -174,6 +186,7 @@ export async function executeMigrationGraphCommand(
             glyphMode,
             colorize,
             refsByHash: listRefsByContractHash(member),
+            ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
           });
     const displayTree =
       showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;
