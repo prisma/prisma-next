@@ -77,7 +77,20 @@ A `--legend` boolean option on `migration graph` only (not `list`, not `status`)
 
 Two coupled fixes on `migration status`'s no-path failure mode, both surfaced during QA of this slice and folded in rather than spilled to follow-up tickets (the wording change is a one-line edit; the picker change is a 4-line edit; neither warrants a separate PR).
 
-**Picker (D14 alignment).** Without `--to`, the default target is the **live contract**, full stop — same as `migrate`'s default. Today `resolveTargetHashForSpace` only returns the live contract when it's already a node in the per-space migration graph; if the live contract is disconnected (e.g. emitted but never planned a migration into), the picker silently falls through to "single reachable leaf" and ends up auto-picking an unrelated chain. That's how the demo can render `(db, contract)` on the live contract *and* simultaneously print "cannot reach the selected target" — status picked a different target than what the user sees on-screen. Fix: trust the live contract whenever it is non-empty; fall back to single-leaf / head-ref **only** when there is no live contract at all (`contractHash === EMPTY_CONTRACT_HASH`). With `--to <ref-or-hash>`, trust the explicit target unconditionally.
+**Picker (D14 alignment, radically simplified).** `migration status` has exactly **one** target per invocation. If the user passed `--to <ref-or-hash>`, that's it. Otherwise it's the application's contract (`contractHash`). End of story. The picker collapses to a one-liner:
+
+```ts
+function resolveTarget(
+  contractHash: string,
+  activeRefHash: string | undefined,
+): string {
+  return activeRefHash ?? contractHash;
+}
+```
+
+That deletes today's "graph membership" guard (`graph.nodes.has(activeRefHash)` / `graph.nodes.has(contractHash)`) and the single-leaf / head-ref fallbacks. The contract envelope can fail to read; the existing `CONTRACT.UNREADABLE` diagnostic already covers that case and `contractHash` defaults to `EMPTY_CONTRACT_HASH` when it does — the simplified picker returns that value and the no-path summary fires naturally, no special-casing needed.
+
+This also kills the dead `'Multiple valid migration paths — select a target with --to'` summary branch, the `MIGRATION.DIVERGED` diagnostic, and the `hasAmbiguousTarget` guard in `executeMigrationStatusCommand`'s loop. They are unreachable once the picker is total. Imports of `requireHeadRef` and `findReachableLeaves` in `migration-status.ts` are no longer used and get removed (other callers in the framework are unaffected — those helpers stay in their home modules).
 
 **Wording (no-path summary).** "Database marker cannot reach the selected target" mis-frames the failure: markers don't reach, paths exist or don't; "selected" implies the user picked. Three context-aware variants:
 
@@ -171,10 +184,10 @@ Six dispatches. D1–D4 sit on the rendering surface (`packages/1-framework/3-to
 
 ### Dispatch 6: `migration status` default target + no-path wording
 
-- **Outcome:** Two coupled fixes per D21. (a) `resolveTargetHashForSpace` in `cli/src/commands/migration-status.ts` returns the live contract whenever `contractHash !== EMPTY_CONTRACT_HASH` and no `--to` was passed; with `--to`, returns the resolved hash unconditionally; falls back to head-ref / single-leaf only when there is no live contract at all. (b) The no-path summary (the branch that today emits "Database marker cannot reach the selected target") is replaced by a context-aware builder that names both endpoints (with `sha256:` prefix and the existing 12-char short-hash), refers to `--to`-explicit targets as "the target (… via \`<ref>\`)" or "the target (…)", and to default targets as "the application's contract (…)". Lead-fix is `migration plan --name <name>`; the `--to <contract>` alternative appears only when `--to` was explicit.
+- **Outcome:** Two coupled fixes per D21, both in `cli/src/commands/migration-status.ts`. (a) Picker collapses to `activeRefHash ?? contractHash` — explicit `--to` wins, otherwise the application's contract. The dead `MIGRATION.DIVERGED` diagnostic + `hasAmbiguousTarget` guard + `'Multiple valid migration paths'` summary branch are removed. Unused imports (`requireHeadRef`, `findReachableLeaves`) drop out. (b) The no-path summary is replaced by a context-aware builder `buildNoPathSummary({ markerHash, targetHash, explicitTarget, refName })` exported alongside `buildStatusHeadline`, with three variants: no `--to` (default → "the application's contract (…)"), `--to <ref>` ("the target (… via \`<ref>\`)"), `--to <hash>` ("the target (…)"). Lead-fix is `migration plan --name <name>`; the `--to <contract>` alternative appears only when `--to` was explicit.
 - **Builds on:** This spec. No dependency on D1–D5; touches `migration-status.ts` only, which D1 already adapted but does not re-enter for this fix.
 - **Hands to:**
-  - Picker change locked behind unit tests covering: (i) `--to <ref>` returns the resolved hash even when disconnected from the graph; (ii) no `--to`, non-empty `contractHash` returns the live contract even when not in the graph; (iii) no `--to`, empty `contractHash`, multiple leaves returns `undefined` (existing fallback); (iv) no `--to`, empty `contractHash`, single leaf returns that leaf.
+  - Picker change locked behind unit tests for the simplified two-line semantics: (i) `activeRefHash` non-undefined → returned regardless of `contractHash`; (ii) `activeRefHash` undefined → `contractHash` returned (including the `EMPTY_CONTRACT_HASH` case).
   - Wording change locked behind unit tests for all three variants (`buildNoPathSummary({...})` exposed alongside `buildStatusHeadline` for direct testing).
-  - The two e2e assertions in `test/integration/test/cli-journeys/migration-status-diagnostics.e2e.test.ts` updated: the post-`db update` scenario (line 286 today) now asserts `up to date` (DB matches the live contract; picker correctly returns it); the marker-on-wrong-branch + `--to production` scenario (line 536 today) now asserts the new wording with the `via \`production\`` ref name.
-- **Focus:** Picker correctness and message clarity in `migration-status.ts`. No change to overlay computation, no change to render pipeline, no new flags. Do **not** introduce a new ticket for either change — both land in this PR.
+  - The two e2e assertions in `test/integration/test/cli-journeys/migration-status-diagnostics.e2e.test.ts` updated: the post-`db update` scenario (line ~286) now asserts `up to date` (picker correctly defaults to the live contract; DB matches it); the marker-on-wrong-branch + `--to production` scenario (line ~536) now asserts the new wording with the `via \`production\`` ref name. Any tests relying on the deleted `MIGRATION.DIVERGED` diagnostic / `'Multiple valid migration paths'` summary are deleted (the operator is comfortable removing the diagnostic; the simplified picker makes it unreachable).
+- **Focus:** Picker simplification and message clarity in `migration-status.ts`. No change to overlay computation, no change to render pipeline, no new flags. Do **not** introduce a new ticket for either change — both land in this PR.
