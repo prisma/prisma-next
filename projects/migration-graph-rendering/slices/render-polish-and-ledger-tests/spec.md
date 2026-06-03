@@ -41,6 +41,7 @@ Six independent follow-ups, all surfaced after the read-command-family slices ([
 7. **Cross-space data-column alignment + contract-node refs adjacent to hash + right-justified from-hash column** (D23, surfaced post-D7) — three coupled padding rules at the row→string join in the renderer.
 8. **Cross-space dirName alignment + capitalised "Up to date"** (D24, surfaced post-D8 QA) — extend D23's cross-space alignment to the dirName column too; capitalise the no-pending-no-error summary headline.
 9. **Trunk-choice rule honors `contractHash` for connected components** (D25, surfaced post-D8 QA) — fix the leaf-selection / rank step in `migration-graph-rows.ts` so the chain ending at the live contract wins the trunk position even when both chains share `∅`. D14 was specced; the algorithm wasn't fully wired.
+10. **Legend wording + universal `--legend` across graph-drawing commands** (D26, surfaced post-D11 QA) — replace the marker/ref legend line with two parallel lines following D22's `<>` / `()` convention; hoist the legend helpers out of `migration-graph.ts` and wire `--legend` into `migration list` and `migration status`.
 
 ## Locked decisions
 
@@ -165,6 +166,34 @@ Live contract is `1375f13`. By D14, `1375f13` should be the trunk's tip. By the 
 Either way, single-node components, components without `contractHash` in them, and components where `contractHash === EMPTY_CONTRACT_HASH` keep today's behaviour.
 
 **Mid-chain edge case.** If `contractHash` is mid-chain (it has descendants — i.e. someone authored migrations beyond the live contract), the trunk should still anchor on the live contract, but the descendants render *above* it as a forward-extension side-branch. The implementer should either (a) handle this case by boosting only when `contractHash` is a leaf in the component, treating the non-leaf case as today's longest-path heuristic, or (b) handle it explicitly with a sensible layout. Option (a) is simpler and covers the common cases. Document the chosen behaviour in the dispatch's final report.
+
+### D26 — Legend wording follows D22's bracket convention; `--legend` is universal across graph-drawing commands
+
+D7 introduced the system-marker / user-ref split (`<contract, db>` for live markers, `(prod, staging)` for user-defined refs). The legend's marker/ref line still describes them with the old single-line collapse: `<contract> (refs) db / contract markers`. That misses the teaching opportunity — the legend exists precisely to teach the bracket convention.
+
+**Wording.** Replace the single marker/ref line with two parallel lines:
+
+```
+  <contract, db>    live markers (contract on disk, database state)
+  (prod, staging)   user-defined refs
+```
+
+Notes:
+- The example bracket contents (`contract, db` and `prod, staging`) are illustrative literal strings in the key — they're not pulled from the user's actual project state.
+- The styling pipeline must NOT apply the active-ref bold treatment to either example; a legend key isn't a graph node and there is no "active ref" in this context.
+- The right column wording carries the conceptual split: live = inferred from external sources (contract file on disk; database marker); refs = user-managed.
+
+**Universality.** With D1's unified rendering pipeline, `migration list` and `migration status` both draw the same tree as `migration graph`. `--legend` should work on all three commands.
+
+The current helpers in `commands/migration-graph.ts` (`migrationGraphShowsLegend`, `validateMigrationGraphLegendOptions`) and `utils/cli-errors.ts` (`errorMigrationGraphLegendHumanOnly`, error code `MIGRATION.GRAPH_LEGEND_HUMAN_ONLY`) are graph-command-specific by name. Hoist and rename:
+
+- `migrationGraphShowsLegend` → `shouldShowLegend` (or similar) in a shared utils module.
+- `validateMigrationGraphLegendOptions` → `validateLegendOptions` in the same shared module.
+- `errorMigrationGraphLegendHumanOnly` → `errorLegendHumanOnly`; error message drops "graph" ("`--legend` is only available for human-readable output"); error code becomes `MIGRATION.LEGEND_HUMAN_ONLY`.
+
+Then wire `--legend` into `migration list` and `migration status` with the same option declaration and the same suppression rules: blocked when combined with `--json` / `--dot` / `--quiet`; printed alongside the human header on stderr only when the command is producing human output.
+
+**Out of scope.** No changes to the legend's *content* beyond the marker/ref line replacement — the contract / forward / rollback / self / applied / pending / empty-database / lane-swatch lines stay byte-identical.
 
 ### D20 — Op-count parity is a cross-target obligation, asserted by one harness
 
@@ -336,3 +365,31 @@ Eight dispatches. D1–D4 sit on the rendering surface (`packages/1-framework/3-
 - **Mid-chain edge case:** Per D25, if `contractHash` has descendants in its component (mid-chain), prefer the simpler implementation (only bias when `contractHash` is a leaf; treat non-leaf as today's heuristic) and document the choice in the dispatch's final report.
 
 - **Hard constraint:** Touch only `migration-graph-rows.ts` (and `migration-list-graph-topology.ts` if it contains the topology classifier the rank step depends on), their unit tests, and snapshot fixtures regenerated mechanically. No other production files. If you find that the rank-boost approach requires a wider refactor of the layout module's column-assignment, stop and report — do not restructure the layout.
+
+### Dispatch 12: legend wording + universal `--legend`
+
+- **Outcome:** D26's two changes:
+  1. The legend's marker/ref line collapses (`<contract> (refs) db / contract markers`) is replaced with two parallel lines following D22's bracket convention:
+
+     ```
+       <contract, db>    live markers (contract on disk, database state)
+       (prod, staging)   user-defined refs
+     ```
+
+  2. The legend helpers are hoisted out of `commands/migration-graph.ts` into a shared utils module, renamed to drop the "graph" prefix, and wired into `migration list` and `migration status` with identical suppression rules (blocked when combined with `--json` / `--dot` / `--quiet`; printed alongside the human header on stderr).
+
+- **Builds on:** D7 (bracket convention), D11 (trunk fix is settled). Independent of D8/D9/D10's whitespace fixes.
+
+- **Hands to:**
+  - **Renderer:** `migration-graph-tree-render.ts` — replace the single marker/ref line with the two-line block. The example contents (`contract, db` and `prod, staging`) are literal strings; the active-ref bold treatment must NOT apply to either example.
+  - **Helpers hoisted:** `migrationGraphShowsLegend` → `shouldShowLegend`; `validateMigrationGraphLegendOptions` → `validateLegendOptions`; `errorMigrationGraphLegendHumanOnly` → `errorLegendHumanOnly`; error code `MIGRATION.GRAPH_LEGEND_HUMAN_ONLY` → `MIGRATION.LEGEND_HUMAN_ONLY`; error message drops "graph". Move them out of `commands/migration-graph.ts` and `utils/cli-errors.ts` (where appropriate) into a shared module — `utils/legend.ts` is fine, or fold into `utils/formatters/`. Pick whichever fits the existing layering.
+  - **Command wiring:** `migration list` and `migration status` get a `--legend` option declaration matching `migration graph`'s, the same `validateLegendOptions` invocation in their `.action(...)`, the same `shouldShowLegend(...)` gate in their command body, and the same call to `renderMigrationGraphLegend` (or the renamed equivalent) when the gate passes.
+  - **Tests:**
+    - **Unit** in `migration-graph-tree-render.test.ts`: legend snapshot updates for the two-line marker/ref block; assert the example strings are not bolded.
+    - **Command tests** for `migration list` and `migration status`: `--legend` prints the key on stderr; `--legend --json` returns the new error; `--legend --quiet` returns the same error; combined with `--space <id>` legend still prints (single-space mode doesn't suppress it). Mirror whatever assertions `migration graph`'s legend tests already have.
+    - **`--help` output** for list/status now mentions `--legend` — update help-output goldens if they exist.
+  - **Snapshots / inline goldens** regenerate mechanically. Inspect the legend diff: every change should be the marker/ref line replacement (and possibly help-text additions for `--legend` on list/status). Anything else is a regression — STOP and report.
+
+- **Focus:** Two narrowly-scoped changes — a wording update in one renderer function, and a code-move-plus-wiring of three small helpers across three command files. No algorithmic logic changes.
+
+- **Hard constraint:** Touch only the renderer file (`migration-graph-tree-render.ts`), the legend-helpers source (`commands/migration-graph.ts`, `utils/cli-errors.ts`, plus the new shared utils file), the three command files (`migration-graph.ts`, `migration-list.ts`, `migration-status.ts`), and their tests. No other production files.
