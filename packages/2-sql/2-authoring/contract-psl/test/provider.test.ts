@@ -88,11 +88,12 @@ describe('prismaContract provider helper', () => {
         storage: {
           namespaces: {
             public: {
-              tables: {
+              entries: { table: {
                 user: expect.any(Object),
               },
             },
           },
+        },
         },
       });
     });
@@ -125,11 +126,12 @@ describe('prismaContract provider helper', () => {
         storage: {
           namespaces: {
             public: {
-              tables: {
+              entries: { table: {
                 user: expect.any(Object),
               },
             },
           },
+        },
         },
       });
     });
@@ -454,7 +456,7 @@ model Document {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            tables: {
+            entries: { table: {
               user: {
                 columns: {
                   dbExpr: {
@@ -467,6 +469,7 @@ model Document {
               },
             },
           },
+        },
         },
       });
     });

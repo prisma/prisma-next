@@ -151,16 +151,18 @@ describe('canonicalizeContractToObject', () => {
           namespaces: {
             [UNBOUND]: {
               id: UNBOUND,
-              collections: {
-                users: {
-                  validator: {
-                    jsonSchema: {
-                      bsonType: 'object',
-                      properties: { _id: { bsonType: 'objectId' } },
-                      additionalProperties: false,
+              entries: {
+                collection: {
+                  users: {
+                    validator: {
+                      jsonSchema: {
+                        bsonType: 'object',
+                        properties: { _id: { bsonType: 'objectId' } },
+                        additionalProperties: false,
+                      },
+                      validationLevel: 'strict',
+                      validationAction: 'error',
                     },
-                    validationLevel: 'strict',
-                    validationAction: 'error',
                   },
                 },
               },
@@ -175,7 +177,8 @@ describe('canonicalizeContractToObject', () => {
       'storage',
       'namespaces',
       UNBOUND,
-      'collections',
+      'entries',
+      'collection',
       'users',
       'validator',
       'jsonSchema',

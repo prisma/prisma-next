@@ -129,8 +129,8 @@ function createParamRef(
   value: unknown,
 ): ParamRef {
   const tableInAnyNs = Object.values(contract.storage.namespaces).find(
-    (ns) => ns.tables[columnRef.table] !== undefined,
-  )?.tables[columnRef.table] as StorageTable | undefined;
+    (ns) => ns.entries.table[columnRef.table] !== undefined,
+  )?.entries.table[columnRef.table] as StorageTable | undefined;
   if (!tableInAnyNs?.columns[columnRef.column]) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }

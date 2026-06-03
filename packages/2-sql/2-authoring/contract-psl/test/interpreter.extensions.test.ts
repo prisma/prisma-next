@@ -360,7 +360,7 @@ model Document {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             document: {
               columns: {
                 shortName: {
@@ -376,6 +376,7 @@ model Document {
               },
             },
           },
+        },
         },
       },
     });

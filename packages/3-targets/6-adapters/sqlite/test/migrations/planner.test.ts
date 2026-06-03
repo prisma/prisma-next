@@ -38,7 +38,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:test-${Date.now()}`),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } }),
       },
     }),
     roots: {},

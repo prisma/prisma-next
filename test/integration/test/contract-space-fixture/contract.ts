@@ -12,7 +12,8 @@ const storageBody = {
   namespaces: {
     [UNBOUND_NAMESPACE_ID]: {
       id: UNBOUND_NAMESPACE_ID,
-      tables: {
+      entries: {
+        table: {
         [TEST_BOX_TABLE]: {
           columns: {
             x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
@@ -21,6 +22,7 @@ const storageBody = {
           uniques: [],
           indexes: [],
           foreignKeys: [],
+        },
         },
       },
     },

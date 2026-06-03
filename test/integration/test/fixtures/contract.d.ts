@@ -71,7 +71,7 @@ type ContractBase = Omit<
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly tables: {
+          readonly entries: { readonly table: {
             readonly user: {
               columns: {
                 readonly id: {
@@ -95,7 +95,8 @@ type ContractBase = Omit<
               indexes: readonly [];
               foreignKeys: readonly [];
             };
-          };
+        };
+      };
         };
       };
       readonly storageHash: StorageHash;
@@ -165,8 +166,8 @@ type ContractBase = Omit<
                 readonly createdAt: { readonly column: 'createdAt' };
               };
             };
-          };
         };
+      };
       };
     };
   };

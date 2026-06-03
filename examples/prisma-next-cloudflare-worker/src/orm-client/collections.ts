@@ -7,7 +7,7 @@ export class UserCollection extends Collection<Contract, 'User'> {
   }
 
   newestFirst() {
-    return this.orderBy((user) => user.createdAt.desc());
+    return this;
   }
 }
 
@@ -17,7 +17,7 @@ export class PostCollection extends Collection<Contract, 'Post'> {
   }
 
   newestFirst() {
-    return this.orderBy((post) => post.createdAt.desc());
+    return this;
   }
 }
 

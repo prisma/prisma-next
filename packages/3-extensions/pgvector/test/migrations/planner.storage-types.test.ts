@@ -73,7 +73,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
+            entries: { table: {
               user: {
                 columns: {
                   id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -90,7 +90,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                 foreignKeys: [],
               },
             },
-          }),
+          }}),
         },
       }),
       roots: {},
@@ -244,7 +244,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
+            entries: { table: {
               user: {
                 columns: {
                   id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -261,7 +261,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                 foreignKeys: [],
               },
             },
-          }),
+          }}),
         },
       }),
       roots: {},
@@ -311,7 +311,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
+            entries: { table: {
               document: {
                 columns: {
                   id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -328,7 +328,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                 foreignKeys: [],
               },
             },
-          }),
+          }}),
         },
       }),
       roots: {},
@@ -376,7 +376,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
+            entries: { table: {
               document: {
                 columns: {
                   id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -393,7 +393,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                 foreignKeys: [],
               },
             },
-          }),
+          }}),
         },
       }),
       roots: {},

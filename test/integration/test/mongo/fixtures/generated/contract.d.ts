@@ -90,7 +90,7 @@ type ContractBase = Omit<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly collections: {
+          readonly entries: { readonly collection: {
             readonly tasks: MongoCollection;
             readonly users: {
               readonly kind: 'mongo-collection';
@@ -112,6 +112,7 @@ type ContractBase = Omit<
             };
           };
         };
+      };
       };
       readonly storageHash: StorageHash;
     },
@@ -419,8 +420,8 @@ type ContractBase = Omit<
               readonly collection: 'users';
               readonly relations: { readonly addresses: { readonly field: 'addresses' } };
             };
-          };
         };
+      };
       };
     };
   };

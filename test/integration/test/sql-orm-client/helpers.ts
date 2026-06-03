@@ -168,7 +168,7 @@ export function buildMixedPolyContract(): TestContract {
     base: { model: 'Task', namespace: POSTGRES_DEFAULT_NAMESPACE_ID },
   };
 
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.tasks = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -181,7 +181,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.features = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -241,17 +241,17 @@ export function buildStiPolyContract(): TestContract {
     base: { model: 'User', namespace: POSTGRES_DEFAULT_NAMESPACE_ID },
   };
 
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.kind = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.role = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.plan = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,

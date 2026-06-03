@@ -44,34 +44,40 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__",
-        "tables": {}
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__"
       },
       "public": {
-        "id": "public",
-        "tables": {
-          "user": {
-            "columns": {
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 21
+        "entries": {
+          "table": {
+            "user": {
+              "columns": {
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 21
+                  }
                 }
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public"
       }
     },
-    "storageHash": "sha256:422fecb77cdf43ed7be5f0b5a6d51380aca318cbc7408357edf3565e35ff59ba"
+    "storageHash": "sha256:2b38ac74b188f1d38c6ffcc5e9f101c6a361881a3967a41690454de1b8e463ee"
   },
   "execution": {
     "executionHash": "sha256:04407e6b5c1efd89186edbee6c999cad6bff95ec87f56433272d7f08f3e6256a",

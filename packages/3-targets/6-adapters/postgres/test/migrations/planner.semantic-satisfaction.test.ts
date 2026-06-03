@@ -216,7 +216,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
 });
 
 function createTestContract(tables: Record<string, StorageTableInput> = {}): Contract<SqlStorage> {
-  const unboundNs = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables });
+  const unboundNs = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
   return {
     target: 'postgres',
     targetFamily: 'sql',

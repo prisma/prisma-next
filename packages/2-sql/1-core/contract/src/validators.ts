@@ -250,6 +250,7 @@ export function createNamespaceEntrySchema(
     id: 'string',
     'kind?': 'string',
     entries: type({
+      '+': 'reject',
       'table?': type({ '[string]': StorageTableSchema }),
       'type?': type({
         '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),

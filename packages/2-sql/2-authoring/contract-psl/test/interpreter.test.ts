@@ -63,7 +63,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             user: {
               columns: {
                 email: {
@@ -73,6 +73,7 @@ describe('interpretPslDocumentToSqlContract', () => {
               },
             },
           },
+        },
         },
       },
     });
@@ -166,7 +167,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             user: {
               columns: {
                 slug: {
@@ -176,6 +177,7 @@ describe('interpretPslDocumentToSqlContract', () => {
               },
             },
           },
+        },
         },
       },
     });
@@ -244,7 +246,7 @@ model Comment {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             user: {
               columns: {
                 id: { codecId: 'pg/int4@1', nativeType: 'int4' },
@@ -253,6 +255,7 @@ model Comment {
               primaryKey: { columns: ['id'] },
             },
           },
+        },
         },
       },
     });
@@ -291,7 +294,7 @@ model Comment {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             idlessThing: {
               columns: {
                 email: { codecId: 'pg/text@1', nativeType: 'text' },
@@ -300,6 +303,7 @@ model Comment {
               uniques: [{ columns: ['email'] }],
             },
           },
+        },
         },
       },
     });
@@ -344,11 +348,12 @@ model Comment {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             compositeThing: {
               primaryKey: { columns: ['email', 'token'] },
             },
           },
+        },
         },
       },
     });
@@ -378,7 +383,7 @@ model Comment {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             composite_thing: {
               primaryKey: {
                 columns: ['email_address', 'api_token'],
@@ -386,6 +391,7 @@ model Comment {
               },
             },
           },
+        },
         },
       },
     });
@@ -488,7 +494,7 @@ model Member {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             org_team: {
               columns: {
                 team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
@@ -519,6 +525,7 @@ model Member {
               ],
             },
           },
+        },
         },
       },
     });
@@ -596,7 +603,7 @@ model OrderItem {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            tables: {
+            entries: { table: {
               order_item: {
                 primaryKey: {
                   columns: ['order_id', 'product_id'],
@@ -605,6 +612,7 @@ model OrderItem {
               },
             },
           },
+        },
         },
       });
     });
@@ -634,11 +642,12 @@ model OrderItem {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             membership: {
               primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
             },
           },
+        },
         },
       },
     });
@@ -668,7 +677,7 @@ model OrderItem {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            tables: {
+            entries: { table: {
               doc: {
                 indexes: [
                   {
@@ -681,6 +690,7 @@ model OrderItem {
               },
             },
           },
+        },
         },
       });
     });
@@ -706,12 +716,13 @@ model OrderItem {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            tables: {
+            entries: { table: {
               doc: {
                 indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
               },
             },
           },
+        },
         },
       });
     });
@@ -887,7 +898,7 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const user = storage.namespaces['auth']?.tables['user'];
+      const user = storage.namespaces['auth']?.entries.table?.['user'];
       expect(user).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
       const json = JSON.parse(JSON.stringify(user)) as Record<string, unknown>;
@@ -919,7 +930,7 @@ namespace tenant_a {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const enums = storage.namespaces['tenant_a']?.enum ?? {};
+      const enums = storage.namespaces['tenant_a']?.entries.type ?? {};
       expect(enums).toHaveProperty('Status');
       expect(enums).toHaveProperty('Tier');
     });
@@ -952,8 +963,8 @@ namespace logs {
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(unboundTables(storage)['post']).toBeDefined();
-      expect(storage.namespaces['auth']?.tables['user']).toBeDefined();
-      expect(storage.namespaces['logs']?.tables['auditLog']).toBeDefined();
+      expect(storage.namespaces['auth']?.entries.table?.['user']).toBeDefined();
+      expect(storage.namespaces['logs']?.entries.table?.['auditLog']).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
     });
   });

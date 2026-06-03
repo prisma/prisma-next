@@ -67,7 +67,9 @@ const TEST_APP_CONTRACT = createSqlContract({
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: { user: { columns: { id: {} } } },
+        entries: {
+          table: { user: { columns: { id: {} } } },
+        },
       },
     },
   },

@@ -63,7 +63,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
-      .collections as unknown as Record<
+      .entries.collection as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -127,7 +127,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
-      .collections as unknown as Record<
+      .entries.collection as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -185,7 +185,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
-      .collections as unknown as Record<
+      .entries.collection as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -234,7 +234,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
-      .collections as unknown as Record<
+      .entries.collection as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -277,7 +277,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
-      .collections as unknown as Record<
+      .entries.collection as unknown as Record<
       string,
       {
         indexes?: Array<{

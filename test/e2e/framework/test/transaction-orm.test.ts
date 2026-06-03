@@ -62,12 +62,10 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
         });
       });
 
-      const user = await db.orm.User.where((u) =>
-        u.email.eq(v('nested-author@example.com')),
-      ).first();
+      const user = await db.orm.User.where({ email: v('nested-author@example.com') }).first();
       expect(user).not.toBeNull();
 
-      const post = await db.orm.Post.where((p) => p.title.eq('Atomic Post')).first();
+      const post = await db.orm.Post.where({ title: 'Atomic Post' }).first();
       expect(post).not.toBeNull();
       expect(post!.published).toBe(true);
       expect(post!.userId).toBe(user!.id);
@@ -88,12 +86,10 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
         }),
       ).rejects.toThrow('deliberate rollback');
 
-      const user = await db.orm.User.where((u) =>
-        u.email.eq(v('rollback-author@example.com')),
-      ).first();
+      const user = await db.orm.User.where({ email: v('rollback-author@example.com') }).first();
       expect(user).toBeNull();
 
-      const post = await db.orm.Post.where((p) => p.title.eq('Rollback Post')).first();
+      const post = await db.orm.Post.where({ title: 'Rollback Post' }).first();
       expect(post).toBeNull();
     });
   });
@@ -103,13 +99,13 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
       await db.transaction(async (tx) => {
         const created = await tx.orm.User.create({ email: v('tx-ryow@example.com') });
 
-        const found = await tx.orm.User.where((u) => u.email.eq(v('tx-ryow@example.com'))).first();
+        const found = await tx.orm.User.where({ email: v('tx-ryow@example.com') }).first();
         expect(found).not.toBeNull();
         expect(found!.id).toBe(created.id);
         expect(found!.email).toBe('tx-ryow@example.com');
       });
 
-      const user = await db.orm.User.where((u) => u.email.eq(v('tx-ryow@example.com'))).first();
+      const user = await db.orm.User.where({ email: v('tx-ryow@example.com') }).first();
       expect(user).not.toBeNull();
     });
   });
@@ -132,12 +128,12 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
         });
       });
 
-      const user = await db.orm.User.where((u) => u.email.eq(v('multi-op@example.com'))).first();
+      const user = await db.orm.User.where({ email: v('multi-op@example.com') }).first();
       expect(user).not.toBeNull();
 
-      const posts = await db.orm.Post.where((p) => p.userId.eq(user!.id))
-        .orderBy((p) => p.title.asc())
-        .all();
+      const posts = [...(await db.orm.Post.where({ userId: user!.id }).all())].sort((a, b) =>
+        a.title.localeCompare(b.title),
+      );
       expect(posts).toHaveLength(2);
       expect(posts[0]!.title).toBe('First Post');
       expect(posts[1]!.title).toBe('Second Post');
@@ -160,12 +156,10 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
         }),
       ).rejects.toThrow('rollback everything');
 
-      const user = await db.orm.User.where((u) =>
-        u.email.eq(v('multi-rollback@example.com')),
-      ).first();
+      const user = await db.orm.User.where({ email: v('multi-rollback@example.com') }).first();
       expect(user).toBeNull();
 
-      const post = await db.orm.Post.where((p) => p.title.eq('Doomed Post')).first();
+      const post = await db.orm.Post.where({ title: 'Doomed Post' }).first();
       expect(post).toBeNull();
     });
   });

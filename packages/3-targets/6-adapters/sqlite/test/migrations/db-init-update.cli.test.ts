@@ -62,7 +62,8 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
+          entries: {
+            table: {
             _ext_helper: {
               columns: {
                 id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
@@ -78,7 +79,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
               foreignKeys: [],
             },
           },
-        }),
+        }}),
       },
     }),
     roots: {},
@@ -448,7 +449,8 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
+            entries: {
+              table: {
               user: {
                 columns: {
                   id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
@@ -464,7 +466,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
                 foreignKeys: [],
               },
             },
-          }),
+          }}),
         },
       }),
       profileHash: profileHash('sha256:app-with-hooked-email'),

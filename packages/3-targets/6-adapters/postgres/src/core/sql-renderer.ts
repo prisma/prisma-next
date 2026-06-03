@@ -708,16 +708,16 @@ function getInsertColumnOrder(
   let table: { columns: Record<string, unknown> } | undefined;
   if (tableRef.namespaceId !== undefined) {
     const ns = contract.storage.namespaces[tableRef.namespaceId];
-    const found = ns?.tables[tableName] as { columns: Record<string, unknown> } | undefined;
+    const found = ns?.entries.table[tableName] as { columns: Record<string, unknown> } | undefined;
     if (found !== undefined) {
       table = found;
     }
   }
   if (table === undefined) {
     for (const ns of Object.values(contract.storage.namespaces)) {
-      // Namespace.tables is Record<string, IRNode> at the interface level;
+      // Namespace.entries.table holds StorageTable instances with .columns.
       // SQL family namespaces hold StorageTable instances which have .columns.
-      const found = ns.tables[tableName] as { columns: Record<string, unknown> } | undefined;
+      const found = ns.entries.table[tableName] as { columns: Record<string, unknown> } | undefined;
       if (found !== undefined) {
         table = found;
         break;

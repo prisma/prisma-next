@@ -48,7 +48,8 @@ function buildUnboundContract(): Contract<SqlStorage> {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
+          entries: {
+            table: {
             tenant: {
               columns: {
                 id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -59,7 +60,7 @@ function buildUnboundContract(): Contract<SqlStorage> {
               indexes: [],
               foreignKeys: [],
             },
-          },
+          }},
         }),
       },
     }),

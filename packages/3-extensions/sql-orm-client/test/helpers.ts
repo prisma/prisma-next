@@ -213,7 +213,7 @@ export function buildMixedPolyContract(): TestContract {
     base: { model: 'Task', namespace: 'public' },
   };
 
-  raw.storage.namespaces.public.tables.tasks = {
+  raw.storage.namespaces.public.entries.table.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -226,7 +226,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces.public.tables.features = {
+  raw.storage.namespaces.public.entries.table.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -281,9 +281,9 @@ export function buildStiPolyContract(): TestContract {
   const usersStorageTable = Object.values(
     raw.storage.namespaces as Record<
       string,
-      { tables: Record<string, { columns: Record<string, unknown> }> }
+      { entries: { table: Record<string, { columns: Record<string, unknown> }> } }
     >,
-  ).find((ns) => ns.tables['users'])?.tables['users'];
+  ).find((ns) => ns.entries.table['users'])?.entries.table['users'];
   if (!usersStorageTable) throw new Error('users table not found in any storage namespace');
   usersStorageTable.columns['kind'] = {
     codecId: 'pg/text@1',

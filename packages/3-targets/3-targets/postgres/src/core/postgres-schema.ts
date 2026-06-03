@@ -208,7 +208,13 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  */
 export function postgresCreateNamespace(input: SqlNamespaceTablesInput): PostgresSchema {
   if (input.id === UNBOUND_NAMESPACE_ID) {
-    return new PostgresUnboundSchema({ id: UNBOUND_NAMESPACE_ID, entries: input.entries });
+    const opts: PostgresSchemaInput =
+      input.entries !== undefined
+        ? { id: UNBOUND_NAMESPACE_ID, entries: input.entries }
+        : { id: UNBOUND_NAMESPACE_ID };
+    return new PostgresUnboundSchema(opts);
   }
-  return new PostgresSchema({ id: input.id, entries: input.entries });
+  const opts: PostgresSchemaInput =
+    input.entries !== undefined ? { id: input.id, entries: input.entries } : { id: input.id };
+  return new PostgresSchema(opts);
 }

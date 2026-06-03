@@ -24,7 +24,8 @@ const testContract: Contract<SqlStorage> = {
     namespaces: {
       __unbound__: buildSqlNamespace({
         id: '__unbound__',
-        tables: {
+        entries: {
+          table: {
           user: {
             columns: {
               id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -33,7 +34,7 @@ const testContract: Contract<SqlStorage> = {
             indexes: [],
             foreignKeys: [],
           },
-        },
+        }},
       }),
     },
   }),

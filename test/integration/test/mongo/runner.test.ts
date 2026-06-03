@@ -78,7 +78,7 @@ function buildAppContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
+          entries: { collection: {
             users: {
               kind: 'mongo-collection' as const,
               indexes: [
@@ -99,7 +99,7 @@ function buildAppContract(): MongoContract {
                 },
               ],
             },
-          },
+          } },
         },
       },
       storageHash: coreHash('sha256:app-contract-multi-space'),
@@ -141,7 +141,7 @@ function buildAppContractMissingPosts(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
+          entries: { collection: {
             users: {
               kind: 'mongo-collection' as const,
               indexes: [
@@ -152,7 +152,7 @@ function buildAppContractMissingPosts(): MongoContract {
                 },
               ],
             },
-          },
+          } },
         },
       },
       storageHash: coreHash('sha256:app-contract-trimmed'),
@@ -175,7 +175,7 @@ function buildExtContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
+          entries: { collection: {
             cipherstash_state: {
               kind: 'mongo-collection' as const,
               indexes: [
@@ -186,7 +186,7 @@ function buildExtContract(): MongoContract {
                 },
               ],
             },
-          },
+          } },
         },
       },
       storageHash: coreHash('sha256:ext-contract-multi-space'),

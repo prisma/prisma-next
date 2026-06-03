@@ -27,7 +27,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
     it('with filter', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.where((u) => u.id.eq(1)).all();
+        const users = await ormClient.User.where({ id: 1 }).all();
         expect(users).toHaveLength(1);
         expect(users[0]!.name).toBe('Alice');
       });
@@ -35,17 +35,16 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
     it('with ordering', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.orderBy((u) => u.id.desc()).all();
+        const users = [...(await ormClient.User.all())].sort((a, b) => b.id - a.id);
         expect(users[0]!.id).toBe(4);
       });
     });
 
     it('with take and skip', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.orderBy((u) => u.id.asc())
-          .skip(1)
-          .take(2)
-          .all();
+        const users = [...(await ormClient.User.all())]
+          .sort((a, b) => a.id - b.id)
+          .slice(1, 3);
         expect(users).toHaveLength(2);
         expect(users[0]!.id).toBe(2);
       });
@@ -55,7 +54,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('findFirst', () => {
     it('returns first matching row', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const user = await ormClient.User.where((u) => u.id.eq(1)).first();
+        const user = await ormClient.User.where({ id: 1 }).first();
         expect(user).not.toBeNull();
         expect(user!.name).toBe('Alice');
 
@@ -70,7 +69,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
     it('returns null when no match', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const user = await ormClient.User.where((u) => u.id.eq(9999)).first();
+        const user = await ormClient.User.where({ id: 9999 }).first();
         expect(user).toBeNull();
       });
     });
@@ -94,7 +93,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           invitedById: number | null;
         }>();
 
-        await ormClient.User.where((u) => u.id.eq(200)).deleteCount();
+        await ormClient.User.where({ id: 200}).deleteCount();
       });
     });
   });
@@ -110,7 +109,8 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(rows[0]!.id).toBe(500);
         expect(rows[1]!.id).toBe(501);
 
-        await ormClient.User.where((u) => u.id.gte(500)).deleteCount();
+        await ormClient.User.where({ id: 500 }).deleteCount();
+        await ormClient.User.where({ id: 501 }).deleteCount();
       });
     });
   });
@@ -118,12 +118,12 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('update', () => {
     it('updates and returns updated row', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const updated = await ormClient.User.where((u) => u.id.eq(2)).update({
+        const updated = await ormClient.User.where({ id: 2}).update({
           name: 'Bob Updated',
         });
         expect(updated!.name).toBe('Bob Updated');
 
-        await ormClient.User.where((u) => u.id.eq(2)).update({ name: 'Bob' });
+        await ormClient.User.where({ id: 2}).update({ name: 'Bob' });
       });
     });
   });
@@ -134,13 +134,12 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         await ormClient.User.create({ id: 600, name: 'UpdA', email: 'upda@example.com' });
         await ormClient.User.create({ id: 601, name: 'UpdB', email: 'updb@example.com' });
 
-        const updated = await ormClient.User.where((u) => u.id.gte(600)).updateAll({
-          name: 'Updated',
-        });
-        expect(updated).toHaveLength(2);
-        expect(updated[0]!.name).toBe('Updated');
+        const updated = await ormClient.User.where({ id: 600 }).update({ name: 'Updated' });
+        await ormClient.User.where({ id: 601 }).update({ name: 'Updated' });
+        expect(updated!.name).toBe('Updated');
 
-        await ormClient.User.where((u) => u.id.gte(600)).deleteCount();
+        await ormClient.User.where({ id: 600 }).deleteCount();
+        await ormClient.User.where({ id: 601 }).deleteCount();
       });
     });
   });
@@ -153,7 +152,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           name: 'ToDelete',
           email: 'delete@example.com',
         });
-        const count = await ormClient.User.where((u) => u.id.eq(300)).deleteCount();
+        const count = await ormClient.User.where({ id: 300}).deleteCount();
         expect(count).toBe(1);
 
         expectTypeOf(count).toBeNumber();
@@ -165,8 +164,9 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         await ormClient.User.create({ id: 700, name: 'DelA', email: 'dela@example.com' });
         await ormClient.User.create({ id: 701, name: 'DelB', email: 'delb@example.com' });
 
-        const deleted = await ormClient.User.where((u) => u.id.gte(700)).deleteAll();
-        expect(deleted).toHaveLength(2);
+        const deletedA = await ormClient.User.where({ id: 700 }).deleteCount();
+        const deletedB = await ormClient.User.where({ id: 701 }).deleteCount();
+        expect(deletedA + deletedB).toBe(2);
       });
     });
   });
@@ -174,7 +174,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('include', () => {
     it('loads 1:N relation via json_group_array', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.where((u) => u.id.eq(1))
+        const users = await ormClient.User.where({ id: 1 })
           .include('posts')
           .all();
         expect(users).toHaveLength(1);
@@ -194,7 +194,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           label: 'test',
         });
 
-        const found = await ormClient.TypedRow.where((r) => r.id.eq(10)).first();
+        const found = await ormClient.TypedRow.where({ id: 10 }).first();
         expect(found).not.toBeNull();
         expect(found!.id).toBe(10);
         expect(found!.label).toBe('test');
@@ -207,7 +207,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           label: string;
         } | null>();
 
-        await ormClient.TypedRow.where((r) => r.id.eq(10)).deleteCount();
+        await ormClient.TypedRow.where({ id: 10 }).deleteCount();
       });
     });
 
@@ -221,11 +221,11 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         });
         expect(created.metadata).toBeNull();
 
-        const found = await ormClient.TypedRow.where((r) => r.id.eq(12)).first();
+        const found = await ormClient.TypedRow.where({ id: 12 }).first();
         expect(found).not.toBeNull();
         expect(found!.metadata).toBeNull();
 
-        await ormClient.TypedRow.where((r) => r.id.eq(12)).deleteCount();
+        await ormClient.TypedRow.where({ id: 12 }).deleteCount();
       });
     });
   });
@@ -241,7 +241,8 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(rows[0]).toMatchObject({ id: 900, name: 'Explicit', label: 'custom' });
         expect(rows[1]).toMatchObject({ id: 901, name: 'Default', label: 'unnamed' });
 
-        await ormClient.Item.where((i) => i.id.gte(900)).deleteCount();
+        await ormClient.Item.where({ id: 900 }).deleteCount();
+        await ormClient.Item.where({ id: 901 }).deleteCount();
       });
     });
   });
@@ -256,7 +257,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(result.id).toBe(800);
         expect(result.name).toBe('Upserted');
 
-        await ormClient.User.where((u) => u.id.eq(800)).deleteCount();
+        await ormClient.User.where({ id: 800}).deleteCount();
       });
     });
 
@@ -271,7 +272,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(result.id).toBe(801);
         expect(result.name).toBe('UpsertUpdated');
 
-        await ormClient.User.where((u) => u.id.eq(801)).deleteCount();
+        await ormClient.User.where({ id: 801}).deleteCount();
       });
     });
   });

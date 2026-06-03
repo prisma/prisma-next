@@ -600,7 +600,7 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      // Codec aliases live in storage.types; enum types live in namespace.enum.
+      // Codec aliases live in storage.types; enum types live in namespace.entries.type.
       // Check types first; fall back to the namespace-keyed enum slot using the
       // issue's namespace coordinate (populated by the verifier for enum-related
       // issues per the BaseSchemaIssue.namespaceId contract).

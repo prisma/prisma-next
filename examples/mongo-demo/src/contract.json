@@ -239,196 +239,198 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "collections": {
-          "posts": {
-            "indexes": [
-              {
-                "keys": [
-                  {
-                    "direction": 1,
-                    "field": "summary"
-                  }
-                ],
-                "kind": "mongo-index",
-                "partialFilterExpression": {
-                  "kind": "article"
-                },
-                "unique": true
-              }
-            ],
-            "kind": "mongo-collection",
-            "validator": {
-              "jsonSchema": {
-                "bsonType": "object",
-                "oneOf": [
-                  {
-                    "additionalProperties": false,
-                    "properties": {
-                      "_id": {
-                        "bsonType": "objectId"
-                      },
-                      "authorId": {
-                        "bsonType": "objectId"
-                      },
-                      "content": {
-                        "bsonType": "string"
-                      },
-                      "createdAt": {
-                        "bsonType": "date"
-                      },
-                      "kind": {
-                        "enum": [
-                          "article"
-                        ]
-                      },
-                      "summary": {
-                        "bsonType": "string"
-                      },
-                      "title": {
-                        "bsonType": "string"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "summary"
-                    ]
+        "entries": {
+          "collection": {
+            "posts": {
+              "indexes": [
+                {
+                  "keys": [
+                    {
+                      "direction": 1,
+                      "field": "summary"
+                    }
+                  ],
+                  "kind": "mongo-index",
+                  "partialFilterExpression": {
+                    "kind": "article"
                   },
-                  {
-                    "additionalProperties": false,
-                    "properties": {
-                      "_id": {
-                        "bsonType": "objectId"
-                      },
-                      "authorId": {
-                        "bsonType": "objectId"
-                      },
-                      "content": {
-                        "bsonType": "string"
-                      },
-                      "createdAt": {
-                        "bsonType": "date"
-                      },
-                      "difficulty": {
-                        "bsonType": "string"
-                      },
-                      "duration": {
-                        "bsonType": "int"
-                      },
-                      "kind": {
-                        "enum": [
-                          "tutorial"
-                        ]
-                      },
-                      "title": {
-                        "bsonType": "string"
-                      }
-                    },
-                    "required": [
-                      "difficulty",
-                      "duration",
-                      "kind"
-                    ]
-                  }
-                ],
-                "properties": {
-                  "_id": {
-                    "bsonType": "objectId"
-                  },
-                  "authorId": {
-                    "bsonType": "objectId"
-                  },
-                  "content": {
-                    "bsonType": "string"
-                  },
-                  "createdAt": {
-                    "bsonType": "date"
-                  },
-                  "kind": {
-                    "bsonType": "string"
-                  },
-                  "title": {
-                    "bsonType": "string"
-                  }
-                },
-                "required": [
-                  "_id",
-                  "authorId",
-                  "content",
-                  "createdAt",
-                  "kind",
-                  "title"
-                ]
-              },
-              "kind": "mongo-validator",
-              "validationAction": "error",
-              "validationLevel": "strict"
-            }
-          },
-          "users": {
-            "kind": "mongo-collection",
-            "validator": {
-              "jsonSchema": {
-                "additionalProperties": false,
-                "bsonType": "object",
-                "properties": {
-                  "_id": {
-                    "bsonType": "objectId"
-                  },
-                  "address": {
-                    "oneOf": [
-                      {
-                        "bsonType": "null"
-                      },
-                      {
-                        "additionalProperties": false,
-                        "bsonType": "object",
-                        "properties": {
-                          "city": {
-                            "bsonType": "string"
-                          },
-                          "country": {
-                            "bsonType": "string"
-                          },
-                          "street": {
-                            "bsonType": "string"
-                          },
-                          "zip": {
-                            "bsonType": [
-                              "null",
-                              "string"
-                            ]
-                          }
+                  "unique": true
+                }
+              ],
+              "kind": "mongo-collection",
+              "validator": {
+                "jsonSchema": {
+                  "bsonType": "object",
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "_id": {
+                          "bsonType": "objectId"
                         },
-                        "required": [
-                          "city",
-                          "country",
-                          "street"
-                        ]
-                      }
-                    ]
+                        "authorId": {
+                          "bsonType": "objectId"
+                        },
+                        "content": {
+                          "bsonType": "string"
+                        },
+                        "createdAt": {
+                          "bsonType": "date"
+                        },
+                        "kind": {
+                          "enum": [
+                            "article"
+                          ]
+                        },
+                        "summary": {
+                          "bsonType": "string"
+                        },
+                        "title": {
+                          "bsonType": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "summary"
+                      ]
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "_id": {
+                          "bsonType": "objectId"
+                        },
+                        "authorId": {
+                          "bsonType": "objectId"
+                        },
+                        "content": {
+                          "bsonType": "string"
+                        },
+                        "createdAt": {
+                          "bsonType": "date"
+                        },
+                        "difficulty": {
+                          "bsonType": "string"
+                        },
+                        "duration": {
+                          "bsonType": "int"
+                        },
+                        "kind": {
+                          "enum": [
+                            "tutorial"
+                          ]
+                        },
+                        "title": {
+                          "bsonType": "string"
+                        }
+                      },
+                      "required": [
+                        "difficulty",
+                        "duration",
+                        "kind"
+                      ]
+                    }
+                  ],
+                  "properties": {
+                    "_id": {
+                      "bsonType": "objectId"
+                    },
+                    "authorId": {
+                      "bsonType": "objectId"
+                    },
+                    "content": {
+                      "bsonType": "string"
+                    },
+                    "createdAt": {
+                      "bsonType": "date"
+                    },
+                    "kind": {
+                      "bsonType": "string"
+                    },
+                    "title": {
+                      "bsonType": "string"
+                    }
                   },
-                  "bio": {
-                    "bsonType": [
-                      "null",
-                      "string"
-                    ]
-                  },
-                  "email": {
-                    "bsonType": "string"
-                  },
-                  "name": {
-                    "bsonType": "string"
-                  }
+                  "required": [
+                    "_id",
+                    "authorId",
+                    "content",
+                    "createdAt",
+                    "kind",
+                    "title"
+                  ]
                 },
-                "required": [
-                  "_id",
-                  "email",
-                  "name"
-                ]
-              },
-              "kind": "mongo-validator",
-              "validationAction": "error",
-              "validationLevel": "strict"
+                "kind": "mongo-validator",
+                "validationAction": "error",
+                "validationLevel": "strict"
+              }
+            },
+            "users": {
+              "kind": "mongo-collection",
+              "validator": {
+                "jsonSchema": {
+                  "additionalProperties": false,
+                  "bsonType": "object",
+                  "properties": {
+                    "_id": {
+                      "bsonType": "objectId"
+                    },
+                    "address": {
+                      "oneOf": [
+                        {
+                          "bsonType": "null"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "bsonType": "object",
+                          "properties": {
+                            "city": {
+                              "bsonType": "string"
+                            },
+                            "country": {
+                              "bsonType": "string"
+                            },
+                            "street": {
+                              "bsonType": "string"
+                            },
+                            "zip": {
+                              "bsonType": [
+                                "null",
+                                "string"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "city",
+                            "country",
+                            "street"
+                          ]
+                        }
+                      ]
+                    },
+                    "bio": {
+                      "bsonType": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "email": {
+                      "bsonType": "string"
+                    },
+                    "name": {
+                      "bsonType": "string"
+                    }
+                  },
+                  "required": [
+                    "_id",
+                    "email",
+                    "name"
+                  ]
+                },
+                "kind": "mongo-validator",
+                "validationAction": "error",
+                "validationLevel": "strict"
+              }
             }
           }
         },
@@ -436,13 +438,13 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:b2b5135166e3ab47ee8cf2cac811542529234939623e7dbf95896314fca16686"
+    "storageHash": "sha256:2827cbad7293fe13a4fb2aab60a55d3cddd856a86d1f6ccea6e11519faacff92"
   },
   "capabilities": {},
   "extensionPacks": {},
   "meta": {},
   "_generated": {
-    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "warning": "\u26a0\ufe0f  GENERATED FILE - DO NOT EDIT",
     "message": "This file is automatically generated by \"prisma-next contract emit\".",
     "regenerate": "To regenerate, run: prisma-next contract emit"
   }

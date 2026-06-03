@@ -82,7 +82,7 @@ function appContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
+          entries: { collection: {
             users: {
               kind: 'mongo-collection' as const,
               indexes: [
@@ -93,7 +93,7 @@ function appContract(): MongoContract {
                 },
               ],
             },
-          },
+          } },
         },
       },
       storageHash: coreHash('sha256:tc18-app-contract'),
@@ -116,7 +116,7 @@ function extContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
+          entries: { collection: {
             cipherstash_state: {
               kind: 'mongo-collection' as const,
               indexes: [
@@ -127,7 +127,7 @@ function extContract(): MongoContract {
                 },
               ],
             },
-          },
+          } },
         },
       },
       storageHash: coreHash('sha256:tc18-ext-contract'),

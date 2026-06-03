@@ -95,7 +95,7 @@ type ContractBase = Omit<
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly tables: {
+          readonly entries: { readonly table: {
             readonly telemetry_event: {
               columns: {
                 readonly id: {
@@ -186,6 +186,7 @@ type ContractBase = Omit<
             };
           };
         };
+      };
       };
       readonly storageHash: StorageHash;
     },
@@ -381,8 +382,8 @@ type ContractBase = Omit<
                 readonly extensions: { readonly column: 'extensions' };
               };
             };
-          };
         };
+      };
       };
     };
   };

@@ -185,107 +185,109 @@
       "public": {
         "id": "public",
         "kind": "postgres-schema",
-        "tables": {
-          "telemetry_event": {
-            "columns": {
-              "agent": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "arch": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "command": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "databaseTarget": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "extensions": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": false
-              },
-              "flags": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "pg/int8@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+        "entries": {
+          "table": {
+            "telemetry_event": {
+              "columns": {
+                "agent": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
-                "nativeType": "int8",
-                "nullable": false
-              },
-              "ingestedAt": {
-                "codecId": "pg/timestamptz@1",
-                "default": {
-                  "expression": "now()",
-                  "kind": "function"
+                "arch": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
-                "nativeType": "timestamptz",
-                "nullable": false
+                "command": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "databaseTarget": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "extensions": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "flags": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int8@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int8",
+                  "nullable": false
+                },
+                "ingestedAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "installationId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "os": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "packageManager": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "runtimeName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "runtimeVersion": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "tsVersion": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "version": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
               },
-              "installationId": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "os": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "packageManager": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "runtimeName": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "runtimeVersion": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "tsVersion": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "version": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [
-              {
+              "foreignKeys": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "ingestedAt"
+                  ]
+                }
+              ],
+              "primaryKey": {
                 "columns": [
-                  "ingestedAt"
+                  "id"
                 ]
-              }
-            ],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
+              },
+              "uniques": []
+            }
           }
         }
       }
@@ -311,7 +313,7 @@
   "extensionPacks": {},
   "meta": {},
   "_generated": {
-    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "warning": "\u26a0\ufe0f  GENERATED FILE - DO NOT EDIT",
     "message": "This file is automatically generated by \"prisma-next contract emit\".",
     "regenerate": "To regenerate, run: prisma-next contract emit"
   }

@@ -39,7 +39,7 @@ function makeContract(
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } }),
       },
     }),
     roots: {},
@@ -1013,7 +1013,8 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
+            entries: {
+              table: {
               item: {
                 columns: {
                   id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -1030,13 +1031,13 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 foreignKeys: [],
               },
             },
-            enum: {
+            type: {
               status_type: new PostgresEnumType({
                 name: 'status_type',
                 nativeType: 'status_type',
                 values: ['active', 'inactive'],
               }),
-            },
+            }},
           }),
         },
       }),
@@ -1289,7 +1290,8 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
+            entries: {
+              table: {
               item: {
                 columns: {
                   id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -1306,13 +1308,13 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 foreignKeys: [],
               },
             },
-            enum: {
+            type: {
               StatusType: new PostgresEnumType({
                 name: 'StatusType',
                 nativeType: 'StatusType',
                 values: ['active', 'inactive'],
               }),
-            },
+            }},
           }),
         },
       }),

@@ -17,7 +17,7 @@ function mongoNamespaceSerializedKind(ns: Namespace): string {
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    for (const coll of Object.keys(ns.collections)) {
+    for (const coll of Object.keys(ns.entries.collection)) {
       const existing = seen.get(coll);
       if (existing !== undefined && existing !== namespaceId) {
         throw new Error(
@@ -62,10 +62,10 @@ function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): st
   const parts: string[] = [];
   for (const [name, ns] of sorted) {
     const collectionsType = generateMongoNamespaceCollectionsType(
-      ns.collections as Readonly<Record<string, MongoCollection>>,
+      ns.entries.collection as Readonly<Record<string, MongoCollection>>,
     );
     parts.push(
-      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; ${mongoNamespaceSerializedKind(ns)}; readonly collections: ${collectionsType} }`,
+      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; ${mongoNamespaceSerializedKind(ns)}; readonly entries: { readonly collection: ${collectionsType} } }`,
     );
   }
   return `{ ${parts.join('; ')} }`;
@@ -133,7 +133,7 @@ export const mongoEmission = {
 
     const collectionNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
-      for (const c of Object.keys(ns.collections)) {
+      for (const c of Object.keys(ns.entries.collection)) {
         collectionNames.add(c);
       }
     }
@@ -175,7 +175,7 @@ export const mongoEmission = {
         } else if (collection) {
           if (!collectionNames.has(collection)) {
             throw new Error(
-              `Model "${qualifiedName}" references collection "${collection}" which is not in storage.namespaces[..].collections`,
+              `Model "${qualifiedName}" references collection "${collection}" which is not in storage.namespaces[..].entries.collection`,
             );
           }
         }

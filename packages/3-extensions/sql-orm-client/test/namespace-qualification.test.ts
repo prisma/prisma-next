@@ -49,7 +49,9 @@ const publicPostgresContract = {
     namespaces: {
       [PUBLIC_NAMESPACE_ID]: new PostgresSchema({
         id: PUBLIC_NAMESPACE_ID,
-        tables: { users: new StorageTable(usersTableInput) },
+        entries: {
+          table: { users: new StorageTable(usersTableInput) },
+        },
       }),
     },
   } as unknown as SqlStorageInput<'sha256:test-core-public-orm'>),
@@ -133,16 +135,18 @@ describe('ORM namespace qualification', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: new SqliteDatabase({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              users: new StorageTable({
-                columns: {
-                  id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-                  email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
-                },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              }),
+            entries: {
+              table: {
+                users: new StorageTable({
+                  columns: {
+                    id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+                    email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                }),
+              },
             },
           }),
         },

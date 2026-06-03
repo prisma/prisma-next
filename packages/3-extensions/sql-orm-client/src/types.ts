@@ -578,7 +578,7 @@ type FieldColumnName<
 
 type NamespaceTableDef<TContract extends Contract<SqlStorage>, TableName extends string> = {
   [K in keyof TContract['storage']['namespaces']]: TContract['storage']['namespaces'][K] extends {
-    readonly tables: infer Tables;
+    readonly entries: { readonly table: infer Tables };
   }
     ? TableName extends keyof Tables
       ? Tables[TableName]

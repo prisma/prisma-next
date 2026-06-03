@@ -77,7 +77,7 @@ model Event {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             event: {
               columns: {
                 id: { codecId: 'pg/text@1', nativeType: 'uuid', nullable: false, typeRef: 'Id' },
@@ -122,6 +122,7 @@ model Event {
             },
           },
         },
+        },
       },
     });
     expect(result.value.roots).toEqual({ event: crossRef('Event', 'public') });
@@ -160,35 +161,38 @@ model User {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          enum: {
-            UserRole: {
-              kind: 'postgres-enum',
-              name: 'UserRole',
-              nativeType: 'user_role',
-              values: ['USER', 'ADMIN'],
+          id: 'public',
+          entries: {
+            type: {
+              UserRole: {
+                kind: 'postgres-enum',
+                name: 'UserRole',
+                nativeType: 'user_role',
+                values: ['USER', 'ADMIN'],
+              },
+              Role: {
+                kind: 'postgres-enum',
+                name: 'Role',
+                nativeType: 'Role',
+                values: ['OWNER'],
+              },
             },
-            Role: {
-              kind: 'postgres-enum',
-              name: 'Role',
-              nativeType: 'Role',
-              values: ['OWNER'],
-            },
-          },
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                role: {
-                  codecId: 'test/enum@1',
-                  nativeType: 'user_role',
-                  nullable: false,
-                  typeRef: 'UserRole',
-                },
-                legacyRole: {
-                  codecId: 'test/enum@1',
-                  nativeType: 'Role',
-                  nullable: false,
-                  typeRef: 'Role',
+            table: {
+              user: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  role: {
+                    codecId: 'test/enum@1',
+                    nativeType: 'user_role',
+                    nullable: false,
+                    typeRef: 'UserRole',
+                  },
+                  legacyRole: {
+                    codecId: 'test/enum@1',
+                    nativeType: 'Role',
+                    nullable: false,
+                    typeRef: 'Role',
+                  },
                 },
               },
             },
@@ -258,7 +262,7 @@ model Event {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             event: {
               columns: {
                 id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
@@ -296,6 +300,7 @@ model Event {
             },
           },
         },
+        },
       },
     });
     expect(result.value.roots).toEqual({ event: crossRef('Event', 'public') });
@@ -328,19 +333,22 @@ model Account {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          enum: {
-            UserRole: { kind: 'postgres-enum', values: ['ADMIN', 'USER'] },
+          id: 'public',
+          entries: {
+            type: {
+              UserRole: { kind: 'postgres-enum', values: ['ADMIN', 'USER'] },
+            },
           },
         },
       },
     });
     const storageNs = (
-      result.value.storage as unknown as { namespaces: Record<string, { enum?: unknown }> }
+      result.value.storage as unknown as { namespaces: Record<string, { entries?: { type?: unknown } }> }
     ).namespaces;
     expect(storageNs['auth']).toBeUndefined();
   });
 
-  it('lowers a namespace-scoped enum into storage.namespaces[nsId].enum', () => {
+  it('lowers a namespace-scoped enum into storage.namespaces[nsId].entries.type', () => {
     const document = parsePslDocument({
       schema: `namespace auth {
   enum user_type {
@@ -369,15 +377,17 @@ model Account {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         auth: {
-          enum: {
-            user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
+          entries: {
+            type: {
+              user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
+            },
           },
         },
       },
     });
     const storageNs2 = (
-      result.value.storage as unknown as { namespaces: Record<string, { enum?: unknown }> }
+      result.value.storage as unknown as { namespaces: Record<string, { entries?: { type?: unknown } }> }
     ).namespaces;
-    expect(storageNs2['public']?.enum).toBeUndefined();
+    expect(storageNs2['public']!.entries?.type).toBeUndefined();
   });
 });

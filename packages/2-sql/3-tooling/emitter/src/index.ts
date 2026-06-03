@@ -43,7 +43,7 @@ export const sqlEmission = {
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
     for (const ns of Object.values(storage.namespaces)) {
-      for (const [tableName, tableUnknown] of Object.entries(ns.tables)) {
+      for (const [tableName, tableUnknown] of Object.entries(ns.entries.table)) {
         const table = tableUnknown as StorageTable;
         for (const [colName, colUnknown] of Object.entries(table.columns)) {
           const col = colUnknown as { codecId?: string };
@@ -75,7 +75,7 @@ export const sqlEmission = {
 
     const tableNamesSeenAcrossNamespaces = new Map<string, string>();
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-      for (const tableName of Object.keys(ns.tables)) {
+      for (const tableName of Object.keys(ns.entries.table)) {
         const existingNs = tableNamesSeenAcrossNamespaces.get(tableName);
         if (existingNs !== undefined && existingNs !== nsId) {
           throw new Error(
@@ -88,7 +88,7 @@ export const sqlEmission = {
 
     const tableNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
-      for (const t of Object.keys(ns.tables)) {
+      for (const t of Object.keys(ns.entries.table)) {
         tableNames.add(t);
       }
     }
@@ -110,7 +110,7 @@ export const sqlEmission = {
         }
 
         const tableName = model.storage.table;
-        const table = storage.namespaces[namespaceId]?.tables[tableName] as
+        const table = storage.namespaces[namespaceId]?.entries.table?.[tableName] as
           | StorageTable
           | undefined;
         if (!table) {
@@ -147,7 +147,7 @@ export const sqlEmission = {
     }
 
     for (const ns of Object.values(storage.namespaces)) {
-      for (const [tableName, tableUnknown] of Object.entries(ns.tables)) {
+      for (const [tableName, tableUnknown] of Object.entries(ns.entries.table)) {
         const table = tableUnknown as StorageTable;
         const columnNames = new Set(Object.keys(table.columns));
 
@@ -206,7 +206,7 @@ export const sqlEmission = {
             }
           }
 
-          const referencedTable = storage.namespaces[fk.target.namespaceId]?.tables[
+          const referencedTable = storage.namespaces[fk.target.namespaceId]?.entries.table?.[
             fk.target.tableName
           ] as StorageTable | undefined;
           if (!referencedTable) {
@@ -281,7 +281,7 @@ export const sqlEmission = {
     const storageNamespaceId = sqlModel.storage.namespaceId;
     if (!storageNamespaceId) return undefined;
 
-    const table = storage.namespaces[storageNamespaceId]?.tables[tableName] as
+    const table = storage.namespaces[storageNamespaceId]?.entries.table?.[tableName] as
       | StorageTable
       | undefined;
     if (!table) return undefined;
@@ -291,14 +291,7 @@ export const sqlEmission = {
 
     if (column.typeRef) {
       const ns = storage.namespaces[storageNamespaceId];
-      const nsEnums =
-        ns !== undefined && 'enum' in ns
-          ? (
-              ns as {
-                enum?: Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>;
-              }
-            ).enum
-          : undefined;
+      const nsEnums = ns?.entries.type;
       const fromNamespace = nsEnums?.[column.typeRef];
       const typeInstance = fromNamespace ?? storage.types?.[column.typeRef];
       if (typeInstance === undefined) return undefined;
@@ -362,7 +355,7 @@ function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): str
   for (const [typeName, typeInstance] of Object.entries(types)) {
     if (isPostgresEnumStorageEntry(typeInstance)) {
       throw new Error(
-        `Document-scoped storage.types entry "${typeName}" is a postgres-enum; enums belong under storage.namespaces[namespaceId].enum`,
+        `Document-scoped storage.types entry "${typeName}" is a postgres-enum; enums belong under storage.namespaces[namespaceId].entries.type`,
       );
     }
     const codecInstanceShape = typeInstance as Partial<StorageTypeInstance>;
@@ -405,20 +398,23 @@ function generatePostgresNamespaceTypesType(
       continue;
     }
     throw new Error(
-      `Unknown namespace storage type kind for "${typeName}"; expected postgres-enum in namespace.enum.`,
+      `Unknown namespace storage type kind for "${typeName}"; expected postgres-enum in namespace.entries.type.`,
     );
   }
   return `{ ${typeEntries.join('; ')} }`;
 }
 
 function isPostgresSchemaNamespace(ns: Namespace): ns is Namespace & {
-  readonly enum: Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>;
+  readonly entries: {
+    readonly type: Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>;
+  };
 } {
+  const typeSlot = ns.entries?.['type'];
   return (
     (ns as { kind?: unknown }).kind === 'schema' &&
-    'enum' in ns &&
-    typeof (ns as { enum?: unknown }).enum === 'object' &&
-    (ns as { enum?: unknown }).enum !== null
+    typeSlot !== undefined &&
+    typeof typeSlot === 'object' &&
+    Object.keys(typeSlot).length > 0
   );
 }
 
@@ -537,13 +533,18 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
   const parts: string[] = [];
   for (const [name, ns] of entries) {
     const kindSuffix = `; ${namespaceSerializedKind(ns)}`;
-    const tablesType = generateTablesMapType(ns.tables as Readonly<Record<string, StorageTable>>);
+    const tablesType = generateTablesMapType(
+      (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
+    );
     const isPg = isPostgresSchemaNamespace(ns);
-    const enumClause = isPg
-      ? `; readonly enum: ${generatePostgresNamespaceTypesType(ns.enum)}`
-      : '';
+    const typeSlot = ns.entries['type'];
+    const entriesParts = [`readonly table: ${tablesType}`];
+    if (isPg && typeSlot !== undefined) {
+      entriesParts.push(`readonly type: ${generatePostgresNamespaceTypesType(typeSlot)}`);
+    }
+    const entriesType = `{ ${entriesParts.join('; ')} }`;
     parts.push(
-      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}${kindSuffix}; readonly tables: ${tablesType}${enumClause} }`,
+      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}${kindSuffix}; readonly entries: ${entriesType} }`,
     );
   }
   return `{ ${parts.join('; ')} }`;

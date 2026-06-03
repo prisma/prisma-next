@@ -33,7 +33,8 @@ function buildCrossNamespaceFkContract(): Contract<SqlStorage> {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
+          entries: {
+            table: {
             post: {
               columns: {
                 id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -59,11 +60,12 @@ function buildCrossNamespaceFkContract(): Contract<SqlStorage> {
                 },
               ],
             },
-          },
+          }},
         }),
         auth: buildSqlNamespace({
           id: 'auth',
-          tables: {
+          entries: {
+            table: {
             user: {
               columns: {
                 id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -73,7 +75,7 @@ function buildCrossNamespaceFkContract(): Contract<SqlStorage> {
               indexes: [],
               foreignKeys: [],
             },
-          },
+          }},
         }),
       },
     }),

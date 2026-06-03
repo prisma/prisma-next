@@ -11,8 +11,9 @@ type TestContract = Contract<
       readonly __unbound__: {
         readonly id: '__unbound__';
         readonly kind: 'sql-namespace';
-        readonly tables: {
-          readonly document: {
+        readonly entries: {
+          readonly table: {
+            readonly document: {
             readonly columns: {
               readonly id: {
                 readonly nativeType: 'int4';
@@ -24,6 +25,7 @@ type TestContract = Contract<
             readonly uniques: readonly [];
             readonly indexes: readonly [];
             readonly foreignKeys: readonly [];
+            };
           };
         };
       };

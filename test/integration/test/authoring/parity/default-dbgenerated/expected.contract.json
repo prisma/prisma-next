@@ -41,35 +41,41 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__",
-        "tables": {}
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__"
       },
       "public": {
-        "id": "public",
-        "tables": {
-          "user": {
-            "columns": {
-              "id": {
-                "codecId": "pg/text@1",
-                "default": {
-                  "expression": "gen_random_uuid()",
-                  "kind": "function"
-                },
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
+        "entries": {
+          "table": {
+            "user": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public"
       }
     },
-    "storageHash": "sha256:b2ce7c974ccdce423e371ee97025f6087677b5a54ed7ce174ce869aa387ac13c"
+    "storageHash": "sha256:3c044e759089462278c9a2ea30116c04d987ce68f78f5656f793147c81449b58"
   },
   "capabilities": {
     "postgres": {

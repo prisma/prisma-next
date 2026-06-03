@@ -25,8 +25,10 @@ describe('Mongo pack composition', () => {
         namespaces: {
           __unbound__: {
             id: '__unbound__',
-            collections: {
-              users: {},
+            entries: {
+              collection: {
+                users: {},
+              },
             },
           },
         },

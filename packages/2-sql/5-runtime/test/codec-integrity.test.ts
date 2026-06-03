@@ -122,7 +122,8 @@ describe('createExecutionContext — column codec integrity', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
+          entries: {
+            table: {
             Doc: {
               columns: {
                 field: {
@@ -138,7 +139,7 @@ describe('createExecutionContext — column codec integrity', () => {
               indexes: [],
               foreignKeys: [],
             },
-          },
+          }},
         }),
       },
     });
@@ -272,7 +273,8 @@ describe('createExecutionContext — column codec integrity', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
+          entries: {
+            table: {
             Doc: {
               columns: {
                 embedding: {
@@ -287,7 +289,7 @@ describe('createExecutionContext — column codec integrity', () => {
               indexes: [],
               foreignKeys: [],
             },
-          },
+          }},
         }),
       },
       types: {

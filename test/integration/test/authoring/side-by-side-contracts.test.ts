@@ -262,13 +262,17 @@ describe('side-by-side contract examples', () => {
         const namespaces = storage['namespaces'] as Record<string, Record<string, unknown>>;
         const strippedNamespaces: Record<string, unknown> = {};
         for (const [nsId, ns] of Object.entries(namespaces)) {
-          const collections = ns['collections'] as Record<string, Record<string, unknown>>;
+          const entries = ns['entries'] as { collection: Record<string, Record<string, unknown>> };
+          const collections = entries.collection;
           const strippedCollections: Record<string, unknown> = {};
           for (const [name, coll] of Object.entries(collections)) {
             const { validator: _, ...rest } = coll;
             strippedCollections[name] = rest;
           }
-          strippedNamespaces[nsId] = { ...ns, collections: strippedCollections };
+          strippedNamespaces[nsId] = {
+            ...ns,
+            entries: { ...(ns['entries'] as object), collection: strippedCollections },
+          };
         }
         const { storageHash: _sh, ...restStorage } = storage;
         return { ...contract, storage: { ...restStorage, namespaces: strippedNamespaces } };
@@ -292,13 +296,17 @@ describe('side-by-side contract examples', () => {
         const namespaces = storage['namespaces'] as Record<string, Record<string, unknown>>;
         const strippedNamespaces: Record<string, unknown> = {};
         for (const [nsId, ns] of Object.entries(namespaces)) {
-          const collections = ns['collections'] as Record<string, Record<string, unknown>>;
+          const entries = ns['entries'] as { collection: Record<string, Record<string, unknown>> };
+          const collections = entries.collection;
           const strippedCollections: Record<string, unknown> = {};
           for (const [name, coll] of Object.entries(collections)) {
             const { validator: _, ...rest } = coll;
             strippedCollections[name] = rest;
           }
-          strippedNamespaces[nsId] = { ...ns, collections: strippedCollections };
+          strippedNamespaces[nsId] = {
+            ...ns,
+            entries: { ...(ns['entries'] as object), collection: strippedCollections },
+          };
         }
         const { storageHash: _sh, ...restStorage } = storage;
         return { ...parsed, storage: { ...restStorage, namespaces: strippedNamespaces } };

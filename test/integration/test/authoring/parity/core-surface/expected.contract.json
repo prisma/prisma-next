@@ -52,8 +52,12 @@
               "author": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["userId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -158,142 +162,164 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__",
-        "tables": {}
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__"
       },
       "public": {
-        "enum": {
-          "Role": {
-            "codecId": "pg/enum@1",
-            "kind": "postgres-enum",
-            "name": "Role",
-            "nativeType": "Role",
-            "values": ["USER", "ADMIN"]
+        "entries": {
+          "table": {
+            "post": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "rating": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "onDelete": "cascade",
+                  "onUpdate": "cascade",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "post"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId"
+                  ]
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "title",
+                    "userId"
+                  ]
+                }
+              ]
+            },
+            "user": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "typeRef": "Email"
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "isActive": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "profile": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": true
+                },
+                "role": {
+                  "codecId": "pg/enum@1",
+                  "nativeType": "Role",
+                  "nullable": false,
+                  "typeRef": "Role"
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "email"
+                  ]
+                }
+              ]
+            }
+          },
+          "type": {
+            "Role": {
+              "codecId": "pg/enum@1",
+              "kind": "postgres-enum",
+              "name": "Role",
+              "nativeType": "Role",
+              "values": [
+                "USER",
+                "ADMIN"
+              ]
+            }
           }
         },
-        "id": "public",
-        "tables": {
-          "post": {
-            "columns": {
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
-                },
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "rating": {
-                "codecId": "pg/float8@1",
-                "nativeType": "float8",
-                "nullable": true
-              },
-              "title": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "userId": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "onDelete": "cascade",
-                "onUpdate": "cascade",
-                "source": {
-                  "columns": ["userId"],
-                  "namespaceId": "public",
-                  "tableName": "post"
-                },
-                "target": {
-                  "columns": ["id"],
-                  "namespaceId": "public",
-                  "tableName": "user"
-                }
-              }
-            ],
-            "indexes": [
-              {
-                "columns": ["userId"]
-              }
-            ],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": [
-              {
-                "columns": ["title", "userId"]
-              }
-            ]
-          },
-          "user": {
-            "columns": {
-              "createdAt": {
-                "codecId": "pg/timestamptz@1",
-                "default": {
-                  "expression": "now()",
-                  "kind": "function"
-                },
-                "nativeType": "timestamptz",
-                "nullable": false
-              },
-              "email": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false,
-                "typeRef": "Email"
-              },
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
-                },
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "isActive": {
-                "codecId": "pg/bool@1",
-                "default": {
-                  "kind": "literal",
-                  "value": true
-                },
-                "nativeType": "bool",
-                "nullable": false
-              },
-              "profile": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": true
-              },
-              "role": {
-                "codecId": "pg/enum@1",
-                "nativeType": "Role",
-                "nullable": false,
-                "typeRef": "Role"
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": [
-              {
-                "columns": ["email"]
-              }
-            ]
-          }
-        }
+        "id": "public"
       }
     },
-    "storageHash": "sha256:a901bb3c04da99b42ac7a5b5e7ea162dfcc22231a690177743353cb6c501262b",
+    "storageHash": "sha256:7dad4e205aa283ae3192fcf371e2aeba4defb06df084fcb6b063b829cf084192",
     "types": {
       "Email": {
         "codecId": "pg/text@1",

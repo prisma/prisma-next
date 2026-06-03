@@ -125,7 +125,7 @@ model User {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             user: {
               columns: {
                 homeAddress: {
@@ -136,6 +136,7 @@ model User {
               },
             },
           },
+        },
         },
       },
     });
@@ -173,7 +174,7 @@ model User {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             user: {
               columns: {
                 tags: {
@@ -184,6 +185,7 @@ model User {
               },
             },
           },
+        },
         },
       },
     });
@@ -226,7 +228,7 @@ model User {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             user: {
               columns: {
                 addresses: {
@@ -237,6 +239,7 @@ model User {
               },
             },
           },
+        },
         },
       },
     });

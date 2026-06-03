@@ -51,41 +51,47 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__",
-        "tables": {}
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__"
       },
       "public": {
-        "id": "public",
-        "tables": {
-          "document": {
-            "columns": {
-              "embedding": {
-                "codecId": "pg/vector@1",
-                "nativeType": "vector",
-                "nullable": false,
-                "typeRef": "Embedding1536"
-              },
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+        "entries": {
+          "table": {
+            "document": {
+              "columns": {
+                "embedding": {
+                  "codecId": "pg/vector@1",
+                  "nativeType": "vector",
+                  "nullable": false,
+                  "typeRef": "Embedding1536"
                 },
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public"
       }
     },
-    "storageHash": "sha256:bf8636d21a100027d7648f10cb58cb404d3733b7cf1ddf7afa6dba08e98a0d38",
+    "storageHash": "sha256:c6fb73b38593ad549f3c8cf7579dddd5349e0fa7c3028246701974036c6ebff4",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

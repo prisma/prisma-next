@@ -60,7 +60,7 @@ type ContractBase = Omit<
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly tables: {
+          readonly entries: { readonly table: {
             readonly Note: {
               columns: {
                 readonly id: {
@@ -78,6 +78,7 @@ type ContractBase = Omit<
           };
         };
       };
+      };
       readonly storageHash: StorageHash;
     },
     {
@@ -90,8 +91,8 @@ type ContractBase = Omit<
               readonly codecId: 'sql/char@1';
               readonly typeParams: { readonly length: 36 };
             };
-          };
         };
+      };
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'Note';
@@ -129,8 +130,8 @@ type ContractBase = Omit<
               readonly namespaceId: 'public';
               readonly fields: { readonly id: { readonly column: 'id' } };
             };
-          };
         };
+      };
       };
     };
   };

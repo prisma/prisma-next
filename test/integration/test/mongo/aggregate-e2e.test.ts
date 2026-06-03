@@ -90,7 +90,7 @@ function buildAppContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
+          entries: { collection: {
             users: {
               kind: 'mongo-collection' as const,
               indexes: [
@@ -101,7 +101,7 @@ function buildAppContract(): MongoContract {
                 },
               ],
             },
-          },
+          } },
         },
       },
       storageHash: coreHash('sha256:p5-app-contract'),

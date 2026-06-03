@@ -61,9 +61,12 @@ function mongoCollectionsFromIr(ir: {
   readonly storage: unknown;
 }): Record<string, Record<string, unknown>> {
   const storage = ir.storage as {
-    namespaces: Record<string, { collections: Record<string, Record<string, unknown>> }>;
+    namespaces: Record<
+      string,
+      { entries: { collection: Record<string, Record<string, unknown>> } }
+    >;
   };
-  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
+  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.collection;
 }
 
 interface MongoModel {
@@ -245,7 +248,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            collections: { userProfile: {} },
+            entries: { collection: { userProfile: {} } },
           },
         },
       });
@@ -266,7 +269,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            collections: { users: {} },
+            entries: { collection: { users: {} } },
           },
         },
       });
@@ -661,10 +664,9 @@ describe('interpretPslDocumentToMongoContract', () => {
       const namespaces = (canonical['storage'] as Record<string, Record<string, unknown>>)[
         'namespaces'
       ] as Record<string, Record<string, unknown>>;
-      const collections = namespaces[UNBOUND_NAMESPACE_ID]!['collections'] as Record<
-        string,
-        Record<string, unknown>
-      >;
+      const collections = (
+        namespaces[UNBOUND_NAMESPACE_ID]!['entries'] as { collection: Record<string, unknown> }
+      ).collection as Record<string, Record<string, unknown>>;
       const validator = collections['users']!['validator'] as Record<string, unknown>;
       const jsonSchema = validator['jsonSchema'] as Record<string, Record<string, unknown>>;
       expect(jsonSchema['properties']!['_id']).toEqual({ bsonType: 'objectId' });
@@ -716,9 +718,11 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            collections: {
-              user: {},
-              post: {},
+            entries: {
+              collection: {
+                user: {},
+                post: {},
+              },
             },
           },
         },
@@ -949,7 +953,8 @@ describe('interpretPslDocumentToMongoContract', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
               id: UNBOUND_NAMESPACE_ID,
-              collections: {
+              entries: {
+                collection: {
                 users: new MongoCollection({
                   validator: new MongoValidator({
                     jsonSchema: {
@@ -985,7 +990,7 @@ describe('interpretPslDocumentToMongoContract', () => {
                     validationAction: 'error',
                   }),
                 }),
-              },
+              }},
             }),
           },
         }),

@@ -38,8 +38,12 @@
               "team": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["teamId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "teamId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "Team",
@@ -88,77 +92,94 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__",
-        "tables": {}
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__"
       },
       "public": {
-        "id": "public",
-        "tables": {
-          "org_team": {
-            "columns": {
-              "team_id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["team_id"]
-            },
-            "uniques": []
-          },
-          "team_member": {
-            "columns": {
-              "member_id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "team_ref": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "name": "team_member_team_ref_fkey",
-                "onDelete": "cascade",
-                "onUpdate": "cascade",
-                "source": {
-                  "columns": ["team_ref"],
-                  "namespaceId": "public",
-                  "tableName": "team_member"
-                },
-                "target": {
-                  "columns": ["team_id"],
-                  "namespaceId": "public",
-                  "tableName": "org_team"
+        "entries": {
+          "table": {
+            "org_team": {
+              "columns": {
+                "team_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
                 }
-              }
-            ],
-            "indexes": [
-              {
-                "columns": ["team_ref"]
-              }
-            ],
-            "primaryKey": {
-              "columns": ["member_id"]
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "team_id"
+                ]
+              },
+              "uniques": []
             },
-            "uniques": [
-              {
-                "columns": ["team_ref", "member_id"]
-              }
-            ]
+            "team_member": {
+              "columns": {
+                "member_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "team_ref": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "name": "team_member_team_ref_fkey",
+                  "onDelete": "cascade",
+                  "onUpdate": "cascade",
+                  "source": {
+                    "columns": [
+                      "team_ref"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "team_member"
+                  },
+                  "target": {
+                    "columns": [
+                      "team_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "org_team"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "team_ref"
+                  ]
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "member_id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "team_ref",
+                    "member_id"
+                  ]
+                }
+              ]
+            }
           }
-        }
+        },
+        "id": "public"
       }
     },
-    "storageHash": "sha256:5d0fc9f0024b3023bec2a3465d83deedacfb6c02e216ef599bfb7cfef9889b9c"
+    "storageHash": "sha256:fd93e12c0d47c86715a7df5f2875367124fbfc21979b4005bd078241d51ae47c"
   },
   "capabilities": {
     "postgres": {

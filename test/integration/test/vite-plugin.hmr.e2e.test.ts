@@ -17,9 +17,9 @@ const pslFixtureSubdir = 'vite-plugin-psl';
 const POSTGRES_DEFAULT_NAMESPACE = 'public';
 
 function unboundUserColumns(storage: {
-  namespaces: Record<string, { tables: { user: { columns: Record<string, unknown> } } }>;
+  namespaces: Record<string, { entries: { table: { user: { columns: Record<string, unknown> } } } }>;
 }) {
-  return storage.namespaces[POSTGRES_DEFAULT_NAMESPACE]!.tables.user.columns;
+  return storage.namespaces[POSTGRES_DEFAULT_NAMESPACE]!.entries.table.user.columns;
 }
 
 type ViteModuleNodeLike = object;
@@ -176,13 +176,13 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           expect(initialContract.storage).toMatchObject({
             namespaces: {
               [POSTGRES_DEFAULT_NAMESPACE]: {
-                tables: {
+                entries: { table: {
                   user: {
                     columns: {
                       email: expect.anything(),
                     },
                   },
-                },
+                } },
               },
             },
           });
@@ -211,13 +211,13 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           expect(updatedContract.storage).toMatchObject({
             namespaces: {
               [POSTGRES_DEFAULT_NAMESPACE]: {
-                tables: {
+                entries: { table: {
                   user: {
                     columns: {
                       name: { nullable: true },
                     },
                   },
-                },
+                } },
               },
             },
           });
@@ -261,13 +261,13 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           expect(initialContract.storage).toMatchObject({
             namespaces: {
               [POSTGRES_DEFAULT_NAMESPACE]: {
-                tables: {
+                entries: { table: {
                   user: {
                     columns: {
                       email: expect.anything(),
                     },
                   },
-                },
+                } },
               },
             },
           });
@@ -287,13 +287,13 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           expect(updatedContract.storage).toMatchObject({
             namespaces: {
               [POSTGRES_DEFAULT_NAMESPACE]: {
-                tables: {
+                entries: { table: {
                   user: {
                     columns: {
                       name: { nullable: true },
                     },
                   },
-                },
+                } },
               },
             },
           });
@@ -357,13 +357,13 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           expect(contractAfterConfigChange.storage).toMatchObject({
             namespaces: {
               [POSTGRES_DEFAULT_NAMESPACE]: {
-                tables: {
+                entries: { table: {
                   user: {
                     columns: {
                       name: { nullable: true },
                     },
                   },
-                },
+                } },
               },
             },
           });
@@ -386,13 +386,13 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           expect(contractAfterAltEdit.storage).toMatchObject({
             namespaces: {
               [POSTGRES_DEFAULT_NAMESPACE]: {
-                tables: {
+                entries: { table: {
                   user: {
                     columns: {
                       nickname: { nullable: true },
                     },
                   },
-                },
+                } },
               },
             },
           });
@@ -487,13 +487,13 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
           expect(recoveredContract.storage).toMatchObject({
             namespaces: {
               [POSTGRES_DEFAULT_NAMESPACE]: {
-                tables: {
+                entries: { table: {
                   user: {
                     columns: {
                       name: { nullable: true },
                     },
                   },
-                },
+                } },
               },
             },
           });

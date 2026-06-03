@@ -40,7 +40,7 @@ export function* elementCoordinates(
   storage: Pick<StorageBase, 'namespaces'>,
 ): Generator<EntityCoordinate> {
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    const entries = (ns as Namespace).entries;
+    const entries = ns.entries;
     if (entries === null || typeof entries !== 'object') continue;
     for (const [entityKind, slot] of Object.entries(entries)) {
       if (slot === null || typeof slot !== 'object') continue;

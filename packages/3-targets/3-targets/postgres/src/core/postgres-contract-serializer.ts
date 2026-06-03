@@ -18,8 +18,8 @@ import type {
   SqlNamespaceTablesInput,
   SqlStorage,
   SqlStorageTypeEntry,
-  StorageTable,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
@@ -105,7 +105,13 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       id,
       entries: {
         table: tables,
-        ...(typeSlot !== undefined ? { type: typeSlot as Record<string, PostgresEnumType> } : {}),
+        ...(typeSlot !== undefined
+          ? {
+              type: blindCast<Record<string, PostgresEnumType>, 'hydrated entries.type slot'>(
+                typeSlot,
+              ),
+            }
+          : {}),
       },
     });
   }

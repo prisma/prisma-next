@@ -12,7 +12,7 @@ const mockSqlHook = createMockSpi();
 function unboundNamespaceTables(tables: Record<string, unknown>) {
   return {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: tables } },
     },
   };
 }
@@ -20,7 +20,8 @@ function unboundNamespaceTables(tables: Record<string, unknown>) {
 function tablesFromCanonicalStorage(storage: Record<string, unknown>): Record<string, unknown> {
   const namespaces = storage['namespaces'] as Record<string, unknown>;
   const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
-  return unbound['tables'] as Record<string, unknown>;
+  const entries = unbound['entries'] as Record<string, unknown>;
+  return entries['table'] as Record<string, unknown>;
 }
 
 describe('emitter round-trip', () => {

@@ -576,7 +576,7 @@ function createTestContract(
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
         id: UNBOUND_NAMESPACE_ID,
-        tables: defaultTables,
+        entries: { table: defaultTables },
       }),
     },
   };
@@ -587,7 +587,7 @@ function createTestContract(
       : {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: defaultTables,
+            entries: { table: defaultTables },
           }),
         }
   ) as SqlStorageInput['namespaces'];
@@ -697,9 +697,11 @@ function planUserTableOperations(
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            ...(options?.extraContractTables ?? {}),
-            user: userTable,
+          entries: {
+            table: {
+              ...(options?.extraContractTables ?? {}),
+              user: userTable,
+            },
           },
         }),
       },

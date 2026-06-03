@@ -33,7 +33,8 @@ export const contract: Contract<SqlStorage> = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
         id: UNBOUND_NAMESPACE_ID,
-        tables: {
+        entries: {
+          table: {
           user: {
             columns: {
               id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
@@ -44,6 +45,7 @@ export const contract: Contract<SqlStorage> = {
             indexes: [{ columns: ['email'] }],
             foreignKeys: [],
           },
+        },
         },
       }),
     },

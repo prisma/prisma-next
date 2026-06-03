@@ -181,7 +181,7 @@ type ContractBase = Omit<
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly tables: {
+          readonly entries: { readonly table: {
             readonly comment: {
               columns: {
                 readonly id: {
@@ -538,6 +538,7 @@ type ContractBase = Omit<
           };
         };
       };
+      };
       readonly storageHash: StorageHash;
     },
     {
@@ -572,8 +573,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['postId'];
               readonly targetFields: readonly ['id'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'comment';
           readonly namespaceId: 'public';
@@ -616,8 +617,8 @@ type ContractBase = Omit<
                 };
               };
             };
-          };
         };
+      };
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'embedding';
@@ -792,8 +793,8 @@ type ContractBase = Omit<
               readonly codecId: 'pg/interval@1';
               readonly typeParams: { readonly precision: 6 };
             };
-          };
         };
+      };
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'param_types';
@@ -859,8 +860,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['id'];
               readonly targetFields: readonly ['postId'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'post';
           readonly namespaceId: 'public';
@@ -910,8 +911,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['id'];
               readonly targetFields: readonly ['userId'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'user';
           readonly namespaceId: 'public';
@@ -1334,8 +1335,8 @@ type ContractBase = Omit<
                 readonly profile: { readonly column: 'profile' };
               };
             };
-          };
         };
+      };
       };
     };
   };

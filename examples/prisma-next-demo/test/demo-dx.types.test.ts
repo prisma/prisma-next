@@ -23,8 +23,8 @@ test('SPI deserializeContract output is assignable to visualization shape', () =
 
   expectTypeOf<Models>().toHaveProperty('User');
   expectTypeOf<Models>().toHaveProperty('Post');
-  expectTypeOf(contract.storage.namespaces['public'].tables).toHaveProperty('user');
-  expectTypeOf(contract.storage.namespaces['public'].tables).toHaveProperty('post');
+  expectTypeOf(contract.storage.namespaces['public'].entries.table).toHaveProperty('user');
+  expectTypeOf(contract.storage.namespaces['public'].entries.table).toHaveProperty('post');
   expectTypeOf(contract.domain.namespaces['public']!.models.User.storage.fields).toHaveProperty(
     'email',
   );

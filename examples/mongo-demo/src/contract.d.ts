@@ -18,7 +18,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b2b5135166e3ab47ee8cf2cac811542529234939623e7dbf95896314fca16686'>;
+  StorageHashBase<'sha256:2827cbad7293fe13a4fb2aab60a55d3cddd856a86d1f6ccea6e11519faacff92'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
@@ -90,7 +90,7 @@ type ContractBase = Omit<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly collections: {
+          readonly entries: { readonly collection: {
             readonly posts: {
               readonly kind: 'mongo-collection';
               readonly indexes: readonly [
@@ -193,6 +193,7 @@ type ContractBase = Omit<
           };
         };
       };
+      };
       readonly storageHash: StorageHash;
     },
     {
@@ -245,8 +246,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['authorId'];
               readonly targetFields: readonly ['_id'];
             };
-          };
         };
+      };
         readonly storage: { readonly collection: 'posts' };
         readonly discriminator: { readonly field: 'kind' };
         readonly variants: {
@@ -303,8 +304,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['_id'];
               readonly targetFields: readonly ['authorId'];
             };
-          };
         };
+      };
         readonly storage: { readonly collection: 'users' };
       };
     }
@@ -459,8 +460,8 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
               };
             };
-          };
         };
+      };
       };
     };
   };

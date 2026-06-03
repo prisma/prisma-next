@@ -115,7 +115,7 @@ type ContractBase = Omit<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'sql-namespace';
-          readonly tables: {
+          readonly entries: { readonly table: {
             readonly comments: {
               columns: {
                 readonly id: {
@@ -281,6 +281,7 @@ type ContractBase = Omit<
           };
         };
       };
+      };
       readonly storageHash: StorageHash;
     },
     {
@@ -377,8 +378,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['userId'];
               readonly targetFields: readonly ['id'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'posts';
           readonly namespaceId: '__unbound__';
@@ -493,8 +494,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['id'];
               readonly targetFields: readonly ['userId'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'users';
           readonly namespaceId: '__unbound__';
@@ -754,8 +755,8 @@ type ContractBase = Omit<
                 readonly invitedById: { readonly column: 'invited_by_id' };
               };
             };
-          };
         };
+      };
       };
     };
   };

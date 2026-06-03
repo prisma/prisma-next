@@ -62,9 +62,11 @@ export const blogContract = createMongoContract({
     namespaces: {
       __unbound__: {
         id: '__unbound__',
-        collections: {
-          users: {},
-          posts: {},
+        entries: {
+          collection: {
+            users: {},
+            posts: {},
+          },
         },
       },
     },

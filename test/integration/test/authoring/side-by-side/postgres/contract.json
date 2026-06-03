@@ -160,102 +160,106 @@
       "__unbound__": {
         "id": "__unbound__",
         "kind": "postgres-unbound-schema",
-        "tables": {}
+        "entries": {
+          "table": {}
+        }
       },
       "public": {
         "id": "public",
         "kind": "postgres-schema",
-        "tables": {
-          "posts": {
-            "columns": {
-              "authorId": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+        "entries": {
+          "table": {
+            "posts": {
+              "columns": {
+                "authorId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
                 },
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "publishedAt": {
-                "codecId": "pg/timestamptz@1",
-                "nativeType": "timestamptz",
-                "nullable": true
-              },
-              "title": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "source": {
-                  "columns": [
-                    "authorId"
-                  ],
-                  "namespaceId": "public",
-                  "tableName": "posts"
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
                 },
-                "target": {
-                  "columns": [
-                    "id"
-                  ],
-                  "namespaceId": "public",
-                  "tableName": "users"
+                "publishedAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 }
-              }
-            ],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "source": {
+                    "columns": [
+                      "authorId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "posts"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "users"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             },
-            "uniques": []
-          },
-          "users": {
-            "columns": {
-              "bio": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "email": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+            "users": {
+              "columns": {
+                "bio": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
-                "nativeType": "int4",
-                "nullable": false
+                "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
               },
-              "name": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
           }
         }
       }
@@ -281,7 +285,7 @@
   "extensionPacks": {},
   "meta": {},
   "_generated": {
-    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "warning": "\u26a0\ufe0f  GENERATED FILE - DO NOT EDIT",
     "message": "This file is automatically generated by \"prisma-next contract emit\".",
     "regenerate": "To regenerate, run: prisma-next contract emit"
   }

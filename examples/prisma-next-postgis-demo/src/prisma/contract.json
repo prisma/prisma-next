@@ -162,99 +162,101 @@
       "public": {
         "id": "public",
         "kind": "postgres-schema",
-        "tables": {
-          "cafe": {
-            "columns": {
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
+        "entries": {
+          "table": {
+            "cafe": {
+              "columns": {
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                },
+                "location": {
+                  "codecId": "pg/geometry@1",
+                  "nativeType": "geometry",
+                  "nullable": false,
+                  "typeRef": "WgsGeometry"
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 }
               },
-              "location": {
-                "codecId": "pg/geometry@1",
-                "nativeType": "geometry",
-                "nullable": false,
-                "typeRef": "WgsGeometry"
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
               },
-              "name": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
+              "uniques": []
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
-          },
-          "neighborhood": {
-            "columns": {
-              "boundary": {
-                "codecId": "pg/geometry@1",
-                "nativeType": "geometry",
-                "nullable": false,
-                "typeRef": "WgsGeometry"
-              },
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
+            "neighborhood": {
+              "columns": {
+                "boundary": {
+                  "codecId": "pg/geometry@1",
+                  "nativeType": "geometry",
+                  "nullable": false,
+                  "typeRef": "WgsGeometry"
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 }
               },
-              "name": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
-          },
-          "route": {
-            "columns": {
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
+            "route": {
+              "columns": {
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "path": {
+                  "codecId": "pg/geometry@1",
+                  "nativeType": "geometry",
+                  "nullable": false,
+                  "typeRef": "WgsGeometry"
                 }
               },
-              "name": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
               },
-              "path": {
-                "codecId": "pg/geometry@1",
-                "nativeType": "geometry",
-                "nullable": false,
-                "typeRef": "WgsGeometry"
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
+              "uniques": []
+            }
           }
         }
       }
@@ -372,7 +374,7 @@
   },
   "meta": {},
   "_generated": {
-    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "warning": "\u26a0\ufe0f  GENERATED FILE - DO NOT EDIT",
     "message": "This file is automatically generated by \"prisma-next contract emit\".",
     "regenerate": "To regenerate, run: prisma-next contract emit"
   }

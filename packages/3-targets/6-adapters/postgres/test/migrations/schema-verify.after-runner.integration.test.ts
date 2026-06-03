@@ -133,7 +133,8 @@ describe.sequential('Schema verification after runner - integration', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
               id: UNBOUND_NAMESPACE_ID,
-              tables: {
+              entries: {
+                table: {
                 user: {
                   columns: {
                     id: {
@@ -155,7 +156,7 @@ describe.sequential('Schema verification after runner - integration', () => {
                   indexes: [],
                   foreignKeys: [],
                 },
-              },
+              }},
             }),
           },
         }),
@@ -197,7 +198,8 @@ describe.sequential('Schema verification after runner - integration', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
               id: UNBOUND_NAMESPACE_ID,
-              tables: {
+              entries: {
+                table: {
                 Organization: {
                   columns: {
                     id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -214,13 +216,13 @@ describe.sequential('Schema verification after runner - integration', () => {
                   foreignKeys: [],
                 },
               },
-              enum: {
+              type: {
                 BillingState: new PostgresEnumType({
                   name: 'BillingState',
                   nativeType: 'BillingState',
                   values: ['ok', 'atRisk', 'blocked'],
                 }),
-              },
+              }},
             }),
           },
         }),

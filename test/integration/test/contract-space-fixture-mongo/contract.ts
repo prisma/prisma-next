@@ -12,7 +12,7 @@ const storageBody = {
     __unbound__: {
       id: '__unbound__' as const,
       kind: 'mongo-namespace' as const,
-      collections: {
+      entries: { collection: {
         [MONGO_TEST_COLLECTION]: {
           kind: 'mongo-collection' as const,
           indexes: [
@@ -36,7 +36,7 @@ const storageBody = {
             validationAction: 'error' as const,
           },
         },
-      },
+      } },
     },
   },
 };

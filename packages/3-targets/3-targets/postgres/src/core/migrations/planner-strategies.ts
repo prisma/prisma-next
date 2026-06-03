@@ -167,7 +167,7 @@ function resolveColumnEnumNamespace(
 
 /**
  * Finds a type entry by explicit namespace coordinate. Namespace types (e.g.
- * Postgres enums) live under `storage.namespaces[nsId].enum`. Returns the
+ * Postgres enums) live under `storage.namespaces[nsId].entries.type`. Returns the
  * entry from the named namespace only — never scans other namespaces, so two
  * namespaces that hold an enum with the same name resolve independently.
  */

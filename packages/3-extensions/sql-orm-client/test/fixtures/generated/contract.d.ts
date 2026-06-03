@@ -144,7 +144,7 @@ type ContractBase = Omit<
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly tables: {
+          readonly entries: { readonly table: {
             readonly articles: {
               columns: {
                 readonly id: {
@@ -363,6 +363,7 @@ type ContractBase = Omit<
           };
         };
       };
+      };
       readonly storageHash: StorageHash;
     },
     {
@@ -389,8 +390,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['reviewerId'];
               readonly targetFields: readonly ['id'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'articles';
           readonly namespaceId: 'public';
@@ -452,8 +453,8 @@ type ContractBase = Omit<
               readonly codecId: 'pg/vector@1';
               readonly typeParams: { readonly length: 3 };
             };
-          };
         };
+      };
         readonly relations: {
           readonly comments: {
             readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Comment' };
@@ -470,8 +471,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['userId'];
               readonly targetFields: readonly ['id'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'posts';
           readonly namespaceId: 'public';
@@ -507,8 +508,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['userId'];
               readonly targetFields: readonly ['id'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'profiles';
           readonly namespaceId: 'public';
@@ -599,8 +600,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['id'];
               readonly targetFields: readonly ['userId'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'users';
           readonly namespaceId: 'public';
@@ -883,8 +884,8 @@ type ContractBase = Omit<
                 readonly address: { readonly column: 'address' };
               };
             };
-          };
         };
+      };
         readonly valueObjects: {
           readonly Address: {
             readonly fields: {
@@ -901,8 +902,8 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
             };
-          };
         };
+      };
       };
     };
   };

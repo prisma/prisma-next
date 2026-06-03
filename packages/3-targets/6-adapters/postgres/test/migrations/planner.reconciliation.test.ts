@@ -183,7 +183,7 @@ function createContract(
     storage: new SqlStorage({
       storageHash: coreHash('sha256:reconciliation-contract'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } }),
       },
     }),
     roots: {},

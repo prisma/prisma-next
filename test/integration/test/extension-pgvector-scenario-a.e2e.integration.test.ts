@@ -147,7 +147,8 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
           kind: 'sql-namespace',
-          tables: {
+          entries: {
+            table: {
             [APP_TABLE]: {
               columns: {
                 id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
@@ -157,6 +158,7 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
               uniques: [],
               indexes: [],
               foreignKeys: [],
+            },
             },
           },
         },

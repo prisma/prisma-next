@@ -98,7 +98,7 @@ type ContractBase = Omit<
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly tables: {
+          readonly entries: { readonly table: {
             readonly cafe: {
               columns: {
                 readonly id: {
@@ -176,6 +176,7 @@ type ContractBase = Omit<
             };
           };
         };
+      };
       };
       readonly types: {
         readonly WgsGeometry: {
@@ -385,8 +386,8 @@ type ContractBase = Omit<
                 readonly path: { readonly column: 'path' };
               };
             };
-          };
         };
+      };
       };
     };
   };

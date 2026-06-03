@@ -351,7 +351,7 @@ withTempDir(({ createTempDir }) => {
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           const { readFile, writeFile } = await import('node:fs/promises');
           const contractJson = JSON.parse(await readFile(contractPath, 'utf-8'));
-          contractJson.storage.namespaces.public.tables.user.columns.email = {
+          contractJson.storage.namespaces.public.entries.table.user.columns.email = {
             codecId: 'pg/text@1',
             nativeType: 'text',
             nullable: false,
@@ -395,7 +395,7 @@ withTempDir(({ createTempDir }) => {
           const contractPath = resolve(testSetup.testDir, 'src/prisma/contract.json');
           const { readFile, writeFile } = await import('node:fs/promises');
           const contractJson = JSON.parse(await readFile(contractPath, 'utf-8'));
-          contractJson.storage.namespaces.public.tables.user.columns.email = {
+          contractJson.storage.namespaces.public.entries.table.user.columns.email = {
             codecId: 'pg/text@1',
             nativeType: 'text',
             nullable: false,

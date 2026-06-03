@@ -27,7 +27,8 @@ function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
         namespaces: {
           __unbound__: {
             id: '__unbound__',
-            tables: {
+            entries: {
+              table: {
               users: {
                 columns: {
                   id: { codecId: 'pg/int4@1', nullable: false },
@@ -48,6 +49,7 @@ function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
                 indexes: [],
                 foreignKeys: [],
               },
+            },
             },
           },
         },

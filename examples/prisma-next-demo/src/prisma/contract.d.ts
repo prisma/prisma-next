@@ -143,7 +143,7 @@ type ContractBase = Omit<
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly tables: {
+          readonly entries: { readonly table: {
             readonly bug: {
               columns: {
                 readonly severity: {
@@ -337,6 +337,7 @@ type ContractBase = Omit<
           };
         };
       };
+      };
       readonly types: {
         readonly Embedding1536: {
           readonly kind: 'codec-instance';
@@ -427,8 +428,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['userId'];
               readonly targetFields: readonly ['id'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'post';
           readonly namespaceId: 'public';
@@ -484,8 +485,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['userId'];
               readonly targetFields: readonly ['id'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'task';
           readonly namespaceId: 'public';
@@ -552,8 +553,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['id'];
               readonly targetFields: readonly ['userId'];
             };
-          };
         };
+      };
         readonly storage: {
           readonly table: 'user';
           readonly namespaceId: 'public';
@@ -800,8 +801,8 @@ type ContractBase = Omit<
                 readonly address: { readonly column: 'address' };
               };
             };
-          };
         };
+      };
         readonly valueObjects: {
           readonly Address: {
             readonly fields: {
@@ -822,8 +823,8 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
             };
-          };
         };
+      };
       };
     };
   };

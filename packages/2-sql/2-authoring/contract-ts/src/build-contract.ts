@@ -564,8 +564,10 @@ export function buildSqlContractFromDefinition(
         const enumTypes = namespaceEnumTypesById[id];
         const nsInput: SqlNamespaceTablesInput = {
           id,
-          tables: tablesByNamespace[id] ?? {},
-          ...ifDefined('enum', enumTypes),
+          entries: {
+            table: tablesByNamespace[id] ?? {},
+            ...ifDefined('type', enumTypes),
+          },
         };
         return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
       }),

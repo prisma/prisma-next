@@ -59,7 +59,7 @@ type ContractBase = Omit<
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly tables: {};
+          readonly entries: { readonly table: {} };
         };
       };
       readonly storageHash: StorageHash;

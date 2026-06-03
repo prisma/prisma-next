@@ -18,7 +18,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:cac01e9b9fd71ee3b5d2b2658b20c60d181cab9feca569c53823f274f63fcec9'>;
+  StorageHashBase<'sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
@@ -248,7 +248,7 @@ type ContractBase = Omit<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly collections: {
+          readonly entries: { readonly collection: {
             readonly carts: {
               readonly kind: 'mongo-collection';
               readonly indexes: readonly [
@@ -690,6 +690,7 @@ type ContractBase = Omit<
           };
         };
       };
+      };
       readonly storageHash: StorageHash;
     },
     {
@@ -735,8 +736,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['userId'];
               readonly targetFields: readonly ['_id'];
             };
-          };
         };
+      };
         readonly storage: { readonly collection: 'carts' };
       };
       readonly Event: {
@@ -814,8 +815,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['orderId'];
               readonly targetFields: readonly ['_id'];
             };
-          };
         };
+      };
         readonly storage: { readonly collection: 'invoices' };
       };
       readonly Location: {
@@ -899,8 +900,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['_id'];
               readonly targetFields: readonly ['orderId'];
             };
-          };
         };
+      };
         readonly storage: { readonly collection: 'orders' };
       };
       readonly Product: {
@@ -1010,8 +1011,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['_id'];
               readonly targetFields: readonly ['userId'];
             };
-          };
         };
+      };
         readonly storage: { readonly collection: 'users' };
       };
       readonly ViewProductEvent: {
@@ -1417,8 +1418,8 @@ type ContractBase = Omit<
               readonly namespace: '__unbound__' & NamespaceId;
               readonly model: 'Event';
             };
-          };
         };
+      };
         readonly valueObjects: {
           readonly Price: {
             readonly fields: {
@@ -1547,8 +1548,8 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
               };
             };
-          };
         };
+      };
       };
     };
   };

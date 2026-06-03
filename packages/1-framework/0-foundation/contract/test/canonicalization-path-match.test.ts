@@ -13,22 +13,27 @@ describe('matchesPathPattern', () => {
   });
 
   it('matches a wildcard segment at any value', () => {
-    const pattern = ['storage', 'namespaces', '*', 'tables'] as const satisfies PathPattern;
-    expect(matchesPathPattern(['storage', 'namespaces', '__unbound__', 'tables'], pattern)).toBe(
-      true,
-    );
-    expect(matchesPathPattern(['storage', 'namespaces', 'public', 'tables'], pattern)).toBe(true);
-    expect(matchesPathPattern(['storage', 'namespaces', 'public', 'collections'], pattern)).toBe(
-      false,
-    );
+    const pattern = ['storage', 'namespaces', '*', 'entries', 'table'] as const satisfies PathPattern;
+    expect(
+      matchesPathPattern(['storage', 'namespaces', '__unbound__', 'entries', 'table'], pattern),
+    ).toBe(true);
+    expect(
+      matchesPathPattern(['storage', 'namespaces', 'public', 'entries', 'table'], pattern),
+    ).toBe(true);
+    expect(
+      matchesPathPattern(['storage', 'namespaces', 'public', 'entries', 'collection'], pattern),
+    ).toBe(false);
   });
 
   it('rejects paths shorter or longer than the pattern', () => {
-    const pattern = ['storage', 'namespaces', '*', 'tables'] as const satisfies PathPattern;
+    const pattern = ['storage', 'namespaces', '*', 'entries', 'table'] as const satisfies PathPattern;
     expect(matchesPathPattern(['storage', 'namespaces'], pattern)).toBe(false);
-    expect(matchesPathPattern(['storage', 'namespaces', 'a', 'tables', 'extra'], pattern)).toBe(
-      false,
-    );
+    expect(
+      matchesPathPattern(
+        ['storage', 'namespaces', 'a', 'entries', 'table', 'extra'],
+        pattern,
+      ),
+    ).toBe(false);
   });
 
   it('matches an alternative segment list at one position', () => {
@@ -36,46 +41,88 @@ describe('matchesPathPattern', () => {
       'storage',
       'namespaces',
       '*',
-      'tables',
+      'entries',
+      'table',
       '*',
       ['uniques', 'indexes', 'foreignKeys'],
     ] as const satisfies PathPattern;
     expect(
-      matchesPathPattern(['storage', 'namespaces', 'ns', 'tables', 'users', 'indexes'], pattern),
+      matchesPathPattern(
+        ['storage', 'namespaces', 'ns', 'entries', 'table', 'users', 'indexes'],
+        pattern,
+      ),
     ).toBe(true);
     expect(
-      matchesPathPattern(['storage', 'namespaces', 'ns', 'tables', 'users', 'columns'], pattern),
+      matchesPathPattern(
+        ['storage', 'namespaces', 'ns', 'entries', 'table', 'users', 'columns'],
+        pattern,
+      ),
     ).toBe(false);
   });
 });
 
 describe('createPreserveEmptyPredicate', () => {
   const sqlPatterns = [
-    ['storage', 'namespaces', '*', 'tables'],
-    ['storage', 'namespaces', '*', 'tables', '*'],
-    ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
-    ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+    ['storage', 'namespaces', '*', 'entries', 'table'],
+    ['storage', 'namespaces', '*', 'entries', 'table', '*'],
+    ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
+    [
+      'storage',
+      'namespaces',
+      '*',
+      'entries',
+      'table',
+      '*',
+      'foreignKeys',
+      ['constraint', 'index'],
+    ],
     ['storage', 'types', '*', 'typeParams'],
   ] as const satisfies readonly PathPattern[];
 
   const shouldPreserveEmpty = createPreserveEmptyPredicate(sqlPatterns);
 
-  it('preserves namespace tables containers and entries', () => {
-    expect(shouldPreserveEmpty(['storage', 'namespaces', '__unbound__', 'tables'])).toBe(true);
-    expect(shouldPreserveEmpty(['storage', 'namespaces', '__unbound__', 'tables', 'users'])).toBe(
-      true,
-    );
+  it('preserves namespace entries.table containers and table entries', () => {
+    expect(
+      shouldPreserveEmpty(['storage', 'namespaces', '__unbound__', 'entries', 'table']),
+    ).toBe(true);
+    expect(
+      shouldPreserveEmpty(['storage', 'namespaces', '__unbound__', 'entries', 'table', 'users']),
+    ).toBe(true);
   });
 
   it('preserves table uniques, indexes, and foreignKeys', () => {
-    expect(shouldPreserveEmpty(['storage', 'namespaces', 'ns', 'tables', 'users', 'uniques'])).toBe(
-      true,
-    );
-    expect(shouldPreserveEmpty(['storage', 'namespaces', 'ns', 'tables', 'users', 'indexes'])).toBe(
-      true,
-    );
     expect(
-      shouldPreserveEmpty(['storage', 'namespaces', 'ns', 'tables', 'users', 'foreignKeys']),
+      shouldPreserveEmpty([
+        'storage',
+        'namespaces',
+        'ns',
+        'entries',
+        'table',
+        'users',
+        'uniques',
+      ]),
+    ).toBe(true);
+    expect(
+      shouldPreserveEmpty([
+        'storage',
+        'namespaces',
+        'ns',
+        'entries',
+        'table',
+        'users',
+        'indexes',
+      ]),
+    ).toBe(true);
+    expect(
+      shouldPreserveEmpty([
+        'storage',
+        'namespaces',
+        'ns',
+        'entries',
+        'table',
+        'users',
+        'foreignKeys',
+      ]),
     ).toBe(true);
   });
 
@@ -85,7 +132,8 @@ describe('createPreserveEmptyPredicate', () => {
         'storage',
         'namespaces',
         'ns',
-        'tables',
+        'entries',
+        'table',
         'posts',
         'foreignKeys',
         'constraint',
@@ -96,7 +144,8 @@ describe('createPreserveEmptyPredicate', () => {
         'storage',
         'namespaces',
         'ns',
-        'tables',
+        'entries',
+        'table',
         'posts',
         'foreignKeys',
         'index',
@@ -110,6 +159,8 @@ describe('createPreserveEmptyPredicate', () => {
 
   it('returns false for unrelated paths', () => {
     expect(shouldPreserveEmpty(['models'])).toBe(false);
-    expect(shouldPreserveEmpty(['storage', 'namespaces', 'ns', 'collections'])).toBe(false);
+    expect(
+      shouldPreserveEmpty(['storage', 'namespaces', 'ns', 'entries', 'collection']),
+    ).toBe(false);
   });
 });

@@ -26,7 +26,8 @@ const contract = new SqlContractSerializer().deserializeContract({
     namespaces: {
       __unbound__: {
         id: '__unbound__',
-        tables: {
+        entries: {
+          table: {
           user: {
             columns: {
               id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
@@ -36,6 +37,7 @@ const contract = new SqlContractSerializer().deserializeContract({
             indexes: [],
             foreignKeys: [],
           },
+        },
         },
       },
     },

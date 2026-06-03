@@ -48,31 +48,33 @@ type GeneratedLikeContractBase = Contract<
       __unbound__: {
         id: '__unbound__';
         kind: 'sql-namespace';
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              active: { nativeType: 'bool'; codecId: 'pg/bool@1'; nullable: false };
-              metadata: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
-            };
-            primaryKey: { columns: ['id'] };
-            uniques: [];
-            indexes: [];
-            foreignKeys: [];
-          };
-          post: {
-            columns: {
-              id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              userId: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              title: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-            };
-            primaryKey: { columns: ['id'] };
-            uniques: [];
-            indexes: [];
-            foreignKeys: [];
-          };
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                active: { nativeType: 'bool'; codecId: 'pg/bool@1'; nullable: false };
+                metadata: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
+              };
+              primaryKey: { columns: ['id'] };
+              uniques: [];
+              indexes: [];
+              foreignKeys: [];
+            },
+            post: {
+              columns: {
+                id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                userId: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                title: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              };
+              primaryKey: { columns: ['id'] };
+              uniques: [];
+              indexes: [];
+              foreignKeys: [];
+            },
+          },
         };
       };
     };
@@ -403,19 +405,21 @@ type VOContractBase = Contract<
       __unbound__: {
         id: '__unbound__';
         kind: 'sql-namespace';
-        tables: {
-          users: {
-            columns: {
-              id: { nativeType: 'int4'; codecId: 'pg/int4@1'; nullable: false };
-              name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              home_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: true };
-              work_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
-            };
-            primaryKey: { columns: ['id'] };
-            uniques: [];
-            indexes: [];
-            foreignKeys: [];
-          };
+        entries: {
+          table: {
+            users: {
+              columns: {
+                id: { nativeType: 'int4'; codecId: 'pg/int4@1'; nullable: false };
+                name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                home_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: true };
+                work_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
+              };
+              primaryKey: { columns: ['id'] };
+              uniques: [];
+              indexes: [];
+              foreignKeys: [];
+            },
+          },
         };
       };
     };

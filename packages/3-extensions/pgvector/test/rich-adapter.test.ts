@@ -41,7 +41,8 @@ const contract = new SqlContractSerializer().deserializeContract({
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: {
+        entries: {
+          table: {
           user: {
             columns: {
               id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
@@ -67,6 +68,7 @@ const contract = new SqlContractSerializer().deserializeContract({
             indexes: [],
             foreignKeys: [],
           },
+        },
         },
       },
     },

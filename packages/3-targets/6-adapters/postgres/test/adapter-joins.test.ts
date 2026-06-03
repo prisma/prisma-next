@@ -28,7 +28,8 @@ const contract = new SqlContractSerializer().deserializeContract({
     namespaces: {
       __unbound__: {
         id: '__unbound__',
-        tables: {
+        entries: {
+          table: {
           user: {
             columns: {
               id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
@@ -57,7 +58,7 @@ const contract = new SqlContractSerializer().deserializeContract({
             indexes: [],
             foreignKeys: [],
           },
-        },
+        }},
       },
     },
   },

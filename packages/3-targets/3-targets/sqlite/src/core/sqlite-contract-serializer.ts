@@ -5,11 +5,8 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type {
-  SqlNamespaceTablesInput,
-  SqlStorage,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceTablesInput, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { SqliteDatabase, SqliteUnboundDatabase } from './sqlite-unbound-database';
 
 /**
@@ -44,7 +41,11 @@ export class SqliteContractSerializer extends SqlContractSerializerBase<Contract
     }
     return new SqliteDatabase({
       id,
-      entries: { table: tables as Readonly<Record<string, StorageTable>> },
+      entries: {
+        table: blindCast<Readonly<Record<string, StorageTable>>, 'hydrated entries.table slot'>(
+          tables,
+        ),
+      },
     });
   }
 }

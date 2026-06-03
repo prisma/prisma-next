@@ -30,7 +30,8 @@ const contractWithEnum: Contract<SqlStorage> = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
         id: UNBOUND_NAMESPACE_ID,
-        tables: {
+        entries: {
+          table: {
           user: {
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -42,13 +43,13 @@ const contractWithEnum: Contract<SqlStorage> = {
             foreignKeys: [],
           },
         },
-        enum: {
+        type: {
           Role: new PostgresEnumType({
             name: 'Role',
             nativeType: 'role',
             values: ['USER', 'ADMIN'],
           }),
-        },
+        }},
       }),
     },
   }),

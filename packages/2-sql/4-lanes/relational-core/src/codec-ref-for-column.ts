@@ -25,7 +25,7 @@ export function codecRefForStorageColumn(
 ): CodecRef | undefined {
   let tableDef: StorageTable | undefined;
   for (const ns of Object.values(storage.namespaces)) {
-    const candidate = ns.tables[tableName] as StorageTable | undefined;
+    const candidate = ns.entries.table[tableName] as StorageTable | undefined;
     if (candidate !== undefined) {
       tableDef = candidate;
       break;

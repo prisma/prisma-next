@@ -62,7 +62,8 @@ function createParamTypesTestContract(
       namespaces: {
         __unbound__: buildSqlNamespace({
           id: '__unbound__',
-          tables: {
+          entries: {
+            table: {
             test: {
               columns: options?.tableColumns ?? {
                 id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -72,7 +73,7 @@ function createParamTypesTestContract(
               indexes: [],
               foreignKeys: [],
             },
-          },
+          }},
         }),
       },
       ...ifDefined('types', options?.types),

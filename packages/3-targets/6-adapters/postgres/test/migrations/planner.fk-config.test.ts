@@ -22,7 +22,8 @@ function createFkTestContract(fkConfig: {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
+          entries: {
+            table: {
             user: {
               columns: {
                 id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -59,7 +60,7 @@ function createFkTestContract(fkConfig: {
                 },
               ],
             },
-          },
+          }},
         }),
       },
     }),

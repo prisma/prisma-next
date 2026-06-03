@@ -81,7 +81,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             defaults: {
               columns: {
                 idNanoidDefault: {
@@ -109,6 +109,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
               },
             },
           },
+        },
         },
       },
     });
@@ -211,7 +212,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             defaults: {
               columns: {
                 touchedAt: {
@@ -229,6 +230,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
               },
             },
           },
+        },
         },
       },
     });
@@ -456,7 +458,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             synthetic: {
               columns: {
                 example: {
@@ -471,6 +473,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
               },
             },
           },
+        },
         },
       },
     });
@@ -524,7 +527,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
+          entries: { table: {
             synthetic: {
               columns: {
                 example: {
@@ -534,6 +537,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
               },
             },
           },
+        },
         },
       },
     });

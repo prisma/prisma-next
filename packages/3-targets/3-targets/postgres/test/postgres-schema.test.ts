@@ -51,7 +51,7 @@ describe('PostgresSchema', () => {
         },
       },
     });
-    expect(schema.entries.type['role']).toBeInstanceOf(PostgresEnumType);
+    expect(schema.entries.type?.['role']).toBeInstanceOf(PostgresEnumType);
   });
 });
 

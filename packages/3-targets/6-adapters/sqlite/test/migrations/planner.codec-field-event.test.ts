@@ -31,7 +31,7 @@ function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Cont
     storage: new SqlStorage({
       storageHash: coreHash(hash),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } }),
       },
     }),
     domain: applicationDomainOf({ models: {} }),

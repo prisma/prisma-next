@@ -14,14 +14,14 @@ const mockSqlHook = createMockSpi();
 
 const emptySqlStorage = {
   namespaces: {
-    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} },
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } },
   },
 };
 
 function unboundNamespaceTables(tables: Record<string, unknown>) {
   return {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: tables } },
     },
   };
 }
@@ -116,7 +116,8 @@ describe('emitter', () => {
       expect(namespaces).toBeDefined();
       const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
       expect(unbound).toBeDefined();
-      const tables = unbound['tables'] as Record<string, unknown>;
+      const entries = unbound['entries'] as Record<string, unknown>;
+      const tables = entries['table'] as Record<string, unknown>;
       expect(tables).toBeDefined();
     },
     timeouts.typeScriptCompilation,

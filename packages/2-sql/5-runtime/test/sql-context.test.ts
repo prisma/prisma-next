@@ -308,7 +308,8 @@ describe('contract/stack validation errors', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
+            entries: {
+              table: {
               user: {
                 columns: {
                   id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -317,7 +318,7 @@ describe('contract/stack validation errors', () => {
                 indexes: [],
                 foreignKeys: [],
               },
-            },
+            }},
           }),
         },
       }),
@@ -356,7 +357,8 @@ describe('contract/stack validation errors', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
+            entries: {
+              table: {
               user: {
                 columns: {
                   id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -366,7 +368,7 @@ describe('contract/stack validation errors', () => {
                 indexes: [],
                 foreignKeys: [],
               },
-            },
+            }},
           }),
         },
       }),
@@ -407,7 +409,8 @@ describe('contract/stack validation errors', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
+            entries: {
+              table: {
               user: {
                 columns: {
                   id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -416,7 +419,7 @@ describe('contract/stack validation errors', () => {
                 indexes: [],
                 foreignKeys: [],
               },
-            },
+            }},
           }),
         },
       }),
@@ -447,7 +450,8 @@ describe('applyMutationDefaults', () => {
       namespaces: {
         __unbound__: buildSqlNamespace({
           id: '__unbound__',
-          tables: {
+          entries: {
+            table: {
             user: {
               columns: {
                 id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -458,7 +462,7 @@ describe('applyMutationDefaults', () => {
               indexes: [],
               foreignKeys: [],
             },
-          },
+          }},
         }),
       },
     }),
@@ -564,7 +568,8 @@ describe('applyMutationDefaults', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
+            entries: {
+              table: {
               user: {
                 columns: {
                   id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -574,7 +579,7 @@ describe('applyMutationDefaults', () => {
                 indexes: [],
                 foreignKeys: [],
               },
-            },
+            }},
           }),
         },
       }),
@@ -659,7 +664,8 @@ describe('applyMutationDefaults', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
+            entries: {
+              table: {
               event: {
                 columns: {
                   id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -670,7 +676,7 @@ describe('applyMutationDefaults', () => {
                 indexes: [],
                 foreignKeys: [],
               },
-            },
+            }},
           }),
         },
       }),
@@ -746,7 +752,8 @@ describe('applyMutationDefaults', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
+            entries: {
+              table: {
               user: {
                 columns: {
                   id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -755,7 +762,7 @@ describe('applyMutationDefaults', () => {
                 indexes: [],
                 foreignKeys: [],
               },
-            },
+            }},
           }),
         },
       }),

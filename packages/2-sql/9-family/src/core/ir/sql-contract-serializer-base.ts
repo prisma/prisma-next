@@ -188,7 +188,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       const messages = parsed.map((p: { message: string }) => p.message).join('; ');
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
     }
-    const entriesInput: NonNullable<SqlNamespaceTablesInput['entries']> = {};
+    const entriesInput: {
+      table?: Record<string, StorageTable>;
+      type?: Record<string, SqlStorageTypeEntry>;
+    } = {};
     const entriesRaw = parsed.entries;
     if (entriesRaw !== undefined && typeof entriesRaw === 'object' && entriesRaw !== null) {
       for (const [slotKey, slotValue] of Object.entries(entriesRaw)) {
@@ -226,12 +229,17 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
           }),
         );
         if (slotKey === 'type') {
-          entriesInput.type = hydratedSlot;
+          entriesInput.type = blindCast<Record<string, SqlStorageTypeEntry>, 'hydrated type slot'>(
+            hydratedSlot,
+          );
         }
       }
     }
 
-    return { id, entries: entriesInput };
+    return blindCast<SqlNamespaceTablesInput, 'hydrated namespace tables input'>({
+      id,
+      entries: entriesInput,
+    });
   }
 
   protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {
