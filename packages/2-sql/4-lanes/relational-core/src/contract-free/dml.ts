@@ -1,61 +1,57 @@
 import type { ParamSpec } from '@prisma-next/operations';
-import type { AnyExpression, InsertValue, ProjectionItem } from '../ast/types';
 import {
+  type AnyExpression,
   ColumnRef,
   InsertAst,
   InsertOnConflict,
+  type InsertValue,
+  type ProjectionItem,
   RawExpr,
   TableSource,
   UpdateAst,
 } from '../ast/types';
 import { param } from '../expression';
 
-/**
- * Contract-free DML builder — the write-side counterpart to the `col` / `lit`
- * / `fn` / `createTable` DDL constructors. Assembles `InsertAst` / `UpdateAst`
- * query nodes for fixed control-plane tables (marker / ledger) without a
- * contract: tables are addressed by literal name, values carry their codec at
- * the value site via {@link param}, and DB-side expressions (e.g. `now()`) are
- * expressed via {@link dbExpr}.
- */
-
+export {
+  CfConflictClause,
+  CfExpr,
+  CfInsertQuery,
+  CfSelectQuery,
+  CfUpdateQuery,
+  CfUpsertBuilder,
+  CfUpsertQuery,
+  type ColumnDescriptor,
+  type ColumnProxy,
+  type ColumnSchema,
+  type ExcludedProxy,
+  type TableHandle,
+  type TableInsertRow,
+  type TableSetValues,
+  table,
+} from './table';
 export { param };
 
-/** A table addressed by literal name for control-plane tables without a contract. */
+/** @deprecated Use `table()` + target column helpers; D9 removes call sites. */
 export function tableRef(name: string): TableSource {
   return TableSource.named(name);
 }
 
-/**
- * A reference to the `excluded` pseudo-table's column, valid only inside an
- * `ON CONFLICT … DO UPDATE SET` action where it denotes the value proposed for
- * insertion. Lets an upsert copy the proposed row into the conflict-update
- * branch without re-binding the same parameters twice.
- */
+/** @deprecated Use `table()` + target column helpers; D9 removes call sites. */
 export function excludedColumn(column: string): ColumnRef {
   return ColumnRef.of('excluded', column);
 }
 
-/**
- * A verbatim DB-side expression in value position (e.g. `now()` /
- * `datetime('now')`). The `returns` spec declares the codec/nullability the
- * expression yields; it carries no bound parameters.
- */
+/** @deprecated Use `table()` + target column helpers; D9 removes call sites. */
 export function dbExpr(sql: string, returns: ParamSpec): RawExpr {
   return new RawExpr({ parts: [sql], returns });
 }
 
-/** A single-row `INSERT INTO <table> (…) VALUES (…)`. */
+/** @deprecated Use `table().insert()`; D9 removes call sites. */
 export function insert(table: TableSource, row: Readonly<Record<string, InsertValue>>): InsertAst {
   return InsertAst.into(table).withRows([row]);
 }
 
-/**
- * A single-row upsert: `INSERT INTO <table> (…) VALUES (…) ON CONFLICT
- * (<conflictColumns>) DO UPDATE SET <set>`. The conflict columns identify the
- * row; the `set` map (typically built from {@link excludedColumn} references
- * plus a {@link dbExpr} timestamp) defines the conflict-update branch.
- */
+/** @deprecated Use `table().upsert()`; D9 removes call sites. */
 export function upsert(options: {
   readonly table: TableSource;
   readonly row: Readonly<Record<string, InsertValue>>;
@@ -70,14 +66,7 @@ export function upsert(options: {
     .withOnConflict(InsertOnConflict.on(conflictRefs).doUpdateSet(options.set));
 }
 
-/**
- * An `UPDATE <table> SET <set> WHERE <where>`, optionally with a `RETURNING`
- * projection. The control plane uses `returning` to detect compare-and-swap
- * success: a CAS `UPDATE … WHERE space = … AND core_hash = expectedFrom`
- * returns one row when the swap matched and zero rows when another process
- * advanced the marker first (the {@link import('@prisma-next/framework-components/control').ControlDriverInstance}
- * query surface exposes `rows` but not an affected-row count).
- */
+/** @deprecated Use `table().update()`; D9 removes call sites. */
 export function update(options: {
   readonly table: TableSource;
   readonly set: Readonly<Record<string, AnyExpression>>;
