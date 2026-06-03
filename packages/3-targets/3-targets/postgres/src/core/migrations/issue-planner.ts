@@ -15,7 +15,6 @@ import type {
   SqlPlannerConflict,
   SqlPlannerConflictLocation,
 } from '@prisma-next/family-sql/control';
-import { partitionCallsByControlPolicy } from '@prisma-next/family-sql/control';
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
@@ -30,10 +29,6 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
-import {
-  formatPostgresControlPolicyTargetRef,
-  resolvePostgresCallControlPolicySubject,
-} from './control-policy';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -186,7 +181,6 @@ export interface IssuePlannerOptions {
 
 export interface IssuePlannerValue {
   readonly calls: readonly PostgresOpFactoryCall[];
-  readonly warnings?: readonly SqlPlannerConflict[];
 }
 
 function toColumnSpec(
@@ -933,18 +927,5 @@ export function planIssues(
     ...byCategory('foreignKey'),
   ];
 
-  const { kept, warnings } = partitionCallsByControlPolicy({
-    calls,
-    contract: options.toContract,
-    resolveControlPolicySubject: (call) =>
-      resolvePostgresCallControlPolicySubject(call, options.toContract),
-    resolveFactoryName: (call) => call.factoryName,
-    formatTargetRef: (factoryName, subject) =>
-      formatPostgresControlPolicyTargetRef(factoryName, subject, options.toContract),
-  });
-
-  return ok({
-    calls: kept,
-    ...(warnings.length > 0 ? { warnings } : {}),
-  });
+  return ok({ calls });
 }

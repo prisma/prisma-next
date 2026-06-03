@@ -21,7 +21,7 @@ Each fixture lives under its own subdir of `test/integration/test/fixtures/contr
 
 ### Scenarios per family
 
-The Postgres fixture exercises five scenarios; the Mongo fixture exercises four (the fifth — external-namespace planner safety floor + warning surfacing — has no Mongo analog because slice 3 didn't deliver Mongo planner-side control gating, and Mongo's "applicable" surface for end-to-end demo is verifier behaviour).
+The Postgres fixture exercises six scenarios; the Mongo fixture exercises four (the fifth and sixth — external-namespace planner safety floor + warning surfacing, and un-plannable-external input-filtering proof — have no Mongo analog because slice 3 didn't deliver Mongo planner-side control gating, and Mongo's "applicable" surface for end-to-end demo is verifier behaviour).
 
 #### Postgres (`cli.control-policy.postgres.e2e.test.ts`)
 
@@ -32,6 +32,7 @@ The Postgres fixture exercises five scenarios; the Mongo fixture exercises four 
 | `external` table | `defaultControlPolicy: 'external'` namespace; declares `auth.users(id, email)` referencing a pre-seeded table | **zero DDL** into `auth.*` (table seeded out-of-band before init) | seeded shape matches declared columns → verifier **passes**; pre-seed a column-type drift on a declared column → verifier **fails**; pre-seed an **extra** column not in contract → verifier **passes** (extras allowed in external) |
 | `observed` table | per-object `observed`; declares `app.legacy_jobs(id, status)` | **zero DDL** | drop the seeded table or alter a declared column → verifier emits **warning only**, exit code 0 |
 | `managed`-in-`external`-namespace | `defaultControlPolicy: 'external'` namespace; declares one object as `controlPolicy: 'managed'` | **zero DDL** into the namespace; **`db update` CLI output surfaces a warning** identifying the suppressed call by table name | _n/a — the assertion is on plan output, not verify_ |
+| `external` table in un-plannable state (input-filtering proof) | per-object `external`; declares `auth.opaque(id)`; pre-seeds the live table with column types / constraints / extensions the SQL diff engine does not model (e.g. a `tsvector` column, or a column whose type is provided by a Postgres extension the framework doesn't know) | `db update` succeeds with **zero DDL** into the table; the suppression warning is emitted; **the planner never errors on the un-plannable state** because the table never enters the planner's input | seeded shape diverges from declaration → verifier passes (per `external` semantics: declared shape match is verified, but the un-modeled state is not interpreted as drift); declared column dropped from the seeded table → verifier fails as in scenario 3 |
 
 The fifth scenario is the cross-cutting safety floor named in the project spec ("a contract with `defaultControl: 'external'` plus a `managed` object mis-declared in that namespace produces zero DDL into the namespace and surfaces the conflict diagnostic") — it is the only place the planner's external-namespace suppression diagnostic becomes user-visible, and the slice's TML-2792 wiring exists to make this assertable through CLI output.
 
@@ -45,6 +46,20 @@ The fifth scenario is the cross-cutting safety floor named in the project spec (
 | `observed` collection | per-object `observed`; declares `legacy_jobs` | **no schema-management actions** | drop the seeded collection or drift a declared field → verifier emits **warning only**, exit code 0 |
 
 The fixture deliberately sets `controlPolicy` per object rather than via namespace defaults — Mongo's project spec non-goal "Namespace-level `control` inheritance" applies, and the mis-declaration scenario depends on namespace-defaulting which doesn't exist in Mongo. This matches the project DoD's "where applicable" qualifier.
+
+### Architectural correction: input-side control-policy filtering
+
+Reviewer pushback during PR #711 surfaced a load-bearing assumption in the slice's first cut that does not hold for real-world external schemas: the cut implemented control-policy filtering as a _post-planning_ pass — the planner generates DDL calls for every subject, then `filterCallsByControlPolicy` / `partitionCallsByControlPolicy` discard the calls whose subjects' policies forbid emission, recording the discarded calls as warnings. This works whenever the planner can _generate_ DDL calls for every subject. It fails whenever a subject the user marked `external` (or `observed`) is in a state the planner cannot reason about — exotic column types we don't model, constraints/extensions outside the diff engine's vocabulary, cross-schema FKs to objects the planner doesn't know — because the planner errors before the post-filter runs. Net effect: a user who declared a table `external` precisely so the framework would leave it alone is still blocked from running `db update` on the rest of the schema, because the framework tripped over the table on the way to deciding to ignore it. That inverts the meaning of `external` and `observed`.
+
+The corrected shape is **input-side filtering**:
+
+1. Before the SQL family planner runs, partition the contract's storage subjects (and the corresponding slice of the introspected current state) into `(plannable, suppressed)` by per-subject effective control policy. `managed` subjects go to `plannable`. `external` and `observed` subjects go to `suppressed` unconditionally. `tolerated` is a special case — see below.
+2. The planner runs on the `plannable` partition only. It never observes the `external`/`observed` subjects, so it cannot trip on them.
+3. Warnings come from the `suppressed` partition directly. We know what the user declared and we know we excluded it from planning — that's enough to construct a `controlPolicySuppressedCall`-equivalent warning per suppressed subject without having had to plan it. (The warning summary becomes `control policy suppressed: <subject> — namespace '<ns>' has effective control '<policy>'`; no planner-DDL-call shape is needed for the warning.)
+
+`tolerated`'s create-if-absent semantics are tractable inside this shape: the planner sees the declared subject, but the planner's diffing logic is short-circuited for tolerated subjects to "if the object exists, emit nothing; if it doesn't exist, emit creation only." The planner never has to reason about the existing object's full state for tolerated subjects, which sidesteps the un-plannable failure mode. (This is a small specialised path inside the planner, not a separate pipeline.)
+
+Postgres adapter implementation lives in the planner's entry point in `packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts` and the SQL family helpers in `packages/2-sql/9-family/src/core/migrations/control-policy.ts`. The framework planner-result type (`MigrationPlannerSuccessResult.warnings`) is unchanged from the first cut; only its population path moves from "post-filter the planner's output" to "construct warnings directly from the suppressed partition."
 
 ### Diagnostic-surfacing wiring (closes TML-2792)
 
@@ -105,8 +120,9 @@ Both family tests + the diagnostic wiring + the new CLI surface fit one reviewer
 
 - Two new test files: `test/integration/test/cli.control-policy.postgres.e2e.test.ts` and `test/integration/test/cli.control-policy.mongo.e2e.test.ts` plus their fixture subdirs under `test/integration/test/fixtures/control-policy/{postgres,mongo}/`.
 - Extend `MigrationPlannerSuccessResult` in `@prisma-next/framework-components` with optional `warnings: readonly MigrationPlannerConflict[]`.
-- Populate `warnings` in the SQL family planner's success path: `filterCallsByControlPolicy`'s suppressed calls become `SqlPlannerConflict` entries with a new `controlPolicySuppressedCall` kind and a `{ table, namespace }` location.
+- Restructure the SQL family planner pipeline so `external` and `observed` subjects are partitioned out of the planner's _input_ before any DDL is generated, not filtered from its _output_. `tolerated` subjects keep their planner entry but follow a create-if-absent short-circuit that does not require diffing the existing object's full state. Warnings are constructed from the suppressed partition directly. The post-filter helper (`filterCallsByControlPolicy`) is replaced by, or reduced to a thin wrapper around, the new input-side path; the existing `controlPolicySuppressedCall` warning kind and its location shape are retained.
 - Surface those warnings in the `db update` CLI summary (the existing CLI command in `@prisma-next/cli`).
+- Address PR #711 review hygiene items: drop the `isPlannerWarningList` runtime predicate in favour of a `blindCast` at the read site (the value is data the CLI itself wrote into `meta`); replace the bare `as unknown as` cast in the Mongo `defineContract` return with `blindCast` carrying a justification literal; rename the SQL family's `formatTargetRef` / `defaultTargetRef` (and the Postgres adapter's `formatPostgresControlPolicyTargetRef`) to use the existing `subject`/`Label` vocabulary so the names stop colliding with the codebase's "target" (= database target); replace the conditional-spread idiom in `buildSuppressionWarning`'s location/meta construction with the repo's `ifDefined` helper.
 - Necessary builder-DSL touch-ups in `@prisma-next/sql-contract-ts` and the Mongo authoring surface if either fixture surfaces a real authoring gap (only what the e2e tests force; nothing speculative).
 - TML-2792 closes alongside this slice (the wiring above is its delivery).
 
@@ -134,6 +150,8 @@ Otherwise none pre-investigated — the implementer's dispatch-time grep on `cli
 - [ ] `pnpm --filter @prisma-next/integration-tests test test/integration/test/cli.control-policy.postgres.e2e.test.ts test/integration/test/cli.control-policy.mongo.e2e.test.ts` is green and pinned in CI under the existing `Integration Tests` gate.
 - [ ] `pnpm fixtures:check` shows zero churn (the slice introduces no contract-fixture changes).
 - [ ] TML-2792 is closed by this slice's PR (the warnings channel + CLI surfacing land here).
+- [ ] `db update` succeeds when an `external` subject is in a state the SQL diff engine cannot model: the planner does not observe such subjects at all (input-side filtering), and the un-plannable-external scenario in the Postgres fixture pins this property.
+- [ ] No bare `as unknown as` casts in Mongo `defineContract`'s return path; no runtime type predicate guarding data the CLI wrote into its own `meta` bag; no `formatTargetRef`/`defaultTargetRef` naming colliding with the codebase's "target" vocabulary; no inline ternary-spread idioms in `buildSuppressionWarning`'s location/meta construction.
 
 ## Open Questions
 

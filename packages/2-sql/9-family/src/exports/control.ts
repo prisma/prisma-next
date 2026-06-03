@@ -30,6 +30,7 @@ export {
   controlPolicyForCall,
   filterCallsByControlPolicy,
   partitionCallsByControlPolicy,
+  partitionIssuesByControlPolicy,
 } from '../core/migrations/control-policy';
 export type { PlanFieldEventOperationsOptions } from '../core/migrations/field-event-planner';
 export { planFieldEventOperations } from '../core/migrations/field-event-planner';

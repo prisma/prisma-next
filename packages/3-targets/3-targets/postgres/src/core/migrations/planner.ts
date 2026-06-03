@@ -8,6 +8,7 @@ import type {
 import {
   extractCodecControlHooks,
   partitionCallsByControlPolicy,
+  partitionIssuesByControlPolicy,
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
@@ -25,8 +26,10 @@ import { postgresColumnsCompatible } from '../column-type-compatibility';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import {
-  formatPostgresControlPolicyTargetRef,
+  formatPostgresControlPolicySubjectLabel,
   resolvePostgresCallControlPolicySubject,
+  resolvePostgresIssueControlPolicySubject,
+  resolvePostgresIssueCreationFactoryName,
 } from './control-policy';
 import { createResolveExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
@@ -144,8 +147,25 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};
 
-    const result = planIssues({
+    // Input-side control-policy partition. `external` / `observed` subjects
+    // — and non-creation issues for `tolerated` subjects — are dropped from
+    // the planner's input entirely; the planner never observes them, never
+    // diffs them, never generates DDL for them. Suppression warnings are
+    // built directly from the suppressed partition (one per subject), so the
+    // user-visible message survives even when the planner would have failed
+    // to model the subject's live shape.
+    const issuePartition = partitionIssuesByControlPolicy({
       issues: schemaIssues,
+      contract: options.contract,
+      resolveControlPolicySubject: (issue) =>
+        resolvePostgresIssueControlPolicySubject(issue, options.contract),
+      resolveCreationFactoryName: resolvePostgresIssueCreationFactoryName,
+      formatSubjectLabel: (factoryName, subject) =>
+        formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
+    });
+
+    const result = planIssues({
+      issues: issuePartition.plannable,
       toContract: options.contract,
       // `fromContract` is only supplied by `migration plan`. It is `null` for
       // `db update` / `db init`, which means data-safety strategies needing
@@ -188,12 +208,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       resolveControlPolicySubject: (call) =>
         resolvePostgresCallControlPolicySubject(call, options.contract),
       resolveFactoryName: (call) => call.factoryName,
-      formatTargetRef: (factoryName, subject) =>
-        formatPostgresControlPolicyTargetRef(factoryName, subject, options.contract),
+      formatSubjectLabel: (factoryName, subject) =>
+        formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
     });
     const calls = [...result.value.calls, ...fieldEventPartition.kept];
     const warnings: SqlPlannerConflict[] = [
-      ...(result.value.warnings ?? []),
+      ...issuePartition.warnings,
       ...fieldEventPartition.warnings,
     ];
 
