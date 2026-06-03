@@ -124,7 +124,7 @@ const runtime = createRuntime({
 - `validateCodecRegistryCompleteness` - Codec validation
 - `extractCodecIds` - Extract codec IDs from a contract
 - `validateContractCodecMappings` - Validate contract codec mappings against registry
-- `createControlCodecRegistry` - Registry for contract-free control DML (codec refs on value sites)
+- `createAstCodecRegistry` - Contract-free codec registry that resolves codecs from AST-supplied `CodecRef`s
 - `deriveParamMetadata` - Walk a control DML AST and collect per-value codec metadata for encoding
 - `encodeParamsWithMetadata` - Encode lowered control DML parameters through their codecs
 

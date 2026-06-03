@@ -7,7 +7,7 @@ import {
   RawExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
-  createControlCodecRegistry,
+  createAstCodecRegistry,
   deriveParamMetadata,
   encodeParamsWithMetadata,
 } from '@prisma-next/sql-runtime';
@@ -22,7 +22,7 @@ import {
   timestamptz,
 } from '@prisma-next/target-postgres/contract-free';
 
-const CONTROL_CODECS = createControlCodecRegistry(postgresCodecRegistry);
+const CONTROL_CODECS = createAstCodecRegistry(postgresCodecRegistry);
 
 const marker = pgTable(
   { name: 'marker', schema: 'prisma_contract' },

@@ -7,7 +7,7 @@ import {
   RawExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
-  createControlCodecRegistry,
+  createAstCodecRegistry,
   deriveParamMetadata,
   encodeParamsWithMetadata,
 } from '@prisma-next/sql-runtime';
@@ -21,7 +21,7 @@ import {
   text,
 } from '@prisma-next/target-sqlite/contract-free';
 
-const CONTROL_CODECS = createControlCodecRegistry(sqliteCodecRegistry);
+const CONTROL_CODECS = createAstCodecRegistry(sqliteCodecRegistry);
 
 const marker = sqliteTable('_prisma_marker', {
   space: text(),

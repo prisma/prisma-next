@@ -7,13 +7,11 @@ import { createAstCodecResolver } from './ast-codec-resolver';
  * purely from AST-supplied {@link import('@prisma-next/framework-components/codec').CodecRef}s
  * against a target's descriptor registry.
  *
- * The control plane uses this to encode lowered DML parameters (marker /
- * ledger writes) without an `ExecutionContext` or a contract walk: control DML
- * carries each value's codec at the value site (`param(value, { codecId })`),
- * so dispatch only ever needs `forCodecRef`. `forColumn` is never reached and
- * returns `undefined`.
+ * Dispatch is driven entirely by `CodecRef`s embedded in AST nodes; no
+ * contract walk is needed. `forColumn` always returns `undefined` — this
+ * registry carries no column-to-codec mappings.
  */
-export function createControlCodecRegistry(
+export function createAstCodecRegistry(
   descriptors: CodecDescriptorRegistry,
 ): ContractCodecRegistry {
   const resolver = createAstCodecResolver(descriptors, (ref) => ({
