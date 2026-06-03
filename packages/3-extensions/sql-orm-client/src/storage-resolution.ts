@@ -54,6 +54,24 @@ export function domainModelNames(contract: Contract<SqlStorage>): string[] {
   return [...names];
 }
 
+export function domainModelNamesInNamespace(
+  contract: Contract<SqlStorage>,
+  namespaceId: string,
+): string[] {
+  const namespace = contract.domain.namespaces[namespaceId];
+  return namespace ? Object.keys(namespace.models) : [];
+}
+
+export function domainModelTableInNamespace(
+  contract: Contract<SqlStorage>,
+  namespaceId: string,
+  modelName: string,
+): string | undefined {
+  const model = contract.domain.namespaces[namespaceId]?.models[modelName];
+  const table = model?.storage['table'];
+  return typeof table === 'string' ? table : undefined;
+}
+
 export function tableSourceForContract(
   contract: Contract<SqlStorage>,
   tableName: string,
