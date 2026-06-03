@@ -38,12 +38,8 @@
               "team": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "teamId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["teamId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "Team",
@@ -111,9 +107,7 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "team_id"
-                ]
+                "columns": ["team_id"]
               },
               "uniques": []
             },
@@ -138,16 +132,12 @@
                   "onDelete": "cascade",
                   "onUpdate": "cascade",
                   "source": {
-                    "columns": [
-                      "team_ref"
-                    ],
+                    "columns": ["team_ref"],
                     "namespaceId": "public",
                     "tableName": "team_member"
                   },
                   "target": {
-                    "columns": [
-                      "team_id"
-                    ],
+                    "columns": ["team_id"],
                     "namespaceId": "public",
                     "tableName": "org_team"
                   }
@@ -155,22 +145,15 @@
               ],
               "indexes": [
                 {
-                  "columns": [
-                    "team_ref"
-                  ]
+                  "columns": ["team_ref"]
                 }
               ],
               "primaryKey": {
-                "columns": [
-                  "member_id"
-                ]
+                "columns": ["member_id"]
               },
               "uniques": [
                 {
-                  "columns": [
-                    "team_ref",
-                    "member_id"
-                  ]
+                  "columns": ["team_ref", "member_id"]
                 }
               ]
             }

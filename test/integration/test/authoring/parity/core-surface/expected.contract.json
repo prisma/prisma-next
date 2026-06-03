@@ -52,12 +52,8 @@
               "author": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "userId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["userId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "User",
@@ -204,16 +200,12 @@
                   "onDelete": "cascade",
                   "onUpdate": "cascade",
                   "source": {
-                    "columns": [
-                      "userId"
-                    ],
+                    "columns": ["userId"],
                     "namespaceId": "public",
                     "tableName": "post"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -221,22 +213,15 @@
               ],
               "indexes": [
                 {
-                  "columns": [
-                    "userId"
-                  ]
+                  "columns": ["userId"]
                 }
               ],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": [
                 {
-                  "columns": [
-                    "title",
-                    "userId"
-                  ]
+                  "columns": ["title", "userId"]
                 }
               ]
             },
@@ -290,15 +275,11 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": [
                 {
-                  "columns": [
-                    "email"
-                  ]
+                  "columns": ["email"]
                 }
               ]
             }
@@ -309,10 +290,7 @@
               "kind": "postgres-enum",
               "name": "Role",
               "nativeType": "Role",
-              "values": [
-                "USER",
-                "ADMIN"
-              ]
+              "values": ["USER", "ADMIN"]
             }
           }
         },

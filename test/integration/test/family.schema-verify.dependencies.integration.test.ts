@@ -327,15 +327,17 @@ describe('family instance schemaVerify', () => {
               ...contract.storage.namespaces,
               public: {
                 ...contract.storage.namespaces['public'],
-                tables: {
-                  ...contract.storage.namespaces['public'].entries.table,
-                  user: {
-                    ...contract.storage.namespaces['public'].entries.table.user,
-                    columns: {
-                      ...contract.storage.namespaces['public'].entries.table.user.columns,
-                      email: {
-                        ...contract.storage.namespaces['public'].entries.table.user.columns.email,
-                        codecId: 'pg/unknown-type@1' as const,
+                entries: {
+                  table: {
+                    ...contract.storage.namespaces['public'].entries.table,
+                    user: {
+                      ...contract.storage.namespaces['public'].entries.table.user,
+                      columns: {
+                        ...contract.storage.namespaces['public'].entries.table.user.columns,
+                        email: {
+                          ...contract.storage.namespaces['public'].entries.table.user.columns.email,
+                          codecId: 'pg/unknown-type@1' as const,
+                        },
                       },
                     },
                   },
