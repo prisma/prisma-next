@@ -38,6 +38,20 @@ export type TableInAnyNamespace<C extends TableProxyContract, Name extends strin
     : never;
 }[keyof C['storage']['namespaces']];
 
+// The tables of a single storage namespace, keyed by bare table name. Lets
+// callers reach a table by its namespace coordinate (`db.<ns>.<table>`) when
+// the same bare name is declared in more than one namespace.
+export type Namespace<
+  C extends TableProxyContract,
+  NsId extends keyof C['storage']['namespaces'],
+> = {
+  readonly [Name in keyof C['storage']['namespaces'][NsId]['tables'] & string]: TableProxy<C, Name>;
+};
+
+// Additive intersection: the flat by-bare-name surface retained alongside a
+// per-namespace facet keyed by namespace id.
 export type Db<C extends TableProxyContract> = {
-  [Name in TableNamesAcrossNamespaces<C>]: TableProxy<C, Name>;
+  readonly [Name in TableNamesAcrossNamespaces<C>]: TableProxy<C, Name>;
+} & {
+  readonly [Ns in keyof C['storage']['namespaces']]: Namespace<C, Ns>;
 };

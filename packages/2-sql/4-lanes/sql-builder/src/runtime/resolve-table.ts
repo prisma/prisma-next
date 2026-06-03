@@ -16,3 +16,15 @@ export function resolveTableForFlatName(
   }
   return resolved;
 }
+
+export function resolveTableInNamespace(
+  storage: SqlStorage,
+  namespaceId: string,
+  tableName: string,
+): StorageTable | undefined {
+  const namespace = storage.namespaces[namespaceId];
+  if (namespace === undefined || !Object.hasOwn(namespace.tables, tableName)) {
+    return undefined;
+  }
+  return namespace.tables[tableName];
+}
