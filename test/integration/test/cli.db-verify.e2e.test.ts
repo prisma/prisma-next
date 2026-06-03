@@ -70,6 +70,7 @@ function createTestContract(
               name,
               {
                 storage: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
                   table: name,
                   fields: Object.fromEntries(
                     Object.keys(columns).map((col) => [col, { column: col }]),
