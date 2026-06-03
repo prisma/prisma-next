@@ -11,9 +11,10 @@ import type {
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
+import { blindCast } from '@prisma-next/utils/casts';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredDdl } from './ddl-renderer';
-import { readMarker } from './marker-read';
+import { readMarker } from './marker-ledger';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -50,7 +51,17 @@ class PostgresAdapterImpl
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
       capabilities: defaultCapabilities,
-      readMarker: (queryable: SqlQueryable) => readMarker(queryable, APP_SPACE_ID),
+      readMarker: (queryable: SqlQueryable) =>
+        readMarker(
+          (ast) =>
+            renderLoweredSql(
+              ast,
+              blindCast<PostgresContract, 'Catalog probe has no contract'>(undefined),
+              this.codecLookup,
+            ),
+          queryable,
+          APP_SPACE_ID,
+        ),
     });
   }
 

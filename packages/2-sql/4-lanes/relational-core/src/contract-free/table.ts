@@ -234,9 +234,9 @@ export class CfSelectQuery {
  * without per-call-site codec or column-name threading.
  *
  * ```ts
- * const marker = table(pgTableRef({ name: 'marker', schema: 'prisma_contract' }), {
- *   space:    text(),
- *   core_hash: text(),
+ * const marker = pgTable({ name: 'marker', schema: 'prisma_contract' }, {
+ *   space:      text(),
+ *   core_hash:  text(),
  *   updated_at: timestamptz(),
  * });
  *

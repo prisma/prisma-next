@@ -1657,15 +1657,20 @@ describe('PostgresControlAdapter', () => {
 
     it('returns null when marker table is absent', async () => {
       const adapter = new PostgresControlAdapter();
-      const driver = createMockDriver([{ match: includes('information_schema.tables'), rows: [] }]);
+      const driver = createMockDriver([
+        { match: includes('"information_schema"."tables"'), rows: [] },
+      ]);
       await expect(adapter.readMarker(driver, 'app')).resolves.toBeNull();
     });
 
     it('returns null when marker table exists but row is absent', async () => {
       const adapter = new PostgresControlAdapter();
       const driver = createMockDriver([
-        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
-        { match: includes('from prisma_contract.marker'), rows: [] },
+        {
+          match: includes('"information_schema"."tables"'),
+          rows: [{ table_schema: 'prisma_contract' }],
+        },
+        { match: includes('"prisma_contract"."marker"'), rows: [] },
       ]);
       await expect(adapter.readMarker(driver, 'app')).resolves.toBeNull();
     });
@@ -1673,9 +1678,12 @@ describe('PostgresControlAdapter', () => {
     it('throws PN-RUN-3005 when marker row fails validation', async () => {
       const adapter = new PostgresControlAdapter();
       const driver = createMockDriver([
-        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
         {
-          match: includes('from prisma_contract.marker'),
+          match: includes('"information_schema"."tables"'),
+          rows: [{ table_schema: 'prisma_contract' }],
+        },
+        {
+          match: includes('"prisma_contract"."marker"'),
           rows: [{ ...validMarkerRow, invariants: null }],
         },
       ]);
@@ -1693,8 +1701,8 @@ describe('PostgresControlAdapter', () => {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [{ '?column?': 1 }] as Row[] };
+          if (sql.includes('"information_schema"."tables"')) {
+            return { rows: [{ table_schema: 'prisma_contract' }] as Row[] };
           }
           throw new Error('permission denied for table marker');
         },

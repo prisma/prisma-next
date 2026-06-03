@@ -36,8 +36,9 @@ import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { renderLoweredDdl } from './ddl-renderer';
-import { readMarker } from './marker-read';
+import { readMarker } from './marker-ledger';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({
@@ -62,7 +63,16 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       id: options?.profileId ?? 'sqlite/default@1',
       target: 'sqlite',
       capabilities: defaultCapabilities,
-      readMarker: (queryable: SqlQueryable) => readMarker(queryable, APP_SPACE_ID),
+      readMarker: (queryable: SqlQueryable) =>
+        readMarker(
+          (ast) =>
+            renderLoweredSql(
+              ast,
+              blindCast<SqliteContract, 'Catalog probe has no contract'>(undefined),
+            ),
+          queryable,
+          APP_SPACE_ID,
+        ),
     });
   }
 

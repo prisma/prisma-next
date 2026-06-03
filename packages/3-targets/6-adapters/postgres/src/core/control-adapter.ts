@@ -53,8 +53,7 @@ import {
   introspectPostgresEnumTypes,
   type PostgresEnumStorageTypeAnnotation,
 } from './enum-control-hooks';
-import * as markerLedgerWrites from './marker-ledger-writes';
-import * as markerRead from './marker-read';
+import * as markerLedger from './marker-ledger';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
@@ -160,7 +159,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   ): Promise<ContractMarkerRecord | null> {
     const markerContext = { space, markerLocation: POSTGRES_MARKER_TABLE };
     const result = await withMarkerReadErrorHandling(
-      () => markerRead.readMarker(driver, space),
+      () =>
+        markerLedger.readMarker(
+          (query) => this.lower(query, { contract: undefined }),
+          driver,
+          space,
+        ),
       markerContext,
     );
     return result.kind === 'present' ? result.record : null;
@@ -311,7 +315,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<void> {
-    await markerLedgerWrites.insertMarker(
+    await markerLedger.insertMarker(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,
@@ -328,7 +332,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<void> {
-    await markerLedgerWrites.initMarker(
+    await markerLedger.initMarker(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,
@@ -354,7 +358,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       destination.invariants === undefined
         ? []
         : ((await this.readMarker(driver, space))?.invariants ?? []);
-    return markerLedgerWrites.updateMarker(
+    return markerLedger.updateMarker(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,
@@ -380,7 +384,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly operations: readonly unknown[];
     },
   ): Promise<void> {
-    await markerLedgerWrites.writeLedgerEntry(
+    await markerLedger.writeLedgerEntry(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,

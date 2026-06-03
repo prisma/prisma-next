@@ -35,8 +35,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
 import { renderLoweredDdl } from './ddl-renderer';
 import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
-import * as markerLedgerWrites from './marker-ledger-writes';
-import { decodeSqliteMarkerRow, readMarker } from './marker-read';
+import * as markerLedger from './marker-ledger';
 import type { SqliteContract } from './types';
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';
@@ -125,7 +124,12 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   ): Promise<ContractMarkerRecord | null> {
     const markerContext = { space, markerLocation: SQLITE_MARKER_TABLE };
     const result = await withMarkerReadErrorHandling(
-      () => readMarker(driver, space),
+      () =>
+        markerLedger.readMarker(
+          (query) => this.lower(query, { contract: undefined }),
+          driver,
+          space,
+        ),
       markerContext,
     );
     return result.kind === 'present' ? result.record : null;
@@ -183,10 +187,14 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
     for (const row of result.rows) {
       rows.set(
         row.space,
-        parseMarkerRowSafely(row, (raw) => parseContractMarkerRow(decodeSqliteMarkerRow(raw)), {
-          space: row.space,
-          markerLocation: SQLITE_MARKER_TABLE,
-        }),
+        parseMarkerRowSafely(
+          row,
+          (raw) => parseContractMarkerRow(markerLedger.decodeSqliteMarkerRow(raw)),
+          {
+            space: row.space,
+            markerLocation: SQLITE_MARKER_TABLE,
+          },
+        ),
       );
     }
     return rows;
@@ -268,7 +276,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<void> {
-    await markerLedgerWrites.insertMarker(
+    await markerLedger.insertMarker(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,
@@ -285,7 +293,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<void> {
-    await markerLedgerWrites.initMarker(
+    await markerLedger.initMarker(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,
@@ -311,7 +319,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       destination.invariants === undefined
         ? []
         : ((await this.readMarker(driver, space))?.invariants ?? []);
-    return markerLedgerWrites.updateMarker(
+    return markerLedger.updateMarker(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,
@@ -337,7 +345,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       readonly operations: readonly unknown[];
     },
   ): Promise<void> {
-    await markerLedgerWrites.writeLedgerEntry(
+    await markerLedger.writeLedgerEntry(
       (query) => this.lower(query, { contract: undefined }),
       driver,
       space,

@@ -347,7 +347,7 @@ describe('Postgres adapter', () => {
 
     expect(result).toEqual({ kind: 'no-table' });
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.sql).toContain('from information_schema.tables');
+    expect(calls[0]?.sql).toContain('"information_schema"."tables"');
     expect(calls[0]?.params).toEqual(['prisma_contract', 'marker']);
   });
 
