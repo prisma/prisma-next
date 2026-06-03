@@ -73,10 +73,43 @@ describe('renderMigrationLogTable', () => {
         appliedAt: new Date('2026-06-01T08:00:00.000Z'),
       }),
     ]);
+    expect(table).toContain('Applied at');
+    expect(table).toContain('Migration');
+    expect(table).not.toContain('Space');
     expect(table).not.toContain('app');
     expect(table).toContain('20260301_init');
     expect(table).toContain('∅ → ef9de27');
     expect(table).toContain('5 ops');
+  });
+
+  it('renders the single-space golden table with heading, divider, and data rows', () => {
+    const table = renderMigrationLogTable(
+      [
+        entry({
+          migrationName: '20260301_init',
+          from: null,
+          to: 'sha256:ef9de27abc',
+          operationCount: 5,
+          appliedAt: new Date('2026-06-01T08:00:00.000Z'),
+        }),
+        entry({
+          migrationName: '20260302_add_users',
+          from: 'sha256:ef9de27abc',
+          to: 'sha256:abcd1234def',
+          operationCount: 12,
+          appliedAt: new Date('2026-06-02T10:30:00.000Z'),
+        }),
+      ],
+      { utc: true },
+    );
+    expect(table).toBe(
+      [
+        'Applied at             Migration            Change                 Ops',
+        '────────────────────   ──────────────────   ─────────────────   ──────',
+        '2026-06-01 08:00:00Z   20260301_init        ∅ → ef9de27          5 ops',
+        '2026-06-02 10:30:00Z   20260302_add_users   ef9de27 → abcd123   12 ops',
+      ].join('\n'),
+    );
   });
 
   it('includes the space column when multiple spaces contribute rows', () => {
@@ -92,8 +125,35 @@ describe('renderMigrationLogTable', () => {
         appliedAt: new Date('2026-06-01T08:00:00.002Z'),
       }),
     ]);
+    expect(table).toContain('Space');
     expect(table).toContain('app');
     expect(table).toContain('audit');
+  });
+
+  it('renders the multi-space golden table with heading, divider, and data rows', () => {
+    const table = renderMigrationLogTable(
+      [
+        entry({
+          space: 'app',
+          migrationName: '20260301_init',
+          appliedAt: new Date('2026-06-01T08:00:00.000Z'),
+        }),
+        entry({
+          space: 'audit',
+          migrationName: '20260302_audit',
+          appliedAt: new Date('2026-06-01T08:00:00.002Z'),
+        }),
+      ],
+      { utc: true },
+    );
+    expect(table).toBe(
+      [
+        'Applied at             Space   Migration        Change       Ops',
+        '────────────────────   ─────   ──────────────   ────────   ─────',
+        '2026-06-01 08:00:00Z   app     20260301_init    ∅ → dest   1 ops',
+        '2026-06-01 08:00:00Z   audit   20260302_audit   ∅ → dest   1 ops',
+      ].join('\n'),
+    );
   });
 
   it('returns an empty string for no entries', () => {
@@ -106,6 +166,67 @@ describe('renderMigrationLogTable', () => {
       { utc: true },
     );
     expect(table).toContain('2026-06-01 08:00:00Z');
+  });
+
+  it('widens the migration column to fit the heading when names are shorter', () => {
+    const table = renderMigrationLogTable(
+      [entry({ migrationName: '01_a', appliedAt: new Date('2026-06-01T08:00:00.000Z') })],
+      { utc: true },
+    );
+    const lines = table.split('\n');
+    const changeIdx = lines[0]!.indexOf('Change');
+    const migrationStart = lines[0]!.indexOf('Migration');
+    const migrationWidth = changeIdx - migrationStart - 3;
+    expect(migrationWidth).toBeGreaterThanOrEqual('Migration'.length);
+    const migrationChunk = lines[2]!.slice(migrationStart, changeIdx - 3);
+    expect(migrationChunk.trimEnd()).toBe('01_a');
+  });
+
+  it('aligns columns when migration names are long', () => {
+    const longName = '20260603T091500_super_long_migration_with_many_words';
+    const table = renderMigrationLogTable(
+      [
+        entry({ migrationName: longName, appliedAt: new Date('2026-06-01T08:00:00.000Z') }),
+        entry({ migrationName: '01_a', appliedAt: new Date('2026-06-02T08:00:00.000Z') }),
+      ],
+      { utc: true },
+    );
+    const lines = table.split('\n');
+    const changeIdx = lines[0]!.indexOf('Change');
+    const migrationStart = lines[0]!.indexOf('Migration');
+    const opsIdx = lines[0]!.indexOf('Ops');
+    const extractMigration = (line: string) => line.slice(migrationStart, changeIdx - 3);
+    const extractChange = (line: string) => line.slice(changeIdx, opsIdx - 3);
+    expect(extractMigration(lines[2]!).length).toBe(extractMigration(lines[3]!).length);
+    expect(extractMigration(lines[2]!).trimEnd()).toBe(longName);
+    expect(extractChange(lines[2]!).length).toBe(extractChange(lines[3]!).length);
+  });
+
+  it('aligns columns when space names are long', () => {
+    const longSpace = 'extension-some-very-long-space-id';
+    const table = renderMigrationLogTable(
+      [
+        entry({
+          space: longSpace,
+          migrationName: '20260301_init',
+          appliedAt: new Date('2026-06-01T08:00:00.000Z'),
+        }),
+        entry({
+          space: 'app',
+          migrationName: '20260302_other',
+          appliedAt: new Date('2026-06-02T08:00:00.000Z'),
+        }),
+      ],
+      { utc: true },
+    );
+    const lines = table.split('\n');
+    const spaceStart = lines[0]!.indexOf('Space');
+    const migrationStart = lines[0]!.indexOf('Migration');
+    const extractSpace = (line: string) => line.slice(spaceStart, migrationStart - 3);
+    const extractTimestamp = (line: string) => line.slice(0, spaceStart - 3);
+    expect(extractSpace(lines[2]!).length).toBe(extractSpace(lines[3]!).length);
+    expect(extractSpace(lines[2]!).trimEnd()).toBe(longSpace);
+    expect(extractTimestamp(lines[2]!).length).toBe(extractTimestamp(lines[3]!).length);
   });
 });
 
@@ -127,11 +248,15 @@ describe('renderMigrationLogTable with ANSI styler', () => {
     expect(table).toContain(dim(cyan('4cb4256')));
     expect(table).toContain(dim(MIGRATION_LIST_FORWARD_EDGE_GLYPH));
     expect(table).toContain(cyanBright('ef9de27'));
-    expect(table).toContain(dim('3 ops'));
-    expect(table).toContain(dim(cyan('2026-06-03 09:15:00Z')));
+    const dataLine = table.split('\n')[2]!;
+    expect(dataLine).toContain('2026-06-03 09:15:00Z');
+    expect(dataLine.slice(0, dataLine.indexOf('   '))).toBe('2026-06-03 09:15:00Z');
+    expect(dataLine).toContain('3 ops');
+    expect(dataLine.endsWith('3 ops')).toBe(true);
+    expect(table).toContain(dim('─'.repeat(20)));
   });
 
-  it('styles the empty source glyph and space column with summary dim', () => {
+  it('styles the empty source glyph with dim and leaves space column unstyled', () => {
     const table = renderMigrationLogTable(
       [
         entry({
@@ -152,8 +277,15 @@ describe('renderMigrationLogTable with ANSI styler', () => {
       { utc: true, styler: createAnsiMigrationListStyler({ useColor: true }) },
     );
     expect(table).toContain(dim(MIGRATION_LIST_EMPTY_SOURCE));
-    expect(table).toContain(dim('app'));
-    expect(table).toContain(dim('audit'));
+    const lines = table.split('\n');
+    const spaceStart = lines[0]!.indexOf('Space');
+    const migrationStart = lines[0]!.indexOf('Migration');
+    const extractSpace = (line: string) => line.slice(spaceStart, migrationStart - 3).trimEnd();
+    expect(extractSpace(lines[2]!)).toBe('app');
+    expect(extractSpace(lines[3]!)).toBe('audit');
+    const ansiEsc = String.fromCharCode(27);
+    expect(lines[2]!.slice(spaceStart, migrationStart - 3)).not.toContain(`${ansiEsc}[`);
+    expect(lines[3]!.slice(spaceStart, migrationStart - 3)).not.toContain(`${ansiEsc}[`);
   });
 });
 

@@ -24,6 +24,14 @@ export interface SerializedLedgerEntryRecord {
   readonly operationCount: number;
 }
 
+const HEADING_APPLIED_AT = 'Applied at';
+const HEADING_SPACE = 'Space';
+const HEADING_MIGRATION = 'Migration';
+const HEADING_CHANGE = 'Change';
+const HEADING_OPS = 'Ops';
+const COLUMN_SEPARATOR = '   ';
+const DIVIDER_CHAR = '─';
+
 export function sortLedgerEntries(entries: readonly LedgerEntryRecord[]): LedgerEntryRecord[] {
   return [...entries].sort((left, right) => {
     const timeDiff = left.appliedAt.getTime() - right.appliedAt.getTime();
@@ -91,6 +99,10 @@ function columnWidth(values: readonly string[]): number {
   return values.reduce((max, value) => Math.max(max, value.length), 0);
 }
 
+function padDividerCell(width: number): string {
+  return DIVIDER_CHAR.repeat(width);
+}
+
 export function renderMigrationLogTable(
   entries: readonly LedgerEntryRecord[],
   options: RenderMigrationLogTableOptions = {},
@@ -113,28 +125,49 @@ export function renderMigrationLogTable(
     to: entry.to,
   }));
 
-  const appliedAtWidth = columnWidth(rows.map((row) => row.appliedAt));
-  const spaceWidth = showSpace ? columnWidth(rows.map((row) => row.space)) : 0;
-  const nameWidth = columnWidth(rows.map((row) => row.migrationName));
-  const transitionWidth = columnWidth(rows.map((row) => row.transition));
-  const opsWidth = columnWidth(rows.map((row) => row.ops));
+  const appliedAtWidth = columnWidth([HEADING_APPLIED_AT, ...rows.map((row) => row.appliedAt)]);
+  const spaceWidth = showSpace ? columnWidth([HEADING_SPACE, ...rows.map((row) => row.space)]) : 0;
+  const nameWidth = columnWidth([HEADING_MIGRATION, ...rows.map((row) => row.migrationName)]);
+  const transitionWidth = columnWidth([HEADING_CHANGE, ...rows.map((row) => row.transition)]);
+  const opsWidth = columnWidth([HEADING_OPS, ...rows.map((row) => row.ops)]);
 
-  return rows
-    .map((row) => {
-      const appliedAt =
-        styler.sourceHash(row.appliedAt) + ' '.repeat(appliedAtWidth - row.appliedAt.length);
-      const parts = [appliedAt];
-      if (showSpace) {
-        parts.push(styler.summary(row.space) + ' '.repeat(spaceWidth - row.space.length));
-      }
-      parts.push(
-        styler.dirName(row.migrationName) + ' '.repeat(nameWidth - row.migrationName.length),
-        padVisible(styleHashTransition(row.from, row.to, styler), transitionWidth),
-        ' '.repeat(opsWidth - row.ops.length) + styler.summary(row.ops),
-      );
-      return parts.join('   ');
-    })
-    .join('\n');
+  const headingParts = [padVisible(HEADING_APPLIED_AT, appliedAtWidth)];
+  if (showSpace) {
+    headingParts.push(padVisible(HEADING_SPACE, spaceWidth));
+  }
+  headingParts.push(
+    padVisible(HEADING_MIGRATION, nameWidth),
+    padVisible(HEADING_CHANGE, transitionWidth),
+    ' '.repeat(Math.max(0, opsWidth - HEADING_OPS.length)) + HEADING_OPS,
+  );
+  const heading = headingParts.join(COLUMN_SEPARATOR);
+
+  const dividerParts = [padDividerCell(appliedAtWidth)];
+  if (showSpace) {
+    dividerParts.push(padDividerCell(spaceWidth));
+  }
+  dividerParts.push(
+    padDividerCell(nameWidth),
+    padDividerCell(transitionWidth),
+    padDividerCell(opsWidth),
+  );
+  const divider = dividerParts.map((cell) => styler.summary(cell)).join(COLUMN_SEPARATOR);
+
+  const dataRows = rows.map((row) => {
+    const appliedAt = row.appliedAt + ' '.repeat(appliedAtWidth - row.appliedAt.length);
+    const parts = [appliedAt];
+    if (showSpace) {
+      parts.push(row.space + ' '.repeat(spaceWidth - row.space.length));
+    }
+    parts.push(
+      styler.dirName(row.migrationName) + ' '.repeat(nameWidth - row.migrationName.length),
+      padVisible(styleHashTransition(row.from, row.to, styler), transitionWidth),
+      ' '.repeat(opsWidth - row.ops.length) + row.ops,
+    );
+    return parts.join(COLUMN_SEPARATOR);
+  });
+
+  return [heading, divider, ...dataRows].join('\n');
 }
 
 export function serializeLedgerEntriesForJson(

@@ -134,10 +134,10 @@ export function createMigrationLogCommand(): Command {
           ui.output(JSON.stringify(serializeLedgerEntriesForJson(entries), null, 2));
         } else if (!flags.quiet) {
           if (entries.length === 0) {
-            ui.log(MIGRATION_LOG_EMPTY_MESSAGE);
+            ui.output(MIGRATION_LOG_EMPTY_MESSAGE);
           } else {
             const styler = createAnsiMigrationListStyler({ useColor: ui.useColor });
-            ui.log(renderMigrationLogTable(entries, { utc: options.utc === true, styler }));
+            ui.output(renderMigrationLogTable(entries, { utc: options.utc === true, styler }));
           }
         }
       });
