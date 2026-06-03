@@ -1,0 +1,78 @@
+import type { TableSource } from '@prisma-next/sql-relational-core/ast';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import { describe, expect, it } from 'vitest';
+import { sql } from '../../src/runtime/sql';
+import type { Contract } from '../fixtures/generated/contract';
+
+const int4 = { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false } as const;
+const text = { codecId: 'pg/text@1', nativeType: 'text', nullable: false } as const;
+
+function table(columns: Record<string, typeof int4 | typeof text>) {
+  return {
+    columns,
+    foreignKeys: [],
+    indexes: [],
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+  };
+}
+
+// Same bare table name (`users`) declared in two namespaces, plus a table
+// that exists in only one namespace, so resolution must discriminate by
+// namespace coordinate rather than fall back to a cross-namespace scan.
+const twoNamespaceContract = {
+  capabilities: {},
+  target: 'postgres',
+  storage: {
+    storageHash: 'stub',
+    namespaces: {
+      public: { tables: { users: table({ id: int4, email: text }), posts: table({ id: int4 }) } },
+      auth: { tables: { users: table({ id: int4, token: text }), sessions: table({ id: int4 }) } },
+    },
+  },
+};
+
+const stubBase = {
+  operations: {},
+  codecs: {},
+  queryOperations: { entries: () => ({}) },
+  types: {},
+  applyMutationDefaults: () => [],
+};
+
+const stubInferer = { inferCodec: () => 'pg/text@1' };
+
+type TableHandle = { buildAst(): TableSource };
+type TwoNamespaceDb = {
+  public: { users: TableHandle; sessions: undefined };
+  auth: { users: TableHandle; sessions: TableHandle };
+  users: TableHandle;
+};
+
+function db() {
+  return sql({
+    context: {
+      ...stubBase,
+      contract: twoNamespaceContract,
+    } as unknown as ExecutionContext<Contract>,
+    rawCodecInferer: stubInferer,
+  }) as unknown as TwoNamespaceDb;
+}
+
+describe('namespaced table resolution', () => {
+  it('resolves the same bare name to the distinct table in each namespace', () => {
+    expect(db().public.users.buildAst().namespaceId).toBe('public');
+    expect(db().auth.users.buildAst().namespaceId).toBe('auth');
+  });
+
+  it('scopes table lookup to the named namespace rather than scanning across namespaces', () => {
+    // `sessions` exists only in `auth`; a cross-namespace scan would wrongly
+    // resolve it under `public`.
+    expect(db().public.sessions).toBeUndefined();
+    expect(db().auth.sessions.buildAst().namespaceId).toBe('auth');
+  });
+
+  it('keeps the flat surface resolving a bare table name', () => {
+    expect(db().users.buildAst().namespaceId).toBe('public');
+  });
+});
