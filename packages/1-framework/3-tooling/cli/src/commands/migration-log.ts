@@ -20,6 +20,7 @@ import {
   setCommandSeeAlso,
   targetSupportsMigrations,
 } from '../utils/command-helpers';
+import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
 import {
   MIGRATION_LOG_EMPTY_MESSAGE,
   renderMigrationLogTable,
@@ -135,7 +136,8 @@ export function createMigrationLogCommand(): Command {
           if (entries.length === 0) {
             ui.log(MIGRATION_LOG_EMPTY_MESSAGE);
           } else {
-            ui.log(renderMigrationLogTable(entries, { utc: options.utc === true }));
+            const styler = createAnsiMigrationListStyler({ useColor: ui.useColor });
+            ui.log(renderMigrationLogTable(entries, { utc: options.utc === true, styler }));
           }
         }
       });

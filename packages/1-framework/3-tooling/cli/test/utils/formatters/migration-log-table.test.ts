@@ -1,5 +1,11 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
+import { bold, cyan, cyanBright, dim } from 'colorette';
 import { describe, expect, it } from 'vitest';
+import {
+  MIGRATION_LIST_EMPTY_SOURCE,
+  MIGRATION_LIST_FORWARD_EDGE_GLYPH,
+} from '../../../src/utils/formatters/migration-list-data-column';
+import { createAnsiMigrationListStyler } from '../../../src/utils/formatters/migration-list-styler';
 import {
   formatLedgerAppliedAt,
   renderMigrationLogTable,
@@ -100,6 +106,54 @@ describe('renderMigrationLogTable', () => {
       { utc: true },
     );
     expect(table).toContain('2026-06-01 08:00:00Z');
+  });
+});
+
+describe('renderMigrationLogTable with ANSI styler', () => {
+  it('applies the shared migration family palette to each column token', () => {
+    const table = renderMigrationLogTable(
+      [
+        entry({
+          migrationName: '20260603T0915_migration',
+          from: 'sha256:4cb4256abcdef',
+          to: 'sha256:ef9de27abcdef',
+          operationCount: 3,
+          appliedAt: new Date('2026-06-03T09:15:00.000Z'),
+        }),
+      ],
+      { utc: true, styler: createAnsiMigrationListStyler({ useColor: true }) },
+    );
+    expect(table).toContain(bold('20260603T0915_migration'));
+    expect(table).toContain(dim(cyan('4cb4256')));
+    expect(table).toContain(dim(MIGRATION_LIST_FORWARD_EDGE_GLYPH));
+    expect(table).toContain(cyanBright('ef9de27'));
+    expect(table).toContain(dim('3 ops'));
+    expect(table).toContain(dim('2026-06-03 09:15:00Z'));
+  });
+
+  it('styles the empty source glyph and space column with summary dim', () => {
+    const table = renderMigrationLogTable(
+      [
+        entry({
+          space: 'app',
+          migrationName: '20260301_init',
+          from: null,
+          to: 'sha256:ef9de27abc',
+          appliedAt: new Date('2026-06-01T08:00:00.000Z'),
+        }),
+        entry({
+          space: 'audit',
+          migrationName: '20260302_audit',
+          from: null,
+          to: 'sha256:aaaaaaaaaaa',
+          appliedAt: new Date('2026-06-01T08:00:00.002Z'),
+        }),
+      ],
+      { utc: true, styler: createAnsiMigrationListStyler({ useColor: true }) },
+    );
+    expect(table).toContain(dim(MIGRATION_LIST_EMPTY_SOURCE));
+    expect(table).toContain(dim('app'));
+    expect(table).toContain(dim('audit'));
   });
 });
 

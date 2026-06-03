@@ -1,14 +1,17 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
+import stringWidth from 'string-width';
 import {
   abbreviateContractHash,
   MIGRATION_LIST_EMPTY_SOURCE,
   MIGRATION_LIST_FORWARD_EDGE_GLYPH,
 } from './migration-list-data-column';
+import { IDENTITY_MIGRATION_LIST_STYLER, type MigrationListStyler } from './migration-list-render';
 
 export type LedgerTimestampMode = 'local' | 'utc' | 'iso';
 
 export interface RenderMigrationLogTableOptions {
   readonly utc?: boolean;
+  readonly styler?: MigrationListStyler;
 }
 
 export interface SerializedLedgerEntryRecord {
@@ -54,15 +57,34 @@ export function formatLedgerAppliedAt(date: Date, mode: LedgerTimestampMode): st
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())} ${sign}${offsetHours}:${offsetMins}`;
 }
 
-function formatHashEndpoint(hash: string | null): string {
+export function formatHashEndpoint(hash: string | null): string {
   if (hash === null) {
     return MIGRATION_LIST_EMPTY_SOURCE;
   }
   return abbreviateContractHash(hash);
 }
 
-function formatHashTransition(from: string | null, to: string): string {
+export function formatHashTransition(from: string | null, to: string): string {
   return `${formatHashEndpoint(from)} ${MIGRATION_LIST_FORWARD_EDGE_GLYPH} ${abbreviateContractHash(to)}`;
+}
+
+export function styleHashTransition(
+  from: string | null,
+  to: string,
+  styler: MigrationListStyler,
+): string {
+  const fromPart =
+    from === null
+      ? styler.glyph(MIGRATION_LIST_EMPTY_SOURCE)
+      : styler.sourceHash(abbreviateContractHash(from));
+  const arrow = styler.glyph(MIGRATION_LIST_FORWARD_EDGE_GLYPH);
+  const dest = styler.destHash(abbreviateContractHash(to));
+  return `${fromPart} ${arrow} ${dest}`;
+}
+
+function padVisible(text: string, targetWidth: number): string {
+  const padding = Math.max(0, targetWidth - stringWidth(text));
+  return text + ' '.repeat(padding);
 }
 
 function columnWidth(values: readonly string[]): number {
@@ -78,6 +100,7 @@ export function renderMigrationLogTable(
     return '';
   }
 
+  const styler = options.styler ?? IDENTITY_MIGRATION_LIST_STYLER;
   const showSpace = new Set(sorted.map((entry) => entry.space)).size > 1;
   const timestampMode: LedgerTimestampMode = options.utc ? 'utc' : 'local';
   const rows = sorted.map((entry) => ({
@@ -86,6 +109,8 @@ export function renderMigrationLogTable(
     migrationName: entry.migrationName,
     transition: formatHashTransition(entry.from, entry.to),
     ops: `${entry.operationCount} ops`,
+    from: entry.from,
+    to: entry.to,
   }));
 
   const appliedAtWidth = columnWidth(rows.map((row) => row.appliedAt));
@@ -96,14 +121,16 @@ export function renderMigrationLogTable(
 
   return rows
     .map((row) => {
-      const parts = [row.appliedAt.padEnd(appliedAtWidth)];
+      const appliedAt =
+        styler.summary(row.appliedAt) + ' '.repeat(appliedAtWidth - row.appliedAt.length);
+      const parts = [appliedAt];
       if (showSpace) {
-        parts.push(row.space.padEnd(spaceWidth));
+        parts.push(styler.summary(row.space) + ' '.repeat(spaceWidth - row.space.length));
       }
       parts.push(
-        row.migrationName.padEnd(nameWidth),
-        row.transition.padEnd(transitionWidth),
-        row.ops.padStart(opsWidth),
+        styler.dirName(row.migrationName) + ' '.repeat(nameWidth - row.migrationName.length),
+        padVisible(styleHashTransition(row.from, row.to, styler), transitionWidth),
+        ' '.repeat(opsWidth - row.ops.length) + styler.summary(row.ops),
       );
       return parts.join('   ');
     })
