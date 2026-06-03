@@ -411,6 +411,7 @@ export interface DbInitFailure {
   readonly summary: string;
   readonly why: string | undefined;
   readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
+  readonly warnings?: ReadonlyArray<MigrationPlannerConflict>;
   readonly meta: Record<string, unknown> | undefined;
   readonly marker?: {
     readonly storageHash?: string;
@@ -482,6 +483,7 @@ export interface DbUpdateFailure {
   readonly summary: string;
   readonly why: string | undefined;
   readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
+  readonly warnings?: ReadonlyArray<MigrationPlannerConflict>;
   readonly meta: Record<string, unknown> | undefined;
 }
 

@@ -231,6 +231,7 @@ export async function executeApply<TFamilyId extends string, TTargetId extends s
       summary: applied.failure.summary,
       ...ifDefined('why', applied.failure.why),
       meta: applied.failure.meta,
+      ...ifDefined('warnings', plannerWarnings),
     });
   }
 
@@ -405,6 +406,7 @@ function buildRunnerFailure(args: {
   readonly summary: string;
   readonly why?: string;
   readonly meta: Record<string, unknown>;
+  readonly warnings?: readonly MigrationPlannerConflict[];
 }): DbInitResult | DbUpdateResult {
   const failure: DbInitFailure | DbUpdateFailure = {
     code: 'RUNNER_FAILED',
@@ -412,6 +414,7 @@ function buildRunnerFailure(args: {
     why: args.why,
     meta: args.meta,
     conflicts: undefined,
+    ...ifDefined('warnings', args.warnings),
   };
   return notOk(failure) as DbInitResult | DbUpdateResult;
 }

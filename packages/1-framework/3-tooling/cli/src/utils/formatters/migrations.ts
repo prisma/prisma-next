@@ -94,7 +94,7 @@ export interface MigrationCommandResult {
   };
 }
 
-function formatPlannerWarningsBlock(
+export function formatPlannerWarningsBlock(
   warnings: readonly MigrationPlannerConflict[],
   useColor: boolean,
 ): readonly string[] {
