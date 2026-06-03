@@ -1017,5 +1017,9 @@ describe('renderMigrationGraphLegend', () => {
     } else {
       expect(stripAnsi(colored)).toBe(renderMigrationGraphLegend({ colorize: false }));
     }
+
+    // The leading glyph markers (○, ↑, ↓, ⟲, ∅) stay bright like the other kind
+    // glyphs — only the descriptive prose dims.
+    expect(colored).not.toContain(`${dim('∅')}`);
   });
 });

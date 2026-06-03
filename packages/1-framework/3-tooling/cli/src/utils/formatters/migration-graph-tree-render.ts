@@ -815,7 +815,7 @@ export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptio
     'Legend:',
     `  ${style.kind(node)} ${style.summary('contract')}   ${style.kind(palette.edgeArrow.forward)} ${style.summary('forward')}   ${style.kind(palette.edgeArrow.rollback)} ${style.summary('rollback')}`,
     `  ${style.kind(palette.edgeArrow.self)} ${style.summary('migration without schema change')}`,
-    `  ${style.glyph(palette.emptySource)} ${style.summary('empty database (baseline)')}`,
+    `  ${style.kind(palette.emptySource)} ${style.summary('empty database (baseline)')}`,
     `  ${style.refs(['refs'])} ${style.summary(`${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`)}`,
     `  ${sampleArrow}   ${style.summary('migration from contract aaaaaa to bbbbbb')}`,
   ].join('\n');
