@@ -432,7 +432,7 @@ describe('buildMigrationGraphRows', () => {
       expect(withDetached.edges).toEqual(without.edges);
     });
 
-    it('leaves the row model unchanged when contractHash is already a graph node', () => {
+    it('leaves the row model unchanged when contractHash is the sole tip of a linear chain', () => {
       const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
       const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
       const g = graph([init, addPosts]);
@@ -456,6 +456,68 @@ describe('buildMigrationGraphRows', () => {
 
       expect(model.nodes).toEqual(['c0ffee0']);
       expect(model.edges).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Trunk choice via contractHash (connected components)
+  // -------------------------------------------------------------------------
+
+  describe('contractHash trunk choice', () => {
+    function twoLeafSharedRootGraph(): MigrationGraph {
+      return graph([
+        edge(EMPTY_CONTRACT_HASH, '76c1bd5', 'historical_1'),
+        edge('76c1bd5', '5618dca', 'historical_2'),
+        edge('5618dca', '6cee614', 'historical_3'),
+        edge('6cee614', 'f7a8eb5', 'historical_4'),
+        edge(EMPTY_CONTRACT_HASH, '1375f13', 'live_migration'),
+      ]);
+    }
+
+    it('places the live-contract leaf on the trunk when it has the shorter chain', () => {
+      const g = twoLeafSharedRootGraph();
+      const without = buildMigrationGraphRows(g);
+      const withLive = buildMigrationGraphRows(g, { contractHash: '1375f13' });
+
+      expect(without.nodes[0]).toBe('f7a8eb5');
+      expect(withLive.nodes[0]).toBe('1375f13');
+    });
+
+    it('keeps the longest-path heuristic when contractHash is undefined', () => {
+      const g = twoLeafSharedRootGraph();
+      const model = buildMigrationGraphRows(g);
+
+      expect(model.nodes[0]).toBe('f7a8eb5');
+    });
+
+    it('keeps the longest-path heuristic for EMPTY_CONTRACT_HASH', () => {
+      const g = twoLeafSharedRootGraph();
+      const model = buildMigrationGraphRows(g, { contractHash: EMPTY_CONTRACT_HASH });
+
+      expect(model.nodes[0]).toBe('f7a8eb5');
+    });
+
+    it('leaves the detached-contract path unchanged when contractHash is not in the graph', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+      const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+      const g = graph([init, addPosts]);
+      const withDetached = buildMigrationGraphRows(g, { contractHash: 'c0ffee0' });
+
+      expect(withDetached.nodes).toEqual([
+        'c0ffee0',
+        null,
+        'a94b7b4',
+        'ef9de27',
+        EMPTY_CONTRACT_HASH,
+      ]);
+    });
+
+    it('leaves a single-node component unchanged when contractHash is set', () => {
+      const g = graph([edge('aaa', 'bbb', 'solo')]);
+      const baseline = buildMigrationGraphRows(g);
+      const withContract = buildMigrationGraphRows(g, { contractHash: 'bbb' });
+
+      expect(withContract).toEqual(baseline);
     });
   });
 

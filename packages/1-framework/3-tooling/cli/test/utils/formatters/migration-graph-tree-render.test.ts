@@ -327,6 +327,31 @@ describe('renderMigrationGraphTree', () => {
     );
   });
 
+  it('places the live-contract leaf on the trunk for a two-leaf shared-root graph', () => {
+    const historical1 = edge(EMPTY_CONTRACT_HASH, '76c1bd5', 'historical_1');
+    const historical2 = edge('76c1bd5', '5618dca', 'historical_2');
+    const historical3 = edge('5618dca', '6cee614', 'historical_3');
+    const historical4 = edge('6cee614', 'f7a8eb5', 'historical_4');
+    const live = edge(EMPTY_CONTRACT_HASH, '1375f13', 'live_migration');
+    const edges = [historical1, historical2, historical3, historical4, live];
+    expect(tree(edges, { colorize: false, contractHash: '1375f13' })).toBe(
+      [
+        '○   1375f13  <contract>',
+        '│↑    live_migration           ∅ → 1375f13',
+        '│ ○   f7a8eb5',
+        '│ │↑  historical_4       6cee614 → f7a8eb5',
+        '│ ○   6cee614',
+        '│ │↑  historical_3       5618dca → 6cee614',
+        '│ ○   5618dca',
+        '│ │↑  historical_2       76c1bd5 → 5618dca',
+        '│ ○   76c1bd5',
+        '│ │↑  historical_1             ∅ → 76c1bd5',
+        '├─╯',
+        '∅',
+      ].join('\n'),
+    );
+  });
+
   it('renders the node marker when a non-trunk node lands a multi-lane merge', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'A', 'init');
     const alice = edge('A', 'B', 'alice');
