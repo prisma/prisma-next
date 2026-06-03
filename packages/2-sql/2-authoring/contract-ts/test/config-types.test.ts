@@ -1,7 +1,11 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
-import { type Contract, domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  type ControlPolicy,
+  domainModelsAtDefaultNamespace,
+} from '@prisma-next/contract/types';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
@@ -126,6 +130,139 @@ describe('typescriptContract', () => {
   );
 });
 
+function minimalSqlContract(overrides?: {
+  readonly defaultControlPolicy?: ControlPolicy;
+}): Contract {
+  return {
+    targetFamily: 'sql',
+    target: 'postgres',
+    ...overrides,
+  } as Contract;
+}
+
+describe('defaultControlPolicy specifier precedence', () => {
+  it('typescriptContract keeps an existing contract default when the specifier sets another', async () => {
+    const contract = minimalSqlContract({ defaultControlPolicy: 'managed' });
+    const config = typescriptContract(contract, undefined, { defaultControlPolicy: 'external' });
+    const result = await config.source.load(stubContext);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.defaultControlPolicy).toBe('managed');
+  });
+
+  it('typescriptContract applies the specifier default when the contract omits one', async () => {
+    const contract = minimalSqlContract();
+    const config = typescriptContract(contract, undefined, { defaultControlPolicy: 'external' });
+    const result = await config.source.load(stubContext);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.defaultControlPolicy).toBe('external');
+  });
+
+  it('typescriptContract leaves defaultControlPolicy unset when the specifier omits it', async () => {
+    const contract = minimalSqlContract();
+    const config = typescriptContract(contract);
+    const result = await config.source.load(stubContext);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).not.toHaveProperty('defaultControlPolicy');
+  });
+
+  it(
+    'typescriptContractFromPath keeps an existing contract default when the specifier sets another',
+    async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'sql-contract-ts-policy-'));
+      const contractPath = join(tempDir, 'contract.ts');
+
+      try {
+        await writeFile(
+          contractPath,
+          `export default { targetFamily: 'sql', target: 'postgres', defaultControlPolicy: 'managed' };\n`,
+          'utf-8',
+        );
+
+        const config = typescriptContractFromPath('./contract.ts', undefined, {
+          defaultControlPolicy: 'external',
+        });
+        const result = await config.source.load({
+          ...stubContext,
+          resolvedInputs: [contractPath],
+        });
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value.defaultControlPolicy).toBe('managed');
+      } finally {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'typescriptContractFromPath applies the specifier default when the module omits one',
+    async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'sql-contract-ts-policy-'));
+      const contractPath = join(tempDir, 'contract.ts');
+
+      try {
+        await writeFile(
+          contractPath,
+          `export default { targetFamily: 'sql', target: 'postgres' };\n`,
+          'utf-8',
+        );
+
+        const config = typescriptContractFromPath('./contract.ts', undefined, {
+          defaultControlPolicy: 'tolerated',
+        });
+        const result = await config.source.load({
+          ...stubContext,
+          resolvedInputs: [contractPath],
+        });
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value.defaultControlPolicy).toBe('tolerated');
+      } finally {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'typescriptContractFromPath leaves defaultControlPolicy unset when the specifier omits it',
+    async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'sql-contract-ts-policy-'));
+      const contractPath = join(tempDir, 'contract.ts');
+
+      try {
+        await writeFile(
+          contractPath,
+          `export default { targetFamily: 'sql', target: 'postgres' };\n`,
+          'utf-8',
+        );
+
+        const config = typescriptContractFromPath('./contract.ts');
+        const result = await config.source.load({
+          ...stubContext,
+          resolvedInputs: [contractPath],
+        });
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value).not.toHaveProperty('defaultControlPolicy');
+      } finally {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    },
+    timeouts.typeScriptCompilation,
+  );
+});
+
 describe('emptyContract', () => {
   it('loads an empty SQL contract for the target', async () => {
     const config = emptyContract({ target: postgresTargetPack });
@@ -156,5 +293,26 @@ describe('emptyContract', () => {
 
     const withoutOutput = emptyContract({ target: postgresTargetPack });
     expect(withoutOutput.output).toBeUndefined();
+  });
+
+  it('applies defaultControlPolicy from the specifier options bag', async () => {
+    const config = emptyContract({
+      target: postgresTargetPack,
+      defaultControlPolicy: 'observed',
+    });
+    const result = await config.source.load(stubContext);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.defaultControlPolicy).toBe('observed');
+  });
+
+  it('omits defaultControlPolicy when the specifier options bag omits it', async () => {
+    const config = emptyContract({ target: postgresTargetPack });
+    const result = await config.source.load(stubContext);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).not.toHaveProperty('defaultControlPolicy');
   });
 });

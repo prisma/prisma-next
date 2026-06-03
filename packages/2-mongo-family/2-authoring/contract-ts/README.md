@@ -83,6 +83,10 @@ export const contract = defineContract({
 });
 ```
 
+## Config helper
+
+`typescriptContract` and `typescriptContractFromPath` accept an optional third options bag with `defaultControlPolicy`. The specifier applies it only when the loaded contract omits `defaultControlPolicy`.
+
 ## Notes
 
 - Use `@prisma-next/family-mongo/pack` and `@prisma-next/target-mongo/pack` in authoring flows. They are pure pack refs and do not pull in control-plane runtime code.

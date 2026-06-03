@@ -1,21 +1,35 @@
 import { pathToFileURL } from 'node:url';
 import type { ContractConfig } from '@prisma-next/config/config-types';
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok } from '@prisma-next/utils/result';
+import { applySpecifierDefaultControlPolicy } from './apply-specifier-default-control-policy';
+
+export interface TypeScriptContractSpecifierOptions {
+  readonly defaultControlPolicy?: ControlPolicy;
+}
 
 // This helper stays family-agnostic and intentionally accepts the base Contract shape even when
 // re-exported from a Mongo-specific package.
-export function typescriptContract(contract: Contract, output?: string): ContractConfig {
+export function typescriptContract(
+  contract: Contract,
+  output?: string,
+  options?: TypeScriptContractSpecifierOptions,
+): ContractConfig {
   return {
     source: {
-      load: async () => ok(contract),
+      load: async () =>
+        ok(applySpecifierDefaultControlPolicy(contract, options?.defaultControlPolicy)),
     },
     ...ifDefined('output', output),
   };
 }
 
-export function typescriptContractFromPath(contractPath: string, output?: string): ContractConfig {
+export function typescriptContractFromPath(
+  contractPath: string,
+  output?: string,
+  options?: TypeScriptContractSpecifierOptions,
+): ContractConfig {
   return {
     source: {
       inputs: [contractPath],
@@ -33,7 +47,7 @@ export function typescriptContractFromPath(contractPath: string, output?: string
             `typescriptContractFromPath: module at "${absolutePath}" has no "default" or "contract" export.`,
           );
         }
-        return ok(contract);
+        return ok(applySpecifierDefaultControlPolicy(contract, options?.defaultControlPolicy));
       },
     },
     ...ifDefined('output', output),
