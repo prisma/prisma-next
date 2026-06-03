@@ -69,14 +69,53 @@ The project spec's D6 was wishful interpretation of the `ppg.url` label. The lab
 - **(b) Hosted PPG with CI secret.** Provision a real Prisma Postgres instance; gate integration tests on `PPG_INTEGRATION_URL` env var sourced from a CI secret. Real protocol coverage; conflicts with the project spec's "no env gating" constraint and adds account/secret management overhead.
 - **(c) Defer AC-4.** Project ships with mocked-driver coverage from Slices 2/3/5 (134 tests through the real driver code via a fake PPG `Client` at the `Client.newSession` boundary). AC-4 marked as deferred pending upstream `@prisma/dev` PPG support or option (a). Document the limitation in the facade README. File a follow-up Linear ticket.
 
-**Disposition.** Operator chose **(c) defer + draft PR + reconsider shim later**. Slice 6 halts at D1; D2 (READMEs + repo-map) also deferred to follow-up. What ships in the draft PR is Slices 1–5 SATISFIED plus the `ppgUrl` field on `DevDatabase` (forward-compatible scaffolding with the protocol mismatch documented in the field's JSDoc). The slice 6 spec/plan get a STATUS:HALTED banner pointing here. The shim option stays in scope for project-close-out re-evaluation.
+**Disposition.** Operator initially chose **(c) defer + draft PR + reconsider shim later**, then revised mid-flight to **(b'): real cloud Prisma Postgres provisioned per-run via the Management API**. The constraint that originally ruled out option (b) ("no env gating" per spec D6) lost its grounding when D6 itself turned out to be empirically false. Option (b'): each CI run provisions a fresh PPG project via `POST /v1/projects` using a workspace-scoped service token, runs SELECT/INSERT/transaction-commit/transaction-rollback against the returned connection string, then `DELETE /v1/projects/{id}` in `afterAll`. Skipped silently locally and on fork PRs; hard-required on `prisma/prisma-next`-owned CI runs via a dedicated workflow `Require PPG service token` step. Uses the official `@prisma/management-api-sdk` (typed via OpenAPI 3.1).
+
+**Resolution lands as.**
+
+- Integration test: `test/integration/test/prisma-postgres-serverless/cloud-integration.test.ts`.
+- Catalog pin: `@prisma/management-api-sdk: 1.35.0` in `pnpm-workspace.yaml` (exact, mirrors the `@prisma/ppg` precedent per FR4; chose 1.35.0 because the latest `1.37.0` is younger than the workspace's `minimumReleaseAge: 1440` supply-chain guard, and the `POST/DELETE /v1/projects` surface we use is stable across the entire 1.x line).
+- Workflow YAML: `.github/workflows/ci.yml`'s `test-integration` job adds (a) an env var that exposes the secret conditionally, (b) a `Require PPG service token` step that hard-fails own-repo PR runs without the secret.
+- Project spec D6 + Slice 6 spec banner updated to reflect the new approach.
+- The `ppgUrl` field added to `DevDatabase` during the original halt remains as forward-compatible scaffolding (in-process shim option (a) is still viable later if cloud-test maintenance becomes painful).
 
 **Open follow-ups for project close-out.**
 
-- Decide whether to build option (a) shim before final merge or after.
-- Author facade + driver READMEs (Slice 6 D2) — pure docs work; not blocked by the upstream constraint.
-- File the Linear follow-up ticket for AC-4.
-- Update project spec's D6 wording to reflect ground truth (the assumption was false; either remove the claim or replace it with the chosen resolution).
+- Configure `PRISMA_POSTGRES_SERVICE_TOKEN` in `prisma/prisma-next` repo secrets (ops setup, not engineering).
+- Author facade + driver READMEs (Slice 6 D2) — still pure docs work; independent of D1.
+- Decide whether the `@prisma/management-api-sdk` per-PR-project churn fits Prisma Postgres' free-tier limits; if not, consider a shared CI project where the test creates / deletes databases inside it (still per-run isolation, less project churn). File-and-forget for now.
+- Schedule a weekly cleanup workflow that deletes leaked `pn-ci-*` projects older than 24h — defensive against `afterAll` killed mid-execution. Low priority.
+- Decide later whether to build option (a) in-process PPG-protocol shim in `@prisma-next/test-utils` for offline / no-network integration tests.
+
+## Slice 6 / D3 / Phase 2 — multi-layer wire-compat gap surfaced under real-cloud verification
+
+**What happened.** D3's static Phase 1 (rewritten test, all gates green) reached SATISFIED on mocked / type-only signals. Phase 2 (live verification against a freshly-provisioned Prisma Postgres database via the Management API) surfaced *three distinct bugs in three distinct layers*, each masked by the previous one:
+
+1. **(facade-validator misdiagnosis)** The orchestrator's mid-flight scope-expansion note pinned the facade's URL validator as broken ("rejects the canonical URL the Management API returns") and authorised a widening of the validator to accept `prisma+postgres://`. Pinned the wrong layer. Truth: `@prisma/ppg@1.0.1`'s own `parseConnectionString` rejects `prisma+postgres:` upstream of the facade. The Management API's `endpoints.accelerate.connectionString` (the `prisma+postgres://` form) is the *Accelerate / data-proxy GraphQL URL*, not the PPG URL — the same URL-scheme-aliasing trap that bit D1 (see § Slice 6 / D1). The PPG-compatible URL form is `endpoints.pooled.connectionString` (the `postgres://identifier:key@db.prisma.io:5432/…` form per the PPG docs). The test was reading the wrong endpoint; the facade was correct.
+
+2. **(driver array-parser gap)** Once the test switched to `endpoints.pooled.connectionString` and Phase 2 made it past `db.connect()` into the first ORM query, `verifyMarker` failed: PPG returned `invariants` (a `text[]` column) as the raw Postgres text-format string `'{a,b,c}'` instead of a JS array. `@prisma/ppg`'s `defaultClientConfig` ships parsers for scalar OIDs only (bool, int*, float*, text/varchar, json/jsonb) — no entries for any of the array OIDs (1009 `_text`, 1007 `_int4`, …). The framework's adapter layer assumes the driver hydrates `text[]` as JS arrays (the comment at `packages/3-targets/6-adapters/postgres/src/core/adapter.ts:99` literally banks on this, matching `pg`'s native behaviour). No prior slice's mocked-driver tests could have surfaced this — they shaped the row themselves before it crossed the boundary.
+
+3. **(SDK typegen drift)** Already captured: the SDK's typegen suggested multiple `connections[]` records keyed by `kind`; the live response carries a single record with all endpoint variants on `endpoints.{direct,pooled,accelerate}`. Caught and fixed during the in-flight D3 expansion before this Phase 2 surfacing.
+
+**Root cause (cross-cutting).** Mocked / type-level Phase 1 verification cannot see boundary-protocol bugs. The driver's wire-compat parity with `pg` is a *behavioural* contract that lives in the column-value-hydration boundary; no static signal exercises it. The orchestrator's mid-flight diagnoses were each defensible at the symptom level ("validator rejected the URL", "first ORM query threw") but neither went one layer deeper before pinning a fix.
+
+**Generalisable lesson.** *Wire-compat gaps in driver substitutes are invisible to mocked tests by definition.* When introducing a new driver that claims protocol-level parity with an existing driver (here: `@prisma-next/driver-postgres` -> `@prisma-next/driver-ppg-serverless`), a real-cloud or real-server integration test must be a prerequisite for slice DoD, not a nice-to-have at project DoD. Mocking at the `Client.newSession` boundary (as Slices 2/3/5 did) is fine for testing the driver's *own* logic but cannot test the boundary itself. Two corollaries:
+  - When a Phase 1 / static-gates dispatch ends a slice, the slice DoD should not declare wire-level parity unless a Phase 2 / integration step has actually exercised the wire.
+  - The orchestrator's mid-flight diagnoses should probe one layer deeper than the surface symptom before pinning a fix. "Facade rejects URL" is a *symptom*; "the URL form the facade rejects is or is not actually accepted by the underlying client" is the *fact* the diagnosis depends on.
+
+**Disposition.** Operator-authorised in-flight D3 scope expansion (3rd one, after the SDK-lookup + warm-up-retry expansions): add `withArrayParsers` to the driver, register array OID parsers when constructing the bound client, ship unit tests + a positive Phase 2 verification. Resolution lands as:
+- `packages/3-targets/7-drivers/ppg-serverless/src/core/array-parsers.ts` — the lifter (10 array OIDs, postgres-array decoder).
+- `packages/3-targets/7-drivers/ppg-serverless/test/array-parsers.test.ts` — 10 unit tests.
+- `packages/3-targets/7-drivers/ppg-serverless/src/ppg-driver.ts` — wires `withArrayParsers` into `createBoundDriverFromBinding`'s URL branch.
+- `packages/3-targets/7-drivers/ppg-serverless/src/exports/runtime.ts` — re-exports `withArrayParsers` so `ppgClient`-binding users can opt in.
+- `pnpm-workspace.yaml` — `postgres-array: 2.0.0` catalog pin (pure-JS dep, edge-safe; transitively used by `pg` already).
+- Project spec FR1 amended to record the parser-registration responsibility.
+- Project spec FR3 amended to record the URL-scheme aliasing trap explicitly.
+- Test now reads `endpoints.pooled.connectionString` (the PPG-compatible URL form).
+
+**Open follow-ups for project close-out.**
+- Worth a Linear ticket for upstream PPG: `defaultClientConfig` could plausibly register array parsers itself (matches what its `pg` analog does). If accepted, our `withArrayParsers` becomes belt-and-suspenders rather than load-bearing.
+- The exported `withArrayParsers` will need README coverage in D4 — the ppgClient-binding code example should call it.
 
 ## Slice 1 close-out — single PR at project close-out (policy override)
 
