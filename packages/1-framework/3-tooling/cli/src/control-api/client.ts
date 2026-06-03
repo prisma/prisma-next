@@ -654,8 +654,9 @@ class ControlClientImpl implements ControlClient {
         this.frameworkComponents ?? [],
       );
 
+      let deserializedContract: Contract;
       try {
-        this.familyInstance.deserializeContract(enrichedIR);
+        deserializedContract = this.familyInstance.deserializeContract(enrichedIR);
       } catch (error) {
         onProgress?.({
           action: 'emit',
@@ -673,7 +674,7 @@ class ControlClientImpl implements ControlClient {
       }
 
       const result = await emitContractArtifacts(
-        enrichedIR,
+        deserializedContract,
         this.stack!,
         this.options.family.emission,
         {
