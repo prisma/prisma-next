@@ -1,7 +1,7 @@
 import type { Client } from '@prisma/ppg';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
-import ppgDriver from '@prisma-next/driver-ppg-serverless/runtime';
+import ppgDriver, { type PpgBinding } from '@prisma-next/driver-ppg-serverless/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import * as sqlBuilderModule from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -38,7 +38,6 @@ const ormBuilder = ormClientModule.orm;
 type PpgClient = Client;
 
 import {
-  type PpgServerlessBinding,
   type PpgServerlessBindingInput,
   resolveOptionalPpgServerlessBinding,
   resolvePpgServerlessBinding,
@@ -83,7 +82,7 @@ export interface PrismaPostgresServerlessOptionsBase {
 }
 
 export interface PrismaPostgresServerlessBindingOptions {
-  readonly binding?: PpgServerlessBinding;
+  readonly binding?: PpgBinding;
   readonly url?: string;
   readonly ppgClient?: PpgClient;
 }
@@ -168,7 +167,7 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
   let backgroundConnectError: unknown;
   let closed = false;
 
-  const connectDriver = async (resolvedBinding: PpgServerlessBinding): Promise<void> => {
+  const connectDriver = async (resolvedBinding: PpgBinding): Promise<void> => {
     if (driverConnected) return;
     if (!runtimeDriver) throw new Error('Prisma Postgres runtime driver missing');
     if (connectPromise) return connectPromise;

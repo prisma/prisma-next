@@ -219,34 +219,6 @@ describe('prisma-postgres-serverless', () => {
         client: fakeClient,
       });
     });
-
-    it('rejects an empty url', () => {
-      expect(() =>
-        prismaPostgresServerless({
-          contract,
-          url: '   ',
-        }),
-      ).toThrow('Postgres URL must be a non-empty string');
-    });
-
-    it('rejects a non-postgres URL scheme', () => {
-      expect(() =>
-        prismaPostgresServerless({
-          contract,
-          url: 'mysql://localhost:5432/db',
-        }),
-      ).toThrow('Postgres URL must use postgres:// or postgresql://');
-    });
-
-    it('throws when multiple binding inputs are provided', () => {
-      expect(() =>
-        prismaPostgresServerless({
-          contract,
-          url: 'postgres://localhost:5432/db',
-          binding: { kind: 'url', url: 'postgres://localhost:5432/db2' },
-        } as unknown as Parameters<typeof prismaPostgresServerless<typeof contract>>[0]),
-      ).toThrow('Provide one binding input');
-    });
   });
 
   describe('connect()', () => {

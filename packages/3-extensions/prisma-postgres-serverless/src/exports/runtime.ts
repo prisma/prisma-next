@@ -1,4 +1,5 @@
-export type { PpgServerlessBinding, PpgServerlessBindingInput } from '../runtime/binding';
+export type { PpgBinding } from '@prisma-next/driver-ppg-serverless/runtime';
+export type { PpgServerlessBindingInput } from '../runtime/binding';
 export type {
   PpgServerlessTargetId,
   PrismaPostgresServerlessBindingOptions,
