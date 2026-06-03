@@ -6,6 +6,7 @@ import {
   type ContractModelDefinitions,
   type ContractReferenceRelation,
   type ContractValueObject,
+  type ControlPolicy,
   type CrossReference,
   crossRef,
   type ProfileHashBase,
@@ -50,6 +51,7 @@ import {
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 // `canonicalStringify` rejects non-plain objects so a `Map` or class
 // instance cannot silently collapse to `{}`. The storage-shape values
@@ -205,6 +207,7 @@ export interface ModelBuilder<
   readonly __relations: Relations;
   readonly __indexes: readonly MongoIndexAuthoringInput[] | undefined;
   readonly __collectionOptions: MongoCollectionOptionsAuthoringInput | undefined;
+  readonly __controlPolicy: ControlPolicy | undefined;
   readonly __collection: Collection;
   readonly __owner: Owner;
   readonly __base: Base;
@@ -529,21 +532,31 @@ type MongoDomainNamespaceFromDefinition<Definition> = Simplify<
   } & MaybeValueObjectsSection<DefinitionValueObjects<Definition>>
 >;
 
-type MongoContractBaseFromDefinition<Definition> = Simplify<{
-  readonly target: DefinitionTargetId<Definition>;
-  readonly targetFamily: DefinitionFamilyId<Definition>;
-  readonly roots: DefinitionRoots<Definition>;
-  readonly domain: {
-    readonly namespaces: {
-      readonly [K in typeof UNBOUND_NAMESPACE_ID]: MongoDomainNamespaceFromDefinition<Definition>;
+type MaybeDefaultControlPolicySection<Definition> = Definition extends {
+  readonly defaultControlPolicy: infer Policy;
+}
+  ? Policy extends ControlPolicy
+    ? { readonly defaultControlPolicy: Policy }
+    : EmptyObject
+  : EmptyObject;
+
+type MongoContractBaseFromDefinition<Definition> = Simplify<
+  {
+    readonly target: DefinitionTargetId<Definition>;
+    readonly targetFamily: DefinitionFamilyId<Definition>;
+    readonly roots: DefinitionRoots<Definition>;
+    readonly domain: {
+      readonly namespaces: {
+        readonly [K in typeof UNBOUND_NAMESPACE_ID]: MongoDomainNamespaceFromDefinition<Definition>;
+      };
     };
-  };
-  readonly storage: DefinitionStorage<Definition>;
-  readonly capabilities: Record<string, never>;
-  readonly extensionPacks: DefinitionExtensionPacks<Definition>;
-  readonly profileHash: ProfileHashBase<string>;
-  readonly meta: Record<string, never>;
-}>;
+    readonly storage: DefinitionStorage<Definition>;
+    readonly capabilities: Record<string, never>;
+    readonly extensionPacks: DefinitionExtensionPacks<Definition>;
+    readonly profileHash: ProfileHashBase<string>;
+    readonly meta: Record<string, never>;
+  } & MaybeDefaultControlPolicySection<Definition>
+>;
 
 type CodecTypesFromDefinition<Definition> = MongoCodecTypes &
   MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
@@ -645,6 +658,7 @@ export type ContractScaffold<
   readonly target: Target;
   readonly extensionPacks?: ExtensionPacks;
   readonly roots?: Roots;
+  readonly defaultControlPolicy?: ControlPolicy;
 };
 
 export type ContractDefinition<
@@ -1041,6 +1055,7 @@ type ModelInput<
   readonly collection?: Collection;
   readonly indexes?: Indexes;
   readonly collectionOptions?: StrictShape<CollectionOptions, MongoCollectionOptionsAuthoringInput>;
+  readonly controlPolicy?: ControlPolicy;
   readonly storageRelations?: StorageRelations;
   readonly fields: Fields;
   readonly relations?: Relations;
@@ -1099,6 +1114,7 @@ export function model<
       : Record<never, never>,
     __indexes: input.indexes,
     __collectionOptions: input.collectionOptions,
+    __controlPolicy: input.controlPolicy,
     __collection: input.collection as Collection,
     __owner: (input.owner
       ? resolveModelName(input.owner)
@@ -1423,6 +1439,12 @@ function buildCollections(
         );
       }
 
+      if (modelBuilder.__controlPolicy) {
+        throw new Error(
+          `Model "${modelBuilder.__name}" defines controlPolicy but has no collection to attach it to.`,
+        );
+      }
+
       continue;
     }
 
@@ -1432,6 +1454,12 @@ function buildCollections(
     if (existingCollection.options && modelBuilder.__collectionOptions) {
       throw new Error(
         `Collection "${modelBuilder.__collection}" has collectionOptions declared by multiple models. Author collectionOptions on a single model per collection.`,
+      );
+    }
+
+    if (existingCollection.control !== undefined && modelBuilder.__controlPolicy) {
+      throw new Error(
+        `Collection "${modelBuilder.__collection}" has controlPolicy declared by multiple models. Author controlPolicy on a single model per collection.`,
       );
     }
 
@@ -1482,6 +1510,8 @@ function buildCollections(
     const storageOptions = modelBuilder.__collectionOptions
       ? toStorageCollectionOptions(modelBuilder.__collectionOptions)
       : undefined;
+    const controlPatch =
+      modelBuilder.__controlPolicy !== undefined ? { control: modelBuilder.__controlPolicy } : {};
 
     intermediate[modelBuilder.__collection] =
       storageIndexes.length > 0
@@ -1489,13 +1519,17 @@ function buildCollections(
             ...existingCollection,
             indexes: [...existingIndexes, ...storageIndexes],
             ...(storageOptions ? { options: storageOptions } : {}),
+            ...controlPatch,
           }
         : storageOptions
           ? {
               ...existingCollection,
               options: storageOptions,
+              ...controlPatch,
             }
-          : existingCollection;
+          : Object.keys(controlPatch).length > 0
+            ? { ...existingCollection, ...controlPatch }
+            : existingCollection;
   }
 
   const collections: Record<string, MongoCollection> = {};
@@ -1559,6 +1593,7 @@ function buildContractFromDefinition<
   const builtContract = {
     target: definition.target.targetId,
     targetFamily: definition.family.familyId,
+    ...ifDefined('defaultControlPolicy', definition.defaultControlPolicy),
     roots,
     domain: {
       namespaces: {
@@ -1579,7 +1614,7 @@ function buildContractFromDefinition<
     meta: {},
   } satisfies MongoContract;
 
-  return builtContract as MongoContractResult<Definition>;
+  return builtContract as unknown as MongoContractResult<Definition>;
 }
 
 export function defineContract<

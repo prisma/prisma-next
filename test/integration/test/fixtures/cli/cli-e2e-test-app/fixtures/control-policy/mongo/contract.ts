@@ -1,124 +1,45 @@
-import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
-import { crossRef } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildMongoNamespace,
-  MongoCollection,
-  type MongoContract,
-  MongoIndex,
-  MongoStorage,
-} from '@prisma-next/mongo-contract';
-import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
+import { defineContract, field, index, model } from '@prisma-next/mongo/contract-builder';
 
-const scalarObjectId = {
-  nullable: false as const,
-  type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
-};
-
-const scalarString = {
-  nullable: false as const,
-  type: { kind: 'scalar' as const, codecId: 'mongo/string@1' },
-};
-
-function collectionIndex(
-  fields: Record<string, 1 | -1>,
-  options?: { readonly unique?: boolean },
-): MongoIndex {
-  return new MongoIndex({
-    keys: Object.entries(fields).map(([field, direction]) => ({ field, direction })),
-    ...options,
-  });
-}
-
-const collections = {
-  catalog: new MongoCollection({
-    control: 'managed',
-    indexes: [collectionIndex({ sku: 1 }, { unique: true })],
-  }),
-  audit_log: new MongoCollection({
-    control: 'tolerated',
-    indexes: [collectionIndex({ ts: 1 })],
-  }),
-  auth_users: new MongoCollection({
-    control: 'external',
-    indexes: [collectionIndex({ email: 1 }, { unique: true })],
-  }),
-  legacy_jobs: new MongoCollection({
-    control: 'observed',
-    indexes: [collectionIndex({ status: 1 })],
-  }),
-};
-
-const capabilities: Record<string, Record<string, boolean>> = {};
-
-const storageBody = {
-  namespaces: {
-    [UNBOUND_NAMESPACE_ID]: {
-      id: UNBOUND_NAMESPACE_ID,
-      collections,
-    },
-  },
-};
-
-const storageHash = computeStorageHash({
-  target: 'mongo',
-  targetFamily: 'mongo',
-  storage: storageBody,
-  ...mongoContractCanonicalizationHooks,
-});
-
-export const contract = {
-  target: 'mongo',
-  targetFamily: 'mongo',
-  roots: {
-    Catalog: crossRef('Catalog'),
-    AuditLog: crossRef('AuditLog'),
-    AuthUsers: crossRef('AuthUsers'),
-    LegacyJobs: crossRef('LegacyJobs'),
-  },
-  domain: {
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        models: {
-          Catalog: {
-            fields: { _id: scalarObjectId, sku: scalarString },
-            relations: {},
-            storage: { collection: 'catalog' },
-          },
-          AuditLog: {
-            fields: { _id: scalarObjectId, ts: scalarString },
-            relations: {},
-            storage: { collection: 'audit_log' },
-          },
-          AuthUsers: {
-            fields: { _id: scalarObjectId, email: scalarString },
-            relations: {},
-            storage: { collection: 'auth_users' },
-          },
-          LegacyJobs: {
-            fields: { _id: scalarObjectId, status: scalarString },
-            relations: {},
-            storage: { collection: 'legacy_jobs' },
-          },
-        },
+export const contract = defineContract({
+  models: {
+    Catalog: model('Catalog', {
+      collection: 'catalog',
+      controlPolicy: 'managed',
+      fields: {
+        _id: field.objectId(),
+        sku: field.string(),
       },
-    },
+      indexes: [index({ sku: 1 }, { unique: true })],
+    }),
+
+    AuditLog: model('AuditLog', {
+      collection: 'audit_log',
+      controlPolicy: 'tolerated',
+      fields: {
+        _id: field.objectId(),
+        ts: field.string(),
+      },
+      indexes: [index({ ts: 1 })],
+    }),
+
+    AuthUsers: model('AuthUsers', {
+      collection: 'auth_users',
+      controlPolicy: 'external',
+      fields: {
+        _id: field.objectId(),
+        email: field.string(),
+      },
+      indexes: [index({ email: 1 }, { unique: true })],
+    }),
+
+    LegacyJobs: model('LegacyJobs', {
+      collection: 'legacy_jobs',
+      controlPolicy: 'observed',
+      fields: {
+        _id: field.objectId(),
+        status: field.string(),
+      },
+      indexes: [index({ status: 1 })],
+    }),
   },
-  storage: new MongoStorage({
-    storageHash,
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        collections,
-      }),
-    },
-  }),
-  capabilities,
-  extensionPacks: {},
-  profileHash: computeProfileHash({
-    target: 'mongo',
-    targetFamily: 'mongo',
-    capabilities,
-  }),
-  meta: {},
-} satisfies MongoContract;
+});
