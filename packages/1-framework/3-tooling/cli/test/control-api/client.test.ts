@@ -874,8 +874,21 @@ describe('ControlClient progress emission', () => {
           appliedAt: new Date('2024-06-01T12:00:00.000Z'),
           operationCount: 1,
         },
+        {
+          space: 'audit',
+          migrationName: '001_init',
+          migrationHash: 'sha256:mig-audit',
+          from: null,
+          to: 'sha256:audit-dest',
+          appliedAt: new Date('2024-06-01T12:00:01.000Z'),
+          operationCount: 2,
+        },
       ];
-      mockFamilyInstance.readLedger = async () => expectedEntries;
+      let capturedSpace: string | undefined;
+      mockFamilyInstance.readLedger = async (options) => {
+        capturedSpace = options.space;
+        return expectedEntries;
+      };
 
       const client = createControlClient({
         family: mockFamily,
@@ -888,6 +901,7 @@ describe('ControlClient progress emission', () => {
       const entries = await client.readLedger();
       await client.close();
 
+      expect(capturedSpace).toBeUndefined();
       expect(entries).toEqual(expectedEntries);
     });
   });
