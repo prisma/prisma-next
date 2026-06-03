@@ -909,10 +909,11 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(fanRow).toBeDefined();
     expect(fanRow).not.toContain(laneColorForColumn(2)('├'));
     expect(fanRow).toContain(laneColorForColumn(1)('─'));
-    expect(fanRow).toContain(laneColorForColumn(1)('┼'));
+    expect(fanRow).toContain(dim('┼'));
+    expect(fanRow).not.toContain(laneColorForColumn(1)('┼'));
+    expect(fanRow).not.toContain(laneColorForColumn(2)('┼'));
     expect(fanRow).toContain(laneColorForColumn(2)('─'));
     expect(fanRow).toContain(laneColorForColumn(2)('┬'));
-    expect(fanRow).not.toContain(laneColorForColumn(2)('┼'));
     expect(fanRow).not.toContain(laneColorForColumn(1)('┼─'));
     const bobMergeRow = lines.find((line) => {
       const plain = stripAnsi(line);
@@ -1014,6 +1015,101 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(landLine).toContain(laneColorForColumn(2)('──'));
     expect(landLine).toContain(laneColorForColumn(2)('╯ '));
     expect(stripAnsi(landLine ?? '')).toContain('◂──╯');
+  });
+
+  function kitchenSinkEdges(): readonly MigrationEdge[] {
+    const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
+    const addPhone = edge('root', 'n1', 'add_phone');
+    const emailDefault = edge('n1', 'n2', 'email_default');
+    const changeDefault = edge('n2', 'n3', 'change_default');
+    const addPosts = edge('n3', 'n4', 'add_posts');
+    const addComments = edge('n4', 'n5', 'add_comments');
+    const kitchenSink = edge('n5', 'tip_long', 'kitchen_sink');
+    const rollback = edge('tip_long', 'n5', 'rollback');
+    const widenEmail = edge('root', 's1', 'widen_email');
+    const migration = edge('s1', 'tip_short', 'migration');
+    return [
+      init,
+      addPhone,
+      emailDefault,
+      changeDefault,
+      addPosts,
+      addComments,
+      kitchenSink,
+      rollback,
+      widenEmail,
+      migration,
+    ];
+  }
+
+  function threeWayFanEdges(): readonly MigrationEdge[] {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const addAvatar = edge('ef9de27', '6656a6e', 'add_avatar');
+    const mergePhone = edge('73e3abe', '3116048', 'merge_phone');
+    const mergePosts = edge('a94b7b4', '3116048', 'merge_posts');
+    const mergeAvatar = edge('6656a6e', '3116048', 'merge_avatar');
+    return [init, addPhone, addPosts, addAvatar, mergePhone, mergePosts, mergeAvatar];
+  }
+
+  it('kitchen-sink colorized snapshot asserts all six lane-color rules', () => {
+    const fixtures: readonly {
+      readonly name: string;
+      readonly edges: readonly MigrationEdge[];
+    }[] = [
+      { name: 'diamond', edges: diamondEdges() },
+      { name: 'routed-back-arc', edges: skipArcEdges() },
+      { name: 'three-way-fan', edges: threeWayFanEdges() },
+      { name: 'kitchen-sink', edges: kitchenSinkEdges() },
+    ];
+
+    for (const { edges } of fixtures) {
+      const plain = tree(edges, { colorize: false });
+      const colored = tree(edges, { colorize: true });
+      expect(colored.split('\n').map(stripAnsi)).toEqual(plain.split('\n').map(stripAnsi));
+    }
+
+    const diamondColored = tree(diamondEdges(), { colorize: true });
+    expect(diamondColored).toContain(laneColorForColumn(1)('│ '));
+    expect(diamondColored.split('\n')[0]).toMatch(/^○/);
+
+    const fanColored = tree(threeWayFanEdges(), { colorize: true });
+    expect(new Set([1, 2].map((column) => laneColorForColumn(column)('│ '))).size).toBe(2);
+    for (const column of [1, 2]) {
+      expect(fanColored).toContain(laneColorForColumn(column)('│ '));
+    }
+
+    const showcaseColored = tree(showcaseEdges(), { colorize: true });
+    const crossingRow = showcaseColored
+      .split('\n')
+      .find((line) => line.includes('┼') && line.includes('┬'));
+    expect(crossingRow).toBeDefined();
+    expect(crossingRow).toContain(dim('┼'));
+    expect(crossingRow).not.toContain(laneColorForColumn(1)('┼'));
+
+    const skipColored = tree(skipArcEdges(), { colorize: true });
+    const landLine = skipColored
+      .split('\n')
+      .find((line) => line.includes('bbbbbbb') && line.includes('◂'));
+    expect(landLine).toContain(laneColorForColumn(2)('◂'));
+    expect(landLine).toContain(laneColorForColumn(2)('──'));
+
+    const branchNode = diamondColored
+      .split('\n')
+      .find((line) => line.includes('6656a6e') && !line.includes('→'));
+    expect(branchNode).toContain(laneColorForColumn(1)('○ '));
+
+    const branchEdge = diamondColored.split('\n').find((line) => line.includes('bob_add_avatar'));
+    expect(branchEdge).toContain(laneColorForColumn(1)('↑'));
+
+    const sinkColored = tree(kitchenSinkEdges(), { colorize: true });
+    const shortBranchNode = sinkColored
+      .split('\n')
+      .find((line) => line.includes('tip_sho') && !line.includes('→'));
+    expect(shortBranchNode).toContain(laneColorForColumn(1)('○ '));
+    expect(sinkColored).toMatch(/kitchen_sink/);
+    expect(sinkColored).toMatch(/rollback/);
   });
 });
 

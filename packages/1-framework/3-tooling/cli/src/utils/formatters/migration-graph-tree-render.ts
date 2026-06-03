@@ -2,7 +2,17 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { bold, createColors, green, yellow } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
-import { laneColorForColumn } from './migration-graph-lane-colors';
+import {
+  laneColorForColumn,
+  NEUTRAL_LANE_COLUMN,
+  type RowArcLaneColors,
+  resolveConnectorLaneColors,
+  resolveRowArcLaneColors,
+  stylerForLaneColumn,
+} from './migration-graph-lane-colors';
+
+export { resolveConnectorLaneColors } from './migration-graph-lane-colors';
+
 import type {
   MigrationGraphGridModel,
   MigrationGraphGridRow,
@@ -135,13 +145,6 @@ function arrowForEdgeKind(
 }
 
 /**
- * The leftmost lane (column 0) renders with the neutral dim lane style rather
- * than a palette hue — in the common single-lane case it has nothing to be told
- * apart from. Used as the "no owning arc" sentinel during colour resolution.
- */
-const NEUTRAL_LANE = 0;
-
-/**
  * Forced bold for branch-coloured names. A branched name pairs its lane hue
  * (also forced, via {@link laneColorForColumn}) with bold; both must emit even
  * when colorette's ambient TTY detection is off, so the colorized branch name
@@ -149,194 +152,12 @@ const NEUTRAL_LANE = 0;
  */
 const { bold: forcedBold } = createColors({ useColor: true });
 
-/**
- * The colour-source column for each cell of a row, resolved together because a
- * routed back-arc spans columns and must read as **one hue** rather than a
- * per-column "rainbow". An arc's horizontal bridges, corners, and node-pair
- * connector all take the arc's owning back-lane column (the corner that closes
- * the arc), not the column they pass through.
- */
-interface RowLaneColors {
-  /** Colour column for a cell's structural glyph (lane / spine / arc body). */
-  readonly lane: readonly number[];
-  /** Colour column for a node arc-pair's connector half (`◂` / `─`). */
-  readonly connector: readonly number[];
-  /**
-   * Colour column for the trailing `─` of a landing tee (`┴─`). The junction
-   * (`lane`) keeps its own column; the dash leads into the next converging arc.
-   */
-  readonly dash: readonly number[];
-}
-
-/**
- * Resolve per-cell colour columns for a row. Scanning right-to-left lets each
- * arc segment inherit the hue of the arc it leads into.
- *
- * On a converging-landing line (`○◂──────┴─┴─╯`), every horizontal dash segment
- * takes the hue of the **nearest landing anchor** — the next `arc-land-tee` or
- * `arc-land-corner` — to its right, i.e. the branch it leads into: the bridge
- * run leads into the first converging arc, and each tee's trailing `─` leads
- * into the next arc out. Tee/corner junction glyphs keep their own column hue.
- * This mirrors the forward connector's `┬─` rule (see
- * {@link resolveConnectorLaneColors}). A single (non-converging) landing has
- * only the corner as an anchor, so its whole horizontal run reads as one hue.
- *
- * The source side (`○─`, `arc-branch-tee`, `arc-branch-corner`) and pure
- * horizontal passes are unaffected: they track the nearest corner to the right
- * (`arcCorner`), so a routed back-arc's source fan still reads as one hue. A
- * crossing can only be one colour, so it takes the arc owning the horizontal
- * run at this row; the crossed vertical lane is occluded at that one cell and
- * reappears on the next row.
- */
-function resolveRowLaneColors(cells: readonly StructuralCell[]): RowLaneColors {
-  const lane = new Array<number>(cells.length);
-  const connector = new Array<number>(cells.length);
-  const dash = new Array<number>(cells.length);
-  let arcCorner = NEUTRAL_LANE;
-  let landingAnchor = NEUTRAL_LANE;
-  for (let column = cells.length - 1; column >= 0; column--) {
-    const cell = cells[column];
-    connector[column] = landingAnchor !== NEUTRAL_LANE ? landingAnchor : arcCorner;
-    switch (cell?.kind) {
-      case 'arc-branch-corner':
-        arcCorner = column;
-        lane[column] = column;
-        dash[column] = column;
-        break;
-      case 'arc-land-corner':
-        arcCorner = column;
-        landingAnchor = column;
-        lane[column] = column;
-        dash[column] = column;
-        break;
-      // An inner co-sourced arc's own back-lane junction: its vertical run
-      // continues below in this column, so the whole `┬─` keeps its own column.
-      case 'arc-branch-tee':
-        lane[column] = column;
-        dash[column] = column;
-        break;
-      // The symmetric co-landing junction: the `┴` keeps its own column (its
-      // vertical run continues above), but the trailing `─` leads into the next
-      // converging arc — the nearest landing anchor still to its right.
-      case 'arc-land-tee':
-        lane[column] = column;
-        dash[column] = landingAnchor === NEUTRAL_LANE ? column : landingAnchor;
-        landingAnchor = column;
-        break;
-      case 'arc-crossing':
-      case 'arc-land-bridge': {
-        const served = landingAnchor !== NEUTRAL_LANE ? landingAnchor : arcCorner;
-        lane[column] = served;
-        dash[column] = served;
-        break;
-      }
-      case 'horizontal-pass':
-        lane[column] = arcCorner === NEUTRAL_LANE ? column : arcCorner;
-        dash[column] = lane[column] ?? column;
-        break;
-      case 'node':
-        lane[column] = column;
-        dash[column] = column;
-        arcCorner = NEUTRAL_LANE;
-        landingAnchor = NEUTRAL_LANE;
-        break;
-      default:
-        lane[column] = column;
-        dash[column] = column;
-        arcCorner = NEUTRAL_LANE;
-        landingAnchor = NEUTRAL_LANE;
-    }
-  }
-  return { lane, connector, dash };
-}
-
-/**
- * Per-cell colour for a forward branch/merge connector row, split into the
- * cell's junction `glyph` and its trailing `dash`. A connector's horizontal run
- * is one logical line (a fork into new lanes, or a merge into a surviving lane)
- * and reads best as the colour of the lane each segment serves — not dim-gray
- * or a per-pass-through-column "rainbow".
- */
-interface ConnectorLaneColors {
-  /** Colour column for a cell's junction glyph (`├` / `┬` / `┴` / `╮` / `╯`). */
-  readonly glyph: readonly number[];
-  /** Colour column for a tee's trailing `─` — the branch it leads into. */
-  readonly dash: readonly number[];
-}
-
-/**
- * Resolve per-cell connector colours. Scanning right-to-left, a corner or an
- * intermediate tee anchors its own lane (its junction glyph takes that column),
- * but a tee's **trailing dash leads into the branch on its right** (the next
- * branch point), so `┬─` reads as "this lane, then on toward the next" rather
- * than tinting the dash with the left lane. The leading tee at `startLane` (the
- * fork/merge origin) and pure horizontal segments inherit the nearest branch
- * point to their right whole-cell, so the run into a branch — or collapsing
- * into a merge corner — stays continuous. An `arc-crossing` keeps its junction
- * glyph at its own column but re-anchors `owner` like an intermediate tee so
- * dashes on both sides lead into the nearest branch on their right. Pass-through
- * verticals outside the run keep their own column (column 0 stays neutral).
- */
-export function resolveConnectorLaneColors(
-  cells: readonly StructuralCell[],
-  startLane: number,
-): ConnectorLaneColors {
-  const glyph = new Array<number>(cells.length);
-  const dash = new Array<number>(cells.length);
-  let owner = NEUTRAL_LANE;
-  for (let column = cells.length - 1; column >= 0; column--) {
-    const cell = cells[column];
-    switch (cell?.kind) {
-      case 'branch-corner':
-      case 'merge-corner':
-        owner = column;
-        glyph[column] = column;
-        dash[column] = column;
-        break;
-      case 'branch-tee':
-      case 'merge-tee':
-        if (column === startLane) {
-          const served = owner === NEUTRAL_LANE ? column : owner;
-          glyph[column] = column;
-          dash[column] = served;
-        } else {
-          dash[column] = owner === NEUTRAL_LANE ? column : owner;
-          glyph[column] = column;
-          owner = column;
-        }
-        break;
-      case 'arc-crossing':
-        glyph[column] = column;
-        dash[column] = owner === NEUTRAL_LANE ? column : owner;
-        owner = column;
-        break;
-      case 'horizontal-pass': {
-        const served = owner === NEUTRAL_LANE ? column : owner;
-        glyph[column] = served;
-        dash[column] = served;
-        break;
-      }
-      default:
-        glyph[column] = column;
-        dash[column] = column;
-    }
-  }
-  return { glyph, dash };
-}
-
-/**
- * Style a structural glyph by its resolved colour column. Column 0 and the
- * neutral sentinel render dim (`style.lane`); columns ≥ 1 take a palette hue.
- */
 function laneStylerForColumn(
   colorColumn: number,
   colorize: boolean,
   style: MigrationListStyler,
 ): (text: string) => string {
-  if (!colorize || colorColumn <= NEUTRAL_LANE) {
-    return (text) => style.lane(text);
-  }
-  return laneColorForColumn(colorColumn);
+  return stylerForLaneColumn(colorColumn, colorize, style.lane);
 }
 
 /**
@@ -351,10 +172,25 @@ function branchStylerOrDefault(
   colorize: boolean,
   fallback: (text: string) => string,
 ): (text: string) => string {
-  if (!colorize || column <= NEUTRAL_LANE) {
+  if (!colorize || column <= NEUTRAL_LANE_COLUMN) {
     return fallback;
   }
   return laneColorForColumn(column);
+}
+
+/**
+ * Render a crossing tee (`┼─`): the junction stays dim/neutral so neither arc
+ * steals the cell; the trailing dash takes the served lane hue.
+ */
+function renderArcCrossing(
+  pair: string,
+  dashColumn: number,
+  colorize: boolean,
+  style: MigrationListStyler,
+): string {
+  const junction = colorize ? style.lane : (text: string) => text;
+  const dash = laneStylerForColumn(dashColumn, colorize, style);
+  return junction(pair.slice(0, 1)) + dash(pair.slice(1));
 }
 
 /**
@@ -398,7 +234,7 @@ function renderNodeMarkerPair(
 function renderCellPair(
   cell: StructuralCell,
   column: number,
-  colors: RowLaneColors,
+  colors: RowArcLaneColors,
   colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
@@ -407,7 +243,7 @@ function renderCellPair(
   const lane = laneStylerForColumn(laneColumn, colorize, style);
   switch (cell.kind) {
     case 'node': {
-      const arcColumn = colors.connector[column] ?? NEUTRAL_LANE;
+      const arcColumn = colors.connector[column] ?? NEUTRAL_LANE_COLUMN;
       if (cell.arcLand === true) {
         return renderNodeMarkerPair(palette.arcLand, column, arcColumn, colorize, style);
       }
@@ -512,7 +348,7 @@ function renderConnectorRow(
           out += lane(palette.horizontalPass);
           break;
         case 'arc-crossing':
-          out += renderConnectorTee(palette.arcCrossing, glyphColumn, dashColumn, colorize, style);
+          out += renderArcCrossing(palette.arcCrossing, dashColumn, colorize, style);
           break;
         default:
           out += '  ';
@@ -748,7 +584,7 @@ export function renderMigrationGraphTree(
       continue;
     }
 
-    const cellColors = resolveRowLaneColors(row.cells);
+    const cellColors = resolveRowArcLaneColors(row.cells);
     let gutter = row.cells
       .map((cell, column) =>
         renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
@@ -845,7 +681,7 @@ export function renderMigrationGraphTree(
     // A branched name keeps its bold (via `style.dirName`) and adds the lane
     // hue, so it reads as one with its lane/arrow; column-0 names stay bold-only.
     const dirNameStyler =
-      opts.colorize && laneIndex > NEUTRAL_LANE
+      opts.colorize && laneIndex > NEUTRAL_LANE_COLUMN
         ? (text: string) => forcedBold(laneColorForColumn(laneIndex)(text))
         : style.dirName;
     const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
