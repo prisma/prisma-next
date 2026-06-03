@@ -99,21 +99,17 @@ function columnWidth(values: readonly string[]): number {
   return values.reduce((max, value) => Math.max(max, value.length), 0);
 }
 
-function padDividerCell(width: number): string {
-  return DIVIDER_CHAR.repeat(width);
-}
-
-function textCellWidth(valueWidth: number): number {
-  return valueWidth + 1;
+function padDividerCell(valueWidth: number): string {
+  return DIVIDER_CHAR.repeat(valueWidth + 2);
 }
 
 function padTextCell(value: string, valueWidth: number): string {
-  return padVisible(` ${value}`, textCellWidth(valueWidth));
+  return ` ${padVisible(value, valueWidth)} `;
 }
 
 function padOpsCell(value: string, valueWidth: number): string {
-  const cellWidth = textCellWidth(valueWidth);
-  return ' '.repeat(Math.max(0, cellWidth - value.length)) + value;
+  const padding = Math.max(0, valueWidth - stringWidth(value));
+  return ` ${' '.repeat(padding)}${value} `;
 }
 
 export function renderMigrationLogTable(
@@ -155,14 +151,14 @@ export function renderMigrationLogTable(
   );
   const heading = headingParts.join(COLUMN_SEPARATOR);
 
-  const dividerParts = [padDividerCell(textCellWidth(appliedAtWidth))];
+  const dividerParts = [padDividerCell(appliedAtWidth)];
   if (showSpace) {
-    dividerParts.push(padDividerCell(textCellWidth(spaceWidth)));
+    dividerParts.push(padDividerCell(spaceWidth));
   }
   dividerParts.push(
-    padDividerCell(textCellWidth(nameWidth)),
-    padDividerCell(textCellWidth(transitionWidth)),
-    padDividerCell(textCellWidth(opsWidth)),
+    padDividerCell(nameWidth),
+    padDividerCell(transitionWidth),
+    padDividerCell(opsWidth),
   );
   const divider = dividerParts.map((cell) => styler.summary(cell)).join(COLUMN_SEPARATOR);
 

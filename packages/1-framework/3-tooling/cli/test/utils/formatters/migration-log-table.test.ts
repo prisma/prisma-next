@@ -104,10 +104,10 @@ describe('renderMigrationLogTable', () => {
     );
     expect(table).toBe(
       [
-        ' Applied at            Migration           Change                Ops',
-        '───────────────────── ─────────────────── ────────────────── ───────',
-        ' 2026-06-01 08:00:00Z  20260301_init       ∅ → ef9de27         5 ops',
-        ' 2026-06-02 10:30:00Z  20260302_add_users  ef9de27 → abcd123  12 ops',
+        ' Applied at             Migration            Change                 Ops ',
+        '────────────────────── ──────────────────── ─────────────────── ────────',
+        ' 2026-06-01 08:00:00Z   20260301_init        ∅ → ef9de27          5 ops ',
+        ' 2026-06-02 10:30:00Z   20260302_add_users   ef9de27 → abcd123   12 ops ',
       ].join('\n'),
     );
   });
@@ -148,10 +148,10 @@ describe('renderMigrationLogTable', () => {
     );
     expect(table).toBe(
       [
-        ' Applied at            Space  Migration       Change      Ops',
-        '───────────────────── ────── ─────────────── ───────── ──────',
-        ' 2026-06-01 08:00:00Z  app    20260301_init   ∅ → dest  1 ops',
-        ' 2026-06-01 08:00:00Z  audit  20260302_audit  ∅ → dest  1 ops',
+        ' Applied at             Space   Migration        Change       Ops ',
+        '────────────────────── ─────── ──────────────── ────────── ───────',
+        ' 2026-06-01 08:00:00Z   app     20260301_init    ∅ → dest   1 ops ',
+        ' 2026-06-01 08:00:00Z   audit   20260302_audit   ∅ → dest   1 ops ',
       ].join('\n'),
     );
   });
@@ -253,8 +253,8 @@ describe('renderMigrationLogTable with ANSI styler', () => {
     expect(dataLine).toContain('2026-06-03 09:15:00Z');
     expect(dataLine.slice(0, migrationStart - 1).trimEnd()).toBe(' 2026-06-03 09:15:00Z');
     expect(dataLine).toContain('3 ops');
-    expect(dataLine.endsWith('3 ops')).toBe(true);
-    expect(table).toContain(dim('─'.repeat(21)));
+    expect(dataLine.endsWith(' 3 ops ')).toBe(true);
+    expect(table).toContain(dim('─'.repeat(22)));
   });
 
   it('styles the empty source glyph with dim and leaves space column unstyled', () => {
