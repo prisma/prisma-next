@@ -4,11 +4,13 @@ import { createColors, dim } from 'colorette';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { laneColorForColumn } from '../../../src/utils/formatters/migration-graph-lane-colors';
+import type { StructuralCell } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migration-graph-layout';
 import { buildMigrationGraphRows } from '../../../src/utils/formatters/migration-graph-rows';
 import {
   renderMigrationGraphLegend,
   renderMigrationGraphTree,
+  resolveConnectorLaneColors,
 } from '../../../src/utils/formatters/migration-graph-tree-render';
 
 const { bold: forcedBold } = createColors({ useColor: true });
@@ -346,6 +348,61 @@ describe('renderMigrationGraphTree', () => {
       │↑  init                 ∅       → ef9de27
       ∅"
     `);
+  });
+
+  function convergingEdges(): readonly MigrationEdge[] {
+    return [
+      edge(EMPTY_CONTRACT_HASH, 'n0', 'init'),
+      edge('n0', 'n1', 'm1'),
+      edge('n1', 'n2', 'm2'),
+      edge('n2', 'n3', 'm3'),
+      edge('n3', 'n4', 'm4'),
+      edge('n4', 'n5', 'm5'),
+      edge('n5', 'n6', 'm6'),
+      edge('n3', 'n1', 'rb_a'),
+      edge('n5', 'n1', 'rb_b'),
+    ];
+  }
+
+  function nodeOrder(rendered: string): string[] {
+    return rendered
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => /^(○|∅)/.test(line))
+      .map((line) => (line === '∅' ? '∅' : (line.split(/\s+/).pop() ?? '')));
+  }
+
+  it('lands two converging skip-rollbacks and keeps the tip at the top', () => {
+    const rendered = tree(convergingEdges());
+    // Tip first, root last — the rollbacks do not perturb the forward order.
+    expect(nodeOrder(rendered)).toEqual(['n6', 'n5', 'n4', 'n3', 'n2', 'n1', 'n0', '∅']);
+    // Both arcs close onto n1: an inner landing tee then the outer corner.
+    const landing = rendered.split('\n').find((line) => line.includes('◂') && line.endsWith('n1'));
+    expect(landing?.startsWith('○◂┴─╯')).toBe(true);
+  });
+
+  it('lands three converging skip-rollbacks onto one target', () => {
+    const rendered = tree([...convergingEdges(), edge('n4', 'n1', 'rb_c')]);
+    expect(nodeOrder(rendered)).toEqual(['n6', 'n5', 'n4', 'n3', 'n2', 'n1', 'n0', '∅']);
+    const landing = rendered.split('\n').find((line) => line.includes('◂') && line.endsWith('n1'));
+    expect(landing?.startsWith('○◂┴─┴─╯')).toBe(true);
+  });
+
+  it('renders a single skip-rollback landing as a bare corner', () => {
+    const rendered = tree([
+      edge(EMPTY_CONTRACT_HASH, 'n0', 'init'),
+      edge('n0', 'n1', 'm1'),
+      edge('n1', 'n2', 'm2'),
+      edge('n2', 'n3', 'm3'),
+      edge('n3', 'n4', 'm4'),
+      edge('n4', 'n5', 'm5'),
+      edge('n5', 'n6', 'm6'),
+      edge('n5', 'n1', 'rb_b'),
+    ]);
+    expect(nodeOrder(rendered)).toEqual(['n6', 'n5', 'n4', 'n3', 'n2', 'n1', 'n0', '∅']);
+    const landing = rendered.split('\n').find((line) => line.includes('◂') && line.endsWith('n1'));
+    expect(landing?.startsWith('○◂╯')).toBe(true);
+    expect(landing).not.toContain('┴');
   });
 });
 
@@ -767,9 +824,12 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     const fanRow = lines.find((line) => line.includes('┼') && line.includes('┬'));
     expect(fanRow).toBeDefined();
     expect(fanRow).not.toContain(laneColorForColumn(2)('├'));
+    expect(fanRow).toContain(laneColorForColumn(1)('─'));
+    expect(fanRow).toContain(laneColorForColumn(1)('┼'));
     expect(fanRow).toContain(laneColorForColumn(2)('─'));
-    expect(fanRow).toContain(laneColorForColumn(1)('┼─'));
+    expect(fanRow).toContain(laneColorForColumn(2)('┬'));
     expect(fanRow).not.toContain(laneColorForColumn(2)('┼'));
+    expect(fanRow).not.toContain(laneColorForColumn(1)('┼─'));
     const bobMergeRow = lines.find((line) => {
       const plain = stripAnsi(line);
       return plain.includes('╯') && plain.includes('├') && !plain.includes('↑');
@@ -788,27 +848,104 @@ describe('renderMigrationGraphTree (lane colors)', () => {
     expect(addNameMergeRow).toContain(laneColorForColumn(1)('─'));
   });
 
+  // A 4-way forward fan (occupying lanes 0..3) plus three node-skipping
+  // rollbacks converging on an early node. The back-lanes are pushed out to
+  // columns 4/5/6, so the landing row reads `○◂──────┴─┴─╯`: a bridge run, two
+  // converging landing tees, then the outermost corner.
+  function convergingLandingEdges(): readonly MigrationEdge[] {
+    return [
+      edge(EMPTY_CONTRACT_HASH, 'n0', 'init'),
+      edge('n0', 'n1', 'm1'),
+      edge('n1', 'n2', 'm2'),
+      edge('n2', 'n3', 'm3'),
+      edge('n3', 'n4', 'm4'),
+      edge('n4', 'n5', 'm5'),
+      edge('n5', 'n6', 'm6'),
+      edge('n6', 'n7', 'm7'),
+      edge('n1', 'b1', 'fan_b1'),
+      edge('n1', 'b2', 'fan_b2'),
+      edge('n1', 'b3', 'fan_b3'),
+      edge('b1', 'n6', 'merge_b1'),
+      edge('b2', 'n6', 'merge_b2'),
+      edge('b3', 'n6', 'merge_b3'),
+      edge('n3', 'n1', 'rb_a'),
+      edge('n4', 'n1', 'rb_c'),
+      edge('n5', 'n1', 'rb_b'),
+    ];
+  }
+
+  it('colors each converging-landing dash by the arc it leads into', () => {
+    const colored = tree(convergingLandingEdges(), { colorize: true });
+    const landing = colored.split('\n').find((line) => stripAnsi(line).startsWith('○◂──────┴─┴─╯'));
+    expect(landing).toBeDefined();
+    // Arcs converge in columns 4, 5, 6 (left → right). The bridge run leads into
+    // the first arc; each tee's trailing dash leads into the NEXT arc out.
+    expect(landing).toContain(laneColorForColumn(4)('◂'));
+    expect(landing).toContain(laneColorForColumn(4)('──'));
+    // First tee: `┴` keeps its own column (4); its trailing `─` leads into 5.
+    expect(landing).toContain(laneColorForColumn(4)('┴') + laneColorForColumn(5)('─'));
+    // Second tee: `┴` keeps its own column (5); its trailing `─` leads into 6.
+    expect(landing).toContain(laneColorForColumn(5)('┴') + laneColorForColumn(6)('─'));
+    // The corner keeps its own column hue.
+    expect(landing).toContain(laneColorForColumn(6)('╯ '));
+    // No tee's trailing dash wears its own (left) lane any more.
+    expect(landing).not.toContain(laneColorForColumn(4)('┴─'));
+    expect(landing).not.toContain(laneColorForColumn(5)('┴─'));
+    // The bridge run no longer wears the outer corner's (col 6) hue.
+    expect(landing).not.toContain(laneColorForColumn(6)('──'));
+  });
+
+  it('keeps a single (non-converging) back-arc landing one continuous hue', () => {
+    const colored = tree(skipArcEdges(), { colorize: true });
+    const landing = colored
+      .split('\n')
+      .find((line) => line.includes('bbbbbbb') && line.includes('◂'));
+    expect(landing).toBeDefined();
+    // The lone arc lands in column 2; with only the corner as an anchor, the
+    // whole run — connector, bridges, and corner — reads as that one hue.
+    expect(landing).toContain(laneColorForColumn(2)('◂'));
+    expect(landing).toContain(laneColorForColumn(2)('──'));
+    expect(landing).toContain(laneColorForColumn(2)('╯ '));
+    expect(landing).not.toContain('┴');
+  });
+
   it("colors a routed back-arc's whole horizontal run — bridges and crossings — one hue", () => {
     const colored = tree(skipArcEdges(), { colorize: true });
     const lines = colored.split('\n');
-    // Source-tee row: every horizontal bridge and the closing corner share the
-    // arc's owning back-lane hue (column 3) — not a per-column "rainbow".
-    const teeLine = lines.find((line) => line.includes('ccccccc') && line.includes('╮'));
+    // The outer back-arc (rollback_d_to_b) routes in column 2. Its source-tee
+    // row crosses the inner arc's body and closes the corner; the crossing
+    // bridge and the corner share the arc's own back-lane hue (column 2) — not
+    // a per-column "rainbow".
+    const teeLine = lines.find((line) => line.includes('ddddddd') && line.includes('╮'));
     expect(teeLine).toBeDefined();
-    expect(teeLine).toContain(laneColorForColumn(3)('──'));
-    expect(teeLine).toContain(laneColorForColumn(3)('╮ '));
+    expect(teeLine).toContain(laneColorForColumn(2)('──'));
+    expect(teeLine).toContain(laneColorForColumn(2)('╮ '));
     expect(teeLine).not.toContain(laneColorForColumn(1)('──'));
-    expect(teeLine).not.toContain(laneColorForColumn(2)('──'));
-    expect(stripAnsi(teeLine ?? '')).toContain('────');
-    // Landing row: the ◂ connector, bridge, and ╯ corner share the arc hue;
-    // the landing node ○ keeps its own lane.
-    const landLine = lines.find((line) => line.includes('ddddddd') && line.includes('◂'));
+    expect(stripAnsi(teeLine ?? '')).toContain('───╮');
+    // Landing row: the ◂ connector, crossing bridge, and ╯ corner share the
+    // arc hue; the landing node ○ keeps its own (neutral column-0) lane.
+    const landLine = lines.find((line) => line.includes('bbbbbbb') && line.includes('◂'));
     expect(landLine).toBeDefined();
-    expect(landLine).toContain(laneColorForColumn(1)('○'));
-    expect(landLine).toContain(laneColorForColumn(3)('◂'));
-    expect(landLine).toContain(laneColorForColumn(3)('──'));
-    expect(landLine).toContain(laneColorForColumn(3)('╯ '));
+    expect(landLine).toContain(laneColorForColumn(2)('◂'));
+    expect(landLine).toContain(laneColorForColumn(2)('──'));
+    expect(landLine).toContain(laneColorForColumn(2)('╯ '));
     expect(stripAnsi(landLine ?? '')).toContain('◂──╯');
+  });
+});
+
+describe('resolveConnectorLaneColors', () => {
+  it('colours arc-crossing dashes by the branch point immediately on their right', () => {
+    const cells: readonly StructuralCell[] = [
+      { kind: 'branch-tee' },
+      { kind: 'arc-crossing' },
+      { kind: 'branch-tee' },
+      { kind: 'branch-corner' },
+    ];
+    const { glyph, dash } = resolveConnectorLaneColors(cells, 0);
+    expect([...glyph]).toEqual([0, 1, 2, 3]);
+    expect(dash[0]).toBe(1);
+    expect(dash[1]).toBe(2);
+    expect(dash[2]).toBe(3);
   });
 });
 
@@ -863,6 +1000,29 @@ describe('renderMigrationGraphLegend', () => {
     expect(stripAnsi(colored)).toContain('* contract   ^ forward   v rollback');
     expect(stripAnsi(colored)).toContain('aaaaaa -> bbbbbb');
     expect(stripAnsi(colored)).not.toContain('lanes');
+  });
+
+  it('dims legend label prose when colorize is on, not the heading or glyphs', () => {
+    const { dim } = createColors({ useColor: true });
+    const colored = renderMigrationGraphLegend({ colorize: true });
+    expect(colored.startsWith('Legend:')).toBe(true);
+    const lines = colored.split('\n');
+    expect(lines[0]).toBe('Legend:');
+    expect(lines[0]).not.toContain('\u001b[2m');
+
+    const firstContent = lines[1] ?? '';
+    const forwardIdx = firstContent.indexOf('forward');
+    expect(forwardIdx).toBeGreaterThan(-1);
+    const dimForward = dim('forward');
+    if (colored.includes(dimForward)) {
+      expect(firstContent.indexOf(dimForward)).toBe(forwardIdx);
+    } else {
+      expect(stripAnsi(colored)).toBe(renderMigrationGraphLegend({ colorize: false }));
+    }
+
+    // The leading glyph markers (○, ↑, ↓, ⟲, ∅) stay bright like the other kind
+    // glyphs — only the descriptive prose dims.
+    expect(colored).not.toContain(`${dim('∅')}`);
   });
 });
 

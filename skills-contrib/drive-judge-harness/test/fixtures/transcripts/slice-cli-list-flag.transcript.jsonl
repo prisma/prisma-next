@@ -1,6 +1,0 @@
-{"role":"user","message":{"content":[{"type":"text","text":"Add a --json flag to the migration-list CLI command. Treat it as one slice."}]}}
-{"role":"assistant","message":{"content":[{"type":"text","text":"Triaging as an in-project slice. Writing the slice spec."},{"type":"tool_use","name":"Write","input":{"path":"projects/example/slices/cli-json-flag/spec.md","contents":"# Slice: cli-json-flag\n..."}}]}}
-{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"path":"projects/example/slices/cli-json-flag/plan.md","contents":"## Dispatch plan\n..."}}]}}
-{"role":"assistant","message":{"content":[{"type":"text","text":"Dispatching the implementation."},{"type":"tool_use","name":"Task","input":{"description":"Implement --json flag on migration-list","subagent_type":"generalPurpose","model":"claude-4.6-sonnet-high-thinking"}}]}}
-{"role":"user","message":{"content":[{"type":"text","text":"Looks good, but please make sure stdout is pure JSON."}]}}
-{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Task","input":{"description":"Address review: keep stdout pure JSON","subagent_type":"generalPurpose","model":"claude-4.6-sonnet-high-thinking"}}]}}

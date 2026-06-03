@@ -1,6 +1,7 @@
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
+  ControlPolicy,
   ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
@@ -785,6 +786,7 @@ export type ModelAttributesSpec = {
 
 export type SqlStageSpec = {
   readonly table?: string;
+  readonly control?: ControlPolicy;
   readonly indexes?: readonly IndexConstraint[];
   readonly foreignKeys?: readonly ForeignKeyConstraint[];
 };
@@ -1216,6 +1218,7 @@ export type ContractInput<
   readonly naming?: NamingConfig;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
+  readonly defaultControl?: ControlPolicy;
   /**
    * Declared namespace coordinates the contract recognises. Per-model
    * `namespace` references must reference an entry in this list (or the
