@@ -76,6 +76,7 @@ function setupConfigMock(
     readAllMarkers: vi
       .fn()
       .mockResolvedValue(markerRecord ? new Map([['app', markerRecord]]) : new Map()),
+    readLedger: vi.fn().mockResolvedValue([]),
     // Pass-through `deserializeContract` stub: the invariant tests construct
     // a skeletal contract for the read site (TML-2536 routes every on-disk
     // contract read through this seam), but the bugs under test are about
@@ -267,6 +268,7 @@ describe('migrate / migration status — invariant-routing pre-checks', {
   });
 
   it('migration status --to fails with UNKNOWN_INVARIANT (parity with migrate, not a warning)', async () => {
+    setupConfigMock({ markerHash: TO_HASH });
     const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
     const fixture = await setupFixture({
       refInvariants: ['typo-id'],
@@ -373,11 +375,8 @@ describe('migrate / migration status — invariant-routing pre-checks', {
 
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
     expect(jsonLine).toBeDefined();
-    const envelope = JSON.parse(jsonLine!) as {
-      diagnostics?: ReadonlyArray<{ code: string }>;
-    };
-    const codes = envelope.diagnostics?.map((d) => d.code) ?? [];
-    expect(codes).not.toContain('MIGRATION.UP_TO_DATE');
+    const envelope = JSON.parse(jsonLine!) as { summary?: string };
+    expect(envelope.summary).not.toBe('up to date');
   });
 
   it('migrate --to does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {

@@ -34,6 +34,7 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createRefCommand } from '@prisma-next/cli/commands/ref';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
 import { isAbsolute, join, resolve } from 'pathe';
@@ -599,6 +600,55 @@ export function parseJsonOutput<T = Record<string, unknown>>(result: CommandResu
     }
     throw new Error(`Failed to parse JSON from command output:\n${output}`);
   }
+}
+
+export { EMPTY_CONTRACT_HASH };
+
+export interface MigrationStatusMigrationJson {
+  readonly status: 'applied' | 'pending' | null;
+  readonly migrationHash: string;
+}
+
+export interface MigrationStatusSpaceJson {
+  readonly spaceId: string;
+  readonly markerHash: string | null;
+  readonly targetHash: string;
+  readonly migrations: readonly MigrationStatusMigrationJson[];
+}
+
+export interface MigrationStatusJson {
+  readonly ok: true;
+  readonly spaces: readonly MigrationStatusSpaceJson[];
+  readonly summary: string;
+  readonly diagnostics?: readonly {
+    code: string;
+    severity: string;
+    message: string;
+    hints: readonly string[];
+  }[];
+  readonly missingInvariants?: string;
+}
+
+export function readEmittedContractStorageHash(ctx: JourneyContext): string {
+  const contractJson = JSON.parse(readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8')) as {
+    storage: { storageHash: string };
+  };
+  return contractJson.storage.storageHash;
+}
+
+export function parseMigrationStatusJson(result: CommandResult): MigrationStatusJson {
+  return parseJsonOutput<MigrationStatusJson>(result);
+}
+
+export function migrationStatusAppSpace(
+  json: MigrationStatusJson,
+  spaceId = 'app',
+): MigrationStatusSpaceJson {
+  const space = json.spaces.find((entry) => entry.spaceId === spaceId);
+  if (space === undefined) {
+    throw new Error(`status JSON has no space ${spaceId}`);
+  }
+  return space;
 }
 
 // ---------------------------------------------------------------------------

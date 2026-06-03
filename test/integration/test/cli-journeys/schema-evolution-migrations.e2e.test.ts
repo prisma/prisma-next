@@ -105,8 +105,17 @@ withTempDir(({ createTempDir }) => {
         expect(statusJson.exitCode, 'B.09: migration status json').toBe(0);
         const statusData = parseJsonOutput(statusJson);
         expect(statusData, 'B.09: json structure').toMatchObject({
-          mode: 'online',
-          migrations: expect.any(Array),
+          ok: true,
+          spaces: [
+            {
+              spaceId: 'app',
+              migrations: expect.arrayContaining([
+                expect.objectContaining({
+                  status: expect.stringMatching(/^(applied|pending)$/),
+                }),
+              ]),
+            },
+          ],
         });
 
         // --- Merged from Journey Q: migration apply noop (already up-to-date) ---

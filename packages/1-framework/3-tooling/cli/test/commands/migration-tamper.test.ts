@@ -105,6 +105,9 @@ function setupConfigMock(): void {
       familyId: TARGET_FAMILY,
       create: vi.fn().mockReturnValue({
         deserializeContract: (json: unknown) => json,
+        readMarker: vi.fn().mockResolvedValue(null),
+        readAllMarkers: vi.fn().mockResolvedValue(new Map()),
+        readLedger: vi.fn().mockResolvedValue([]),
       }),
     },
     target: {
@@ -115,7 +118,10 @@ function setupConfigMock(): void {
       migrations: {},
     },
     adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
-    driver: { kind: 'driver' },
+    driver: {
+      kind: 'driver',
+      create: vi.fn().mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) }),
+    },
     db: { connection: 'postgres://localhost/tamper-test' },
     // The fixture writes contract.json at this path under the per-test cwd
     // (see setupTamperFixture). Each test chdirs to its tempdir before

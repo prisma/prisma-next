@@ -1,59 +1,71 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildStatusHeadline,
   formatStatusSummary,
   type MigrationStatusResult,
 } from '../../src/commands/migration-status';
 
-const baseResult: Omit<MigrationStatusResult, 'diagnostics'> = {
+const baseResult: MigrationStatusResult = {
   ok: true,
-  mode: 'online',
-  migrations: [],
-  targetHash: 'sha256:t',
-  contractHash: 'sha256:c',
-  requiredInvariants: [],
-  summary: 'Up to date',
+  spaces: [],
+  summary: 'up to date',
+  diagnostics: [],
+  treeSections: [],
 };
 
-function withDiagnostics(diagnostics: MigrationStatusResult['diagnostics']): MigrationStatusResult {
-  return { ...baseResult, diagnostics };
-}
+describe('buildStatusHeadline', () => {
+  it('reports up to date when nothing is pending', () => {
+    expect(
+      buildStatusHeadline({
+        pendingCount: 0,
+        targetHash: 'sha256:abc',
+        markerDiverged: false,
+        markerHash: 'sha256:abc',
+      }),
+    ).toBe('up to date');
+  });
+
+  it('names the migrate target when migrations are pending', () => {
+    expect(
+      buildStatusHeadline({
+        pendingCount: 2,
+        targetHash: 'sha256:deadbeef',
+        markerDiverged: false,
+        markerHash: 'sha256:marker',
+      }),
+    ).toBe('2 pending — run `prisma-next migrate --to deadbeef`');
+  });
+});
 
 describe('formatStatusSummary', () => {
-  it('renders the success icon when online with zero pending and no warnings', () => {
-    const out = formatStatusSummary(withDiagnostics([]), false);
-    expect(out.startsWith('✔ ')).toBe(true);
-  });
-
-  it('renders the pending icon when MIGRATION.INVARIANTS_PENDING is present even at info severity', () => {
-    const result = withDiagnostics([
+  it('includes the missing-invariants line when present', () => {
+    const out = formatStatusSummary(
       {
-        code: 'MIGRATION.INVARIANTS_PENDING',
-        severity: 'info',
-        message: 'Missing required invariant(s): users-have-email',
-        hints: [],
+        ...baseResult,
+        missingInvariantsLine: 'missing invariant(s): users-have-email',
       },
-    ]);
-    const out = formatStatusSummary(result, false);
-    expect(out.startsWith('⧗ ')).toBe(true);
-    expect(out.startsWith('✔ ')).toBe(false);
+      false,
+    );
+    expect(out).toContain('up to date');
+    expect(out).toContain('missing invariant(s): users-have-email');
   });
 
-  it('renders the warning icon when a warn-severity diagnostic is present', () => {
-    const result = withDiagnostics([
+  it('highlights divergence warnings', () => {
+    const out = formatStatusSummary(
       {
-        code: 'MIGRATION.SOMETHING_FISHY',
-        severity: 'warn',
-        message: 'something fishy',
-        hints: [],
+        ...baseResult,
+        summary: 'Database marker abcdef is not in the on-disk migration graph',
+        diagnostics: [
+          {
+            code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
+            severity: 'warn',
+            message: 'marker diverged',
+            hints: [],
+          },
+        ],
       },
-    ]);
-    const out = formatStatusSummary(result, false);
-    expect(out.startsWith('⚠ ')).toBe(true);
-  });
-
-  it('omits the icon prefix in offline mode', () => {
-    const result: MigrationStatusResult = { ...baseResult, mode: 'offline', diagnostics: [] };
-    const out = formatStatusSummary(result, false);
-    expect(out).toBe('Up to date');
+      false,
+    );
+    expect(out).toContain('Database marker abcdef');
   });
 });

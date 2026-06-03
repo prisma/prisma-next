@@ -67,13 +67,12 @@ withTempDir(({ createTempDir }) => {
         expect(remaining, 'P4.pre: only add-name remains').toHaveLength(1);
         expect(remaining[0], 'P4.pre: remaining is add-name').toMatch(/_add_name$/);
 
-        // P4.01: migration status detects the broken graph
+        // P4.01: migration status still lists the orphaned on-disk migration
         const status = await runMigrationStatus(ctx);
-        expect(status.exitCode, 'P4.01: status reports error').not.toBe(0);
+        expect(status.exitCode, 'P4.01: status succeeds').toBe(0);
         const statusOutput = stripAnsi(status.stdout);
-        expect(statusOutput, 'P4.01: reports broken migration history').toMatch(
-          /Cannot reconstruct migration history/,
-        );
+        expect(statusOutput, 'P4.01: surviving migration visible').toMatch(/add_name/);
+        expect(statusOutput, 'P4.01: not treated as empty').not.toContain('No migrations found');
 
         // P4.02: migration plan uses the db ref even when the graph chain is
         // broken — it must not silently greenfield-plan a duplicate init

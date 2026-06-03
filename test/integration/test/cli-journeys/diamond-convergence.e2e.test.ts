@@ -22,7 +22,9 @@ import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
+  migrationStatusAppSpace,
   parseJsonOutput,
+  parseMigrationStatusJson,
   runContractEmit,
   runMigrate,
   runMigrationPlanAndEmit,
@@ -189,9 +191,7 @@ withTempDir(({ createTempDir }) => {
         // D.10: verify status shows distinct paths for each environment
         const statusStaging = await runMigrationStatus(staging, ['--to', 'staging', '--json']);
         expect(statusStaging.exitCode, 'D.10: staging status').toBe(0);
-        const stagingStatusData = parseJsonOutput<{
-          migrations: readonly { status: string }[];
-        }>(statusStaging);
+        const stagingStatusData = migrationStatusAppSpace(parseMigrationStatusJson(statusStaging));
         const stagingPending = stagingStatusData.migrations.filter(
           (m) => m.status === 'pending',
         ).length;
@@ -199,20 +199,19 @@ withTempDir(({ createTempDir }) => {
 
         const statusProd = await runMigrationStatus(production, ['--to', 'production', '--json']);
         expect(statusProd.exitCode, 'D.10: production status').toBe(0);
-        const prodStatusData = parseJsonOutput<{
-          migrations: readonly { status: string }[];
-        }>(statusProd);
+        const prodStatusData = migrationStatusAppSpace(parseMigrationStatusJson(statusProd));
         const prodPending = prodStatusData.migrations.filter((m) => m.status === 'pending').length;
         expect(prodPending, 'D.10: production 0 pending').toBe(0);
 
-        // Both environments converged to C5. Status uses shortest path from ∅
-        // to the ref target: ∅→C1→C4→C5 (3 edges) is shorter than ∅→C1→C2→C3→C5 (4 edges).
-        expect(stagingStatusData.migrations.length, 'D.10: staging shows shortest path to C5').toBe(
-          3,
-        );
-        expect(prodStatusData.migrations.length, 'D.10: production shows shortest path to C5').toBe(
-          3,
-        );
+        // Status lists every on-disk migration in the space (both branches remain visible).
+        expect(
+          stagingStatusData.migrations.length,
+          'D.10: staging lists migrations',
+        ).toBeGreaterThan(3);
+        expect(
+          prodStatusData.migrations.length,
+          'D.10: production lists migrations',
+        ).toBeGreaterThan(3);
       },
       timeouts.spinUpPpgDev,
     );

@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.4.0",
-    "@dagrejs/dagre": "^3.0.0",
     "@prisma-next/config": "workspace:0.12.0",
     "@prisma-next/contract": "workspace:0.12.0",
     "@prisma-next/emitter": "workspace:0.12.0",

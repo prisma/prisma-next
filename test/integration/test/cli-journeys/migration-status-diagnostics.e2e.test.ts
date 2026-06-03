@@ -18,7 +18,9 @@ import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
+  migrationStatusAppSpace,
   parseJsonOutput,
+  parseMigrationStatusJson,
   runContractEmit,
   runDbUpdate,
   runMigrate,
@@ -60,33 +62,24 @@ withTempDir(({ createTempDir }) => {
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
-        // 1. No migrations, no contract — reports empty
-        const statusEmpty = await runMigrationStatus(ctx);
-        const outEmpty = stripAnsi(statusEmpty.stdout);
-        expect(statusEmpty.exitCode).toBe(0);
-        expect(outEmpty).toContain('No migrations found');
+        const statusWithoutDb = await runMigrationStatus(ctx);
+        expect(statusWithoutDb.exitCode, 'requires --db or --from').not.toBe(0);
 
-        // 2. No migrations, contract exists — nudges toward migration plan
         const emit = await runContractEmit(ctx);
         expect(emit.exitCode, 'emit succeeds').toBe(0);
 
-        const statusContract = await runMigrationStatus(ctx);
-        const outContract = stripAnsi(statusContract.stdout);
-        expect(statusContract.exitCode).toBe(0);
-        expect(outContract).toContain('No migrations found');
-        expect(outContract).toContain('No migration exists for the current contract');
-        expect(outContract).toContain('migration plan');
+        const statusContractOnly = await runMigrationStatus(ctx);
+        expect(statusContractOnly.exitCode, 'still requires --db or --from after emit').not.toBe(0);
 
-        // 3. Offline with migrations — reports count on disk
-        const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
+        const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
         expect(plan.exitCode, 'plan').toBe(0);
+        const planFrom = parseJsonOutput<{ from: string }>(plan).from;
 
-        const statusMigrations = await runMigrationStatus(ctx);
+        const statusMigrations = await runMigrationStatus(ctx, ['--from', planFrom]);
         const outMigrations = stripAnsi(statusMigrations.stdout);
         expect(statusMigrations.exitCode).toBe(0);
-        expect(outMigrations).toContain('1 migration(s) on disk');
-        // No status legend — offline mode can't determine applied/pending/unreachable
-        expect(outMigrations).not.toMatch(/[✓⧗✗] (applied|pending|unreachable)/);
+        expect(outMigrations).toContain('pending');
+        expect(outMigrations).not.toContain('✓ applied');
       },
       timeouts.spinUpPpgDev,
     );
@@ -125,7 +118,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('Database has not been initialized');
+          expect(out).toMatch(/pending/);
           expect(out).toContain('prisma-next migrate');
         },
         timeouts.spinUpPpgDev,
@@ -161,7 +154,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('up to date');
-          expect(out).toMatch(/1 migration.* applied/);
+          expect(out).toContain('✓ applied');
         },
         timeouts.spinUpPpgDev,
       );
@@ -203,7 +196,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toMatch(/1 pending migration/);
+          expect(out).toMatch(/1 pending/);
           expect(out).toContain('prisma-next migrate');
         },
         timeouts.spinUpPpgDev,
@@ -245,8 +238,8 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('Contract has changed since the last migration was planned');
-          expect(out).toContain('migration plan');
+          expect(out).toContain('(contract)');
+          expect(out).toContain('up to date');
         },
         timeouts.spinUpPpgDev,
       );
@@ -290,8 +283,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('updated directly');
-          expect(out).toContain('migration plan');
+          expect(out).toContain('Database marker cannot reach the selected target');
         },
         timeouts.spinUpPpgDev,
       );
@@ -340,14 +332,19 @@ withTempDir(({ createTempDir }) => {
           const emit2 = await runContractEmit(ctx);
           expect(emit2.exitCode, 'emit v3').toBe(0);
 
-          const status = await runMigrationStatus(ctx);
+          const status = await runMigrationStatus(ctx, ['--json']);
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('updated outside the migration system');
-          expect(out).toContain('db update');
-          expect(out).toContain('contract infer');
-          expect(out).toContain('db verify');
+          expect(out).toContain('not in the on-disk migration graph');
+          const statusJson = parseMigrationStatusJson(status);
+          const hints =
+            statusJson.diagnostics?.flatMap((diagnostic) => [
+              diagnostic.message,
+              ...diagnostic.hints,
+            ]) ?? [];
+          expect(hints.join('\n')).toMatch(/db sign/i);
+          expect(hints.join('\n')).toMatch(/db update/i);
         },
         timeouts.spinUpPpgDev,
       );
@@ -383,25 +380,21 @@ withTempDir(({ createTempDir }) => {
 
           const status = await runMigrationStatus(ctx, ['--json']);
           expect(status.exitCode).toBe(0);
-          const json = parseJsonOutput<Record<string, unknown>>(status);
+          const json = parseMigrationStatusJson(status);
+          const appSpace = migrationStatusAppSpace(json);
 
-          // Public fields present
-          expect(json).toHaveProperty('ok', true);
-          expect(json).toHaveProperty('mode', 'online');
-          expect(json).toHaveProperty('migrations');
-          expect(json).toHaveProperty('targetHash');
-          expect(json).toHaveProperty('contractHash');
-          expect(json).toHaveProperty('summary');
-          expect(json).toHaveProperty('diagnostics');
-          expect(json).toHaveProperty('markerHash');
+          expect(json.ok).toBe(true);
+          expect(json.summary).toBeTruthy();
+          expect(appSpace.spaceId).toBe('app');
+          expect(appSpace.targetHash).toBeTruthy();
+          expect(appSpace.migrations.length).toBeGreaterThan(0);
+          expect(appSpace.migrations[0]?.status).toBe('applied');
 
-          // Internal fields stripped
           expect(json).not.toHaveProperty('graph');
           expect(json).not.toHaveProperty('bundles');
-          expect(json).not.toHaveProperty('edgeStatuses');
-          expect(json).not.toHaveProperty('activeRefHash');
-          expect(json).not.toHaveProperty('activeRefName');
-          expect(json).not.toHaveProperty('diverged');
+          expect(json).not.toHaveProperty('treeSections');
+          expect(json).not.toHaveProperty('mode');
+          expect(json).not.toHaveProperty('contractHash');
         },
         timeouts.spinUpPpgDev,
       );
@@ -464,12 +457,12 @@ withTempDir(({ createTempDir }) => {
           const emitC = await runContractEmit(ctx);
           expect(emitC.exitCode, 'emit neutral').toBe(0);
 
-          const status = await runMigrationStatus(ctx);
-          const out = stripAnsi(status.stdout);
-
+          const status = await runMigrationStatus(ctx, ['--json']);
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('multiple valid migration paths');
-          expect(out).toContain('--to');
+          const json = parseMigrationStatusJson(status);
+          expect(
+            json.diagnostics?.some((diagnostic) => diagnostic.code === 'MIGRATION.DIVERGED'),
+          ).toBe(true);
         },
         timeouts.spinUpPpgDev,
       );
@@ -540,8 +533,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('No path between database marker and ref');
-          expect(out).toContain('unreachable');
+          expect(out).toContain('Database marker cannot reach the selected target');
         },
         timeouts.spinUpPpgDev,
       );
@@ -607,7 +599,8 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).not.toContain('multiple valid migration paths');
-          expect(out).toContain('1 migration(s) behind ref "production"');
+          expect(out).toMatch(/1 pending/);
+          expect(out).toContain('prisma-next migrate');
         },
         timeouts.spinUpPpgDev,
       );
@@ -640,9 +633,8 @@ withTempDir(({ createTempDir }) => {
 
           const status = await runMigrationStatus(ctx, ['--from', hashA, '--json']);
           expect(status.exitCode).toBe(0);
-          const json = parseJsonOutput(status);
-          const migrations = json?.['migrations'] as readonly unknown[];
-          expect(migrations.length).toBeGreaterThan(0);
+          const json = parseMigrationStatusJson(status);
+          expect(migrationStatusAppSpace(json).migrations.length).toBeGreaterThan(0);
         },
         timeouts.spinUpPpgDev,
       );
