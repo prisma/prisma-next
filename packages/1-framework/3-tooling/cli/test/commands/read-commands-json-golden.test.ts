@@ -12,12 +12,12 @@ import { createDbSignCommand } from '../../src/commands/db-sign';
 import { executeMigrationGraphCommand } from '../../src/commands/migration-graph';
 import { executeMigrationLogCommand } from '../../src/commands/migration-log';
 import { executeRefSetCommand } from '../../src/commands/ref';
+import * as configLoader from '../../src/config-loader';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
 const mocks = vi.hoisted(() => ({
-  loadConfig: vi.fn(),
   writeRefPaired: vi.fn(),
   readMarker: vi.fn(),
   readLedger: vi.fn(),
@@ -25,10 +25,6 @@ const mocks = vi.hoisted(() => ({
   close: vi.fn(),
   schemaVerify: vi.fn(),
   sign: vi.fn(),
-}));
-
-vi.mock('../../src/config-loader', () => ({
-  loadConfig: mocks.loadConfig,
 }));
 
 vi.mock('@prisma-next/migration-tools/refs', async (importOriginal) => {
@@ -59,6 +55,10 @@ const ADDITIVE_OP: MigrationPlanOperation = {
 };
 
 const createdDirs: string[] = [];
+
+function stubLoadConfig(contractOutput: string): void {
+  vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(baseConfig(contractOutput));
+}
 
 function baseConfig(contractOutput: string) {
   return {
@@ -179,7 +179,6 @@ function migrationLogJson(
 
 describe('read commands --json golden', () => {
   afterAll(() => {
-    vi.doUnmock('../../src/config-loader');
     vi.doUnmock('@prisma-next/migration-tools/refs');
     vi.doUnmock('../../src/control-api/client');
   });
@@ -211,7 +210,7 @@ describe('read commands --json golden', () => {
     createdDirs.push(cwd);
     const contractPath = await writeContract(cwd, HASH_B);
     const { dirInit, dirNext } = await writeLinearMigrations(join(cwd, 'migrations'));
-    mocks.loadConfig.mockResolvedValue(baseConfig(contractPath));
+    stubLoadConfig(contractPath);
 
     const flags = parseGlobalFlags({ json: true, quiet: true });
     const ui = createTerminalUI(flags);
@@ -254,7 +253,7 @@ describe('read commands --json golden', () => {
     createdDirs.push(cwd);
     const contractPath = await writeContract(cwd, HASH_B);
     const { dirInit, dirNext } = await writeLinearMigrations(join(cwd, 'migrations'));
-    mocks.loadConfig.mockResolvedValue(baseConfig(contractPath));
+    stubLoadConfig(contractPath);
     mocks.readLedger.mockResolvedValue([
       {
         space: 'app',
@@ -306,7 +305,7 @@ describe('read commands --json golden', () => {
     const { dirNext } = await writeLinearMigrations(join(cwd, 'migrations'));
     const packageDir = join(cwd, 'migrations', 'app', dirNext);
     await writeEndContract(packageDir, HASH_B);
-    mocks.loadConfig.mockResolvedValue(baseConfig(contractPath));
+    stubLoadConfig(contractPath);
 
     const prev = process.cwd();
     process.chdir(cwd);
@@ -332,7 +331,7 @@ describe('read commands --json golden', () => {
     const { dirNext } = await writeLinearMigrations(join(cwd, 'migrations'));
     const packageDir = join(cwd, 'migrations', 'app', dirNext);
     await writeEndContract(packageDir, HASH_B);
-    mocks.loadConfig.mockResolvedValue(baseConfig(contractPath));
+    stubLoadConfig(contractPath);
 
     const { consoleOutput, cleanup } = setupCommandMocks({ isTTY: false });
     const signCmd = createDbSignCommand();
