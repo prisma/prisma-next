@@ -33,7 +33,12 @@ import type {
   OnControlProgress,
   PerSpaceExecutionEntry,
 } from '../types';
-import { applyMigration, buildPerSpaceBreakdown, collectOrdered } from './apply';
+import {
+  applyMigration,
+  buildPerSpaceBreakdown,
+  collectOrdered,
+  type OrderedResolution,
+} from './apply';
 import { stripOperations } from './migration-helpers';
 
 /**
@@ -255,9 +260,7 @@ export async function executeApply<TFamilyId extends string, TTargetId extends s
 }
 
 function aggregatePlannerWarnings(
-  orderedResolutions: ReadonlyArray<{
-    readonly entry: { readonly warnings?: readonly MigrationPlannerConflict[] };
-  }>,
+  orderedResolutions: readonly OrderedResolution[],
 ): readonly MigrationPlannerConflict[] | undefined {
   const warnings = orderedResolutions.flatMap((r) => r.entry.warnings ?? []);
   return warnings.length > 0 ? warnings : undefined;

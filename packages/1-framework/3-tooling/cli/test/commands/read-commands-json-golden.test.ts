@@ -57,7 +57,10 @@ const ADDITIVE_OP: MigrationPlanOperation = {
 const createdDirs: string[] = [];
 
 function stubLoadConfig(contractOutput: string): void {
-  vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(baseConfig(contractOutput));
+  type LoadedConfig = Awaited<ReturnType<typeof configLoader.loadConfig>>;
+  vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+    baseConfig(contractOutput) as unknown as LoadedConfig,
+  );
 }
 
 function baseConfig(contractOutput: string) {
