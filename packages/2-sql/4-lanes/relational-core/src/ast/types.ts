@@ -325,7 +325,7 @@ export class TableSource extends FromSource {
    */
   readonly namespaceId: string | undefined;
 
-  constructor(name: string, alias?: string, namespaceId?: string) {
+  protected constructor(name: string, alias?: string, namespaceId?: string) {
     super();
     this.name = name;
     this.alias = alias;
