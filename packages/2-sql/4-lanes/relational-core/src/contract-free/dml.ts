@@ -14,20 +14,16 @@ import { param } from '../expression';
  * Contract-free DML builder — the write-side counterpart to the `col` / `lit`
  * / `fn` / `createTable` DDL constructors. Assembles `InsertAst` / `UpdateAst`
  * query nodes for fixed control-plane tables (marker / ledger) without a
- * contract: tables are addressed by literal name (+ optional `schema`), values
- * carry their codec at the value site via {@link param}, and DB-side
- * expressions (e.g. `now()`) are expressed via {@link dbExpr}.
+ * contract: tables are addressed by literal name, values carry their codec at
+ * the value site via {@link param}, and DB-side expressions (e.g. `now()`) are
+ * expressed via {@link dbExpr}.
  */
 
 export { param };
 
-/**
- * A table addressed by literal name, optionally schema-qualified. Used for
- * control-plane tables that have no contract namespace coordinate
- * (`prisma_contract.marker`, `_prisma_ledger`).
- */
-export function tableRef(name: string, options?: { readonly schema?: string }): TableSource {
-  return TableSource.named(name, undefined, undefined, options?.schema);
+/** A table addressed by literal name for control-plane tables without a contract. */
+export function tableRef(name: string): TableSource {
+  return TableSource.named(name);
 }
 
 /**

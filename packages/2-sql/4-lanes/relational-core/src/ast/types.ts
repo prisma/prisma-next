@@ -324,31 +324,18 @@ export class TableSource extends FromSource {
    * bare table name at render time.
    */
   readonly namespaceId: string | undefined;
-  /**
-   * Literal storage schema this table lives in, used by control-plane DML
-   * against fixed tables (e.g. `prisma_contract.marker`) that have no contract
-   * namespace coordinate. When set, the Postgres renderer qualifies the table
-   * as `schema.name` (each part quoted independently); SQLite asserts it is
-   * absent, since its control tables are unqualified. `schema` and
-   * `namespaceId` are mutually exclusive — `namespaceId` is the contract-bound
-   * coordinate, `schema` the contract-free literal.
-   */
-  readonly schema: string | undefined;
 
-  constructor(name: string, alias?: string, namespaceId?: string, schema?: string) {
+  constructor(name: string, alias?: string, namespaceId?: string) {
     super();
-    if (namespaceId !== undefined && schema !== undefined) {
-      throw new Error('TableSource cannot carry both namespaceId and schema');
-    }
     this.name = name;
     this.alias = alias;
     this.namespaceId = namespaceId;
-    this.schema = schema;
-    this.freeze();
   }
 
-  static named(name: string, alias?: string, namespaceId?: string, schema?: string): TableSource {
-    return new TableSource(name, alias, namespaceId, schema);
+  static named(name: string, alias?: string, namespaceId?: string): TableSource {
+    const source = new TableSource(name, alias, namespaceId);
+    source.freeze();
+    return source;
   }
 
   override rewrite(rewriter: AstRewriter): AnyFromSource {

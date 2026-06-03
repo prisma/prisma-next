@@ -31,6 +31,7 @@ import {
   type UpdateAst,
   type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { PostgresTableSource } from '@prisma-next/target-postgres/contract-free';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresContract } from './types';
@@ -271,14 +272,10 @@ function renderDistinctPrefix(
 }
 
 function qualifyTableFromNamespaceCoordinate(
-  table: Pick<TableSource, 'name' | 'namespaceId' | 'schema'>,
+  table: Pick<TableSource, 'name' | 'namespaceId'>,
   contract: PostgresContract,
 ): string {
-  // A literal `schema` is the contract-free coordinate used by control-plane
-  // DML against fixed tables (e.g. `prisma_contract.marker`). Quote each part
-  // independently so the dotted name renders as `"schema"."name"` rather than
-  // a single quoted identifier.
-  if (table.schema !== undefined) {
+  if (table instanceof PostgresTableSource && table.schema !== undefined) {
     return `${quoteIdentifier(table.schema)}.${quoteIdentifier(table.name)}`;
   }
   if (table.namespaceId === undefined) {
