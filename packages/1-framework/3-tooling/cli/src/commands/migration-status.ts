@@ -45,6 +45,7 @@ import {
 import {
   computeGlobalMaxDirNameWidth,
   computeGlobalMaxEdgeTreePrefixWidth,
+  indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
 } from '../utils/formatters/migration-graph-space-render';
 import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
@@ -536,9 +537,11 @@ async function executeMigrationStatusCommand(
       targetHash,
       migrations,
     });
+    const displayTree =
+      showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;
     treeSections.push({
       spaceId: spaceEntry.spaceId,
-      tree,
+      tree: displayTree,
       showHeading: showSpaceHeadings,
     });
   }

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
@@ -11,7 +11,7 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { join } from 'pathe';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatMigrationGraphHumanOutput } from '../../src/commands/migration-graph';
 import {
   listRefsByContractHash,
@@ -24,12 +24,14 @@ import {
   type MigrationStatusResult,
 } from '../../src/commands/migration-status';
 import { deriveStatusEdgeAnnotations } from '../../src/commands/migration-status-overlay';
+import * as configLoader from '../../src/config-loader';
 import {
   computeGlobalMaxDirNameWidth,
   computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
 } from '../../src/utils/formatters/migration-graph-space-render';
+import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
 const HASH_4cb4256 = `sha256:4cb4256${'0'.repeat(57)}`;
 const HASH_55bada2 = `sha256:55bada2${'0'.repeat(57)}`;
@@ -125,6 +127,28 @@ function stripStatusOverlayColumn(output: string): string {
     .join('\n');
 }
 
+function assertIndentedTreesUnderSpaceHeadings(output: string): void {
+  const lines = output.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    if (!/^[a-z][a-z0-9_]*:$/.test(line)) {
+      continue;
+    }
+    let nextIndex = i + 1;
+    while (nextIndex < lines.length && (lines[nextIndex] ?? '') === '') {
+      nextIndex++;
+    }
+    if (nextIndex >= lines.length) {
+      continue;
+    }
+    const nextLine = lines[nextIndex] ?? '';
+    if (nextLine === '(no migrations)') {
+      continue;
+    }
+    expect(nextLine.startsWith('  ')).toBe(true);
+  }
+}
+
 function multiSpaceGlobalWidths(
   spaces: readonly { readonly spaceId: string; readonly migrations: readonly unknown[] }[],
   aggregate: Awaited<ReturnType<typeof loadContractSpaceAggregate>>,
@@ -153,12 +177,24 @@ function multiSpaceGlobalWidths(
 }
 
 async function buildMultiSpaceFixture(): Promise<{
+  readonly cwd: string;
   readonly migrationsDir: string;
   readonly aggregate: Awaited<ReturnType<typeof loadContractSpaceAggregate>>;
 }> {
   const cwd = await mkdtemp(join(tmpdir(), 'migration-read-parity-'));
   createdDirs.push(cwd);
   const migrationsDir = join(cwd, 'migrations');
+  const contractDir = join(cwd, 'src', 'prisma');
+  await mkdir(contractDir, { recursive: true });
+  await writeFile(
+    join(contractDir, 'contract.json'),
+    JSON.stringify({
+      storage: { storageHash: LIVE_CONTRACT_HASH, namespaces: {} },
+      schemaVersion: '1.0.0',
+      target: 'postgres',
+      targetFamily: 'sql',
+    }),
+  );
   await mkdir(join(migrationsDir, 'app'), { recursive: true });
   await mkdir(join(migrationsDir, 'postgis'), { recursive: true });
 
@@ -193,6 +229,15 @@ async function buildMultiSpaceFixture(): Promise<{
   });
   await writeRefFor(migrationsDir, { spaceId: 'app', name: 'db', hash: HASH_804e018 });
   await writeRefFor(migrationsDir, { spaceId: 'postgis', name: 'db', hash: HASH_POSTGIS });
+  await writeFile(
+    join(migrationsDir, 'postgis', 'contract.json'),
+    JSON.stringify({
+      storage: { storageHash: HASH_POSTGIS, namespaces: {} },
+      schemaVersion: '1.0.0',
+      target: 'postgres',
+      targetFamily: 'sql',
+    }),
+  );
 
   const aggregate = await loadContractSpaceAggregate({
     migrationsDir,
@@ -200,7 +245,7 @@ async function buildMultiSpaceFixture(): Promise<{
     deserializeContract: identityDeserialize,
   });
 
-  return { migrationsDir, aggregate };
+  return { cwd, migrationsDir, aggregate };
 }
 
 describe('migration read commands pretty parity', () => {
@@ -263,6 +308,7 @@ describe('migration read commands pretty parity', () => {
     expect(graphHuman).toBe(listHuman);
     expect(graphHuman).toContain('postgis:');
     expect(graphHuman).toContain('20260601T0000_install_postgis_extension');
+    assertIndentedTreesUnderSpaceHeadings(listHuman);
   });
 
   it('matches list per-space sections when status overlay column is stripped', async () => {
@@ -339,5 +385,53 @@ describe('migration read commands pretty parity', () => {
     );
 
     expect(statusHuman).toBe(listHuman);
+    assertIndentedTreesUnderSpaceHeadings(statusHuman);
+  });
+
+  it('indents per-space trees under headings via migration status --from', async () => {
+    const commandMocks = setupCommandMocks();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    const { cwd } = await buildMultiSpaceFixture();
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    type LoadedConfig = Awaited<ReturnType<typeof configLoader.loadConfig>>;
+    loadConfigSpy.mockResolvedValue({
+      family: {
+        familyId: 'sql',
+        create: vi.fn().mockReturnValue({
+          deserializeContract: (json: unknown) => json,
+        }),
+      },
+      target: {
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        kind: 'target',
+      },
+      adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres' },
+      driver: { kind: 'driver' },
+      contract: { output: 'src/prisma/contract.json', source: 'src/prisma/contract.json' },
+      migrations: { dir: 'migrations' },
+      extensionPacks: [],
+    } as unknown as LoadedConfig);
+    try {
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      const exitCode = await executeCommand(createMigrationStatusCommand(), [
+        '--from',
+        EMPTY_CONTRACT_HASH,
+        '--no-color',
+      ]);
+      expect(exitCode).toBe(0);
+      const human = stripCommandFooter(
+        [...commandMocks.consoleOutput, ...commandMocks.consoleErrors].join('\n'),
+      );
+      assertIndentedTreesUnderSpaceHeadings(human);
+      expect(human).toContain('app:');
+      expect(human).toContain('postgis:');
+    } finally {
+      process.chdir(originalCwd);
+      loadConfigSpy.mockRestore();
+      commandMocks.cleanup();
+    }
   });
 });
