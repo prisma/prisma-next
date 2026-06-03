@@ -1,6 +1,39 @@
 import { bold, cyan, cyanBright, dim, green, yellow } from 'colorette';
 import { IDENTITY_MIGRATION_LIST_STYLER, type MigrationListStyler } from './migration-list-render';
 
+export type MigrationListStylerWithMarkers = MigrationListStyler & {
+  markers(names: readonly string[]): string;
+};
+
+function hasMarkersFormatter(
+  styler: MigrationListStyler,
+): styler is MigrationListStylerWithMarkers {
+  return 'markers' in styler && typeof styler.markers === 'function';
+}
+
+function styleMarkerName(name: string): string {
+  return name === CONTRACT_MARKER_NAME ? bold(green(name)) : green(name);
+}
+
+function plainMarkers(names: readonly string[]): string {
+  return `<${names.join(', ')}>`;
+}
+
+export function formatContractNodeOverlays(
+  styler: MigrationListStyler,
+  markers: readonly string[],
+  refs: readonly string[],
+): string {
+  const parts: string[] = [];
+  if (markers.length > 0) {
+    parts.push(hasMarkersFormatter(styler) ? styler.markers(markers) : plainMarkers(markers));
+  }
+  if (refs.length > 0) {
+    parts.push(styler.refs(refs));
+  }
+  return parts.join(' ');
+}
+
 /**
  * The current contract overlay marker. Unlike user refs, this names the user's
  * declared desired state — the implicit base/target for `plan` / `migrate` —
@@ -10,7 +43,7 @@ import { IDENTITY_MIGRATION_LIST_STYLER, type MigrationListStyler } from './migr
 export const CONTRACT_MARKER_NAME = 'contract';
 
 function styleRefName(name: string): string {
-  return name === CONTRACT_MARKER_NAME ? bold(green(name)) : green(name);
+  return green(name);
 }
 
 /**
@@ -29,17 +62,21 @@ function styleRefName(name: string): string {
  * - `glyph` (`→` / `⟲` / `∅`): dim
  * - `lane` (graph gutter lines `│` and fan/join connectors `├─┐` / `├─┘`): dim
  * - `invariants` (`{...}`): yellow
- * - `refs` (`(...)`): green; the `contract` desired-state marker inside is
- *   green-bold (the active ref is bolded separately by the tree styler)
+ * - `markers` (`<...>`): green; the `contract` desired-state marker inside is
+ *   green-bold (`db` is plain green)
+ * - `refs` (`(...)`): green (the active ref is bolded separately by the tree styler)
  * - `spaceHeading` (`<spaceId>:`): bold
  * - `summary`: dim
  * - `emptyState`: dim
  */
 export function createAnsiMigrationListStyler(opts: {
   readonly useColor: boolean;
-}): MigrationListStyler {
+}): MigrationListStylerWithMarkers {
   if (!opts.useColor) {
-    return IDENTITY_MIGRATION_LIST_STYLER;
+    return {
+      ...IDENTITY_MIGRATION_LIST_STYLER,
+      markers: plainMarkers,
+    };
   }
   return {
     // Kind glyphs stay bright in both flat and graph views; lanes carry the dim gutter.
@@ -50,6 +87,12 @@ export function createAnsiMigrationListStyler(opts: {
     glyph: (text) => dim(text),
     lane: (text) => dim(text),
     invariants: (ids) => yellow(`{${ids.join(', ')}}`),
+    markers: (names) => {
+      const open = green('<');
+      const close = green('>');
+      const separator = green(', ');
+      return open + names.map(styleMarkerName).join(separator) + close;
+    },
     refs: (names) => {
       const open = green('(');
       const close = green(')');

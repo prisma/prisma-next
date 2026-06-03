@@ -104,21 +104,27 @@ describe('createAnsiMigrationListStyler', () => {
     );
   });
 
-  it('renders refs in green, emphasizes the contract marker, and leaves db plain', () => {
+  it('renders system markers in angle brackets and user refs in parentheses', () => {
     const styler = createAnsiMigrationListStyler({ useColor: true });
+    expect(styler.markers(['contract'])).toBe(green('<') + bold(green('contract')) + green('>'));
+    expect(styler.markers(['db'])).toBe(green('<') + green('db') + green('>'));
     expect(styler.refs(['production'])).toBe(green('(') + green('production') + green(')'));
     expect(styler.refs(['production', 'staging'])).toBe(
       green('(') + [green('production'), green('staging')].join(green(', ')) + green(')'),
     );
-    // `db` is just another ref — plain green, no special treatment.
-    expect(styler.refs(['db'])).toBe(green('(') + green('db') + green(')'));
-    // `contract` is the desired-state marker — emphasized with bold.
-    expect(styler.refs(['contract'])).toBe(green('(') + bold(green('contract')) + green(')'));
-    expect(styler.refs(['production', 'db', 'contract'])).toBe(
-      green('(') +
-        [green('production'), green('db'), bold(green('contract'))].join(green(', ')) +
-        green(')'),
-    );
+  });
+
+  it('bolds the active user ref when the tree styler overrides refs', () => {
+    const base = createAnsiMigrationListStyler({ useColor: true });
+    const activeRefName = 'production';
+    const styler = {
+      ...base,
+      refs: (names: readonly string[]) => {
+        const styledNames = names.map((name) => (name === activeRefName ? bold(name) : name));
+        return base.refs(styledNames);
+      },
+    };
+    expect(styler.refs(['production'])).toBe(green('(') + bold(green('production')) + green(')'));
   });
 });
 

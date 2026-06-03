@@ -455,9 +455,8 @@ async function executeMigrationStatusCommand(
     if (
       connected &&
       !usingFromOverride &&
-      markerHash !== undefined &&
       markerInGraph &&
-      markerHash !== targetHash &&
+      originHash !== targetHash &&
       findPath(graph, originHash, targetHash) === null
     ) {
       markerCannotReachTarget = true;

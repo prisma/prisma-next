@@ -27,7 +27,11 @@ import {
 } from './migration-list-data-column';
 import type { MigrationEdgeKind } from './migration-list-graph-topology';
 import type { MigrationListStyler } from './migration-list-render';
-import { CONTRACT_MARKER_NAME, createAnsiMigrationListStyler } from './migration-list-styler';
+import {
+  CONTRACT_MARKER_NAME,
+  createAnsiMigrationListStyler,
+  formatContractNodeOverlays,
+} from './migration-list-styler';
 
 const LABEL_GAP = 2;
 
@@ -390,22 +394,37 @@ function abbreviateHash(hash: string, hashLength: number, emptySource: string): 
 
 const MIN_HASH_DATA_COLUMN = 25;
 
+interface ContractOverlayNames {
+  readonly markers: readonly string[];
+  readonly refs: readonly string[];
+}
+
 function overlayNamesForContract(
   contractHash: string,
   opts: RenderMigrationGraphTreeOptions,
-): readonly string[] {
-  const names: string[] = [];
+): ContractOverlayNames {
+  const markers: string[] = [];
+  const refs: string[] = [];
   const userRefs = opts.refsByHash?.get(contractHash);
   if (userRefs) {
-    names.push(...[...userRefs].sort((a, b) => a.localeCompare(b)));
-  }
-  if (opts.dbHash === contractHash) {
-    names.push(DB_MARKER_NAME);
+    refs.push(...[...userRefs].sort((a, b) => a.localeCompare(b)));
   }
   if (opts.contractHash === contractHash && contractHash !== EMPTY_CONTRACT_HASH) {
-    names.push(CONTRACT_MARKER_NAME);
+    markers.push(CONTRACT_MARKER_NAME);
   }
-  return names;
+  if (opts.dbHash === contractHash) {
+    markers.push(DB_MARKER_NAME);
+  }
+  markers.sort((a, b) => {
+    if (a === CONTRACT_MARKER_NAME) {
+      return -1;
+    }
+    if (b === CONTRACT_MARKER_NAME) {
+      return 1;
+    }
+    return a.localeCompare(b);
+  });
+  return { markers, refs };
 }
 
 function createTreeStyler(opts: RenderMigrationGraphTreeOptions): MigrationListStyler {
@@ -653,24 +672,26 @@ export function renderMigrationGraphTree(
           )
           .join('');
         const emptyGutter = palette.emptySource.padEnd(2, ' ') + trailingLanes;
-        const overlayNames = overlayNamesForContract(contractHash, opts);
-        if (overlayNames.length === 0) {
+        const overlays = overlayNamesForContract(contractHash, opts);
+        if (overlays.markers.length === 0 && overlays.refs.length === 0) {
           lines.push(trimTrailingWhitespace(emptyGutter));
           continue;
         }
-        const overlay = style.refs(overlayNames);
+        const overlay = formatContractNodeOverlays(style, overlays.markers, overlays.refs);
         lines.push(trimTrailingWhitespace(`${padVisible(emptyGutter, dataColumn)}${overlay}`));
         continue;
       }
       const hashText = style.sourceHash(
         abbreviateHash(contractHash, hashLength, palette.emptySource),
       );
-      const overlayNames = overlayNamesForContract(contractHash, opts);
-      const overlayPad =
-        overlayNames.length > 0
-          ? ' '.repeat(Math.max(0, dataColumn - labelColumn - stringWidth(hashText)))
-          : '';
-      const overlay = overlayNames.length > 0 ? style.refs(overlayNames) : '';
+      const overlays = overlayNamesForContract(contractHash, opts);
+      const hasOverlays = overlays.markers.length > 0 || overlays.refs.length > 0;
+      const overlayPad = hasOverlays
+        ? ' '.repeat(Math.max(0, dataColumn - labelColumn - stringWidth(hashText)))
+        : '';
+      const overlay = hasOverlays
+        ? formatContractNodeOverlays(style, overlays.markers, overlays.refs)
+        : '';
       lines.push(trimTrailingWhitespace(`${gutterPad}${hashText}${overlayPad}${overlay}`));
       continue;
     }
@@ -727,7 +748,7 @@ export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptio
     `  ${style.kind(palette.edgeArrow.self)} ${style.summary('migration without schema change')}`,
     appliedPending,
     `  ${style.kind(palette.emptySource)} ${style.summary('empty database (baseline)')}`,
-    `  ${style.refs(['refs'])} ${style.summary(`${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`)}`,
+    `  ${style.markers([CONTRACT_MARKER_NAME])} ${style.refs(['refs'])} ${style.summary(`${DB_MARKER_NAME} / ${CONTRACT_MARKER_NAME} markers`)}`,
     `  ${sampleArrow}   ${style.summary('migration from contract aaaaaa to bbbbbb')}`,
   ];
   if (opts.colorize) {

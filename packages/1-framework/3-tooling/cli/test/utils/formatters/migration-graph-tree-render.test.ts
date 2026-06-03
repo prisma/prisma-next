@@ -1,6 +1,6 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
-import { createColors, dim } from 'colorette';
+import { bold, createColors, dim, green } from 'colorette';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { laneColorForColumn } from '../../../src/utils/formatters/migration-graph-lane-colors';
@@ -123,15 +123,70 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   c0ffee0              (contract)',
+        '○   c0ffee0              <contract>',
         '',
-        '○   a94b7b4              (main, db)',
+        '○   a94b7b4              <db> (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
         '│↑  init                 ∅       → ef9de27',
         '∅',
       ].join('\n'),
     );
+  });
+
+  it('renders only system markers in angle brackets', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    expect(
+      tree([init], {
+        colorize: false,
+        dbHash: 'ef9de27',
+        contractHash: 'ef9de27',
+      }),
+    ).toContain('<contract, db>');
+  });
+
+  it('renders only user refs in parentheses', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    expect(
+      tree([init], {
+        colorize: false,
+        refsByHash: refsMap([{ hash: 'ef9de27', names: ['prod', 'staging'] }]),
+      }),
+    ).toContain('(prod, staging)');
+  });
+
+  it('renders system markers before user refs when both are present', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    expect(
+      tree([init, addPosts], {
+        colorize: false,
+        refsByHash: refsMap([{ hash: 'a94b7b4', names: ['prod'] }]),
+        dbHash: 'a94b7b4',
+        contractHash: 'a94b7b4',
+      }),
+    ).toContain('<contract, db> (prod)');
+  });
+
+  it('renders colliding system db marker and user ref named db separately', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    expect(
+      tree([init], {
+        colorize: false,
+        refsByHash: refsMap([{ hash: 'ef9de27', names: ['db'] }]),
+        dbHash: 'ef9de27',
+      }),
+    ).toContain('<db> (db)');
+  });
+
+  it('emphasizes the contract system marker in colorized output', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const colored = tree([init], {
+      colorize: true,
+      contractHash: 'ef9de27',
+    });
+    expect(colored).toContain(green('<') + bold(green('contract')) + green('>'));
+    expect(colored).not.toContain(bold(green('db')));
   });
 
   it('renders node overlays for refs, db, and contract per mockup', () => {
@@ -149,9 +204,9 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   a94b7b4              (main, contract)',
+        '○   a94b7b4              <contract> (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
-        '○   ef9de27              (prod, db)',
+        '○   ef9de27              <db> (prod)',
         '│↑  init                 ∅       → ef9de27',
         '∅',
       ].join('\n'),
@@ -410,7 +465,7 @@ describe('renderMigrationGraphTree', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "○   cd5c15b              (main, contract)
+      "○   cd5c15b              <contract> (main)
       ├─╮
       │↑│   merge_2a           0276f92 → cd5c15b
       │ │↑  merge_2b           a94b7b4 → cd5c15b
@@ -514,9 +569,9 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'c0ffee0',
       }),
     ).toMatchInlineSnapshot(`
-      "*   c0ffee0              (contract)
+      "*   c0ffee0              <contract>
 
-      *   a94b7b4              (main, db)
+      *   a94b7b4              <db> (main)
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
       |^  init                 -       -> ef9de27
@@ -538,9 +593,9 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'a94b7b4',
       }),
     ).toMatchInlineSnapshot(`
-      "*   a94b7b4              (main, contract)
+      "*   a94b7b4              <contract> (main)
       |^  add_posts            ef9de27 -> a94b7b4
-      *   ef9de27              (prod, db)
+      *   ef9de27              <db> (prod)
       |^  init                 -       -> ef9de27
       -"
     `);
@@ -674,7 +729,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "*   cd5c15b              (main, contract)
+      "*   cd5c15b              <contract> (main)
       +-\\
       |^|   merge_2a           0276f92 -> cd5c15b
       | |^  merge_2b           a94b7b4 -> cd5c15b
@@ -1137,7 +1192,7 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        (refs) db / contract markers
+        <contract> (refs) db / contract markers
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
@@ -1151,7 +1206,7 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        (refs) db / contract markers
+        <contract> (refs) db / contract markers
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
   });
@@ -1175,7 +1230,7 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        (refs) db / contract markers
+        <contract> (refs) db / contract markers
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb
         │ │ │ │ │ │ │   gutter lanes by column (column 0 dim; routed back-arcs one hue)"
     `);
@@ -1190,7 +1245,7 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        (refs) db / contract markers
+        <contract> (refs) db / contract markers
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb
         | | | | | | |   gutter lanes by column (column 0 dim; routed back-arcs one hue)"
     `);
@@ -1202,7 +1257,7 @@ describe('renderMigrationGraphLegend', () => {
       expect(text).not.toContain('contract node');
       expect(text).not.toContain('data column');
       expect(text).not.toContain('node overlay');
-      expect(text).toContain('(refs) db / contract markers');
+      expect(text).toContain('<contract> (refs) db / contract markers');
       expect(text).toContain('migration from contract aaaaaa to bbbbbb');
     }
   });

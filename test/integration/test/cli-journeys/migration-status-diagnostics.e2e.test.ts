@@ -211,6 +211,38 @@ withTempDir(({ createTempDir }) => {
      * run `migration plan`. The DB is still on the last applied migration;
      * status targets the live contract and reports no migration path to it.
      */
+    describe('fresh DB, live contract unreachable from empty — no-path summary', () => {
+      const db = useDevDatabase();
+
+      it(
+        'emit → plan (no apply) → swap → emit → no path from empty database state',
+        async () => {
+          const ctx: JourneyContext = setupJourney({
+            connectionString: db.connectionString,
+            createTempDir,
+          });
+
+          const emit0 = await runContractEmit(ctx);
+          expect(emit0.exitCode, 'emit').toBe(0);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
+          expect(plan0.exitCode, 'plan').toBe(0);
+
+          swapContract(ctx, 'contract-additive');
+          const emit1 = await runContractEmit(ctx);
+          expect(emit1.exitCode, 'emit v2').toBe(0);
+
+          const status = await runMigrationStatus(ctx);
+          const out = stripAnsi(status.stdout);
+
+          expect(status.exitCode).toBe(0);
+          expect(out).toContain('No migration path from the database state');
+          expect(out).toContain("to the application's contract");
+          expect(out).not.toContain('up to date');
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
+
     describe('contract changed since last plan — CONTRACT.AHEAD', () => {
       const db = useDevDatabase();
 
@@ -237,7 +269,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('(contract)');
+          expect(out).toContain('<contract>');
           expect(out).toContain("to the application's contract");
           expect(out).toContain('prisma-next migration plan --name');
         },
@@ -282,7 +314,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toMatch(/\(db[^)]*contract\)/);
+          expect(out).toContain('<contract, db>');
           expect(out).toContain('up to date');
         },
         timeouts.spinUpPpgDev,
