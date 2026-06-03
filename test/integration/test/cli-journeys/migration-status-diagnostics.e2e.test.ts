@@ -153,7 +153,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('up to date');
+          expect(out).toContain('Up to date');
           expect(out).toContain('✓ applied');
         },
         timeouts.spinUpPpgDev,
@@ -315,7 +315,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('<contract, db>');
-          expect(out).toContain('up to date');
+          expect(out).toContain('Up to date');
         },
         timeouts.spinUpPpgDev,
       );

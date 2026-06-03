@@ -9,7 +9,7 @@ import {
 const baseResult: MigrationStatusResult = {
   ok: true,
   spaces: [],
-  summary: 'up to date',
+  summary: 'Up to date',
   diagnostics: [],
   treeSections: [],
 };
@@ -77,7 +77,7 @@ describe('buildStatusHeadline', () => {
         markerDiverged: false,
         markerHash: 'sha256:abc',
       }),
-    ).toBe('up to date');
+    ).toBe('Up to date');
   });
 
   it('names the migrate target when migrations are pending', () => {
@@ -101,7 +101,7 @@ describe('formatStatusSummary', () => {
       },
       false,
     );
-    expect(out).toContain('up to date');
+    expect(out).toContain('Up to date');
     expect(out).toContain('missing invariant(s): users-have-email');
   });
 

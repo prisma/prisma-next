@@ -57,6 +57,7 @@ export interface RenderMigrationGraphTreeOptions {
   readonly activeRefName?: string;
   readonly hashLength?: number;
   readonly globalMaxEdgeTreePrefixWidth?: number;
+  readonly globalMaxDirNameWidth?: number;
   readonly colorize: boolean;
   readonly glyphMode?: GlyphMode;
   readonly styler?: MigrationListStyler;
@@ -571,6 +572,16 @@ export function computeMaxEdgeTreePrefixWidthForLayout(model: MigrationGraphGrid
   return maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
 }
 
+export function computeMaxDirNameLengthForLayout(model: MigrationGraphGridModel): number {
+  const allEdges = model.rows
+    .filter(
+      (row): row is MigrationGraphGridRow & { edge: ClassifiedEdge } =>
+        row.kind === 'edge' && row.edge !== undefined,
+    )
+    .map((row) => row.edge);
+  return maxDirNameLength(allEdges);
+}
+
 function nodeHasArcDecoration(row: MigrationGraphGridRow): boolean {
   return row.cells.some(
     (cell) => cell.kind === 'node' && (cell.arcTee === true || cell.arcLand === true),
@@ -595,9 +606,10 @@ export function renderMigrationGraphTree(
     )
     .map((row) => row.edge);
   const maxDirNameLen = maxDirNameLength(allEdges);
+  const effectiveMaxDirNameLen = opts.globalMaxDirNameWidth ?? maxDirNameLen;
   const maxEdgePrefixWidth =
     opts.globalMaxEdgeTreePrefixWidth ?? maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
-  const edgeDirNameWidth = rowDirNameWidth(maxEdgePrefixWidth, maxDirNameLen, dirNameGap);
+  const edgeDirNameWidth = rowDirNameWidth(maxEdgePrefixWidth, effectiveMaxDirNameLen, dirNameGap);
 
   const lines: string[] = [];
 

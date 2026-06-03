@@ -151,6 +151,14 @@ describe('renderMigrationGraphTree (D23 padding rules)', () => {
     const appDirName = migrationDirNameColumns(appTree, ['merge_alice', 'init']);
     const pgDirName = migrationDirNameColumns(pgTree, ['install_vector_v1']);
     expect(appDirName[0]!).toBe(pgDirName[0]!);
+
+    const appMergeLine = stripAnsi(
+      appTree.split('\n').find((row) => row.includes('merge_alice')) ?? '',
+    );
+    const pgInstallLine = stripAnsi(
+      pgTree.split('\n').find((row) => row.includes('install_vector_v1')) ?? '',
+    );
+    expect(arrowColumnOffset(appMergeLine)).toBe(arrowColumnOffset(pgInstallLine));
   });
 
   it('places contract-node markers adjacent to the hash with LABEL_GAP', () => {

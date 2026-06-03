@@ -25,6 +25,8 @@ import {
 } from '../../src/commands/migration-status';
 import { deriveStatusEdgeAnnotations } from '../../src/commands/migration-status-overlay';
 import {
+  computeGlobalMaxDirNameWidth,
+  computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
 } from '../../src/utils/formatters/migration-graph-space-render';
@@ -102,7 +104,7 @@ function stripCommandFooter(output: string): string {
     if (
       /^\d+ migration\(s\)/.test(line) ||
       /^\d+ node\(s\), \d+ edge\(s\)/.test(line) ||
-      line === 'up to date' ||
+      line === 'Up to date' ||
       /^\d+ pending/.test(line)
     ) {
       lines.pop();
@@ -121,6 +123,33 @@ function stripStatusOverlayColumn(output: string): string {
     .split('\n')
     .map((line) => line.replace(/\s{2,}(✓ applied|⧗ pending|\+ applied|> pending)\s*$/, ''))
     .join('\n');
+}
+
+function multiSpaceGlobalWidths(
+  spaces: readonly { readonly spaceId: string; readonly migrations: readonly unknown[] }[],
+  aggregate: Awaited<ReturnType<typeof loadContractSpaceAggregate>>,
+  liveContractHash: string,
+  showSpaceHeadings: boolean,
+): {
+  readonly globalMaxEdgeTreePrefixWidth?: number;
+  readonly globalMaxDirNameWidth?: number;
+} {
+  if (!showSpaceHeadings) {
+    return {};
+  }
+  const inputs = spaces
+    .filter((space) => space.migrations.length > 0)
+    .map((space) => ({
+      graph: aggregate.space(space.spaceId)!.graph(),
+      liveContractHash,
+    }));
+  if (inputs.length === 0) {
+    return {};
+  }
+  return {
+    globalMaxEdgeTreePrefixWidth: computeGlobalMaxEdgeTreePrefixWidth(inputs),
+    globalMaxDirNameWidth: computeGlobalMaxDirNameWidth(inputs),
+  };
 }
 
 async function buildMultiSpaceFixture(): Promise<{
@@ -193,6 +222,12 @@ describe('migration read commands pretty parity', () => {
     );
 
     const showSpaceHeadings = listResult.value.spaces.length > 1;
+    const globalWidths = multiSpaceGlobalWidths(
+      listResult.value.spaces,
+      aggregate,
+      LIVE_CONTRACT_HASH,
+      showSpaceHeadings,
+    );
 
     const graphHuman = stripCommandFooter(
       formatMigrationGraphHumanOutput({
@@ -210,6 +245,7 @@ describe('migration read commands pretty parity', () => {
                   glyphMode: 'unicode',
                   colorize: false,
                   refsByHash: listRefsByContractHash(member),
+                  ...globalWidths,
                 });
           return {
             spaceId: spaceEntry.spaceId,
@@ -247,6 +283,12 @@ describe('migration read commands pretty parity', () => {
     );
 
     const showSpaceHeadings = listResult.value.spaces.length > 1;
+    const globalWidths = multiSpaceGlobalWidths(
+      listResult.value.spaces,
+      aggregate,
+      LIVE_CONTRACT_HASH,
+      showSpaceHeadings,
+    );
     const treeSections = listResult.value.spaces.map((spaceEntry) => {
       const member = aggregate.space(spaceEntry.spaceId)!;
       const graph = member.graph();
@@ -274,6 +316,7 @@ describe('migration read commands pretty parity', () => {
               colorize: false,
               refsByHash: listRefsByContractHash(member),
               statusOverlayByHash: statusOverlay,
+              ...globalWidths,
             });
       return {
         spaceId: spaceEntry.spaceId,

@@ -3,6 +3,7 @@ import type { GlyphMode } from '../glyph-mode';
 import { buildMigrationGraphLayout } from './migration-graph-layout';
 import { buildMigrationGraphRows } from './migration-graph-rows';
 import {
+  computeMaxDirNameLengthForLayout,
   computeMaxEdgeTreePrefixWidthForLayout,
   type MigrationEdgeAnnotation,
   renderMigrationGraphTree,
@@ -42,6 +43,7 @@ export interface RenderMigrationGraphSpaceTreeInput {
   readonly dbHash?: string;
   readonly styler?: MigrationListStyler;
   readonly globalMaxEdgeTreePrefixWidth?: number;
+  readonly globalMaxDirNameWidth?: number;
 }
 
 export interface ComputeGlobalMaxEdgeTreePrefixWidthInput {
@@ -59,6 +61,20 @@ export function computeGlobalMaxEdgeTreePrefixWidth(
     });
     const layout = buildMigrationGraphLayout(rowModel);
     globalMax = Math.max(globalMax, computeMaxEdgeTreePrefixWidthForLayout(layout));
+  }
+  return globalMax;
+}
+
+export function computeGlobalMaxDirNameWidth(
+  inputs: readonly ComputeGlobalMaxEdgeTreePrefixWidthInput[],
+): number {
+  let globalMax = 0;
+  for (const input of inputs) {
+    const rowModel = buildMigrationGraphRows(input.graph, {
+      contractHash: input.liveContractHash,
+    });
+    const layout = buildMigrationGraphLayout(rowModel);
+    globalMax = Math.max(globalMax, computeMaxDirNameLengthForLayout(layout));
   }
   return globalMax;
 }
@@ -84,6 +100,9 @@ function renderMigrationGraphSpaceTreeInternal(input: RenderMigrationGraphSpaceT
     ...(input.globalMaxEdgeTreePrefixWidth !== undefined
       ? { globalMaxEdgeTreePrefixWidth: input.globalMaxEdgeTreePrefixWidth }
       : {}),
+    ...(input.globalMaxDirNameWidth !== undefined
+      ? { globalMaxDirNameWidth: input.globalMaxDirNameWidth }
+      : {}),
   });
 }
 
@@ -94,11 +113,16 @@ export function renderMigrationGraphSpaceTree(input: RenderMigrationGraphSpaceTr
 export function renderMigrationGraphSpaceTrees(
   inputs: readonly RenderMigrationGraphSpaceTreeInput[],
 ): readonly string[] {
-  const globalMax = inputs.length > 1 ? computeGlobalMaxEdgeTreePrefixWidth(inputs) : undefined;
+  const globalMaxTreePrefix =
+    inputs.length > 1 ? computeGlobalMaxEdgeTreePrefixWidth(inputs) : undefined;
+  const globalMaxDirName = inputs.length > 1 ? computeGlobalMaxDirNameWidth(inputs) : undefined;
   return inputs.map((input) =>
     renderMigrationGraphSpaceTreeInternal({
       ...input,
-      ...(globalMax !== undefined ? { globalMaxEdgeTreePrefixWidth: globalMax } : {}),
+      ...(globalMaxTreePrefix !== undefined
+        ? { globalMaxEdgeTreePrefixWidth: globalMaxTreePrefix }
+        : {}),
+      ...(globalMaxDirName !== undefined ? { globalMaxDirNameWidth: globalMaxDirName } : {}),
     }),
   );
 }

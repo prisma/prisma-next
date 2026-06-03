@@ -13,6 +13,7 @@ import {
 } from '../utils/command-helpers';
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import {
+  computeGlobalMaxDirNameWidth,
   computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
@@ -158,16 +159,20 @@ export async function executeMigrationGraphCommand(
   const glyphMode = ui.resolveGlyphMode(options.ascii === true);
   const colorize = flags.color !== false;
 
-  const globalMaxEdgeTreePrefixWidth = showSpaceHeadings
-    ? computeGlobalMaxEdgeTreePrefixWidth(
-        scopedSpaces
-          .filter((spaceEntry) => spaceEntry.migrations.length > 0)
-          .map((spaceEntry) => ({
-            graph: aggregate.space(spaceEntry.spaceId)!.graph(),
-            liveContractHash,
-          })),
-      )
-    : undefined;
+  const globalLayoutInputs = showSpaceHeadings
+    ? scopedSpaces
+        .filter((spaceEntry) => spaceEntry.migrations.length > 0)
+        .map((spaceEntry) => ({
+          graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+          liveContractHash,
+        }))
+    : [];
+  const globalMaxEdgeTreePrefixWidth =
+    globalLayoutInputs.length > 0
+      ? computeGlobalMaxEdgeTreePrefixWidth(globalLayoutInputs)
+      : undefined;
+  const globalMaxDirNameWidth =
+    globalLayoutInputs.length > 0 ? computeGlobalMaxDirNameWidth(globalLayoutInputs) : undefined;
 
   const treeSections: MigrationGraphTreeSection[] = [];
   for (const spaceEntry of scopedSpaces) {
@@ -187,6 +192,7 @@ export async function executeMigrationGraphCommand(
             colorize,
             refsByHash: listRefsByContractHash(member),
             ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
+            ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
           });
     const displayTree =
       showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;

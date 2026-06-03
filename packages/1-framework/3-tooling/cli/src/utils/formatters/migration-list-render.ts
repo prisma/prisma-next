@@ -2,6 +2,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import type { GlyphMode } from '../glyph-mode';
 import {
+  computeGlobalMaxDirNameWidth,
   computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
@@ -133,6 +134,7 @@ function renderSpaceTreeBlock(
   liveContractHash: string,
   graphForSpace: (spaceId: string) => MigrationGraph | undefined,
   globalMaxEdgeTreePrefixWidth?: number,
+  globalMaxDirNameWidth?: number,
 ): readonly string[] {
   if (migrations.length === 0) {
     const emptyLine = formatEmptyStateLine(spaceId, style);
@@ -152,6 +154,7 @@ function renderSpaceTreeBlock(
     refsByHash: buildRefsByHashFromListEntries(migrations),
     styler: style,
     ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
+    ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
   });
 
   if (!multiSpace) {
@@ -186,16 +189,20 @@ export function renderMigrationListWithStyle(
   const colorize = options.colorize ?? false;
   const liveContractHash = options.liveContractHash ?? EMPTY_CONTRACT_HASH;
   const graphForSpace = options.graphForSpace ?? (() => undefined);
-  const globalMaxEdgeTreePrefixWidth = multiSpace
-    ? computeGlobalMaxEdgeTreePrefixWidth(
-        result.spaces
-          .filter((space) => space.migrations.length > 0)
-          .map((space) => ({
-            graph: graphForSpace(space.spaceId) ?? migrationGraphFromListEntries(space.migrations),
-            liveContractHash,
-          })),
-      )
-    : undefined;
+  const globalLayoutInputs = multiSpace
+    ? result.spaces
+        .filter((space) => space.migrations.length > 0)
+        .map((space) => ({
+          graph: graphForSpace(space.spaceId) ?? migrationGraphFromListEntries(space.migrations),
+          liveContractHash,
+        }))
+    : [];
+  const globalMaxEdgeTreePrefixWidth =
+    globalLayoutInputs.length > 0
+      ? computeGlobalMaxEdgeTreePrefixWidth(globalLayoutInputs)
+      : undefined;
+  const globalMaxDirNameWidth =
+    globalLayoutInputs.length > 0 ? computeGlobalMaxDirNameWidth(globalLayoutInputs) : undefined;
   const lines: string[] = [];
 
   for (let index = 0; index < result.spaces.length; index++) {
@@ -214,6 +221,7 @@ export function renderMigrationListWithStyle(
         liveContractHash,
         graphForSpace,
         globalMaxEdgeTreePrefixWidth,
+        globalMaxDirNameWidth,
       ),
     );
   }
