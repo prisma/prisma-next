@@ -154,20 +154,11 @@ when color is enabled.
 
 ## Legend (`--legend`)
 
-`migration graph --legend` prints a compact key for the tree's visual language —
-the contract-node marker, the in-lane direction arrows (`↑` / `↓` / `⟲`), the
-empty baseline (`∅`), the data-column arrow (`→`), the `(refs)` overlay
-(including the reserved `db` and `contract` markers), and the rotating
-per-column lane colors. The lane-color row is shown only when color is enabled.
+`--legend` prints a compact key for the tree's visual language — the contract-node marker, the in-lane direction arrows (`↑` / `↓` / `⟲`), the empty baseline (`∅`), the data-column arrow (`→`), the system markers and user-defined refs (`<contract, db>` for live markers; `(prod, staging)` for user-defined refs), and the rotating per-column lane colors. The lane-color row is shown only when color is enabled.
 
-The legend honors the active glyph palette (`--ascii` swaps to `* ^ v @ -`) and
-the same `colorize` gate as the renderer. It is decoration: it prints to
-**stderr** alongside the command header, so `migration graph --legend | …` still
-pipes pure graph output on stdout. Combining `--legend` with `--json` or `--dot`
-is rejected (human-only). Under `--quiet`, the legend is omitted like the
-command header. Implementation: `renderMigrationGraphLegend` in
-`migration-graph-tree-render.ts`; lane hues come from
-`migration-graph-lane-colors.ts`.
+The flag is available on every command that draws the tree — `migration list`, `migration graph`, and `migration status` — and behaves identically across all three. The legend honors the active glyph palette (`--ascii` swaps to `* ^ v @ -`) and the same `colorize` gate as the renderer. It is decoration: it prints to **stderr** alongside the command header, so `migration list --legend | …` still pipes pure tree output on stdout. Combining `--legend` with `--json`, `--dot`, or `--quiet` is rejected (human-only).
+
+Implementation: `renderMigrationGraphLegend` in `migration-graph-tree-render.ts`; the `shouldShowLegend` / `validateLegendOptions` helpers live in `utils/legend.ts`; lane hues come from `migration-graph-lane-colors.ts`.
 
 ## Relationship to the other views
 
