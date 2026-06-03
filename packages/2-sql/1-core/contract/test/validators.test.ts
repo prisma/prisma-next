@@ -164,7 +164,6 @@ describe('SQL contract validators', () => {
     it('validates model without relations', () => {
       const modelWithoutRelations = {
         storage: {
-          namespaceId: '__unbound__',
           table: 'user',
           namespaceId: UNBOUND_NAMESPACE_ID,
           fields: { id: { column: 'id' } },
