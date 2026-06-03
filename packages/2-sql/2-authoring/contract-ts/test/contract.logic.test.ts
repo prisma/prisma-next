@@ -16,7 +16,8 @@ function contractTablesRecord(contract: Record<string, unknown>): Record<string,
   const storage = contract['storage'] as Record<string, unknown>;
   const namespaces = storage['namespaces'] as Record<string, unknown>;
   const slot = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
-  return slot.entries.table as Record<string, unknown>;
+  const entries = slot['entries'] as Record<string, unknown>;
+  return entries['table'] as Record<string, unknown>;
 }
 
 describe('SqlContractSerializer logic validation', () => {
