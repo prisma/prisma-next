@@ -21,13 +21,7 @@ but not blocked by, the consolidation project (TML-2739).
    ([TML-2765](https://linear.app/prisma-company/issue/TML-2765)). Now that the
    Tier-3 tree is compact and correct, the Tier-2 list-graph gutter is the
    redundant middle; this slice removes it, leaving one graph renderer.
-3. **`migration graph` multi-space** —
-   [`slices/migration-graph-space-flag/spec.md`](./slices/migration-graph-space-flag/spec.md)
-   ([TML-2767](https://linear.app/prisma-company/issue/TML-2767)). Makes the read
-   commands consistent: `graph` draws every on-disk space as a disconnected
-   per-space tree by default, with `--space <id>` to narrow — matching
-   `migration list`. Deferred — land after `--tree` becomes the default
-   (TML-2748).
+3. **`migration graph` multi-space** — [`slices/migration-graph-space-flag/spec.md`](./slices/migration-graph-space-flag/spec.md) ([TML-2767](https://linear.app/prisma-company/issue/TML-2767)). **Cancelled / superseded** by D16 in slice 8 below. The all-spaces-by-default rule lands as part of the unified pretty-rendering pass in `render-polish-and-ledger-tests`. Spec retained for historical context.
 4. **`migration list` renders the tree (human output)** —
    [`slices/list-renders-tree/spec.md`](./slices/list-renders-tree/spec.md)
    ([TML-2768](https://linear.app/prisma-company/issue/TML-2768)). `list`'s
@@ -64,34 +58,14 @@ its own branch/PR. The only shared surface is the tree renderer's
 `edgeAnnotationsByHash` field (D11), touched by 4 and 6 (additively); `log` (7)
 shares none of it.
 
-8. **Unify pretty rendering across `list` / `status` / `graph`** — [`slices/unify-pretty-rendering/spec.md`](./slices/unify-pretty-rendering/spec.md) ([TML-2812](https://linear.app/prisma-company/issue/TML-2812)). Closes the gap between D1's promise ("one shared renderer") and what the merged slices actually produce on disk: same input ⇒ byte-identical pretty output across all three commands, modulo `status`'s overlay column and per-command footer. Locks the trunk-choice rule (D14: live-contract chain), the per-row data shape (`dirName · from → to · N ops · {invariants}` everywhere), and `graph`'s space iteration (all spaces by default, matching the others). JSON shapes stay distinct by design (D2/D3); the question of whether `graph` is worth keeping as a separate top-level command is **deferred** — surface a new slice if/when the answer is clear.
+8. **Render polish + ledger test coverage** — [`slices/render-polish-and-ledger-tests/spec.md`](./slices/render-polish-and-ledger-tests/spec.md). The follow-up slice covering [TML-2812](https://linear.app/prisma-company/issue/TML-2812) (unify pretty rendering across `list` / `status` / `graph`, locking trunk-choice as D14 + per-row data as D15 + space iteration as D16), [TML-2811](https://linear.app/prisma-company/issue/TML-2811) (column alignment, D17), [TML-2773](https://linear.app/prisma-company/issue/TML-2773) (colored lanes + `--legend`, D18 / D19), and the two open items in [TML-2774](https://linear.app/prisma-company/issue/TML-2774) (cross-target op-count parity harness + Postgres op-count-mismatch throw test, D20). Subsumes the former `unify-pretty-rendering` and `lane-colors-and-legend` slice drafts. [TML-2767](https://linear.app/prisma-company/issue/TML-2767) (`migration graph` multi-space) is **superseded** by D16 and closed.
 
-Future siblings (not core): `migration path --from X --to Y`
-([TML-2771](https://linear.app/prisma-company/issue/TML-2771)) and `ref show`
-invariants ([TML-2772](https://linear.app/prisma-company/issue/TML-2772)).
+Future siblings (not core): `migration path --from X --to Y` ([TML-2771](https://linear.app/prisma-company/issue/TML-2771)) and `ref show` invariants ([TML-2772](https://linear.app/prisma-company/issue/TML-2772)).
 
-Presentation polish (independent of the sequence above):
+Ledger cleanups (still deferred — out of any current slice's scope, no Linear tickets):
 
-- **Colored lanes + `--legend`** —
-  [`slices/lane-colors-and-legend/spec.md`](./slices/lane-colors-and-legend/spec.md)
-  ([TML-2773](https://linear.app/prisma-company/issue/TML-2773)). The Tier-3 tree gains a `git log --graph`-style
-  per-column colored gutter and an opt-in `--legend` key. Presentation-only;
-  touches the tree renderer + the `graph` command, behind unchanged layout and
-  `--json`/`--dot`.
-
-Ledger cleanups (follow-ups from the TML-2769 / PR #665 review; sequenced after the ledger foundation):
-
-- **Consolidate the per-edge breakdown onto the plan** —
-  [`slices/edges-on-plan/spec.md`](./slices/edges-on-plan/spec.md). The ledger
-  foundation threads `migrationEdges` as a sibling of `plan` on the runner
-  options, requiring a hand-maintained consistency guard. This slice moves the
-  breakdown onto `MigrationPlan.edges` so the runner reads one object and the
-  guard's reason to exist disappears.
-- **Stop spelling the empty-contract origin as a fake hash** —
-  [`slices/empty-origin-as-null/spec.md`](./slices/empty-origin-as-null/spec.md).
-  ∅ is modelled as `null` at the read boundary but as `sha256:empty` (not a real
-  hash) in storage/graph, bridged by a coercion helper. This slice gives ∅ one
-  honest representation (cut chosen with the graph-layer owner at pickup).
+- **Consolidate the per-edge breakdown onto the plan** — [`slices/edges-on-plan/spec.md`](./slices/edges-on-plan/spec.md). The ledger foundation threads `migrationEdges` as a sibling of `plan` on the runner options. Moving the breakdown onto `MigrationPlan.edges` would let the runner read one object instead of two. Filed only as a draft spec until picked up.
+- **Stop spelling the empty-contract origin as a fake hash** — [`slices/empty-origin-as-null/spec.md`](./slices/empty-origin-as-null/spec.md). ∅ is modelled as `null` at the read boundary but as `sha256:empty` in storage / graph, bridged by a coercion helper. The `EMPTY_CONTRACT_HASH` value is wired into the `MigrationGraph` node-keying, walk algorithms, integrity checks, and ref parsing — non-trivial blast radius; the operator ruled in the TML-2769 review that the constant's value is "not our fight." Filed only as a draft spec until picked up.
 
 ## Contents
 
