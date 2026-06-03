@@ -394,7 +394,7 @@ describe('collection-dispatch', () => {
       state,
       tableName: 'accounts',
       modelName: 'Account',
-    }).toArray();
+    });
 
     const members = (rows[0] as { members: Record<string, unknown>[] }).members;
     expect(members[0]).toEqual({
@@ -404,7 +404,6 @@ describe('collection-dispatch', () => {
       kind: 'admin',
       role: 'owner',
     });
-    expect(members[0]).not.toHaveProperty('plan');
     expect(members[1]).toEqual({
       id: 11,
       name: 'Bo',
@@ -412,7 +411,6 @@ describe('collection-dispatch', () => {
       kind: 'regular',
       plan: 'free',
     });
-    expect(members[1]).not.toHaveProperty('role');
   });
 
   it('dispatchCollectionRows() decodes MTI-target include child rows, surfacing variant columns under their field names', async () => {
@@ -439,10 +437,20 @@ describe('collection-dispatch', () => {
     }).toArray();
 
     const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
-    expect(tasks[0]).toMatchObject({ id: 10, title: 'Crash', type: 'bug', severity: 'critical' });
-    expect(tasks[0]).not.toHaveProperty('priority');
-    expect(tasks[1]).toMatchObject({ id: 11, title: 'Dark mode', type: 'feature', priority: 7 });
-    expect(tasks[1]).not.toHaveProperty('severity');
+    expect(tasks[0]).toEqual({
+      id: 10,
+      title: 'Crash',
+      type: 'bug',
+      severity: 'critical',
+      projectId: 1,
+    });
+    expect(tasks[1]).toEqual({
+      id: 11,
+      title: 'Dark mode',
+      type: 'feature',
+      priority: 7,
+      projectId: 1,
+    });
   });
 
   it('dispatchCollectionRows() decodes a nested include hanging off a poly-target child from the raw child row, for both an MTI and a non-MTI variant', async () => {
@@ -507,20 +515,28 @@ describe('collection-dispatch', () => {
 
     const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
 
-    // Non-MTI (STI) variant: grandchild decodes to its real value, parent poly
-    // row is still variant-shaped (the sibling-variant `priority` column is
-    // dropped).
-    expect(tasks[0]).toMatchObject({ id: 10, title: 'Crash', type: 'bug', severity: 'critical' });
-    expect(tasks[0]).not.toHaveProperty('priority');
-    expect(tasks[0]!['subtasks']).toEqual([{ id: 100, title: 'Repro', type: 'bug', parentId: 10 }]);
+    // Non-MTI (STI) variant: grandchild decodes to its real value, and the
+    // parent poly row is variant-shaped — the sibling-variant `priority`
+    // column is dropped, so it is absent from the whole-shape assertion.
+    expect(tasks[0]).toEqual({
+      id: 10,
+      title: 'Crash',
+      type: 'bug',
+      severity: 'critical',
+      projectId: 1,
+      subtasks: [{ id: 100, title: 'Repro', type: 'bug', parentId: 10 }],
+    });
 
-    // MTI variant: grandchild decodes to its real value, parent poly row is
-    // still variant-shaped (the sibling-variant `severity` column is dropped).
-    expect(tasks[1]).toMatchObject({ id: 11, title: 'Dark mode', type: 'feature', priority: 7 });
-    expect(tasks[1]).not.toHaveProperty('severity');
-    expect(tasks[1]!['subtasks']).toEqual([
-      { id: 101, title: 'Toggle', type: 'feature', parentId: 11 },
-    ]);
+    // MTI variant: grandchild decodes to its real value, and the parent poly
+    // row is variant-shaped — the sibling-variant `severity` column is dropped.
+    expect(tasks[1]).toEqual({
+      id: 11,
+      title: 'Dark mode',
+      type: 'feature',
+      priority: 7,
+      projectId: 1,
+      subtasks: [{ id: 101, title: 'Toggle', type: 'feature', parentId: 11 }],
+    });
   });
 
   it('dispatchCollectionRows() maps a variant-narrowed include via its named variant', async () => {
@@ -553,8 +569,13 @@ describe('collection-dispatch', () => {
     }).toArray();
 
     const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
-    expect(tasks[0]).toMatchObject({ id: 11, title: 'Dark mode', type: 'feature', priority: 7 });
-    expect(tasks[0]).not.toHaveProperty('severity');
+    expect(tasks[0]).toEqual({
+      id: 11,
+      title: 'Dark mode',
+      type: 'feature',
+      priority: 7,
+      projectId: 1,
+    });
   });
 
   // ---------------------------------------------------------------------------
