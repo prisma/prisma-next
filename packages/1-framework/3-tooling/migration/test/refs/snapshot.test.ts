@@ -38,7 +38,7 @@ function sampleContractIR(variant: 'a' | 'b' = 'a'): ContractIR {
                   },
                 },
                 relations: {},
-                storage: { table: 'users', namespace: 'public' },
+                storage: { namespaceId: '__unbound__', table: 'users', namespace: 'public' },
               },
             },
           },

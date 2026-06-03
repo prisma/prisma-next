@@ -23,7 +23,7 @@ const userModel = {
     id: { type: { kind: 'scalar', name: 'Int' } },
     email: { type: { kind: 'scalar', name: 'String' } },
   },
-  storage: { table: 'users' },
+  storage: { namespaceId: PUBLIC_NAMESPACE_ID, table: 'users' },
 } as unknown as ContractModelBase;
 
 const usersTableInput = {
@@ -66,7 +66,9 @@ describe('ORM namespace qualification', () => {
       domain: {
         namespaces: {
           public: { models: { User: userModel } },
-          auth: { models: { User: { ...userModel, storage: { table: 'users' } } } },
+          auth: {
+            models: { User: { ...userModel, storage: { namespaceId: 'auth', table: 'users' } } },
+          },
         },
       },
     } as Contract<SqlStorageType>;

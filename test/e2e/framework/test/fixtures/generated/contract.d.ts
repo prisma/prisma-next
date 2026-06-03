@@ -576,6 +576,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'comment';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly postId: { readonly column: 'postId' };
@@ -620,6 +621,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'embedding';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly embedding: { readonly column: 'embedding' };
@@ -653,6 +655,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'event';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly name: { readonly column: 'name' };
@@ -699,6 +702,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'literal_defaults';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly label: { readonly column: 'label' };
@@ -793,6 +797,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'param_types';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly name: { readonly column: 'name' };
@@ -858,6 +863,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'post';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly userId: { readonly column: 'userId' };
@@ -908,6 +914,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'user';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly email: { readonly column: 'email' };
@@ -977,6 +984,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'comment';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly postId: { readonly column: 'postId' };
@@ -1021,6 +1029,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'embedding';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly embedding: { readonly column: 'embedding' };
@@ -1054,6 +1063,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'event';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly name: { readonly column: 'name' };
@@ -1100,6 +1110,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'literal_defaults';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly label: { readonly column: 'label' };
@@ -1194,6 +1205,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'param_types';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly name: { readonly column: 'name' };
@@ -1262,6 +1274,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'post';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly userId: { readonly column: 'userId' };
@@ -1312,6 +1325,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'user';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly email: { readonly column: 'email' };

@@ -3,21 +3,6 @@ import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { errorDescriptorHeadHashMismatch } from './errors';
 
-function stripNamespaceKinds(storage: Record<string, unknown>): Record<string, unknown> {
-  const namespaces = storage['namespaces'] as Record<string, Record<string, unknown>> | undefined;
-  if (!namespaces) return storage;
-  const stripped: Record<string, Record<string, unknown>> = {};
-  for (const [nsId, ns] of Object.entries(namespaces)) {
-    if (ns && typeof ns === 'object') {
-      const { kind: _kind, ...rest } = ns as Record<string, unknown>;
-      stripped[nsId] = rest as Record<string, unknown>;
-    } else {
-      stripped[nsId] = ns;
-    }
-  }
-  return { ...storage, namespaces: stripped };
-}
-
 /**
  * Inputs the helper needs to recompute the descriptor's storage hash and
  * compare it to the published `headRef.hash`. Kept structural so the SQL
@@ -74,18 +59,10 @@ export function assertDescriptorSelfConsistency(inputs: DescriptorSelfConsistenc
   // descriptor-published `storageHash` before re-canonicalising.
   const storageRecord = inputs.storage as Record<string, unknown>;
   const { storageHash: _stripped, ...storageWithoutHash } = storageRecord;
-  // Target serializers (e.g. PostgresContractSerializer) inject a `kind`
-  // discriminator into each namespace entry when writing contract.json (e.g.
-  // `"postgres-unbound-schema"`). The authoring pipeline computes
-  // `storageHash` from IR class instances whose `kind` property is
-  // non-enumerable, so `kind` is absent from the hash input. Strip `kind`
-  // from namespace entries before recomputing so this check always operates
-  // on the same canonical shape the authoring pipeline saw.
-  const normalizedStorage = stripNamespaceKinds(storageWithoutHash);
   const recomputed = computeStorageHash({
     target: inputs.target,
     targetFamily: inputs.targetFamily,
-    storage: normalizedStorage,
+    storage: storageWithoutHash,
     ...ifDefined('shouldPreserveEmpty', inputs.shouldPreserveEmpty),
     ...ifDefined('sortStorage', inputs.sortStorage),
   });

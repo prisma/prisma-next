@@ -370,7 +370,7 @@ describe('createModelAccessor', () => {
       ...models,
       User: {
         ...(models['User'] as Record<string, unknown>),
-        storage: { table: 'users' },
+        storage: { namespaceId: 'public', table: 'users' },
         relations: {},
       },
     }));

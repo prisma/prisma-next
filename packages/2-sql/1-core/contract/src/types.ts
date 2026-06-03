@@ -55,6 +55,7 @@ export type SqlModelFieldStorage = {
 
 export type SqlModelStorage = {
   readonly table: string;
+  readonly namespaceId: string;
   readonly fields: Record<string, SqlModelFieldStorage>;
 };
 

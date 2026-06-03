@@ -56,6 +56,7 @@
                   "column": "team_ref"
                 }
               },
+              "namespaceId": "public",
               "table": "team_member"
             }
           },
@@ -76,6 +77,7 @@
                   "column": "team_id"
                 }
               },
+              "namespaceId": "public",
               "table": "org_team"
             }
           }

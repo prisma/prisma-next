@@ -64,6 +64,8 @@ its own branch/PR. The only shared surface is the tree renderer's
 `edgeAnnotationsByHash` field (D11), touched by 4 and 6 (additively); `log` (7)
 shares none of it.
 
+8. **Unify pretty rendering across `list` / `status` / `graph`** — [`slices/unify-pretty-rendering/spec.md`](./slices/unify-pretty-rendering/spec.md) ([TML-2812](https://linear.app/prisma-company/issue/TML-2812)). Closes the gap between D1's promise ("one shared renderer") and what the merged slices actually produce on disk: same input ⇒ byte-identical pretty output across all three commands, modulo `status`'s overlay column and per-command footer. Locks the trunk-choice rule (D14: live-contract chain), the per-row data shape (`dirName · from → to · N ops · {invariants}` everywhere), and `graph`'s space iteration (all spaces by default, matching the others). JSON shapes stay distinct by design (D2/D3); the question of whether `graph` is worth keeping as a separate top-level command is **deferred** — surface a new slice if/when the answer is clear.
+
 Future siblings (not core): `migration path --from X --to Y`
 ([TML-2771](https://linear.app/prisma-company/issue/TML-2771)) and `ref show`
 invariants ([TML-2772](https://linear.app/prisma-company/issue/TML-2772)).

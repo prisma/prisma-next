@@ -213,6 +213,16 @@ always emit ISO-8601 UTC (`2026-06-02T14:37:31.000Z`) regardless of `--utc`
 renderer). Non-TTY already auto-switches to JSON, so a piped `log` is UTC by
 construction.
 
+### D14 — Trunk-choice rule: the live-contract chain is the trunk (TML-2812)
+
+D1 commits the three commands to one shared renderer, but doesn't pin **which chain is the trunk** when the topology is disconnected. In practice the commands diverged on disk: `list` chose the live-contract chain, `status` and `graph` chose the historical-ref chain (often `f7a8eb5` for the demo fixture's `prod` ref). Same data, two different trunk picks — same rendering engine, different inputs to its trunk resolver.
+
+The locked rule: **the trunk is the chain containing the live contract** — the contract emitted from the on-disk schema, i.e. the same contract `migrate` defaults to advancing toward when no `--to` is passed. Disconnected sub-graphs (historical-ref chains, abandoned branches, parallel work, etc.) render as side-branches indented one level.
+
+Rationale: the live contract answers "where does the app's code think the schema is?" — it's the *current* anchor in every authoring workflow. Historical refs are secondary, possibly-stale artefacts. Picking the historical-ref chain as the trunk is misleading: it implies the historical state is "the main line" when the operator's actual reference frame is the live contract.
+
+This rule applies uniformly to `list`, `status`, and `graph`. `list` already implements it; TML-2812 propagates it to the other two and asserts it via a shared snapshot. A parametrised trunk-choice (e.g. `--trunk <ref>`) is not in scope — locking one rule is the priority.
+
 ## Resolved open items (were under discussion)
 
 - `status` multi-space rendering → **full annotated per-space sections** (each

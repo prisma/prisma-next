@@ -1493,9 +1493,6 @@ importers:
       '@clack/prompts':
         specifier: ^1.4.0
         version: 1.4.0
-      '@dagrejs/dagre':
-        specifier: ^3.0.0
-        version: 3.0.0
       '@prisma-next/cli-telemetry':
         specifier: workspace:0.12.0
         version: link:../cli-telemetry
@@ -1734,9 +1731,6 @@ importers:
       '@clack/prompts':
         specifier: ^1.4.0
         version: 1.4.0
-      '@dagrejs/dagre':
-        specifier: ^3.0.0
-        version: 3.0.0
       '@prisma-next/cli-telemetry':
         specifier: workspace:0.12.0
         version: link:../cli-telemetry
@@ -5021,12 +5015,6 @@ packages:
   '@cursor/sdk@1.0.15':
     resolution: {integrity: sha512-O8ItVzKZX4L0veS/PH0vwA/0/sxV5doTprrDiBo6llBcTqRMZCj83e227lSoWg45f8wLDc8pVYaWktfE/B2rEw==}
     engines: {node: '>=18'}
-
-  '@dagrejs/dagre@3.0.0':
-    resolution: {integrity: sha512-ZzhnTy1rfuoew9Ez3EIw4L2znPGnYYhfn8vc9c4oB8iw6QAsszbiU0vRhlxWPFnmmNSFAkrYeF1PhM5m4lAN0Q==}
-
-  '@dagrejs/graphlib@4.0.1':
-    resolution: {integrity: sha512-IvcV6FduIIAmLwnH+yun+QtV36SC7mERqa86aClNqmMN09WhmPPYU8ckHrZBozErf+UvHPWOTJYaGYiIcs0DgA==}
 
   '@electric-sql/pglite-socket@0.1.3':
     resolution: {integrity: sha512-LAciWM0M1dCL8hlsxu2venbVZcdxema0BtDfpWYVqr+Y468UADw0pFWidhKw1M8sfJ8rdLT71tjMmnirf/IZRQ==}
@@ -10189,12 +10177,6 @@ snapshots:
     transitivePeerDependencies:
       - bluebird
       - supports-color
-
-  '@dagrejs/dagre@3.0.0':
-    dependencies:
-      '@dagrejs/graphlib': 4.0.1
-
-  '@dagrejs/graphlib@4.0.1': {}
 
   '@electric-sql/pglite-socket@0.1.3(@electric-sql/pglite@0.4.3)':
     dependencies:

@@ -72,7 +72,9 @@
             "foreignKeys": [],
             "indexes": [],
             "primaryKey": {
-              "columns": ["id"]
+              "columns": [
+                "id"
+              ]
             },
             "uniques": []
           }
@@ -117,7 +119,8 @@
                   "column": "id"
                 }
               },
-              "table": "account"
+              "table": "account",
+              "namespaceId": "__unbound__"
             }
           }
         }

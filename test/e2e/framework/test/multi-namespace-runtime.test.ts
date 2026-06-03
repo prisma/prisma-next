@@ -97,6 +97,7 @@ function buildMultiNamespaceRuntimeContract(): Contract<SqlStorage> {
               },
               relations: {},
               storage: {
+                namespaceId: 'auth',
                 table: 'user',
                 fields: { id: { column: 'id' }, name: { column: 'name' } },
               },
@@ -119,6 +120,7 @@ function buildMultiNamespaceRuntimeContract(): Contract<SqlStorage> {
                 },
               },
               storage: {
+                namespaceId: 'public',
                 table: 'note',
                 fields: {
                   id: { column: 'id' },

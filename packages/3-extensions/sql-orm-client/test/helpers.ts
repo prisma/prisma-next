@@ -7,7 +7,6 @@ import type {
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SelectAst } from '@prisma-next/sql-relational-core/ast';
@@ -184,6 +183,7 @@ export function buildMixedPolyContract(): TestContract {
     },
     relations: {},
     storage: {
+      namespaceId: 'public',
       table: 'tasks',
       fields: { id: { column: 'id' }, title: { column: 'title' }, type: { column: 'type' } },
     },
@@ -194,18 +194,26 @@ export function buildMixedPolyContract(): TestContract {
   domainModels['Bug'] = {
     fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
-    storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
+    storage: {
+      namespaceId: 'public',
+      table: 'tasks',
+      fields: { severity: { column: 'severity' } },
+    },
     base: { model: 'Task', namespace: 'public' },
   };
 
   domainModels['Feature'] = {
     fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
     relations: {},
-    storage: { table: 'features', fields: { priority: { column: 'priority' } } },
+    storage: {
+      namespaceId: 'public',
+      table: 'features',
+      fields: { priority: { column: 'priority' } },
+    },
     base: { model: 'Task', namespace: 'public' },
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.tasks = {
+  raw.storage.namespaces.public.tables.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -218,7 +226,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.features = {
+  raw.storage.namespaces.public.tables.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -259,14 +267,14 @@ export function buildStiPolyContract(): TestContract {
   domainModels['Admin'] = {
     fields: { role: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
-    storage: { table: 'users', fields: { role: { column: 'role' } } },
+    storage: { namespaceId: 'public', table: 'users', fields: { role: { column: 'role' } } },
     base: { model: 'User', namespace: 'public' },
   };
 
   domainModels['Regular'] = {
     fields: { plan: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
-    storage: { table: 'users', fields: { plan: { column: 'plan' } } },
+    storage: { namespaceId: 'public', table: 'users', fields: { plan: { column: 'plan' } } },
     base: { model: 'User', namespace: 'public' },
   };
 

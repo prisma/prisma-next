@@ -108,6 +108,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'feature_flag';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly key: { readonly column: 'key' };
             readonly enabled: { readonly column: 'enabled' };
@@ -144,6 +145,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'feature_flag';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly key: { readonly column: 'key' };
                 readonly enabled: { readonly column: 'enabled' };

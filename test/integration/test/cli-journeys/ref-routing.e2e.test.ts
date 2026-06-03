@@ -16,7 +16,9 @@ import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
+  migrationStatusAppSpace,
   parseJsonOutput,
+  parseMigrationStatusJson,
   runContractEmit,
   runMigrate,
   runMigrationPlanAndEmit,
@@ -66,18 +68,14 @@ withTempDir(({ createTempDir }) => {
         // M.04: status --ref production → at-target (DB marker = C1, ref = C1)
         const statusProd = await runMigrationStatus(ctx, ['--to', 'production', '--json']);
         expect(statusProd.exitCode, 'M.04: status --ref production').toBe(0);
-        const prodStatus = parseJsonOutput<{
-          migrations: readonly { status: string }[];
-        }>(statusProd);
+        const prodStatus = migrationStatusAppSpace(parseMigrationStatusJson(statusProd));
         const prodPending = prodStatus.migrations.filter((m) => m.status === 'pending').length;
         expect(prodPending, 'M.04: production has 0 pending').toBe(0);
 
         // M.05: status --ref staging → 1 pending (DB marker = C1, ref = C2)
         const statusStaging = await runMigrationStatus(ctx, ['--to', 'staging', '--json']);
         expect(statusStaging.exitCode, 'M.05: status --ref staging').toBe(0);
-        const stagingStatus = parseJsonOutput<{
-          migrations: readonly { status: string }[];
-        }>(statusStaging);
+        const stagingStatus = migrationStatusAppSpace(parseMigrationStatusJson(statusStaging));
         const stagingPending = stagingStatus.migrations.filter(
           (m) => m.status === 'pending',
         ).length;
@@ -107,7 +105,7 @@ withTempDir(({ createTempDir }) => {
         const statusProdAfter = await runMigrationStatus(ctx, ['--to', 'production', '--json']);
         const prodAfterOutput = stripAnsi(statusProdAfter.stdout);
         expect(prodAfterOutput, 'N.02: production status indicates ahead-of-ref condition').toMatch(
-          /ahead|no.*path|mismatch/i,
+          /ahead|no.*path|mismatch|cannot reach/i,
         );
       },
       timeouts.spinUpPpgDev,

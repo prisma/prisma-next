@@ -992,6 +992,7 @@ describe('renderMigrationGraphLegend', () => {
       "Legend:
         ○ contract   ↑ forward   ↓ rollback
         ⟲ migration without schema change
+        ✓ applied   ⧗ pending
         ∅ empty database (baseline)
         (refs) db / contract markers
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
@@ -1005,6 +1006,7 @@ describe('renderMigrationGraphLegend', () => {
       "Legend:
         * contract   ^ forward   v rollback
         @ migration without schema change
+        + applied   > pending
         - empty database (baseline)
         (refs) db / contract markers
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
@@ -1058,5 +1060,39 @@ describe('renderMigrationGraphLegend', () => {
     // The leading glyph markers (○, ↑, ↓, ⟲, ∅) stay bright like the other kind
     // glyphs — only the descriptive prose dims.
     expect(colored).not.toContain(`${dim('∅')}`);
+  });
+});
+
+describe('renderMigrationGraphTree status overlay', () => {
+  it('appends applied and pending labels on migration rows', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const annotations = new Map([
+      [init.migrationHash, { status: 'applied' as const }],
+      [addPosts.migrationHash, { status: 'pending' as const }],
+    ]);
+    const output = tree([init, addPosts], {
+      colorize: false,
+      edgeAnnotationsByHash: annotations,
+    });
+    expect(output).toContain('✓ applied');
+    expect(output).toContain('⧗ pending');
+  });
+
+  it('uses ASCII overlay status markers when glyphMode is ascii', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const annotations = new Map([
+      [init.migrationHash, { status: 'applied' as const }],
+      [addPosts.migrationHash, { status: 'pending' as const }],
+    ]);
+    const output = treeAscii([init, addPosts], {
+      colorize: false,
+      edgeAnnotationsByHash: annotations,
+    });
+    expect(output).toContain('+ applied');
+    expect(output).toContain('> pending');
+    expect(output).not.toContain('✓');
+    expect(output).not.toContain('⧗');
   });
 });

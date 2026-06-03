@@ -40,7 +40,8 @@
                   "column": "key"
                 }
               },
-              "table": "feature_flag"
+              "table": "feature_flag",
+              "namespaceId": "public"
             }
           }
         }

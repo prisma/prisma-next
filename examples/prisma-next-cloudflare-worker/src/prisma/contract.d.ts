@@ -340,6 +340,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'bug';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly severity: { readonly column: 'severity' };
             readonly stepsToRepro: { readonly column: 'stepsToRepro' };
@@ -361,6 +362,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'feature';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly priority: { readonly column: 'priority' };
             readonly targetRelease: { readonly column: 'targetRelease' };
@@ -403,6 +405,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'post';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
@@ -458,6 +461,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'task';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
@@ -525,6 +529,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'user';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly email: { readonly column: 'email' };
@@ -564,6 +569,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'bug';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly severity: { readonly column: 'severity' };
                 readonly stepsToRepro: { readonly column: 'stepsToRepro' };
@@ -585,6 +591,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'feature';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly priority: { readonly column: 'priority' };
                 readonly targetRelease: { readonly column: 'targetRelease' };
@@ -627,6 +634,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'post';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
@@ -682,6 +690,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'task';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
@@ -749,6 +758,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'user';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly email: { readonly column: 'email' };

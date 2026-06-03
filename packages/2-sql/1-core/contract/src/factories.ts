@@ -72,12 +72,13 @@ export function model(
   tableName: string,
   fields: Record<string, SqlModelFieldStorage>,
   relations: Record<string, unknown> = {},
+  namespaceId: string = UNBOUND_NAMESPACE_ID,
 ): {
   storage: SqlModelStorage;
   fields: Record<string, { readonly nullable: boolean; readonly type: ScalarFieldType }>;
   relations: Record<string, unknown>;
 } {
-  const storage: SqlModelStorage = { table: tableName, fields };
+  const storage: SqlModelStorage = { table: tableName, namespaceId, fields };
   const domainFields = Object.fromEntries(
     Object.entries(fields).map(([name, field]) => [
       name,

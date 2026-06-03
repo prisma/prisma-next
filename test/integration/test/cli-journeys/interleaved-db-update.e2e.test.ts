@@ -16,7 +16,9 @@ import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
+  migrationStatusAppSpace,
   parseJsonOutput,
+  parseMigrationStatusJson,
   runContractEmit,
   runDbUpdate,
   runDbVerify,
@@ -129,9 +131,7 @@ withTempDir(({ createTempDir }) => {
         // 7. Status clean
         const status = await runMigrationStatus(ctx, ['--json']);
         expect(status.exitCode, '7: status').toBe(0);
-        const statusData = parseJsonOutput<{
-          migrations: readonly { status: string }[];
-        }>(status);
+        const statusData = migrationStatusAppSpace(parseMigrationStatusJson(status));
         const pending = statusData.migrations.filter((m) => m.status === 'pending').length;
         expect(pending, '7: 0 pending').toBe(0);
       },

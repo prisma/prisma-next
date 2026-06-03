@@ -71,9 +71,7 @@ describe('builder integration', () => {
     expect(userTable?.primaryKey?.columns).toEqual(['id']);
     const userModel = contract.domain.namespaces['public']!.models.User;
     expect(userModel).toMatchObject({
-      storage: {
-        table: 'user',
-      },
+      storage: { namespaceId: 'public', table: 'user' },
       fields: expect.objectContaining({
         id: expect.anything(),
         email: expect.anything(),
@@ -262,7 +260,7 @@ describe('builder integration', () => {
       },
     });
     type ModelShape = {
-      storage: { table: string; fields: Record<string, unknown> };
+      storage: { namespaceId: string; table: string; fields: Record<string, unknown> };
       fields: Record<string, unknown>;
     };
     const builderUserModel = builderContract.domain.namespaces['public']!.models
