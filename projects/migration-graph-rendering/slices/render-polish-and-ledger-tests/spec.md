@@ -39,6 +39,7 @@ Six independent follow-ups, all surfaced after the read-command-family slices ([
 5. **`migration status` default target + no-path wording** (D21, surfaced during QA) — fix `resolveTargetHashForSpace` so the default target is the live contract whenever there is one (matching `migrate`'s default and preventing the "(db, contract) ... cannot reach the selected target" contradiction); reword the no-path summary to name the actual missing thing (a migration path), name both endpoints, and lead with `migration plan` as the fix.
 6. **System-marker rendering + fresh-DB no-path** (D22, surfaced post-D6) — render system markers (`contract`, `db`) in `<>` brackets to distinguish them syntactically from user-managed refs (`()`); fix the `markerHash !== undefined` guard in the path check so a fresh DB with the live contract disconnected from `∅` reports the no-path summary instead of "up to date".
 7. **Cross-space data-column alignment + contract-node refs adjacent to hash + right-justified from-hash column** (D23, surfaced post-D7) — three coupled padding rules at the row→string join in the renderer.
+8. **Cross-space dirName alignment + capitalised "Up to date"** (D24, surfaced post-D8 QA) — extend D23's cross-space alignment to the dirName column too; capitalise the no-pending-no-error summary headline.
 
 ## Locked decisions
 
@@ -130,6 +131,14 @@ Three coupled rendering polish fixes surfaced post-D7 QA. Each is a small target
 **Right-justified from-hash column.** Today the from-hash column in the migration data block is left-padded (the value sits at the left of a fixed-width pad, trailing spaces fill to the `→`). Effect with regular 7-char hashes: invisible. Effect with `∅` (one char): six trailing spaces, then `→`, which reads as a gap. New rule: switch the from-hash column to right-padding (right-justified value). Regular hashes are unchanged (they fill the column). `∅` lands flush against the `→`. The to-hash column stays left-justified (it's followed by other tokens, not preceded by a glyph that should hug it).
 
 Goldens regenerate mechanically. Plain-text (`colorize: false`) goldens see whitespace-only changes per the three rules. The lane-color goldens (D3) and the legend goldens (D4) are unaffected (color is orthogonal to padding).
+
+### D24 — Cross-space dirName alignment + capitalised "Up to date"
+
+Two trivial follow-ups surfaced post-D8 QA. Each is one independent change in one helper.
+
+**Cross-space dirName alignment.** D23 / D8 aligned the **tree-prefix** width globally across per-space blocks but left the **dirName** column padded to each space's local max. That means the from-hash column (which sits immediately after dirName) lands at different absolute column positions across spaces — defeating the visual goal of cross-space alignment for everything *after* the tree-prefix. Extend the rule: compute a single global max dirName width across every migration row in every per-space block in the current rendering, pad every migration row's dirName to that width. Single-space renderings collapse to today's behaviour. Same orchestration point D8 used (`computeGlobalMaxEdgeTreePrefixWidth` + `renderMigrationGraphSpaceTrees`), parameterised with a parallel `globalMaxDirNameWidth`.
+
+**Capitalised "Up to date".** `buildStatusHeadline` currently emits the literal `'up to date'`. Change to `'Up to date'`. Sentences in the summary line start capitalised; this is the only outlier.
 
 ### D20 — Op-count parity is a cross-target obligation, asserted by one harness
 
@@ -264,3 +273,23 @@ Eight dispatches. D1–D4 sit on the rendering surface (`packages/1-framework/3-
 - **Focus:** Whitespace-only changes at three specific join points (layout entry width-computation, contract-row builder, from-hash padder). No semantic, color, or content changes.
 
 - **Hard constraint:** Touch only the three named source files (`migration-graph-tree-render.ts`, the multi-space orchestration point — likely `migration-graph-space-render.ts` or the layout module — and `migration-list-data-column.ts`), their unit tests, and snapshot fixtures regenerated mechanically. No other production files. If you find that the cross-space orchestration requires a wider refactor than a single-pass max-width computation handed down via prop, stop and report — do not refactor the layout module structurally.
+
+### Dispatch 9: cross-space dirName alignment + capitalised "Up to date"
+
+- **Outcome:** Two trivial follow-ups per D24, both in surfaces D8 already touched.
+
+  (a) **Cross-space dirName alignment.** Mirror D8's `globalMaxEdgeTreePrefixWidth` for dirName: compute a single global max dirName width across every migration row in every per-space block in the current rendering, then pad every migration row's dirName to that width. Reuse the orchestration point D8 introduced (`computeGlobalMaxEdgeTreePrefixWidth` / `renderMigrationGraphSpaceTrees`); add a parallel `globalMaxDirNameWidth` parameter and threading. Wire it through the same three caller sites D8 wired (`migration-list-render.ts`, `migration-graph.ts`, `migration-status.ts`).
+
+  (b) **Capitalised "Up to date".** In `cli/src/commands/migration-status.ts`, `buildStatusHeadline`'s `pendingCount === 0` branch returns the literal `'up to date'`. Change to `'Up to date'`. One character.
+
+- **Builds on:** D8 (the orchestration plumbing); the rest of the slice is unaffected.
+
+- **Hands to:**
+  - **Unit tests:** extend the cross-space test from D8 to also assert that the from-hash column lands at the same absolute column offset across the two per-space blocks. The test from D8 today asserts the dirName start position (governed by tree-prefix width); add an additional assertion on the `→` arrow position (governed by tree-prefix width + dirName width + from-hash width — equality across blocks proves dirName is aligned globally).
+  - One unit test for the capitalisation: extend `format-status-summary.test.ts`'s `'reports up to date when nothing is pending'` test to assert `'Up to date'`.
+  - **E2E:** existing scenarios pass (whitespace + capitalisation only; goldens regenerate mechanically).
+  - Existing snapshots regenerate mechanically (the multi-space goldens now show globally-aligned from-hash columns; `'up to date'` snapshots flip to `'Up to date'`).
+
+- **Focus:** Two surgical edits — one paralleling D8's existing pattern, one a single-character literal. No structural change.
+
+- **Hard constraint:** Touch only `migration-graph-tree-render.ts`, `migration-graph-space-render.ts`, `migration-list-render.ts`, `migration-graph.ts`, `migration-status.ts` (same set as D8), their unit tests, and snapshot fixtures regenerated mechanically. No other production files. If you find a non-whitespace-or-capitalisation snapshot diff, stop and report.
