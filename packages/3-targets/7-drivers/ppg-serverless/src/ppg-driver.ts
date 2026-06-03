@@ -11,6 +11,7 @@ import type {
   SqlTransaction,
 } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
+import { withArrayParsers } from './core/array-parsers';
 import { mapRowToRecord } from './core/row-mapper';
 import { normalizePpgError } from './normalize-error';
 
@@ -343,7 +344,18 @@ export function createBoundDriverFromBinding(
 ): PpgServerlessBoundDriverImpl {
   switch (binding.kind) {
     case 'url': {
-      const ppgClient = client(defaultClientConfig(binding.url));
+      // `defaultClientConfig`'s parsers cover scalar OIDs only — it has no
+      // entries for `_text` (1009), `_int4` (1007), and so on. The framework's
+      // adapter layer assumes the driver hydrates `text[]` columns as JS
+      // arrays (matching `pg`'s native behaviour), so we extend the parser
+      // table with the array OID variants before constructing the client.
+      // User-owned clients (the `ppgClient` binding) opt in by calling
+      // `withArrayParsers` themselves — see the exported helper.
+      const config = defaultClientConfig(binding.url);
+      const ppgClient = client({
+        ...config,
+        parsers: withArrayParsers(config.parsers ?? []),
+      });
       return new PpgServerlessBoundDriverImpl(ppgClient, /* ownsClient */ true);
     }
     case 'ppgClient': {

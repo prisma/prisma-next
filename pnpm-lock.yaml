@@ -36,6 +36,9 @@ catalogs:
     pg:
       specifier: 8.20.0
       version: 8.20.0
+    postgres-array:
+      specifier: 2.0.0
+      version: 2.0.0
     tsdown:
       specifier: 0.22.0
       version: 0.22.0
@@ -4204,6 +4207,9 @@ importers:
       arktype:
         specifier: ^2.2.0
         version: 2.2.0
+      postgres-array:
+        specifier: 'catalog:'
+        version: 2.0.0
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.12.0

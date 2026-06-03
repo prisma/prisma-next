@@ -16,6 +16,7 @@ blockExoticSubdeps: true
 
 catalog:
   '@prisma/dev': 0.24.7
+  '@prisma/management-api-sdk': 1.35.0
   '@prisma/ppg': 1.0.1
   '@types/node': 25.6.0
   '@types/pg': 8.20.0
@@ -24,6 +25,7 @@ catalog:
   mongodb: ^7.2.0
   mongodb-memory-server: 11.1.0
   pg: 8.20.0
+  postgres-array: 2.0.0
   tsdown: 0.22.0
   tsx: ^4.22.3
   typescript: 5.9.3

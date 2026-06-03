@@ -185,5 +185,6 @@ const ppgServerlessRuntimeDriverDescriptor: RuntimeDriverDescriptor<
 };
 
 export default ppgServerlessRuntimeDriverDescriptor;
+export { withArrayParsers } from '../core/array-parsers';
 export type { PpgBinding, PpgServerlessDriverCreateOptions } from '../ppg-driver';
 export { createBoundDriverFromBinding } from '../ppg-driver';

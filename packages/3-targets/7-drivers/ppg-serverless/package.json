@@ -25,7 +25,8 @@
     "@prisma-next/sql-relational-core": "workspace:0.12.0",
     "@prisma-next/utils": "workspace:0.12.0",
     "@prisma/ppg": "catalog:",
-    "arktype": "^2.2.0"
+    "arktype": "^2.2.0",
+    "postgres-array": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:0.12.0",

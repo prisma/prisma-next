@@ -40,6 +40,67 @@ const SERVICE_TOKEN = process.env['PRISMA_POSTGRES_SERVICE_TOKEN'];
 const REGION = 'us-east-1' as const;
 
 /**
+ * Retry an async operation with a fixed backoff schedule when its
+ * thrown error matches `isTransient`. Non-transient errors propagate
+ * immediately. Used in `beforeAll` to wait out Prisma Postgres's TCP
+ * gateway warm-up window (see comment at the call site).
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  opts: {
+    readonly backoffSchedule: ReadonlyArray<number>;
+    readonly isTransient: (err: unknown) => boolean;
+    readonly onAttempt?: (
+      attempt: number,
+      elapsedMs: number,
+      outcome: 'ok' | 'transient' | 'fatal',
+    ) => void;
+  },
+): Promise<T> {
+  const start = Date.now();
+  let lastErr: unknown;
+  for (let i = 0; i < opts.backoffSchedule.length; i++) {
+    const waitMs = opts.backoffSchedule[i] ?? 0;
+    if (waitMs > 0) {
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+    const elapsed = Date.now() - start;
+    try {
+      const result = await fn();
+      opts.onAttempt?.(i + 1, elapsed, 'ok');
+      return result;
+    } catch (err) {
+      lastErr = err;
+      if (!opts.isTransient(err)) {
+        opts.onAttempt?.(i + 1, elapsed, 'fatal');
+        throw err;
+      }
+      opts.onAttempt?.(i + 1, elapsed, 'transient');
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * Recognise Prisma Postgres's TCP gateway warm-up rejection. The
+ * gateway returns a non-Postgres-shape `ErrorResponse` packet during
+ * the brief window after `POST /v1/projects` returns `status: "ready"`
+ * but before the gateway has finished routing to the backend Postgres
+ * engine. The message string is the same whether the error surfaces
+ * bare (from `pg`) or wrapped (from the framework's `errorRuntime`,
+ * which puts the original message into a `why` field).
+ */
+function isGatewayWarmupError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const marker = 'Failed to connect to upstream database';
+  if (err.message.includes(marker)) return true;
+  if ('why' in err && typeof err.why === 'string') {
+    return err.why.includes(marker);
+  }
+  return false;
+}
+
+/**
  * Minimal one-model contract. `field.id.uuidv7()` is the canonical
  * generated-id preset across the workspace (used by the CLI's `init`
  * scaffold). The SQL ORM's `CreateInput` type currently requires the
@@ -87,23 +148,33 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
     // (the more failure-prone step) blows up.
     projectId = response.data.id;
 
-    // Two connection strings live on the same database, one per
-    // protocol: the `accelerate`-kind connection carries the PPG
-    // WebSocket URL (data plane); the `postgres`-kind connection
-    // carries the TCP direct URL (control plane). The serverless
-    // facade's control surface uses TCP because DDL doesn't go over
-    // the Accelerate protocol; the data plane uses PPG because that
-    // is the whole point of this package.
+    // Prisma Postgres returns one connection per database with all
+    // endpoint variants populated. `endpoints` is a discriminated
+    // bag of three URL forms — one per protocol the platform speaks:
+    //   - `direct`:     `postgres://…@<host>:5432/…` for raw TCP /
+    //                   `pg` (control plane: DDL, migrations).
+    //   - `pooled`:     `postgres://identifier:key@db.prisma.io:5432/…`
+    //                   for PPG's raw-SQL WebSocket protocol
+    //                   (data plane: `@prisma/ppg`).
+    //   - `accelerate`: `prisma+postgres://accelerate.prisma-data.net/?api_key=…`
+    //                   for Prisma Accelerate / data-proxy's GraphQL
+    //                   protocol (consumed by `@prisma/client/edge`,
+    //                   NOT by `@prisma/ppg`).
+    // The `prisma+postgres://…api_key=…` form looks PPG-y because it
+    // shares the scheme with `@prisma/dev`'s endpoint, but the wire
+    // protocol underneath is GraphQL/Accelerate, not PPG. This is
+    // the same URL-scheme aliasing trap that bit D1 (see
+    // `projects/ppg-serverless/learnings.md`). For PPG, take the
+    // `pooled` endpoint.
     const database = response.data.database;
-    const accelerateConn = database?.connections.find((c) => c.kind === 'accelerate');
-    const tcpConn = database?.connections.find((c) => c.kind === 'postgres');
-    const ppgUrl = accelerateConn?.endpoints.accelerate?.connectionString;
-    const tcpUrl = tcpConn?.endpoints.direct?.connectionString;
+    const conn = database?.connections[0];
+    const ppgUrl = conn?.endpoints.pooled?.connectionString;
+    const tcpUrl = conn?.endpoints.direct?.connectionString;
     if (!ppgUrl) {
-      throw new Error(`mgmt-api: project ${projectId} has no accelerate connection string`);
+      throw new Error(`mgmt-api: project ${projectId} has no pooled (PPG) connection endpoint`);
     }
     if (!tcpUrl) {
-      throw new Error(`mgmt-api: project ${projectId} has no direct TCP connection string`);
+      throw new Error(`mgmt-api: project ${projectId} has no direct TCP connection endpoint`);
     }
 
     // `dbInit` requires a `migrationsDir` even on a from-scratch
@@ -111,15 +182,31 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
     // temp dir is sufficient — the planner generates the create-
     // from-scratch operations directly from the contract. Same
     // pattern as the framework e2e harness's `runDbInit` helper.
-    migrationsDir = await mkdtemp(join(tmpdir(), 'pn-cloud-it-'));
+    const dir = await mkdtemp(join(tmpdir(), 'pn-cloud-it-'));
+    migrationsDir = dir;
 
+    // Prisma Postgres's TCP gateway has a brief warm-up window after
+    // `POST /v1/projects` returns `status: "ready"` — during which
+    // the gateway transient-rejects pg.Client connections with a
+    // non-Postgres-shape ErrorResponse ("Failed to connect to
+    // upstream database…"). Observed warm-up ~5–10s. Retry the whole
+    // `dbInit` call (which internally calls `pg.Client.connect`) on
+    // that specific envelope; any other error class is non-transient
+    // and surfaces immediately.
     const controlClient = createPostgresControlClient({ connection: tcpUrl });
     try {
-      const result = await controlClient.dbInit({
-        contract,
-        mode: 'apply',
-        migrationsDir,
-      });
+      const result = await retryWithBackoff(
+        () => controlClient.dbInit({ contract, mode: 'apply', migrationsDir: dir }),
+        {
+          backoffSchedule: [0, 5_000, 10_000, 20_000, 40_000],
+          isTransient: isGatewayWarmupError,
+          onAttempt: (attempt, elapsedMs, outcome) => {
+            console.log(
+              `dbInit attempt ${attempt} at t=${(elapsedMs / 1000).toFixed(1)}s: ${outcome}`,
+            );
+          },
+        },
+      );
       if (!result.ok) {
         throw new Error(
           `dbInit failed: ${result.failure.summary}\n\n${JSON.stringify(result.failure, null, 2)}`,
