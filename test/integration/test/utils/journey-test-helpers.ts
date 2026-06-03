@@ -620,7 +620,12 @@ export interface MigrationStatusJson {
   readonly ok: true;
   readonly spaces: readonly MigrationStatusSpaceJson[];
   readonly summary: string;
-  readonly diagnostics?: readonly { code: string; severity: string; message: string }[];
+  readonly diagnostics?: readonly {
+    code: string;
+    severity: string;
+    message: string;
+    hints: readonly string[];
+  }[];
   readonly missingInvariants?: string;
 }
 

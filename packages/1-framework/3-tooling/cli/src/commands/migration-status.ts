@@ -438,8 +438,9 @@ async function executeMigrationStatusCommand(
   const treeSections: MigrationStatusTreeSection[] = [];
   let markerDiverged = false;
   let markerCannotReachTarget = false;
-  let headlineTargetHash = contractHash;
+  let headlineTargetHash = activeRefHash ?? contractHash;
   let totalPending = 0;
+  let hasAmbiguousTarget = false;
 
   for (const spaceEntry of scopedSpaces) {
     const member = aggregate.space(spaceEntry.spaceId);
@@ -450,6 +451,7 @@ async function executeMigrationStatusCommand(
     const spaceContractHash = member.contract().storage.storageHash;
     const targetHash = resolveTargetHashForSpace(member, spaceContractHash, activeRefHash);
     if (targetHash === undefined) {
+      hasAmbiguousTarget = true;
       diagnostics.push({
         code: 'MIGRATION.DIVERGED',
         severity: 'warn',
@@ -461,7 +463,9 @@ async function executeMigrationStatusCommand(
       });
       continue;
     }
-    headlineTargetHash = targetHash;
+    if (spaceEntry.spaceId === aggregate.app.spaceId) {
+      headlineTargetHash = targetHash;
+    }
 
     const markerRecord = markersBySpace.get(spaceEntry.spaceId);
     const markerHash = usingFromOverride
@@ -563,14 +567,16 @@ async function executeMigrationStatusCommand(
   }
 
   const appMarkerHash = markersBySpace.get(aggregate.app.spaceId)?.storageHash;
-  const summary = markerCannotReachTarget
-    ? 'Database marker cannot reach the selected target'
-    : buildStatusHeadline({
-        pendingCount: totalPending,
-        targetHash: headlineTargetHash,
-        markerDiverged,
-        markerHash: appMarkerHash,
-      });
+  const summary = hasAmbiguousTarget
+    ? 'Multiple valid migration paths — select a target with --to'
+    : markerCannotReachTarget
+      ? 'Database marker cannot reach the selected target'
+      : buildStatusHeadline({
+          pendingCount: totalPending,
+          targetHash: headlineTargetHash,
+          markerDiverged,
+          markerHash: appMarkerHash,
+        });
 
   if (scopedSpaces.every((s) => s.migrations.length === 0)) {
     return ok({
