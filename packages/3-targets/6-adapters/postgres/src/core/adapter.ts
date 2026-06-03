@@ -1,4 +1,3 @@
-import { type MarkerReadShape, readMarkerResult } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type {
@@ -6,7 +5,6 @@ import type {
   AdapterProfile,
   AnyQueryAst,
   LowererContext,
-  MarkerReadResult,
   RawSqlLiteral,
   SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
@@ -15,6 +13,7 @@ import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expressio
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredDdl } from './ddl-renderer';
+import { readMarker } from './marker-read';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -51,7 +50,7 @@ class PostgresAdapterImpl
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
       capabilities: defaultCapabilities,
-      readMarker: (queryable: SqlQueryable) => readPostgresMarker(queryable),
+      readMarker: (queryable: SqlQueryable) => readMarker(queryable, APP_SPACE_ID),
     });
   }
 
@@ -86,29 +85,6 @@ export const postgresRawCodecInferer: RawCodecInferer = {
     );
   },
 };
-
-/**
- * Builds the probe + select statements for the Postgres marker read at
- * `space`. Shared by the runtime reader and the control adapter so both spell
- * the read exactly once. Postgres' driver hydrates `text[]` columns as native
- * JS arrays, so no row decode is needed before the shared parser.
- */
-export function postgresMarkerReadShape(space: string): MarkerReadShape {
-  return {
-    tableProbe: {
-      sql: 'select 1 from information_schema.tables where table_schema = $1 and table_name = $2',
-      params: ['prisma_contract', 'marker'],
-    },
-    selectRow: {
-      sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
-      params: [space],
-    },
-  };
-}
-
-function readPostgresMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
-  return readMarkerResult(queryable, postgresMarkerReadShape(APP_SPACE_ID));
-}
 
 export function createPostgresAdapter(options?: PostgresAdapterOptions) {
   return Object.freeze(new PostgresAdapterImpl(options));

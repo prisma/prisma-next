@@ -5,7 +5,7 @@ import type {
 } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import { parseContractMarkerRow, readMarkerResult } from '@prisma-next/family-sql/verify';
+import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   APP_SPACE_ID,
@@ -47,7 +47,6 @@ import {
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { postgresMarkerReadShape } from './adapter';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredDdl } from './ddl-renderer';
 import {
@@ -55,6 +54,7 @@ import {
   type PostgresEnumStorageTypeAnnotation,
 } from './enum-control-hooks';
 import * as markerLedgerWrites from './marker-ledger-writes';
+import * as markerRead from './marker-read';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
@@ -160,7 +160,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   ): Promise<ContractMarkerRecord | null> {
     const markerContext = { space, markerLocation: POSTGRES_MARKER_TABLE };
     const result = await withMarkerReadErrorHandling(
-      () => readMarkerResult(driver, postgresMarkerReadShape(space)),
+      () => markerRead.readMarker(driver, space),
       markerContext,
     );
     return result.kind === 'present' ? result.record : null;

@@ -1,5 +1,4 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
-import type { MarkerReadResult, MarkerStatement } from '@prisma-next/sql-relational-core/ast';
 import { type } from 'arktype';
 
 const MetaSchema = type({ '[string]': 'unknown' });
@@ -100,56 +99,6 @@ export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
     meta: parseMeta(result.meta),
     invariants: result.invariants,
   };
-}
-
-/**
- * Minimal queryable surface the marker read needs: just `query`. Both the
- * runtime `SqlQueryable` and the control `ControlDriverInstance` satisfy it,
- * so one read flow serves the runtime reader and the control adapter alike.
- */
-export interface MarkerReadQueryable {
-  query<Row = Record<string, unknown>>(
-    sql: string,
-    params?: readonly unknown[],
-  ): Promise<{ readonly rows: ReadonlyArray<Row> }>;
-}
-
-/**
- * Per-dialect inputs to the canonical marker read: the existence probe, the
- * single-row select, and an optional row decode. SQLite stores `invariants`
- * as JSON-encoded TEXT and must decode it to `string[]` before the parser;
- * Postgres' driver hydrates the native array, so no decode is supplied.
- */
-export interface MarkerReadShape {
-  readonly tableProbe: MarkerStatement;
-  readonly selectRow: MarkerStatement;
-  readonly decodeRow?: (row: unknown) => unknown;
-}
-
-/**
- * Canonical contract-marker read shared by every SQL target. Probes for the
- * marker storage (absent → `no-table`), reads the single row for the space
- * (missing → `absent`), then decodes and parses it (→ `present`). The runtime
- * reader returns this `MarkerReadResult` verbatim; the control adapter
- * projects it to `ContractMarkerRecord | null`.
- */
-export async function readMarkerResult(
-  queryable: MarkerReadQueryable,
-  shape: MarkerReadShape,
-): Promise<MarkerReadResult> {
-  const exists = await queryable.query(shape.tableProbe.sql, shape.tableProbe.params);
-  if (exists.rows.length === 0) {
-    return { kind: 'no-table' };
-  }
-
-  const result = await queryable.query(shape.selectRow.sql, shape.selectRow.params);
-  const row = result.rows[0];
-  if (!row) {
-    return { kind: 'absent' };
-  }
-
-  const decoded = shape.decodeRow ? shape.decodeRow(row) : row;
-  return { kind: 'present', record: parseContractMarkerRow(decoded) };
 }
 
 /**

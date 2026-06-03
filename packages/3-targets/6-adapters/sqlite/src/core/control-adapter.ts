@@ -1,7 +1,7 @@
 import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import { parseContractMarkerRow, readMarkerResult } from '@prisma-next/family-sql/verify';
+import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import {
   APP_SPACE_ID,
   type ControlDriverInstance,
@@ -32,10 +32,11 @@ import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { decodeSqliteMarkerRow, renderLoweredSql, sqliteMarkerReadShape } from './adapter';
+import { renderLoweredSql } from './adapter';
 import { renderLoweredDdl } from './ddl-renderer';
 import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
 import * as markerLedgerWrites from './marker-ledger-writes';
+import { decodeSqliteMarkerRow, readMarker } from './marker-read';
 import type { SqliteContract } from './types';
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';
@@ -124,7 +125,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   ): Promise<ContractMarkerRecord | null> {
     const markerContext = { space, markerLocation: SQLITE_MARKER_TABLE };
     const result = await withMarkerReadErrorHandling(
-      () => readMarkerResult(driver, sqliteMarkerReadShape(space)),
+      () => readMarker(driver, space),
       markerContext,
     );
     return result.kind === 'present' ? result.record : null;

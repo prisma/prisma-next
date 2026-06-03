@@ -1,4 +1,3 @@
-import { type MarkerReadShape, readMarkerResult } from '@prisma-next/family-sql/verify';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type {
   Adapter,
@@ -20,7 +19,6 @@ import type {
   LiteralExpr,
   LoweredParam,
   LowererContext,
-  MarkerReadResult,
   NullCheckExpr,
   OperationExpr,
   OrderByItem,
@@ -39,6 +37,7 @@ import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expressio
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import { renderLoweredDdl } from './ddl-renderer';
+import { readMarker } from './marker-read';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({
@@ -63,7 +62,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       id: options?.profileId ?? 'sqlite/default@1',
       target: 'sqlite',
       capabilities: defaultCapabilities,
-      readMarker: (queryable: SqlQueryable) => readSqliteMarker(queryable),
+      readMarker: (queryable: SqlQueryable) => readMarker(queryable, APP_SPACE_ID),
     });
   }
 
@@ -618,52 +617,6 @@ function renderReturning(returning: ReadonlyArray<ProjectionItem> | undefined): 
       return `${renderExpr(item.expr)} AS ${quoteIdentifier(item.alias)}`;
     })
     .join(', ')}`;
-}
-
-/**
- * SQLite stores arrays as JSON-encoded TEXT (no native array type), so the
- * driver returns `invariants` as a string. Decode before delegating to the
- * shared row schema, which expects `string[]`. A non-JSON value here is a
- * corrupt row and surfaces as `Invalid contract marker row: …` via the
- * typed-envelope wrapper. Shared by the runtime reader and the control adapter.
- */
-export function decodeSqliteMarkerRow(row: unknown): unknown {
-  if (typeof row !== 'object' || row === null || !('invariants' in row)) {
-    return row;
-  }
-  const record = row as { invariants: unknown };
-  if (typeof record.invariants !== 'string') return row;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(record.invariants);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`Invalid contract marker row: invariants is not valid JSON: ${detail}`);
-  }
-  return { ...record, invariants: parsed };
-}
-
-/**
- * Builds the probe + select statements for the SQLite marker read at `space`.
- * Shared by the runtime reader and the control adapter so both spell the read
- * exactly once, including the `invariants` TEXT decode.
- */
-export function sqliteMarkerReadShape(space: string): MarkerReadShape {
-  return {
-    tableProbe: {
-      sql: "select 1 from sqlite_master where type = 'table' and name = ?",
-      params: ['_prisma_marker'],
-    },
-    selectRow: {
-      sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where space = ?',
-      params: [space],
-    },
-    decodeRow: decodeSqliteMarkerRow,
-  };
-}
-
-function readSqliteMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
-  return readMarkerResult(queryable, sqliteMarkerReadShape(APP_SPACE_ID));
 }
 
 export function createSqliteAdapter(options?: SqliteAdapterOptions) {
