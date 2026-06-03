@@ -41,6 +41,7 @@
     "schemas"
   ],
   "exports": {
+    "./apply-specifier-default-control-policy": "./dist/apply-specifier-default-control-policy.mjs",
     "./contract-validation-error": "./dist/contract-validation-error.mjs",
     "./default-namespace": "./dist/default-namespace.mjs",
     "./hashing": "./dist/hashing.mjs",

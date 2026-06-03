@@ -1,9 +1,9 @@
 import { pathToFileURL } from 'node:url';
 import type { ContractConfig } from '@prisma-next/config/config-types';
+import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok } from '@prisma-next/utils/result';
-import { applySpecifierDefaultControlPolicy } from './apply-specifier-default-control-policy';
 
 export interface TypeScriptContractSpecifierOptions {
   readonly defaultControlPolicy?: ControlPolicy;

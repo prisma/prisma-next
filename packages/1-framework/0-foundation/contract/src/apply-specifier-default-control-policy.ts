@@ -1,4 +1,5 @@
-import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
+import type { Contract } from './contract-types';
+import type { ControlPolicy } from './control-policy';
 
 export function applySpecifierDefaultControlPolicy(
   contract: Contract,
