@@ -9,6 +9,7 @@ import {
 import {
   buildEdgeAnnotationsByHashFromListEntries,
   buildRefsByHashFromListEntries,
+  type MigrationListStyler,
 } from './migration-list-render';
 import type { MigrationListEntry } from './migration-list-types';
 
@@ -38,6 +39,7 @@ export interface RenderMigrationGraphSpaceTreeInput {
   readonly refsByHash?: ReadonlyMap<string, readonly string[]>;
   readonly statusOverlayByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly dbHash?: string;
+  readonly styler?: MigrationListStyler;
 }
 
 export function renderMigrationGraphSpaceTree(input: RenderMigrationGraphSpaceTreeInput): string {
@@ -57,6 +59,7 @@ export function renderMigrationGraphSpaceTree(input: RenderMigrationGraphSpaceTr
     colorize: input.colorize,
     glyphMode: input.glyphMode,
     ...(input.dbHash !== undefined ? { dbHash: input.dbHash } : {}),
+    ...(input.styler !== undefined ? { styler: input.styler } : {}),
   });
 }
 

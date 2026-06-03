@@ -1,12 +1,12 @@
 import {
   createMongoControlDriver,
   createMongoRunnerDeps,
-  introspectSchema,
   readLedger as readMongoLedger,
 } from '@prisma-next/adapter-mongo/control';
 import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import {
   type AggregateMigrationEdgeRef,
@@ -47,6 +47,12 @@ import {
   frameworkComponents as sqliteFrameworkComponents,
   sqliteTargetDescriptor,
 } from '../../../../packages/3-targets/6-adapters/sqlite/test/migrations/fixtures/runner-fixtures';
+
+function makeMongoFamily(): ReturnType<typeof createMongoFamilyInstance> {
+  return createMongoFamilyInstance(
+    {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+  );
+}
 
 function multiEdgePlanPg() {
   const destHash = pgContract.storage.storageHash;
@@ -267,10 +273,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       createMongoRunnerDeps(
         createMongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
-        {
-          familyId: 'mongo',
-          introspect: async () => introspectSchema(mongoDb),
-        } as Parameters<typeof createMongoRunnerDeps>[2],
+        makeMongoFamily(),
       ),
     );
     const mongoResult = await mongoRunner.execute({
@@ -436,10 +439,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       createMongoRunnerDeps(
         createMongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
-        {
-          familyId: 'mongo',
-          introspect: async () => introspectSchema(mongoDb),
-        } as Parameters<typeof createMongoRunnerDeps>[2],
+        makeMongoFamily(),
       ),
     );
     const mongoResult = await mongoRunner.execute({
@@ -466,6 +466,13 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     timeout: timeouts.databaseOperation,
   }, async () => {
     const pgDest = pgContract.storage.storageHash;
+    const pgSynthEdges = [
+      buildSynthMigrationEdge({
+        currentMarkerStorageHash: null,
+        destinationStorageHash: pgDest,
+        operationCount: 1,
+      }),
+    ];
     const pgPlan = createLedgerTestPlan<PostgresPlanTargetDetails>({
       destinationHash: pgDest,
       operations: [
@@ -482,14 +489,8 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
           postcheck: [{ description: 'ok', sql: 'SELECT TRUE' }],
         },
       ],
+      migrationEdges: pgSynthEdges,
     });
-    const pgSynthEdges = [
-      buildSynthMigrationEdge({
-        currentMarkerStorageHash: null,
-        destinationStorageHash: pgDest,
-        operationCount: pgPlan.operations.length,
-      }),
-    ];
     const pgRunner = postgresTargetDescriptor.createRunner(pgFamily);
     const pgResult = await pgRunner.execute({
       driver: pgDriver!,
@@ -510,6 +511,13 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     const pgLedger = await new PostgresControlAdapter().readLedger(pgDriver!, LEDGER_TEST_SPACE_ID);
 
     const sqliteDest = sqliteContract.storage.storageHash;
+    const sqliteSynthEdges = [
+      buildSynthMigrationEdge({
+        currentMarkerStorageHash: null,
+        destinationStorageHash: sqliteDest,
+        operationCount: 1,
+      }),
+    ];
     const sqlitePlan = createSqliteLedgerPlan({
       destinationHash: sqliteDest,
       operations: [
@@ -526,14 +534,8 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
           postcheck: [{ description: 'ok', sql: 'SELECT 1' }],
         },
       ],
+      migrationEdges: sqliteSynthEdges,
     });
-    const sqliteSynthEdges = [
-      buildSynthMigrationEdge({
-        currentMarkerStorageHash: null,
-        destinationStorageHash: sqliteDest,
-        operationCount: sqlitePlan.operations.length,
-      }),
-    ];
     const sqliteDriver = sqliteTestDb!.driver;
     const sqliteRunner = sqliteTargetDescriptor.createRunner(sqliteFamily);
     const sqliteResult = await sqliteRunner.execute({
@@ -576,10 +578,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       createMongoRunnerDeps(
         createMongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
-        {
-          familyId: 'mongo',
-          introspect: async () => introspectSchema(mongoDb),
-        } as Parameters<typeof createMongoRunnerDeps>[2],
+        makeMongoFamily(),
       ),
     );
     const mongoResult = await mongoRunner.execute({

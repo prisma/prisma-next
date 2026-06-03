@@ -53,6 +53,7 @@ export interface RenderMigrationGraphTreeOptions {
   readonly hashLength?: number;
   readonly colorize: boolean;
   readonly glyphMode?: GlyphMode;
+  readonly styler?: MigrationListStyler;
 }
 
 interface MigrationGraphTreeGlyphPalette {
@@ -408,7 +409,7 @@ function overlayNamesForContract(
 }
 
 function createTreeStyler(opts: RenderMigrationGraphTreeOptions): MigrationListStyler {
-  const base = createAnsiMigrationListStyler({ useColor: opts.colorize });
+  const base = opts.styler ?? createAnsiMigrationListStyler({ useColor: opts.colorize });
   const activeRefName = opts.activeRefName;
   if (!opts.colorize || activeRefName === undefined) {
     return base;

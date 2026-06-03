@@ -25,27 +25,28 @@ export function assertOperationCountsMatchAcrossBackends(
 export function buildMultiEdgeRefs(destHash: string): readonly AggregateMigrationEdgeRef[] {
   const hashA = 'sha256:parity-mid-a';
   const hashB = 'sha256:parity-mid-b';
-  return [
+  const edgeSpecs = [
     {
       migrationHash: 'sha256:parity-mig-a',
       dirName: '001_a',
       from: EMPTY_CONTRACT_HASH,
       to: hashA,
-      operationCount: 1,
     },
     {
       migrationHash: 'sha256:parity-mig-b',
       dirName: '002_b',
       from: hashA,
       to: hashB,
-      operationCount: 2,
     },
     {
       migrationHash: 'sha256:parity-mig-c',
       dirName: '003_c',
       from: hashB,
       to: destHash,
-      operationCount: 1,
     },
-  ];
+  ] as const;
+  return edgeSpecs.map((edge, index) => ({
+    ...edge,
+    operationCount: MULTI_EDGE_OPERATION_COUNTS[index]!,
+  }));
 }

@@ -225,6 +225,9 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
         ],
       }),
     ).rejects.toThrow(/does not match sum of migrationEdges operationCount/);
+
+    const ledger = await ledgerAdapter.readLedger(driver!, LEDGER_TEST_SPACE_ID);
+    expect(ledger).toEqual([]);
   });
 
   it('writes N ledger rows in walk order for multi-edge apply with ops and contract_json on endpoints only', {

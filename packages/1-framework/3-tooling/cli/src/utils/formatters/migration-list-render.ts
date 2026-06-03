@@ -148,6 +148,7 @@ function renderSpaceTreeBlock(
     glyphMode,
     colorize,
     refsByHash: buildRefsByHashFromListEntries(migrations),
+    styler: style,
   });
 
   if (!multiSpace) {

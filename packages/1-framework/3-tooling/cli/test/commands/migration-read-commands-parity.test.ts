@@ -250,7 +250,12 @@ describe('migration read commands pretty parity', () => {
     const treeSections = listResult.value.spaces.map((spaceEntry) => {
       const member = aggregate.space(spaceEntry.spaceId)!;
       const graph = member.graph();
-      const targetHash = HASH_804e018;
+      const targetHash =
+        spaceEntry.spaceId === 'postgis'
+          ? HASH_POSTGIS
+          : spaceEntry.spaceId === 'app'
+            ? HASH_804e018
+            : (graph.nodes.values().next().value ?? EMPTY_CONTRACT_HASH);
       const statusOverlay = deriveStatusEdgeAnnotations({
         graph,
         targetHash,
