@@ -48,6 +48,10 @@ type SqliteScaffold<
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = SqliteBaseScaffold<ExtensionPacks>;
 
+const sqliteAuthoringDefaults = {
+  createNamespace: sqliteCreateNamespace,
+} as const;
+
 export function defineContract<
   const Types extends TypesConstraint = Record<never, never>,
   const Models extends ModelsConstraint = Record<never, never>,
@@ -71,10 +75,6 @@ export function defineContract<
     readonly models?: Models;
   },
 ): SqliteResult<Types, Models, ExtensionPacks>;
-
-const sqliteAuthoringDefaults = {
-  createNamespace: sqliteCreateNamespace,
-} as const;
 
 export function defineContract(
   scaffold: Omit<ContractInput, 'family' | 'target'>,

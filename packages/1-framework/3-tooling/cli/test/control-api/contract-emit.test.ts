@@ -245,9 +245,12 @@ describe('executeContractEmit', () => {
     };
     mockedEmit.mockResolvedValueOnce(createEmitResult('hydrated'));
 
-    await withMockedConfig({ ...config, family: familyWithHydration }, async () => {
-      await executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-    });
+    await withMockedConfig(
+      { ...config, family: familyWithHydration as typeof config.family },
+      async () => {
+        await executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+      },
+    );
 
     expect(deserializeContract).toHaveBeenCalledOnce();
     expect(mockedEmit).toHaveBeenCalledOnce();
