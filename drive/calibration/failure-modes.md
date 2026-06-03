@@ -376,6 +376,27 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-06-03, slice `sql-marker-ops-through-adapter` (TML-2753), D4. The slice spec decided "upsert collapses to `INSERT … ON CONFLICT (space) DO UPDATE`" based on the migration-runner's idempotent-re-apply contract. `sign()` also called `initMarker` after observing `readMarker() === null`, expecting init-once semantics — concurrent `sign()` invocations could each see "no marker" and the second would silently overwrite the first. CodeRabbit caught at PR review; fixed at `5da812ac0` by adding a separate `insertMarker` (insert-only, mirrors Mongo's existing primitive) and routing `sign()` to it while leaving migration-runner on upsert `initMarker`.
 
+### F20. Orchestrator drifts into implementer mode on "small" fixes
+
+**Symptom.** A small follow-up surfaces between dispatches (a low-severity review finding, a tiny ride-along cleanup, a "this is just a one-liner" tidy). The orchestrator, mid-stream and holding context, edits the production file directly instead of dispatching an implementer. The change may be correct and even pre-validated, but the orchestrator/implementer split has been collapsed — the orchestrator is now both author and arbiter of the change, eroding the separation that makes the review-with-fresh-eyes contract sound. Subsequent reviews of the combined diff have to disentangle which lines came from a dispatch (briefed, reviewable as a unit) and which came from in-stream orchestrator edits (no brief, no closed file list, no per-caller trace).
+
+**Detection signal.**
+
+- A review finding arrives mid-session (operator-flagged, reviewer-flagged, or self-surfaced) and the orchestrator's next move is `StrReplace` / `Delete` on production code rather than `Task` with an implementer brief.
+- Self-justifications appear in orchestrator reasoning: *"it's just five lines"*, *"I've already verified it's dead code"*, *"dispatching would be wasteful"*, *"the implementer would do the same thing"*, *"I'm already in the file".*
+- The branch's commit history shows a commit authored by the orchestrator's session (no implementer dispatch transcript precedes it) on production code, between two regularly-dispatched commits.
+- A reviewer's per-caller trace, scope-discipline check, or "what brief authorised this?" question can't be answered for some lines in the combined diff.
+
+**Mitigation.**
+
+- The split is a **role constraint, not an efficiency tradeoff**: orchestrators dispatch and review; implementers edit production code; reviewers verdict. The orchestrator's "I could just do it" instinct is the failure mode, not the optimisation.
+- Calibration docs, retro write-ups, planning files (`projects/<project>/...`), Drive trace events, and other process/orchestration surfaces are inside the orchestrator role and may be edited directly. Production source (`packages/`, `examples/`) and its test/doc neighbours are not.
+- When a small fix surfaces and dispatching feels wasteful, the right shape is *still* a dispatch — write a tight closed-file-list brief (5 files; pure deletion; etc.), spawn `composer-2.5-fast`, and let the implementer ship the commit. The dispatch cost on a 5-line fix is small; the precedent of skipping it is not.
+- If the orchestrator has already started editing in-place when this is caught, **revert the edits before re-dispatching**, not "commit what I have and dispatch next time". The sunk-cost trap is the on-ramp to repeating the violation; reverting and re-dispatching cements the role boundary in the session's behaviour.
+- An operator interrupt of the form "YOU ARE AN ORCHESTRATOR" (or equivalent role-reminder) is a stop-the-line signal: revert any in-flight implementer edits, dispatch the work, and acknowledge the calibration miss explicitly. Do not finish the in-flight edit first.
+
+**Reference incident.** 2026-06-03, slice `sql-marker-ops-through-adapter` (TML-2753), F03 close-the-residual. D6 R1 reviewer flagged F03 (residual `MarkerStatement` consumer in `sql-runtime/src/sql-marker.ts` — D6 brief had wrongly excluded the file from its closed list, F17 in miniature). Orchestrator started doing the deletion in-place (read the consumer, ran usage greps, `StrReplace`-d the import, deleted the function, removed the export, deleted the test, edited the README), validated with build/typecheck/grep. Operator interrupt: *"YOU ARE AN ORCHESTRATOR"*. Edits reverted; F03 dispatched as D7 to `composer-2.5-fast` with the brief the work should have had from the start (closed file list, pre-verified facts, composer constraints), shipped at `e3c4c4470`, reviewed and SATISFIED.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.
