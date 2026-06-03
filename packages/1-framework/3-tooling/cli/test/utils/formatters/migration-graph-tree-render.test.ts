@@ -1064,6 +1064,18 @@ describe('renderMigrationGraphLegend', () => {
 });
 
 describe('renderMigrationGraphTree status overlay', () => {
+  it('renders operation counts before status overlay labels', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const annotations = new Map([
+      [init.migrationHash, { operationCount: 3, status: 'applied' as const }],
+    ]);
+    const output = tree([init], {
+      colorize: false,
+      edgeAnnotationsByHash: annotations,
+    });
+    expect(output).toMatch(/3 ops\s+✓ applied/);
+  });
+
   it('appends applied and pending labels on migration rows', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');

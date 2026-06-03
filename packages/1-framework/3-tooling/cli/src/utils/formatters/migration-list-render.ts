@@ -1,12 +1,11 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import type { GlyphMode } from '../glyph-mode';
-import { buildMigrationGraphLayout } from './migration-graph-layout';
-import { buildMigrationGraphRows } from './migration-graph-rows';
 import {
-  type MigrationEdgeAnnotation,
-  renderMigrationGraphTree,
-} from './migration-graph-tree-render';
+  indentMigrationGraphTreeBlock,
+  renderMigrationGraphSpaceTree,
+} from './migration-graph-space-render';
+import type { MigrationEdgeAnnotation } from './migration-graph-tree-render';
 import type { MigrationListEntry, MigrationListResult } from './migration-list-types';
 
 export type { GlyphMode } from '../glyph-mode';
@@ -123,16 +122,6 @@ function formatEmptyStateLine(spaceId: string, style: MigrationListStyler): stri
   return style.emptyState(`There are no migrations in migrations/${spaceId}/ yet`);
 }
 
-function indentTreeBlock(treeOutput: string, indent: string): string {
-  if (treeOutput.length === 0) {
-    return treeOutput;
-  }
-  return treeOutput
-    .split('\n')
-    .map((line) => (line.length === 0 ? line : `${indent}${line}`))
-    .join('\n');
-}
-
 function renderSpaceTreeBlock(
   spaceId: string,
   migrations: readonly MigrationListEntry[],
@@ -140,6 +129,8 @@ function renderSpaceTreeBlock(
   glyphMode: GlyphMode,
   style: MigrationListStyler,
   colorize: boolean,
+  liveContractHash: string,
+  graphForSpace: (spaceId: string) => MigrationGraph | undefined,
 ): readonly string[] {
   if (migrations.length === 0) {
     const emptyLine = formatEmptyStateLine(spaceId, style);
@@ -149,26 +140,28 @@ function renderSpaceTreeBlock(
     return [style.spaceHeading(`${spaceId}:`), `  ${emptyLine}`];
   }
 
-  const graph = migrationGraphFromListEntries(migrations);
-  const rowModel = buildMigrationGraphRows(graph);
-  const layout = buildMigrationGraphLayout(rowModel);
-  const treeOutput = renderMigrationGraphTree(layout, {
-    refsByHash: buildRefsByHashFromListEntries(migrations),
-    edgeAnnotationsByHash: buildEdgeAnnotationsByHashFromListEntries(migrations),
-    colorize,
+  const graph = graphForSpace(spaceId) ?? migrationGraphFromListEntries(migrations);
+  const treeOutput = renderMigrationGraphSpaceTree({
+    graph,
+    migrations,
+    liveContractHash,
     glyphMode,
+    colorize,
+    refsByHash: buildRefsByHashFromListEntries(migrations),
   });
 
   if (!multiSpace) {
     return treeOutput.length === 0 ? [] : [treeOutput];
   }
 
-  const indented = indentTreeBlock(treeOutput, '  ');
+  const indented = indentMigrationGraphTreeBlock(treeOutput, '  ');
   return [style.spaceHeading(`${spaceId}:`), indented];
 }
 
 export interface RenderMigrationListWithStyleOptions {
   readonly colorize?: boolean;
+  readonly liveContractHash?: string;
+  readonly graphForSpace?: (spaceId: string) => MigrationGraph | undefined;
 }
 
 /**
@@ -187,6 +180,8 @@ export function renderMigrationListWithStyle(
 ): string {
   const multiSpace = result.spaces.length > 1;
   const colorize = options.colorize ?? false;
+  const liveContractHash = options.liveContractHash ?? EMPTY_CONTRACT_HASH;
+  const graphForSpace = options.graphForSpace ?? (() => undefined);
   const lines: string[] = [];
 
   for (let index = 0; index < result.spaces.length; index++) {
@@ -202,6 +197,8 @@ export function renderMigrationListWithStyle(
         glyphMode,
         style,
         colorize,
+        liveContractHash,
+        graphForSpace,
       ),
     );
   }

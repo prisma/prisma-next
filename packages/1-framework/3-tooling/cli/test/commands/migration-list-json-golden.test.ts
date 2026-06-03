@@ -142,7 +142,7 @@ describe('migration list --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const json = JSON.stringify(result.value, null, 2);
+    const json = JSON.stringify(result.value.list, null, 2);
     expect(json).toContain('"ok": true');
     expect(json).toContain('"summary": "5 migration(s) on disk"');
     expect(json).toContain('"spaceId": "app"');
@@ -203,7 +203,7 @@ describe('migration list --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const postgisSpace = result.value.spaces.find((s) => s.spaceId === 'postgis');
+    const postgisSpace = result.value.list.spaces.find((s) => s.spaceId === 'postgis');
     expect(postgisSpace?.migrations[0]?.refs).toEqual(['head']);
   });
 });

@@ -595,6 +595,12 @@ function formatEdgeAnnotationSuffix(
     return '';
   }
   const segments: string[] = [];
+  if (annotation.operationCount !== undefined) {
+    segments.push(`${annotation.operationCount} ops`);
+  }
+  if (annotation.invariants !== undefined && annotation.invariants.length > 0) {
+    segments.push(style.invariants(annotation.invariants));
+  }
   const status = annotation.status;
   if (status !== undefined) {
     const glyphs = overlayStatusGlyphs(opts.glyphMode ?? 'unicode');
@@ -607,17 +613,10 @@ function formatEdgeAnnotationSuffix(
       segments.push(styler(`${glyph} ${label}`));
     }
   }
-  if (annotation.operationCount !== undefined) {
-    segments.push(`${annotation.operationCount} ops`);
-  }
-  if (annotation.invariants !== undefined && annotation.invariants.length > 0) {
-    segments.push(style.invariants(annotation.invariants));
-  }
   if (segments.length === 0) {
     return '';
   }
-  const prefix = status !== undefined ? '   ' : '  ';
-  return `${prefix}${segments.join('  ')}`;
+  return `  ${segments.join('  ')}`;
 }
 
 function formatEdgeHashColumn(

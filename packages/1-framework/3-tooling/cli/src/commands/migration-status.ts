@@ -47,12 +47,8 @@ import {
   loadContractRawSafely,
   refusePackageCorruptionOnAggregate,
 } from '../utils/contract-space-aggregate-loader';
-import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
-import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
-import {
-  type MigrationEdgeAnnotation,
-  renderMigrationGraphTree,
-} from '../utils/formatters/migration-graph-tree-render';
+import { renderMigrationGraphSpaceTree } from '../utils/formatters/migration-graph-space-render';
+import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
 import type { MigrationListEntry } from '../utils/formatters/migration-list-types';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -146,11 +142,11 @@ function buildStatusMigrations(
 
 function renderSpaceTree(args: {
   readonly member: ContractSpaceMember;
-  readonly contractHash: string;
+  readonly liveContractHash: string;
+  readonly migrations: readonly MigrationListEntry[];
   readonly markerHash: string | undefined;
   readonly showDbMarker: boolean;
-  readonly targetHash: string;
-  readonly edgeAnnotations: ReadonlyMap<string, MigrationEdgeAnnotation>;
+  readonly statusOverlay: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly colorize: boolean;
   readonly glyphMode: 'unicode' | 'ascii';
 }): string {
@@ -158,16 +154,15 @@ function renderSpaceTree(args: {
   if (graph.nodes.size === 0) {
     return '';
   }
-  const refsByHash = listRefsByContractHash(args.member);
-  const rowModel = buildMigrationGraphRows(graph, { contractHash: args.contractHash });
-  const layout = buildMigrationGraphLayout(rowModel);
-  return renderMigrationGraphTree(layout, {
-    refsByHash,
-    ...(args.showDbMarker && args.markerHash !== undefined ? { dbHash: args.markerHash } : {}),
-    contractHash: args.contractHash,
-    edgeAnnotationsByHash: args.edgeAnnotations,
+  return renderMigrationGraphSpaceTree({
+    graph,
+    migrations: args.migrations,
+    liveContractHash: args.liveContractHash,
+    refsByHash: listRefsByContractHash(args.member),
+    statusOverlayByHash: args.statusOverlay,
     colorize: args.colorize,
     glyphMode: args.glyphMode,
+    ...(args.showDbMarker && args.markerHash !== undefined ? { dbHash: args.markerHash } : {}),
   });
 }
 
@@ -511,11 +506,11 @@ async function executeMigrationStatusCommand(
     });
     const tree = renderSpaceTree({
       member,
-      contractHash: spaceContractHash,
+      liveContractHash: contractHash,
+      migrations: spaceEntry.migrations,
       markerHash,
       showDbMarker,
-      targetHash,
-      edgeAnnotations: annotations,
+      statusOverlay: annotations,
       colorize,
       glyphMode,
     });

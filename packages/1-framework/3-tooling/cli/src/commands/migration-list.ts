@@ -2,6 +2,7 @@ import type {
   ContractSpaceAggregate,
   ContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { HEAD_REF_NAME, refsByContractHash } from '@prisma-next/migration-tools/refs';
 import {
   APP_SPACE_ID,
@@ -130,9 +131,17 @@ interface MigrationListOptions extends CommonCommandOptions {
   readonly ascii?: boolean;
 }
 
+export interface MigrationListExecuteResult {
+  readonly list: MigrationListResult;
+  readonly liveContractHash: string;
+  readonly aggregate: ContractSpaceAggregate;
+}
+
 export interface MigrationListHumanRenderOptions {
   readonly glyphMode: GlyphMode;
   readonly useColor: boolean;
+  readonly liveContractHash: string;
+  readonly graphForSpace: (spaceId: string) => MigrationGraph | undefined;
 }
 
 export function renderMigrationListHumanOutput(
@@ -142,6 +151,8 @@ export function renderMigrationListHumanOutput(
   const styler = createAnsiMigrationListStyler({ useColor: options.useColor });
   return renderMigrationListWithStyle(result, styler, options.glyphMode, {
     colorize: options.useColor,
+    liveContractHash: options.liveContractHash,
+    graphForSpace: options.graphForSpace,
   });
 }
 
@@ -210,7 +221,7 @@ export async function executeMigrationListCommand(
   options: MigrationListOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<Result<MigrationListResult, CliStructuredError>> {
+): Promise<Result<MigrationListExecuteResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
   const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
     options.config,
@@ -236,15 +247,18 @@ export async function executeMigrationListCommand(
     return notOk(loaded.failure);
   }
 
-  const spaces = await migrationSpaceListEntriesFromAggregate(
-    loaded.value.aggregate,
-    migrationsDir,
-  );
+  const { aggregate, contractHash: liveContractHash } = loaded.value;
 
-  return runMigrationList({
+  const spaces = await migrationSpaceListEntriesFromAggregate(aggregate, migrationsDir);
+
+  const listResult = runMigrationList({
     spaces,
     ...ifDefined('spaceFilter', options.space),
   });
+  if (!listResult.ok) {
+    return listResult;
+  }
+  return ok({ list: listResult.value, liveContractHash, aggregate });
 }
 
 export function createMigrationListCommand(): Command {
@@ -279,14 +293,16 @@ export function createMigrationListCommand(): Command {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
       const result = await executeMigrationListCommand(options, flags, ui);
-      const exitCode = handleResult(result, flags, ui, (listResult) => {
+      const exitCode = handleResult(result, flags, ui, ({ list, liveContractHash, aggregate }) => {
         if (flags.json) {
-          ui.output(JSON.stringify(listResult, null, 2));
+          ui.output(JSON.stringify(list, null, 2));
         } else if (!flags.quiet) {
           ui.output(
-            renderMigrationListHumanOutput(listResult, {
+            renderMigrationListHumanOutput(list, {
               glyphMode: ui.resolveGlyphMode(options.ascii === true),
               useColor: ui.useColor,
+              liveContractHash,
+              graphForSpace: (spaceId) => aggregate.space(spaceId)?.graph(),
             }),
           );
         }

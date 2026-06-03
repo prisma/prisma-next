@@ -5,6 +5,7 @@ import {
   deriveStatusEdgeAnnotations,
   statusForMigrationHash,
 } from '../../src/commands/migration-status-overlay';
+import { mergeMigrationEdgeAnnotations } from '../../src/utils/formatters/migration-graph-space-render';
 import { buildGraph, entry } from '../utils/graph-helpers';
 
 const ROOT = EMPTY_CONTRACT_HASH;
@@ -89,6 +90,18 @@ describe('deriveStatusEdgeAnnotations', () => {
     expect(statusForMigrationHash('mid_m1', annotations)).toBe('applied');
     expect(statusForMigrationHash('mid_m2', annotations)).toBe('applied');
     expect([...annotations.values()].some((a) => a.status === 'pending')).toBe(false);
+  });
+});
+
+describe('mergeMigrationEdgeAnnotations', () => {
+  it('composes list package facts with status overlay', () => {
+    const list = new Map([['mid_m1', { operationCount: 2, invariants: ['inv_a'] as const }]]);
+    const status = new Map([['mid_m1', { status: 'pending' as const }]]);
+    expect(mergeMigrationEdgeAnnotations(list, status).get('mid_m1')).toEqual({
+      operationCount: 2,
+      invariants: ['inv_a'],
+      status: 'pending',
+    });
   });
 });
 
