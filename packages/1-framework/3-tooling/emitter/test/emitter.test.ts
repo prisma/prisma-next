@@ -63,8 +63,7 @@ describe('emitter', () => {
       const ir = createTestContract({
         models: {
           User: {
-            storage: {
-              table: 'user',
+            storage: { namespaceId: '__unbound__', table: 'user',
               fields: {
                 id: { column: 'id' },
                 email: { column: 'email' },
@@ -345,7 +344,7 @@ describe('emitter', () => {
     const ir = createTestContract({
       models: {
         User: {
-          storage: { table: 'user' },
+          storage: { namespaceId: '__unbound__', table: 'user' },
           fields: {
             id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
             embedding: {
@@ -432,7 +431,7 @@ describe('emitter', () => {
     const ir = createTestContract({
       models: {
         User: {
-          storage: { table: 'user' },
+          storage: { namespaceId: '__unbound__', table: 'user' },
           fields: {
             id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },

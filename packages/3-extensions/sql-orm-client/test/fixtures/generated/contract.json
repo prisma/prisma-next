@@ -86,6 +86,7 @@
                   "column": "title"
                 }
               },
+              "namespaceId": "public",
               "table": "articles"
             }
           },
@@ -126,6 +127,7 @@
                   "column": "post_id"
                 }
               },
+              "namespaceId": "public",
               "table": "comments"
             }
           },
@@ -220,6 +222,7 @@
                   "column": "views"
                 }
               },
+              "namespaceId": "public",
               "table": "posts"
             }
           },
@@ -276,6 +279,7 @@
                   "column": "user_id"
                 }
               },
+              "namespaceId": "public",
               "table": "profiles"
             }
           },
@@ -309,6 +313,7 @@
                   "column": "name"
                 }
               },
+              "namespaceId": "public",
               "table": "tags"
             }
           },
@@ -430,6 +435,7 @@
                   "column": "name"
                 }
               },
+              "namespaceId": "public",
               "table": "users"
             }
           }

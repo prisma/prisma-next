@@ -195,7 +195,7 @@ describe('contract DSL authoring surface', () => {
       {
         fields: Record<string, unknown>;
         relations: Record<string, unknown>;
-        storage: { table: string; fields: Record<string, unknown> };
+        storage: { namespaceId: '__unbound__', table: string; fields: Record<string, unknown> };
       }
     >;
     expect(modelsByName['User']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });

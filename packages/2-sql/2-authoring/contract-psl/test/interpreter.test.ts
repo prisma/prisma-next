@@ -259,6 +259,7 @@ model Comment {
     expect(modelsOf(result.value)).toMatchObject({
       User: {
         storage: {
+          namespaceId: 'public',
           table: 'user',
           fields: {
             id: { column: 'id' },
@@ -309,6 +310,7 @@ model Comment {
     expect(modelsOf(result.value)).toMatchObject({
       IdlessThing: {
         storage: {
+          namespaceId: 'public',
           table: 'idlessThing',
           fields: {
             email: { column: 'email' },
@@ -523,12 +525,14 @@ model Member {
     expect(modelsOf(result.value)).toMatchObject({
       Team: {
         storage: {
+          namespaceId: 'public',
           table: 'org_team',
           fields: { id: { column: 'team_id' } },
         },
       },
       Member: {
         storage: {
+          namespaceId: 'public',
           table: 'team_member',
           fields: {
             id: { column: 'member_id' },
@@ -566,7 +570,7 @@ model AuditLog {
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(unboundTables(storage)['audit_log']?.primaryKey).toBeUndefined();
       expect(modelsOf(result.value)).toMatchObject({
-        AuditLog: { storage: { table: 'audit_log' } },
+        AuditLog: { storage: { namespaceId: 'public', table: 'audit_log' } },
       });
     });
 

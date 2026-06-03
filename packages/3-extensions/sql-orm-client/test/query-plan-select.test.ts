@@ -1,4 +1,3 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   AggregateExpr,
   AndExpr,
@@ -679,14 +678,11 @@ describe('compileSelect MTI JOINs', () => {
     const plan = compileSelect(contract, 'tasks', emptyState(), 'Task');
 
     expect(plan.ast).toEqual(
-      SelectAst.from(TableSource.named('tasks', undefined, UNBOUND_NAMESPACE_ID))
+      SelectAst.from(TableSource.named('tasks', undefined, 'public'))
         .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
         .withSelectAllIntent({ table: 'tasks' })
         .withJoins([
-          JoinAst.left(
-            TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
-            featuresJoinOn,
-          ),
+          JoinAst.left(TableSource.named('features', undefined, 'public'), featuresJoinOn),
         ]),
     );
   });
@@ -711,14 +707,11 @@ describe('compileSelect MTI JOINs', () => {
     const plan = compileSelect(contract, 'tasks', state, 'Task');
 
     expect(plan.ast).toEqual(
-      SelectAst.from(TableSource.named('tasks', undefined, UNBOUND_NAMESPACE_ID))
+      SelectAst.from(TableSource.named('tasks', undefined, 'public'))
         .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
         .withSelectAllIntent({ table: 'tasks' })
         .withJoins([
-          JoinAst.inner(
-            TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
-            featuresJoinOn,
-          ),
+          JoinAst.inner(TableSource.named('features', undefined, 'public'), featuresJoinOn),
         ]),
     );
   });
@@ -736,7 +729,7 @@ describe('compileSelect MTI JOINs', () => {
     const plan = compileSelect(contract, 'tasks', state, 'Task');
 
     expect(plan.ast).toEqual(
-      SelectAst.from(TableSource.named('tasks', undefined, UNBOUND_NAMESPACE_ID))
+      SelectAst.from(TableSource.named('tasks', undefined, 'public'))
         .withProjection(tasksBaseProjection)
         .withSelectAllIntent({ table: 'tasks' }),
     );

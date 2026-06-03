@@ -163,7 +163,7 @@ describe('SqlContractSerializer structural validation', () => {
     const input = validSqlContractJson({
       models: {
         User: {
-          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          storage: { namespaceId: '__unbound__', table: 'User', fields: { id: { column: 'id' } } },
           fields: {
             id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
           },
@@ -192,11 +192,11 @@ describe('SqlContractSerializer structural validation', () => {
     const input = validSqlContractJson({
       models: {
         User: {
-          storage: { table: 'user', fields: { id: { column: 'id' } } },
+          storage: { namespaceId: '__unbound__', table: 'user', fields: { id: { column: 'id' } } },
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
         },
         Post: {
-          storage: { table: 'post', fields: { id: { column: 'id' } } },
+          storage: { namespaceId: '__unbound__', table: 'post', fields: { id: { column: 'id' } } },
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
         },
       },
@@ -227,7 +227,7 @@ describe('SqlContractSerializer structural validation', () => {
     const input = validSqlContractJson({
       models: {
         User: {
-          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          storage: { namespaceId: '__unbound__', table: 'User', fields: { id: { column: 'id' } } },
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
           relations: {
             posts: {
@@ -238,8 +238,7 @@ describe('SqlContractSerializer structural validation', () => {
           },
         },
         Post: {
-          storage: {
-            table: 'Post',
+          storage: { namespaceId: '__unbound__', table: 'Post',
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
           fields: {
@@ -303,7 +302,7 @@ describe('SqlContractSerializer structural validation', () => {
     const input = validSqlContractJson({
       models: {
         User: {
-          storage: { table: 'User', fields: { id: { column: 'id' } } },
+          storage: { namespaceId: '__unbound__', table: 'User', fields: { id: { column: 'id' } } },
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
           relations: {
             posts: {
@@ -314,8 +313,7 @@ describe('SqlContractSerializer structural validation', () => {
           },
         },
         Post: {
-          storage: {
-            table: 'Post',
+          storage: { namespaceId: '__unbound__', table: 'Post',
             fields: { id: { column: 'id' }, userId: { column: 'userId' } },
           },
           fields: {

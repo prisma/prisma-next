@@ -240,7 +240,11 @@ describe('SqlContractSerializer logic validation', () => {
       validSqlContractJson({
         models: {
           User: {
-            storage: { table: 'User', fields: { id: { column: 'id' } } },
+            storage: {
+              namespaceId: '__unbound__',
+              table: 'User',
+              fields: { id: { column: 'id' } },
+            },
             fields: {
               id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
             },
@@ -263,6 +267,7 @@ describe('SqlContractSerializer logic validation', () => {
     const addPostModel = (contract: Record<string, unknown>) => {
       domainModelsRecord(contract)['Post'] = {
         storage: {
+          namespaceId: '__unbound__',
           table: 'Post',
           fields: { id: { column: 'id' }, userId: { column: 'userId' } },
         },
@@ -288,9 +293,13 @@ describe('SqlContractSerializer logic validation', () => {
     it('rejects model referencing missing table', () => {
       const contract = createModelContract();
       const userModel = domainModelsRecord(contract)['User'] as Record<string, unknown>;
-      userModel['storage'] = { table: 'MissingTable', fields: { id: { column: 'id' } } };
+      userModel['storage'] = {
+        table: 'MissingTable',
+        namespaceId: '__unbound__',
+        fields: { id: { column: 'id' } },
+      };
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow(
-        /references non-existent table "MissingTable"/,
+        /references non-existent table "__unbound__\.MissingTable"/,
       );
     });
 

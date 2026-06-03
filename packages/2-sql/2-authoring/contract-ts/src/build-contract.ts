@@ -513,6 +513,7 @@ export function buildSqlContractFromDefinition(
     namespaceModels[semanticModel.modelName] = {
       storage: {
         table: tableName,
+        namespaceId,
         fields: storageFields,
       },
       fields: domainFields,

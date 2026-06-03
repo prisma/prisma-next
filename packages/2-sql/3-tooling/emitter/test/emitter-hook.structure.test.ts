@@ -56,8 +56,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: {
-            table: 'user',
+          storage: { namespaceId: '__unbound__', table: 'user',
             fields: {
               id: { column: 'id' },
             },
@@ -89,7 +88,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { table: 'nonexistent', fields: {} },
+          storage: { namespaceId: '__unbound__', table: 'nonexistent', fields: {} },
           relations: {},
         },
       },
@@ -114,8 +113,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: {
-            table: 'user',
+          storage: { namespaceId: '__unbound__', table: 'user',
             fields: {
               id: {},
             },
@@ -203,7 +201,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { table: 'nonexistent', fields: {} },
+          storage: { namespaceId: '__unbound__', table: 'nonexistent', fields: {} },
           relations: {},
         },
       },
@@ -228,7 +226,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { table: 'user', fields: { email: { column: 'email' } } },
+          storage: { namespaceId: '__unbound__', table: 'user', fields: { email: { column: 'email' } } },
           relations: {},
         },
       },
@@ -255,8 +253,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: {
-            table: 'user',
+          storage: { namespaceId: '__unbound__', table: 'user',
             fields: { id: { column: 'nonexistent' } },
           },
           relations: {},
@@ -286,7 +283,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { table: 'user' },
+          storage: { namespaceId: '__unbound__', table: 'user' },
           relations: {},
         },
       },
@@ -562,8 +559,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: {
-            table: 'user',
+          storage: { namespaceId: '__unbound__', table: 'user',
             fields: {
               id: { column: 'id' },
             },
@@ -595,8 +591,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: {
-            table: 'user',
+          storage: { namespaceId: '__unbound__', table: 'user',
             fields: {
               id: { column: 'id' },
             },
@@ -694,8 +689,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: {
-            table: 'user',
+          storage: { namespaceId: '__unbound__', table: 'user',
             fields: {
               id: { column: 'id' },
             },
@@ -882,8 +876,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: {
-            table: 'user',
+          storage: { namespaceId: '__unbound__', table: 'user',
             fields: {
               id: { column: 'id' },
               email: { column: 'email' },
@@ -892,8 +885,7 @@ describe('sql-target-family-hook', () => {
           relations: {},
         },
         Post: {
-          storage: {
-            table: 'post',
+          storage: { namespaceId: '__unbound__', table: 'post',
             fields: {
               id: { column: 'id' },
               userId: { column: 'userId' },
