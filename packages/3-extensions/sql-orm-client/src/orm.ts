@@ -48,9 +48,9 @@ type ModelCollectionMap<
   [K in ModelNames<TContract>]: ModelCollection<TContract, Collections, K>;
 };
 
-type OrmClient<
+export type OrmClient<
   TContract extends Contract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass>>,
+  Collections extends Partial<Record<string, AnyCollectionClass>> = Record<never, never>,
 > = ModelCollectionMap<TContract, Collections>;
 
 export function orm<

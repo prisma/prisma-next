@@ -5,7 +5,7 @@ import { instantiateExecutionStack } from '@prisma-next/framework-components/exe
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
-import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
+import { type OrmClient, orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type { CodecTypesBase, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
 import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -33,7 +33,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export type PpgServerlessTargetId = 'postgres';
-type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
 export interface PrismaPostgresServerlessTransactionContext<TContract extends Contract<SqlStorage>>
   extends TransactionContext {
