@@ -273,6 +273,39 @@ describe('table().upsert()', () => {
   });
 });
 
+describe('table() with aliased source', () => {
+  const aliasedSrc = TableSource.named('things', 't');
+  const aliasedTbl = table(aliasedSrc, { id: INT, name: TEXT, note: NULLABLE_TEXT });
+
+  it('column proxy tableName reflects the alias', () => {
+    expect(aliasedTbl.id.tableName).toBe('t');
+  });
+
+  it('.toRef() uses the alias as table qualifier', () => {
+    const ref = aliasedTbl.name.toRef();
+    expect(ref.table).toBe('t');
+    expect(ref.column).toBe('name');
+  });
+
+  it('.eq() emits a ColumnRef against the alias, not the base table name', () => {
+    const binary = aliasedTbl.name.eq('alice').ast as BinaryExpr;
+    expect((binary.left as ColumnRef).table).toBe('t');
+  });
+});
+
+describe('ColumnProxy — null equality routing', () => {
+  it('.eq(null) produces IS NULL, not = NULL', () => {
+    const expr = tbl.note.eq(null).ast as NullCheckExpr;
+    expect(expr.kind).toBe('null-check');
+    expect(expr.isNull).toBe(true);
+  });
+
+  it('.neq(null) produces IS NOT NULL, not <> NULL', () => {
+    const expr = tbl.note.neq(null).ast as NullCheckExpr;
+    expect(expr.kind).toBe('null-check');
+    expect(expr.isNull).toBe(false);
+  });
+});
 describe('table().select()', () => {
   it('produces a SelectAst with the specified columns', () => {
     const ast = tbl.select(tbl.id, tbl.name).build();

@@ -253,7 +253,7 @@ export function table<Schema extends ColumnSchema>(
 ): TableHandle<Schema> {
   const proxies: Record<string, ColumnProxy> = {};
   for (const [col, desc] of Object.entries(schema)) {
-    proxies[col] = makeColumnProxy(source.name, col, desc);
+    proxies[col] = makeColumnProxy(source.alias ?? source.name, col, desc);
   }
 
   const handle = {
@@ -286,8 +286,14 @@ function makeColumnProxy(
     nullable: desc.nullable,
     columnName,
     tableName,
-    eq: (value) => new CfExpr(BinaryExpr.eq(ref, toSetExpression(value, desc))),
-    neq: (value) => new CfExpr(BinaryExpr.neq(ref, toSetExpression(value, desc))),
+    eq: (value) =>
+      value === null
+        ? new CfExpr(NullCheckExpr.isNull(ref))
+        : new CfExpr(BinaryExpr.eq(ref, toSetExpression(value, desc))),
+    neq: (value) =>
+      value === null
+        ? new CfExpr(NullCheckExpr.isNotNull(ref))
+        : new CfExpr(BinaryExpr.neq(ref, toSetExpression(value, desc))),
     isNull: () => new CfExpr(NullCheckExpr.isNull(ref)),
     isNotNull: () => new CfExpr(NullCheckExpr.isNotNull(ref)),
     toRef: () => ref,
