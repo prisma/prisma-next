@@ -1,4 +1,10 @@
-import { InsertAst, UpdateAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  type BinaryExpr,
+  type ColumnRef,
+  InsertAst,
+  type ParamRef,
+  UpdateAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   int4,
@@ -11,30 +17,24 @@ import {
 } from '../../src/exports/contract-free';
 
 describe('postgres column type helpers', () => {
-  it('text() returns a non-nullable text descriptor by default', () => {
-    const col = text();
-    expect(col.codecId).toBe('pg/text@1');
-    expect(col.nullable).toBe(false);
+  it('column helpers return expected codec descriptors', () => {
+    expect({
+      text: text(),
+      int4: int4(),
+      jsonb: jsonb(),
+      textArray: textArray(),
+      timestamptz: timestamptz(),
+    }).toEqual({
+      text: { codecId: 'pg/text@1', nullable: false },
+      int4: { codecId: 'pg/int4@1', nullable: false },
+      jsonb: { codecId: 'pg/jsonb@1', nullable: false },
+      textArray: { codecId: 'pg/text-array@1', nullable: false },
+      timestamptz: { codecId: 'pg/timestamptz@1', nullable: false },
+    });
   });
 
   it('text({ nullable: true }) returns a nullable descriptor', () => {
     expect(text({ nullable: true }).nullable).toBe(true);
-  });
-
-  it('int4() binds pg/int4@1 codec', () => {
-    expect(int4().codecId).toBe('pg/int4@1');
-  });
-
-  it('jsonb() binds pg/jsonb@1 codec', () => {
-    expect(jsonb().codecId).toBe('pg/jsonb@1');
-  });
-
-  it('textArray() binds pg/text-array@1 codec', () => {
-    expect(textArray().codecId).toBe('pg/text-array@1');
-  });
-
-  it('timestamptz() binds pg/timestamptz@1 codec', () => {
-    expect(timestamptz().codecId).toBe('pg/timestamptz@1');
   });
 });
 
@@ -54,7 +54,7 @@ describe('pgTable()', () => {
   it('creates a PostgresTableSource', () => {
     expect(marker.source).toBeInstanceOf(PostgresTableSource);
     expect(marker.source.name).toBe('marker');
-    expect((marker.source as PostgresTableSource).schema).toBe('prisma_contract');
+    expect((marker.source as unknown as PostgresTableSource).schema).toBe('prisma_contract');
   });
 
   it('exposes typed column proxies', () => {
@@ -66,9 +66,9 @@ describe('pgTable()', () => {
 
   it('column proxy .eq() carries the column codec in the emitted ParamRef', () => {
     const expr = marker.space.eq('my-space');
-    const binary = expr.ast as import('@prisma-next/sql-relational-core/ast').BinaryExpr;
+    const binary = expr.ast as unknown as BinaryExpr;
     expect(binary.right.kind).toBe('param-ref');
-    const param = binary.right as import('@prisma-next/sql-relational-core/ast').ParamRef;
+    const param = binary.right as unknown as ParamRef;
     expect(param.codec?.codecId).toBe('pg/text@1');
   });
 
@@ -107,8 +107,6 @@ describe('pgTable()', () => {
     expect(ast).toBeInstanceOf(InsertAst);
     expect(ast.onConflict?.action.kind).toBe('do-update-set');
     const action = ast.onConflict!.action as unknown as { set: { core_hash: unknown } };
-    expect(
-      (action.set.core_hash as import('@prisma-next/sql-relational-core/ast').ColumnRef).table,
-    ).toBe('excluded');
+    expect((action.set.core_hash as unknown as ColumnRef).table).toBe('excluded');
   });
 });

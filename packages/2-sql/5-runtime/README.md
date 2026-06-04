@@ -23,7 +23,7 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 - **Mutation Default Generator Composition**: Assemble execution default generators from composed target/adapter/extension contributors
 - **No Implicit Generator Baseline**: Runtime resolves generator ids only from composed contributors (no built-in runtime fallback table)
 - **SQL Context Creation**: Create runtime contexts with SQL contracts, adapters, and codecs
-- **SQL Marker Management**: Provide SQL statements for reading contract markers (writes go through the control adapter SPI)
+- **SQL Marker Bootstrap**: Provide test-utility helpers for bootstrapping the marker table; marker reads and writes both go through the control adapter SPI
 - **Codec Encoding/Decoding**: Encode parameters and decode rows using SQL codec registries
 - **Codec Validation**: Validate that codec registries contain all required codecs
 - **SQL Family Adapter**: Implement `RuntimeFamilyAdapter` for SQL contracts (defined in `runtime-spi.ts`)
@@ -130,8 +130,7 @@ const runtime = createRuntime({
 
 ### SQL Marker
 
-- `ensureSchemaStatement`, `ensureTableStatement` - DDL statements for marker table setup
-- `SqlStatement` - SQL statement type
+- Test helpers in `./test/utils` bootstrap marker tables via contract-free DDL lowering
 
 Marker reads and writes go through the control adapter SPI (`adapter.readMarker`, `adapter.initMarker`, `adapter.updateMarker`, `adapter.writeLedgerEntry`).
 

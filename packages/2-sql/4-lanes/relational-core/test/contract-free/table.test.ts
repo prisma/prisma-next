@@ -47,38 +47,40 @@ describe('ColumnProxy — expression methods', () => {
   it('.eq(value) wraps a plain JS value in a ParamRef with the column codec', () => {
     const expr = tbl.name.eq('alice');
     expect(expr).toBeInstanceOf(CfExpr);
-    const binary = expr.ast as BinaryExpr;
+    const binary = expr.ast as unknown as BinaryExpr;
     expect(binary.kind).toBe('binary');
     expect(binary.op).toBe('eq');
     expect(binary.left.kind).toBe('column-ref');
-    expect((binary.left as ColumnRef).column).toBe('name');
+    const left = binary.left as unknown as ColumnRef;
+    const right = binary.right as unknown as ParamRef;
+    expect(left.column).toBe('name');
     expect(binary.right.kind).toBe('param-ref');
-    expect((binary.right as ParamRef).value).toBe('alice');
-    expect((binary.right as ParamRef).codec?.codecId).toBe('test/text@1');
+    expect(right.value).toBe('alice');
+    expect(right.codec?.codecId).toBe('test/text@1');
   });
 
   it('.eq(expr) passes an existing AST expression through without re-wrapping', () => {
     const existing = ColumnRef.of('other', 'id');
     const expr = tbl.id.eq(existing);
-    const binary = expr.ast as BinaryExpr;
+    const binary = expr.ast as unknown as BinaryExpr;
     expect(binary.right.kind).toBe('column-ref');
-    expect((binary.right as ColumnRef).table).toBe('other');
+    expect((binary.right as unknown as ColumnRef).table).toBe('other');
   });
 
   it('.neq(value) produces a "neq" binary expression', () => {
-    const binary = tbl.id.neq(42).ast as BinaryExpr;
+    const binary = tbl.id.neq(42).ast as unknown as BinaryExpr;
     expect(binary.op).toBe('neq');
-    expect((binary.right as ParamRef).value).toBe(42);
+    expect((binary.right as unknown as ParamRef).value).toBe(42);
   });
 
   it('.isNull() produces a null-check expression', () => {
-    const expr = tbl.note.isNull().ast as NullCheckExpr;
+    const expr = tbl.note.isNull().ast as unknown as NullCheckExpr;
     expect(expr.kind).toBe('null-check');
     expect(expr.isNull).toBe(true);
   });
 
   it('.isNotNull() produces a null-check expression with isNull=false', () => {
-    const expr = tbl.note.isNotNull().ast as NullCheckExpr;
+    const expr = tbl.note.isNotNull().ast as unknown as NullCheckExpr;
     expect(expr.isNull).toBe(false);
   });
 
@@ -103,7 +105,7 @@ describe('ColumnProxy — expression methods', () => {
 describe('CfExpr — boolean combinators', () => {
   it('.and() produces AndExpr with both sides', () => {
     const expr = tbl.id.eq(1).and(tbl.name.eq('alice'));
-    const and = expr.ast as AndExpr;
+    const and = expr.ast as unknown as AndExpr;
     expect(and.kind).toBe('and');
     expect(and.exprs.length).toBe(2);
   });
@@ -120,7 +122,7 @@ describe('CfExpr — boolean combinators', () => {
 
   it('chained .and().and() flattens correctly — two nested AndExprs', () => {
     const expr = tbl.id.eq(1).and(tbl.name.eq('alice')).and(tbl.note.isNull());
-    const outer = expr.ast as AndExpr;
+    const outer = expr.ast as unknown as AndExpr;
     expect(outer.kind).toBe('and');
     // inner .and() is the left child, wrapped again
     expect(outer.exprs.length).toBe(2);
@@ -136,22 +138,28 @@ describe('table().insert()', () => {
     const ast = tbl.insert({ id: 42, name: 'bob', note: null }).build();
     expect(ast).toBeInstanceOf(InsertAst);
     expect(ast.table.name).toBe('things');
-    const row = ast.rows[0]! as { id: InsertValue; name: InsertValue; note: InsertValue };
-    const idParam = row.id as ParamRef;
+    const row = ast.rows[0]! as unknown as {
+      id: InsertValue;
+      name: InsertValue;
+      note: InsertValue;
+    };
+    const idParam = row.id as unknown as ParamRef;
     expect(idParam.kind).toBe('param-ref');
     expect(idParam.value).toBe(42);
     expect(idParam.codec?.codecId).toBe('test/int@1');
-    expect((row.name as ParamRef).value).toBe('bob');
-    expect((row.note as ParamRef).value).toBeNull();
-    expect((row.note as ParamRef).codec?.codecId).toBe('test/text@1');
+    expect((row.name as unknown as ParamRef).value).toBe('bob');
+    const noteParam = row.note as unknown as ParamRef;
+    expect(noteParam.value).toBeNull();
+    expect(noteParam.codec?.codecId).toBe('test/text@1');
   });
 
   it('.build() passes ColumnRef values through without re-wrapping', () => {
     const ref = ColumnRef.of('excluded', 'id');
     const ast = tbl.insert({ id: ref, name: 'test', note: null }).build();
-    const idCell = ast.rows[0]! as { id: InsertValue };
-    expect((idCell.id as ColumnRef).kind).toBe('column-ref');
-    expect((idCell.id as ColumnRef).table).toBe('excluded');
+    const idCell = ast.rows[0]! as unknown as { id: InsertValue };
+    const idRef = idCell.id as unknown as ColumnRef;
+    expect(idRef.kind).toBe('column-ref');
+    expect(idRef.table).toBe('excluded');
   });
 
   it('.build() passes RawExpr values through without re-wrapping', () => {
@@ -160,8 +168,8 @@ describe('table().insert()', () => {
       returns: { codecId: 'pg/timestamptz@1', nullable: false },
     });
     const ast = tbl.insert({ id: 1, name: raw, note: null }).build();
-    const nameCell = ast.rows[0]! as { name: InsertValue };
-    expect((nameCell.name as RawExpr).kind).toBe('raw-expr');
+    const nameCell = ast.rows[0]! as unknown as { name: InsertValue };
+    expect((nameCell.name as unknown as RawExpr).kind).toBe('raw-expr');
   });
 
   it('.returning() adds a RETURNING projection', () => {
@@ -188,9 +196,10 @@ describe('table().update()', () => {
 
     expect(ast).toBeInstanceOf(UpdateAst);
     expect(ast.table.name).toBe('things');
-    const setValues = ast.set as { name: AnyExpression };
-    expect((setValues.name as ParamRef).value).toBe('carol');
-    expect((setValues.name as ParamRef).codec?.codecId).toBe('test/text@1');
+    const setValues = ast.set as unknown as { name: AnyExpression };
+    const nameParam = setValues.name as unknown as ParamRef;
+    expect(nameParam.value).toBe('carol');
+    expect(nameParam.codec?.codecId).toBe('test/text@1');
     expect(ast.where?.kind).toBe('binary');
     expect(ast.returning?.length).toBe(1);
     expect(ast.returning?.[0]?.alias).toBe('name');
@@ -199,9 +208,10 @@ describe('table().update()', () => {
   it('.set() with an AST expression in value position passes it through', () => {
     const excluded = ColumnRef.of('excluded', 'name');
     const ast = tbl.update().set({ name: excluded }).where(tbl.id.eq(1)).build();
-    const setValues = ast.set as { name: AnyExpression };
-    expect((setValues.name as ColumnRef).kind).toBe('column-ref');
-    expect((setValues.name as ColumnRef).table).toBe('excluded');
+    const setValues = ast.set as unknown as { name: AnyExpression };
+    const nameRef = setValues.name as unknown as ColumnRef;
+    expect(nameRef.kind).toBe('column-ref');
+    expect(nameRef.table).toBe('excluded');
   });
 
   it('immutability — each chained call returns a distinct instance', () => {
@@ -247,7 +257,8 @@ describe('table().upsert()', () => {
     expect(ast.onConflict?.columns.length).toBe(1);
     expect(ast.onConflict?.columns[0]?.column).toBe('id');
     expect(ast.onConflict?.action.kind).toBe('do-update-set');
-    const setEntry = (ast.onConflict!.action as unknown as { set: { name: ColumnRef } }).set.name;
+    const action = ast.onConflict!.action as unknown as { set: { name: ColumnRef } };
+    const setEntry = action.set.name;
     expect(setEntry.kind).toBe('column-ref');
     expect(setEntry.table).toBe('excluded');
     expect(setEntry.column).toBe('name');
@@ -288,20 +299,20 @@ describe('table() with aliased source', () => {
   });
 
   it('.eq() emits a ColumnRef against the alias, not the base table name', () => {
-    const binary = aliasedTbl.name.eq('alice').ast as BinaryExpr;
-    expect((binary.left as ColumnRef).table).toBe('t');
+    const binary = aliasedTbl.name.eq('alice').ast as unknown as BinaryExpr;
+    expect((binary.left as unknown as ColumnRef).table).toBe('t');
   });
 });
 
 describe('ColumnProxy — null equality routing', () => {
   it('.eq(null) produces IS NULL, not = NULL', () => {
-    const expr = tbl.note.eq(null).ast as NullCheckExpr;
+    const expr = tbl.note.eq(null).ast as unknown as NullCheckExpr;
     expect(expr.kind).toBe('null-check');
     expect(expr.isNull).toBe(true);
   });
 
   it('.neq(null) produces IS NOT NULL, not <> NULL', () => {
-    const expr = tbl.note.neq(null).ast as NullCheckExpr;
+    const expr = tbl.note.neq(null).ast as unknown as NullCheckExpr;
     expect(expr.kind).toBe('null-check');
     expect(expr.isNull).toBe(false);
   });

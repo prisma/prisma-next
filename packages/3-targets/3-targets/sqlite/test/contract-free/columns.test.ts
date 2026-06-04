@@ -3,26 +3,22 @@ import { describe, expect, it } from 'vitest';
 import { datetime, integer, jsonText, sqliteTable, text } from '../../src/exports/contract-free';
 
 describe('sqlite column type helpers', () => {
-  it('text() returns a non-nullable text descriptor', () => {
-    const col = text();
-    expect(col.codecId).toBe('sqlite/text@1');
-    expect(col.nullable).toBe(false);
+  it('column helpers return expected codec descriptors', () => {
+    expect({
+      text: text(),
+      integer: integer(),
+      jsonText: jsonText(),
+      datetime: datetime(),
+    }).toEqual({
+      text: { codecId: 'sqlite/text@1', nullable: false },
+      integer: { codecId: 'sqlite/integer@1', nullable: false },
+      jsonText: { codecId: 'sqlite/json@1', nullable: false },
+      datetime: { codecId: 'sqlite/datetime@1', nullable: false },
+    });
   });
 
   it('text({ nullable: true }) returns a nullable descriptor', () => {
     expect(text({ nullable: true }).nullable).toBe(true);
-  });
-
-  it('integer() binds sqlite/integer@1 codec', () => {
-    expect(integer().codecId).toBe('sqlite/integer@1');
-  });
-
-  it('jsonText() binds sqlite/json@1 codec', () => {
-    expect(jsonText().codecId).toBe('sqlite/json@1');
-  });
-
-  it('datetime() binds sqlite/datetime@1 codec', () => {
-    expect(datetime().codecId).toBe('sqlite/datetime@1');
   });
 });
 
