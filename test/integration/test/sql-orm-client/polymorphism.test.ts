@@ -1,39 +1,31 @@
 import { Collection } from '@prisma-next/sql-orm-client';
-import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
-import { withReturningCapability } from './collection-fixtures';
-import { buildMixedPolyContract, getTestContext, type TestContract } from './helpers';
+import { getPolyTestContext } from './helpers';
 import { timeouts, withCollectionRuntime } from './integration-helpers';
 import type { PgIntegrationRuntime } from './runtime-helpers';
 
-function polyContract() {
-  return withReturningCapability(buildMixedPolyContract()) as TestContract;
-}
+const polyContext = getPolyTestContext();
 
-// The poly `Task` hierarchy is patched into the contract at runtime, so the
-// static `TestContract` Models type doesn't carry its order-by accessor. This
-// minimal view exposes the `Collection` API idiom these tests need —
-// `.variant(...).orderBy((row) => row.id.asc()).all().toArray()` — so the
-// asserted shape is stable and DB-side ordered by the base `id` column. Mirrors
-// the cast pattern in the sibling `polymorphism-include.test.ts`.
-interface OrderByRow {
-  id: { asc(): unknown };
-}
-interface PolyTaskCollection {
-  variant(name: string): PolyTaskCollection;
-  orderBy(selector: (row: OrderByRow) => unknown): PolyTaskCollection;
-  all(): { toArray(): Promise<Record<string, unknown>[]> };
-  create(values: Record<string, unknown>): Promise<Record<string, unknown>>;
-}
+// These tests run against the REAL emitted poly fixture
+// (`fixtures/polymorphism/generated/contract.json`): the Task hierarchy — base
+// `Task` (discriminator `type`), `Bug` (single-table inheritance, own field
+// `severity`), `Feature` (multi-table inheritance, table `features`, field
+// `priority`) — is part of the static contract type, so `.variant(...)`,
+// `.orderBy(...)`, `.create(...)` and the decoded row shapes are driven by the
+// real `Collection` types, not a hand-written cast interface.
+//
+// The fixture's `Task` carries the relationship FK columns (`project_id`,
+// `reporter_id`) that the sibling include tests need; they are nullable and
+// surface in the default (no-`select`) projection here as `projectId` /
+// `reporterId`.
 
-function createTaskCollection(runtime: PgIntegrationRuntime): PolyTaskCollection {
-  const contract = polyContract();
-  const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'Task') as unknown as PolyTaskCollection;
+function createTaskCollection(runtime: PgIntegrationRuntime) {
+  return new Collection({ runtime, context: polyContext }, 'Task');
 }
 
 async function setupPolySchema(runtime: PgIntegrationRuntime): Promise<void> {
   await runtime.query('drop table if exists features');
+  await runtime.query('drop table if exists epics');
   await runtime.query('drop table if exists tasks');
 
   await runtime.query(`
@@ -41,7 +33,9 @@ async function setupPolySchema(runtime: PgIntegrationRuntime): Promise<void> {
       id serial primary key,
       title text not null,
       type text not null,
-      severity text
+      severity text,
+      project_id integer,
+      reporter_id integer
     )
   `);
 
@@ -49,6 +43,16 @@ async function setupPolySchema(runtime: PgIntegrationRuntime): Promise<void> {
     create table features (
       id integer primary key references tasks(id),
       priority integer not null
+    )
+  `);
+
+  // The shared fixture's Task hierarchy includes a second MTI variant (Epic →
+  // `epics`). A base `Task` query LEFT JOINs every MTI variant table, so the
+  // table must exist even though these scenarios seed no epics.
+  await runtime.query(`
+    create table epics (
+      id integer primary key references tasks(id),
+      scope text not null
     )
   `);
 }
@@ -85,12 +89,40 @@ describe('integration/polymorphism', () => {
           .toArray();
 
         expect(rows).toEqual([
-          { id: 1, title: 'Crash on login', type: 'bug', severity: 'critical' },
-          { id: 2, title: 'Null ref in parser', type: 'bug', severity: 'low' },
-          { id: 3, title: 'Dark mode', type: 'feature', priority: 1 },
-          { id: 4, title: 'Export to PDF', type: 'feature', priority: 3 },
+          {
+            id: 1,
+            title: 'Crash on login',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'critical',
+          },
+          {
+            id: 2,
+            title: 'Null ref in parser',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'low',
+          },
+          {
+            id: 3,
+            title: 'Dark mode',
+            type: 'feature',
+            projectId: null,
+            reporterId: null,
+            priority: 1,
+          },
+          {
+            id: 4,
+            title: 'Export to PDF',
+            type: 'feature',
+            projectId: null,
+            reporterId: null,
+            priority: 3,
+          },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -113,10 +145,24 @@ describe('integration/polymorphism', () => {
           .toArray();
 
         expect(bugs).toEqual([
-          { id: 1, title: 'Crash on login', type: 'bug', severity: 'critical' },
-          { id: 2, title: 'Null ref in parser', type: 'bug', severity: 'low' },
+          {
+            id: 1,
+            title: 'Crash on login',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'critical',
+          },
+          {
+            id: 2,
+            title: 'Null ref in parser',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'low',
+          },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -140,10 +186,24 @@ describe('integration/polymorphism', () => {
           .toArray();
 
         expect(features).toEqual([
-          { id: 3, title: 'Dark mode', type: 'feature', priority: 1 },
-          { id: 4, title: 'Export to PDF', type: 'feature', priority: 3 },
+          {
+            id: 3,
+            title: 'Dark mode',
+            type: 'feature',
+            projectId: null,
+            reporterId: null,
+            priority: 1,
+          },
+          {
+            id: 4,
+            title: 'Export to PDF',
+            type: 'feature',
+            projectId: null,
+            reporterId: null,
+            priority: 3,
+          },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -158,8 +218,15 @@ describe('integration/polymorphism', () => {
         const bugs = tasks.variant('Bug');
         const created = await bugs.create({ title: 'New bug', severity: 'high' });
 
-        const id = created['id'];
-        expect(created).toEqual({ id, title: 'New bug', type: 'bug', severity: 'high' });
+        const id = created.id;
+        expect(created).toEqual({
+          id,
+          title: 'New bug',
+          type: 'bug',
+          projectId: null,
+          reporterId: null,
+          severity: 'high',
+        });
 
         // Read the row back through the ORM (no select → default variant shape)
         // rather than re-reading the discriminator column raw: the discriminator
@@ -169,8 +236,17 @@ describe('integration/polymorphism', () => {
           .orderBy((task) => task.id.asc())
           .all()
           .toArray();
-        expect(readBack).toEqual([{ id, title: 'New bug', type: 'bug', severity: 'high' }]);
-      });
+        expect(readBack).toEqual([
+          {
+            id,
+            title: 'New bug',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'high',
+          },
+        ]);
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -188,8 +264,15 @@ describe('integration/polymorphism', () => {
           priority: 5,
         });
 
-        const id = created['id'];
-        expect(created).toEqual({ id, title: 'New feature', type: 'feature', priority: 5 });
+        const id = created.id;
+        expect(created).toEqual({
+          id,
+          title: 'New feature',
+          type: 'feature',
+          projectId: null,
+          reporterId: null,
+          priority: 5,
+        });
 
         // Storage-level invariant the ORM intentionally hides: an MTI create is a
         // two-table transactional write — the base row lands in `tasks` and the
@@ -207,7 +290,7 @@ describe('integration/polymorphism', () => {
           [id],
         );
         expect(variantRows).toEqual([{ priority: 5 }]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );

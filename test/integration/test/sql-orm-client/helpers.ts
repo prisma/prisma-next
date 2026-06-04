@@ -18,6 +18,10 @@ import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sq
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
+import type { Contract as PolyContractType } from './fixtures/polymorphism/generated/contract';
+import polyContractJson from './fixtures/polymorphism/generated/contract.json' with {
+  type: 'json',
+};
 
 export function isSelectAst(ast: unknown): ast is SelectAst {
   return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
@@ -108,6 +112,27 @@ const testContext: ExecutionContext<TestContract> = createExecutionContext({
 
 export function getTestContext(): ExecutionContext<TestContract> {
   return testContext;
+}
+
+export type PolyContract = PolyContractType;
+
+export function deserializePolyContract(json: unknown = polyContractJson): PolyContract {
+  return postgresContractSerializer.deserializeContract(json) as PolyContract;
+}
+
+const polyTestContract = deserializePolyContract();
+
+const polyTestContext: ExecutionContext<PolyContract> = createExecutionContext({
+  contract: polyTestContract,
+  stack: createSqlExecutionStack({
+    target: postgresTarget,
+    adapter: postgresAdapter,
+    extensionPacks: [pgvectorRuntime],
+  }),
+});
+
+export function getPolyTestContext(): ExecutionContext<PolyContract> {
+  return polyTestContext;
 }
 
 export interface MockExecution {

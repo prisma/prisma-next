@@ -1,42 +1,24 @@
 import { Collection } from '@prisma-next/sql-orm-client';
-import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
-import {
-  buildMixedPolyContract,
-  buildStiPolyContract,
-  getTestContext,
-  type TestContract,
-} from './helpers';
+import { getPolyTestContext } from './helpers';
 import { timeouts, withCollectionRuntime } from './integration-helpers';
 import type { PgIntegrationRuntime } from './runtime-helpers';
 
-// These tests extend the poly-include coverage to relationship shapes the
-// sibling `polymorphism-include.test.ts` doesn't reach:
+// These tests run against the REAL emitted poly fixture
+// (`fixtures/polymorphism/generated/contract.json`), which carries two
+// polymorphic hierarchies and the parent/relation models these scenarios need:
 //   1. a poly (MTI) model as the include PARENT (poly model is the root);
 //   2. a to-one / N:1 include whose TARGET is a poly model;
 //   3. a base with two MTI variant tables (no cross-variant contamination);
 //   4. a nested include through a poly target (Parent -> tasks(poly) -> child);
 //   5. relationship-level implicit-default selection (no `.select(...)`).
 //
-// As in the sibling file, the poly models (and the relationship models wired
-// to them below) are patched onto a real emitted contract at runtime: there is
-// no `.psl` source for these test-only shapes, so they are absent from the
-// static `TestContract` Models type. The real `Collection`/`include` types are
-// driven by that static Models type, so `.include('<polyRel>')` on a
-// runtime-only relation does not type-check against them. These minimal cast
-// interfaces (`IncludeRoot`/`IncludeRefinement`/`BaseRow`) are the deliberate
-// stand-in for the fluent surface under test; they mirror only the methods
-// these tests call. The base contract IS the emitted fixture — `build*Contract`
-// deserialize `getTestContract()` (the real emitted contract) and patch the
-// extra models on top — so the contract shape is real even though the static
-// type can't name the patched relations.
-//
-// `RawContract`/`MutableModel`/`RawTable` below are the matching write-side
-// stand-in: the patched relationship models and their storage tables are added
-// as plain JSON onto the deserialized contract. We keep these LOCAL (rather
-// than the helpers' own mutation types) because the relationship wiring here is
-// specific to these scenarios and we don't want to widen the shared helper
-// surface for one file's fixtures.
+// Because the models are part of the static contract type, `.include(...)`,
+// `.variant(...)`, `.select(...)` and the decoded row shapes are driven by the
+// real `Collection` types — no runtime contract patching, no cast stand-in
+// interfaces. The fixture's `Task` carries `projectId` / `reporterId` (the FK
+// columns these relations need); they are nullable base columns and surface in
+// the default (no-`select`) poly projection below.
 //
 // Ordering is ALWAYS by a base-table column (`id`): TML-2782 makes orderBy on
 // an MTI variant column throw. Poly result columns are asserted at their
@@ -44,334 +26,52 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
 // columns (TML-2783) — so the no-select implicit-default shape is the primary
 // vehicle for poly result assertions here.
 
-interface OrderBy {
-  asc(): unknown;
-}
-interface BaseRow {
-  id: OrderBy;
-}
-interface IncludeRefinement {
-  variant(name: string): IncludeRefinement;
-  select(...fields: string[]): IncludeRefinement;
-  orderBy(selector: (row: BaseRow) => unknown): IncludeRefinement;
-  include(
-    relation: string,
-    refine?: (collection: IncludeRefinement) => IncludeRefinement,
-  ): IncludeRefinement;
-}
-interface IncludeRoot {
-  select(...fields: string[]): IncludeRoot;
-  orderBy(selector: (row: BaseRow) => unknown): IncludeRoot;
-  include(
-    relation: string,
-    refine?: (collection: IncludeRefinement) => IncludeRefinement,
-  ): IncludeRoot & {
-    include(
-      relation: string,
-      refine?: (collection: IncludeRefinement) => IncludeRefinement,
-    ): IncludeRoot;
-    // `.all()` returns an awaitable result (the real Collection returns an
-    // `AsyncIterableResult`, which is `PromiseLike<Row[]>`), so `await` alone
-    // collects the rows — no `.toArray()` needed.
-    all(): PromiseLike<Record<string, unknown>[]>;
-  };
-}
+const polyContext = getPolyTestContext();
 
-type RawContract = {
-  domain: { namespaces: Record<string, { models: Record<string, MutableModel> }> };
-  storage: { namespaces: Record<string, { tables: Record<string, RawTable> }> };
-};
-type MutableModel = {
-  fields: Record<string, unknown>;
-  relations: Record<string, unknown>;
-  storage: { table: string; fields: Record<string, { column: string }> };
-  discriminator?: { field: string };
-  variants?: Record<string, { value: string }>;
-  base?: string;
-};
-type RawTable = {
-  columns: Record<string, unknown>;
-  primaryKey: { columns: string[] };
-  uniques: never[];
-  indexes: never[];
-  foreignKeys: never[];
-};
-
-function rawOf(contract: TestContract): RawContract {
-  return JSON.parse(JSON.stringify(contract)) as RawContract;
-}
-function modelsOf(raw: RawContract): Record<string, MutableModel> {
-  return Object.values(raw.domain.namespaces)[0]!.models;
-}
-function tablesOf(raw: RawContract): Record<string, RawTable> {
-  return Object.values(raw.storage.namespaces)[0]!.tables;
-}
-function int(nullable: boolean) {
-  return { nullable, type: { kind: 'scalar', codecId: 'pg/int4@1' } };
-}
-function text(nullable: boolean) {
-  return { nullable, type: { kind: 'scalar', codecId: 'pg/text@1' } };
-}
-function intCol(nullable: boolean) {
-  return { nativeType: 'int4', codecId: 'pg/int4@1', nullable };
-}
-function textCol(nullable: boolean) {
-  return { nativeType: 'text', codecId: 'pg/text@1', nullable };
-}
-
-// Task (Bug STI / Feature MTI poly) as the include PARENT --comments(1:N)-->
-// Comment (plain). The poly model is the include ROOT here: its base+variant
-// span must correlate to the child rows.
-function buildPolyParentContract(): TestContract {
-  const raw = rawOf(buildMixedPolyContract());
-  const models = modelsOf(raw);
-  const tables = tablesOf(raw);
-
-  const task = models['Task']!;
-  task.relations['comments'] = {
-    to: { model: 'TaskComment', namespace: 'public' },
-    cardinality: '1:N',
-    on: { localFields: ['id'], targetFields: ['taskId'] },
-  };
-
-  models['TaskComment'] = {
-    fields: { id: int(false), body: text(false), taskId: int(true) },
-    relations: {},
-    storage: {
-      table: 'task_comments',
-      fields: { id: { column: 'id' }, body: { column: 'body' }, taskId: { column: 'task_id' } },
-    },
-  };
-  tables['task_comments'] = {
-    columns: { id: intCol(false), body: textCol(false), task_id: intCol(true) },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  return raw as unknown as TestContract;
-}
-
-// Ticket (plain) --owner(N:1)--> User (Admin/Regular STI poly). A to-one
-// include whose TARGET is a poly model: per-row variant mapping on a single
-// included object, not an array.
-function buildToOnePolyTargetContract(): TestContract {
-  const raw = rawOf(buildStiPolyContract());
-  const models = modelsOf(raw);
-  const tables = tablesOf(raw);
-
-  models['Ticket'] = {
-    fields: { id: int(false), subject: text(false), ownerId: int(true) },
-    relations: {
-      owner: {
-        to: { model: 'User', namespace: 'public' },
-        cardinality: 'N:1',
-        on: { localFields: ['ownerId'], targetFields: ['id'] },
-      },
-    },
-    storage: {
-      table: 'tickets',
-      fields: {
-        id: { column: 'id' },
-        subject: { column: 'subject' },
-        ownerId: { column: 'owner_id' },
-      },
-    },
-  };
-  tables['tickets'] = {
-    columns: { id: intCol(false), subject: textCol(false), owner_id: intCol(true) },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  return raw as unknown as TestContract;
-}
-
-// Project (plain) --tasks(1:N)--> Task with TWO MTI variants:
-//   Feature (MTI -> features.priority) and Epic (MTI -> epics.scope).
-// Confirms each row carries ONLY its own variant table's column.
-function buildTwoMtiVariantContract(): TestContract {
-  const raw = rawOf(buildMixedPolyContract());
-  const models = modelsOf(raw);
-  const tables = tablesOf(raw);
-
-  const task = models['Task']!;
-  task.fields['projectId'] = int(true);
-  task.storage.fields['projectId'] = { column: 'project_id' };
-  task.variants = { Bug: { value: 'bug' }, Feature: { value: 'feature' }, Epic: { value: 'epic' } };
-  tables['tasks']!.columns['project_id'] = intCol(true);
-
-  models['Epic'] = {
-    fields: { scope: text(false) },
-    relations: {},
-    storage: { table: 'epics', fields: { scope: { column: 'scope' } } },
-    base: 'Task',
-  };
-  tables['epics'] = {
-    columns: { id: intCol(false), scope: textCol(false) },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  models['Project'] = {
-    fields: { id: int(false), name: text(false) },
-    relations: {
-      tasks: {
-        to: { model: 'Task', namespace: 'public' },
-        cardinality: '1:N',
-        on: { localFields: ['id'], targetFields: ['projectId'] },
-      },
-    },
-    storage: { table: 'projects_tbl', fields: { id: { column: 'id' }, name: { column: 'name' } } },
-  };
-  tables['projects_tbl'] = {
-    columns: { id: intCol(false), name: textCol(false) },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  return raw as unknown as TestContract;
-}
-
-// Project --tasks(1:N)--> Task (poly) --reporter(N:1)--> Person.
-// Nested include through a poly target: a relation hanging off the poly child
-// must stitch when the child row is variant-mapped.
-function buildNestedThroughPolyContract(): TestContract {
-  const raw = rawOf(buildMixedPolyContract());
-  const models = modelsOf(raw);
-  const tables = tablesOf(raw);
-
-  const task = models['Task']!;
-  task.fields['projectId'] = int(true);
-  task.storage.fields['projectId'] = { column: 'project_id' };
-  task.fields['reporterId'] = int(true);
-  task.storage.fields['reporterId'] = { column: 'reporter_id' };
-  task.relations['reporter'] = {
-    to: { model: 'Person', namespace: 'public' },
-    cardinality: 'N:1',
-    on: { localFields: ['reporterId'], targetFields: ['id'] },
-  };
-  tables['tasks']!.columns['project_id'] = intCol(true);
-  tables['tasks']!.columns['reporter_id'] = intCol(true);
-
-  models['Person'] = {
-    fields: { id: int(false), name: text(false) },
-    relations: {},
-    storage: { table: 'people', fields: { id: { column: 'id' }, name: { column: 'name' } } },
-  };
-  tables['people'] = {
-    columns: { id: intCol(false), name: textCol(false) },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  models['Project'] = {
-    fields: { id: int(false), name: text(false) },
-    relations: {
-      tasks: {
-        to: { model: 'Task', namespace: 'public' },
-        cardinality: '1:N',
-        on: { localFields: ['id'], targetFields: ['projectId'] },
-      },
-    },
-    storage: { table: 'projects_tbl', fields: { id: { column: 'id' }, name: { column: 'name' } } },
-  };
-  tables['projects_tbl'] = {
-    columns: { id: intCol(false), name: textCol(false) },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  return raw as unknown as TestContract;
-}
-
-// Account --members(1:N)--> User (STI poly), for relationship-level
-// implicit-default coverage. Mirrors `buildStiIncludeContract` in the sibling
-// file but stays local here.
-function buildStiMembersContract(): TestContract {
-  const raw = rawOf(buildStiPolyContract());
-  const models = modelsOf(raw);
-  const tables = tablesOf(raw);
-
-  const user = models['User']!;
-  user.fields['accountId'] = int(true);
-  user.storage.fields['accountId'] = { column: 'account_id' };
-  tables['users']!.columns['account_id'] = intCol(true);
-
-  models['Account'] = {
-    fields: { id: int(false), name: text(false) },
-    relations: {
-      members: {
-        to: { model: 'User', namespace: 'public' },
-        cardinality: '1:N',
-        on: { localFields: ['id'], targetFields: ['accountId'] },
-      },
-    },
-    storage: { table: 'accounts', fields: { id: { column: 'id' }, name: { column: 'name' } } },
-  };
-  tables['accounts'] = {
-    columns: { id: intCol(false), name: textCol(false) },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  return raw as unknown as TestContract;
-}
-
-// Project --tasks(1:N)--> Task (Bug STI / Feature MTI), for the MTI half of
-// relationship-level implicit-default coverage.
-function buildMtiTasksContract(): TestContract {
-  const raw = rawOf(buildMixedPolyContract());
-  const models = modelsOf(raw);
-  const tables = tablesOf(raw);
-
-  const task = models['Task']!;
-  task.fields['projectId'] = int(true);
-  task.storage.fields['projectId'] = { column: 'project_id' };
-  tables['tasks']!.columns['project_id'] = intCol(true);
-
-  models['Project'] = {
-    fields: { id: int(false), name: text(false) },
-    relations: {
-      tasks: {
-        to: { model: 'Task', namespace: 'public' },
-        cardinality: '1:N',
-        on: { localFields: ['id'], targetFields: ['projectId'] },
-      },
-    },
-    storage: { table: 'projects_tbl', fields: { id: { column: 'id' }, name: { column: 'name' } } },
-  };
-  tables['projects_tbl'] = {
-    columns: { id: intCol(false), name: textCol(false) },
-    primaryKey: { columns: ['id'] },
-    uniques: [],
-    indexes: [],
-    foreignKeys: [],
-  };
-
-  return raw as unknown as TestContract;
-}
-
-function collectionOf(
+function collectionOf<M extends 'Task' | 'Ticket' | 'Project' | 'Account'>(
   runtime: PgIntegrationRuntime,
-  contract: TestContract,
-  model: string,
-): IncludeRoot {
-  const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, model as never) as unknown as IncludeRoot;
+  model: M,
+) {
+  return new Collection({ runtime, context: polyContext }, model);
+}
+
+async function createTasksTable(runtime: PgIntegrationRuntime): Promise<void> {
+  await runtime.query(`
+    create table tasks (
+      id integer primary key,
+      title text not null,
+      type text not null,
+      severity text,
+      project_id integer,
+      reporter_id integer
+    )
+  `);
+  await runtime.query(`
+    create table features (
+      id integer primary key references tasks(id),
+      priority integer not null
+    )
+  `);
+  await runtime.query(`
+    create table epics (
+      id integer primary key references tasks(id),
+      scope text not null
+    )
+  `);
+}
+
+async function createUsersTable(runtime: PgIntegrationRuntime): Promise<void> {
+  await runtime.query(`
+    create table users (
+      id integer primary key,
+      name text not null,
+      email text not null,
+      kind text not null,
+      role text,
+      plan text,
+      account_id integer
+    )
+  `);
 }
 
 describe('integration/polymorphism-include-relationships', () => {
@@ -380,22 +80,10 @@ describe('integration/polymorphism-include-relationships', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await runtime.query('drop table if exists task_comments');
+        await runtime.query('drop table if exists epics');
         await runtime.query('drop table if exists features');
         await runtime.query('drop table if exists tasks');
-        await runtime.query(`
-          create table tasks (
-            id integer primary key,
-            title text not null,
-            type text not null,
-            severity text
-          )
-        `);
-        await runtime.query(`
-          create table features (
-            id integer primary key references tasks(id),
-            priority integer not null
-          )
-        `);
+        await createTasksTable(runtime);
         await runtime.query(`
           create table task_comments (
             id integer primary key,
@@ -420,7 +108,7 @@ describe('integration/polymorphism-include-relationships', () => {
           "insert into task_comments (id, body, task_id) values (12, 'me too', 1)",
         );
 
-        const tasks = collectionOf(runtime, buildPolyParentContract(), 'Task');
+        const tasks = collectionOf(runtime, 'Task');
         const rows = await tasks
           .orderBy((task) => task.id.asc())
           .include('comments', (comments) =>
@@ -437,6 +125,8 @@ describe('integration/polymorphism-include-relationships', () => {
             id: 1,
             title: 'Crash',
             type: 'bug',
+            projectId: null,
+            reporterId: null,
             severity: 'critical',
             comments: [
               { id: 10, body: 'repro attached', taskId: 1 },
@@ -447,11 +137,13 @@ describe('integration/polymorphism-include-relationships', () => {
             id: 2,
             title: 'Dark mode',
             type: 'feature',
+            projectId: null,
+            reporterId: null,
             priority: 5,
             comments: [{ id: 11, body: 'ship it', taskId: 2 }],
           },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -462,18 +154,7 @@ describe('integration/polymorphism-include-relationships', () => {
       await withCollectionRuntime(async (runtime) => {
         await runtime.query('drop table if exists tickets');
         await runtime.query('drop table if exists users');
-        await runtime.query(`
-          create table users (
-            id integer primary key,
-            name text not null,
-            email text not null,
-            invited_by_id integer,
-            address jsonb,
-            kind text not null,
-            role text,
-            plan text
-          )
-        `);
+        await createUsersTable(runtime);
         await runtime.query(`
           create table tickets (
             id integer primary key,
@@ -497,7 +178,7 @@ describe('integration/polymorphism-include-relationships', () => {
           "insert into tickets (id, subject, owner_id) values (102, 'Orphan', null)",
         );
 
-        const tickets = collectionOf(runtime, buildToOnePolyTargetContract(), 'Ticket');
+        const tickets = collectionOf(runtime, 'Ticket');
         const rows = await tickets
           .select('id', 'subject')
           .orderBy((ticket) => ticket.id.asc())
@@ -514,9 +195,8 @@ describe('integration/polymorphism-include-relationships', () => {
               id: 1,
               name: 'Ada',
               email: 'ada@x',
-              invitedById: null,
-              address: null,
               kind: 'admin',
+              accountId: null,
               role: 'superadmin',
             },
           },
@@ -527,15 +207,14 @@ describe('integration/polymorphism-include-relationships', () => {
               id: 2,
               name: 'Bob',
               email: 'bob@x',
-              invitedById: null,
-              address: null,
               kind: 'regular',
+              accountId: null,
               plan: 'free',
             },
           },
           { id: 102, subject: 'Orphan', owner: null },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -554,27 +233,7 @@ describe('integration/polymorphism-include-relationships', () => {
             name text not null
           )
         `);
-        await runtime.query(`
-          create table tasks (
-            id integer primary key,
-            title text not null,
-            type text not null,
-            severity text,
-            project_id integer
-          )
-        `);
-        await runtime.query(`
-          create table features (
-            id integer primary key references tasks(id),
-            priority integer not null
-          )
-        `);
-        await runtime.query(`
-          create table epics (
-            id integer primary key references tasks(id),
-            scope text not null
-          )
-        `);
+        await createTasksTable(runtime);
         await runtime.query("insert into projects_tbl (id, name) values (1, 'Roadmap')");
         await runtime.query(
           "insert into tasks (id, title, type, severity, project_id) values (1, 'Crash', 'bug', 'critical', 1)",
@@ -588,7 +247,7 @@ describe('integration/polymorphism-include-relationships', () => {
         );
         await runtime.query("insert into epics (id, scope) values (3, 'Q3')");
 
-        const projects = collectionOf(runtime, buildTwoMtiVariantContract(), 'Project');
+        const projects = collectionOf(runtime, 'Project');
         const rows = await projects
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
@@ -605,13 +264,34 @@ describe('integration/polymorphism-include-relationships', () => {
             id: 1,
             name: 'Roadmap',
             tasks: [
-              { id: 1, title: 'Crash', type: 'bug', severity: 'critical', projectId: 1 },
-              { id: 2, title: 'Dark mode', type: 'feature', projectId: 1, priority: 3 },
-              { id: 3, title: 'Billing', type: 'epic', projectId: 1, scope: 'Q3' },
+              {
+                id: 1,
+                title: 'Crash',
+                type: 'bug',
+                projectId: 1,
+                reporterId: null,
+                severity: 'critical',
+              },
+              {
+                id: 2,
+                title: 'Dark mode',
+                type: 'feature',
+                projectId: 1,
+                reporterId: null,
+                priority: 3,
+              },
+              {
+                id: 3,
+                title: 'Billing',
+                type: 'epic',
+                projectId: 1,
+                reporterId: null,
+                scope: 'Q3',
+              },
             ],
           },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -628,6 +308,7 @@ describe('integration/polymorphism-include-relationships', () => {
     'a nested include through a poly target stitches the grandchild on variant-mapped rows',
     async () => {
       await withCollectionRuntime(async (runtime) => {
+        await runtime.query('drop table if exists epics');
         await runtime.query('drop table if exists features');
         await runtime.query('drop table if exists tasks');
         await runtime.query('drop table if exists people');
@@ -644,22 +325,7 @@ describe('integration/polymorphism-include-relationships', () => {
             name text not null
           )
         `);
-        await runtime.query(`
-          create table tasks (
-            id integer primary key,
-            title text not null,
-            type text not null,
-            severity text,
-            project_id integer,
-            reporter_id integer
-          )
-        `);
-        await runtime.query(`
-          create table features (
-            id integer primary key references tasks(id),
-            priority integer not null
-          )
-        `);
+        await createTasksTable(runtime);
         await runtime.query("insert into projects_tbl (id, name) values (1, 'Roadmap')");
         await runtime.query("insert into people (id, name) values (50, 'Ada')");
         await runtime.query("insert into people (id, name) values (51, 'Bob')");
@@ -671,7 +337,7 @@ describe('integration/polymorphism-include-relationships', () => {
         );
         await runtime.query('insert into features (id, priority) values (2, 7)');
 
-        const projects = collectionOf(runtime, buildNestedThroughPolyContract(), 'Project');
+        const projects = collectionOf(runtime, 'Project');
         const rows = await projects
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
@@ -694,9 +360,9 @@ describe('integration/polymorphism-include-relationships', () => {
                 id: 1,
                 title: 'Crash',
                 type: 'bug',
-                severity: 'critical',
                 projectId: 1,
                 reporterId: 50,
+                severity: 'critical',
                 reporter: { id: 50, name: 'Ada' },
               },
               {
@@ -711,7 +377,7 @@ describe('integration/polymorphism-include-relationships', () => {
             ],
           },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -728,19 +394,7 @@ describe('integration/polymorphism-include-relationships', () => {
             name text not null
           )
         `);
-        await runtime.query(`
-          create table users (
-            id integer primary key,
-            name text not null,
-            email text not null,
-            invited_by_id integer,
-            address jsonb,
-            kind text not null,
-            role text,
-            plan text,
-            account_id integer
-          )
-        `);
+        await createUsersTable(runtime);
         await runtime.query("insert into accounts (id, name) values (1, 'Acme')");
         await runtime.query(
           "insert into users (id, name, email, kind, role, account_id) values (1, 'Ada', 'ada@x', 'admin', 'superadmin', 1)",
@@ -749,7 +403,7 @@ describe('integration/polymorphism-include-relationships', () => {
           "insert into users (id, name, email, kind, plan, account_id) values (2, 'Bob', 'bob@x', 'regular', 'free', 1)",
         );
 
-        const accounts = collectionOf(runtime, buildStiMembersContract(), 'Account');
+        const accounts = collectionOf(runtime, 'Account');
         const rows = await accounts
           .select('id', 'name')
           .orderBy((account) => account.id.asc())
@@ -769,26 +423,22 @@ describe('integration/polymorphism-include-relationships', () => {
                 id: 1,
                 name: 'Ada',
                 email: 'ada@x',
-                invitedById: null,
-                address: null,
                 kind: 'admin',
-                role: 'superadmin',
                 accountId: 1,
+                role: 'superadmin',
               },
               {
                 id: 2,
                 name: 'Bob',
                 email: 'bob@x',
-                invitedById: null,
-                address: null,
                 kind: 'regular',
-                plan: 'free',
                 accountId: 1,
+                plan: 'free',
               },
             ],
           },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -797,6 +447,7 @@ describe('integration/polymorphism-include-relationships', () => {
     'an MTI-target include with no select returns the full default per-variant shape',
     async () => {
       await withCollectionRuntime(async (runtime) => {
+        await runtime.query('drop table if exists epics');
         await runtime.query('drop table if exists features');
         await runtime.query('drop table if exists tasks');
         await runtime.query('drop table if exists projects_tbl');
@@ -806,21 +457,7 @@ describe('integration/polymorphism-include-relationships', () => {
             name text not null
           )
         `);
-        await runtime.query(`
-          create table tasks (
-            id integer primary key,
-            title text not null,
-            type text not null,
-            severity text,
-            project_id integer
-          )
-        `);
-        await runtime.query(`
-          create table features (
-            id integer primary key references tasks(id),
-            priority integer not null
-          )
-        `);
+        await createTasksTable(runtime);
         await runtime.query("insert into projects_tbl (id, name) values (1, 'Roadmap')");
         await runtime.query(
           "insert into tasks (id, title, type, severity, project_id) values (1, 'Crash', 'bug', 'critical', 1)",
@@ -830,7 +467,7 @@ describe('integration/polymorphism-include-relationships', () => {
         );
         await runtime.query('insert into features (id, priority) values (2, 9)');
 
-        const projects = collectionOf(runtime, buildMtiTasksContract(), 'Project');
+        const projects = collectionOf(runtime, 'Project');
         const rows = await projects
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
@@ -846,12 +483,26 @@ describe('integration/polymorphism-include-relationships', () => {
             id: 1,
             name: 'Roadmap',
             tasks: [
-              { id: 1, title: 'Crash', type: 'bug', severity: 'critical', projectId: 1 },
-              { id: 2, title: 'Dark mode', type: 'feature', projectId: 1, priority: 9 },
+              {
+                id: 1,
+                title: 'Crash',
+                type: 'bug',
+                projectId: 1,
+                reporterId: null,
+                severity: 'critical',
+              },
+              {
+                id: 2,
+                title: 'Dark mode',
+                type: 'feature',
+                projectId: 1,
+                reporterId: null,
+                priority: 9,
+              },
             ],
           },
         ]);
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
