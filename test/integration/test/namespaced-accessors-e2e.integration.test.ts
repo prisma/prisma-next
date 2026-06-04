@@ -253,7 +253,6 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
             instantiateExecutionStack(db.stack).adapter,
           );
 
-          // --- SQL path: qualification is per-namespace ---------------------
           const publicSelectPlan = sql.public.users.select('id', 'email').build();
           const authSelectPlan = sql.auth.users.select('id', 'token').build();
           expect(
@@ -269,7 +268,6 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
             }).sql,
           ).toContain('"auth"."users"');
 
-          // --- SQL path: insert into each namespace -------------------------
           await rows(
             runtime.execute(sql.public.users.insert([{ id: 1, email: 'pub@x.io' }]).build()),
           );
@@ -284,7 +282,6 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
             [{ id: 1, token: 'tok-1' }],
           );
 
-          // --- SQL path: update in each namespace ---------------------------
           await rows(
             runtime.execute(
               sql.public.users
@@ -308,7 +305,6 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
             (await client.query('select token from "auth"."users" where id = 1')).rows[0],
           ).toEqual({ token: 'tok-2' });
 
-          // --- SQL path: delete from each namespace -------------------------
           await rows(
             runtime.execute(
               sql.public.users
@@ -328,7 +324,6 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
           expect((await client.query('select * from "public"."users"')).rows).toHaveLength(0);
           expect((await client.query('select * from "auth"."users"')).rows).toHaveLength(0);
 
-          // --- ORM path: create / find / update / delete on both namespaces -
           expect(await orm.public.User.create({ id: 10, email: 'alice@x.io' })).toEqual({
             id: 10,
             email: 'alice@x.io',
@@ -352,7 +347,6 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
           expect((await orm.public.User.where({ id: 10 }).first())?.['email']).toBe('alice2@x.io');
           expect((await orm.auth.User.where({ id: 20 }).first())?.['token']).toBe('auth-tok-2');
 
-          // --- Cross-namespace relation read --------------------------------
           await orm.public.Profile.create({ id: 100, userId: 20 });
           const withUser = await orm.public.Profile.where({ id: 100 }).include('user').first();
           // The included `user` is the auth.User row (distinct `token` column).
