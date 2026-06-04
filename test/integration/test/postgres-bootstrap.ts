@@ -1,10 +1,11 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
 import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
 } from '@prisma-next/target-postgres/contract-free';
-import type { PostgresContract } from '@prisma-next/target-postgres/types';
+import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { Client } from 'pg';
 
 const postgresControlAdapter = createPostgresAdapter();
@@ -25,7 +26,7 @@ export async function bootstrapPostgresSignMarkerTables(client: Client): Promise
   for (const query of buildSignMarkerBootstrapQueries()) {
     await executeLoweredStatement(
       client,
-      postgresControlAdapter.lower(query, postgresControlLowererContext),
+      postgresControlAdapter.lower(query as PostgresDdlNode, postgresControlLowererContext),
     );
   }
 }
@@ -37,7 +38,7 @@ export async function bootstrapPostgresControlSchema(client: Client): Promise<vo
   }
   await executeLoweredStatement(
     client,
-    postgresControlAdapter.lower(schemaQuery, postgresControlLowererContext),
+    postgresControlAdapter.lower(schemaQuery as PostgresDdlNode, postgresControlLowererContext),
   );
 }
 
@@ -45,7 +46,7 @@ export async function bootstrapPostgresControlTables(client: Client): Promise<vo
   for (const query of buildControlTableBootstrapQueries()) {
     await executeLoweredStatement(
       client,
-      postgresControlAdapter.lower(query, postgresControlLowererContext),
+      postgresControlAdapter.lower(query as PostgresDdlNode, postgresControlLowererContext),
     );
   }
 }

@@ -19,10 +19,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { emit } from '../utils/emit';
-import {
-  bootstrapPostgresSignMarkerTables,
-  executeLoweredStatement as executeStatement,
-} from './postgres-bootstrap';
+import { bootstrapPostgresSignMarkerTables } from './postgres-bootstrap';
 import { createIntegrationTestDir } from './utils/cli-test-helpers';
 
 /**

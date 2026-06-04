@@ -12,10 +12,7 @@ import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import testContractSpaceExtension from './contract-space-fixture/control';
-import {
-  bootstrapPostgresSignMarkerTables,
-  executeLoweredStatement as executeStatement,
-} from './postgres-bootstrap';
+import { bootstrapPostgresSignMarkerTables } from './postgres-bootstrap';
 import {
   executeCommand,
   getExitCode,

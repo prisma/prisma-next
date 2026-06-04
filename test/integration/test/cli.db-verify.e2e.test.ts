@@ -10,10 +10,7 @@ import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  bootstrapPostgresSignMarkerTables,
-  executeLoweredStatement as executeStatement,
-} from './postgres-bootstrap';
+import { bootstrapPostgresSignMarkerTables } from './postgres-bootstrap';
 import {
   executeCommand,
   getExitCode,
