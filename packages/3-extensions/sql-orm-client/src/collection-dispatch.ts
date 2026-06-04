@@ -173,12 +173,21 @@ export function reloadMutationRowsByIdentities<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   tableName: string;
   modelName: string;
+  namespaceId?: string | undefined;
   identityRows: readonly Record<string, unknown>[];
   selectedFields: readonly string[] | undefined;
   includes: readonly IncludeExpr[];
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, tableName, modelName, identityRows, selectedFields, includes } =
-    options;
+  const {
+    contract,
+    runtime,
+    tableName,
+    modelName,
+    namespaceId,
+    identityRows,
+    selectedFields,
+    includes,
+  } = options;
   if (identityRows.length === 0) {
     return emptyResult<Row>();
   }
@@ -206,6 +215,7 @@ export function reloadMutationRowsByIdentities<Row>(options: {
     },
     tableName,
     modelName,
+    namespaceId,
   });
 }
 

@@ -67,9 +67,12 @@ export function hasNestedMutationCallbacks(
   contract: Contract<SqlStorage>,
   modelName: string,
   data: Record<string, unknown>,
+  namespaceId?: string,
 ): boolean {
   const relationNames = new Set(
-    getRelationDefinitions(contract, modelName).map((relation) => relation.relationName),
+    getRelationDefinitions(contract, modelName, namespaceId).map(
+      (relation) => relation.relationName,
+    ),
   );
   for (const [fieldName, value] of Object.entries(data)) {
     if (!relationNames.has(fieldName)) {
@@ -110,10 +113,11 @@ export function buildPrimaryKeyFilterFromRow(
   contract: Contract<SqlStorage>,
   modelName: string,
   row: Record<string, unknown>,
+  namespaceId?: string,
 ): Record<string, unknown> {
-  const tableName = resolveModelTableName(contract, modelName);
+  const tableName = resolveModelTableName(contract, modelName, namespaceId);
   const primaryKeyColumn = resolvePrimaryKeyColumn(contract, tableName);
-  const fieldName = toFieldName(contract, modelName, primaryKeyColumn);
+  const fieldName = toFieldName(contract, modelName, primaryKeyColumn, namespaceId);
   const value = row[fieldName];
   if (value === undefined) {
     throw new Error(
@@ -682,28 +686,35 @@ const relationDefsCache = new WeakMap<object, Map<string, RelationDefinition[]>>
 function getRelationDefinitions(
   contract: Contract<SqlStorage>,
   modelName: string,
+  namespaceId?: string,
 ): RelationDefinition[] {
   let perContract = relationDefsCache.get(contract);
   if (!perContract) {
     perContract = new Map();
     relationDefsCache.set(contract, perContract);
   }
-  const cached = perContract.get(modelName);
+  const cacheKey = namespaceId === undefined ? modelName : `${namespaceId}\u0000${modelName}`;
+  const cached = perContract.get(cacheKey);
   if (cached) return cached;
 
-  const relations = resolveModelRelations(contract, modelName);
+  // The base model's relations resolve within its namespace; relation
+  // targets (`relation.to`) keep the default resolution — cross-namespace
+  // relation-target threading is out of slice scope.
+  const relations = resolveModelRelations(contract, modelName, namespaceId);
   const definitions = Object.entries(relations).map(([relationName, relation]) => ({
     relationName,
     relatedModelName: relation.to,
     relatedTableName: resolveModelTableName(contract, relation.to),
     cardinality: relation.cardinality,
-    localColumns: relation.on.localFields.map((f) => resolveFieldToColumn(contract, modelName, f)),
+    localColumns: relation.on.localFields.map((f) =>
+      resolveFieldToColumn(contract, modelName, f, namespaceId),
+    ),
     targetColumns: relation.on.targetFields.map((f) =>
       resolveFieldToColumn(contract, relation.to, f),
     ),
   }));
 
-  perContract.set(modelName, definitions);
+  perContract.set(cacheKey, definitions);
   return definitions;
 }
 
@@ -711,7 +722,8 @@ function toFieldName(
   contract: Contract<SqlStorage>,
   modelName: string,
   columnName: string,
+  namespaceId?: string,
 ): string {
-  const columnToField = getColumnToFieldMap(contract, modelName);
+  const columnToField = getColumnToFieldMap(contract, modelName, namespaceId);
   return columnToField[columnName] ?? columnName;
 }

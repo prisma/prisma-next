@@ -1183,7 +1183,12 @@ export class Collection<
     const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'create');
 
     if (
-      hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
+      hasNestedMutationCallbacks(
+        this.contract,
+        this.modelName,
+        data as Record<string, unknown>,
+        this.namespaceId,
+      )
     ) {
       const createdRow = await executeNestedCreateMutation({
         context: this.ctx.context,
@@ -1192,7 +1197,12 @@ export class Collection<
         data: data as MutationCreateInput<Contract<SqlStorage>, string>,
       });
 
-      const pkCriterion = buildPrimaryKeyFilterFromRow(this.contract, this.modelName, createdRow);
+      const pkCriterion = buildPrimaryKeyFilterFromRow(
+        this.contract,
+        this.modelName,
+        createdRow,
+        this.namespaceId,
+      );
       const reloaded = await this.#reloadMutationRowByPrimaryKey(pkCriterion);
       if (!reloaded) {
         throw new Error(`create() for model "${this.modelName}" did not return a row`);
@@ -1282,6 +1292,7 @@ export class Collection<
         plans,
         tableName: this.tableName,
         modelName: this.modelName,
+        namespaceId: this.namespaceId,
         includes: this.state.includes,
         selectedFields: this.state.selectedFields,
         hiddenColumns,
@@ -1299,6 +1310,7 @@ export class Collection<
       compiled,
       tableName: this.tableName,
       modelName: this.modelName,
+      namespaceId: this.namespaceId,
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       hiddenColumns,
@@ -1610,6 +1622,7 @@ export class Collection<
       compiled,
       tableName: this.tableName,
       modelName: this.modelName,
+      namespaceId: this.namespaceId,
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       hiddenColumns,
@@ -1678,7 +1691,12 @@ export class Collection<
     const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'update');
 
     if (
-      hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
+      hasNestedMutationCallbacks(
+        this.contract,
+        this.modelName,
+        data as Record<string, unknown>,
+        this.namespaceId,
+      )
     ) {
       const updatedRow = await executeNestedUpdateMutation({
         context: this.ctx.context,
@@ -1691,7 +1709,12 @@ export class Collection<
         return null;
       }
 
-      const pkCriterion = buildPrimaryKeyFilterFromRow(this.contract, this.modelName, updatedRow);
+      const pkCriterion = buildPrimaryKeyFilterFromRow(
+        this.contract,
+        this.modelName,
+        updatedRow,
+        this.namespaceId,
+      );
       return this.#reloadMutationRowByPrimaryKey(pkCriterion);
     }
 
@@ -1783,6 +1806,7 @@ export class Collection<
       compiled,
       tableName: this.tableName,
       modelName: this.modelName,
+      namespaceId: this.namespaceId,
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       hiddenColumns,
@@ -1932,6 +1956,7 @@ export class Collection<
       compiled,
       tableName: this.tableName,
       modelName: this.modelName,
+      namespaceId: this.namespaceId,
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       hiddenColumns,
