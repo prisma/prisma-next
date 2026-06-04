@@ -1,5 +1,6 @@
 #!/usr/bin/env -S node
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import {
   AggregateCommand,
@@ -12,7 +13,9 @@ import {
 import { dataTransform, setValidation } from '@prisma-next/target-mongo/migration';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
-const STORAGE_HASH = endContractJson.storage.storageHash;
+const endContract = new MongoContractSerializer().deserializeContract(endContractJson);
+
+const STORAGE_HASH = endContract.storage.storageHash;
 
 // `migration new` records the contract delta as `from` → `to` but produces an
 // empty `operations` array; the author is responsible for declaring the work
@@ -30,23 +33,17 @@ const STORAGE_HASH = endContractJson.storage.storageHash;
 //    so they satisfy the new `required: [..., "status", ...]` rule.
 //
 // The validator is sourced from `end-contract.json` so the op stays in sync
-// with the contract if the chain is ever re-emitted. The JSON types these
-// fields as `string`, so narrow them to the literal unions setValidation
-// expects.
-const endStorage = endContractJson.storage as {
-  collections?: { products: { validator: unknown } };
-  namespaces?: {
-    __unbound__: { entries: { collection: { products: { validator: unknown } } } };
-  };
-};
-const productsCollection =
-  endStorage.namespaces?.__unbound__.entries.collection.products ??
-  endStorage.collections?.products;
-const PRODUCTS_VALIDATOR = productsCollection!.validator as {
-  jsonSchema: Record<string, unknown>;
-  validationLevel: 'strict' | 'moderate';
-  validationAction: 'error' | 'warn';
-};
+// with the contract if the chain is ever re-emitted.
+function requireProductsValidator() {
+  const validator =
+    endContract.storage.namespaces['__unbound__']?.entries.collection['products']?.validator;
+  if (validator === undefined) {
+    throw new Error('end-contract.json is missing a validator for the products collection');
+  }
+  return validator;
+}
+
+const PRODUCTS_VALIDATOR = requireProductsValidator();
 
 function existingProductsWithoutStatus(): MongoQueryPlan {
   return {
