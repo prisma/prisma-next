@@ -2,10 +2,10 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import ppgDriver, { type PpgBinding } from '@prisma-next/driver-ppg-serverless/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import * as sqlBuilderModule from '@prisma-next/sql-builder/runtime';
+import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
-import * as ormClientModule from '@prisma-next/sql-orm-client';
+import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type { CodecTypesBase, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
 import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -31,9 +31,6 @@ import {
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-
-const sqlBuilder = sqlBuilderModule.sql;
-const ormBuilder = ormClientModule.orm;
 
 export type PpgServerlessTargetId = 'postgres';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
