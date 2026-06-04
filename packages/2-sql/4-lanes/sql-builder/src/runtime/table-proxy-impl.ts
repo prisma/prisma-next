@@ -77,7 +77,11 @@ export class TableProxyImpl<
     this.#tableName = tableName;
     this.#table = table;
     this.#namespaceId = namespaceId;
-    this.#scope = tableToScope(alias, table, { storage: ctx.storage, tableName });
+    this.#scope = tableToScope(alias, table, {
+      storage: ctx.storage,
+      tableName,
+      namespaceId,
+    });
     this.#fromSource = tableSourceForProxy(tableName, alias, namespaceId);
   }
 
@@ -198,6 +202,7 @@ export class TableProxyImpl<
         this.#tableName,
         'update',
         this.ctx,
+        this.#namespaceId,
       );
       return new UpdateQueryImpl(this.#fromSource, this.#scope, setExpressions, this.ctx);
     }
@@ -207,6 +212,7 @@ export class TableProxyImpl<
       this.#tableName,
       'update',
       this.ctx,
+      this.#namespaceId,
     );
     return new UpdateQueryImpl(this.#fromSource, this.#scope, setExpressions, this.ctx);
   }

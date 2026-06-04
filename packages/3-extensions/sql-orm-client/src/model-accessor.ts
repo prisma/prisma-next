@@ -105,7 +105,7 @@ export function createModelAccessor<
       const variantField = variantFieldColumns[prop];
       const resolvedTable = variantField?.table ?? tableName;
       const columnName = variantField?.column ?? fieldToColumn[prop] ?? prop;
-      const column = resolveColumn(contract, resolvedTable, columnName);
+      const column = resolveColumn(contract, resolvedTable, columnName, namespaceId);
       // Unknown fields return `undefined`, matching plain JS object semantics.
       // The `ModelAccessor<TContract, ModelName>` type already rejects typos
       // at compile time for TS consumers, and contexts that iterate accessor
@@ -116,7 +116,7 @@ export function createModelAccessor<
       }
       const traits = context.codecDescriptors.descriptorFor(column.codecId)?.traits ?? [];
       const operations = opsByCodecId.get(column.codecId) ?? [];
-      const codec = codecRefForStorageColumn(contract.storage, resolvedTable, columnName);
+      const codec = codecRefForStorageColumn(contract.storage, resolvedTable, columnName, namespaceId);
       return createScalarFieldAccessor(
         resolvedTable,
         columnName,
@@ -135,10 +135,11 @@ function resolveColumn(
   contract: Contract<SqlStorage>,
   tableName: string,
   columnName: string,
+  namespaceId?: string,
 ): { readonly codecId: string; readonly nullable: boolean } | undefined {
   let table: StorageTable;
   try {
-    table = storageTableForContract(contract, tableName);
+    table = storageTableForContract(contract, tableName, namespaceId);
   } catch {
     return undefined;
   }
