@@ -30,7 +30,7 @@ describe('SQL ORM rich AST filters', () => {
   const context = getTestContext();
 
   it('builds scalar and relation filters as AST instances', () => {
-    const user = createModelAccessor(context, 'User');
+    const user = createModelAccessor(context, 'public', 'User');
     const expr = and(
       user['name']!.eq('Alice'),
       user['posts']!.some((post) => post['views']!.gt(10)),

@@ -65,7 +65,7 @@ describe('collection-contract capability detection', () => {
   it('resolveIncludeRelation() reads relation metadata from model.relations', () => {
     const contract = getTestContract();
 
-    expect(resolveIncludeRelation(contract, 'User', 'posts')).toEqual({
+    expect(resolveIncludeRelation(contract, 'public', 'User', 'posts')).toEqual({
       relatedModelName: 'Post',
       relatedNamespaceId: 'public',
       relatedTableName: 'posts',
@@ -86,7 +86,9 @@ describe('collection-contract capability detection', () => {
   it('resolveIncludeRelation() throws for missing or malformed relations', () => {
     const contract = getTestContract();
 
-    expect(() => resolveIncludeRelation(contract, 'User', 'missing')).toThrow(/not found/);
+    expect(() => resolveIncludeRelation(contract, 'public', 'User', 'missing')).toThrow(
+      /not found/,
+    );
 
     const malformed = withPatchedDomainModels(contract, (models) => ({
       ...models,
@@ -101,7 +103,7 @@ describe('collection-contract capability detection', () => {
       },
     }));
 
-    expect(() => resolveIncludeRelation(malformed, 'User', 'posts')).toThrow(/not found/);
+    expect(() => resolveIncludeRelation(malformed, 'public', 'User', 'posts')).toThrow(/not found/);
   });
 
   it('resolveIncludeRelation() handles incomplete relation metadata', () => {
@@ -124,7 +126,7 @@ describe('collection-contract capability detection', () => {
       },
     }));
 
-    expect(() => resolveIncludeRelation(incompleteRelation, 'User', 'posts')).toThrow(
+    expect(() => resolveIncludeRelation(incompleteRelation, 'public', 'User', 'posts')).toThrow(
       /incomplete join metadata/,
     );
   });
@@ -132,34 +134,33 @@ describe('collection-contract capability detection', () => {
   it('resolveUpsertConflictColumns() maps explicit criteria and falls back to primary key', () => {
     const contract = getTestContract();
 
-    expect(resolveUpsertConflictColumns(contract, 'Post', { userId: 'x', title: 'y' })).toEqual([
-      'user_id',
-      'title',
-    ]);
-    expect(resolveUpsertConflictColumns(contract, 'Post', undefined)).toEqual(['id']);
-    expect(resolveUpsertConflictColumns(contract, 'Post', {})).toEqual(['id']);
+    expect(
+      resolveUpsertConflictColumns(contract, 'public', 'Post', { userId: 'x', title: 'y' }),
+    ).toEqual(['user_id', 'title']);
+    expect(resolveUpsertConflictColumns(contract, 'public', 'Post', undefined)).toEqual(['id']);
+    expect(resolveUpsertConflictColumns(contract, 'public', 'Post', {})).toEqual(['id']);
   });
 
   it('resolveUpsertConflictColumns() falls back for unmapped fields and unknown models', () => {
     const contract = getTestContract();
 
-    expect(resolveUpsertConflictColumns(contract, 'Post', { unknownField: 'x' })).toEqual([
-      'unknownField',
-    ]);
-    expect(resolveUpsertConflictColumns(contract, 'UnknownModel', { custom: 1 })).toEqual([
-      'custom',
-    ]);
+    expect(resolveUpsertConflictColumns(contract, 'public', 'Post', { unknownField: 'x' })).toEqual(
+      ['unknownField'],
+    );
+    expect(resolveUpsertConflictColumns(contract, 'public', 'UnknownModel', { custom: 1 })).toEqual(
+      ['custom'],
+    );
   });
 
   it('resolveModelTableName() resolves from storage.table and throws when missing', () => {
     const contract = getTestContract();
 
-    expect(resolveModelTableName(contract, 'User')).toBe('users');
-    expect(() => resolveModelTableName(contract, 'UnknownModel')).toThrow(
-      'Model "UnknownModel" not found in contract',
+    expect(resolveModelTableName(contract, 'public', 'User')).toBe('users');
+    expect(() => resolveModelTableName(contract, 'public', 'UnknownModel')).toThrow(
+      'Model "UnknownModel" has invalid or missing storage.table in namespace "public"',
     );
-    expect(resolvePrimaryKeyColumn(contract, 'users')).toBe('id');
-    expect(resolvePrimaryKeyColumn(contract, 'unknown_table')).toBe('id');
+    expect(resolvePrimaryKeyColumn(contract, 'public', 'users')).toBe('id');
+    expect(resolvePrimaryKeyColumn(contract, 'public', 'unknown_table')).toBe('id');
   });
 
   it('resolveModelTableName() reads from storage.table and throws for invalid values', () => {
@@ -175,7 +176,7 @@ describe('collection-contract capability detection', () => {
       },
     }));
 
-    expect(resolveModelTableName(withStorageFallback, 'User')).toBe('users_from_storage');
+    expect(resolveModelTableName(withStorageFallback, 'public', 'User')).toBe('users_from_storage');
 
     const invalidStorageTable = withPatchedDomainModels(contract, (models) => ({
       ...models,
@@ -187,8 +188,8 @@ describe('collection-contract capability detection', () => {
       },
     }));
 
-    expect(() => resolveModelTableName(invalidStorageTable, 'User')).toThrow(
-      'Model "User" has invalid or missing storage.table in the contract',
+    expect(() => resolveModelTableName(invalidStorageTable, 'public', 'User')).toThrow(
+      'Model "User" has invalid or missing storage.table in namespace "public"',
     );
   });
 
@@ -253,13 +254,21 @@ describe('collection-contract capability detection', () => {
 
     it('returns primary key columns when present', () => {
       expect(
-        resolveRowIdentityColumns(buildContract({ primaryKey: { columns: ['id'] } }), 't'),
+        resolveRowIdentityColumns(
+          buildContract({ primaryKey: { columns: ['id'] } }),
+          '__unbound__',
+          't',
+        ),
       ).toEqual(['id']);
     });
 
     it('returns composite primary key columns when present', () => {
       expect(
-        resolveRowIdentityColumns(buildContract({ primaryKey: { columns: ['a', 'b'] } }), 't'),
+        resolveRowIdentityColumns(
+          buildContract({ primaryKey: { columns: ['a', 'b'] } }),
+          '__unbound__',
+          't',
+        ),
       ).toEqual(['a', 'b']);
     });
 
@@ -267,6 +276,7 @@ describe('collection-contract capability detection', () => {
       expect(
         resolveRowIdentityColumns(
           buildContract({ uniques: [{ columns: ['email'] }, { columns: ['handle'] }] }),
+          '__unbound__',
           't',
         ),
       ).toEqual(['email']);
@@ -276,18 +286,23 @@ describe('collection-contract capability detection', () => {
       expect(
         resolveRowIdentityColumns(
           buildContract({ uniques: [{ columns: ['tenant_id', 'slug'] }] }),
+          '__unbound__',
           't',
         ),
       ).toEqual(['tenant_id', 'slug']);
     });
 
     it('returns empty array when neither primary key nor uniques are defined', () => {
-      expect(resolveRowIdentityColumns(buildContract({}), 't')).toEqual([]);
+      expect(resolveRowIdentityColumns(buildContract({}), '__unbound__', 't')).toEqual([]);
     });
 
     it('returns empty array for unknown tables', () => {
       expect(
-        resolveRowIdentityColumns(buildContract({ primaryKey: { columns: ['id'] } }), 'missing'),
+        resolveRowIdentityColumns(
+          buildContract({ primaryKey: { columns: ['id'] } }),
+          '__unbound__',
+          'missing',
+        ),
       ).toEqual([]);
     });
   });
@@ -296,12 +311,12 @@ describe('collection-contract capability detection', () => {
 describe('resolvePolymorphismInfo()', () => {
   it('returns undefined for non-polymorphic models', () => {
     const contract = getTestContract();
-    expect(resolvePolymorphismInfo(contract, 'User')).toBeUndefined();
+    expect(resolvePolymorphismInfo(contract, 'public', 'User')).toBeUndefined();
   });
 
   it('classifies Bug as STI (same table as Task)', () => {
     const contract = buildMixedPolyContract();
-    const info = resolvePolymorphismInfo(contract, 'Task');
+    const info = resolvePolymorphismInfo(contract, 'public', 'Task');
     expect(info).toBeDefined();
     const bugVariant = info!.variants.get('Bug');
     expect(bugVariant).toBeDefined();
@@ -312,7 +327,7 @@ describe('resolvePolymorphismInfo()', () => {
 
   it('classifies Feature as MTI (different table from Task)', () => {
     const contract = buildMixedPolyContract();
-    const info = resolvePolymorphismInfo(contract, 'Task');
+    const info = resolvePolymorphismInfo(contract, 'public', 'Task');
     expect(info).toBeDefined();
     const featureVariant = info!.variants.get('Feature');
     expect(featureVariant).toBeDefined();
@@ -323,7 +338,7 @@ describe('resolvePolymorphismInfo()', () => {
 
   it('resolves discriminator field and column', () => {
     const contract = buildMixedPolyContract();
-    const info = resolvePolymorphismInfo(contract, 'Task')!;
+    const info = resolvePolymorphismInfo(contract, 'public', 'Task')!;
     expect(info.discriminatorField).toBe('type');
     expect(info.discriminatorColumn).toBe('type');
     expect(info.baseTable).toBe('tasks');
@@ -331,29 +346,29 @@ describe('resolvePolymorphismInfo()', () => {
 
   it('populates variantsByValue keyed by discriminator value', () => {
     const contract = buildMixedPolyContract();
-    const info = resolvePolymorphismInfo(contract, 'Task')!;
+    const info = resolvePolymorphismInfo(contract, 'public', 'Task')!;
     expect(info.variantsByValue.get('bug')?.modelName).toBe('Bug');
     expect(info.variantsByValue.get('feature')?.modelName).toBe('Feature');
   });
 
   it('populates mtiVariants with only MTI variants', () => {
     const contract = buildMixedPolyContract();
-    const info = resolvePolymorphismInfo(contract, 'Task')!;
+    const info = resolvePolymorphismInfo(contract, 'public', 'Task')!;
     expect(info.mtiVariants).toHaveLength(1);
     expect(info.mtiVariants[0]!.modelName).toBe('Feature');
   });
 
   it('caches results per (contract, modelName)', () => {
     const contract = buildMixedPolyContract();
-    const first = resolvePolymorphismInfo(contract, 'Task');
-    const second = resolvePolymorphismInfo(contract, 'Task');
+    const first = resolvePolymorphismInfo(contract, 'public', 'Task');
+    const second = resolvePolymorphismInfo(contract, 'public', 'Task');
     expect(first).toBe(second);
   });
 
   it('returns undefined for variant models themselves', () => {
     const contract = buildMixedPolyContract();
-    expect(resolvePolymorphismInfo(contract, 'Bug')).toBeUndefined();
-    expect(resolvePolymorphismInfo(contract, 'Feature')).toBeUndefined();
+    expect(resolvePolymorphismInfo(contract, 'public', 'Bug')).toBeUndefined();
+    expect(resolvePolymorphismInfo(contract, 'public', 'Feature')).toBeUndefined();
   });
 
   it('throws when a declared variant model is missing from the contract', () => {
@@ -362,7 +377,7 @@ describe('resolvePolymorphismInfo()', () => {
       const { Bug: _removed, ...rest } = models;
       return rest;
     });
-    expect(() => resolvePolymorphismInfo(withoutBug, 'Task')).toThrow(
+    expect(() => resolvePolymorphismInfo(withoutBug, 'public', 'Task')).toThrow(
       /declares variant "Bug", but that model is missing/,
     );
   });

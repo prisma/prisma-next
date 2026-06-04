@@ -1,4 +1,8 @@
-import { type Contract, domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  domainModelsAtDefaultNamespace,
+  soleDomainNamespaceId,
+} from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -97,9 +101,9 @@ export function orm<
   type AnyCollection = Collection<TContract, string, unknown, CollectionTypeState>;
 
   function buildCollection(
+    namespaceId: string,
     modelName: string,
     tableName?: string,
-    namespaceId?: string,
   ): AnyCollection {
     const CollectionClass = collectionRegistry.get(modelName) ?? Collection;
     const CollectionCtor = blindCast<
@@ -112,8 +116,8 @@ export function orm<
     >(CollectionClass);
     return new CollectionCtor(ctx, modelName, {
       registry: collectionRegistry,
+      namespaceId,
       ...(tableName !== undefined ? { tableName } : {}),
-      ...(namespaceId !== undefined ? { namespaceId } : {}),
     });
   }
 
@@ -125,7 +129,7 @@ export function orm<
     if (cached) {
       return cached;
     }
-    const collection = buildCollection(modelName);
+    const collection = buildCollection(soleDomainNamespaceId(contract.domain), modelName);
     flatCache.set(modelName, collection);
     return collection;
   }
@@ -154,9 +158,9 @@ export function orm<
             return hit;
           }
           const collection = buildCollection(
+            namespaceId,
             modelProp,
             domainModelTableInNamespace(contract, namespaceId, modelProp),
-            namespaceId,
           );
           facetCache.set(modelProp, collection);
           return collection;

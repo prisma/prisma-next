@@ -29,8 +29,10 @@ db.Post.published();
 orm({
   runtime,
   context,
-  // @ts-expect-error collections values must be classes, not instances
-  collections: { User: new UserCollection({ runtime, context }, 'User') },
+  collections: {
+    // @ts-expect-error collections values must be classes, not instances
+    User: new UserCollection({ runtime, context }, 'User', { namespaceId: 'public' }),
+  },
 });
 
 // ---------------------------------------------------------------------------

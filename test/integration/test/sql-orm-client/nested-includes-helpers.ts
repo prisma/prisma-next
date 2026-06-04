@@ -34,7 +34,9 @@ export function collectionWithCapabilities<
   const base = getTestContract();
   const contract = { ...base, capabilities } as TestContract;
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, modelName as ModelName & string);
+  return new Collection({ runtime, context }, modelName as ModelName & string, {
+    namespaceId: 'public',
+  });
 }
 
 // Capability fixtures for the include suites. Include codegen always

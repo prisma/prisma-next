@@ -29,7 +29,7 @@ describe('filters', () => {
   }
 
   it('and(), or(), not(), and all() use rich where objects', () => {
-    const user = createModelAccessor(context, 'User');
+    const user = createModelAccessor(context, 'public', 'User');
 
     const andExpr = and(user['name']!.eq('Alice'), user['email']!.neq('bob@example.com'));
     expect(andExpr).toEqual(
@@ -74,7 +74,7 @@ describe('filters', () => {
   });
 
   it('wraps scalar binary operators in NotExpr', () => {
-    const user = createModelAccessor(context, 'User');
+    const user = createModelAccessor(context, 'public', 'User');
 
     expect(not(user['id']!.neq(1))).toEqual(
       new NotExpr(BinaryExpr.neq(ColumnRef.of('users', 'id'), paramRef('users', 'id', 1))),
@@ -107,7 +107,7 @@ describe('filters', () => {
   });
 
   it('eq(null) / neq(null) lower to IS NULL / IS NOT NULL', () => {
-    const post = createModelAccessor(context, 'Post');
+    const post = createModelAccessor(context, 'public', 'Post');
     const userId = post['userId']! as { eq: (v: unknown) => unknown; neq: (v: unknown) => unknown };
 
     expect(userId.eq(null)).toEqual(NullCheckExpr.isNull(ColumnRef.of('posts', 'user_id')));
@@ -115,7 +115,7 @@ describe('filters', () => {
   });
 
   it('wraps like in NotExpr', () => {
-    const user = createModelAccessor(context, 'User');
+    const user = createModelAccessor(context, 'public', 'User');
 
     expect(not(user['name']!.like('%a%'))).toEqual(
       new NotExpr(BinaryExpr.like(ColumnRef.of('users', 'name'), paramRef('users', 'name', '%a%'))),
@@ -123,7 +123,7 @@ describe('filters', () => {
   });
 
   it('shorthandToWhereExpr() maps nulls, skips undefined, and combines multiple fields', () => {
-    const expr = shorthandToWhereExpr(context, 'Post', {
+    const expr = shorthandToWhereExpr(context, 'public', 'Post', {
       id: 1,
       userId: null,
       views: undefined,
@@ -159,16 +159,16 @@ describe('filters', () => {
       },
     } as unknown as typeof context;
 
-    expect(() => shorthandToWhereExpr(stubbedContext, 'User', { email: 'a@b.com' })).toThrow(
-      /does not support equality comparisons/,
-    );
+    expect(() =>
+      shorthandToWhereExpr(stubbedContext, 'public', 'User', { email: 'a@b.com' }),
+    ).toThrow(/does not support equality comparisons/);
   });
 
   it('shorthandToWhereExpr() rejects equality-shorthand on a non-scalar field type', () => {
     // When `fieldType?.kind !== 'scalar'` (e.g. the field doesn't have a codec id resolvable from a scalar type), the trait array is empty and the filter throws — this models a relation-shorthand attempt through the scalar code path.
-    expect(() => shorthandToWhereExpr(context, 'User', { posts: 'oops' } as never)).toThrow(
-      /does not support equality comparisons/,
-    );
+    expect(() =>
+      shorthandToWhereExpr(context, 'public', 'User', { posts: 'oops' } as never),
+    ).toThrow(/does not support equality comparisons/);
   });
 
   it('shorthandToWhereExpr() rejects equality-shorthand when no descriptor is registered for the codec', () => {
@@ -181,16 +181,16 @@ describe('filters', () => {
       },
     } as unknown as typeof context;
 
-    expect(() => shorthandToWhereExpr(stubbedContext, 'User', { email: 'a@b.com' })).toThrow(
-      /does not support equality comparisons/,
-    );
+    expect(() =>
+      shorthandToWhereExpr(stubbedContext, 'public', 'User', { email: 'a@b.com' }),
+    ).toThrow(/does not support equality comparisons/);
   });
 
   it('shorthandToWhereExpr() supports storage and model-name fallbacks', () => {
-    expect(shorthandToWhereExpr(context, 'User', {})).toBeUndefined();
+    expect(shorthandToWhereExpr(context, 'public', 'User', {})).toBeUndefined();
 
     expect(
-      shorthandToWhereExpr(context, 'User', {
+      shorthandToWhereExpr(context, 'public', 'User', {
         email: 'alice@example.com',
       }),
     ).toEqual(BinaryExpr.eq(ColumnRef.of('users', 'email'), LiteralExpr.of('alice@example.com')));
@@ -205,9 +205,14 @@ describe('filters', () => {
     }));
 
     expect(
-      shorthandToWhereExpr({ ...context, contract: withoutStorageFields } as never, 'User', {
-        unknownField: null,
-      } as never),
+      shorthandToWhereExpr(
+        { ...context, contract: withoutStorageFields } as never,
+        'public',
+        'User',
+        {
+          unknownField: null,
+        } as never,
+      ),
     ).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'unknownField')));
   });
 });

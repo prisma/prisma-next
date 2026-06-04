@@ -203,7 +203,7 @@ export class Collection<
   /** @internal */
   readonly tableName: string;
   /** @internal */
-  readonly namespaceId: string | undefined;
+  readonly namespaceId: string;
   /** @internal */
   readonly state: CollectionState;
   /** @internal */
@@ -214,14 +214,14 @@ export class Collection<
   constructor(
     ctx: CollectionContext<TContract>,
     modelName: ModelName,
-    options: CollectionInit<TContract> = {},
+    options: CollectionInit<TContract>,
   ) {
     this.ctx = ctx;
     this.contract = ctx.context.contract;
     this.modelName = modelName;
     this.namespaceId = options.namespaceId;
     this.tableName =
-      options.tableName ?? resolveModelTableName(this.contract, modelName, options.namespaceId);
+      options.tableName ?? resolveModelTableName(this.contract, options.namespaceId, modelName);
     this.state = options.state ?? emptyState();
     this.registry = options.registry ?? new Map<string, CollectionConstructor<TContract>>();
     this.includeRefinementMode = options.includeRefinementMode ?? false;
@@ -286,15 +286,15 @@ export class Collection<
             >(
               createModelAccessor(
                 this.ctx.context,
-                this.modelName,
                 this.namespaceId,
+                this.modelName,
                 this.state.variantName,
               ),
             ),
           )
         : isWhereDirectInput(input)
           ? input
-          : shorthandToWhereExpr(this.ctx.context, this.modelName, input, this.namespaceId);
+          : shorthandToWhereExpr(this.ctx.context, this.namespaceId, this.modelName, input);
     const filter = normalizeWhereArg(whereArg, {
       contract: this.contract,
       namespaceId: this.namespaceId,
@@ -337,7 +337,9 @@ export class Collection<
     WithVariantState<WithWhereState<State>, V>
   > {
     type ReturnState = WithVariantState<WithWhereState<State>, V>;
-    const model = modelOf(this.contract, this.modelName) as Record<string, unknown> | undefined;
+    const model = modelOf(this.contract, this.namespaceId, this.modelName) as
+      | Record<string, unknown>
+      | undefined;
     const discriminator = model?.['discriminator'] as { field: string } | undefined;
     const variants = model?.['variants'] as Record<string, { value: string }> | undefined;
 
@@ -362,9 +364,9 @@ export class Collection<
 
     const columnName = resolveFieldToColumn(
       this.contract,
+      this.namespaceId,
       this.modelName,
       discriminator.field,
-      this.namespaceId,
     );
     const filter = BinaryExpr.eq(
       ColumnRef.of(this.tableName, columnName),
@@ -466,9 +468,9 @@ export class Collection<
   > {
     const relation = resolveIncludeRelation(
       this.contract,
+      this.namespaceId,
       this.modelName,
       relationName as string,
-      this.namespaceId,
     );
 
     let nestedState = emptyState();
@@ -583,9 +585,9 @@ export class Collection<
   > {
     const selectedFields = mapFieldsToColumns(
       this.contract,
+      this.namespaceId,
       this.modelName,
       fields,
-      this.namespaceId,
     );
 
     return this.#cloneWithRow<
@@ -621,7 +623,7 @@ export class Collection<
       | ((model: ModelAccessor<TContract, ModelName>) => OrderByItem)
       | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByItem>,
   ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
-    const accessor = createModelAccessor(this.ctx.context, this.modelName, this.namespaceId);
+    const accessor = createModelAccessor(this.ctx.context, this.namespaceId, this.modelName);
     const selectors = Array.isArray(selection) ? selection : [selection];
     const nextOrders = selectors.map((selector) =>
       selector(accessor as ModelAccessor<TContract, ModelName>),
@@ -653,9 +655,9 @@ export class Collection<
   >(...fields: Fields): GroupedCollection<TContract, ModelName, Fields> {
     const groupByColumns = mapFieldsToColumns(
       this.contract,
+      this.namespaceId,
       this.modelName,
       fields,
-      this.namespaceId,
     );
 
     return new GroupedCollection(this.ctx, this.modelName, {
@@ -702,9 +704,9 @@ export class Collection<
     this.#assertIncludeRefinementMode('sum()');
     const columnName = resolveFieldToColumn(
       this.contract,
+      this.namespaceId,
       this.modelName,
       field as string,
-      this.namespaceId,
     );
     return createIncludeScalar<number | null>('sum', this.state, columnName);
   }
@@ -726,9 +728,9 @@ export class Collection<
     this.#assertIncludeRefinementMode('avg()');
     const columnName = resolveFieldToColumn(
       this.contract,
+      this.namespaceId,
       this.modelName,
       field as string,
-      this.namespaceId,
     );
     return createIncludeScalar<number | null>('avg', this.state, columnName);
   }
@@ -749,9 +751,9 @@ export class Collection<
     this.#assertIncludeRefinementMode('min()');
     const columnName = resolveFieldToColumn(
       this.contract,
+      this.namespaceId,
       this.modelName,
       field as string,
-      this.namespaceId,
     );
     return createIncludeScalar<number | null>('min', this.state, columnName);
   }
@@ -772,9 +774,9 @@ export class Collection<
     this.#assertIncludeRefinementMode('max()');
     const columnName = resolveFieldToColumn(
       this.contract,
+      this.namespaceId,
       this.modelName,
       field as string,
-      this.namespaceId,
     );
     return createIncludeScalar<number | null>('max', this.state, columnName);
   }
@@ -873,9 +875,9 @@ export class Collection<
   ): Collection<TContract, ModelName, Row, State> {
     const mappedCursor = mapCursorValuesToColumns(
       this.contract,
+      this.namespaceId,
       this.modelName,
       cursorValues as Readonly<Record<string, unknown>>,
-      this.namespaceId,
     );
 
     if (Object.keys(mappedCursor).length === 0) {
@@ -903,9 +905,9 @@ export class Collection<
   >(...fields: Fields): Collection<TContract, ModelName, Row, State> {
     const distinctFields = mapFieldsToColumns(
       this.contract,
+      this.namespaceId,
       this.modelName,
       fields,
-      this.namespaceId,
     );
 
     return this.#clone({
@@ -938,6 +940,7 @@ export class Collection<
   ): Collection<TContract, ModelName, Row, State> {
     const distinctOnFields = mapFieldsToColumns(
       this.contract,
+      this.namespaceId,
       this.modelName,
       fields as readonly string[],
     );
@@ -1101,7 +1104,7 @@ export class Collection<
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<AggregateResult<Spec>> {
     const aggregateSpec = fn(
-      createAggregateBuilder(this.contract, this.modelName, this.namespaceId),
+      createAggregateBuilder(this.contract, this.namespaceId, this.modelName),
     );
     const entries = Object.entries(aggregateSpec);
     if (entries.length === 0) {
@@ -1119,10 +1122,10 @@ export class Collection<
     const compiled = mergeAnnotations(
       compileAggregate(
         this.contract,
+        this.namespaceId,
         this.tableName,
         this.state.filters,
         aggregateSpec,
-        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -1199,23 +1202,24 @@ export class Collection<
     if (
       hasNestedMutationCallbacks(
         this.contract,
+        this.namespaceId,
         this.modelName,
         data as Record<string, unknown>,
-        this.namespaceId,
       )
     ) {
       const createdRow = await executeNestedCreateMutation({
         context: this.ctx.context,
         runtime: this.ctx.runtime,
+        namespaceId: this.namespaceId,
         modelName: this.modelName,
         data: data as MutationCreateInput<Contract<SqlStorage>, string>,
       });
 
       const pkCriterion = buildPrimaryKeyFilterFromRow(
         this.contract,
+        this.namespaceId,
         this.modelName,
         createdRow,
-        this.namespaceId,
       );
       const reloaded = await this.#reloadMutationRowByPrimaryKey(pkCriterion);
       if (!reloaded) {
@@ -1296,10 +1300,10 @@ export class Collection<
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
       const plans = compileInsertReturningSplit(
         this.contract,
+        this.namespaceId,
         this.tableName,
         mappedRows,
         selectedForInsert,
-        this.namespaceId,
       ).map((plan) => mergeAnnotations(plan, annotationsMap));
       return dispatchSplitMutationRows<Row>({
         contract: this.contract,
@@ -1318,10 +1322,10 @@ export class Collection<
     const compiled = mergeAnnotations(
       compileInsertReturning(
         this.contract,
+        this.namespaceId,
         this.tableName,
         mappedRows,
         selectedForInsert,
-        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -1352,19 +1356,19 @@ export class Collection<
     const variantName = this.state.variantName;
     if (!variantName) return null;
 
-    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName, this.namespaceId);
+    const polyInfo = resolvePolymorphismInfo(this.contract, this.namespaceId, this.modelName);
     if (!polyInfo) return null;
 
     const variant = polyInfo.variants.get(variantName);
     if (!variant || variant.strategy !== 'mti') return null;
 
-    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName, this.namespaceId);
+    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.namespaceId, this.modelName);
     const variantFieldToColumn = getFieldToColumnMap(
       this.contract,
-      variant.modelName,
       this.namespaceId,
+      variant.modelName,
     );
-    const pkColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
+    const pkColumn = resolvePrimaryKeyColumn(this.contract, this.namespaceId, this.tableName);
 
     return {
       polyInfo,
@@ -1416,10 +1420,10 @@ export class Collection<
           applyCreateDefaults(collectionCtx, tableName, [baseRow]);
           const baseCompiled = compileInsertReturning(
             contract,
+            namespaceId,
             tableName,
             [baseRow],
             undefined,
-            namespaceId,
           );
           const baseResult = await executeQueryPlan<Record<string, unknown>>(
             scope,
@@ -1435,10 +1439,10 @@ export class Collection<
           applyCreateDefaults(collectionCtx, variant.table, [variantRow]);
           const variantCompiled = compileInsertReturning(
             contract,
+            namespaceId,
             variant.table,
             [variantRow],
             undefined,
-            namespaceId,
           );
           const variantResult = await executeQueryPlan<Record<string, unknown>>(
             scope,
@@ -1459,6 +1463,7 @@ export class Collection<
 
           return mapPolymorphicRow(
             contract,
+            namespaceId,
             modelName,
             polyInfo,
             { ...baseCreated, ...prefixedVariant },
@@ -1477,29 +1482,29 @@ export class Collection<
     const variantName = this.state.variantName;
     if (!variantName) {
       return data.map((row) =>
-        mapModelDataToStorageRow(this.contract, this.modelName, row, this.namespaceId),
+        mapModelDataToStorageRow(this.contract, this.namespaceId, this.modelName, row),
       );
     }
 
-    const polyInfo = resolvePolymorphismInfo(this.contract, this.modelName, this.namespaceId);
+    const polyInfo = resolvePolymorphismInfo(this.contract, this.namespaceId, this.modelName);
     if (!polyInfo) {
       return data.map((row) =>
-        mapModelDataToStorageRow(this.contract, this.modelName, row, this.namespaceId),
+        mapModelDataToStorageRow(this.contract, this.namespaceId, this.modelName, row),
       );
     }
 
     const variant = polyInfo.variants.get(variantName);
     if (!variant) {
       return data.map((row) =>
-        mapModelDataToStorageRow(this.contract, this.modelName, row, this.namespaceId),
+        mapModelDataToStorageRow(this.contract, this.namespaceId, this.modelName, row),
       );
     }
 
-    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName, this.namespaceId);
+    const baseFieldToColumn = getFieldToColumnMap(this.contract, this.namespaceId, this.modelName);
     const variantFieldToColumn = getFieldToColumnMap(
       this.contract,
-      variant.modelName,
       this.namespaceId,
+      variant.modelName,
     );
     const mergedFieldToColumn = { ...baseFieldToColumn, ...variantFieldToColumn };
 
@@ -1551,9 +1556,9 @@ export class Collection<
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
       const plans = compileInsertCountSplit(
         this.contract,
+        this.namespaceId,
         this.tableName,
         mappedRows,
-        this.namespaceId,
       ).map((plan) => mergeAnnotations(plan, annotationsMap));
       for (const plan of plans) {
         await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, plan).toArray();
@@ -1562,7 +1567,7 @@ export class Collection<
     }
 
     const compiled = mergeAnnotations(
-      compileInsertCount(this.contract, this.tableName, mappedRows, this.namespaceId),
+      compileInsertCount(this.contract, this.namespaceId, this.tableName, mappedRows),
       annotationsMap,
     );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
@@ -1618,9 +1623,9 @@ export class Collection<
     applyCreateDefaults(this.ctx, this.tableName, [createValues]);
     const updateValues = mapModelDataToStorageRow(
       this.contract,
+      this.namespaceId,
       this.modelName,
       input.update,
-      this.namespaceId,
     );
     const hasUpdateValues = Object.keys(updateValues).length > 0;
     if (hasUpdateValues) {
@@ -1628,9 +1633,9 @@ export class Collection<
     }
     const conflictColumns = resolveUpsertConflictColumns(
       this.contract,
+      this.namespaceId,
       this.modelName,
       input.conflictOn as Record<string, unknown> | undefined,
-      this.namespaceId,
     );
     if (conflictColumns.length === 0) {
       throw new Error(`upsert() for model "${this.modelName}" requires conflict columns`);
@@ -1640,12 +1645,12 @@ export class Collection<
     const compiled = mergeAnnotations(
       compileUpsertReturning(
         this.contract,
+        this.namespaceId,
         this.tableName,
         createValues,
         updateValues,
         conflictColumns,
         selectedForUpsert,
-        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -1726,14 +1731,15 @@ export class Collection<
     if (
       hasNestedMutationCallbacks(
         this.contract,
+        this.namespaceId,
         this.modelName,
         data as Record<string, unknown>,
-        this.namespaceId,
       )
     ) {
       const updatedRow = await executeNestedUpdateMutation({
         context: this.ctx.context,
         runtime: this.ctx.runtime,
+        namespaceId: this.namespaceId,
         modelName: this.modelName,
         filters: this.state.filters,
         data: data as MutationUpdateInput<Contract<SqlStorage>, string>,
@@ -1744,9 +1750,9 @@ export class Collection<
 
       const pkCriterion = buildPrimaryKeyFilterFromRow(
         this.contract,
+        this.namespaceId,
         this.modelName,
         updatedRow,
-        this.namespaceId,
       );
       return this.#reloadMutationRowByPrimaryKey(pkCriterion);
     }
@@ -1811,9 +1817,9 @@ export class Collection<
 
     const mappedData = mapModelDataToStorageRow(
       this.contract,
+      this.namespaceId,
       this.modelName,
       data,
-      this.namespaceId,
     );
     if (Object.keys(mappedData).length === 0) {
       const generator = async function* (): AsyncGenerator<Row, void, unknown> {};
@@ -1826,11 +1832,11 @@ export class Collection<
     const compiled = mergeAnnotations(
       compileUpdateReturning(
         this.contract,
+        this.namespaceId,
         this.tableName,
         mappedData,
         this.state.filters,
         selectedForUpdate,
-        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -1868,9 +1874,9 @@ export class Collection<
   ): Promise<number> {
     const mappedData = mapModelDataToStorageRow(
       this.contract,
+      this.namespaceId,
       this.modelName,
       data,
-      this.namespaceId,
     );
     if (Object.keys(mappedData).length === 0) {
       return 0;
@@ -1883,8 +1889,8 @@ export class Collection<
 
     const primaryKeyColumn = resolvePrimaryKeyColumn(
       this.contract,
-      this.tableName,
       this.namespaceId,
+      this.tableName,
     );
     const countState: CollectionState = {
       ...emptyState(),
@@ -1893,10 +1899,10 @@ export class Collection<
     };
     const countCompiled = compileSelect(
       this.contract,
+      this.namespaceId,
       this.tableName,
       countState,
       undefined,
-      this.namespaceId,
     );
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -1906,10 +1912,10 @@ export class Collection<
     const compiled = mergeAnnotations(
       compileUpdateCount(
         this.contract,
+        this.namespaceId,
         this.tableName,
         mappedData,
         this.state.filters,
-        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -1999,10 +2005,10 @@ export class Collection<
     const compiled = mergeAnnotations(
       compileDeleteReturning(
         this.contract,
+        this.namespaceId,
         this.tableName,
         this.state.filters,
         selectedForDelete,
-        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -2050,9 +2056,9 @@ export class Collection<
         const deletePlan = mergeAnnotations(
           compileDeleteCount(
             collection.contract,
+            collection.namespaceId,
             collection.tableName,
             collection.state.filters,
-            collection.namespaceId,
           ),
           annotationsMap,
         );
@@ -2087,8 +2093,8 @@ export class Collection<
 
     const primaryKeyColumn = resolvePrimaryKeyColumn(
       this.contract,
-      this.tableName,
       this.namespaceId,
+      this.tableName,
     );
     const countState: CollectionState = {
       ...emptyState(),
@@ -2097,10 +2103,10 @@ export class Collection<
     };
     const countCompiled = compileSelect(
       this.contract,
+      this.namespaceId,
       this.tableName,
       countState,
       undefined,
-      this.namespaceId,
     );
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -2108,7 +2114,7 @@ export class Collection<
     ).toArray();
 
     const compiled = mergeAnnotations(
-      compileDeleteCount(this.contract, this.tableName, this.state.filters, this.namespaceId),
+      compileDeleteCount(this.contract, this.namespaceId, this.tableName, this.state.filters),
       annotationsMap,
     );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
@@ -2120,7 +2126,7 @@ export class Collection<
     createValues: Record<string, unknown>,
     conflictColumns: readonly string[],
   ): Record<string, unknown> {
-    const columnToField = getColumnToFieldMap(this.contract, this.modelName, this.namespaceId);
+    const columnToField = getColumnToFieldMap(this.contract, this.namespaceId, this.modelName);
     const criterion: Record<string, unknown> = {};
 
     for (const columnName of conflictColumns) {
@@ -2154,8 +2160,8 @@ export class Collection<
     if (this.state.includes.length > 0) {
       const identityColumns = resolveRowIdentityColumns(
         this.contract,
-        this.tableName,
         this.namespaceId,
+        this.tableName,
       );
       if (identityColumns.length === 0) {
         throw new Error(
@@ -2170,8 +2176,8 @@ export class Collection<
   async #findFirstMatchingRowIdentityWhere(): Promise<AnyExpression | null> {
     const identityColumns = resolveRowIdentityColumns(
       this.contract,
-      this.tableName,
       this.namespaceId,
+      this.tableName,
     );
     if (identityColumns.length === 0) {
       throw new Error(
@@ -2185,7 +2191,7 @@ export class Collection<
     if (!firstRow) {
       return null;
     }
-    const columnToField = getColumnToFieldMap(this.contract, this.modelName, this.namespaceId);
+    const columnToField = getColumnToFieldMap(this.contract, this.namespaceId, this.modelName);
     const criterion: Record<string, unknown> = {};
     for (const column of identityColumns) {
       const fieldName = columnToField[column] ?? column;
@@ -2200,9 +2206,9 @@ export class Collection<
     return (
       shorthandToWhereExpr(
         this.ctx.context,
+        this.namespaceId,
         this.modelName,
         criterion as ShorthandWhereFilter<TContract, ModelName>,
-        this.namespaceId,
       ) ?? null
     );
   }
@@ -2217,9 +2223,9 @@ export class Collection<
   ): Promise<Row | null> {
     const whereExpr = shorthandToWhereExpr(
       this.ctx.context,
+      this.namespaceId,
       this.modelName,
       criterion as ShorthandWhereFilter<TContract, ModelName>,
-      this.namespaceId,
     );
     if (!whereExpr) {
       throw new Error(

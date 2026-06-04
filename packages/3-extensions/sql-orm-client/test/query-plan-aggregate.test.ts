@@ -30,7 +30,15 @@ const defaultAggSpec = {
 };
 
 function compileWithHaving(having: AnyExpression) {
-  return compileGroupedAggregate(baseContract, 'posts', [], ['user_id'], defaultAggSpec, having);
+  return compileGroupedAggregate(
+    baseContract,
+    'public',
+    'posts',
+    [],
+    ['user_id'],
+    defaultAggSpec,
+    having,
+  );
 }
 
 describe('query plan aggregate', () => {
@@ -40,11 +48,11 @@ describe('query plan aggregate', () => {
   );
 
   it('rejects empty aggregate specs and selectors without required fields', () => {
-    expect(() => compileAggregate(baseContract, 'posts', [], {})).toThrow(
+    expect(() => compileAggregate(baseContract, 'public', 'posts', [], {})).toThrow(
       'aggregate() requires at least one aggregation selector',
     );
     expect(() =>
-      compileAggregate(baseContract, 'posts', [], {
+      compileAggregate(baseContract, 'public', 'posts', [], {
         totalViews: { kind: 'aggregate', fn: 'sum' },
       }),
     ).toThrow('Aggregate selector "sum" requires a field');
@@ -52,6 +60,7 @@ describe('query plan aggregate', () => {
     expect(() =>
       compileGroupedAggregate(
         baseContract,
+        'public',
         'posts',
         [],
         [],
@@ -63,7 +72,7 @@ describe('query plan aggregate', () => {
     ).toThrow('groupBy() requires at least one field');
 
     expect(() =>
-      compileGroupedAggregate(baseContract, 'posts', [], ['user_id'], {}, undefined),
+      compileGroupedAggregate(baseContract, 'public', 'posts', [], ['user_id'], {}, undefined),
     ).toThrow('groupBy().aggregate() requires at least one aggregation selector');
   });
 
@@ -75,6 +84,7 @@ describe('query plan aggregate', () => {
     expect(() =>
       compileGroupedAggregate(
         baseContract,
+        'public',
         'posts',
         [],
         ['user_id'],
@@ -89,6 +99,7 @@ describe('query plan aggregate', () => {
     expect(() =>
       compileGroupedAggregate(
         baseContract,
+        'public',
         'posts',
         [],
         ['user_id'],
@@ -103,6 +114,7 @@ describe('query plan aggregate', () => {
     expect(() =>
       compileGroupedAggregate(
         baseContract,
+        'public',
         'posts',
         [],
         ['user_id'],
@@ -114,6 +126,7 @@ describe('query plan aggregate', () => {
     expect(() =>
       compileGroupedAggregate(
         baseContract,
+        'public',
         'posts',
         [],
         ['user_id'],
@@ -126,6 +139,7 @@ describe('query plan aggregate', () => {
   it('keeps grouped aggregate HAVING expressions composed from aggregate metrics', () => {
     const plan = compileGroupedAggregate(
       baseContract,
+      'public',
       'posts',
       [],
       ['user_id'],
@@ -159,6 +173,7 @@ describe('query plan aggregate', () => {
   it('keeps grouped aggregate HAVING with OR expressions', () => {
     const plan = compileGroupedAggregate(
       baseContract,
+      'public',
       'posts',
       [],
       ['user_id'],
@@ -181,7 +196,7 @@ describe('query plan aggregate', () => {
   });
 
   it('keeps aggregate filters and params when lowering plain aggregate queries', () => {
-    const plan = compileAggregate(baseContract, 'posts', [filteredViews], {
+    const plan = compileAggregate(baseContract, 'public', 'posts', [filteredViews], {
       totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
     });
 
@@ -197,7 +212,7 @@ describe('query plan aggregate', () => {
   });
 
   it('stamps min/max ProjectionItem.codec from the underlying column', () => {
-    const plan = compileAggregate(baseContract, 'posts', [], {
+    const plan = compileAggregate(baseContract, 'public', 'posts', [], {
       minViews: { kind: 'aggregate', fn: 'min', column: 'views' },
       maxViews: { kind: 'aggregate', fn: 'max', column: 'views' },
     });
@@ -209,7 +224,7 @@ describe('query plan aggregate', () => {
   });
 
   it('leaves count/sum/avg ProjectionItem.codec undefined (deferred until target+widening-aware mapping)', () => {
-    const plan = compileAggregate(baseContract, 'posts', [], {
+    const plan = compileAggregate(baseContract, 'public', 'posts', [], {
       total: { kind: 'aggregate', fn: 'count' },
       sumViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
       avgViews: { kind: 'aggregate', fn: 'avg', column: 'views' },
@@ -223,6 +238,7 @@ describe('query plan aggregate', () => {
   it('stamps min/max codec on grouped aggregates too', () => {
     const plan = compileGroupedAggregate(
       baseContract,
+      'public',
       'posts',
       [],
       ['user_id'],

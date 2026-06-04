@@ -74,7 +74,11 @@ describe('namespaced orm accessor', () => {
     expect(db().auth.Session.tableName).toBe('sessions');
   });
 
-  it('keeps the flat surface resolving a bare model name', () => {
-    expect(db().User.tableName).toBe('users');
+  it('throws on flat bare-name access against a multi-namespace contract (bare=default deferred)', () => {
+    // With a required, leading namespace the flat surface resolves the sole
+    // domain namespace; a multi-namespace contract has no sole namespace, so
+    // bare access throws until bare=default lands. Namespace-qualified access
+    // (db().public.User) remains the supported path.
+    expect(() => db().User).toThrow(/exactly one domain namespace/);
   });
 });

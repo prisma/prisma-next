@@ -16,11 +16,11 @@ export function deriveParamsFromAst(ast: AnyQueryAst): {
 
 export function resolveTableColumns(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
-  namespaceId?: string,
 ): string[] {
   try {
-    return Object.keys(storageTableForContract(contract, tableName, namespaceId).columns);
+    return Object.keys(storageTableForContract(contract, namespaceId, tableName).columns);
   } catch (error) {
     // Surface the ambiguous-bare-name fail-fast rather than masking it as an
     // unknown table.

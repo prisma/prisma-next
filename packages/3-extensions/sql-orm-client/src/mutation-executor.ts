@@ -47,6 +47,7 @@ import { emptyState } from './types';
 interface RelationDefinition {
   readonly relationName: string;
   readonly relatedModelName: string;
+  readonly relatedNamespaceId: string;
   readonly relatedTableName: string;
   readonly cardinality: RelationCardinalityTag | undefined;
   readonly localColumns: readonly string[];
@@ -65,16 +66,16 @@ interface ParsedMutationInput {
 
 export function hasNestedMutationCallbacks(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   data: Record<string, unknown>,
-  namespaceId?: string,
 ): boolean {
   // Only the base model's relation names are needed to detect nested-mutation
   // callbacks; resolving relation targets here would eagerly resolve
   // cross-namespace targets (and throw on a non-existent target namespace),
   // so enumerate names directly without target resolution.
   const relationNames = new Set(
-    Object.keys(resolveModelRelations(contract, modelName, namespaceId)),
+    Object.keys(resolveModelRelations(contract, namespaceId, modelName)),
   );
   for (const [fieldName, value] of Object.entries(data)) {
     if (!relationNames.has(fieldName)) {
@@ -91,35 +92,44 @@ export function hasNestedMutationCallbacks(
 export async function executeNestedCreateMutation(options: {
   context: ExecutionContext;
   runtime: RuntimeQueryable;
+  namespaceId: string;
   modelName: string;
   data: MutationCreateInput<Contract<SqlStorage>, string>;
 }): Promise<Record<string, unknown>> {
   return withMutationScope(options.runtime, async (scope) =>
-    createGraph(scope, options.context, options.modelName, options.data),
+    createGraph(scope, options.context, options.namespaceId, options.modelName, options.data),
   );
 }
 
 export async function executeNestedUpdateMutation(options: {
   context: ExecutionContext;
   runtime: RuntimeQueryable;
+  namespaceId: string;
   modelName: string;
   filters: readonly AnyExpression[];
   data: MutationUpdateInput<Contract<SqlStorage>, string>;
 }): Promise<Record<string, unknown> | null> {
   return withMutationScope(options.runtime, async (scope) =>
-    updateFirstGraph(scope, options.context, options.modelName, options.filters, options.data),
+    updateFirstGraph(
+      scope,
+      options.context,
+      options.namespaceId,
+      options.modelName,
+      options.filters,
+      options.data,
+    ),
   );
 }
 
 export function buildPrimaryKeyFilterFromRow(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   row: Record<string, unknown>,
-  namespaceId?: string,
 ): Record<string, unknown> {
-  const tableName = resolveModelTableName(contract, modelName, namespaceId);
-  const primaryKeyColumn = resolvePrimaryKeyColumn(contract, tableName);
-  const fieldName = toFieldName(contract, modelName, primaryKeyColumn, namespaceId);
+  const tableName = resolveModelTableName(contract, namespaceId, modelName);
+  const primaryKeyColumn = resolvePrimaryKeyColumn(contract, namespaceId, tableName);
+  const fieldName = toFieldName(contract, namespaceId, modelName, primaryKeyColumn);
   const value = row[fieldName];
   if (value === undefined) {
     throw new Error(
@@ -165,11 +175,12 @@ export async function withMutationScope<T>(
 async function createGraph(
   scope: RuntimeScope,
   context: ExecutionContext,
+  namespaceId: string,
   modelName: string,
   input: MutationCreateInput<Contract<SqlStorage>, string>,
 ): Promise<Record<string, unknown>> {
   const contract = context.contract;
-  const parsed = parseMutationInput(contract, modelName, input);
+  const parsed = parseMutationInput(contract, namespaceId, modelName, input);
   const { parentOwned, childOwned } = partitionByOwnership(parsed.relationMutations);
 
   const scalarData = { ...parsed.scalarData };
@@ -182,6 +193,7 @@ async function createGraph(
     await applyParentOwnedMutation(
       scope,
       context,
+      namespaceId,
       modelName,
       scalarData,
       relationMutation.relation,
@@ -189,7 +201,7 @@ async function createGraph(
     );
   }
 
-  const parentRow = await insertSingleRow(scope, context, modelName, scalarData);
+  const parentRow = await insertSingleRow(scope, context, namespaceId, modelName, scalarData);
 
   for (const relationMutation of childOwned) {
     if (relationMutation.mutation.kind === 'disconnect') {
@@ -199,6 +211,7 @@ async function createGraph(
     await applyChildOwnedMutation(
       scope,
       context,
+      namespaceId,
       modelName,
       parentRow,
       relationMutation.relation,
@@ -212,17 +225,23 @@ async function createGraph(
 async function updateFirstGraph(
   scope: RuntimeScope,
   context: ExecutionContext,
+  namespaceId: string,
   modelName: string,
   filters: readonly AnyExpression[],
   input: MutationUpdateInput<Contract<SqlStorage>, string>,
 ): Promise<Record<string, unknown> | null> {
   const contract = context.contract;
-  const existingRow = await findFirstByFilters(scope, contract, modelName, filters);
+  const existingRow = await findFirstByFilters(scope, contract, namespaceId, modelName, filters);
   if (!existingRow) {
     return null;
   }
 
-  const parsed = parseMutationInput(contract, modelName, input as Record<string, unknown>);
+  const parsed = parseMutationInput(
+    contract,
+    namespaceId,
+    modelName,
+    input as Record<string, unknown>,
+  );
   const { parentOwned, childOwned } = partitionByOwnership(parsed.relationMutations);
 
   const scalarData = { ...parsed.scalarData };
@@ -231,6 +250,7 @@ async function updateFirstGraph(
     await applyParentOwnedMutation(
       scope,
       context,
+      namespaceId,
       modelName,
       scalarData,
       relationMutation.relation,
@@ -240,9 +260,9 @@ async function updateFirstGraph(
 
   let parentRow = existingRow;
 
-  const mappedUpdateData = mapModelDataToStorageRow(contract, modelName, scalarData);
+  const mappedUpdateData = mapModelDataToStorageRow(contract, namespaceId, modelName, scalarData);
   if (Object.keys(mappedUpdateData).length > 0) {
-    const tableName = resolveModelTableName(contract, modelName);
+    const tableName = resolveModelTableName(contract, namespaceId, modelName);
     const appliedUpdateDefaults = context.applyMutationDefaults({
       op: 'update',
       table: tableName,
@@ -251,9 +271,10 @@ async function updateFirstGraph(
     for (const def of appliedUpdateDefaults) {
       mappedUpdateData[def.column] = def.value;
     }
-    const pkFilter = buildPrimaryKeyFilterFromRow(contract, modelName, existingRow);
+    const pkFilter = buildPrimaryKeyFilterFromRow(contract, namespaceId, modelName, existingRow);
     const pkWhere = shorthandToWhereExpr(
       context,
+      namespaceId,
       modelName,
       pkFilter as MutationUpdateInput<Contract<SqlStorage>, string>,
     );
@@ -263,6 +284,7 @@ async function updateFirstGraph(
 
     const compiled = compileUpdateReturning(
       contract,
+      namespaceId,
       tableName,
       mappedUpdateData,
       [pkWhere],
@@ -275,7 +297,7 @@ async function updateFirstGraph(
 
     const updatedRaw = updatedRowsRaw[0];
     if (updatedRaw) {
-      parentRow = mapStorageRowToModelFields(contract, modelName, updatedRaw);
+      parentRow = mapStorageRowToModelFields(contract, namespaceId, modelName, updatedRaw);
     }
   }
 
@@ -283,6 +305,7 @@ async function updateFirstGraph(
     await applyChildOwnedMutation(
       scope,
       context,
+      namespaceId,
       modelName,
       parentRow,
       relationMutation.relation,
@@ -295,12 +318,13 @@ async function updateFirstGraph(
 
 function parseMutationInput(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   input: Record<string, unknown>,
 ): ParsedMutationInput {
   const scalarData: Record<string, unknown> = {};
   const relationDefinitions = new Map(
-    getRelationDefinitions(contract, modelName).map((relation) => [
+    getRelationDefinitions(contract, namespaceId, modelName).map((relation) => [
       relation.relationName,
       relation,
     ]),
@@ -370,6 +394,7 @@ function partitionByOwnership(relationMutations: readonly ParsedRelationMutation
 async function applyParentOwnedMutation(
   scope: RuntimeScope,
   context: ExecutionContext,
+  parentNamespaceId: string,
   parentModelName: string,
   scalarData: Record<string, unknown>,
   relation: RelationDefinition,
@@ -378,7 +403,12 @@ async function applyParentOwnedMutation(
   const contract = context.contract;
   if (mutation.kind === 'disconnect') {
     for (const localColumn of relation.localColumns) {
-      const parentFieldName = toFieldName(contract, parentModelName, localColumn);
+      const parentFieldName = toFieldName(
+        contract,
+        parentNamespaceId,
+        parentModelName,
+        localColumn,
+      );
       scalarData[parentFieldName] = null;
     }
     return;
@@ -395,10 +425,18 @@ async function applyParentOwnedMutation(
     const relatedRow = await createGraph(
       scope,
       context,
+      relation.relatedNamespaceId,
       relation.relatedModelName,
       row as MutationCreateInput<Contract<SqlStorage>, string>,
     );
-    copyRelatedValuesToParent(contract, parentModelName, relation, scalarData, relatedRow);
+    copyRelatedValuesToParent(
+      contract,
+      parentNamespaceId,
+      parentModelName,
+      relation,
+      scalarData,
+      relatedRow,
+    );
     return;
   }
 
@@ -412,6 +450,7 @@ async function applyParentOwnedMutation(
   const relatedRow = await findRowByCriterion(
     scope,
     context,
+    relation.relatedNamespaceId,
     relation.relatedModelName,
     criterion as Record<string, unknown>,
   );
@@ -421,11 +460,19 @@ async function applyParentOwnedMutation(
     );
   }
 
-  copyRelatedValuesToParent(contract, parentModelName, relation, scalarData, relatedRow);
+  copyRelatedValuesToParent(
+    contract,
+    parentNamespaceId,
+    parentModelName,
+    relation,
+    scalarData,
+    relatedRow,
+  );
 }
 
 function copyRelatedValuesToParent(
   contract: Contract<SqlStorage>,
+  parentNamespaceId: string,
   parentModelName: string,
   relation: RelationDefinition,
   scalarData: Record<string, unknown>,
@@ -438,8 +485,13 @@ function copyRelatedValuesToParent(
       continue;
     }
 
-    const parentFieldName = toFieldName(contract, parentModelName, localColumn);
-    const childFieldName = toFieldName(contract, relation.relatedModelName, targetColumn);
+    const parentFieldName = toFieldName(contract, parentNamespaceId, parentModelName, localColumn);
+    const childFieldName = toFieldName(
+      contract,
+      relation.relatedNamespaceId,
+      relation.relatedModelName,
+      targetColumn,
+    );
     scalarData[parentFieldName] = relatedRow[childFieldName];
   }
 }
@@ -447,13 +499,20 @@ function copyRelatedValuesToParent(
 async function applyChildOwnedMutation(
   scope: RuntimeScope,
   context: ExecutionContext,
+  parentNamespaceId: string,
   parentModelName: string,
   parentRow: Record<string, unknown>,
   relation: RelationDefinition,
   mutation: RelationMutation<Contract<SqlStorage>, string>,
 ): Promise<void> {
   const contract = context.contract;
-  const parentValues = readParentColumnValues(contract, parentModelName, relation, parentRow);
+  const parentValues = readParentColumnValues(
+    contract,
+    parentNamespaceId,
+    parentModelName,
+    relation,
+    parentRow,
+  );
 
   if (mutation.kind === 'create') {
     for (const childInput of mutation.data) {
@@ -462,13 +521,19 @@ async function applyChildOwnedMutation(
       };
 
       for (const [childColumn, parentValue] of parentValues.entries()) {
-        const childFieldName = toFieldName(contract, relation.relatedModelName, childColumn);
+        const childFieldName = toFieldName(
+          contract,
+          relation.relatedNamespaceId,
+          relation.relatedModelName,
+          childColumn,
+        );
         payload[childFieldName] = parentValue;
       }
 
       await createGraph(
         scope,
         context,
+        relation.relatedNamespaceId,
         relation.relatedModelName,
         payload as MutationCreateInput<Contract<SqlStorage>, string>,
       );
@@ -480,6 +545,7 @@ async function applyChildOwnedMutation(
     for (const criterion of mutation.criteria) {
       const criterionWhere = shorthandToWhereExpr(
         context,
+        relation.relatedNamespaceId,
         relation.relatedModelName,
         criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
       );
@@ -494,9 +560,14 @@ async function applyChildOwnedMutation(
         setValues[childColumn] = parentValue;
       }
 
-      await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-        criterionWhere,
-      ]);
+      await executeUpdateCount(
+        scope,
+        contract,
+        relation.relatedNamespaceId,
+        relation.relatedTableName,
+        setValues,
+        [criterionWhere],
+      );
     }
     return;
   }
@@ -508,15 +579,21 @@ async function applyChildOwnedMutation(
 
   if (!mutation.criteria || mutation.criteria.length === 0) {
     const parentJoinWhere = buildChildJoinWhere(relation, parentValues);
-    await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-      parentJoinWhere,
-    ]);
+    await executeUpdateCount(
+      scope,
+      contract,
+      relation.relatedNamespaceId,
+      relation.relatedTableName,
+      setValues,
+      [parentJoinWhere],
+    );
     return;
   }
 
   for (const criterion of mutation.criteria) {
     const criterionWhere = shorthandToWhereExpr(
       context,
+      relation.relatedNamespaceId,
       relation.relatedModelName,
       criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
     );
@@ -527,14 +604,20 @@ async function applyChildOwnedMutation(
     }
 
     const parentJoinWhere = buildChildJoinWhere(relation, parentValues);
-    await executeUpdateCount(scope, contract, relation.relatedTableName, setValues, [
-      and(parentJoinWhere, criterionWhere),
-    ]);
+    await executeUpdateCount(
+      scope,
+      contract,
+      relation.relatedNamespaceId,
+      relation.relatedTableName,
+      setValues,
+      [and(parentJoinWhere, criterionWhere)],
+    );
   }
 }
 
 function readParentColumnValues(
   contract: Contract<SqlStorage>,
+  parentNamespaceId: string,
   parentModelName: string,
   relation: RelationDefinition,
   parentRow: Record<string, unknown>,
@@ -548,7 +631,7 @@ function readParentColumnValues(
       continue;
     }
 
-    const parentFieldName = toFieldName(contract, parentModelName, localColumn);
+    const parentFieldName = toFieldName(contract, parentNamespaceId, parentModelName, localColumn);
     const parentValue = parentRow[parentFieldName];
     if (parentValue === undefined) {
       throw new Error(
@@ -588,13 +671,14 @@ function buildChildJoinWhere(
 async function insertSingleRow(
   scope: RuntimeScope,
   context: ExecutionContext,
+  namespaceId: string,
   modelName: string,
   data: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const contract = context.contract;
-  const tableName = resolveModelTableName(contract, modelName);
+  const tableName = resolveModelTableName(contract, namespaceId, modelName);
 
-  const mappedData = mapModelDataToStorageRow(contract, modelName, data);
+  const mappedData = mapModelDataToStorageRow(contract, namespaceId, modelName, data);
   const applied = context.applyMutationDefaults({
     op: 'create',
     table: tableName,
@@ -605,7 +689,13 @@ async function insertSingleRow(
     mappedData[def.column] = def.value;
   }
 
-  const compiled = compileInsertReturning(contract, tableName, [mappedData], undefined);
+  const compiled = compileInsertReturning(
+    contract,
+    namespaceId,
+    tableName,
+    [mappedData],
+    undefined,
+  );
   const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
@@ -613,18 +703,20 @@ async function insertSingleRow(
     throw new Error(`Nested create for model "${modelName}" did not return a row`);
   }
 
-  return mapStorageRowToModelFields(contract, modelName, firstRow);
+  return mapStorageRowToModelFields(contract, namespaceId, modelName, firstRow);
 }
 
 async function findRowByCriterion(
   scope: RuntimeScope,
   context: ExecutionContext,
+  namespaceId: string,
   modelName: string,
   criterion: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
   const contract = context.contract;
   const whereExpr = shorthandToWhereExpr(
     context,
+    namespaceId,
     modelName,
     criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
   );
@@ -632,13 +724,13 @@ async function findRowByCriterion(
     throw new Error(`Nested connect for model "${modelName}" requires non-empty criterion`);
   }
 
-  const tableName = resolveModelTableName(contract, modelName);
+  const tableName = resolveModelTableName(contract, namespaceId, modelName);
   const state: CollectionState = {
     ...emptyState(),
     filters: [whereExpr],
     limit: 1,
   };
-  const compiled = compileSelect(contract, tableName, state);
+  const compiled = compileSelect(contract, namespaceId, tableName, state);
   const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
@@ -646,22 +738,23 @@ async function findRowByCriterion(
     return null;
   }
 
-  return mapStorageRowToModelFields(contract, modelName, firstRow);
+  return mapStorageRowToModelFields(contract, namespaceId, modelName, firstRow);
 }
 
 async function findFirstByFilters(
   scope: RuntimeScope,
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   filters: readonly AnyExpression[],
 ): Promise<Record<string, unknown> | null> {
-  const tableName = resolveModelTableName(contract, modelName);
+  const tableName = resolveModelTableName(contract, namespaceId, modelName);
   const state: CollectionState = {
     ...emptyState(),
     filters,
     limit: 1,
   };
-  const compiled = compileSelect(contract, tableName, state);
+  const compiled = compileSelect(contract, namespaceId, tableName, state);
   const rows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 
   const firstRow = rows[0];
@@ -669,17 +762,18 @@ async function findFirstByFilters(
     return null;
   }
 
-  return mapStorageRowToModelFields(contract, modelName, firstRow);
+  return mapStorageRowToModelFields(contract, namespaceId, modelName, firstRow);
 }
 
 async function executeUpdateCount(
   scope: RuntimeScope,
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   setValues: Record<string, unknown>,
   filters: readonly AnyExpression[],
 ): Promise<void> {
-  const compiled = compileUpdateCount(contract, tableName, setValues, filters);
+  const compiled = compileUpdateCount(contract, namespaceId, tableName, setValues, filters);
   await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 }
 
@@ -687,15 +781,15 @@ const relationDefsCache = new WeakMap<object, Map<string, RelationDefinition[]>>
 
 function getRelationDefinitions(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
-  namespaceId?: string,
 ): RelationDefinition[] {
   let perContract = relationDefsCache.get(contract);
   if (!perContract) {
     perContract = new Map();
     relationDefsCache.set(contract, perContract);
   }
-  const cacheKey = namespaceId === undefined ? modelName : `${namespaceId}\u0000${modelName}`;
+  const cacheKey = `${namespaceId}\u0000${modelName}`;
   const cached = perContract.get(cacheKey);
   if (cached) return cached;
 
@@ -703,17 +797,18 @@ function getRelationDefinitions(
   // targets resolve within the target model's namespace (`relation.toNamespace`,
   // carried by the cross-reference) so a cross-namespace relation does not
   // fall back to the default/first-match path.
-  const relations = resolveModelRelations(contract, modelName, namespaceId);
+  const relations = resolveModelRelations(contract, namespaceId, modelName);
   const definitions = Object.entries(relations).map(([relationName, relation]) => ({
     relationName,
     relatedModelName: relation.to,
-    relatedTableName: resolveModelTableName(contract, relation.to, relation.toNamespace),
+    relatedNamespaceId: relation.toNamespace,
+    relatedTableName: resolveModelTableName(contract, relation.toNamespace, relation.to),
     cardinality: relation.cardinality,
     localColumns: relation.on.localFields.map((f) =>
-      resolveFieldToColumn(contract, modelName, f, namespaceId),
+      resolveFieldToColumn(contract, namespaceId, modelName, f),
     ),
     targetColumns: relation.on.targetFields.map((f) =>
-      resolveFieldToColumn(contract, relation.to, f, relation.toNamespace),
+      resolveFieldToColumn(contract, relation.toNamespace, relation.to, f),
     ),
   }));
 
@@ -723,10 +818,10 @@ function getRelationDefinitions(
 
 function toFieldName(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   columnName: string,
-  namespaceId?: string,
 ): string {
-  const columnToField = getColumnToFieldMap(contract, modelName, namespaceId);
+  const columnToField = getColumnToFieldMap(contract, namespaceId, modelName);
   return columnToField[columnName] ?? columnName;
 }

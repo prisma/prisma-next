@@ -34,13 +34,13 @@ export function shorthandToWhereExpr<
   ModelName extends string,
 >(
   context: ExecutionContext<TContract>,
+  namespaceId: string,
   modelName: ModelName,
   filters: ShorthandWhereFilter<TContract, ModelName>,
-  namespaceId?: string,
 ): AnyExpression | undefined {
   const contract = context.contract;
-  const tableName = resolveModelTableName(contract, modelName, namespaceId);
-  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
+  const tableName = resolveModelTableName(contract, namespaceId, modelName);
+  const fieldToColumn = getFieldToColumnMap(contract, namespaceId, modelName);
 
   const exprs: AnyExpression[] = [];
   for (const [fieldName, value] of Object.entries(filters)) {
@@ -56,7 +56,7 @@ export function shorthandToWhereExpr<
       continue;
     }
 
-    assertFieldHasEqualityTrait(context, modelName, fieldName, namespaceId);
+    assertFieldHasEqualityTrait(context, namespaceId, modelName, fieldName);
     exprs.push(BinaryExpr.eq(left, LiteralExpr.of(value)));
   }
 
@@ -69,11 +69,11 @@ export function shorthandToWhereExpr<
 
 function assertFieldHasEqualityTrait(
   context: ExecutionContext,
+  namespaceId: string,
   modelName: string,
   fieldName: string,
-  namespaceId?: string,
 ): void {
-  const fieldType = modelOf(context.contract, modelName, namespaceId)?.fields?.[fieldName]?.type;
+  const fieldType = modelOf(context.contract, namespaceId, modelName)?.fields?.[fieldName]?.type;
   const codecId = fieldType?.kind === 'scalar' ? fieldType.codecId : undefined;
   const traits = codecId ? (context.codecDescriptors.descriptorFor(codecId)?.traits ?? []) : [];
   if (!traits.includes('equality')) {
