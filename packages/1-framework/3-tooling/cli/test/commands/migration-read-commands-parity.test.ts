@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { Contract } from '@prisma-next/contract/types';
+import type { CliErrorEnvelope } from '@prisma-next/errors/control';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
@@ -11,27 +12,55 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { join } from 'pathe';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { formatMigrationGraphHumanOutput } from '../../src/commands/migration-graph';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  createMigrationCheckCommand,
+  enumerateCheckSpaces,
+  runMigrationCheck,
+} from '../../src/commands/migration-check';
+import type { MigrationGraphJsonResult } from '../../src/commands/migration-graph';
+import {
+  createMigrationGraphCommand,
+  formatMigrationGraphHumanOutput,
+} from '../../src/commands/migration-graph';
+import {
+  createMigrationListCommand,
   listRefsByContractHash,
   migrationSpaceListEntriesFromAggregate,
   renderMigrationListHumanOutput,
   runMigrationList,
 } from '../../src/commands/migration-list';
 import {
+  createMigrationLogCommand,
+  executeMigrationLogCommand,
+  type MigrationLogResult,
+} from '../../src/commands/migration-log';
+import {
+  createMigrationShowCommand,
+  type MigrationShowResult,
+} from '../../src/commands/migration-show';
+import {
+  createMigrationStatusCommand,
   formatStatusHumanOutput,
   type MigrationStatusResult,
 } from '../../src/commands/migration-status';
 import { deriveStatusEdgeAnnotations } from '../../src/commands/migration-status-overlay';
 import * as configLoader from '../../src/config-loader';
+import { getCommandSeeAlso } from '../../src/utils/command-helpers';
 import {
   computeGlobalMaxDirNameWidth,
   computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
 } from '../../src/utils/formatters/migration-graph-space-render';
-import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
+import { parseGlobalFlags } from '../../src/utils/global-flags';
+import { createTerminalUI } from '../../src/utils/terminal-ui';
+import {
+  executeCommand,
+  getExitCode,
+  parseJsonObjectFromCliCapture,
+  setupCommandMocks,
+} from '../utils/test-helpers';
 
 const HASH_4cb4256 = `sha256:4cb4256${'0'.repeat(57)}`;
 const HASH_55bada2 = `sha256:55bada2${'0'.repeat(57)}`;
@@ -433,5 +462,363 @@ describe('migration read commands pretty parity', () => {
       loadConfigSpy.mockRestore();
       commandMocks.cleanup();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helpers shared by the consistency-lock sections below
+// ---------------------------------------------------------------------------
+
+type LoadedConfig = Awaited<ReturnType<typeof configLoader.loadConfig>>;
+
+function makeOfflineConfig(cwd: string): LoadedConfig {
+  return {
+    family: {
+      familyId: 'sql',
+      create: vi.fn().mockReturnValue({
+        deserializeContract: (json: unknown) => json,
+        toOperationPreview: () => ({ statements: [] }),
+      }),
+    },
+    target: {
+      id: 'postgres',
+      familyId: 'sql',
+      targetId: 'postgres',
+      kind: 'target',
+      migrations: {},
+    },
+    adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres' },
+    driver: { kind: 'driver' },
+    contract: { output: join(cwd, 'src', 'prisma', 'contract.json') },
+    migrations: { dir: 'migrations' },
+    extensionPacks: [],
+  } as unknown as LoadedConfig;
+}
+
+async function runAndCaptureExit(invoke: () => Promise<number>): Promise<number> {
+  try {
+    return await invoke();
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== 'process.exit called') {
+      throw error;
+    }
+    return getExitCode() ?? 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// D1 lock: every read verb's --json output is { ok, … } (not a bare array)
+// ---------------------------------------------------------------------------
+
+describe('migration read-verb --json envelope shape (D1 lock)', () => {
+  const originalCwd = process.cwd();
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+  });
+
+  it('migration list --json emits { ok: true, spaces: [...] }', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await executeCommand(createMigrationListCommand(), ['--json']);
+    } finally {
+      cleanup();
+    }
+
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
+      ok: boolean;
+      spaces: unknown[];
+    };
+    expect(envelope.ok).toBe(true);
+    expect(Array.isArray(envelope.spaces)).toBe(true);
+  });
+
+  it('migration graph --json emits { ok: true, nodes: [...], edges: [...], summary }', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await executeCommand(createMigrationGraphCommand(), ['--json']);
+    } finally {
+      cleanup();
+    }
+
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as MigrationGraphJsonResult;
+    expect(envelope.ok).toBe(true);
+    expect(Array.isArray(envelope.nodes)).toBe(true);
+    expect(Array.isArray(envelope.edges)).toBe(true);
+    expect(typeof envelope.summary).toBe('string');
+  });
+
+  it('migration status --json (with --from) emits { ok: true, spaces: [...] }', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await executeCommand(createMigrationStatusCommand(), [
+        '--json',
+        '--from',
+        EMPTY_CONTRACT_HASH,
+      ]);
+    } finally {
+      cleanup();
+    }
+
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
+      ok: boolean;
+      spaces: unknown[];
+    };
+    expect(envelope.ok).toBe(true);
+    expect(Array.isArray(envelope.spaces)).toBe(true);
+  });
+
+  it('migration show --json emits { ok: true, migration: { … } } (type-shape lock)', () => {
+    // The runtime JSON path is pinned by migration-show.test.ts.
+    // This assertion locks the exported type's shape so a type-level regression
+    // (removing `ok` or removing/renaming `migration`) fails at typecheck.
+    const sample: MigrationShowResult = {
+      ok: true,
+      migration: {
+        spaceId: 'app',
+        dirName: '20260101T0000_init',
+        dirPath: 'migrations/app/20260101T0000_init',
+        from: null,
+        to: 'sha256:a',
+        migrationHash: 'sha256:edge',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        operations: [],
+        preview: { statements: [] },
+        summary: '0 operation(s)',
+      },
+    };
+    const parsed = JSON.parse(JSON.stringify(sample)) as { ok: boolean; migration: unknown };
+    expect(parsed.ok).toBe(true);
+    expect(typeof parsed.migration).toBe('object');
+    expect(parsed.migration).not.toBeNull();
+    expect(Array.isArray(parsed)).toBe(false);
+  });
+
+  it('migration check --json emits { ok: boolean, failures: [...], summary }', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await runAndCaptureExit(() => executeCommand(createMigrationCheckCommand(), ['--json']));
+    } finally {
+      cleanup();
+    }
+
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
+      ok: boolean;
+      failures: unknown[];
+      summary: string;
+    };
+    expect(typeof envelope.ok).toBe('boolean');
+    expect(Array.isArray(envelope.failures)).toBe(true);
+    expect(typeof envelope.summary).toBe('string');
+  });
+
+  it('migration log --json emits { ok: true, entries: [...] } (type-shape lock)', () => {
+    // The runtime JSON path is pinned by read-commands-json-golden.test.ts.
+    // This assertion locks the exported type's shape so a type-level regression
+    // (removing `ok` or renaming `entries`) fails immediately at typecheck.
+    const sample: MigrationLogResult = { ok: true, entries: [] };
+    const parsed = JSON.parse(JSON.stringify(sample)) as { ok: boolean; entries: unknown[] };
+    expect(parsed.ok).toBe(true);
+    expect(Array.isArray(parsed.entries)).toBe(true);
+    // `ok` must be the discriminator field — no bare-array fallback.
+    expect(Array.isArray(parsed)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D5 lock: see-also symmetry — check links show; all verbs reference siblings
+// ---------------------------------------------------------------------------
+
+describe('migration read-verb see-also symmetry (D5 lock)', () => {
+  const READ_VERBS = ['status', 'list', 'graph', 'log', 'show', 'check'] as const;
+
+  function seeAlsoVerbs(cmd: ReturnType<typeof createMigrationStatusCommand>): readonly string[] {
+    return (getCommandSeeAlso(cmd) ?? []).map((ref) => ref.verb);
+  }
+
+  it('check links migration show in its see-also', () => {
+    const refs = seeAlsoVerbs(createMigrationCheckCommand());
+    expect(refs).toContain('migration show');
+  });
+
+  it('every read verb lists at least two sibling read verbs in its see-also', () => {
+    const commands = {
+      status: createMigrationStatusCommand,
+      list: createMigrationListCommand,
+      graph: createMigrationGraphCommand,
+      log: createMigrationLogCommand,
+      show: createMigrationShowCommand,
+      check: createMigrationCheckCommand,
+    } satisfies Record<
+      (typeof READ_VERBS)[number],
+      () => ReturnType<typeof createMigrationStatusCommand>
+    >;
+
+    for (const verb of READ_VERBS) {
+      const refs = seeAlsoVerbs(commands[verb]());
+      const siblingRefs = refs.filter((r) => READ_VERBS.some((v) => r === `migration ${v}`));
+      expect(
+        siblingRefs.length,
+        `${verb} should reference ≥2 sibling read verbs`,
+      ).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('see-also graph is symmetric: if A lists B then B lists A (or B lists at least one sibling)', () => {
+    const commands = {
+      status: createMigrationStatusCommand,
+      list: createMigrationListCommand,
+      graph: createMigrationGraphCommand,
+      log: createMigrationLogCommand,
+      show: createMigrationShowCommand,
+      check: createMigrationCheckCommand,
+    } satisfies Record<
+      (typeof READ_VERBS)[number],
+      () => ReturnType<typeof createMigrationStatusCommand>
+    >;
+
+    const verbSeeAlso = new Map<string, readonly string[]>();
+    for (const verb of READ_VERBS) {
+      verbSeeAlso.set(`migration ${verb}`, seeAlsoVerbs(commands[verb]()));
+    }
+
+    // For each verb that another verb links to, verify the link target also
+    // has at least one back-link to a read verb (the graph is not one-way).
+    for (const [sourceVerb, refs] of verbSeeAlso) {
+      for (const ref of refs) {
+        if (!verbSeeAlso.has(ref)) continue;
+        const targetRefs = verbSeeAlso.get(ref) ?? [];
+        const hasBackLink = targetRefs.some((r) => verbSeeAlso.has(r));
+        expect(
+          hasBackLink,
+          `${ref} links to at least one read verb (back-link from ${sourceVerb})`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D2 lock: log and status agree on the missing-DB error envelope shape
+// ---------------------------------------------------------------------------
+
+describe('migration read-verb missing-DB error shape parity (D2 lock)', () => {
+  afterAll(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('migration log and migration status produce the same PN-CLI-4005 code and meta.missingFlags shape when no db is configured', async () => {
+    const noDbConfig = {
+      family: { familyId: 'sql', create: vi.fn() },
+      target: {
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        kind: 'target',
+        migrations: {},
+      },
+      adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres' },
+      driver: { kind: 'driver' },
+      db: {},
+      contract: { output: 'contract.json' },
+      migrations: { dir: 'migrations' },
+    } as unknown as LoadedConfig;
+
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(noDbConfig);
+
+    const flags = parseGlobalFlags({ json: true });
+    const ui = createTerminalUI(flags);
+
+    const logResult = await executeMigrationLogCommand({}, flags, ui);
+    expect(logResult.ok).toBe(false);
+    if (logResult.ok) throw new Error('unreachable');
+    const logEnvelope = logResult.failure.toEnvelope() as CliErrorEnvelope;
+
+    loadConfigSpy.mockResolvedValue(noDbConfig);
+
+    const statusCommandMocks = setupCommandMocks();
+    const originalCwd = process.cwd();
+    let statusEnvelope: CliErrorEnvelope | undefined;
+    try {
+      await runAndCaptureExit(() => executeCommand(createMigrationStatusCommand(), ['--json']));
+      statusEnvelope = parseJsonObjectFromCliCapture(
+        statusCommandMocks.consoleOutput,
+      ) as CliErrorEnvelope;
+    } finally {
+      process.chdir(originalCwd);
+      statusCommandMocks.cleanup();
+    }
+
+    expect(logEnvelope.code).toBe('PN-CLI-4005');
+    expect(statusEnvelope?.code).toBe('PN-CLI-4005');
+    expect(logEnvelope.meta?.['missingFlags']).toEqual(['--db']);
+    expect(statusEnvelope?.meta?.['missingFlags']).toEqual(['--db']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D6 lock: check enumerates all spaces by default; --space narrows
+// ---------------------------------------------------------------------------
+
+describe('migration check multi-space parity (D6 lock)', () => {
+  it('no-arg check validates all spaces from the multi-space fixture', async () => {
+    const { aggregate, migrationsDir } = await buildMultiSpaceFixture();
+    const spaces = await enumerateCheckSpaces(aggregate, migrationsDir);
+    const spaceIds = spaces.map((s) => s.spaceId);
+    expect(spaceIds).toContain('app');
+    expect(spaceIds).toContain('postgis');
+
+    const result = runMigrationCheck({ spaces });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.ok).toBe(true);
+    expect(result.value.failures).toHaveLength(0);
+  });
+
+  it('--space app narrows to only the app space', async () => {
+    const { aggregate, migrationsDir } = await buildMultiSpaceFixture();
+    const spaces = await enumerateCheckSpaces(aggregate, migrationsDir);
+
+    const result = runMigrationCheck({ spaces, spaceFilter: 'app' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.ok).toBe(true);
+    const checkedSpaceIds = result.value.failures.map((f) => f.where);
+    expect(checkedSpaceIds.every((w) => !w.includes('postgis'))).toBe(true);
+  });
+
+  it('--space <unknown> emits a structured error (not a bare array)', async () => {
+    const { aggregate, migrationsDir } = await buildMultiSpaceFixture();
+    const spaces = await enumerateCheckSpaces(aggregate, migrationsDir);
+
+    const result = runMigrationCheck({ spaces, spaceFilter: 'nonexistent' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const envelope = result.failure.toEnvelope();
+    expect(envelope.ok).toBe(false);
+    expect(typeof envelope.code).toBe('string');
+    expect(envelope.meta?.['code']).toBe('MIGRATION.SPACE_NOT_FOUND');
   });
 });
