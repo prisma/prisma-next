@@ -45,10 +45,10 @@ describe('codecRefForStorageColumn', () => {
   it('resolves a same-bare-name column strictly within the given namespace', () => {
     const storage = twoNamespaceSameTableName();
 
-    expect(codecRefForStorageColumn(storage, 'users', 'email_addr', 'public')).toEqual({
+    expect(codecRefForStorageColumn(storage, 'public', 'users', 'email_addr')).toEqual({
       codecId: 'pg/text@1',
     });
-    expect(codecRefForStorageColumn(storage, 'users', 'token_col', 'auth')).toEqual({
+    expect(codecRefForStorageColumn(storage, 'auth', 'users', 'token_col')).toEqual({
       codecId: 'pg/int4@1',
     });
   });
@@ -56,19 +56,11 @@ describe('codecRefForStorageColumn', () => {
   it('returns undefined when the column belongs to a different namespace', () => {
     const storage = twoNamespaceSameTableName();
 
-    expect(codecRefForStorageColumn(storage, 'users', 'token_col', 'public')).toBeUndefined();
-    expect(codecRefForStorageColumn(storage, 'users', 'email_addr', 'auth')).toBeUndefined();
+    expect(codecRefForStorageColumn(storage, 'public', 'users', 'token_col')).toBeUndefined();
+    expect(codecRefForStorageColumn(storage, 'auth', 'users', 'email_addr')).toBeUndefined();
   });
 
-  it('throws naming the candidate namespaces for an ambiguous bare table name', () => {
-    const storage = twoNamespaceSameTableName();
-
-    expect(() => codecRefForStorageColumn(storage, 'users', 'id')).toThrow(/ambiguous/i);
-    expect(() => codecRefForStorageColumn(storage, 'users', 'id')).toThrow(/auth/);
-    expect(() => codecRefForStorageColumn(storage, 'users', 'id')).toThrow(/public/);
-  });
-
-  it('resolves a unique bare table name without a coordinate', () => {
+  it('returns undefined for an unknown column within the namespace', () => {
     const storage = new SqlStorage({
       storageHash: STORAGE_HASH,
       namespaces: {
@@ -79,9 +71,9 @@ describe('codecRefForStorageColumn', () => {
       },
     });
 
-    expect(codecRefForStorageColumn(storage, 'users', 'email_addr')).toEqual({
+    expect(codecRefForStorageColumn(storage, 'public', 'users', 'email_addr')).toEqual({
       codecId: 'pg/text@1',
     });
-    expect(codecRefForStorageColumn(storage, 'users', 'missing')).toBeUndefined();
+    expect(codecRefForStorageColumn(storage, 'public', 'users', 'missing')).toBeUndefined();
   });
 });

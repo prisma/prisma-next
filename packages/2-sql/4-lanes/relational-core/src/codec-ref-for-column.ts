@@ -18,15 +18,15 @@ import {
  *
  * Returns `undefined` when the table or column is unknown, or when a `typeRef` column references a `storage.types` entry that does not exist.
  *
- * When `namespaceId` is supplied the table is resolved strictly within that
- * namespace; when omitted a bare table name that is ambiguous across namespaces
- * throws a fail-fast diagnostic (see {@link resolveStorageTable}).
+ * `namespaceId` leads the coordinate args and is always supplied: every
+ * model/table sits in an explicit namespace, so the table is resolved strictly
+ * within that namespace (see {@link resolveStorageTable}).
  */
 export function codecRefForStorageColumn(
   storage: SqlStorage,
+  namespaceId: string,
   tableName: string,
   columnName: string,
-  namespaceId?: string,
 ): CodecRef | undefined {
   const resolved = resolveStorageTable(storage, tableName, namespaceId);
   if (resolved === undefined) return undefined;

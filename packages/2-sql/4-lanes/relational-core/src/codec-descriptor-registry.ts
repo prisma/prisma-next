@@ -47,7 +47,7 @@ export function buildCodecDescriptorRegistry(
     },
     codecRefForColumn(namespaceId: string, table: string, column: string): CodecRef | undefined {
       if (!storage) return undefined;
-      return codecRefForStorageColumn(storage, table, column, namespaceId);
+      return codecRefForStorageColumn(storage, namespaceId, table, column);
     },
     *values(): IterableIterator<AnyDescriptor> {
       yield* byId.values();

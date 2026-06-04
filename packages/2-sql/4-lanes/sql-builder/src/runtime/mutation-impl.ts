@@ -68,21 +68,21 @@ export type UpdateSetCallback = (
 
 export function buildParamValues(
   values: Record<string, unknown>,
+  namespaceId: string,
   table: StorageTable,
   tableName: string,
   op: MutationDefaultsOp,
   ctx: BuilderContext,
-  namespaceId?: string,
 ): Record<string, ParamRef> {
   const params: Record<string, ParamRef> = {};
   for (const [col, value] of Object.entries(values)) {
     const column = table.columns[col];
-    const codec = column ? codecRefFor(ctx, tableName, col, namespaceId) : undefined;
+    const codec = column ? codecRefFor(ctx, namespaceId, tableName, col) : undefined;
     params[col] = ParamRef.of(value, codec ? { codec } : undefined);
   }
   for (const def of ctx.applyMutationDefaults({ op, table: tableName, values })) {
     const column = table.columns[def.column];
-    const codec = column ? codecRefFor(ctx, tableName, def.column, namespaceId) : undefined;
+    const codec = column ? codecRefFor(ctx, namespaceId, tableName, def.column) : undefined;
     params[def.column] = ParamRef.of(def.value, codec ? { codec } : undefined);
   }
   return params;
@@ -130,17 +130,17 @@ export function evaluateUpdateCallback(
 
 export function buildSetExpressions(
   exprs: Record<string, AstExpression>,
+  namespaceId: string,
   table: StorageTable,
   tableName: string,
   op: MutationDefaultsOp,
   ctx: BuilderContext,
-  namespaceId?: string,
 ): Record<string, AstExpression> {
   const set: Record<string, AstExpression> = { ...exprs };
   for (const def of ctx.applyMutationDefaults({ op, table: tableName, values: exprs })) {
     if (!(def.column in set)) {
       const column = table.columns[def.column];
-      const codec = column ? codecRefFor(ctx, tableName, def.column, namespaceId) : undefined;
+      const codec = column ? codecRefFor(ctx, namespaceId, tableName, def.column) : undefined;
       set[def.column] = ParamRef.of(def.value, ifDefined('codec', codec));
     }
   }
@@ -157,6 +157,7 @@ export class InsertQueryImpl<
 {
   readonly #tableSource: TableSource;
   readonly #tableName: string;
+  readonly #namespaceId: string;
   readonly #table: StorageTable;
   readonly #scope: Scope;
   readonly #rows: ReadonlyArray<Record<string, unknown>>;
@@ -166,6 +167,7 @@ export class InsertQueryImpl<
 
   constructor(
     tableSource: TableSource,
+    namespaceId: string,
     table: StorageTable,
     scope: Scope,
     rows: ReadonlyArray<Record<string, unknown>>,
@@ -177,6 +179,7 @@ export class InsertQueryImpl<
     super(ctx);
     this.#tableSource = tableSource;
     this.#tableName = tableSource.name;
+    this.#namespaceId = namespaceId;
     this.#table = table;
     this.#scope = scope;
     this.#rows = rows;
@@ -197,6 +200,7 @@ export class InsertQueryImpl<
       }
       return new InsertQueryImpl(
         this.#tableSource,
+        this.#namespaceId,
         this.#table,
         this.#scope,
         this.#rows,
@@ -220,6 +224,7 @@ export class InsertQueryImpl<
   ): InsertQuery<QC, AvailableScope, RowType> {
     return new InsertQueryImpl(
       this.#tableSource,
+      this.#namespaceId,
       this.#table,
       this.#scope,
       this.#rows,
@@ -241,11 +246,11 @@ export class InsertQueryImpl<
     const paramRows = this.#rows.map((rowValues) =>
       buildParamValues(
         rowValues,
+        this.#namespaceId,
         this.#table,
         this.#tableName,
         'create',
         this.ctx,
-        this.#tableSource.namespaceId,
       ),
     );
 

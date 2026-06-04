@@ -178,7 +178,14 @@ export class TableProxyImpl<
   }
 
   insert(rows: ReadonlyArray<Record<string, unknown>>): InsertQuery<QC, AvailableScope, EmptyRow> {
-    return new InsertQueryImpl(this.#fromSource, this.#table, this.#scope, rows, this.ctx);
+    return new InsertQueryImpl(
+      this.#fromSource,
+      this.#namespaceId,
+      this.#table,
+      this.#scope,
+      rows,
+      this.ctx,
+    );
   }
 
   update(
@@ -198,21 +205,21 @@ export class TableProxyImpl<
       );
       const setExpressions = buildSetExpressions(
         callbackExprs,
+        this.#namespaceId,
         this.#table,
         this.#tableName,
         'update',
         this.ctx,
-        this.#namespaceId,
       );
       return new UpdateQueryImpl(this.#fromSource, this.#scope, setExpressions, this.ctx);
     }
     const setExpressions = buildParamValues(
       setOrCallback,
+      this.#namespaceId,
       this.#table,
       this.#tableName,
       'update',
       this.ctx,
-      this.#namespaceId,
     );
     return new UpdateQueryImpl(this.#fromSource, this.#scope, setExpressions, this.ctx);
   }
