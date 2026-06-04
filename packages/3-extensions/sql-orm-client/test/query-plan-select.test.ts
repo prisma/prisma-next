@@ -646,6 +646,7 @@ describe('M:N include correlated subquery', () => {
       cardinality: 'N:M',
       through: {
         table: opts.junctionTable,
+        namespaceId: 'public',
         parentColumns: opts.parentColumns,
         childColumns: opts.childColumns,
         targetColumns: opts.targetColumns,
@@ -920,6 +921,7 @@ describe('M:N include correlated subquery', () => {
       cardinality: 'N:M',
       through: {
         table: 'parent_child',
+        namespaceId: 'public',
         parentColumns: ['parent_id'],
         childColumns: ['child_id'],
         targetColumns: ['id'],

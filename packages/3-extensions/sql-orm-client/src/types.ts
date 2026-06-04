@@ -52,6 +52,8 @@ export interface IncludeCombine<ResultShape extends Record<string, unknown>>
 
 export interface IncludeThroughDescriptor {
   readonly table: string;
+  /** Namespace the junction table lives in, as declared in the contract. */
+  readonly namespaceId: string;
   /** FK columns in the junction table that point to the parent. */
   readonly parentColumns: readonly string[];
   /** FK columns in the junction table that point to the target (child). */
@@ -60,8 +62,6 @@ export interface IncludeThroughDescriptor {
   readonly targetColumns: readonly string[];
   /** Resolved column names in the parent table that junction.parentColumns reference. */
   readonly parentLocalColumns: readonly string[];
-  /** Namespace of the junction table, resolved from storage. */
-  readonly namespaceId?: string;
 }
 
 export interface IncludeExpr {
