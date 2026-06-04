@@ -64,11 +64,23 @@ const twoNamespaceContract = blindCast<Contract<SqlStorage>, 'hand-built multi-n
   },
 });
 
+type AggregateBuilderView = {
+  count(): unknown;
+  max(field: string): unknown;
+};
 type CrudCollection = {
   all(): { toArray(): Promise<Record<string, unknown>[]> };
   create(values: Record<string, unknown>): Promise<Record<string, unknown>>;
   where(filter: Record<string, unknown>): {
     deleteAll(): { toArray(): Promise<Record<string, unknown>[]> };
+  };
+  aggregate(
+    fn: (aggregate: AggregateBuilderView) => Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  groupBy(field: string): {
+    aggregate(
+      fn: (aggregate: AggregateBuilderView) => Record<string, unknown>,
+    ): Promise<Record<string, unknown>[]>;
   };
 };
 type TwoNamespaceOrm = { public: { User: CrudCollection }; auth: { User: CrudCollection } };
@@ -139,6 +151,15 @@ function lastWriteAst(runtime: MockRuntime): WriteAst {
 
 function returningCodecByColumn(ast: WriteAst): Record<string, string | undefined> {
   return codecByColumnOfProjection(ast.returning ?? []);
+}
+
+function codecByAlias(ast: SelectAst): Record<string, string | undefined> {
+  const result: Record<string, string | undefined> = {};
+  for (const item of projectionItems(ast)) {
+    const alias = (item as unknown as { alias: string }).alias;
+    result[alias] = (item as unknown as { codec?: { codecId: string } }).codec?.codecId;
+  }
+  return result;
 }
 
 describe('orm same bare table name across namespaces', () => {
@@ -212,5 +233,45 @@ describe('orm same bare table name across namespaces', () => {
       id: 'pg/int4@1',
       token_col: 'pg/varchar@1',
     });
+  });
+
+  it('resolves per-namespace aggregate column codecs, discriminating by namespace', async () => {
+    const { db, runtime } = setup();
+
+    runtime.setNextResults([[{ maxEmail: 'z@example.com' }]]);
+    await db.public.User.aggregate((aggregate) => ({ maxEmail: aggregate.max('email') }));
+    const publicAst = lastPlanAst(runtime);
+    expect((publicAst as unknown as { from: { namespaceId: string } }).from.namespaceId).toBe(
+      'public',
+    );
+    expect(codecByAlias(publicAst)).toEqual({ maxEmail: 'pg/text@1' });
+
+    runtime.setNextResults([[{ maxToken: 'tok' }]]);
+    await db.auth.User.aggregate((aggregate) => ({ maxToken: aggregate.max('token') }));
+    const authAst = lastPlanAst(runtime);
+    expect((authAst as unknown as { from: { namespaceId: string } }).from.namespaceId).toBe('auth');
+    expect(codecByAlias(authAst)).toEqual({ maxToken: 'pg/varchar@1' });
+  });
+
+  it('resolves per-namespace grouped aggregate column codecs, discriminating by namespace', async () => {
+    const { db, runtime } = setup();
+
+    runtime.setNextResults([[{ id: 1, maxEmail: 'z@example.com' }]]);
+    await db.public.User.groupBy('id').aggregate((aggregate) => ({
+      maxEmail: aggregate.max('email'),
+    }));
+    const publicAst = lastPlanAst(runtime);
+    expect((publicAst as unknown as { from: { namespaceId: string } }).from.namespaceId).toBe(
+      'public',
+    );
+    expect(codecByAlias(publicAst)).toEqual({ id: 'pg/int4@1', maxEmail: 'pg/text@1' });
+
+    runtime.setNextResults([[{ id: 2, maxToken: 'tok' }]]);
+    await db.auth.User.groupBy('id').aggregate((aggregate) => ({
+      maxToken: aggregate.max('token'),
+    }));
+    const authAst = lastPlanAst(runtime);
+    expect((authAst as unknown as { from: { namespaceId: string } }).from.namespaceId).toBe('auth');
+    expect(codecByAlias(authAst)).toEqual({ id: 'pg/int4@1', maxToken: 'pg/varchar@1' });
   });
 });
