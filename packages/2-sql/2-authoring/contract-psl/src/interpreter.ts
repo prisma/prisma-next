@@ -1515,6 +1515,7 @@ function materializeMtiVariantStorageLinks(
         model: baseNode.modelName,
         table: baseNode.tableName,
         columns: basePrimaryKey.columns,
+        ...ifDefined('namespaceId', baseNode.namespaceId),
       },
       constraint: true,
       // The link columns are the variant's own primary key, which already

@@ -232,6 +232,60 @@ model Feature {
       });
     });
 
+    it('MTI variant FK carries the base namespace when the base lives in a non-default namespace', () => {
+      const document = parsePslDocument({
+        schema: `namespace auth {
+  model Task {
+    id    Int    @id @default(autoincrement())
+    title String
+    type  String
+
+    @@discriminator(type)
+    @@map("tasks")
+  }
+
+  model Feature {
+    priority Int
+
+    @@base(Task, "feature")
+    @@map("features")
+  }
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // The variant FK references the base table; its target coordinate must
+      // carry the base's namespace (`auth`), not silently fall back to the
+      // default namespace — mirroring the regular relation-FK path.
+      const storage = result.value.storage as SqlStorage;
+      const featureTable = storage.namespaces['auth']?.tables['features'];
+      expect(featureTable?.foreignKeys).toEqual([
+        expect.objectContaining({
+          source: expect.objectContaining({
+            namespaceId: 'auth',
+            tableName: 'features',
+            columns: ['id'],
+          }),
+          target: expect.objectContaining({
+            namespaceId: 'auth',
+            tableName: 'tasks',
+            columns: ['id'],
+          }),
+          constraint: true,
+          index: false,
+          onDelete: 'cascade',
+        }),
+      ]);
+    });
+
     it('variant models contain only their own fields (thin)', () => {
       const document = parsePslDocument({
         schema: `model Task {
