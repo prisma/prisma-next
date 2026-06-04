@@ -124,14 +124,23 @@ function assertStorageSemantics(
 
 function assertKnownTargetModel(
   modelsByName: ReadonlyMap<string, ModelNode>,
+  modelsByCoordinate: ReadonlyMap<string, ModelNode>,
   sourceModelName: string,
   targetModelName: string,
+  targetNamespaceId: string | undefined,
   context: string,
 ): ModelNode {
-  const targetModel = modelsByName.get(targetModelName);
+  const targetModel =
+    targetNamespaceId !== undefined && targetNamespaceId.length > 0
+      ? modelsByCoordinate.get(`${targetNamespaceId}:${targetModelName}`)
+      : modelsByName.get(targetModelName);
   if (!targetModel) {
+    const qualified =
+      targetNamespaceId !== undefined && targetNamespaceId.length > 0
+        ? `${targetNamespaceId}.${targetModelName}`
+        : targetModelName;
     throw new Error(
-      `${context} on model "${sourceModelName}" references unknown model "${targetModelName}"`,
+      `${context} on model "${sourceModelName}" references unknown model "${qualified}"`,
     );
   }
   return targetModel;
@@ -369,6 +378,8 @@ export function buildSqlContractFromDefinition(
   const target = definition.target.targetId;
   const defaultNamespaceId = definition.target.defaultNamespaceId;
   const targetFamily = 'sql';
+  const resolveNamespaceId = (m: ModelNode): string =>
+    m.namespaceId !== undefined && m.namespaceId.length > 0 ? m.namespaceId : defaultNamespaceId;
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
   const tableNamespaceByName = new Map(
     definition.models.map((m) => [
@@ -376,13 +387,19 @@ export function buildSqlContractFromDefinition(
       m.namespaceId !== undefined && m.namespaceId.length > 0 ? m.namespaceId : defaultNamespaceId,
     ]),
   );
+  const modelsByCoordinate = new Map(
+    definition.models.map((m) => [`${resolveNamespaceId(m)}:${m.modelName}`, m]),
+  );
 
   const tablesByNamespace: Record<string, Record<string, StorageTable>> = {};
-  const tableNameToNamespaceId = new Map<string, string>();
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const modelsByNamespace: Record<string, Record<string, ContractModel>> = {};
-  const roots: Record<string, CrossReference> = {};
+  const rootEntries: Array<{
+    readonly tableName: string;
+    readonly namespaceId: string;
+    readonly ref: CrossReference;
+  }> = [];
 
   for (const semanticModel of definition.models) {
     const tableName = semanticModel.tableName;
@@ -394,7 +411,11 @@ export function buildSqlContractFromDefinition(
     // STI variants share the base table; the base model already owns this
     // table name and its root, so the variant contributes neither.
     if (!semanticModel.sharesBaseTable) {
-      roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
+      rootEntries.push({
+        tableName,
+        namespaceId,
+        ref: crossRef(semanticModel.modelName, namespaceId),
+      });
     }
 
     // --- Build storage table ---
@@ -498,8 +519,10 @@ export function buildSqlContractFromDefinition(
 
       const targetModel = assertKnownTargetModel(
         modelsByName,
+        modelsByCoordinate,
         semanticModel.modelName,
         fk.references.model,
+        fk.references.namespaceId,
         'Foreign key',
       );
       assertTargetTableMatches(
@@ -537,14 +560,6 @@ export function buildSqlContractFromDefinition(
     // materialised onto the base `ModelNode`, so the variant builds a domain
     // model (below) but no storage table of its own.
     if (!semanticModel.sharesBaseTable) {
-      const existingNs = tableNameToNamespaceId.get(tableName);
-      if (existingNs !== undefined && existingNs !== namespaceId) {
-        throw new Error(
-          `buildSqlContractFromDefinition: table "${tableName}" is mapped in namespace "${namespaceId}" but already exists in namespace "${existingNs}".`,
-        );
-      }
-      tableNameToNamespaceId.set(tableName, namespaceId);
-
       const checksForTable: CheckConstraintInput[] = Object.entries(columns).flatMap(
         ([columnName, col]) => {
           const valueSet = col.valueSet;
@@ -624,8 +639,10 @@ export function buildSqlContractFromDefinition(
 
       const targetModel = assertKnownTargetModel(
         modelsByName,
+        modelsByCoordinate,
         semanticModel.modelName,
         relation.toModel,
+        relation.toNamespaceId,
         'Relation',
       );
       assertTargetTableMatches(semanticModel.modelName, targetModel, relation.toTable, 'Relation');
@@ -636,7 +653,9 @@ export function buildSqlContractFromDefinition(
 
       const to = crossRef(
         relation.toModel,
-        resolveModelNamespaceId(targetModel, modelNameToNamespaceId, defaultNamespaceId),
+        relation.toNamespaceId !== undefined && relation.toNamespaceId.length > 0
+          ? relation.toNamespaceId
+          : resolveModelNamespaceId(targetModel, modelNameToNamespaceId, defaultNamespaceId),
       );
       const on = {
         localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
@@ -683,6 +702,24 @@ export function buildSqlContractFromDefinition(
   }
 
   // --- Assemble contract ---
+
+  // Aggregate roots are keyed by bare storage table name. When two models in
+  // different namespaces map to the same bare table name, the bare key would
+  // collide (last write wins, silently dropping a root), so those entries fall
+  // back to a namespace-qualified key. Single-namespace contracts never
+  // collide and keep their bare keys unchanged.
+  const rootTableNameCounts = new Map<string, number>();
+  for (const entry of rootEntries) {
+    rootTableNameCounts.set(entry.tableName, (rootTableNameCounts.get(entry.tableName) ?? 0) + 1);
+  }
+  const roots: Record<string, CrossReference> = {};
+  for (const entry of rootEntries) {
+    const key =
+      (rootTableNameCounts.get(entry.tableName) ?? 0) > 1
+        ? `${entry.namespaceId}.${entry.tableName}`
+        : entry.tableName;
+    roots[key] = entry.ref;
+  }
 
   // Normalise raw codec-triple inputs to the `kind: 'codec-instance'`
   // discriminator shape before hashing so the storageHash matches the
