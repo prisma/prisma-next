@@ -148,7 +148,7 @@ type ContractBase = Omit<
         };
         readonly public: {
           readonly id: 'public';
-          readonly kind: 'sql-namespace';
+          readonly kind: 'postgres-schema';
           readonly entries: {
             readonly table: {
               readonly articles: {
@@ -367,6 +367,7 @@ type ContractBase = Omit<
                 ];
               };
             };
+            readonly type: Record<string, never>;
           };
         };
       };

@@ -63,8 +63,8 @@ type ContractBase = Omit<
         };
         readonly public: {
           readonly id: 'public';
-          readonly kind: 'sql-namespace';
-          readonly entries: { readonly table: {} };
+          readonly kind: 'postgres-schema';
+          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
         };
       };
       readonly types: {

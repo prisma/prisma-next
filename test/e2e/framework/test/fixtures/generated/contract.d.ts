@@ -185,7 +185,7 @@ type ContractBase = Omit<
         };
         readonly public: {
           readonly id: 'public';
-          readonly kind: 'sql-namespace';
+          readonly kind: 'postgres-schema';
           readonly entries: {
             readonly table: {
               readonly comment: {
@@ -545,6 +545,7 @@ type ContractBase = Omit<
                 foreignKeys: readonly [];
               };
             };
+            readonly type: Record<string, never>;
           };
         };
       };

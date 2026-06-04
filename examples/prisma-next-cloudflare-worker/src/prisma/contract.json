@@ -646,6 +646,18 @@
               },
               "uniques": []
             }
+          },
+          "type": {
+            "user_type": {
+              "codecId": "pg/enum@1",
+              "kind": "postgres-enum",
+              "name": "user_type",
+              "nativeType": "user_type",
+              "values": [
+                "admin",
+                "user"
+              ]
+            }
           }
         },
         "id": "public",

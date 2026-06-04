@@ -139,7 +139,7 @@ type ContractBase = Omit<
         };
         readonly public: {
           readonly id: 'public';
-          readonly kind: 'sql-namespace';
+          readonly kind: 'postgres-schema';
           readonly entries: {
             readonly table: {
               readonly bug: {
@@ -325,6 +325,15 @@ type ContractBase = Omit<
                 uniques: readonly [];
                 indexes: readonly [];
                 foreignKeys: readonly [];
+              };
+            };
+            readonly type: {
+              readonly user_type: {
+                readonly kind: 'postgres-enum';
+                readonly name: 'user_type';
+                readonly nativeType: 'user_type';
+                readonly codecId: 'pg/enum@1';
+                readonly values: readonly ['admin', 'user'];
               };
             };
           };
