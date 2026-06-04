@@ -201,8 +201,9 @@ export function createMigrationGraphCommand(): Command {
   setCommandDescriptions(
     command,
     'Show the migration graph topology',
-    'Renders the migration graph topology. Offline — does not consult\n' +
-      'the database. --ascii swaps box-drawing for pipe-friendly ASCII glyphs.\n' +
+    'Renders the migration graph topology.\n' +
+      'Offline — does not consult the database.\n' +
+      '--ascii swaps box-drawing for pipe-friendly ASCII glyphs.\n' +
       'Use --json for machine-readable output, or --dot for Graphviz DOT\n' +
       'format.',
   );

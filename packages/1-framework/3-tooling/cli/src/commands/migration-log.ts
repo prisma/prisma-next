@@ -113,7 +113,8 @@ export function createMigrationLogCommand(): Command {
     command,
     'Show executed migration history',
     'Reads the database ledger and displays every applied migration edge\n' +
-      'in chronological order, including rollbacks and re-applies.',
+      'in chronological order, including rollbacks and re-applies, merged\n' +
+      'across all contract spaces. Requires a database connection.',
   );
   setCommandExamples(command, [
     'prisma-next migration log --db $DATABASE_URL',

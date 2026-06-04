@@ -634,7 +634,8 @@ export function createMigrationStatusCommand(): Command {
     command,
     'Show migration path and pending status',
     'Shows which migrations are pending between the database marker and\n' +
-      'the target contract. Requires a database connection for live status.\n' +
+      'the target contract. Requires a database connection.\n' +
+      'Pass --from for an offline path preview without a database.\n' +
       'Use `migration graph` for topology, `migration log` for history,\n' +
       'and `migration list` for on-disk enumeration.',
   );
@@ -642,6 +643,8 @@ export function createMigrationStatusCommand(): Command {
     'prisma-next migration status --db $DATABASE_URL',
     'prisma-next migration status --to production --db $DATABASE_URL',
     'prisma-next migration status --from sha256:abc --to production',
+    'prisma-next migration status --from sha256:abc --to production --json',
+    'prisma-next migration status --ascii --from sha256:abc --to production',
     'prisma-next migration status --legend --from sha256:abc --to production',
   ]);
   setCommandSeeAlso(command, [

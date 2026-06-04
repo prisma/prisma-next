@@ -291,8 +291,8 @@ export function createMigrationCheckCommand(): Command {
     'Verify artifact and graph integrity',
     'Validates that on-disk migration packages are internally consistent\n' +
       '(hashes match, manifests are complete) and that the graph is well-formed\n' +
-      '(edges connect, refs point at valid nodes). Offline — does not consult\n' +
-      'the database.',
+      '(edges connect, refs point at valid nodes).\n' +
+      'Offline — does not consult the database.',
   );
   setCommandExamples(command, [
     'prisma-next migration check',
@@ -303,6 +303,7 @@ export function createMigrationCheckCommand(): Command {
     { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
     { verb: 'migration list', oneLiner: 'List on-disk migrations' },
     { verb: 'migration graph', oneLiner: 'Show the migration graph topology' },
+    { verb: 'migration show', oneLiner: 'Display migration package contents' },
   ]);
   command.exitOverride();
   addGlobalOptions(command)

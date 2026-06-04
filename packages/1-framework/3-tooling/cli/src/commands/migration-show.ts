@@ -230,11 +230,13 @@ export function createMigrationShowCommand(): Command {
     command,
     'Display migration package contents',
     'Shows the operations, statement preview, and metadata for one app-space migration.\n' +
-      'Accepts a directory path, directory name, or hash prefix.',
+      'Accepts a directory path, directory name, or hash prefix.\n' +
+      'Offline — does not consult the database.',
   );
   setCommandExamples(command, [
     'prisma-next migration show 20260101_100000_add_user',
     'prisma-next migration show sha256:a1b2c3',
+    'prisma-next migration show 20260101_100000_add_user --json',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
