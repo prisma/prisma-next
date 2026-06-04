@@ -192,7 +192,7 @@ export function reloadMutationRowsByIdentities<Row>(options: {
     return emptyResult<Row>();
   }
 
-  const identityColumns = resolveRowIdentityColumns(contract, tableName);
+  const identityColumns = resolveRowIdentityColumns(contract, tableName, namespaceId);
   if (identityColumns.length === 0) {
     throw new Error(
       `Cannot load includes for the mutation result on model "${modelName}": table "${tableName}" has no primary key or unique constraint to key the include read-back on.`,

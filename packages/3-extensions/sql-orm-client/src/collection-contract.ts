@@ -458,7 +458,8 @@ export function resolveUpsertConflictColumns(
   }
 
   const tableName = resolveModelTableName(contract, modelName, namespaceId);
-  const primaryKeyColumns = storageTableForContract(contract, tableName).primaryKey?.columns ?? [];
+  const primaryKeyColumns =
+    storageTableForContract(contract, tableName, namespaceId).primaryKey?.columns ?? [];
   return [...primaryKeyColumns];
 }
 
@@ -499,11 +500,19 @@ export function resolvePrimaryKeyColumn(
 export function resolveRowIdentityColumns(
   contract: Contract<SqlStorage>,
   tableName: string,
+  namespaceId?: string,
 ): readonly string[] {
   let table: StorageTable;
   try {
-    table = storageTableForContract(contract, tableName);
-  } catch {
+    table = storageTableForContract(contract, tableName, namespaceId);
+  } catch (error) {
+    // An ambiguous bare name is a real diagnostic the caller must see — never
+    // mask it as "table has no identity columns" (which surfaces as a
+    // misleading "no primary key" error). A genuinely unknown table stays
+    // lenient and resolves to no identity columns.
+    if (error instanceof Error && error.message.includes('ambiguous')) {
+      throw error;
+    }
     return [];
   }
   if (table.primaryKey && table.primaryKey.columns.length > 0) {

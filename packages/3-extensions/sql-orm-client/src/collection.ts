@@ -2152,7 +2152,11 @@ export class Collection<
     hiddenColumns: readonly string[];
   } {
     if (this.state.includes.length > 0) {
-      const identityColumns = resolveRowIdentityColumns(this.contract, this.tableName);
+      const identityColumns = resolveRowIdentityColumns(
+        this.contract,
+        this.tableName,
+        this.namespaceId,
+      );
       if (identityColumns.length === 0) {
         throw new Error(
           `Cannot load includes for the mutation result on model "${this.modelName}": table "${this.tableName}" has no primary key or unique constraint to key the include read-back on.`,
@@ -2164,7 +2168,11 @@ export class Collection<
   }
 
   async #findFirstMatchingRowIdentityWhere(): Promise<AnyExpression | null> {
-    const identityColumns = resolveRowIdentityColumns(this.contract, this.tableName);
+    const identityColumns = resolveRowIdentityColumns(
+      this.contract,
+      this.tableName,
+      this.namespaceId,
+    );
     if (identityColumns.length === 0) {
       throw new Error(
         `update()/delete() on model "${this.modelName}" requires the table to have a primary key or unique constraint`,
