@@ -50,8 +50,8 @@
                   "column": "id"
                 }
               },
-              "table": "audit_event",
-              "namespaceId": "public"
+              "namespaceId": "public",
+              "table": "audit_event"
             }
           }
         }
@@ -60,39 +60,48 @@
   },
   "storage": {
     "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema"
+      },
       "public": {
-        "id": "public",
-        "kind": "postgres-schema",
-        "tables": {
-          "audit_event": {
-            "columns": {
-              "action": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
+        "entries": {
+          "table": {
+            "audit_event": {
+              "columns": {
+                "action": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "actor": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
               },
-              "actor": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
               },
-              "id": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:fe392da2aa42388c72b60af5f613f19a501220e1d5c0c06a7524875b3e72f0c1"
+    "storageHash": "sha256:975333779a8ca7ec4dacc25cd0e6816b04896d8f5227e2c6e4921760c60ebaa1"
   },
   "capabilities": {
     "postgres": {
