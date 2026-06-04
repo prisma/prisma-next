@@ -375,6 +375,7 @@ export function buildManyToManyContract(opts: {
                   on: { localFields, targetFields: targetColumns },
                   through: {
                     table: junctionTable,
+                    namespaceId: 'public',
                     parentColumns,
                     childColumns,
                     targetColumns,
