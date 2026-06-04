@@ -1,4 +1,4 @@
-import type { ProjectionItem, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { InsertAst, ProjectionItem, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../../src/runtime/sql';
@@ -47,10 +47,13 @@ const stubBase = {
   applyMutationDefaults: () => [],
 };
 
-type SelectHandle = { select(column: string): { build(): { ast: SelectAst } } };
+type TableHandle = {
+  select(column: string): { build(): { ast: SelectAst } };
+  insert(rows: ReadonlyArray<Record<string, unknown>>): { build(): { ast: InsertAst } };
+};
 type TwoNamespaceDb = {
-  public: { users: SelectHandle };
-  auth: { users: SelectHandle };
+  public: { users: TableHandle };
+  auth: { users: TableHandle };
 };
 
 function db() {
@@ -68,6 +71,11 @@ function projectionCodecId(ast: SelectAst): string | undefined {
   return (projection as unknown as { codec?: { codecId: string } }).codec?.codecId;
 }
 
+function insertParamCodecId(ast: InsertAst, column: string): string | undefined {
+  const value = ast.rows[0]?.[column];
+  return (value as unknown as { codec?: { codecId: string } } | undefined)?.codec?.codecId;
+}
+
 describe('same bare table name across namespaces', () => {
   it('resolves the column codec within the proxy namespace, discriminating per namespace', () => {
     const publicAst = db().public.users.select('email_addr').build().ast;
@@ -79,5 +87,21 @@ describe('same bare table name across namespaces', () => {
     const authAst = db().auth.users.select('token_col').build().ast;
     expect(projectionCodecId(authAst)).toBe('pg/varchar@1');
     expect((authAst as unknown as { from: { namespaceId: string } }).from.namespaceId).toBe('auth');
+  });
+
+  it('resolves insert param codecs within the proxy namespace, discriminating per namespace', () => {
+    const publicInsert = db()
+      .public.users.insert([{ id: 1, email_addr: 'a@example.com' }])
+      .build().ast;
+    expect(insertParamCodecId(publicInsert, 'email_addr')).toBe('pg/text@1');
+    expect(insertParamCodecId(publicInsert, 'id')).toBe('pg/int4@1');
+    expect(publicInsert.table.namespaceId).toBe('public');
+
+    const authInsert = db()
+      .auth.users.insert([{ id: 2, token_col: 'tok' }])
+      .build().ast;
+    expect(insertParamCodecId(authInsert, 'token_col')).toBe('pg/varchar@1');
+    expect(insertParamCodecId(authInsert, 'id')).toBe('pg/int4@1');
+    expect(authInsert.table.namespaceId).toBe('auth');
   });
 });

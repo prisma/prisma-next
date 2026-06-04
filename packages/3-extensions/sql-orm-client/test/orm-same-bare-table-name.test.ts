@@ -1,6 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ColumnRef, ProjectionItem, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type {
+  ColumnRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
@@ -37,7 +42,7 @@ function storageTable(columnCodecs: Record<string, string>) {
 const twoNamespaceContract = blindCast<Contract<SqlStorage>, 'hand-built multi-namespace fixture'>({
   target: 'postgres',
   targetFamily: 'sql',
-  capabilities: {},
+  capabilities: { returning: { enabled: true } },
   domain: {
     namespaces: {
       public: { models: { User: model('users', { id: 'id', email: 'email_addr' }) } },
@@ -59,7 +64,13 @@ const twoNamespaceContract = blindCast<Contract<SqlStorage>, 'hand-built multi-n
   },
 });
 
-type CrudCollection = { all(): { toArray(): Promise<Record<string, unknown>[]> } };
+type CrudCollection = {
+  all(): { toArray(): Promise<Record<string, unknown>[]> };
+  create(values: Record<string, unknown>): Promise<Record<string, unknown>>;
+  where(filter: Record<string, unknown>): {
+    deleteAll(): { toArray(): Promise<Record<string, unknown>[]> };
+  };
+};
 type TwoNamespaceOrm = { public: { User: CrudCollection }; auth: { User: CrudCollection } };
 
 function setup(): { db: TwoNamespaceOrm; runtime: MockRuntime } {
@@ -70,6 +81,7 @@ function setup(): { db: TwoNamespaceOrm; runtime: MockRuntime } {
       context: blindCast<ExecutionContext<Contract<SqlStorage>>, 'stub execution context'>({
         contract: twoNamespaceContract,
         applyMutationDefaults: () => [],
+        codecDescriptors: { descriptorFor: () => ({ traits: ['equality'] }) },
       }),
     }),
   );
@@ -97,8 +109,14 @@ function projectedColumns(ast: SelectAst): string[] {
 }
 
 function codecByColumn(ast: SelectAst): Record<string, string | undefined> {
+  return codecByColumnOfProjection(projectionItems(ast));
+}
+
+function codecByColumnOfProjection(
+  projection: readonly ProjectionItem[],
+): Record<string, string | undefined> {
   const result: Record<string, string | undefined> = {};
-  for (const item of projectionItems(ast)) {
+  for (const item of projection) {
     const column = (
       blindCast<ColumnRef, 'projection column ref'>(
         (item as unknown as { expr: unknown }).expr,
@@ -107,6 +125,20 @@ function codecByColumn(ast: SelectAst): Record<string, string | undefined> {
     result[column] = (item as unknown as { codec?: { codecId: string } }).codec?.codecId;
   }
   return result;
+}
+
+type WriteAst = {
+  table: TableSource;
+  returning?: readonly ProjectionItem[];
+};
+
+function lastWriteAst(runtime: MockRuntime): WriteAst {
+  const plan = runtime.executions[runtime.executions.length - 1]?.plan;
+  return blindCast<WriteAst, 'write plan ast'>((plan as { ast: unknown }).ast);
+}
+
+function returningCodecByColumn(ast: WriteAst): Record<string, string | undefined> {
+  return codecByColumnOfProjection(ast.returning ?? []);
 }
 
 describe('orm same bare table name across namespaces', () => {
@@ -130,5 +162,55 @@ describe('orm same bare table name across namespaces', () => {
     expect(projectedColumns(authAst).sort()).toEqual(['id', 'token_col']);
     expect(codecByColumn(authAst)).toEqual({ id: 'pg/int4@1', token_col: 'pg/varchar@1' });
     expect((authAst as unknown as { from: { namespaceId: string } }).from.namespaceId).toBe('auth');
+  });
+
+  it('resolves per-namespace returning columns/codecs on create, discriminating by namespace', async () => {
+    const { db, runtime } = setup();
+
+    runtime.setNextResults([[{ id: 1, email_addr: 'a@example.com' }]]);
+    const publicCreated = await db.public.User.create({ id: 1, email: 'a@example.com' });
+    expect(publicCreated).toEqual({ id: 1, email: 'a@example.com' });
+    const publicCreateAst = lastWriteAst(runtime);
+    expect(publicCreateAst.table.namespaceId).toBe('public');
+    expect(returningCodecByColumn(publicCreateAst)).toEqual({
+      id: 'pg/int4@1',
+      email_addr: 'pg/text@1',
+    });
+
+    runtime.setNextResults([[{ id: 2, token_col: 'tok' }]]);
+    const authCreated = await db.auth.User.create({ id: 2, token: 'tok' });
+    expect(authCreated).toEqual({ id: 2, token: 'tok' });
+    const authCreateAst = lastWriteAst(runtime);
+    expect(authCreateAst.table.namespaceId).toBe('auth');
+    expect(returningCodecByColumn(authCreateAst)).toEqual({
+      id: 'pg/int4@1',
+      token_col: 'pg/varchar@1',
+    });
+  });
+
+  it('resolves per-namespace returning columns/codecs on delete, discriminating by namespace', async () => {
+    const { db, runtime } = setup();
+
+    runtime.setNextResults([[{ id: 1, email_addr: 'a@example.com' }]]);
+    const publicDeleted = await db.public.User.where({ email: 'a@example.com' })
+      .deleteAll()
+      .toArray();
+    expect(publicDeleted).toEqual([{ id: 1, email: 'a@example.com' }]);
+    const publicDeleteAst = lastWriteAst(runtime);
+    expect(publicDeleteAst.table.namespaceId).toBe('public');
+    expect(returningCodecByColumn(publicDeleteAst)).toEqual({
+      id: 'pg/int4@1',
+      email_addr: 'pg/text@1',
+    });
+
+    runtime.setNextResults([[{ id: 2, token_col: 'tok' }]]);
+    const authDeleted = await db.auth.User.where({ token: 'tok' }).deleteAll().toArray();
+    expect(authDeleted).toEqual([{ id: 2, token: 'tok' }]);
+    const authDeleteAst = lastWriteAst(runtime);
+    expect(authDeleteAst.table.namespaceId).toBe('auth');
+    expect(returningCodecByColumn(authDeleteAst)).toEqual({
+      id: 'pg/int4@1',
+      token_col: 'pg/varchar@1',
+    });
   });
 });
