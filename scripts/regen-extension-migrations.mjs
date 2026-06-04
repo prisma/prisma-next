@@ -22,6 +22,9 @@
  *   5. Re-pins `migrations/refs/head.json` with the new hash, preserving
  *      the existing `invariants` array verbatim.
  *   6. Syncs `end-contract.{json,d.ts}` from `src/contract.{json,d.ts}`.
+ *   7. Runs `biome format` via stdin on each touched JSON file so output is
+ *      byte-identical to the committed canonical format (biome keeps short
+ *      arrays inline and adds a trailing newline).
  *
  * If the new storageHash already matches the published `head.json` hash the
  * extension is skipped (already consistent) - making the script idempotent.
@@ -35,12 +38,13 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const extensionsDir = join(repoRoot, 'packages', '3-extensions');
 const tsx = join(repoRoot, 'node_modules', '.bin', 'tsx');
+const biome = join(repoRoot, 'node_modules', '.bin', 'biome');
 
 /**
  * Read and parse a JSON file, returning the parsed object.
@@ -58,6 +62,27 @@ function readJson(filePath) {
   } catch (err) {
     throw new Error(`regen-extension-migrations: malformed JSON in ${filePath}: ${err.message}`);
   }
+}
+
+/**
+ * Format a file's content through `biome format --stdin-file-path <basename>`
+ * and write the result back in place.
+ *
+ * Using stdin bypasses biome's `files.includes` exclusion globs (which exclude
+ * migration.json, ops.json, end-contract.json, and *.d.ts from the normal
+ * check/format pass) while still applying the project's formatter settings
+ * (lineWidth, indentStyle, etc.). The result is byte-identical to what biome
+ * would produce if the file were not excluded — short arrays stay inline,
+ * trailing newline is present — matching the committed canonical format.
+ */
+function biomeFormatInPlace(filePath) {
+  const content = readFileSync(filePath, 'utf8');
+  const formatted = execFileSync(biome, ['format', '--stdin-file-path', basename(filePath)], {
+    input: content,
+    encoding: 'utf8',
+    cwd: repoRoot,
+  });
+  writeFileSync(filePath, formatted, 'utf8');
 }
 
 /**
@@ -152,12 +177,15 @@ function reemitMigrationArtifacts(extDir, migrationTsPath) {
 
 /**
  * Rewrite `migrations/refs/head.json`, replacing `hash` with `newHash`
- * and preserving the existing `invariants` array verbatim.
+ * and preserving the existing `invariants` array verbatim. The file is
+ * then passed through `biome format` (via stdin) so the output matches
+ * the committed canonical format: short arrays inline, trailing newline.
  */
 function repinHeadRef(headRefPath, newHash) {
   const existing = readJson(headRefPath);
   const updated = { hash: newHash, invariants: existing.invariants };
-  writeFileSync(headRefPath, `${JSON.stringify(updated, null, 2)}\n`, 'utf8');
+  writeFileSync(headRefPath, JSON.stringify(updated, null, 2), 'utf8');
+  biomeFormatInPlace(headRefPath);
 }
 
 /**
@@ -167,6 +195,9 @@ function repinHeadRef(headRefPath, newHash) {
  * `src/contract.json` is emitted without a trailing newline; the on-disk
  * end-contract.json convention includes one. A trailing newline is added
  * if absent so idempotence holds on the first run.
+ *
+ * `src/contract.d.ts` is formatted by prettier during emission and already
+ * carries a trailing newline; it is copied verbatim.
  */
 function syncEndContract(extDir, headMigrationDir) {
   for (const ext of ['json', 'd.ts']) {
@@ -225,8 +256,11 @@ function processExtension(extDir) {
 
   rewriteMigrationToHash(migrationTsPath, newHash);
   reemitMigrationArtifacts(extDir, migrationTsPath);
+  biomeFormatInPlace(join(headMigrationDir, 'migration.json'));
+  biomeFormatInPlace(join(headMigrationDir, 'ops.json'));
   repinHeadRef(headRefPath, newHash);
   syncEndContract(extDir, headMigrationDir);
+  biomeFormatInPlace(join(headMigrationDir, 'end-contract.json'));
 
   return 'updated';
 }
