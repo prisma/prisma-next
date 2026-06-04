@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { CliErrorEnvelope } from '@prisma-next/errors/control';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
@@ -9,6 +9,11 @@ import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
+
+afterAll(() => {
+  vi.doUnmock('../../src/config-loader');
+  vi.resetModules();
+});
 
 /**
  * End-to-end command coverage for `migration check`'s multi-space mode:
@@ -93,6 +98,33 @@ async function writeFixture(): Promise<string> {
   return cwd;
 }
 
+async function tamperMigrationHash(pkgDir: string): Promise<void> {
+  const manifestPath = join(pkgDir, 'migration.json');
+  const raw = JSON.parse(await readFile(manifestPath, 'utf-8')) as Record<string, unknown>;
+  raw['migrationHash'] = `sha256:${'f'.repeat(64)}`;
+  await writeFile(manifestPath, JSON.stringify(raw, null, 2));
+}
+
+async function writeFixtureWithTamperedAppHash(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), 'check-hash-tamper-'));
+  const migrationsRoot = join(cwd, 'migrations');
+  await writePackage(migrationsRoot, 'app', '20260101T0000_init', null, HASH_APP);
+  await tamperMigrationHash(join(migrationsRoot, 'app', '20260101T0000_init'));
+  await writePackage(migrationsRoot, 'postgis', '20260101T0000_install', null, HASH_EXT);
+  const contractDir = join(cwd, 'src', 'prisma');
+  await mkdir(contractDir, { recursive: true });
+  await writeFile(
+    join(contractDir, 'contract.json'),
+    JSON.stringify({
+      storage: { storageHash: HASH_APP, namespaces: {} },
+      schemaVersion: '1.0.0',
+      target: TARGET,
+      targetFamily: TARGET_FAMILY,
+    }),
+  );
+  return cwd;
+}
+
 function firstJsonLine<T>(consoleOutput: readonly string[]): T {
   const line = consoleOutput.find((l) => l.trimStart().startsWith('{'));
   if (!line) {
@@ -140,11 +172,6 @@ describe('migration check multi-space (command)', () => {
     vi.clearAllMocks();
   });
 
-  afterAll(() => {
-    vi.doUnmock('../../src/config-loader');
-    vi.resetModules();
-  });
-
   it('no-arg check surfaces a dangling ref in a non-app space and exits INTEGRITY_FAILED', async () => {
     const { createMigrationCheckCommand } = await import('../../src/commands/migration-check');
     tempDir = await writeFixture();
@@ -189,5 +216,78 @@ describe('migration check multi-space (command)', () => {
     expect(exitCode).toBe(2);
     expect(envelope.ok).toBe(false);
     expect(envelope.meta?.['code']).toBe('MIGRATION.INVALID_SPACE_ID');
+  });
+});
+
+describe('migration check --space narrows aggregate integrity violations (command)', () => {
+  let consoleOutput: string[];
+  let cleanup: () => void;
+  const originalCwd = process.cwd();
+  let tempDir: string | undefined;
+
+  beforeEach(() => {
+    vi.resetModules();
+    const commandMocks = setupCommandMocks();
+    consoleOutput = commandMocks.consoleOutput;
+    cleanup = commandMocks.cleanup;
+    mocks.loadConfig.mockResolvedValue(baseConfig());
+  });
+
+  afterEach(async () => {
+    process.chdir(originalCwd);
+    cleanup();
+    if (tempDir) await rm(tempDir, { recursive: true, force: true });
+    tempDir = undefined;
+    vi.clearAllMocks();
+  });
+
+  it('no-arg check reports an app-space hash-mismatch via the aggregate path', async () => {
+    const { createMigrationCheckCommand } = await import('../../src/commands/migration-check');
+    tempDir = await writeFixtureWithTamperedAppHash();
+    process.chdir(tempDir);
+
+    const exitCode = await runAndCaptureExit(() =>
+      executeCommand(createMigrationCheckCommand(), ['--json']),
+    );
+    const result = firstJsonLine<CheckResultEnvelope>(consoleOutput);
+
+    expect(exitCode).toBe(4);
+    expect(result.ok).toBe(false);
+    const hashFailures = result.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-001');
+    expect(hashFailures).toHaveLength(1);
+    expect(hashFailures[0]?.where).toContain('app');
+  });
+
+  it('--space app reports an app-space hash-mismatch (aggregate integrity narrowed to space)', async () => {
+    const { createMigrationCheckCommand } = await import('../../src/commands/migration-check');
+    tempDir = await writeFixtureWithTamperedAppHash();
+    process.chdir(tempDir);
+
+    const exitCode = await runAndCaptureExit(() =>
+      executeCommand(createMigrationCheckCommand(), ['--space', 'app', '--json']),
+    );
+    const result = firstJsonLine<CheckResultEnvelope>(consoleOutput);
+
+    expect(exitCode).toBe(4);
+    expect(result.ok).toBe(false);
+    const hashFailures = result.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-001');
+    expect(hashFailures).toHaveLength(1);
+    expect(hashFailures[0]?.where).toContain('app');
+  });
+
+  it('--space postgis does not report an app-space hash-mismatch (no cross-space contamination)', async () => {
+    const { createMigrationCheckCommand } = await import('../../src/commands/migration-check');
+    tempDir = await writeFixtureWithTamperedAppHash();
+    process.chdir(tempDir);
+
+    await runAndCaptureExit(() =>
+      executeCommand(createMigrationCheckCommand(), ['--space', 'postgis', '--json']),
+    );
+    const result = firstJsonLine<CheckResultEnvelope>(consoleOutput);
+
+    const appHashFailures = result.failures.filter(
+      (f) => f.pnCode === 'PN-MIG-CHECK-001' && f.where.includes('app'),
+    );
+    expect(appHashFailures).toHaveLength(0);
   });
 });

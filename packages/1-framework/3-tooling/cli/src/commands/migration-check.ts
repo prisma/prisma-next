@@ -360,10 +360,13 @@ async function executeMigrationCheckCommand(
   }
 
   const failures: CheckFailure[] = [...checkResult.value.failures];
-  if (options.space === undefined) {
-    for (const violation of await loadAggregateIntegrityViolations(config, migrationsDir)) {
-      failures.push(integrityViolationToCheckFailure(violation, migrationsDir));
-    }
+  const allViolations = await loadAggregateIntegrityViolations(config, migrationsDir);
+  const scopedViolations =
+    options.space === undefined
+      ? allViolations
+      : allViolations.filter((v) => v.kind !== 'disjointness' && v.spaceId === options.space);
+  for (const violation of scopedViolations) {
+    failures.push(integrityViolationToCheckFailure(violation, migrationsDir));
   }
 
   if (failures.length === 0) {
