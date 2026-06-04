@@ -144,21 +144,31 @@ function createParamRef(
   value: unknown,
   namespaceId?: string,
 ): ParamRef {
-  const tableInNs =
-    namespaceId !== undefined
-      ? contract.storage.namespaces[namespaceId]?.entries.table[columnRef.table]
-      : Object.values(contract.storage.namespaces).find(
-          (ns) => ns.entries.table[columnRef.table] !== undefined,
-        )?.entries.table[columnRef.table];
-  const tableInAnyNs = tableInNs as StorageTable | undefined;
+  // `bindWhereExpr` binds AST that can reach into nested subqueries spanning
+  // namespaces, so the namespace coordinate is genuinely absent on the deep
+  // recursion. Resolve the column's owning namespace here — directly when the
+  // coordinate is supplied, otherwise by scanning storage — and feed that
+  // resolved id to the namespace-leading `codecRefForStorageColumn`.
+  const namespaces = contract.storage.namespaces;
+  const resolvedNamespaceId =
+    namespaceId ??
+    Object.keys(namespaces).find(
+      (ns) => namespaces[ns]?.entries.table[columnRef.table] !== undefined,
+    );
+  if (resolvedNamespaceId === undefined) {
+    throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
+  }
+  const tableInAnyNs = namespaces[resolvedNamespaceId]?.entries.table[columnRef.table] as
+    | StorageTable
+    | undefined;
   if (!tableInAnyNs?.columns[columnRef.column]) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
   const codec = codecRefForStorageColumn(
     contract.storage,
+    resolvedNamespaceId,
     columnRef.table,
     columnRef.column,
-    namespaceId,
   );
   return ParamRef.of(value, codec ? { codec } : undefined);
 }

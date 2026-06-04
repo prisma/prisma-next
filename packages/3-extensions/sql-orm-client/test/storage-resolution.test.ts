@@ -53,11 +53,11 @@ describe('storage-resolution coordinate-aware lookups', () => {
   it('enumerates columns strictly within the given namespace', () => {
     const contract = twoNamespaceSameTableName();
 
-    expect(Object.keys(storageTableForContract(contract, 'users', 'public').columns)).toEqual([
+    expect(Object.keys(storageTableForContract(contract, 'public', 'users').columns)).toEqual([
       'id',
       'email_addr',
     ]);
-    expect(Object.keys(storageTableForContract(contract, 'users', 'auth').columns)).toEqual([
+    expect(Object.keys(storageTableForContract(contract, 'auth', 'users').columns)).toEqual([
       'id',
       'token_col',
     ]);
@@ -66,21 +66,11 @@ describe('storage-resolution coordinate-aware lookups', () => {
   it('resolves the namespace coordinate strictly', () => {
     const contract = twoNamespaceSameTableName();
 
-    expect(requireStorageTableForContract(contract, 'users', 'auth').namespaceId).toBe('auth');
-    expect(tableSourceForContract(contract, 'users', undefined, 'public').namespaceId).toBe(
-      'public',
-    );
+    expect(requireStorageTableForContract(contract, 'auth', 'users').namespaceId).toBe('auth');
+    expect(tableSourceForContract(contract, 'public', 'users').namespaceId).toBe('public');
   });
 
-  it('throws naming the candidate namespaces for an ambiguous bare table name', () => {
-    const contract = twoNamespaceSameTableName();
-
-    expect(() => storageTableForContract(contract, 'users')).toThrow(/ambiguous/i);
-    expect(() => storageTableForContract(contract, 'users')).toThrow(/auth/);
-    expect(() => storageTableForContract(contract, 'users')).toThrow(/public/);
-  });
-
-  it('resolves a unique bare table name without a coordinate', () => {
+  it('resolves a bare table name within the given namespace', () => {
     const contract = contractWith(
       new SqlStorage({
         storageHash: STORAGE_HASH,
@@ -90,7 +80,7 @@ describe('storage-resolution coordinate-aware lookups', () => {
       }),
     );
 
-    expect(Object.keys(storageTableForContract(contract, 'users').columns)).toEqual([
+    expect(Object.keys(storageTableForContract(contract, 'public', 'users').columns)).toEqual([
       'id',
       'email_addr',
     ]);

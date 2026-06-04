@@ -44,14 +44,14 @@ export function createModelAccessor<
   ModelName extends string,
 >(
   context: ExecutionContext<TContract>,
+  namespaceId: string,
   modelName: ModelName,
-  namespaceId?: string,
   variantName?: string,
 ): ModelAccessor<TContract, ModelName> {
   const contract = context.contract;
-  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
-  const tableName = resolveModelTableName(contract, modelName, namespaceId);
-  const modelRelations = resolveModelRelations(contract, modelName, namespaceId);
+  const fieldToColumn = getFieldToColumnMap(contract, namespaceId, modelName);
+  const tableName = resolveModelTableName(contract, namespaceId, modelName);
+  const modelRelations = resolveModelRelations(contract, namespaceId, modelName);
   // When a variant is selected, MTI variant-owned fields resolve to a
   // `ColumnRef` qualified against the variant table the read path joins into
   // the correlated child SELECT. STI variant columns live on the base table
@@ -99,13 +99,13 @@ export function createModelAccessor<
 
       const relation = modelRelations[prop];
       if (relation) {
-        return createRelationFilterAccessor(context, modelName, tableName, relation);
+        return createRelationFilterAccessor(context, namespaceId, modelName, tableName, relation);
       }
 
       const variantField = variantFieldColumns[prop];
       const resolvedTable = variantField?.table ?? tableName;
       const columnName = variantField?.column ?? fieldToColumn[prop] ?? prop;
-      const column = resolveColumn(contract, resolvedTable, columnName, namespaceId);
+      const column = resolveColumn(contract, namespaceId, resolvedTable, columnName);
       // Unknown fields return `undefined`, matching plain JS object semantics.
       // The `ModelAccessor<TContract, ModelName>` type already rejects typos
       // at compile time for TS consumers, and contexts that iterate accessor
@@ -116,7 +116,12 @@ export function createModelAccessor<
       }
       const traits = context.codecDescriptors.descriptorFor(column.codecId)?.traits ?? [];
       const operations = opsByCodecId.get(column.codecId) ?? [];
-      const codec = codecRefForStorageColumn(contract.storage, resolvedTable, columnName, namespaceId);
+      const codec = codecRefForStorageColumn(
+        contract.storage,
+        namespaceId,
+        resolvedTable,
+        columnName,
+      );
       return createScalarFieldAccessor(
         resolvedTable,
         columnName,
@@ -133,13 +138,13 @@ export function createModelAccessor<
 
 function resolveColumn(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   columnName: string,
-  namespaceId?: string,
 ): { readonly codecId: string; readonly nullable: boolean } | undefined {
   let table: StorageTable;
   try {
-    table = storageTableForContract(contract, tableName, namespaceId);
+    table = storageTableForContract(contract, namespaceId, tableName);
   } catch {
     return undefined;
   }
@@ -216,28 +221,48 @@ function createRelationFilterAccessor<
   ParentModelName extends string,
 >(
   context: ExecutionContext<TContract>,
+  parentNamespaceId: string,
   parentModelName: ParentModelName,
   parentTableName: string,
   relation: ResolvedModelRelation,
 ): RelationFilterAccessor<TContract, string> {
-  const relatedTableName = resolveModelTableName(context.contract, relation.to);
+  const relatedTableName = resolveModelTableName(
+    context.contract,
+    relation.toNamespace,
+    relation.to,
+  );
 
   const relationAccessor: RelationFilterAccessor<TContract, string> = {
     some: (predicate) =>
-      buildExistsExpr(context, parentModelName, parentTableName, relatedTableName, relation, {
-        mode: 'some',
-        predicate,
-      }),
+      buildExistsExpr(
+        context,
+        parentNamespaceId,
+        parentModelName,
+        parentTableName,
+        relatedTableName,
+        relation,
+        { mode: 'some', predicate },
+      ),
     every: (predicate) =>
-      buildExistsExpr(context, parentModelName, parentTableName, relatedTableName, relation, {
-        mode: 'every',
-        predicate,
-      }),
+      buildExistsExpr(
+        context,
+        parentNamespaceId,
+        parentModelName,
+        parentTableName,
+        relatedTableName,
+        relation,
+        { mode: 'every', predicate },
+      ),
     none: (predicate) =>
-      buildExistsExpr(context, parentModelName, parentTableName, relatedTableName, relation, {
-        mode: 'none',
-        predicate,
-      }),
+      buildExistsExpr(
+        context,
+        parentNamespaceId,
+        parentModelName,
+        parentTableName,
+        relatedTableName,
+        relation,
+        { mode: 'none', predicate },
+      ),
   };
 
   return relationAccessor;
@@ -245,6 +270,7 @@ function createRelationFilterAccessor<
 
 function buildExistsExpr<TContract extends Contract<SqlStorage>>(
   context: ExecutionContext<TContract>,
+  parentNamespaceId: string,
   parentModelName: string,
   parentTableName: string,
   relatedTableName: string,
@@ -256,12 +282,18 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
 ): AnyExpression {
   const joinWhere = buildJoinWhere(
     context.contract,
+    parentNamespaceId,
     parentModelName,
     parentTableName,
     relatedTableName,
     relation,
   );
-  const childWhere = toRelationWhereExpr(context, relation.to, options.predicate);
+  const childWhere = toRelationWhereExpr(
+    context,
+    relation.toNamespace,
+    relation.to,
+    options.predicate,
+  );
 
   let subqueryWhere = joinWhere;
   let existsNot = false;
@@ -282,7 +314,9 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
   }
 
   const selectProjectionColumn = firstTargetColumn(context.contract, relation) ?? 'id';
-  const subquery = SelectAst.from(tableSourceForContract(context.contract, relatedTableName))
+  const subquery = SelectAst.from(
+    tableSourceForContract(context.contract, relation.toNamespace, relatedTableName),
+  )
     .withProjection([
       ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, selectProjectionColumn)),
     ])
@@ -293,6 +327,7 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
 
 function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
   context: ExecutionContext<TContract>,
+  relatedNamespaceId: string,
   relatedModelName: string,
   predicate: RelationPredicateInput<TContract, string> | undefined,
 ): AnyExpression | undefined {
@@ -301,7 +336,7 @@ function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
   }
 
   // Both callback and shorthand paths use the trait-gated accessor
-  const accessor = createModelAccessor(context, relatedModelName);
+  const accessor = createModelAccessor(context, relatedNamespaceId, relatedModelName);
 
   if (typeof predicate === 'function') {
     return predicate(accessor);
@@ -354,6 +389,7 @@ function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
 
 function buildJoinWhere<TContract extends Contract<SqlStorage>>(
   contract: TContract,
+  parentNamespaceId: string,
   parentModelName: string,
   parentTableName: string,
   relatedTableName: string,
@@ -372,8 +408,18 @@ function buildJoinWhere<TContract extends Contract<SqlStorage>>(
       continue;
     }
 
-    const localColumn = resolveFieldToColumn(contract, parentModelName, localField);
-    const targetColumn = resolveFieldToColumn(contract, relation.to, targetField);
+    const localColumn = resolveFieldToColumn(
+      contract,
+      parentNamespaceId,
+      parentModelName,
+      localField,
+    );
+    const targetColumn = resolveFieldToColumn(
+      contract,
+      relation.toNamespace,
+      relation.to,
+      targetField,
+    );
 
     joinExprs.push(
       BinaryExpr.eq(
@@ -404,5 +450,5 @@ function firstTargetColumn<TContract extends Contract<SqlStorage>>(
   if (!firstField) {
     return undefined;
   }
-  return resolveFieldToColumn(contract, relation.to, firstField);
+  return resolveFieldToColumn(contract, relation.toNamespace, relation.to, firstField);
 }

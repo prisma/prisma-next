@@ -22,9 +22,9 @@ import { combineWhereExprs } from './where-utils';
 
 function toAggregateProjection(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   selector: AggregateSelector<unknown>,
-  namespaceId?: string,
 ): { expr: AggregateExpr; codec: CodecRef | undefined } {
   if (selector.fn === 'count') {
     // count() returns a target-specific bigint; mapping isn't derivable here
@@ -43,9 +43,9 @@ function toAggregateProjection(
   if (selector.fn === 'min' || selector.fn === 'max') {
     const codec = codecRefForStorageColumn(
       contract.storage,
+      namespaceId,
       tableName,
       selector.column,
-      namespaceId,
     );
     return { expr, codec };
   }
@@ -133,10 +133,10 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
 
 export function compileAggregate(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   filters: readonly AnyExpression[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
-  namespaceId?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
   const entries = Object.entries(aggregateSpec);
   if (entries.length === 0) {
@@ -144,12 +144,12 @@ export function compileAggregate(
   }
 
   const projection: ProjectionItem[] = entries.map(([alias, selector]) => {
-    const { expr, codec } = toAggregateProjection(contract, tableName, selector, namespaceId);
+    const { expr, codec } = toAggregateProjection(contract, namespaceId, tableName, selector);
     return ProjectionItem.of(alias, expr, codec);
   });
-  let ast = SelectAst.from(
-    tableSourceForContract(contract, tableName, undefined, namespaceId),
-  ).withProjection(projection);
+  let ast = SelectAst.from(tableSourceForContract(contract, namespaceId, tableName)).withProjection(
+    projection,
+  );
   const where = combineWhereExprs(filters);
   if (where) {
     ast = ast.withWhere(where);
@@ -161,12 +161,12 @@ export function compileAggregate(
 
 export function compileGroupedAggregate(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   filters: readonly AnyExpression[],
   groupByColumns: readonly string[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
   havingExpr: AnyExpression | undefined,
-  namespaceId?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
   if (groupByColumns.length === 0) {
     throw new Error('groupBy() requires at least one field');
@@ -182,16 +182,16 @@ export function compileGroupedAggregate(
       ProjectionItem.of(
         column,
         ColumnRef.of(tableName, column),
-        codecRefForStorageColumn(contract.storage, tableName, column, namespaceId),
+        codecRefForStorageColumn(contract.storage, namespaceId, tableName, column),
       ),
     ),
     ...entries.map(([alias, selector]) => {
-      const { expr, codec } = toAggregateProjection(contract, tableName, selector, namespaceId);
+      const { expr, codec } = toAggregateProjection(contract, namespaceId, tableName, selector);
       return ProjectionItem.of(alias, expr, codec);
     }),
   ];
 
-  let ast = SelectAst.from(tableSourceForContract(contract, tableName, undefined, namespaceId))
+  let ast = SelectAst.from(tableSourceForContract(contract, namespaceId, tableName))
     .withProjection(projection)
     .withGroupBy(groupByColumns.map((column) => ColumnRef.of(tableName, column)));
   const where = combineWhereExprs(filters);

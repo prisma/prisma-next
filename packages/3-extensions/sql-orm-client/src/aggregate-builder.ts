@@ -8,10 +8,10 @@ export function createAggregateBuilder<
   ModelName extends string,
 >(
   contract: TContract,
+  namespaceId: string,
   modelName: ModelName,
-  namespaceId?: string,
 ): AggregateBuilder<TContract, ModelName> {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
+  const fieldToColumn = getFieldToColumnMap(contract, namespaceId, modelName);
 
   return {
     count() {

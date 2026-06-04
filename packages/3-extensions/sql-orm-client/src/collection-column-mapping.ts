@@ -4,21 +4,21 @@ import { getFieldToColumnMap } from './collection-contract';
 
 export function mapFieldsToColumns(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   fieldNames: readonly string[],
-  namespaceId?: string,
 ): string[] {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
+  const fieldToColumn = getFieldToColumnMap(contract, namespaceId, modelName);
   return fieldNames.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
 }
 
 export function mapCursorValuesToColumns(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   cursorValues: Readonly<Record<string, unknown>>,
-  namespaceId?: string,
 ): Record<string, unknown> {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
+  const fieldToColumn = getFieldToColumnMap(contract, namespaceId, modelName);
   const mappedCursor: Record<string, unknown> = {};
 
   for (const [fieldName, value] of Object.entries(cursorValues)) {

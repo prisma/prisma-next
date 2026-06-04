@@ -109,7 +109,7 @@ describe('integration/upsert', () => {
         delete usersTable['primaryKey'];
         const contract = deserializeTestContract(raw);
         const context = { ...getTestContext(), contract };
-        const users = new Collection({ runtime, context }, 'User');
+        const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
 
         await expect(
           users.upsert({

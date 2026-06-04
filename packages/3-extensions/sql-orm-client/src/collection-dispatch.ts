@@ -59,19 +59,26 @@ export function dispatchCollectionRows<Row>(options: {
   state: CollectionState;
   tableName: string;
   modelName: string;
-  namespaceId?: string | undefined;
+  namespaceId: string;
 }): AsyncIterableResult<Row> {
   const { contract, runtime, state, tableName, modelName, namespaceId } = options;
-  const polyInfo = resolvePolymorphismInfo(contract, modelName, namespaceId);
+  const polyInfo = resolvePolymorphismInfo(contract, namespaceId, modelName);
 
   if (state.includes.length === 0) {
-    const compiled = compileSelect(contract, tableName, state, modelName, namespaceId);
+    const compiled = compileSelect(contract, namespaceId, tableName, state, modelName);
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
     const mapper = polyInfo
       ? (rawRow: Record<string, unknown>) =>
-          mapPolymorphicRow(contract, modelName, polyInfo, rawRow, state.variantName) as Row
+          mapPolymorphicRow(
+            contract,
+            namespaceId,
+            modelName,
+            polyInfo,
+            rawRow,
+            state.variantName,
+          ) as Row
       : (rawRow: Record<string, unknown>) =>
-          mapStorageRowToModelFields(contract, modelName, rawRow, namespaceId) as Row;
+          mapStorageRowToModelFields(contract, namespaceId, modelName, rawRow) as Row;
     return mapResultRows(source, mapper);
   }
 
@@ -87,7 +94,7 @@ function dispatchWithIncludes<Row>(options: {
   state: CollectionState;
   tableName: string;
   modelName: string;
-  namespaceId?: string | undefined;
+  namespaceId: string;
 }): AsyncIterableResult<Row> {
   const { contract, runtime, state, tableName, modelName, namespaceId } = options;
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
@@ -98,13 +105,13 @@ function dispatchWithIncludes<Row>(options: {
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
       const compiled = compileSelectWithIncludes(
         contract,
+        namespaceId,
         tableName,
         {
           ...state,
           selectedFields: parentSelectedForQuery,
         },
         modelName,
-        namespaceId,
       );
 
       const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(
@@ -115,11 +122,11 @@ function dispatchWithIncludes<Row>(options: {
         return;
       }
 
-      const polyInfo = resolvePolymorphismInfo(contract, modelName, namespaceId);
+      const polyInfo = resolvePolymorphismInfo(contract, namespaceId, modelName);
       const parentRows = parentRowsRaw.map((row) => {
         const mapped = polyInfo
-          ? mapPolymorphicRow(contract, modelName, polyInfo, row, state.variantName)
-          : mapStorageRowToModelFields(contract, modelName, row, namespaceId);
+          ? mapPolymorphicRow(contract, namespaceId, modelName, polyInfo, row, state.variantName)
+          : mapStorageRowToModelFields(contract, namespaceId, modelName, row);
         return { raw: row, mapped } as RowEnvelope;
       });
 
@@ -133,7 +140,13 @@ function dispatchWithIncludes<Row>(options: {
         }
 
         if (hiddenParentColumns.length > 0) {
-          stripHiddenMappedFields(contract, modelName, parent.mapped, hiddenParentColumns);
+          stripHiddenMappedFields(
+            contract,
+            namespaceId,
+            modelName,
+            parent.mapped,
+            hiddenParentColumns,
+          );
         }
       }
 
@@ -173,7 +186,7 @@ export function reloadMutationRowsByIdentities<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   tableName: string;
   modelName: string;
-  namespaceId?: string | undefined;
+  namespaceId: string;
   identityRows: readonly Record<string, unknown>[];
   selectedFields: readonly string[] | undefined;
   includes: readonly IncludeExpr[];
@@ -192,7 +205,7 @@ export function reloadMutationRowsByIdentities<Row>(options: {
     return emptyResult<Row>();
   }
 
-  const identityColumns = resolveRowIdentityColumns(contract, tableName, namespaceId);
+  const identityColumns = resolveRowIdentityColumns(contract, namespaceId, tableName);
   if (identityColumns.length === 0) {
     throw new Error(
       `Cannot load includes for the mutation result on model "${modelName}": table "${tableName}" has no primary key or unique constraint to key the include read-back on.`,
@@ -294,22 +307,30 @@ function decodeIncludePayload(
     return decodeCombineIncludePayload(contract, include, include.combine, raw);
   }
   const rawChildren = parseIncludedRows(raw);
-  const polyInfo = resolvePolymorphismInfo(contract, include.relatedModelName);
+  const polyInfo = resolvePolymorphismInfo(
+    contract,
+    include.relatedNamespaceId,
+    include.relatedModelName,
+  );
   const mapChildRow = polyInfo
     ? (childRow: Record<string, unknown>) =>
         mapPolymorphicRow(
           contract,
+          include.relatedNamespaceId,
           include.relatedModelName,
           polyInfo,
           childRow,
           include.nested.variantName,
         )
     : (childRow: Record<string, unknown>) =>
-        mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
+        mapStorageRowToModelFields(
+          contract,
+          include.relatedNamespaceId,
+          include.relatedModelName,
+          childRow,
+        );
   const mappedChildren = rawChildren.map((childRow) => {
-    const mapped = mapChildRow(childRow,
-      include.relatedNamespaceId,
-    );
+    const mapped = mapChildRow(childRow);
     // Source each nested-include payload from the RAW child row: it always
     // carries the payload under its relation alias. `mapChildRow` may be the
     // polymorphic mapper, which keeps only variant model-field columns and so

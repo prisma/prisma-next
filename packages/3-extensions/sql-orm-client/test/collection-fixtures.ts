@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import { type Contract, soleDomainNamespaceId } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
@@ -30,7 +30,9 @@ export function createCollectionFor<ModelName extends TestModelName>(
 } {
   const runtime = createMockRuntime();
   const context = contextForContract(contract);
-  const collection = new Collection({ runtime, context }, modelName);
+  const collection = new Collection({ runtime, context }, modelName, {
+    namespaceId: soleDomainNamespaceId(context.contract.domain),
+  });
   return {
     collection,
     runtime,
@@ -70,7 +72,9 @@ export function createReturningCollectionWithoutDefaultInInsert<ModelName extend
 } {
   const runtime = createMockRuntime();
   const context = contextForContract(withReturningCapability(withoutDefaultInInsert()));
-  const collection = new Collection({ runtime, context }, modelName);
+  const collection = new Collection({ runtime, context }, modelName, {
+    namespaceId: soleDomainNamespaceId(context.contract.domain),
+  });
   return { collection, runtime };
 }
 
@@ -82,7 +86,9 @@ export function createReturningCollectionFor<ModelName extends TestModelName>(
 } {
   const runtime = createMockRuntime();
   const context = contextForContract(withReturningCapability());
-  const collection = new Collection({ runtime, context }, modelName);
+  const collection = new Collection({ runtime, context }, modelName, {
+    namespaceId: soleDomainNamespaceId(context.contract.domain),
+  });
   return {
     collection,
     runtime,

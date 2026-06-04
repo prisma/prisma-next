@@ -98,6 +98,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: collection.state,
       tableName: collection.tableName,
+      namespaceId: 'public',
       modelName: collection.modelName,
     }).toArray();
 
@@ -121,6 +122,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
+      namespaceId: 'public',
       modelName: scoped.modelName,
     }).toArray();
 
@@ -171,6 +173,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
+      namespaceId: 'public',
       modelName: scoped.modelName,
     }).toArray();
 
@@ -222,6 +225,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
+      namespaceId: 'public',
       modelName: scoped.modelName,
     }).toArray();
 
@@ -262,6 +266,7 @@ describe('collection-dispatch', () => {
       runtime: runtimeWithConnection,
       state: scoped.state,
       tableName: scoped.tableName,
+      namespaceId: 'public',
       modelName: scoped.modelName,
     }).toArray();
 
@@ -303,6 +308,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
+      namespaceId: 'public',
       modelName: scoped.modelName,
     }).toArray();
 
@@ -350,6 +356,7 @@ describe('collection-dispatch', () => {
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
+      namespaceId: 'public',
       modelName: scoped.modelName,
     }).toArray();
 

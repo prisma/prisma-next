@@ -14,14 +14,14 @@ describe('Collection construction', () => {
   it('resolves table name from contract mappings', () => {
     const runtime = createMockRuntime();
     const context = getTestContext();
-    const collection = new Collection({ runtime, context }, 'User');
+    const collection = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
     expect(collection.tableName).toBe('users');
   });
 
   it('initializes with empty state', () => {
     const runtime = createMockRuntime();
     const context = getTestContext();
-    const collection = new Collection({ runtime, context }, 'Post');
+    const collection = new Collection({ runtime, context }, 'Post', { namespaceId: 'public' });
     expect(collection.state.filters).toEqual([]);
     expect(collection.state.includes).toEqual([]);
     expect(collection.state.orderBy).toBeUndefined();
@@ -32,7 +32,7 @@ describe('Collection construction', () => {
   it('supports custom subclass with named scopes', () => {
     const runtime = createMockRuntime();
     const context = getTestContext();
-    const collection = new PostCollection({ runtime, context }, 'Post');
+    const collection = new PostCollection({ runtime, context }, 'Post', { namespaceId: 'public' });
     const scoped = collection.popular();
     expect(scoped.state.filters).toHaveLength(1);
     expect(scoped.state.filters[0]).toEqual(

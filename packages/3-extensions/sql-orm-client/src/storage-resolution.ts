@@ -1,8 +1,4 @@
-import {
-  type Contract,
-  type ResolvedDomainModel,
-  resolveDomainModel,
-} from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import {
   type ResolvedStorageTable,
   resolveStorageTable,
@@ -10,22 +6,22 @@ import {
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { TableSource } from '@prisma-next/sql-relational-core/ast';
 
-export type { ResolvedDomainModel, ResolvedStorageTable };
+export type { ResolvedStorageTable };
 
 export function resolveTableForContract(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
-  namespaceId?: string,
 ): ResolvedStorageTable | undefined {
   return resolveStorageTable(contract.storage, tableName, namespaceId);
 }
 
 export function requireStorageTableForContract(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
-  namespaceId?: string,
 ): ResolvedStorageTable {
-  const resolved = resolveTableForContract(contract, tableName, namespaceId);
+  const resolved = resolveTableForContract(contract, namespaceId, tableName);
   if (resolved === undefined) {
     throw new Error(`Unknown table "${tableName}"`);
   }
@@ -34,17 +30,10 @@ export function requireStorageTableForContract(
 
 export function storageTableForContract(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
-  namespaceId?: string,
 ): StorageTable {
-  return requireStorageTableForContract(contract, tableName, namespaceId).table;
-}
-
-export function resolveDomainModelForContract(
-  contract: Contract<SqlStorage>,
-  modelName: string,
-): ResolvedDomainModel | undefined {
-  return resolveDomainModel(contract.domain, modelName);
+  return requireStorageTableForContract(contract, namespaceId, tableName).table;
 }
 
 export function domainModelNames(contract: Contract<SqlStorage>): string[] {
@@ -77,11 +66,11 @@ export function domainModelTableInNamespace(
 
 export function tableSourceForContract(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   alias?: string,
-  namespaceId?: string,
 ): TableSource {
-  const resolved = requireStorageTableForContract(contract, tableName, namespaceId);
+  const resolved = requireStorageTableForContract(contract, namespaceId, tableName);
   const effectiveAlias = alias !== undefined && alias !== tableName ? alias : undefined;
   return TableSource.named(tableName, effectiveAlias, resolved.namespaceId);
 }

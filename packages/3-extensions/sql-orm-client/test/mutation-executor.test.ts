@@ -63,20 +63,20 @@ describe('mutation-executor', () => {
     const contract = getTestContract();
 
     expect(
-      hasNestedMutationCallbacks(contract, 'User', {
+      hasNestedMutationCallbacks(contract, 'public', 'User', {
         posts: (posts: { connect: (criterion: Record<string, unknown>) => unknown }) =>
           posts.connect({ id: 1 }),
       }),
     ).toBe(true);
 
     expect(
-      hasNestedMutationCallbacks(contract, 'User', {
+      hasNestedMutationCallbacks(contract, 'public', 'User', {
         posts: { kind: 'connect', criteria: [{ id: 1 }] },
       }),
     ).toBe(false);
 
     expect(
-      hasNestedMutationCallbacks(contract, 'User', {
+      hasNestedMutationCallbacks(contract, 'public', 'User', {
         name: () => ({ kind: 'connect' }),
       }),
     ).toBe(false);
@@ -124,14 +124,14 @@ describe('mutation-executor', () => {
     });
 
     expect(
-      hasNestedMutationCallbacks(malformed, 'User', {
+      hasNestedMutationCallbacks(malformed, 'public', 'User', {
         posts: (posts: { connect: (criterion: Record<string, unknown>) => unknown }) =>
           posts.connect({ id: 1 }),
       }),
     ).toBe(true);
 
     expect(
-      hasNestedMutationCallbacks(contract, 'UnknownModel', {
+      hasNestedMutationCallbacks(contract, 'public', 'UnknownModel', {
         anything: () => ({ kind: 'connect' }),
       }),
     ).toBe(false);
@@ -140,9 +140,9 @@ describe('mutation-executor', () => {
   it('buildPrimaryKeyFilterFromRow() resolves mapped keys and throws when missing', () => {
     const contract = getTestContract();
 
-    expect(buildPrimaryKeyFilterFromRow(contract, 'User', { id: 7 })).toEqual({ id: 7 });
+    expect(buildPrimaryKeyFilterFromRow(contract, 'public', 'User', { id: 7 })).toEqual({ id: 7 });
 
-    expect(() => buildPrimaryKeyFilterFromRow(contract, 'User', {})).toThrow(
+    expect(() => buildPrimaryKeyFilterFromRow(contract, 'public', 'User', {})).toThrow(
       /Missing primary key field "id"/,
     );
   });
@@ -176,7 +176,7 @@ describe('mutation-executor', () => {
       },
     } as unknown as TestContract;
 
-    expect(buildPrimaryKeyFilterFromRow(withCustomPk, 'User', { pk_id: 99 })).toEqual({
+    expect(buildPrimaryKeyFilterFromRow(withCustomPk, 'public', 'User', { pk_id: 99 })).toEqual({
       pk_id: 99,
     });
   });
@@ -190,6 +190,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
       runtime: transactional.runtime,
+      namespaceId: 'public',
       modelName: 'User',
       data: { id: 1, name: 'Alice', email: 'alice@example.com' } as never,
     });
@@ -215,6 +216,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
       runtime: runtimeWithBareTransaction,
+      namespaceId: 'public',
       modelName: 'User',
       data: { id: 1, name: 'Alice', email: 'alice@example.com' } as never,
     });
@@ -232,6 +234,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime: transactional.runtime,
+        namespaceId: 'public',
         modelName: 'User',
         data: { id: 1, name: 'Alice', email: 'alice@example.com' } as never,
       }),
@@ -254,6 +257,7 @@ describe('mutation-executor', () => {
     await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
       runtime: scopedRuntime,
+      namespaceId: 'public',
       modelName: 'User',
       data: { id: 1, name: 'Alice', email: 'alice@example.com' } as never,
     });
@@ -269,6 +273,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         data: {
           id: 1,
@@ -283,6 +288,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         data: {
           id: 1,
@@ -302,6 +308,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'Post',
         data: {
           id: 1,
@@ -317,6 +324,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         data: {
           id: 1,
@@ -336,6 +344,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'Post',
         data: {
           id: 1,
@@ -352,6 +361,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'Post',
         data: {
           id: 1,
@@ -368,6 +378,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'Post',
         data: {
           id: 1,
@@ -383,6 +394,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'Post',
         data: {
           id: 1,
@@ -419,6 +431,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract: withManyToMany },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         data: {
           id: 1,
@@ -442,6 +455,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'Post',
       data: {
         id: 1,
@@ -491,6 +505,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: { ...getTestContext(), contract: sparseAuthorRelation },
       runtime,
+      namespaceId: 'public',
       modelName: 'Post',
       data: {
         id: 1,
@@ -512,6 +527,7 @@ describe('mutation-executor', () => {
     const updated = await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       filters: [userIdFilter],
       data: { name: 'Alice Updated' } as never,
@@ -531,6 +547,7 @@ describe('mutation-executor', () => {
     const updated = await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'Post',
       filters: [postIdFilter],
       data: {
@@ -549,6 +566,7 @@ describe('mutation-executor', () => {
     const updated = await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       filters: [userIdFilter],
       data: { name: 'Updated' } as never,
@@ -566,6 +584,7 @@ describe('mutation-executor', () => {
       executeNestedUpdateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         filters: [userIdFilter],
         data: {
@@ -579,6 +598,7 @@ describe('mutation-executor', () => {
     const connected = await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       filters: [userIdFilter],
       data: {
@@ -593,6 +613,7 @@ describe('mutation-executor', () => {
     const disconnected = await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       filters: [userIdFilter],
       data: {
@@ -607,6 +628,7 @@ describe('mutation-executor', () => {
       executeNestedUpdateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         filters: [userIdFilter],
         data: {
@@ -645,6 +667,7 @@ describe('mutation-executor', () => {
     const updated = await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract: compositeRelationContract },
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       filters: [userIdFilter],
       data: {
@@ -664,6 +687,7 @@ describe('mutation-executor', () => {
       executeNestedUpdateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         filters: [userIdFilter],
         data: {
@@ -683,6 +707,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: getTestContext(),
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       data: { id: 1, name: 'Alice', email: 'alice@test.com' } as never,
     });
@@ -701,6 +726,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: getTestContext(),
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       data: { id: 1, name: 'Alice', email: 'alice@test.com' } as never,
     });

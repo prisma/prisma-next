@@ -54,7 +54,7 @@ function createPolyCollection() {
   const baseContext = getTestContext();
   const context = { ...baseContext, contract };
   const runtime = createMockRuntime();
-  const collection = new Collection({ runtime, context }, 'User');
+  const collection = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
   return { collection, runtime, contract };
 }
 
@@ -92,7 +92,9 @@ describe('Collection.variant()', () => {
   it('returns unchanged collection when model has no discriminator', () => {
     const baseContext = getTestContext();
     const runtime = createMockRuntime();
-    const collection = new Collection({ runtime, context: baseContext }, 'User');
+    const collection = new Collection({ runtime, context: baseContext }, 'User', {
+      namespaceId: 'public',
+    });
     const result = collection.variant('Admin' as never);
     expect(result.state.filters).toHaveLength(0);
   });
@@ -184,7 +186,7 @@ function createMixedPolyCollection() {
   const baseContext = getTestContext();
   const context = { ...baseContext, contract };
   const runtime = createMockRuntime();
-  const collection = new Collection({ runtime, context }, 'Task');
+  const collection = new Collection({ runtime, context }, 'Task', { namespaceId: 'public' });
   return { collection, runtime };
 }
 
@@ -289,7 +291,7 @@ function createReturningMixedPolyCollection() {
   const baseContext = getTestContext();
   const context = { ...baseContext, contract };
   const runtime = createMockRuntime();
-  const collection = new Collection({ runtime, context }, 'Task');
+  const collection = new Collection({ runtime, context }, 'Task', { namespaceId: 'public' });
   return { collection, runtime, contract };
 }
 
@@ -442,7 +444,9 @@ describe('MTI variant create (two-INSERT orchestration)', () => {
       }),
     };
 
-    const collection = new Collection({ runtime: txRuntime, context }, 'Task');
+    const collection = new Collection({ runtime: txRuntime, context }, 'Task', {
+      namespaceId: 'public',
+    });
     const narrowed = collection.variant('Feature' as never) as typeof collection;
     await narrowed.createAll([{ title: 'Dark mode', priority: 1 } as never]).toArray();
 

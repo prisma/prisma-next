@@ -18,7 +18,7 @@ import type {
 
 export interface CollectionInit<TContract extends Contract<SqlStorage>> {
   readonly tableName?: string | undefined;
-  readonly namespaceId?: string | undefined;
+  readonly namespaceId: string;
   readonly state?: import('./types').CollectionState | undefined;
   readonly registry?: ReadonlyMap<string, CollectionConstructor<TContract>> | undefined;
   readonly includeRefinementMode?: boolean | undefined;

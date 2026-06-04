@@ -7,7 +7,7 @@ describe('Collection result types are simplified', () => {
   const context = getTestContext();
 
   test('default Row is a plain object', () => {
-    const users = new Collection({ runtime, context }, 'User');
+    const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
     type UserRow = Awaited<ReturnType<typeof users.first>>;
     expectTypeOf<NonNullable<UserRow>>().toEqualTypeOf<{
       id: number;
@@ -23,7 +23,7 @@ describe('Collection result types are simplified', () => {
   });
 
   test('select() produces a plain object', () => {
-    const users = new Collection({ runtime, context }, 'User');
+    const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
     const selected = users.select('id', 'email');
     type SelectedRow = Awaited<ReturnType<typeof selected.first>>;
     expectTypeOf<NonNullable<SelectedRow>>().toEqualTypeOf<{
@@ -33,7 +33,7 @@ describe('Collection result types are simplified', () => {
   });
 
   test('include() produces a plain object with nested relation', () => {
-    const users = new Collection({ runtime, context }, 'User');
+    const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
     const withPosts = users.include('posts');
     type WithPostsRow = Awaited<ReturnType<typeof withPosts.first>>;
     expectTypeOf<NonNullable<WithPostsRow>>().toEqualTypeOf<{
@@ -57,7 +57,7 @@ describe('Collection result types are simplified', () => {
   });
 
   test('select().include() produces a plain object', () => {
-    const users = new Collection({ runtime, context }, 'User');
+    const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
     const selected = users.select('name').include('posts');
     type Row = Awaited<ReturnType<typeof selected.first>>;
     expectTypeOf<NonNullable<Row>>().toEqualTypeOf<{
@@ -73,7 +73,7 @@ describe('Collection result types are simplified', () => {
   });
 
   test('include() with non-nullable to-one relation', () => {
-    const posts = new Collection({ runtime, context }, 'Post');
+    const posts = new Collection({ runtime, context }, 'Post', { namespaceId: 'public' });
     const withAuthor = posts.include('author');
     type Row = Awaited<ReturnType<typeof withAuthor.first>>;
     type AuthorField = NonNullable<Row>['author'];
@@ -91,7 +91,7 @@ describe('Collection result types are simplified', () => {
   });
 
   test('chained include() produces a plain object', () => {
-    const users = new Collection({ runtime, context }, 'User');
+    const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
     const withPostsAndInviter = users.include('posts').include('invitedBy');
     type Row = Awaited<ReturnType<typeof withPostsAndInviter.first>>;
     expectTypeOf<NonNullable<Row>>().toEqualTypeOf<{
@@ -126,7 +126,7 @@ describe('Collection result types are simplified', () => {
   });
 
   test('include() with count refinement', () => {
-    const users = new Collection({ runtime, context }, 'User');
+    const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
     const withPostCount = users.include('posts', (posts) => posts.count());
     type Row = Awaited<ReturnType<typeof withPostCount.first>>;
     expectTypeOf<NonNullable<Row>['posts']>().toEqualTypeOf<number>();

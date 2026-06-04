@@ -145,7 +145,9 @@ describe('orm()', () => {
 
   it('throws when custom collection values are instances instead of classes', () => {
     const runtime = createMockRuntime();
-    const postCollectionInstance = new PostCollection({ runtime, context }, 'Post');
+    const postCollectionInstance = new PostCollection({ runtime, context }, 'Post', {
+      namespaceId: 'public',
+    });
 
     expect(() =>
       orm({

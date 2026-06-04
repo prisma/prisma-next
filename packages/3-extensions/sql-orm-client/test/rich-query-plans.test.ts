@@ -42,7 +42,7 @@ describe('SQL ORM rich AST query plans', () => {
       )
       .take(5).state;
 
-    const plan = compileSelectWithIncludes(baseContract, 'users', state);
+    const plan = compileSelectWithIncludes(baseContract, 'public', 'users', state);
 
     expect(plan.ast.kind).toBe('select');
     expect(plan.params).toEqual([100, 'Alice']);
@@ -66,6 +66,7 @@ describe('SQL ORM rich AST query plans', () => {
   it('compiles insert, upsert, update, delete, and grouped aggregate plans with rich nodes', () => {
     const insertPlan = compileInsertReturning(
       baseContract,
+      'public',
       'users',
       [{ id: 1, name: 'Alice', email: 'a@example.com' }],
       ['id'],
@@ -74,6 +75,7 @@ describe('SQL ORM rich AST query plans', () => {
 
     const upsertPlan = compileUpsertReturning(
       baseContract,
+      'public',
       'users',
       { id: 1, name: 'Alice', email: 'a@example.com' },
       { name: 'Alice Updated' },
@@ -85,6 +87,7 @@ describe('SQL ORM rich AST query plans', () => {
 
     const updatePlan = compileUpdateReturning(
       baseContract,
+      'public',
       'users',
       { email: 'b@example.com' },
       [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
@@ -95,6 +98,7 @@ describe('SQL ORM rich AST query plans', () => {
 
     const deletePlan = compileDeleteReturning(
       baseContract,
+      'public',
       'users',
       [BinaryExpr.eq(ColumnRef.of('users', 'id'), LiteralExpr.of(1))],
       ['id'],
@@ -103,6 +107,7 @@ describe('SQL ORM rich AST query plans', () => {
 
     const groupedPlan = compileGroupedAggregate(
       baseContract,
+      'public',
       'posts',
       [],
       ['user_id'],

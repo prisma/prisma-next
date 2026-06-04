@@ -59,34 +59,36 @@ const twoNamespaceContract = blindCast<Contract<SqlStorage>, 'hand-built multi-n
 
 describe('namespace-scoped metadata resolution', () => {
   it('resolves field→column maps within the named namespace, discriminating per namespace', () => {
-    expect(getFieldToColumnMap(twoNamespaceContract, 'User', 'public')).toEqual({
+    expect(getFieldToColumnMap(twoNamespaceContract, 'public', 'User')).toEqual({
       id: 'id',
       email: 'email_addr',
     });
-    expect(getFieldToColumnMap(twoNamespaceContract, 'User', 'auth')).toEqual({
+    expect(getFieldToColumnMap(twoNamespaceContract, 'auth', 'User')).toEqual({
       id: 'id',
       token: 'token_col',
     });
   });
 
   it('resolves column→field maps within the named namespace', () => {
-    expect(getColumnToFieldMap(twoNamespaceContract, 'User', 'public')).toEqual({
+    expect(getColumnToFieldMap(twoNamespaceContract, 'public', 'User')).toEqual({
       id: 'id',
       email_addr: 'email',
     });
-    expect(getColumnToFieldMap(twoNamespaceContract, 'User', 'auth')).toEqual({
+    expect(getColumnToFieldMap(twoNamespaceContract, 'auth', 'User')).toEqual({
       id: 'id',
       token_col: 'token',
     });
   });
 
   it('resolves the storage table within the named namespace', () => {
-    expect(resolveModelTableName(twoNamespaceContract, 'User', 'public')).toBe('users');
-    expect(resolveModelTableName(twoNamespaceContract, 'User', 'auth')).toBe('auth_users');
+    expect(resolveModelTableName(twoNamespaceContract, 'public', 'User')).toBe('users');
+    expect(resolveModelTableName(twoNamespaceContract, 'auth', 'User')).toBe('auth_users');
   });
 
-  it('still throws on flat bare-name metadata access against a multi-namespace contract', () => {
-    expect(() => getFieldToColumnMap(twoNamespaceContract, 'User')).toThrow();
+  it('throws when the named namespace is not present on the contract', () => {
+    expect(() => getFieldToColumnMap(twoNamespaceContract, 'missing', 'User')).toThrow(
+      /namespace "missing" is not present/,
+    );
   });
 
   it('a collection constructed with a namespace resolves its own table within that namespace', () => {
