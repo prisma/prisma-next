@@ -428,7 +428,7 @@ function assertColumnCodecIntegrity(
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
     for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const columnName of Object.keys(table.columns)) {
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName, namespaceId);
+        const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
         if (!ref) continue;
 
         const descriptor = codecDescriptors.descriptorFor(ref.codecId);
@@ -520,7 +520,7 @@ function assertColumnCodecIntegrity(
  *
  * Contract integrity is enforced upstream by {@link assertColumnCodecIntegrity}: every column must reference a registered `codecId` whose `descriptor.isParameterized` flag matches the presence of `typeParams` (via `codecRefForColumn`). The pre-population walk and `forColumn` therefore make no defensive checks — malformed columns fail fast at `createExecutionContext` construction with `RUNTIME.CODEC_DESCRIPTOR_MISSING` or `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH` rather than being silently skipped here.
  *
- * `forColumn(t, c)` is a thin delegate over `forCodecRef(codecRefForColumn(t, c))`; encode/decode hot paths read the resolver directly via `forCodecRef`. The only `undefined` `forColumn` returns is the legitimate "no such column in the contract" case.
+ * `forColumn(ns, t, c)` is a thin delegate over `forCodecRef(codecRefForColumn(ns, t, c))`; encode/decode hot paths read the resolver directly via `forCodecRef`. The only `undefined` `forColumn` returns is the legitimate "no such column in the contract" case.
  */
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
@@ -568,7 +568,7 @@ function buildContractCodecRegistry(
     for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeRef !== undefined) continue;
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName, namespaceId);
+        const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
         if (!ref) continue;
         const key = refKeyOf(ref);
         const site = { table: tableName, column: columnName };
@@ -599,7 +599,7 @@ function buildContractCodecRegistry(
   for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
     for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const columnName of Object.keys(table.columns)) {
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName, namespaceId);
+        const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
         if (!ref) continue;
         resolver.forCodecRef(ref);
       }
@@ -607,8 +607,8 @@ function buildContractCodecRegistry(
   }
 
   const registry: ContractCodecRegistry = {
-    forColumn(table, column, namespaceId) {
-      const ref = codecDescriptors.codecRefForColumn(table, column, namespaceId);
+    forColumn(namespaceId, table, column) {
+      const ref = codecDescriptors.codecRefForColumn(namespaceId, table, column);
       return ref ? resolver.forCodecRef(ref) : undefined;
     },
     forCodecRef(ref) {

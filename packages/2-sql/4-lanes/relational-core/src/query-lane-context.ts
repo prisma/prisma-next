@@ -21,11 +21,11 @@ export interface CodecDescriptorRegistry {
    * - inline `typeParams` column → emit `{codecId, typeParams}` from the column itself.
    * - non-parameterized column → emit `{codecId}` with `typeParams` undefined (keys as `${codecId}:undefined` → one shared codec).
    *
-   * When `namespaceId` is supplied the table is resolved strictly within that namespace coordinate — two same-bare-named tables in different namespaces resolve to their own per-namespace columns/codecs without colliding. When omitted, a bare name unique across namespaces resolves to its sole namespace.
+   * The `namespaceId` coordinate leads and is always supplied — the table is resolved strictly within that namespace, so two same-bare-named tables in different namespaces resolve to their own per-namespace columns/codecs without colliding.
    *
    * Returns `undefined` when the registry was built without contract storage (package-scoped registries used purely as descriptor lookups), when the table or column is unknown in the namespace, or when the column declares a `typeRef` that the storage doesn't define.
    */
-  codecRefForColumn(table: string, column: string, namespaceId?: string): CodecRef | undefined;
+  codecRefForColumn(namespaceId: string, table: string, column: string): CodecRef | undefined;
   /**
    * All registered descriptors. Used by `validateCodecRegistryCompleteness` and other startup-time consumers that enumerate descriptors.
    */

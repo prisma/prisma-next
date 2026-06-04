@@ -13,10 +13,10 @@ Every codec-bearing AST node carries `codec: CodecRef | undefined` — a seriali
 
 ### Builder construction sites
 
-Column-bound construction sites derive `codec` from the contract via `descriptors.codecRefForColumn(table, column)`:
+Column-bound construction sites derive `codec` from the contract via `descriptors.codecRefForColumn(namespace, table, column)`:
 
 ```ts
-const ref = descriptors.codecRefForColumn('document', 'embedding');
+const ref = descriptors.codecRefForColumn('public', 'document', 'embedding');
 // → { codecId: 'pg/vector@1', typeParams: { length: 1536 } }
 
 ParamRef.of(value, { codec: ref });

@@ -19,7 +19,7 @@ import { createStubAdapter, createTestContext } from './utils';
 
 // The codec-registry layer exposes two runtime registries:
 //
-// - `ContractCodecRegistry` (`context.contractCodecs`): per-column resolved-codec dispatch with `forColumn(table, column)` and content-keyed AST dispatch via `forCodecRef(ref)`.
+// - `ContractCodecRegistry` (`context.contractCodecs`): per-column resolved-codec dispatch with `forColumn(namespace, table, column)` and content-keyed AST dispatch via `forCodecRef(ref)`.
 // - `CodecDescriptorRegistry` (`context.codecDescriptors`): codec-id-keyed metadata read with `descriptorFor(codecId)` — non-branching for parameterized vs. non-parameterized codecs (every non-parameterized codec is auto-lifted into a synthesized `CodecDescriptor<void>`).
 
 function makeVectorCodec(meta?: Record<string, unknown>): Codec {
@@ -167,7 +167,7 @@ describe('ContractCodecRegistry', () => {
       extensionPacks: [createVectorExtensionDescriptor()],
     });
 
-    const resolved = context.contractCodecs.forColumn('Doc', 'embedding');
+    const resolved = context.contractCodecs.forColumn('__unbound__', 'Doc', 'embedding');
     expect(resolved).toBeDefined();
     // The per-instance codec carries the column's `length` on its meta — confirms the dispatch path resolves through `factory(typeParams) (ctx)`, not the codec-id-keyed fallback.
     expect((resolved as Codec & { meta: { length: number } }).meta.length).toBe(768);
@@ -207,8 +207,8 @@ describe('ContractCodecRegistry', () => {
       extensionPacks: [createVectorExtensionDescriptor()],
     });
 
-    const docCodec = context.contractCodecs.forColumn('Doc', 'embedding');
-    const pageCodec = context.contractCodecs.forColumn('Page', 'embedding');
+    const docCodec = context.contractCodecs.forColumn('__unbound__', 'Doc', 'embedding');
+    const pageCodec = context.contractCodecs.forColumn('__unbound__', 'Page', 'embedding');
 
     expect(docCodec).toBeDefined();
     expect(pageCodec).toBeDefined();
@@ -229,8 +229,8 @@ describe('ContractCodecRegistry', () => {
       extensionPacks: [createNonParameterizedExtensionDescriptor()],
     });
 
-    const primaryCodec = context.contractCodecs.forColumn('User', 'primary');
-    const secondaryCodec = context.contractCodecs.forColumn('User', 'secondary');
+    const primaryCodec = context.contractCodecs.forColumn('__unbound__', 'User', 'primary');
+    const secondaryCodec = context.contractCodecs.forColumn('__unbound__', 'User', 'secondary');
 
     expect(primaryCodec).toBeDefined();
     expect(secondaryCodec).toBeDefined();
@@ -250,8 +250,10 @@ describe('ContractCodecRegistry', () => {
       extensionPacks: [createNonParameterizedExtensionDescriptor()],
     });
 
-    expect(context.contractCodecs.forColumn('User', 'nonexistent')).toBeUndefined();
-    expect(context.contractCodecs.forColumn('NoSuchTable', 'whatever')).toBeUndefined();
+    expect(context.contractCodecs.forColumn('__unbound__', 'User', 'nonexistent')).toBeUndefined();
+    expect(
+      context.contractCodecs.forColumn('__unbound__', 'NoSuchTable', 'whatever'),
+    ).toBeUndefined();
   });
 });
 

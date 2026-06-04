@@ -62,22 +62,22 @@ describe('same bare table name across namespaces — execution context', () => {
   it('resolves the per-namespace column codec via the coordinate, discriminating per namespace', () => {
     const context = createTestContext(twoNamespaceContract(), createStubAdapter());
 
-    expect(context.contractCodecs.forColumn('users', 'email', 'public')?.id).toBe('pg/text@1');
-    expect(context.contractCodecs.forColumn('users', 'token', 'auth')?.id).toBe('sql/varchar@1');
+    expect(context.contractCodecs.forColumn('public', 'users', 'email')?.id).toBe('pg/text@1');
+    expect(context.contractCodecs.forColumn('auth', 'users', 'token')?.id).toBe('sql/varchar@1');
 
     // A column present only in the other namespace must not resolve here — proves
     // resolution honours the coordinate rather than first-matching by bare name.
-    expect(context.contractCodecs.forColumn('users', 'token', 'public')).toBeUndefined();
-    expect(context.contractCodecs.forColumn('users', 'email', 'auth')).toBeUndefined();
+    expect(context.contractCodecs.forColumn('public', 'users', 'token')).toBeUndefined();
+    expect(context.contractCodecs.forColumn('auth', 'users', 'email')).toBeUndefined();
   });
 
   it('exposes the per-namespace codec ref through the descriptor registry coordinate', () => {
     const context = createTestContext(twoNamespaceContract(), createStubAdapter());
 
-    expect(context.codecDescriptors.codecRefForColumn('users', 'email', 'public')).toEqual({
+    expect(context.codecDescriptors.codecRefForColumn('public', 'users', 'email')).toEqual({
       codecId: 'pg/text@1',
     });
-    expect(context.codecDescriptors.codecRefForColumn('users', 'token', 'auth')).toEqual({
+    expect(context.codecDescriptors.codecRefForColumn('auth', 'users', 'token')).toEqual({
       codecId: 'sql/varchar@1',
     });
   });

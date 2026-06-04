@@ -91,7 +91,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
 
   it('returns undefined when the registry was built without storage', () => {
     const registry = buildCodecDescriptorRegistry(descriptors);
-    expect(registry.codecRefForColumn('Doc', 'embedding')).toBeUndefined();
+    expect(registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'Doc', 'embedding')).toBeUndefined();
   });
 
   it('derives `{codecId, typeParams}` from `storage.types` for a typeRef column', () => {
@@ -123,7 +123,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     });
 
     const registry = buildCodecDescriptorRegistry(descriptors, storage);
-    expect(registry.codecRefForColumn('Doc', 'embedding')).toEqual({
+    expect(registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'Doc', 'embedding')).toEqual({
       codecId: 'pg/vector@1',
       typeParams: { length: 1536 },
     });
@@ -150,7 +150,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     });
 
     const registry = buildCodecDescriptorRegistry(descriptors, storage);
-    expect(registry.codecRefForColumn('Doc', 'embedding')).toEqual({
+    expect(registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'Doc', 'embedding')).toEqual({
       codecId: 'pg/vector@1',
       typeParams: { length: 768 },
     });
@@ -176,7 +176,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     });
 
     const registry = buildCodecDescriptorRegistry(descriptors, storage);
-    const ref = registry.codecRefForColumn('User', 'email');
+    const ref = registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'User', 'email');
     expect(ref).toEqual({ codecId: 'pg/text@1' });
     expect(ref?.typeParams).toBeUndefined();
   });
@@ -197,8 +197,10 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     });
 
     const registry = buildCodecDescriptorRegistry(descriptors, storage);
-    expect(registry.codecRefForColumn('User', 'nope')).toBeUndefined();
-    expect(registry.codecRefForColumn('NoSuchTable', 'whatever')).toBeUndefined();
+    expect(registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'User', 'nope')).toBeUndefined();
+    expect(
+      registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'NoSuchTable', 'whatever'),
+    ).toBeUndefined();
   });
 
   it('returns undefined when the typeRef points at an undefined storage type', () => {
@@ -222,7 +224,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     });
 
     const registry = buildCodecDescriptorRegistry(descriptors, storage);
-    expect(registry.codecRefForColumn('Doc', 'embedding')).toBeUndefined();
+    expect(registry.codecRefForColumn(UNBOUND_NAMESPACE_ID, 'Doc', 'embedding')).toBeUndefined();
   });
 });
 
@@ -270,16 +272,16 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn namespace coordinat
   it('resolves the per-namespace codec ref for a same bare table name, discriminating by coordinate', () => {
     const registry = buildCodecDescriptorRegistry(descriptors, twoNamespaceStorage());
 
-    expect(registry.codecRefForColumn('users', 'email', 'public')).toEqual({
+    expect(registry.codecRefForColumn('public', 'users', 'email')).toEqual({
       codecId: 'pg/text@1',
     });
-    expect(registry.codecRefForColumn('users', 'token', 'auth')).toEqual({
+    expect(registry.codecRefForColumn('auth', 'users', 'token')).toEqual({
       codecId: 'pg/varchar@1',
     });
 
     // A column present only in the other namespace must not resolve here — proves
     // the resolution honours the coordinate rather than first-matching by name.
-    expect(registry.codecRefForColumn('users', 'token', 'public')).toBeUndefined();
-    expect(registry.codecRefForColumn('users', 'email', 'auth')).toBeUndefined();
+    expect(registry.codecRefForColumn('public', 'users', 'token')).toBeUndefined();
+    expect(registry.codecRefForColumn('auth', 'users', 'email')).toBeUndefined();
   });
 });
