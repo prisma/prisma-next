@@ -8,19 +8,22 @@ alwaysApply: false
 
 ## Pattern: Structured Errors + Result Pattern + process.exit()
 
-**CRITICAL**: CLI commands use structured errors (`CliStructuredError`), the Result pattern (`performAction`), and `process.exit()` for exit codes. Commands never throw errors (except unhandled failures that fail fast).
+**CRITICAL**: CLI commands use structured errors (`CliStructuredError`), the Result pattern
+(`performAction`), and `process.exit()` for exit codes. Commands never throw (except unhandled
+failures, which fail fast).
 
-## The Architecture
+The architecture:
 
-1. **Structured Errors**: Call sites throw `CliStructuredError` instances with full context (why, fix, docsUrl, etc.)
-2. **Result Pattern**: Commands wrap logic in `performAction()` which only catches `CliStructuredError` instances
-3. **Error Handling**: `handleResult()` processes Results, formats output, and returns exit codes
-4. **Exit**: Commands call `process.exit(exitCode)` directly - never throw errors
-5. **Fail Fast**: Non-structured errors propagate (fail fast) and are caught by Commander.js's `exitOverride`
-
-## The Solution
-
-**✅ CORRECT: Structured errors + Result pattern + process.exit()**
+1. **Structured errors**: call sites throw `CliStructuredError` instances with full context (why,
+   fix, docsUrl, etc.) — so they can provide actionable messages and metadata.
+2. **Result pattern**: commands wrap logic in `performAction()`, which catches **only**
+   `CliStructuredError` — cleanly separating action logic from error handling.
+3. **Error handling**: `handleResult()` processes Results, formats output (JSON vs human), and
+   returns an exit code.
+4. **Exit**: commands call `process.exit(exitCode)` directly — never throw — so they control exit
+   codes.
+5. **Fail fast**: non-structured errors (bugs, unexpected failures) propagate with stack traces and
+   are caught by Commander.js's `exitOverride`.
 
 ```typescript
 import { performAction } from '../utils/result';
@@ -28,79 +31,58 @@ import { handleResult } from '../utils/result-handler';
 import { errorContractConfigMissing } from '../utils/cli-errors';
 
 export function createEmitCommand(): Command {
-  return new Command('emit')
-    .action(async (options) => {
-      const flags = parseGlobalFlags(options);
-
-      const result = await performAction(async () => {
-        // Command logic - throw CliStructuredError instances
-        const config = await loadConfig(options.config);
-        if (!config.contract) {
-          throw errorContractConfigMissing({
-            why: 'Config.contract is required for emit',
-          });
-        }
-        // ... more logic ...
-        return emitResult;
-      });
-
-      // Handle result - formats output and returns exit code
-      const exitCode = handleResult(result, flags, (emitResult) => {
-        // Success output
-        console.log(formatEmitOutput(emitResult, flags));
-      });
-      process.exit(exitCode);
+  return new Command('emit').action(async (options) => {
+    const flags = parseGlobalFlags(options);
+    const result = await performAction(async () => {
+      const config = await loadConfig(options.config);
+      if (!config.contract) {
+        throw errorContractConfigMissing({ why: 'Config.contract is required for emit' });
+      }
+      return emitResult;
     });
+    const exitCode = handleResult(result, flags, (emitResult) => {
+      console.log(formatEmitOutput(emitResult, flags));
+    });
+    process.exit(exitCode);
+  });
 }
 ```
 
-**Why?**
-- **Structured errors**: Call sites have full context to provide better error messages, fixes, and metadata
-- **Result pattern**: Clean separation between action logic and error handling
-- **process.exit()**: Commands control exit codes directly, no throwing needed
-- **Fail fast**: Unhandled errors (non-structured) propagate and are caught by Commander.js
-
 ## Structured Error Factories
 
-Use factory functions from `utils/cli-errors.ts` to create structured errors:
+Create structured errors with the factory functions from `utils/cli-errors.ts` — they give
+type-safe, consistently-structured errors with call-site context and no fragile string matching in
+the mapper.
 
 ```typescript
-import {
-  errorConfigFileNotFound,
-  errorContractConfigMissing,
-  errorDatabaseUrlRequired,
-  errorMarkerMissing,
-  errorHashMismatch,
-} from '../utils/cli-errors';
+import { errorConfigFileNotFound, errorContractConfigMissing, errorMarkerMissing } from '../utils/cli-errors';
 
-// Config errors (PN-CLI-4xxx)
-throw errorConfigFileNotFound(configPath);
+throw errorConfigFileNotFound(configPath);          // Config errors (PN-CLI-4xxx)
 throw errorContractConfigMissing({ why: '...' });
-throw errorDatabaseUrlRequired();
-
-// Runtime errors (PN-RTM-3xxx)
-throw errorMarkerMissing();
-throw errorHashMismatch({ expected: '...', actual: '...' });
+throw errorMarkerMissing();                           // Runtime errors (PN-RTM-3xxx)
 ```
-
-**Why factory functions?**
-- Type-safe error creation
-- Consistent error structure
-- Call sites have context to provide better messages
-- No fragile string matching in error mapper
 
 ## PN code ranges inside the `CLI` domain
 
-Error codes are `PN-<domain>-<NNNN>`. Inside the `CLI` domain we sub-cluster by numeric prefix:
+Error codes are `PN-<domain>-<NNNN>`. Inside the `CLI` domain, sub-cluster by numeric prefix:
 
-- **`4xxx`** — generic / cross-command errors authored in `packages/1-framework/1-core/errors/src/control.ts`. Examples: `4001` config-file-not-found, `4003` contract-validation-failed, `4011` missing-extension-packs.
-- **`5xxx`** — command-specific errors authored alongside the command itself. Each command owns its own `errors.ts` and reserves a numeric block at the top of that file. The `init` command currently owns `5001`–`5009` (see `packages/1-framework/3-tooling/cli/src/commands/init/errors.ts`).
+- **`4xxx`** — generic / cross-command errors authored in
+  `packages/1-framework/1-core/errors/src/control.ts` (e.g. `4001` config-file-not-found, `4003`
+  contract-validation-failed, `4011` missing-extension-packs).
+- **`5xxx`** — command-specific errors authored alongside the command. Each command owns its own
+  `errors.ts` and reserves a numeric block at the top (e.g. `init` owns `5001`–`5009` in
+  `packages/1-framework/3-tooling/cli/src/commands/init/errors.ts`).
 
-Consumers branch on the full `PN-CLI-NNNN` form, so the prefix is purely an authoring guide — but it keeps the cross-command pool from colliding with command-local codes as new commands grow their own factories. When adding a new command-specific factory, pick the next free 5xxx code and update the comment block at the top of the command's `errors.ts`.
+Consumers branch on the full `PN-CLI-NNNN` form, so the prefix is purely an authoring guide that
+keeps the cross-command pool from colliding with command-local codes. When adding a new
+command-specific factory, pick the next free `5xxx` code and update the comment block at the top of
+the command's `errors.ts`.
 
 ## Variant: explicit `runFoo` + `emitError` (no `performAction`)
 
-Some commands use a structured-error-driven control flow that does **not** route through `performAction` / `handleResult`. The canonical example today is `init` (see `packages/1-framework/3-tooling/cli/src/commands/init/init.ts`):
+Some commands use structured-error-driven control flow that does **not** route through
+`performAction`/`handleResult`. The canonical example is `init`
+(`packages/1-framework/3-tooling/cli/src/commands/init/init.ts`):
 
 ```typescript
 export async function runInit(baseDir: string, opts: { … }): Promise<number> {
@@ -121,131 +103,44 @@ function emitError(ui, flags, error: CliStructuredError): number {
 }
 ```
 
-This shape is used because `init` has multiple distinct fallible phases (input resolution, install, emit) that each map to a **different** command-specific exit code (`PRECONDITION = 2`, `USER_ABORTED = 3`, `INSTALL_FAILED = 4`, `EMIT_FAILED = 5`). `performAction` / `handleResult` collapse every error path to a single envelope-derived exit code, which loses the per-phase signal that CI/agents branch on. The explicit `runInit` + `emitError(error)` + `exitCodeForError(error)` pipeline keeps:
+`init` has multiple distinct fallible phases (input resolution, install, emit) that each map to a
+**different** command-specific exit code (`PRECONDITION = 2`, `USER_ABORTED = 3`,
+`INSTALL_FAILED = 4`, `EMIT_FAILED = 5`). `performAction`/`handleResult` collapse every error path
+to a single envelope-derived exit code, losing the per-phase signal CI/agents branch on. The
+explicit pipeline keeps the error → exit-code mapping centralised (one `switch` over `error.code`),
+shares structured envelope rendering with the rest of the CLI (`formatErrorJson`/`formatErrorOutput`),
+and lets each phase throw its own factory without an exit-code argument.
 
-- the error → exit-code mapping centralised (one `switch` over `error.code`),
-- structured envelope rendering shared with the rest of the CLI (`formatErrorJson` / `formatErrorOutput`), and
-- each phase free to throw its own `CliStructuredError` factory without reaching for an exit-code argument.
+**Default to `performAction`/`handleResult`.** Reach for the explicit `runFoo` + `emitError` +
+`exitCodeForError` variant only when the command needs **4+** distinct command-specific exit codes
+tied to specific failure modes — and document the mapping in `exit-codes.ts` next to the codes.
 
-When you write a new command, default to `performAction` / `handleResult`. Reach for the explicit `runFoo` + `emitError` variant only when the command needs **4+** distinct command-specific exit codes tied to specific failure modes — and document the mapping in `exit-codes.ts` next to the codes themselves.
+## Helper behavior
 
-## performAction() Behavior
-
-`performAction()` only catches `CliStructuredError` instances:
-
-```typescript
-export async function performAction<T>(fn: () => Promise<T>): Promise<Result<T>> {
-  try {
-    const value = await fn();
-    return ok(value);
-  } catch (error) {
-    // Only catch structured errors - let other errors propagate (fail fast)
-    if (error instanceof CliStructuredError) {
-      return err(error);
-    }
-    // Re-throw non-structured errors to fail fast
-    throw error;
-  }
-}
-```
-
-**Why?**
-- Structured errors are handled gracefully with formatted output
-- Non-structured errors (bugs, unexpected failures) fail fast with stack traces
-- Clear separation between expected errors and unexpected failures
-
-## handleResult() Behavior
-
-`handleResult()` processes Results and returns exit codes:
-
-```typescript
-export function handleResult<T>(
-  result: Result<T>,
-  flags: GlobalFlags,
-  onSuccess?: (value: T) => void,
-): number {
-  if (result.ok) {
-    if (onSuccess) {
-      onSuccess(result.value);
-    }
-    return 0;
-  }
-
-  // Error case - map to CLI envelope and format output
-  const envelope = mapErrorToCliEnvelope(result.error);
-  // ... format and output error ...
-  return envelope.exitCode ?? 1;
-}
-```
-
-**Why?**
-- Never throws - returns exit code for `process.exit()`
-- Formats output based on flags (JSON vs human-readable)
-- Handles both success and error cases consistently
-
-## Error Mapping
-
-`mapErrorToCliEnvelope()` extracts fields from structured errors:
-
-```typescript
-export function mapErrorToCliEnvelope(error: unknown): CliErrorEnvelope {
-  // Structured errors contain all the information we need
-  if (error instanceof CliStructuredError) {
-    const codePrefix = error.domain === 'CLI' ? 'PN-CLI-' : 'PN-RTM-';
-    return {
-      code: `${codePrefix}${error.code}`,
-      domain: error.domain,
-      severity: error.severity,
-      summary: error.message,
-      why: error.why,
-      fix: error.fix,
-      where: error.where,
-      meta: error.meta,
-      docsUrl: error.docsUrl,
-      exitCode: error.exitCode,
-    };
-  }
-  // Fallback for non-structured errors (should be rare)
-  // ...
-}
-```
-
-**Why?**
-- No string matching - direct field extraction
-- Type-safe error handling
-- Call sites define errors, mapper extracts them
+- **`performAction()`** catches only `CliStructuredError` (returns `err(error)`); it re-throws
+  everything else so bugs fail fast with stack traces.
+- **`handleResult()`** never throws — it returns an exit code for `process.exit()`, formatting
+  output per flags (JSON vs human) and handling success and error cases consistently. On error it
+  maps via `mapErrorToCliEnvelope()` and returns `envelope.exitCode ?? 1`.
+- **`mapErrorToCliEnvelope()`** extracts fields directly from a `CliStructuredError` (code with the
+  `PN-CLI-`/`PN-RTM-` prefix, domain, severity, summary, why, fix, where, meta, docsUrl, exitCode) —
+  no string matching — with a fallback for the rare non-structured error.
 
 ## Testing
 
-**✅ CORRECT: Test that commands exit with correct codes**
+Commands call `process.exit()` directly, so spy on it — no need to mock Commander.js:
 
 ```typescript
 it('exits with code 2 for config errors', async () => {
-  const command = createEmitCommand();
   const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
     throw new Error('process.exit called');
   });
-
   await expect(
-    command.parseAsync(['node', 'cli.js', 'emit', '--config', invalidPath]),
+    createEmitCommand().parseAsync(['node', 'cli.js', 'emit', '--config', invalidPath]),
   ).rejects.toThrow('process.exit called');
-
   expect(exitSpy).toHaveBeenCalledWith(2);
 });
 ```
-
-**Why?**
-- Commands call `process.exit()` directly, so we can spy on it
-- No need to mock Commander.js error handling
-- Clear test expectations
-
-## Why This Matters
-
-1. **Better error messages**: Call sites have context to provide actionable fixes
-2. **Type safety**: Structured errors are type-safe, no string matching
-3. **Clean separation**: Action logic separate from error handling
-4. **Fail fast**: Unhandled errors propagate with stack traces
-5. **Testable**: Easy to test exit codes and error output
 
 ## Related Patterns
 
