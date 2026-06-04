@@ -1,6 +1,7 @@
 import { crossRef } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import type { SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -174,6 +175,61 @@ model Feature {
       if (!result.ok) return;
 
       expect(modelsOf(result.value)['Feature']?.storage).toMatchObject({ table: 'features' });
+    });
+
+    it('MTI variant storage table carries the base PK column, primary key, and FK to the base', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Feature {
+  priority Int
+
+  @@base(Task, "feature")
+  @@map("features")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // The variant lives in its own table, so the ORM joins it to the base on
+      // the shared primary key (`tasks.id = features.id`). That requires the
+      // base PK column to be materialised on the variant storage table.
+      const storage = result.value.storage as SqlStorage;
+      const featureTable = storage.namespaces['public']?.tables['features'];
+      expect(featureTable?.columns['id']).toMatchObject({ nullable: false });
+      expect(featureTable?.columns['priority']).toBeDefined();
+      expect(featureTable?.primaryKey).toMatchObject({ columns: ['id'] });
+      expect(featureTable?.foreignKeys).toEqual([
+        expect.objectContaining({
+          source: expect.objectContaining({ tableName: 'features', columns: ['id'] }),
+          target: expect.objectContaining({ tableName: 'tasks', columns: ['id'] }),
+          constraint: true,
+          index: false,
+          onDelete: 'cascade',
+        }),
+      ]);
+
+      // The link column is storage-only: the domain variant stays thin so
+      // variant create/read surfaces are not forced to carry an `id` field.
+      const feature = modelsOf(result.value)['Feature'];
+      expect(Object.keys(feature?.fields ?? {})).toEqual(['priority']);
+      expect((feature?.storage as SqlModelStorage | undefined)?.fields).toEqual({
+        priority: { column: 'priority' },
+      });
     });
 
     it('variant models contain only their own fields (thin)', () => {
