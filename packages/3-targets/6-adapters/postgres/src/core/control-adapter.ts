@@ -3,7 +3,11 @@ import type {
   ContractMarkerRecord,
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
-import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
+import {
+  parseMarkerRowSafely,
+  rethrowMarkerReadError,
+  withMarkerReadErrorHandling,
+} from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -217,6 +221,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     if (exists.length === 0) {
       return new Map();
     }
+
+    await this.assertMarkerTableHasSpaceColumn(driver, APP_SPACE_ID);
 
     const fetch = marker
       .select(
@@ -454,6 +460,32 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     );
   }
 
+  private async assertMarkerTableHasSpaceColumn(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    space: string,
+  ): Promise<void> {
+    const result = await driver.query<{ column_name: string }>(
+      `select column_name
+         from information_schema.columns
+        where table_schema = 'prisma_contract'
+          and table_name = 'marker'`,
+    );
+    const rows = result.rows;
+    if (rows.length === 0) {
+      return;
+    }
+    if (!rows.every((row) => typeof row.column_name === 'string')) {
+      return;
+    }
+    if (rows.some((row) => row.column_name === 'space')) {
+      return;
+    }
+    rethrowMarkerReadError(new Error('column "space" does not exist'), {
+      space,
+      markerLocation: POSTGRES_MARKER_TABLE,
+    });
+  }
+
   private async readMarkerResult(driver: ControlDriverInstance<'sql', 'postgres'>, space: string) {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
     const probe = infoSchemaTables
@@ -466,6 +498,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       .build();
     const exists = await execute(lower, driver, probe);
     if (exists.length === 0) return { kind: 'no-table' as const };
+
+    await this.assertMarkerTableHasSpaceColumn(driver, space);
 
     const fetch = marker
       .select(
