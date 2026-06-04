@@ -10,7 +10,7 @@ describe('progressLabelForAction', () => {
     expect(progressLabelForAction('dbUpdate')).toBe('Updating database across spaces');
   });
 
-  it('returns the migration-apply label for migrationApply', () => {
-    expect(progressLabelForAction('migrationApply')).toBe('Applying migration plan across spaces');
+  it('returns the migrate label for migrate', () => {
+    expect(progressLabelForAction('migrate')).toBe('Applying migration plan across spaces');
   });
 });

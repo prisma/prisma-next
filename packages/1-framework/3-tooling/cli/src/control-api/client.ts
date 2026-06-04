@@ -33,7 +33,7 @@ import { ContractValidationError } from './errors';
 import { executeDbInit } from './operations/db-init';
 import { executeDbUpdate } from './operations/db-update';
 import { type ExecuteDbVerifyResult, executeDbVerify } from './operations/db-verify';
-import { executeMigrationApply } from './operations/migration-apply';
+import { executeMigrate } from './operations/migration-apply';
 
 import type {
   ControlActionName,
@@ -47,8 +47,8 @@ import type {
   EmitOptions,
   EmitResult,
   IntrospectOptions,
-  MigrationApplyOptions,
-  MigrationApplyResult,
+  MigrateOptions,
+  MigrateResult,
   OnControlProgress,
   SchemaVerifyOptions,
   SignOptions,
@@ -457,9 +457,9 @@ class ControlClientImpl implements ControlClient {
     return familyInstance.readLedger({ driver, ...ifDefined('space', space) });
   }
 
-  async migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult> {
+  async migrate(options: MigrateOptions): Promise<MigrateResult> {
     const { onProgress } = options;
-    await this.connectWithProgress(options.connection, 'migrationApply', onProgress);
+    await this.connectWithProgress(options.connection, 'migrate', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
     if (!hasMigrations(this.options.target)) {
@@ -474,7 +474,7 @@ class ControlClientImpl implements ControlClient {
       throw new ContractValidationError(message, error);
     }
 
-    return executeMigrationApply({
+    return executeMigrate({
       driver,
       familyInstance,
       contract,

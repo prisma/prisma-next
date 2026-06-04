@@ -131,7 +131,7 @@ export interface PerSpacePlan {
    * strategy; absent for synth-produced plans.
    *
    * `migrate` surfaces this for the app member as
-   * `MigrationApplySuccess.pathDecision` (back-compat with single-
+   * `MigrateSuccess.pathDecision` (back-compat with single-
    * space callers).
    */
   readonly pathDecision?: PathDecision;

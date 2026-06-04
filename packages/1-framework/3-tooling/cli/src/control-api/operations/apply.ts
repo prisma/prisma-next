@@ -21,13 +21,13 @@ const APPLY_SPAN_ID = 'apply' as const;
  * events so the parent CLI command can attribute the span correctly,
  * and used to compose action-specific summary phrasing.
  */
-export type ApplyAction = 'dbInit' | 'dbUpdate' | 'migrationApply';
+export type ApplyAction = 'dbInit' | 'dbUpdate' | 'migrate';
 
 /**
  * Failure variant emitted by {@link applyMigration} when the runner
  * itself rejects the apply. Mirrors the failure shape callers
  * already wrap into their own action-specific failure envelopes
- * (`DbInitFailure`, `DbUpdateFailure`, `MigrationApplyFailure`) so each
+ * (`DbInitFailure`, `DbUpdateFailure`, `MigrateFailure`) so each
  * caller keeps owning its own discriminated failure code.
  */
 export interface ApplyRunnerFailure {
@@ -70,7 +70,7 @@ export interface ApplyMigrationInputs<TFamilyId extends string, TTargetId extend
  * Resolved per-space plan in canonical schedule order. Surfaced from
  * {@link applyMigration} to callers so each one can build its own
  * action-specific success envelope (e.g. `DbInitSuccess` vs
- * `MigrationApplySuccess`) without re-deriving the ordering.
+ * `MigrateSuccess`) without re-deriving the ordering.
  */
 export interface OrderedResolution {
   readonly spaceId: string;
@@ -255,7 +255,7 @@ export function progressLabelForAction(action: ApplyAction): string {
       return 'Initialising database across spaces';
     case 'dbUpdate':
       return 'Updating database across spaces';
-    case 'migrationApply':
+    case 'migrate':
       return 'Applying migration plan across spaces';
   }
 }

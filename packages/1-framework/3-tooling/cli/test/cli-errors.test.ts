@@ -3,7 +3,7 @@ import {
   buildNeverPlannedFailure,
   buildPathNotFoundFailure,
 } from '../src/control-api/operations/migration-apply';
-import type { MigrationApplyFailure } from '../src/control-api/types';
+import type { MigrateFailure } from '../src/control-api/types';
 import {
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
@@ -45,7 +45,7 @@ describe('errorPathUnreachable', () => {
   const fromHash = `sha256:${'b'.repeat(64)}`;
 
   it('emits a fully-qualified --from --to --name plan step plus a migrate apply step for the pathUnreachable runner kind', () => {
-    const failure: MigrationApplyFailure = {
+    const failure: MigrateFailure = {
       code: 'MIGRATION_PATH_NOT_FOUND',
       summary: 'Current contract has no planned migration path',
       why: 'Cannot reach target.',
@@ -64,7 +64,7 @@ describe('errorPathUnreachable', () => {
   });
 
   it('omits the --from clause when the runner kind is neverPlanned (no fromHash in meta)', () => {
-    const failure: MigrationApplyFailure = {
+    const failure: MigrateFailure = {
       code: 'MIGRATION_PATH_NOT_FOUND',
       summary: 'No on-disk migrations for contract space "app"',
       why: 'migrate is replay-only.',
@@ -77,7 +77,7 @@ describe('errorPathUnreachable', () => {
   });
 
   it('falls back to a bare `migration plan` suggestion when both hashes are absent', () => {
-    const failure: MigrationApplyFailure = {
+    const failure: MigrateFailure = {
       code: 'MIGRATION_PATH_NOT_FOUND',
       summary: 'Migration runner reported an unreachable target',
       why: 'No detail available.',

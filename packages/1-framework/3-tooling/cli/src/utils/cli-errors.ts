@@ -28,7 +28,7 @@ import {
 import { errorRuntime } from '@prisma-next/errors/execution';
 import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { RefResolutionError } from '@prisma-next/migration-tools/ref-resolution';
-import type { MigrationApplyFailure } from '../control-api/types';
+import type { MigrateFailure } from '../control-api/types';
 
 export {
   ERROR_CODE_DESTRUCTIVE_CHANGES,
@@ -267,7 +267,7 @@ export function errorMarkerMismatch(
   });
 }
 
-export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructuredError {
+export function errorPathUnreachable(failure: MigrateFailure): CliStructuredError {
   const meta = failure.meta ?? {};
   const fromHashMeta = typeof meta['fromHash'] === 'string' ? meta['fromHash'] : null;
   // `buildPathNotFoundFailure` uses this sentinel in meta when the live marker is null.

@@ -71,7 +71,7 @@ export type ControlActionName =
   | 'dbInit'
   | 'dbUpdate'
   | 'dbVerify'
-  | 'migrationApply'
+  | 'migrate'
   | 'verify'
   | 'schemaVerify'
   | 'sign'
@@ -540,7 +540,7 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
 // ============================================================================
 
 /**
- * Options for the aggregate-walking `migrationApply` operation.
+ * Options for the aggregate-walking `migrate` operation.
  *
  * The control-api operation is responsible for: loading the
  * contract-space aggregate, reading per-space marker rows from the
@@ -550,7 +550,7 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
  * just resolves the descriptor surface (config, refs, contract
  * envelope, app-space migration packages) and hands the inputs in.
  */
-export interface MigrationApplyOptions {
+export interface MigrateOptions {
   /** Already-validated app contract (the canonical "where we are heading" hash). */
   readonly contract: unknown;
   /** Migrations root directory (`migrations/` under the project). */
@@ -575,7 +575,7 @@ export interface MigrationApplyOptions {
    */
   readonly refName?: string;
   /**
-   * Database connection. If provided, migrationApply will connect before executing.
+   * Database connection. If provided, migrate will connect before executing.
    * If omitted, the client must already be connected.
    */
   readonly connection?: unknown;
@@ -619,7 +619,7 @@ export interface MigrationApplyStep {
  * Per-space aggregate detail (markers, ops grouped by space) lives
  * on `perSpace[]`; this list is the per-edge view.
  */
-export interface MigrationApplyAppliedEntry {
+export interface MigrateRanEntry {
   readonly spaceId: string;
   readonly dirName: string;
   readonly migrationHash: string;
@@ -629,13 +629,13 @@ export interface MigrationApplyAppliedEntry {
 }
 
 /**
- * Successful migrationApply result. Carries both the top-level fields
- * (`markerHash` is the **app member's** post-apply marker) and the
+ * Successful migrate result. Carries both the top-level fields
+ * (`markerHash` is the **app member's** post-migrate marker) and the
  * per-space breakdown (`perSpace` — markers / operations in canonical
  * schedule order).
  */
 /**
- * Path-decision summary for the **app member** post-apply. Surfaced
+ * Path-decision summary for the **app member** post-migrate. Surfaced
  * at the top level (and consumed by the cli-journeys suite, which
  * inspects `requiredInvariants`/`satisfiedInvariants`/
  * `selectedPath` to validate invariant routing).
@@ -643,7 +643,7 @@ export interface MigrationApplyAppliedEntry {
  * Per-space path decisions for extension members are not surfaced —
  * extensions own their own ref/invariant control.
  */
-export interface MigrationApplyPathDecision {
+export interface MigratePathDecision {
   readonly fromHash: string;
   readonly toHash: string;
   readonly alternativeCount: number;
@@ -660,10 +660,10 @@ export interface MigrationApplyPathDecision {
   }[];
 }
 
-export interface MigrationApplySuccess {
+export interface MigrateSuccess {
   readonly migrationsApplied: number;
   readonly markerHash: string;
-  readonly applied: readonly MigrationApplyAppliedEntry[];
+  readonly applied: readonly MigrateRanEntry[];
   readonly summary: string;
   /**
    * Per-space breakdown in canonical schedule order (extensions
@@ -674,31 +674,31 @@ export interface MigrationApplySuccess {
   /**
    * Path-decision data for the app member. Present whenever the
    * graph-walk strategy ran for the app (i.e. always for the
-   * aggregate-walking apply path). Absent only for the no-op
+   * aggregate-walking migrate path). Absent only for the no-op
    * "Already up to date" early return when the app has no plan.
    */
-  readonly pathDecision?: MigrationApplyPathDecision;
+  readonly pathDecision?: MigratePathDecision;
 }
 
 /**
- * Failure codes for migrationApply operation.
+ * Failure codes for migrate operation.
  */
-export type MigrationApplyFailureCode = 'RUNNER_FAILED' | 'MIGRATION_PATH_NOT_FOUND';
+export type MigrateFailureCode = 'RUNNER_FAILED' | 'MIGRATION_PATH_NOT_FOUND';
 
 /**
- * Failure details for migrationApply operation.
+ * Failure details for migrate operation.
  */
-export interface MigrationApplyFailure {
-  readonly code: MigrationApplyFailureCode;
+export interface MigrateFailure {
+  readonly code: MigrateFailureCode;
   readonly summary: string;
   readonly why: string | undefined;
   readonly meta: Record<string, unknown> | undefined;
 }
 
 /**
- * Result type for migrationApply operation.
+ * Result type for migrate operation.
  */
-export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyFailure>;
+export type MigrateResult = Result<MigrateSuccess, MigrateFailure>;
 
 // ============================================================================
 // Standalone Contract Emit Types
@@ -892,17 +892,19 @@ export interface ControlClient {
   readLedger(space?: string): Promise<readonly LedgerEntryRecord[]>;
 
   /**
-   * Applies pre-planned on-disk migrations to the database.
+   * Advances the database along the migration graph to the target contract.
    * Each migration runs in its own transaction with full execution checks.
-   * Resume-safe: re-running after failure picks up from the last applied migration.
+   * Resume-safe: re-running after failure picks up from the last run migration.
    *
-   * @param options.originHash - Explicit source hash for the apply path
-   * @param options.destinationHash - Explicit destination hash for the apply path
-   * @param options.pendingMigrations - Ordered migrations to execute
-   * @returns Result pattern: Ok with applied details, NotOk with failure details
+   * @param options.contract - The target contract to migrate to
+   * @param options.migrationsDir - Root migrations directory (`migrations/` under the project)
+   * @param options.refHash - Optional app-space ref override hash
+   * @param options.refInvariants - Required invariants on the user-supplied ref
+   * @param options.refName - Resolved name of the user-supplied app-space ref
+   * @returns Result pattern: Ok with migration details, NotOk with failure details
    * @throws If not connected, target doesn't support migrations, or infrastructure failure
    */
-  migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult>;
+  migrate(options: MigrateOptions): Promise<MigrateResult>;
 
   /**
    * Introspects the database schema.

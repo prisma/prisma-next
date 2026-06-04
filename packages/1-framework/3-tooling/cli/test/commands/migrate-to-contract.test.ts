@@ -21,14 +21,14 @@ import {
  * the emitted contract stays the apply contract.
  *
  * The control client is mocked so the assertion is purely about *which*
- * contract `migrate` hands to `migrationApply` — path resolution and the real
- * apply are covered by the PGlite journey suite.
+ * contract `migrate` hands to `client.migrate` — path resolution and the real
+ * migration run are covered by the PGlite journey suite.
  */
 
 const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   createControlClient: vi.fn(),
-  migrationApply: vi.fn(),
+  migrate: vi.fn(),
   readAllMarkers: vi.fn(),
 }));
 
@@ -114,8 +114,8 @@ function setupConfigMock(): void {
 }
 
 function capturedApplyContractHash(): string {
-  const firstCall = mocks.migrationApply.mock.calls[0];
-  expect(firstCall, 'migrationApply was invoked').toBeDefined();
+  const firstCall = mocks.migrate.mock.calls[0];
+  expect(firstCall, 'migrate was invoked').toBeDefined();
   const arg = firstCall![0] as { contract: { storage: { storageHash: string } } };
   return arg.contract.storage.storageHash;
 }
@@ -144,7 +144,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
 
     setupConfigMock();
     mocks.readAllMarkers.mockResolvedValue(new Map([['app', { storageHash: C2, invariants: [] }]]));
-    mocks.migrationApply.mockResolvedValue({
+    mocks.migrate.mockResolvedValue({
       ok: true,
       value: {
         migrationsApplied: 1,
@@ -157,7 +157,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
     mocks.createControlClient.mockReturnValue({
       connect: vi.fn().mockResolvedValue(undefined),
       readAllMarkers: mocks.readAllMarkers,
-      migrationApply: mocks.migrationApply,
+      migrate: mocks.migrate,
       close: vi.fn().mockResolvedValue(undefined),
     });
   });
@@ -227,7 +227,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
     expect(envelope.summary).toContain('Contract validation failed');
     expect(envelope.where?.path).toContain(endContractRel);
     expect(envelope.why).toContain(endContractRel);
-    expect(mocks.migrationApply).not.toHaveBeenCalled();
+    expect(mocks.migrate).not.toHaveBeenCalled();
   });
 
   // Regression lock for TML-2478: the top-level `contract.json` read at the
@@ -253,7 +253,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
     expect(envelope.code).toBe('PN-CLI-4004');
     expect(envelope.summary).toContain('File not found');
     expect(envelope.where?.path).toContain('contract.json');
-    expect(mocks.migrationApply).not.toHaveBeenCalled();
+    expect(mocks.migrate).not.toHaveBeenCalled();
   });
 
   it('reports contract validation failure when the top-level contract.json is unparseable', async () => {
@@ -276,6 +276,6 @@ describe('migrate --to verifies against the target bundle contract', () => {
     expect(envelope.code).toBe('PN-CLI-4003');
     expect(envelope.summary).toContain('Contract validation failed');
     expect(envelope.where?.path).toContain('contract.json');
-    expect(mocks.migrationApply).not.toHaveBeenCalled();
+    expect(mocks.migrate).not.toHaveBeenCalled();
   });
 });

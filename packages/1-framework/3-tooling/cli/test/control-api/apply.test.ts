@@ -133,11 +133,11 @@ describe('applyMigration apply span label', () => {
     });
   });
 
-  it('emits the `migrationApply` label for action=migrationApply', async () => {
-    const events = await runWithAction('migrationApply');
+  it('emits the `migrate` label for action=migrate', async () => {
+    const events = await runWithAction('migrate');
     const start = events.find((e) => e.kind === 'spanStart' && e.spanId === 'apply');
     expect(start).toMatchObject({
-      action: 'migrationApply',
+      action: 'migrate',
       label: 'Applying migration plan across spaces',
     });
   });
