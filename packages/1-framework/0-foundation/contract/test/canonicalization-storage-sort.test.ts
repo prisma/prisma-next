@@ -96,4 +96,11 @@ describe('compareByNameProperty', () => {
   it('treats missing name as empty string', () => {
     expect(compareByNameProperty({}, { name: 'a' })).toBeLessThan(0);
   });
+
+  // Locale-independence regression: comparator must use code-unit order, not locale collation.
+  // Code-unit: 'Z' = U+005A < 'a' = U+0061, so { name: 'Z' } sorts before { name: 'a' }.
+  // Most locales sort 'a' before 'Z' (case-insensitive), so localeCompare would return > 0 here.
+  it('uses code-unit order, not locale collation (Z < a)', () => {
+    expect(compareByNameProperty({ name: 'Z' }, { name: 'a' })).toBeLessThan(0);
+  });
 });
