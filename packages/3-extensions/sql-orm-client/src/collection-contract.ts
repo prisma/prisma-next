@@ -250,13 +250,11 @@ export function resolveIncludeRelation(
     );
     through = {
       table: relation.through.table,
+      namespaceId: relation.through.namespaceId,
       parentColumns: relation.through.parentColumns,
       childColumns: relation.through.childColumns,
       targetColumns: relation.through.targetColumns,
       parentLocalColumns,
-      ...(relation.through.namespaceId !== undefined
-        ? { namespaceId: relation.through.namespaceId }
-        : {}),
     };
   }
 
