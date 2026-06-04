@@ -83,8 +83,25 @@ One reviewer holds it in one sitting: the slice migrates **all** Mongo marker/le
 
 - [ ] Zero `db.collection(...).{aggregate,insertOne,findOneAndUpdate}` in marker/ledger code paths — every read/write goes `construct → createMongoAdapter().lower() → MongoDriverImpl.fromDb(db).execute(wireCommand)` (`rg` clean).
 - [ ] `executeAggregate` / `executeInsertOne` / `executeFindOneAndUpdate`, the two `as` casts in `marker-ledger.ts`, and the `extractDb` marker coupling are **deleted, not wrapped**; cast ratchet not regressed.
-- [ ] The contract-free Mongo construction surface is authored and is the construction path for all in-scope marker/ledger reads + writes; it reuses `createFieldAccessor` (no re-derivation of `PipelineChain`'s state machine) and produces canonical structured command nodes (no second AST layer; no option-bag wrappers over `new Raw*Command(...)` — F21).
+- [ ] The contract-free Mongo construction surface is authored and is the construction path for all in-scope marker/ledger reads + writes; it reuses `createFieldAccessor` and produces canonical structured command nodes through a **fluent builder** (see Corrective scope round 2 — the original "no re-derivation of the chain" framing was wrong and caused the F21 miss).
 - [ ] `readAllMarkers`'s `$type` / `$expr` filter is expressed via the additive typed surface (`.type()` / `expr(...)`), with **zero new AST nodes** and no raw escape hatch.
+
+## Corrective scope (round 2 — added after operator review of D1/D2)
+
+Operator review found D1 delivered the SPI routing (good — kept) but **not a query builder**: `control-construction.ts` is free-standing `*Command` factory functions that hand-assemble the AST (`new MongoMatchStage(MongoAndExpr.of([...]))`, `new AggregateCommand(...)`, `new FindOneAndUpdateCommand(...)`, plain insert-doc literals). `createFieldAccessor` only typed the leaves. That is the F21 failure one altitude above D1's review, and it violates the project-DoD "no in-scope operation hand-builds nodes by object literal." Root cause: the `drive-plan-slice` scope guard ("reuse the field accessor; do **not** re-derive the chain") conflated *reuse the field accessor* with *have a builder* — SQL's `table.ts` has both column proxies **and** fluent query classes; D1 shipped only the proxies.
+
+**Corrected design (operator-confirmed):**
+
+- A **focused contract-free fluent Mongo query builder** (option A — parallel to the user-facing `mongoQuery`, the way SQL's `table.ts` is a purpose-built contract-free builder rather than a contract-free-ified `sql()`). `collection<Shape>(name)` → a fluent chain producing the canonical `AggregateCommand` / `InsertOneCommand` / `FindOneAndUpdateCommand`; leaf field access reuses `createFieldAccessor`; **no second AST layer** (the chain `.build()`s the real command). Lives in `@prisma-next/mongo-query-builder`'s contract-free entry.
+- **No free-standing query functions.** Each control op is constructed **inline** in its `MongoControlAdapterImpl` method via the builder; `control-construction.ts`'s `*Command` functions are deleted. The invariant-merge agg-expr is a private adapter helper, not a free-standing query function. (Completes the SQL round-3 retro: ops are adapter methods, not module functions.)
+- **Kept from D1/D2:** the `.type()`/`expr()` field-accessor sugar; the entire D2 layer (`MongoControlAdapter` SPI + `#executeControl` lower→dispatch). The corrective rounds replace only the *construction* layer.
+
+### New done conditions (round 2)
+
+- [ ] A fluent contract-free Mongo builder exists (`collection<Shape>(name)` + chain) producing canonical command nodes via `createFieldAccessor`; representative chain depth ≥ 2; not a factory-wrapper-over-`new-Command` shape; no second AST layer.
+- [ ] No marker/ledger construction site (builder internals aside) writes `new MongoMatchStage(` / `new AggregateCommand(` / `new FindOneAndUpdateCommand(` / `MongoAndExpr.of(` — `rg` clean in adapter source.
+- [ ] The six free-standing `*Command` functions no longer exist; each adapter method builds inline. `rg` for `readMarkerCommand|readAllMarkersCommand|readLedgerCommand|insertMarkerCommand|insertLedgerCommand|advanceMarkerCommand` returns zero.
+- [ ] Behaviour invariant preserved — `marker-ledger.test.ts` still green **unmodified**.
 
 ## Open Questions
 

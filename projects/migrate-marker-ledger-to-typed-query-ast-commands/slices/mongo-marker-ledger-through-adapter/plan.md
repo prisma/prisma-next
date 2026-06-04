@@ -31,3 +31,21 @@ The slice-DoD is fully reachable: surface authored (D1) + consumed as first cons
 ## Out of scope (per spec — candidate follow-up)
 
 Mongo **migration-op** adoption of the contract-free surface (`CreateCollectionCommand` / `CreateIndexCommand` via `MongoCommandExecutor`). If, during D1, the surface's shape clearly wants to cover DDL too and one review can't hold both, fan out a third dispatch / sibling slice rather than widening D1.
+
+## Corrective dispatches (round 2 — after operator review of D1/D2)
+
+**Why:** operator review found that D1's "contract-free construction surface" (`control-construction.ts`) is not a query builder — it's free-standing `*Command` factory functions that **hand-assemble** the AST (`new MongoMatchStage(MongoAndExpr.of([...]))`, `new AggregateCommand(...)`, `new FindOneAndUpdateCommand(...)`, plain insert-doc object literals). The only builder-like piece is `createFieldAccessor` at the leaves. That is the F21 failure one altitude up from what D1's review checked, and it trips the project-DoD line "no in-scope operation hand-builds nodes by object literal." D2's adapter SPI + `#executeControl` routing are **correct and kept**; only the construction layer is replaced. Implementer for D3/D4: **Sonnet-4.6-med** (reviewer stays Opus). Retro lesson landed in `learnings.md` + the reviewer-litmus calibration.
+
+### Dispatch 3: contract-free fluent Mongo query builder
+
+- **Outcome:** A focused **fluent** contract-free Mongo query builder exists — `collection<Shape>(name)` → a handle whose chain produces the *canonical* command nodes, with the leaf field access reusing `createFieldAccessor`. Covers exactly what the six control ops need: `.aggregate().match(f => …).limit(n).sort(spec).build() → AggregateCommand`; `.insertOne(doc) → InsertOneCommand`; `.match(f => …).findOneAndUpdate(f => f.set({…}), { upsert }) → FindOneAndUpdateCommand`. **No call site writes `new MongoMatchStage(...)` / `new AggregateCommand(...)` / `MongoAndExpr.of([...])`.** It is the spirit of SQL's `table.ts` (`marker.update().set().where().build()`), adapted to Mongo's command model — a real builder, not factory wrappers; produces existing AST (no second AST layer). Unit-tested in isolation.
+- **Builds on:** D1's `createFieldAccessor` sugar (`.type()`, `expr()`) and the structured command classes.
+- **Hands to:** a tested fluent builder surface (lives in `@prisma-next/mongo-query-builder`'s contract-free entry, beside `createFieldAccessor`) that D4 consumes.
+- **Focus:** the builder + its tests. **Out:** the adapter methods (D4); deleting the free-standing functions (D4). **Gates:** package typecheck + new builder tests; `pnpm lint:deps`.
+
+### Dispatch 4: adapter methods build inline via the builder; delete the free-standing functions
+
+- **Outcome:** Each of the six `MongoControlAdapterImpl` methods constructs its command **inline** via the D3 builder (e.g. `this.#control.aggregate().match(f => f._id.eq(space).and(f.space.eq(space))).limit(1).build()`), then dispatches via the existing `#executeControl`. The free-standing `readMarkerCommand` / `readAllMarkersCommand` / `readLedgerCommand` / `insertMarkerCommand` / `insertLedgerCommand` / `advanceMarkerCommand` functions in `control-construction.ts` are **deleted**; the invariant-merge agg-expr becomes a private adapter helper (or inline), not a free-standing query function. `ControlDocShape` / `CONTROL_COLLECTION` survive only as the shape/const the builder is parameterized with.
+- **Builds on:** D3's builder.
+- **Hands to:** the slice's true end state — every control op constructed through a real fluent builder, as adapter instance methods, dispatched through the adapter.
+- **Focus:** `mongo-control-adapter.ts` + removing `control-construction.ts`'s free functions. **Gates:** `marker-ledger.test.ts` green **unmodified** (behaviour oracle); `rg` gate — zero `new MongoMatchStage(`/`new AggregateCommand(`/`new FindOneAndUpdateCommand(`/`MongoAndExpr.of(` in marker/ledger source (the build goes through the fluent surface); `rg` zero `readMarkerCommand|advanceMarkerCommand|insertMarkerCommand|insertLedgerCommand|readAllMarkersCommand|readLedgerCommand` (free functions gone); adapter-mongo + target-mongo tests; `pnpm lint:deps`; cast ratchet not regressed.
