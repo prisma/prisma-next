@@ -18,7 +18,7 @@ import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sq
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
-import type { Contract as PolyContractType } from './fixtures/polymorphism/generated/contract';
+import type { Contract as PolyContract } from './fixtures/polymorphism/generated/contract';
 import polyContractJson from './fixtures/polymorphism/generated/contract.json' with {
   type: 'json',
 };
@@ -114,7 +114,7 @@ export function getTestContext(): ExecutionContext<TestContract> {
   return testContext;
 }
 
-export type PolyContract = PolyContractType;
+export type { PolyContract };
 
 export function deserializePolyContract(json: unknown = polyContractJson): PolyContract {
   return postgresContractSerializer.deserializeContract(json) as PolyContract;
