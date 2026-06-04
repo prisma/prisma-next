@@ -332,6 +332,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'post_tag';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly postId: { readonly column: 'postId' };
             readonly tagId: { readonly column: 'tagId' };
@@ -374,6 +375,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'tag';
+          readonly namespaceId: '__unbound__';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly label: { readonly column: 'label' };
@@ -536,6 +538,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'post_tag';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly postId: { readonly column: 'postId' };
                 readonly tagId: { readonly column: 'tagId' };
@@ -578,6 +581,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'tag';
+              readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly label: { readonly column: 'label' };
