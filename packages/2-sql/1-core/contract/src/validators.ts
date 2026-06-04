@@ -256,21 +256,6 @@ export function createNamespaceEntrySchema(
         '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
       }),
     }),
-  }).narrow((ns, ctx) => {
-    if (typeof ns !== 'object' || ns === null || Array.isArray(ns)) {
-      return ctx.mustBe('an object');
-    }
-    if (
-      Object.hasOwn(ns, 'tables') ||
-      Object.hasOwn(ns, 'enum') ||
-      Object.hasOwn(ns, 'collections')
-    ) {
-      return ctx.reject({
-        expected:
-          'namespace must use `entries: { table?, type?, collection? }`; flat slot keys (tables, enum, collections) are no longer accepted',
-      });
-    }
-    return true;
   }) as Type<unknown>;
 }
 
