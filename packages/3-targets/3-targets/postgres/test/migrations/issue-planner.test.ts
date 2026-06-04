@@ -29,14 +29,13 @@ function makeContract(
     };
   } = {},
 ): Contract<SqlStorage> {
+  const { table = {}, type } = overrides.entries ?? {};
   const unboundNs = postgresCreateNamespace(
     {
       id: UNBOUND_NAMESPACE_ID,
-      entries: {
-        table: overrides.entries?.table ?? {},
-      },
+      entries: { table },
     },
-    overrides.entries?.type,
+    type,
   );
   return {
     target: 'postgres',
