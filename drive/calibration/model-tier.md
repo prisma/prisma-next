@@ -1,6 +1,6 @@
 # Model-tier routing
 
-Which model tier should this dispatch run on? Per [`docs/drive/principles/decomposition-and-cost.md`](../../docs/drive/principles/decomposition-and-cost.md), the cost-vs-capability decision is dispatch-shape-dependent, not size-dependent. A judgment-heavy M dispatch belongs on the orchestrator tier; a mechanical M dispatch belongs on the cheap tier.
+Which model tier should this dispatch run on? Per [`docs/drive/principles/decomposition-and-cost.md`](https://github.com/prisma/ignite/blob/main/docs/drive/principles/decomposition-and-cost.md), the cost-vs-capability decision is dispatch-shape-dependent, not size-dependent. A judgment-heavy M dispatch belongs on the orchestrator tier; a mechanical M dispatch belongs on the cheap tier.
 
 ## Routing table
 

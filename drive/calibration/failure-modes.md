@@ -79,7 +79,7 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Mitigation.**
 
-- Dispatch DoR refuses dispatches that fail dispatch-INVEST (in particular *Estimable* + *Small* — see [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md)).
+- Dispatch DoR refuses dispatches that fail dispatch-INVEST (in particular *Estimable* + *Small* — see [`docs/drive/principles/sizing.md`](https://github.com/prisma/ignite/blob/main/docs/drive/principles/sizing.md)).
 - All admitted dispatches are subject to WIP-inspection cadence (≤ 5 min), including diff reads.
 - Brief pre-names the dispatch's single outcome so the orchestrator can verify each commit serves it.
 
