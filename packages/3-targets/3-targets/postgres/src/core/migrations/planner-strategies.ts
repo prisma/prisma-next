@@ -35,6 +35,7 @@ import {
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
 import {
@@ -177,7 +178,12 @@ function locateNamespaceType(
   typeName: string,
 ): PostgresEnumStorageEntry | undefined {
   const ns = storage.namespaces[namespaceId];
-  return ns?.entries.type?.[typeName];
+  const raw = ns?.entries['type']?.[typeName];
+  if (raw === undefined) return undefined;
+  return blindCast<
+    PostgresEnumStorageEntry,
+    'postgres type slot carries PostgresEnumStorageEntry at the postgres target layer'
+  >(raw);
 }
 
 // ============================================================================

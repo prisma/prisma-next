@@ -16,7 +16,7 @@ import type {
   VerificationStatus,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
@@ -28,6 +28,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import type { CodecControlHooks } from '../migrations/types';
@@ -152,10 +153,13 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     >),
   };
   for (const ns of Object.values(contract.storage.namespaces)) {
-    const nsEnums = ns.entries.type;
+    const nsEnums = ns.entries['type'];
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
-        allStorageTypesMap[k] = v;
+        allStorageTypesMap[k] = blindCast<
+          PostgresEnumStorageEntry | StorageTypeInstance,
+          'entries.type holds postgres-specific enum entries at runtime; family verifier reads them opaquely'
+        >(v);
       }
     }
   }
@@ -223,23 +227,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     });
   };
 
-  // Top-level `storage.types`: codec-typed entries via codec hooks; a
-  // defensive top-level enum is verified under the unbound coordinate.
+  // Top-level `storage.types`: codec-typed entries via codec hooks.
   for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
-    if (isPostgresEnumStorageEntry(typeInstance)) {
-      pushTypeNode(
-        typeName,
-        `storage.types.${typeName}`,
-        verifyEnumType({
-          typeName,
-          typeInstance,
-          schema,
-          resolveExistingEnumValues,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-        }),
-        effectiveControlPolicy(typeInstance.control, contract.defaultControlPolicy),
-      );
-    } else if (isStorageTypeInstance(typeInstance)) {
+    if (isStorageTypeInstance(typeInstance)) {
       const hook = codecHooks.get(typeInstance.codecId);
       pushTypeNode(
         typeName,
@@ -254,7 +244,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   for (const nsId of Object.keys(contract.storage.namespaces)) {
     const ns = contract.storage.namespaces[nsId];
     if (!ns) continue;
-    const nsEnums = ns.entries.type;
+    const nsEnums = ns.entries['type'];
     if (!nsEnums) continue;
     for (const [typeName, entry] of Object.entries(nsEnums)) {
       if (!isPostgresEnumStorageEntry(entry)) continue;

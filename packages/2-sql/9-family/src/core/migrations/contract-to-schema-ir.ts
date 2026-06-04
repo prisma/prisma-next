@@ -24,6 +24,7 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
@@ -327,10 +328,13 @@ export function contractToSchemaIR(
     ...((storage.types ?? {}) as ResolvedStorageTypes),
   };
   for (const ns of Object.values(storage.namespaces)) {
-    const nsEnums = ns.entries.type;
+    const nsEnums = ns.entries['type'];
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
-        allTypes[k] = v;
+        allTypes[k] = blindCast<
+          PostgresEnumStorageEntry | StorageTypeInstance,
+          'entries.type holds postgres-specific enum entries at runtime'
+        >(v);
       }
     }
   }
@@ -415,7 +419,7 @@ function deriveAnnotations(
   // `readExistingEnumValues` read side, so two namespaces sharing an enum name
   // (or native type) resolve to distinct live-database types.
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    const nsEnums = ns.entries.type;
+    const nsEnums = ns.entries['type'];
     if (!nsEnums) continue;
     for (const entry of Object.values(nsEnums)) {
       if (!isPostgresEnumStorageEntry(entry)) continue;

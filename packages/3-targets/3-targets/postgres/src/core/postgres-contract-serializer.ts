@@ -14,11 +14,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type {
-  SqlNamespaceTablesInput,
-  SqlStorage,
-  SqlStorageTypeEntry,
-} from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { Type } from 'arktype';
@@ -57,9 +53,8 @@ function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamesp
       if (isAuthoringEntityTypeDescriptor(value)) {
         if (isAuthoringEntityTypeFactoryOutput(value.output)) {
           const { factory } = value.output;
-          entityTypeRegistry.set(
-            value.discriminator,
-            (raw) => factory(raw, POSTGRES_AUTHORING_CTX) as SqlStorageTypeEntry,
+          entityTypeRegistry.set(value.discriminator, (raw) =>
+            factory(raw, POSTGRES_AUTHORING_CTX),
           );
         }
         if (value.validatorSchema !== undefined) {
@@ -96,10 +91,28 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       'super.hydrateSqlNamespaceEntry returns the tables form when raw is not a NamespaceBase'
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
-    const tables = entries?.table ?? {};
-    const typeSlot = entries?.type;
 
-    const emptyTables = Object.keys(tables).length === 0;
+    // Extract the postgres-specific `type` slot directly from raw input.
+    // The family base handles the `table` slot; the postgres target owns `type`.
+    const rawRecord = raw as Record<string, unknown>;
+    const rawEntries = rawRecord['entries'];
+    let typeSlot: Record<string, PostgresEnumType> | undefined;
+    if (rawEntries !== null && typeof rawEntries === 'object' && !Array.isArray(rawEntries)) {
+      const rawTypeSlot = (rawEntries as Record<string, unknown>)['type'];
+      if (rawTypeSlot !== null && typeof rawTypeSlot === 'object' && !Array.isArray(rawTypeSlot)) {
+        const enumFactory = this.entityTypeRegistry.get('postgres-enum');
+        typeSlot = Object.fromEntries(
+          Object.entries(rawTypeSlot as Record<string, unknown>).map(([name, entry]) => [
+            name,
+            blindCast<PostgresEnumType, 'postgres-enum factory returns PostgresEnumType'>(
+              enumFactory !== undefined ? enumFactory(entry) : entry,
+            ),
+          ]),
+        );
+      }
+    }
+
+    const emptyTables = Object.keys(entries.table).length === 0;
     const emptyTypes = !typeSlot || Object.keys(typeSlot).length === 0;
     if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes) {
       return PostgresSchema.unbound;
@@ -107,14 +120,8 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     return new PostgresSchema({
       id,
       entries: {
-        table: tables,
-        ...(typeSlot !== undefined
-          ? {
-              type: blindCast<Record<string, PostgresEnumType>, 'hydrated entries.type slot'>(
-                typeSlot,
-              ),
-            }
-          : {}),
+        table: entries.table,
+        ...(typeSlot !== undefined ? { type: typeSlot } : {}),
       },
     });
   }
@@ -127,7 +134,6 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
       } else {
         const isUnboundSlot = nsId === UNBOUND_NAMESPACE_ID;
-        const typeSlot = ns.entries.type ?? {};
         namespacesJson[nsId] = {
           id: nsId,
           kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
@@ -136,12 +142,6 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
               Object.entries(ns.entries.table).map(([tableName, table]) => [
                 tableName,
                 this.serializeJsonValue(table) as JsonObject,
-              ]),
-            ),
-            type: Object.fromEntries(
-              Object.entries(typeSlot).map(([typeName, entry]) => [
-                typeName,
-                this.serializeJsonValue(entry) as JsonObject,
               ]),
             ),
           },
@@ -171,7 +171,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       tablesOut[tableName] = this.serializeJsonValue(table) as JsonObject;
     }
     const typeOut: Record<string, JsonObject> = {};
-    for (const [typeName, ty] of Object.entries(ns.entries.type ?? {})) {
+    for (const [typeName, ty] of Object.entries(ns.entries.type)) {
       typeOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
     }
     return {

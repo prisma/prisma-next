@@ -251,10 +251,10 @@ function partitionStorageTypesForTarget(
   types: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
   namespaceTypes?: Readonly<Record<string, Readonly<Record<string, PostgresEnumStorageEntry>>>>,
 ): {
-  readonly documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+  readonly documentTypes: Record<string, StorageTypeInstance>;
   readonly namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>>;
 } {
-  const documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  const documentTypes: Record<string, StorageTypeInstance> = {};
   const namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
   for (const [name, entry] of Object.entries(types)) {
     if (isPostgresEnumStorageEntry(entry)) {

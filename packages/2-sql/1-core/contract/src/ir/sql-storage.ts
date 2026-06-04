@@ -1,9 +1,5 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
 import { freezeNode, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
-import {
-  isPostgresEnumStorageEntry,
-  type PostgresEnumStorageEntry,
-} from './postgres-enum-storage-entry';
 import { SqlNode } from './sql-node';
 import type { StorageTable, StorageTableInput } from './storage-table';
 import {
@@ -14,20 +10,19 @@ import {
 
 /**
  * Polymorphic value type for document-scoped `SqlStorage.types` entries
- * (codec aliases / parameterised native type registrations). Postgres
- * native enum registrations live under
- * `storage.namespaces[namespaceId].entries.type` instead.
+ * (codec aliases / parameterised native type registrations).
+ *
+ * Postgres native enum registrations live under the postgres-specific
+ * `entries.type` slot on `PostgresSchema` (target layer), not here.
  */
-export type SqlStorageTypeEntry =
-  | StorageTypeInstance
-  | StorageTypeInstanceInput
-  | PostgresEnumStorageEntry;
+export type SqlStorageTypeEntry = StorageTypeInstance | StorageTypeInstanceInput;
 
 export interface SqlNamespaceTablesInput {
   readonly id: string;
-  readonly entries?: {
-    readonly table?: Record<string, StorageTable | StorageTableInput>;
-    readonly type?: Record<string, PostgresEnumStorageEntry>;
+  readonly entries: {
+    readonly table: Record<string, StorageTable | StorageTableInput>;
+    /** Target-specific pass-through: postgres enum entries under `type`. */
+    readonly type?: Record<string, unknown>;
   };
 }
 
@@ -53,12 +48,10 @@ export interface SqlStorageInput<THash extends string = string> {
  *
  * The constructor normalises optional `types` into class instances.
  * `types` is polymorphic per Decision 18 Option B: codec-triple inputs
- * are stamped with `kind: 'codec-instance'`; class-instance kinds
- * (e.g. Postgres-enum entries satisfying `PostgresEnumStorageEntry`)
- * pass through; hydration of raw JSON class-instance entries (carrying
- * their narrower `kind` literal) is the per-target serializer's
- * responsibility (so the family base does not import target-specific
- * subclasses).
+ * are stamped with `kind: 'codec-instance'`; hydration of raw JSON
+ * class-instance entries (carrying their narrower `kind` literal) is
+ * the per-target serializer's responsibility (so the family base does
+ * not import target-specific subclasses).
  */
 // SQL concretions store `StorageTable` values under `entries.table`.
 // Mongo namespaces carry `entries.collection` instead. The wider
@@ -69,7 +62,8 @@ export interface SqlStorageInput<THash extends string = string> {
 export type SqlNamespace = Namespace & {
   readonly entries: Readonly<{
     readonly table: Readonly<Record<string, StorageTable>>;
-    readonly type?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+    /** Target-specific pass-through: postgres enum entries under `type`. */
+    readonly type?: Readonly<Record<string, unknown>>;
   }>;
   /**
    * Render a dialect-qualified table reference for runtime SQL emission.
@@ -83,7 +77,7 @@ export type SqlNamespace = Namespace & {
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
   readonly namespaces: Readonly<Record<string, SqlNamespace>>;
-  declare readonly types?: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
+  declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
 
   constructor(input: SqlStorageInput<THash>) {
     super();
@@ -110,9 +104,8 @@ export function storageTableAt(
 
 /**
  * Strict polymorphic-slot dispatch for `SqlStorage.types` entries.
- * Every entry must carry a recognised `kind` discriminator — either
- * `'codec-instance'` (codec triple, family-shared) or
- * `'postgres-enum'` (target-specific IR class). Untagged or
+ * Every entry must carry a `kind: 'codec-instance'` discriminator or
+ * be an already-constructed `StorageTypeInstance`. Untagged or
  * unrecognised inputs throw a diagnostic naming the entry and its
  * `kind`, so format drift surfaces loudly at the deserializer
  * boundary instead of slipping past the seam and corrupting
@@ -125,22 +118,7 @@ export function storageTableAt(
  * arktype schema rejects untagged entries earlier, so this throw
  * only fires for in-memory authoring bugs.
  */
-function normaliseTypeEntry(
-  name: string,
-  entry: SqlStorageTypeEntry,
-): StorageTypeInstance | PostgresEnumStorageEntry {
-  if (isPostgresEnumStorageEntry(entry)) {
-    // Live class instances pass through unchanged; raw JSON envelopes
-    // (e.g. `kind: 'postgres-enum'` without the class identity) are
-    // rejected so the target serializer's hydration path is the only
-    // way IR class instances enter the slot.
-    if (entry instanceof SqlNode) {
-      return entry;
-    }
-    throw new Error(
-      `Encountered raw postgres-enum JSON in storage.types[${JSON.stringify(name)}] without serializer hydration; use a target ContractSerializer that registers the matching entity-type factory.`,
-    );
-  }
+function normaliseTypeEntry(name: string, entry: SqlStorageTypeEntry): StorageTypeInstance {
   if (isStorageTypeInstance(entry)) {
     return entry;
   }
@@ -150,6 +128,6 @@ function normaliseTypeEntry(
       ? 'missing `kind` discriminator'
       : `unrecognised \`kind\` discriminator ${JSON.stringify(rawKind)}`;
   throw new Error(
-    `storage.types[${JSON.stringify(name)}] has ${kindDescription}; expected ${JSON.stringify('codec-instance')} or ${JSON.stringify('postgres-enum')}. Untagged codec triples should be wrapped with toStorageTypeInstance(...) before construction.`,
+    `storage.types[${JSON.stringify(name)}] has ${kindDescription}; expected ${JSON.stringify('codec-instance')}. Untagged codec triples should be wrapped with toStorageTypeInstance(...) before construction.`,
   );
 }

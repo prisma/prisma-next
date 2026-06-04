@@ -38,7 +38,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export type SqlEntityHydrationFactory = (entry: unknown) => SqlStorageTypeEntry;
+export type SqlEntityHydrationFactory = (entry: unknown) => unknown;
 
 /**
  * SQL family `ContractSerializer` abstract base. Carries the SQL-shared
@@ -70,7 +70,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   private readonly contractSchema: Type<unknown> | undefined;
 
   constructor(
-    private readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory> = new Map(),
+    protected readonly entityTypeRegistry: ReadonlyMap<
+      string,
+      SqlEntityHydrationFactory
+    > = new Map(),
     validatorFragments?: ReadonlyMap<string, Type<unknown>>,
   ) {
     // Only build a fragments-aware contract schema when pack contributions
@@ -158,7 +161,12 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         const namespaceMaterialised =
           namespaceHydrated instanceof NamespaceBase
             ? namespaceHydrated
-            : buildSqlNamespace(namespaceHydrated);
+            : buildSqlNamespace(
+                blindCast<
+                  SqlNamespaceTablesInput,
+                  'hydrateSqlNamespaceEntry returns SqlNamespaceTablesInput when raw is not a NamespaceBase'
+                >(namespaceHydrated),
+              );
         return [nsId, namespaceMaterialised];
       }),
     );
@@ -178,7 +186,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       Object.hasOwn(rawRecord, 'collections')
     ) {
       throw new ContractValidationError(
-        'Namespace envelope uses deprecated flat slot keys; expected `entries: { table?, type? }`',
+        'Namespace envelope uses deprecated flat slot keys; expected `entries: { table? }`',
         'structural',
       );
     }
@@ -188,52 +196,21 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       const messages = parsed.map((p: { message: string }) => p.message).join('; ');
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
     }
-    const entriesInput: {
-      table?: Record<string, StorageTable>;
-      type?: Record<string, SqlStorageTypeEntry>;
-    } = {};
+    // Default to empty table; overwritten below if raw entries carry a table slot.
+    const entriesInput: { table: Record<string, StorageTable> } = { table: {} };
     const entriesRaw = parsed.entries;
     if (entriesRaw !== undefined && typeof entriesRaw === 'object' && entriesRaw !== null) {
-      for (const [slotKey, slotValue] of Object.entries(entriesRaw)) {
-        if (slotValue === null || typeof slotValue !== 'object') continue;
-
-        if (slotKey === 'table') {
-          entriesInput.table = Object.fromEntries(
-            Object.entries(slotValue as Record<string, unknown>).map(([tableName, table]) => [
-              tableName,
-              table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
-            ]),
-          );
-          continue;
-        }
-
-        const hydratedSlot = Object.fromEntries(
-          Object.entries(slotValue as Record<string, unknown>).map(([entryName, entry]) => {
-            if (typeof entry !== 'object' || entry === null) {
-              return [entryName, entry];
-            }
-            const kind = (entry as { kind?: unknown }).kind;
-            if (typeof kind === 'string') {
-              const factory = this.entityTypeRegistry.get(kind);
-              if (factory !== undefined) {
-                return [entryName, factory(entry)];
-              }
-              if (slotKey === 'type' && this.entityTypeRegistry.get(kind) === undefined) {
-                throw new ContractValidationError(
-                  `Entry kind '${kind}' has no registered hydration factory.`,
-                  'structural',
-                );
-              }
-            }
-            return [entryName, entry];
-          }),
+      const tableSlot = (entriesRaw as Record<string, unknown>)['table'];
+      if (tableSlot !== null && typeof tableSlot === 'object' && !Array.isArray(tableSlot)) {
+        entriesInput.table = Object.fromEntries(
+          Object.entries(tableSlot as Record<string, unknown>).map(([tableName, table]) => [
+            tableName,
+            table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
+          ]),
         );
-        if (slotKey === 'type') {
-          entriesInput.type = blindCast<Record<string, SqlStorageTypeEntry>, 'hydrated type slot'>(
-            hydratedSlot,
-          );
-        }
       }
+      // Target-specific slots (e.g. postgres `type`) are left for target
+      // overrides to extract from the original `raw` parameter.
     }
 
     return blindCast<SqlNamespaceTablesInput, 'hydrated namespace tables input'>({
@@ -254,7 +231,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     if (factory === undefined) {
       return entry;
     }
-    return factory(entry);
+    return blindCast<
+      SqlStorageTypeEntry,
+      'entity registry factory returns SqlStorageTypeEntry for storage.types entries'
+    >(factory(entry));
   }
 
   protected constructTargetContract(hydrated: Contract<SqlStorage>): TContract {
