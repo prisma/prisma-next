@@ -55,12 +55,14 @@ describe('SqliteDatabase', () => {
 
 describe('sqliteCreateNamespace factory', () => {
   it('returns the unbound singleton for the framework-reserved sentinel', () => {
-    expect(sqliteCreateNamespace({ id: UNBOUND_NAMESPACE_ID })).toBe(
+    expect(sqliteCreateNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } })).toBe(
       SqliteUnboundDatabase.instance,
     );
   });
 
   it('rejects every non-unbound coordinate — SQLite contracts cannot declare named namespaces', () => {
-    expect(() => sqliteCreateNamespace({ id: 'auth' })).toThrow(/SQLite has no schema concept/);
+    expect(() => sqliteCreateNamespace({ id: 'auth', entries: { table: {} } })).toThrow(
+      /SQLite has no schema concept/,
+    );
   });
 });

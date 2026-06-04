@@ -19,7 +19,7 @@ describe('buildSqlNamespaceMap', () => {
 
   it('materialises plain tables-input entries', () => {
     const map = buildSqlNamespaceMap({
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID },
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } },
       app: { id: 'app', entries: { table: { users: emptyTableInput } } },
     });
     expect(map[UNBOUND_NAMESPACE_ID]).toBe(SqlUnboundNamespace.instance);

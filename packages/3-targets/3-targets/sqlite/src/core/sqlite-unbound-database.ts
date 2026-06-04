@@ -1,35 +1,33 @@
 import {
   freezeNode,
+  materializeAndFreezeEntries,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import { type SqlNamespaceTablesInput, StorageTable } from '@prisma-next/sql-contract/types';
-import { castAs } from '@prisma-next/utils/casts';
+import {
+  type SqlNamespaceTablesInput,
+  StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 
 export type SqliteDatabaseInput = {
   readonly id: string;
   readonly entries: {
-    readonly table: Readonly<Record<string, StorageTable>>;
+    readonly table: Readonly<Record<string, StorageTable | StorageTableInput>>;
   };
 };
 
 const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
 
-function freezeSqliteTableEntries(
-  input: SqlNamespaceTablesInput['entries'],
-): SqliteDatabase['entries'] {
-  return Object.freeze({
-    table: Object.freeze(
-      Object.fromEntries(
-        Object.entries(input?.table ?? {}).map(([name, t]) => [
-          name,
-          t instanceof StorageTable ? t : new StorageTable(t),
-        ]),
-      ),
-    ),
-  });
-}
+const SQLITE_TABLE_REGISTRY: ReadonlyMap<string, (raw: unknown) => StorageTable> = new Map([
+  [
+    'table',
+    (raw: unknown) =>
+      raw instanceof StorageTable ? raw : new StorageTable(raw as StorageTableInput),
+  ],
+]);
 
 function isMaterializedSqliteNamespace(
   ns: Namespace | SqlNamespaceTablesInput,
@@ -60,7 +58,10 @@ export class SqliteDatabase extends NamespaceBase {
   constructor(input: SqliteDatabaseInput) {
     super();
     this.id = input.id;
-    this.entries = freezeSqliteTableEntries(input.entries);
+    this.entries = blindCast<
+      SqliteDatabase['entries'],
+      'materializeAndFreezeEntries with SQLITE_TABLE_REGISTRY produces StorageTable instances under table slot'
+    >(materializeAndFreezeEntries(input.entries, SQLITE_TABLE_REGISTRY));
     Object.defineProperty(this, 'kind', {
       value: SQLITE_NAMESPACE_KIND,
       writable: false,
@@ -107,19 +108,15 @@ export class SqliteUnboundDatabase extends SqliteDatabase {
 export function buildSqliteNamespace(
   input: SqlNamespaceTablesInput,
 ): SqliteDatabase | SqliteUnboundDatabase {
-  const tableCount = Object.keys(input.entries?.table ?? {}).length;
-  if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0) {
-    return castAs<SqliteUnboundDatabase>(SqliteUnboundDatabase.instance);
-  }
   if (input.id !== UNBOUND_NAMESPACE_ID) {
     throw new Error(
       `buildSqliteNamespace: SQLite has no schema concept; the only valid namespace id is "${UNBOUND_NAMESPACE_ID}" (received "${input.id}").`,
     );
   }
-  return new SqliteDatabase({
-    id: input.id,
-    entries: freezeSqliteTableEntries(input.entries),
-  });
+  if (Object.keys(input.entries.table).length === 0) {
+    return castAs<SqliteUnboundDatabase>(SqliteUnboundDatabase.instance);
+  }
+  return new SqliteDatabase({ id: input.id, entries: input.entries });
 }
 
 export function buildSqliteNamespaceMap(
@@ -128,7 +125,14 @@ export function buildSqliteNamespaceMap(
   return Object.fromEntries(
     Object.entries(namespaces).map(([nsKey, ns]) => [
       nsKey,
-      isMaterializedSqliteNamespace(ns) ? ns : buildSqliteNamespace(ns),
+      isMaterializedSqliteNamespace(ns)
+        ? ns
+        : buildSqliteNamespace(
+            blindCast<
+              SqlNamespaceTablesInput,
+              'non-materialized SQLite namespace map entry is a SqlNamespaceTablesInput'
+            >(ns),
+          ),
     ]),
   );
 }
