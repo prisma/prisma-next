@@ -2,24 +2,12 @@ import { DatabaseError, HttpResponseError, ValidationError, WebSocketError } fro
 import { SqlConnectionError, SqlQueryError } from '@prisma-next/sql-errors';
 
 /**
- * Translate a `@prisma/ppg` error into the shared `SqlQueryError` /
- * `SqlConnectionError` vocabulary used across SQL drivers.
- *
- * - `DatabaseError` (PostgreSQL wire error with a SQLSTATE code) → `SqlQueryError`.
- *   PPG carries the conventional Postgres error fields (`constraint`, `table`,
- *   `column`, `detail`, …) under `details: Record<string, string>` rather than
- *   on the top-level error object like `pg` does.
- * - `WebSocketError` (transport failure) → `SqlConnectionError`. The closure
- *   code distinguishes normal closures (1000, 1001) from abnormal ones; only
- *   abnormal codes are marked transient.
- * - `HttpResponseError` (HTTP-side failure during initial handshake) →
- *   `SqlConnectionError`. 5xx is transient, 4xx is not.
- * - `ValidationError` (programmer error such as a malformed connection string)
- *   passes through unchanged. Wrapping it would obscure the actionable shape.
- * - Anything else: pass through if it's already an `Error`, otherwise wrap.
- *
- * The original error is preserved via `Error.cause` so stack traces and any
- * PPG-specific metadata stay reachable to consumers.
+ * Translate `@prisma/ppg` errors into the shared `SqlQueryError` /
+ * `SqlConnectionError` vocabulary. PPG-specific shapes worth noting:
+ * `DatabaseError` carries the Postgres `constraint` / `table` / `column` /
+ * `detail` fields under `error.details` (not on the top-level object the way
+ * `pg` exposes them); `ValidationError` (e.g. malformed connection string)
+ * passes through unwrapped so the actionable shape stays visible to callers.
  */
 export function normalizePpgError(error: unknown): SqlQueryError | SqlConnectionError | Error {
   if (error instanceof DatabaseError) {
@@ -70,28 +58,13 @@ export function normalizePpgError(error: unknown): SqlQueryError | SqlConnection
   return new Error(String(error));
 }
 
-/**
- * Best-effort transient classification for WebSocket closures.
- *
- * Codes 1000 (normal) and 1001 (going away) are clean closures and should not
- * normally surface as errors; treat them as non-transient if we ever see them
- * here. Any other observed code — or no code at all (`undefined` falls through
- * to `false` since we lack the signal to claim retryability) — is treated as
- * non-transient unless explicitly known.
- *
- * The conservative default here is "not transient": callers that retry on
- * transient errors must have evidence the failure is recoverable. We expand
- * this set as PPG's closure-code semantics become observed.
- */
+// Conservative: a missing or unknown code is non-transient (callers retrying
+// on `transient: true` must have evidence the failure is recoverable). 1000
+// (normal) and 1001 (going away) are clean closures; treat as non-transient
+// if seen as errors. Anything else (1006 abnormal, 1011 server, 1012/1013
+// restart/try-again-later, 1014 bad gateway, …) is retryable.
 function isTransientWebSocketClosure(code: number | undefined): boolean {
-  if (code === undefined) {
-    return false;
-  }
-  if (code === 1000 || code === 1001) {
-    return false;
-  }
-  // 1006 (abnormal closure), 1011 (server error), 1012/1013 (service
-  // restart / try again later), 1014 (bad gateway) and similar are
-  // generally retryable on the next attempt.
+  if (code === undefined) return false;
+  if (code === 1000 || code === 1001) return false;
   return true;
 }

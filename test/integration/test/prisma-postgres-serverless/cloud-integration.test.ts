@@ -1,27 +1,10 @@
 /**
- * Real-cloud integration test for `@prisma-next/prisma-postgres-serverless`.
- *
- * Proves the facade's ORM round-trips through the real PPG WebSocket
- * wire protocol end-to-end against a real Prisma Postgres database.
- * Every other test in the facade and driver packages mocks the PPG
- * client at the `Client.newSession` boundary; wire-level serialization,
- * auth, and WS framing are not covered there.
- *
- * Lifecycle per run:
- *   beforeAll: provision a fresh project via the Management API,
- *              apply the contract via the facade's `./control` surface
- *              (TCP path — control plane is TCP-only by design;
- *              `./control` re-exports `@prisma-next/postgres/control`).
- *   it × 3:    INSERT + SELECT via ORM, transaction COMMIT, transaction
- *              ROLLBACK — all through the facade's data plane (PPG
- *              wire protocol over WebSocket).
- *   afterAll:  close the facade, drop the temp `migrationsDir`,
- *              DELETE the project via the Management API.
- *
- * Skipped silently when `PRISMA_POSTGRES_SERVICE_TOKEN` is unset
- * (local development, fork PR runs). On prisma/prisma-next-owned CI
- * runs the workflow YAML's require-token step hard-fails before this
- * suite is reached if the secret is missing.
+ * Real-cloud integration test: provisions a fresh Prisma Postgres project
+ * via the Management API, applies the contract over TCP (control plane),
+ * exercises ORM round-trip + transaction COMMIT/ROLLBACK over PPG WebSocket
+ * (data plane), then deletes the project. Skipped without
+ * `PRISMA_POSTGRES_SERVICE_TOKEN`; the CI workflow hard-fails own-repo PR
+ * runs missing the secret.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -39,12 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const SERVICE_TOKEN = process.env['PRISMA_POSTGRES_SERVICE_TOKEN'];
 const REGION = 'us-east-1' as const;
 
-/**
- * Retry an async operation with a fixed backoff schedule when its
- * thrown error matches `isTransient`. Non-transient errors propagate
- * immediately. Used in `beforeAll` to wait out Prisma Postgres's TCP
- * gateway warm-up window (see comment at the call site).
- */
+/** Used in `beforeAll` to wait out PPG's TCP gateway warm-up window. */
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   opts: {
@@ -81,15 +59,11 @@ async function retryWithBackoff<T>(
   throw lastErr;
 }
 
-/**
- * Recognise Prisma Postgres's TCP gateway warm-up rejection. The
- * gateway returns a non-Postgres-shape `ErrorResponse` packet during
- * the brief window after `POST /v1/projects` returns `status: "ready"`
- * but before the gateway has finished routing to the backend Postgres
- * engine. The message string is the same whether the error surfaces
- * bare (from `pg`) or wrapped (from the framework's `errorRuntime`,
- * which puts the original message into a `why` field).
- */
+// PPG's TCP gateway transient-rejects with a non-Postgres ErrorResponse during
+// the warm-up window between `POST /v1/projects` returning `status: "ready"`
+// and the gateway finishing its backend routing. The marker string is the same
+// whether the error surfaces bare (from `pg`) or wrapped (framework's
+// `errorRuntime` moves it into `why`).
 function isGatewayWarmupError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const marker = 'Failed to connect to upstream database';
@@ -100,17 +74,9 @@ function isGatewayWarmupError(err: unknown): boolean {
   return false;
 }
 
-/**
- * Minimal one-model contract. `field.id.uuidv7()` is the canonical
- * generated-id preset across the workspace (used by the CLI's `init`
- * scaffold). The SQL ORM's `CreateInput` type currently requires the
- * id field even when the contract has a runtime execution default,
- * so this test passes explicit ids — same pattern as
- * `test/integration/test/sql-orm-client/collection-mutation-defaults.test.ts`.
- * From the PPG wire protocol's perspective the explicit-id path is
- * indistinguishable from the executed-default path; what matters here
- * is the round-trip, not which side generated the id.
- */
+// Explicit ids on `create(...)`: `defineContract`'s factory form doesn't yet
+// propagate field-level execution defaults to `CreateInput` type-level
+// optionality. Same pattern as `collection-mutation-defaults.test.ts`.
 const contract = defineContract({}, ({ field, model }) => ({
   models: {
     Item: model('Item', {
@@ -134,36 +100,20 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
     mgmt = createManagementApiClient({ token: SERVICE_TOKEN! });
     const name = `pn-ci-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
-    // Provision the project + its default database (one Management
-    // API call). The response carries the project id (for teardown)
-    // and the database with all connection variants.
     const { data: response, error } = await mgmt.POST('/v1/projects', {
       body: { name, region: REGION },
     });
     if (error || !response) {
       throw new Error(`mgmt-api: provision failed: ${JSON.stringify(error ?? 'no data')}`);
     }
-    // Capture the id before anything else can throw — the afterAll
-    // teardown needs it to delete the project even if schema apply
-    // (the more failure-prone step) blows up.
+    // Capture the id before anything else can throw — afterAll needs it to
+    // teardown the project even if dbInit (the failure-prone step) blows up.
     projectId = response.data.id;
 
-    // Prisma Postgres returns one connection per database with all
-    // endpoint variants populated. `endpoints` is a discriminated
-    // bag of three URL forms — one per protocol the platform speaks:
-    //   - `direct`:     `postgres://…@<host>:5432/…` for raw TCP /
-    //                   `pg` (control plane: DDL, migrations).
-    //   - `pooled`:     `postgres://identifier:key@db.prisma.io:5432/…`
-    //                   for PPG's raw-SQL WebSocket protocol
-    //                   (data plane: `@prisma/ppg`).
-    //   - `accelerate`: `prisma+postgres://accelerate.prisma-data.net/?api_key=…`
-    //                   for Prisma Accelerate / data-proxy's GraphQL
-    //                   protocol (consumed by `@prisma/client/edge`,
-    //                   NOT by `@prisma/ppg`).
-    // The `prisma+postgres://…api_key=…` form looks PPG-y because it
-    // shares the scheme with `@prisma/dev`'s endpoint, but the wire
-    // protocol underneath is GraphQL/Accelerate, not PPG. For PPG,
-    // take the `pooled` endpoint.
+    // `endpoints.pooled` is the PPG raw-SQL endpoint (data plane);
+    // `endpoints.direct` is raw TCP (control plane). `endpoints.accelerate`
+    // is the GraphQL data-proxy and is NOT consumable by `@prisma/ppg`
+    // despite the shared `prisma+postgres://` scheme.
     const database = response.data.database;
     const conn = database?.connections[0];
     const ppgUrl = conn?.endpoints.pooled?.connectionString;
@@ -175,22 +125,15 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
       throw new Error(`mgmt-api: project ${projectId} has no direct TCP connection endpoint`);
     }
 
-    // `dbInit` requires a `migrationsDir` even on a from-scratch
-    // apply: the per-space flow reads on-disk refs from it. An empty
-    // temp dir is sufficient — the planner generates the create-
-    // from-scratch operations directly from the contract. Same
-    // pattern as the framework e2e harness's `runDbInit` helper.
+    // `dbInit` requires a `migrationsDir` even from-scratch (per-space flow
+    // reads on-disk refs from it); an empty temp dir is sufficient.
     const dir = await mkdtemp(join(tmpdir(), 'pn-cloud-it-'));
     migrationsDir = dir;
 
-    // Prisma Postgres's TCP gateway has a brief warm-up window after
-    // `POST /v1/projects` returns `status: "ready"` — during which
-    // the gateway transient-rejects pg.Client connections with a
-    // non-Postgres-shape ErrorResponse ("Failed to connect to
-    // upstream database…"). Observed warm-up ~5–10s. Retry the whole
-    // `dbInit` call (which internally calls `pg.Client.connect`) on
-    // that specific envelope; any other error class is non-transient
-    // and surfaces immediately.
+    // PPG's TCP gateway has a ~5–10s warm-up window after `POST /v1/projects`
+    // returns ready, during which `pg.Client.connect` transient-rejects with
+    // `isGatewayWarmupError`. Retry only on that envelope; everything else
+    // surfaces immediately.
     const controlClient = createPostgresControlClient({ connection: tcpUrl });
     try {
       const result = await retryWithBackoff(
@@ -219,15 +162,11 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
   }, 120_000);
 
   afterAll(async () => {
-    // Best-effort teardown: each step is guarded so a failure in one
-    // does not prevent the others. Resource leaks (the cloud
-    // project) are the only step whose failure produces a
-    // human-actionable breadcrumb.
+    // Each step is guarded so one failure does not block the rest; the
+    // project-delete failure mode is the only one with a real leak cost.
     try {
       await db?.close();
-    } catch {
-      // facade close never fails today, but be defensive
-    }
+    } catch {}
 
     if (migrationsDir !== undefined) {
       await rm(migrationsDir, { recursive: true, force: true }).catch(() => undefined);
@@ -238,8 +177,8 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
       params: { path: { id: projectId } },
     });
     if (error) {
-      // Surface the leak so manual cleanup is possible; do not fail
-      // the suite (provision + tests already ran).
+      // Leak the breadcrumb instead of failing the suite — provision + tests
+      // already ran, manual cleanup is still possible from the project id.
       console.warn(
         `mgmt-api: teardown leak — manual delete needed for project ${projectId}:`,
         JSON.stringify(error),
@@ -278,11 +217,7 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
         await tx.orm.Item.create({ id: carolId, name: 'carol' });
         throw new Error('intentional rollback');
       })
-      .catch(() => {
-        // `withTransaction` re-throws the callback's error after the
-        // rollback succeeds. Absorb here so the test continues to
-        // the read-back assertion that proves the row was discarded.
-      });
+      .catch(() => {});
 
     const rows = await db.orm.Item.all();
     const names = rows.map((row) => row.name).sort();

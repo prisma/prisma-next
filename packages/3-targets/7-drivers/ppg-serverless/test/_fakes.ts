@@ -1,8 +1,7 @@
 /**
- * Hand-built fakes for `@prisma/ppg` types. Tests import these and pass them
- * to the driver via the `{ kind: 'ppgClient' }` binding, so we exercise the
- * real driver lifecycle without standing up a WebSocket server or mocking the
- * `@prisma/ppg` module.
+ * Hand-built `@prisma/ppg` fakes passed to the driver via the `{ ppgClient }`
+ * binding so the driver lifecycle runs without a WebSocket server or a
+ * `vi.mock` on the package.
  */
 import type { Column, Client as PpgClient, Resultset, Row, Session } from '@prisma/ppg';
 
@@ -16,12 +15,7 @@ export type QueryHandler = (
   params: readonly unknown[],
 ) => ResultsetSpec | Promise<ResultsetSpec> | Error | Promise<Error>;
 
-/**
- * Convenience handler for transaction tests: returns an empty resultset for
- * any SQL whose first keyword is `BEGIN` / `COMMIT` / `ROLLBACK` (PPG
- * accepts these via `session.query` and returns an empty resultset). For
- * anything else, defers to the supplied inner handler.
- */
+/** Returns empty resultsets for `BEGIN` / `COMMIT` / `ROLLBACK`; defers other SQL. */
 export function withTxnControlStatements(
   inner: QueryHandler = () => ({ columns: [], rows: [] }),
 ): QueryHandler {
@@ -39,18 +33,9 @@ export interface FakeClientControls {
   readonly newSessionCalls: () => number;
   readonly queryCalls: () => Array<{ sql: string; params: readonly unknown[] }>;
   readonly sessionCloseCalls: () => number;
-  /**
-   * Alias for `queryCalls` — query history observed across every fake session
-   * the client minted. Each entry carries the `sql` and `params` arguments
-   * passed to `session.query(sql, ...params)`. Useful for transaction tests
-   * that assert the exact `BEGIN` / `COMMIT` / `ROLLBACK` ordering.
-   */
+  /** Alias for `queryCalls`. */
   readonly sessionQueryHistory: () => Array<{ sql: string; params: readonly unknown[] }>;
-  /**
-   * Alias for `sessionCloseCalls` — total number of `session.close()` calls
-   * across every fake session. Useful for tests asserting one-session-per-call
-   * vs held-session lifecycles.
-   */
+  /** Alias for `sessionCloseCalls`. */
   readonly closeCount: () => number;
 }
 

@@ -116,13 +116,9 @@ function resolveContract<TContract extends Contract<SqlStorage>>(
 }
 
 /**
- * Creates a lazy Prisma Postgres serverless client from either `contractJson`
- * or a TypeScript-authored `contract`. Static query surfaces are available
- * immediately, while `runtime()` instantiates the driver on first call.
- *
- * - No-emit: pass a TypeScript-authored contract. Example: `prismaPostgresServerless({ contract })`.
- * - Emitted: pass `Contract` type explicitly.
- *     Example: `prismaPostgresServerless<Contract>({ contractJson, url })`.
+ * Lazy Prisma Postgres serverless client. The `sql` / `orm` / `context` /
+ * `stack` surfaces are available synchronously; the driver and runtime are
+ * instantiated on first `runtime()` / `connect()` call.
  */
 export default function prismaPostgresServerless<TContract extends Contract<SqlStorage>>(
   options: PrismaPostgresServerlessOptionsWithContract<TContract>,
@@ -161,10 +157,6 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
     if (driverConnected) return;
     if (!runtimeDriver) throw new Error('Prisma Postgres runtime driver missing');
     if (connectPromise) return connectPromise;
-    // PPG handles transport-side pooling; we never wrap the binding into a
-    // facade-owned resource (no Pool to construct, no Client to call
-    // `.end()` on at close time). Whichever binding the caller passed, the
-    // driver consumes it directly.
     connectPromise = runtimeDriver
       .connect(resolvedBinding)
       .then(() => {
@@ -196,8 +188,6 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
       throw new Error('Driver descriptor missing from execution stack');
     }
 
-    // PPG driver's create() takes no options today (cursor mode is not a
-    // configurable PPG concept — sessions are streamed natively).
     const driver = driverDescriptor.create();
     runtimeDriver = driver;
     if (binding !== undefined) {
@@ -315,14 +305,10 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
     async close(): Promise<void> {
       if (closed) return;
       closed = true;
-      // Swallow background connect failures during close: the caller has
-      // already signalled they are done; the failure was either already
-      // surfaced via `runtime()` or never observed at all. Either way,
-      // re-raising here would mask the fact that close() ran cleanly.
+      // Swallow a still-pending connect failure: the caller has signalled
+      // they are done, and the error was either already surfaced via
+      // `runtime()` or never observed.
       await connectPromise?.catch(() => undefined);
-      // PPG owns wire-side pooling; the underlying driver instance carries
-      // its own close() semantics. There is no facade-owned resource to
-      // dispose here (no Pool, no Client.end()).
     },
 
     [Symbol.asyncDispose](): Promise<void> {

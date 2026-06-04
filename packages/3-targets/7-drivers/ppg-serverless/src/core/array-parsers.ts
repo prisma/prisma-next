@@ -1,20 +1,10 @@
 import type { ValueParser } from '@prisma/ppg';
 import * as postgresArray from 'postgres-array';
 
-/**
- * PostgreSQL OIDs for the array variants of the scalar types that
- * `@prisma/ppg`'s `defaultClientConfig` already registers parsers for.
- * Each entry pairs an array OID with the OID of its element type so
- * the array parser can re-use the existing element-type parser.
- *
- * The set mirrors the array OIDs `pg`'s built-in type registry handles
- * via the same `postgres-array` decoder. The framework's
- * `parseContractMarkerRow` expects `text[]` to surface as a JS array;
- * any user query reading `int4[]` / `uuid[]` / `jsonb[]` columns has
- * the same expectation. PPG ships scalar-only parsers, so without
- * this extension array columns flow through as their raw Postgres
- * text-format string (`'{a,b,c}'`) instead of `['a','b','c']`.
- */
+// `[array OID, element OID]` for the scalars `defaultClientConfig` already
+// parses. Mirrors `pg`'s built-in array decoder set so `text[]` / `int4[]` /
+// `jsonb[]` etc. land as JS arrays at the framework adapter, not as the raw
+// Postgres text form `'{a,b,c}'`.
 const ARRAY_OID_TO_ELEMENT_OID: ReadonlyMap<number, number> = new Map([
   [1000, 16], // _bool   -> bool
   [1005, 21], // _int2   -> int2
@@ -29,20 +19,9 @@ const ARRAY_OID_TO_ELEMENT_OID: ReadonlyMap<number, number> = new Map([
 ]);
 
 /**
- * Extend a `ValueParser` table (typically the one from
- * `defaultClientConfig(url).parsers`) with array variants for every
- * scalar OID present in the input that has a known array OID
- * counterpart. The original parsers pass through unchanged; the
- * appended entries decode the Postgres array text format via
- * `postgres-array.parse` and apply the matching element parser per
- * element.
- *
- * Scalar OIDs without a known array counterpart, or array OIDs whose
- * element parser is missing from the input, are silently skipped.
- * A NULL array column surfaces as JS `null`; a NULL element inside
- * a non-null array surfaces as JS `null` in its slot (handled by
- * `postgres-array` itself, which short-circuits the literal `NULL`
- * token before calling the element transform).
+ * Extend a `ValueParser` table with array variants for the scalar OIDs above.
+ * Scalars without a known array counterpart, and array OIDs whose element
+ * parser is missing from `parsers`, are silently skipped.
  */
 export function withArrayParsers(
   parsers: ReadonlyArray<ValueParser<unknown>>,

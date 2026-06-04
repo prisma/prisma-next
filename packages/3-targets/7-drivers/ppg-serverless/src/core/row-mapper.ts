@@ -1,14 +1,8 @@
 import { blindCast } from '@prisma-next/utils/casts';
 
 /**
- * Recombine a positionally-indexed PPG `Row` and the resultset's `columns`
- * descriptor into a name-keyed record matching the framework's
- * `SqlQueryResult<Row>` row shape.
- *
- * PPG returns rows as `{ values: unknown[] }` where `values[i]` aligns with
- * `columns[i].name`. The framework expects rows keyed by column name. This
- * helper performs the shape transform; it does not attempt to narrow the
- * column-value types.
+ * Recombine PPG's positional `Row.values` with the resultset's `columns`
+ * into a name-keyed record (the row shape the framework expects).
  */
 export function mapRowToRecord<Row = Record<string, unknown>>(
   ppgRow: { readonly values: readonly unknown[] },

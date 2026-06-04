@@ -69,16 +69,8 @@ function unboundExecute<Row>(): AsyncIterable<Row> {
 }
 
 /**
- * Public unbound wrapper. Constructed by `descriptor.create(options?)`.
- *
- * Lifecycle:
- *   unbound (no binding yet) → connect(binding) → connected (delegate held) →
- *   close() → closed.
- *
- * Reconnect after close is permitted, mirroring `@prisma-next/driver-postgres`.
- *
- * All `SqlQueryable` methods delegate to the bound impl when connected, and
- * throw `DRIVER.NOT_CONNECTED` otherwise.
+ * Public unbound wrapper. Lifecycle:
+ *   unbound → connect(binding) → connected → close() → closed (reconnectable).
  */
 class PpgServerlessUnboundDriverImpl implements PpgServerlessRuntimeDriver {
   readonly familyId = 'sql' as const;
@@ -121,9 +113,6 @@ class PpgServerlessUnboundDriverImpl implements PpgServerlessRuntimeDriver {
   }
 
   async acquireConnection(): Promise<SqlConnection> {
-    // Opens a long-lived PPG session on the bound impl and returns a
-    // SqlConnection that routes execute/query/executePrepared through that
-    // single session for its lifetime. release()/destroy() close it.
     const delegate = this.#requireDelegate();
     return delegate.acquireConnection();
   }
