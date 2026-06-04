@@ -77,6 +77,7 @@
                   "childColumns": [
                     "tagId"
                   ],
+                  "namespaceId": "__unbound__",
                   "parentColumns": [
                     "postId"
                   ],
@@ -197,6 +198,7 @@
                   "childColumns": [
                     "postId"
                   ],
+                  "namespaceId": "__unbound__",
                   "parentColumns": [
                     "tagId"
                   ],
