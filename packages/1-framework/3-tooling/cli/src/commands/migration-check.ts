@@ -12,6 +12,7 @@ import { readRefs } from '@prisma-next/migration-tools/refs';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
+import { type CliStructuredError, mapRefResolutionError } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   resolveContractPath,
@@ -21,6 +22,7 @@ import {
   setCommandSeeAlso,
 } from '../utils/command-helpers';
 import { toDeclaredExtensionsFromRaw } from '../utils/extension-pack-inputs';
+import { formatErrorJson, formatErrorOutput } from '../utils/formatters/errors';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
@@ -110,12 +112,18 @@ async function loadAggregateIntegrityViolations(
   }
 }
 
+interface MigrationCheckOutcome {
+  readonly result?: MigrationCheckResult;
+  readonly error?: CliStructuredError;
+  readonly exitCode: number;
+}
+
 async function executeMigrationCheckCommand(
   target: string | undefined,
   options: MigrationCheckOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<{ result: MigrationCheckResult; exitCode: number }> {
+): Promise<MigrationCheckOutcome> {
   const config = await loadConfig(options.config);
   const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative, refsDir } =
     resolveMigrationPaths(options.config, config);
@@ -171,14 +179,8 @@ async function executeMigrationCheckCommand(
     const refs = await readRefs(refsDir);
     const migResult = parseMigrationRef(target, { graph, refs });
     if (!migResult.ok) {
-      const msg =
-        migResult.failure.kind === 'not-found'
-          ? `Migration "${target}" does not exist`
-          : migResult.failure.kind === 'wrong-grammar'
-            ? migResult.failure.message
-            : `Invalid migration reference: "${target}"`;
       return {
-        result: { ok: false, failures: [], summary: msg },
+        error: mapRefResolutionError(migResult.failure),
         exitCode: PRECONDITION,
       };
     }
@@ -298,15 +300,32 @@ export function createMigrationCheckCommand(): Command {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
 
-      let result: MigrationCheckResult;
-      let exitCode: number;
+      let outcome: MigrationCheckOutcome;
       try {
-        ({ result, exitCode } = await executeMigrationCheckCommand(target, options, flags, ui));
+        outcome = await executeMigrationCheckCommand(target, options, flags, ui);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        result = { ok: false, failures: [], summary: msg };
-        exitCode = PRECONDITION;
+        outcome = {
+          result: { ok: false, failures: [], summary: msg },
+          exitCode: PRECONDITION,
+        };
       }
+
+      if (outcome.error) {
+        const envelope = outcome.error.toEnvelope();
+        if (flags.json) {
+          ui.output(formatErrorJson(envelope));
+        } else if (!flags.quiet) {
+          ui.error(formatErrorOutput(envelope, flags));
+        }
+        process.exit(outcome.exitCode);
+      }
+
+      const result = outcome.result ?? {
+        ok: false,
+        failures: [],
+        summary: 'No check result produced',
+      };
 
       if (flags.json) {
         ui.output(JSON.stringify(result, null, 2));
@@ -322,7 +341,7 @@ export function createMigrationCheckCommand(): Command {
         }
       }
 
-      process.exit(exitCode);
+      process.exit(outcome.exitCode);
     });
 
   return command;

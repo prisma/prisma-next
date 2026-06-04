@@ -21,10 +21,10 @@ import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
   CliStructuredError,
-  errorDatabaseConnectionRequired,
   errorUnexpected,
   mapMigrationToolsError,
   mapRefResolutionError,
+  requireLiveDatabase,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -271,13 +271,16 @@ async function executeMigrationStatusCommand(
   const hasDriver = !!config.driver;
   const usingFromOverride = options.from !== undefined;
 
-  if (!usingFromOverride && (!dbConnection || !hasDriver)) {
-    return notOk(
-      errorDatabaseConnectionRequired({
-        why: 'migration status needs a database connection to read the marker and ledger (or pass --from for offline path preview)',
-        retryCommand: 'prisma-next migration status --from <contract>',
-      }),
-    );
+  if (!usingFromOverride) {
+    const missingDb = requireLiveDatabase({
+      dbConnection,
+      hasDriver,
+      why: 'migration status needs a database connection to read the marker and ledger (or pass --from for offline path preview)',
+      retryCommand: 'prisma-next migration status --from <contract>',
+    });
+    if (missingDb) {
+      return notOk(missingDb);
+    }
   }
 
   let allRefs: Refs = {};

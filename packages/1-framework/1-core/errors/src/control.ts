@@ -239,6 +239,7 @@ export function errorDatabaseConnectionRequired(options?: {
   readonly why?: string;
   readonly commandName?: string;
   readonly retryCommand?: string;
+  readonly missingFlags?: readonly string[];
 }): CliStructuredError {
   const runHint = options?.retryCommand
     ? `Run \`${options.retryCommand}\``
@@ -249,6 +250,9 @@ export function errorDatabaseConnectionRequired(options?: {
     domain: 'CLI',
     why: options?.why ?? 'Database connection is required for this command',
     fix: `${runHint}, or set \`db: { connection: "postgres://…" }\` in prisma-next.config.ts`,
+    ...(options?.missingFlags !== undefined
+      ? { meta: { missingFlags: [...options.missingFlags] } }
+      : {}),
   });
 }
 

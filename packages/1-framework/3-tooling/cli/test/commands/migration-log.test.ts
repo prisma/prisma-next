@@ -69,6 +69,23 @@ describe('executeMigrationLogCommand', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.code).toBe('4005');
+    expect(result.failure.meta?.['missingFlags']).toEqual(['--db']);
+  });
+
+  it('returns the same missing-DB envelope when only the driver is missing', async () => {
+    mocks.loadConfig.mockResolvedValue({
+      ...baseConfig,
+      driver: undefined,
+    });
+    const result = await executeMigrationLogCommand(
+      { config: 'prisma-next.config.ts', db: 'postgres://localhost/test' },
+      parseGlobalFlags({}),
+      createTerminalUI(parseGlobalFlags({})),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.code).toBe('4005');
+    expect(result.failure.meta?.['missingFlags']).toEqual([]);
   });
 
   it('returns an empty array when the ledger has no rows', async () => {

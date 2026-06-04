@@ -1,15 +1,15 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
   CliStructuredError,
-  errorDatabaseConnectionRequired,
-  errorDriverRequired,
   errorUnexpected,
   mapMigrationToolsError,
+  requireLiveDatabase,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -53,16 +53,14 @@ export async function executeMigrationLogCommand(
   const { configPath } = resolveMigrationPaths(options.config, config);
 
   const dbConnection = options.db ?? config.db?.connection;
-  if (!dbConnection) {
-    return notOk(
-      errorDatabaseConnectionRequired({
-        why: `Database connection is required for migration log (set db.connection in ${configPath}, or pass --db <url>)`,
-        commandName: 'migration log',
-      }),
-    );
-  }
-  if (!config.driver) {
-    return notOk(errorDriverRequired({ why: 'Config.driver is required for migration log' }));
+  const missingDb = requireLiveDatabase({
+    dbConnection,
+    hasDriver: !!config.driver,
+    why: `migration log needs a database connection and driver to read the ledger (set db.connection in ${configPath}, or pass --db <url>)`,
+    commandName: 'migration log',
+  });
+  if (missingDb) {
+    return notOk(missingDb);
   }
   if (!targetSupportsMigrations(config.target)) {
     return notOk(errorUnexpected('Target does not support migrations'));
@@ -87,7 +85,7 @@ export async function executeMigrationLogCommand(
     family: config.family,
     target: config.target,
     adapter: config.adapter,
-    driver: config.driver,
+    ...ifDefined('driver', config.driver),
     extensionPacks: config.extensionPacks ?? [],
   });
 

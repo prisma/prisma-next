@@ -28,6 +28,7 @@ import {
 import { errorRuntime } from '@prisma-next/errors/execution';
 import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { RefResolutionError } from '@prisma-next/migration-tools/ref-resolution';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { MigrationApplyFailure } from '../control-api/types';
 
 export {
@@ -339,6 +340,33 @@ export function mapMigrationToolsError(error: MigrationToolsError): CliStructure
     why: error.why,
     fix: error.fix,
     meta: { code: error.code, ...(error.details ?? {}) },
+  });
+}
+
+/**
+ * Shared "needs a live database" precondition for read verbs that consult the
+ * marker/ledger (`migration log`, `migration status`). A command needs both a
+ * connection string and a control-plane driver; either missing yields the same
+ * `PN-CLI-4005` envelope with `meta.missingFlags` (canonical long-form flags
+ * per CLI Style Guide §Errors) so callers can react programmatically. Returns
+ * `null` when both are present.
+ */
+export function requireLiveDatabase(args: {
+  readonly dbConnection: unknown;
+  readonly hasDriver: boolean;
+  readonly why: string;
+  readonly commandName?: string;
+  readonly retryCommand?: string;
+}): CliStructuredError | null {
+  if (args.dbConnection && args.hasDriver) {
+    return null;
+  }
+  const missingFlags = args.dbConnection ? [] : ['--db'];
+  return errorDatabaseConnectionRequired({
+    why: args.why,
+    missingFlags,
+    ...ifDefined('commandName', args.commandName),
+    ...ifDefined('retryCommand', args.retryCommand),
   });
 }
 
