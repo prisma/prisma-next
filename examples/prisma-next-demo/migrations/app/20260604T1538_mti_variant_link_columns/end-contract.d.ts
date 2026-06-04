@@ -36,7 +36,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:1375f137fa3186c77cda92aba4048c49714ed5fe65993ca7d5eed3bcd9e85cb7'>;
+  StorageHashBase<'sha256:193e40339cb36ff6e2a5e6782103274d90f1515919e79c4694a591fcb50bcd3a'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
 export type ProfileHash =
@@ -146,6 +146,12 @@ type ContractBase = Omit<
           readonly tables: {
             readonly bug: {
               columns: {
+                readonly id: {
+                  readonly nativeType: 'character';
+                  readonly codecId: 'sql/char@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly length: 36 };
+                };
                 readonly severity: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
@@ -157,12 +163,34 @@ type ContractBase = Omit<
                   readonly nullable: true;
                 };
               };
+              primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
               indexes: readonly [];
-              foreignKeys: readonly [];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'bug';
+                    readonly columns: readonly ['id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'task';
+                    readonly columns: readonly ['id'];
+                  };
+                  readonly constraint: true;
+                  readonly index: false;
+                },
+              ];
             };
             readonly feature: {
               columns: {
+                readonly id: {
+                  readonly nativeType: 'character';
+                  readonly codecId: 'sql/char@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly length: 36 };
+                };
                 readonly priority: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
@@ -174,9 +202,25 @@ type ContractBase = Omit<
                   readonly nullable: true;
                 };
               };
+              primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
               indexes: readonly [];
-              foreignKeys: readonly [];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'feature';
+                    readonly columns: readonly ['id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'task';
+                    readonly columns: readonly ['id'];
+                  };
+                  readonly constraint: true;
+                  readonly index: false;
+                },
+              ];
             };
             readonly post: {
               columns: {
@@ -362,6 +406,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'bug';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly severity: { readonly column: 'severity' };
             readonly stepsToRepro: { readonly column: 'stepsToRepro' };
@@ -383,6 +428,7 @@ type ContractBase = Omit<
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'feature';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly priority: { readonly column: 'priority' };
             readonly targetRelease: { readonly column: 'targetRelease' };
@@ -429,6 +475,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'post';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
@@ -485,6 +532,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'task';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
@@ -552,6 +600,7 @@ type ContractBase = Omit<
         };
         readonly storage: {
           readonly table: 'user';
+          readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly email: { readonly column: 'email' };
@@ -591,6 +640,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'bug';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly severity: { readonly column: 'severity' };
                 readonly stepsToRepro: { readonly column: 'stepsToRepro' };
@@ -612,6 +662,7 @@ type ContractBase = Omit<
             readonly relations: Record<string, never>;
             readonly storage: {
               readonly table: 'feature';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly priority: { readonly column: 'priority' };
                 readonly targetRelease: { readonly column: 'targetRelease' };
@@ -658,6 +709,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'post';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
@@ -714,6 +766,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'task';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
@@ -781,6 +834,7 @@ type ContractBase = Omit<
             };
             readonly storage: {
               readonly table: 'user';
+              readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly email: { readonly column: 'email' };
