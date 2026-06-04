@@ -41,7 +41,7 @@ function isMaterializedSqliteNamespace(
   if (proto === Object.prototype || proto === null) {
     return false;
   }
-  return (ns as Namespace).kind === SQLITE_NAMESPACE_KIND;
+  return (ns as { kind?: unknown }).kind === SQLITE_NAMESPACE_KIND;
 }
 
 /**

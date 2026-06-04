@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   type AnyExpression,
@@ -130,7 +130,7 @@ function createParamRef(
 ): ParamRef {
   const tableInAnyNs = Object.values(contract.storage.namespaces).find(
     (ns) => ns.entries.table[columnRef.table] !== undefined,
-  )?.entries.table[columnRef.table] as StorageTable | undefined;
+  )?.entries.table[columnRef.table];
   if (!tableInAnyNs?.columns[columnRef.column]) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
