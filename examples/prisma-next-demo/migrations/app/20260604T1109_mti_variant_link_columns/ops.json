@@ -1,0 +1,324 @@
+[
+  {
+    "id": "column.bug.id",
+    "label": "Add column \"id\" to \"bug\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "bug"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'bug'\n    AND column_name = 'id'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"id\"",
+        "sql": "ALTER TABLE \"public\".\"bug\" ADD COLUMN \"id\" character(36)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'bug'\n    AND column_name = 'id'\n)"
+      }
+    ]
+  },
+  {
+    "id": "data_migration.backfill-bug-id",
+    "label": "Data transform: backfill-bug-id",
+    "operationClass": "data",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "Check backfill-bug-id has work to do",
+        "sql": "SELECT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"bug\" WHERE \"id\" IS NULL LIMIT 1) AS ok",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "Run backfill-bug-id",
+        "sql": "UPDATE \"public\".\"bug\" SET \"id\" = gen_random_uuid()::char(36) WHERE \"id\" IS NULL",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "Verify backfill-bug-id resolved all violations",
+        "sql": "SELECT NOT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"bug\" WHERE \"id\" IS NULL LIMIT 1) AS ok",
+        "params": []
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.setNotNull.bug.id",
+    "label": "Set NOT NULL on \"bug\".\"id\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "bug"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'bug'\n    AND column_name = 'id'\n)"
+      },
+      {
+        "description": "ensure no NULL values in \"id\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"bug\" WHERE \"id\" IS NULL)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"id\"",
+        "sql": "ALTER TABLE \"public\".\"bug\" ALTER COLUMN \"id\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" is NOT NULL",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'bug'\n    AND column_name = 'id'\n    AND is_nullable = 'NO'\n)"
+      }
+    ]
+  },
+  {
+    "id": "column.feature.id",
+    "label": "Add column \"id\" to \"feature\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "feature"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"id\"",
+        "sql": "ALTER TABLE \"public\".\"feature\" ADD COLUMN \"id\" character(36)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n)"
+      }
+    ]
+  },
+  {
+    "id": "data_migration.backfill-feature-id",
+    "label": "Data transform: backfill-feature-id",
+    "operationClass": "data",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "Check backfill-feature-id has work to do",
+        "sql": "SELECT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"feature\" WHERE \"id\" IS NULL LIMIT 1) AS ok",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "Run backfill-feature-id",
+        "sql": "UPDATE \"public\".\"feature\" SET \"id\" = gen_random_uuid()::char(36) WHERE \"id\" IS NULL",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "Verify backfill-feature-id resolved all violations",
+        "sql": "SELECT NOT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"feature\" WHERE \"id\" IS NULL LIMIT 1) AS ok",
+        "params": []
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.setNotNull.feature.id",
+    "label": "Set NOT NULL on \"feature\".\"id\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "feature"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n)"
+      },
+      {
+        "description": "ensure no NULL values in \"id\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"feature\" WHERE \"id\" IS NULL)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"id\"",
+        "sql": "ALTER TABLE \"public\".\"feature\" ALTER COLUMN \"id\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" is NOT NULL",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n    AND is_nullable = 'NO'\n)"
+      }
+    ]
+  },
+  {
+    "id": "primaryKey.bug.bug_pkey",
+    "label": "Add primary key on \"bug\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "primaryKey",
+        "name": "bug_pkey",
+        "table": "bug"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure primary key \"bug_pkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'bug_pkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"bug\"')\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add primary key \"bug_pkey\"",
+        "sql": "ALTER TABLE \"public\".\"bug\" ADD CONSTRAINT \"bug_pkey\" PRIMARY KEY (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify primary key \"bug_pkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'bug_pkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"bug\"')\n)"
+      }
+    ]
+  },
+  {
+    "id": "primaryKey.feature.feature_pkey",
+    "label": "Add primary key on \"feature\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "primaryKey",
+        "name": "feature_pkey",
+        "table": "feature"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure primary key \"feature_pkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'feature_pkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"feature\"')\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add primary key \"feature_pkey\"",
+        "sql": "ALTER TABLE \"public\".\"feature\" ADD CONSTRAINT \"feature_pkey\" PRIMARY KEY (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify primary key \"feature_pkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'feature_pkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"feature\"')\n)"
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.bug.bug_id_fkey",
+    "label": "Add foreign key \"bug_id_fkey\" on \"bug\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "bug_id_fkey",
+        "table": "bug"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"bug_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'bug_id_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"bug\"')\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"bug_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"bug\"\nADD CONSTRAINT \"bug_id_fkey\"\nFOREIGN KEY (\"id\")\nREFERENCES \"public\".\"task\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"bug_id_fkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'bug_id_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"bug\"')\n)"
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.feature.feature_id_fkey",
+    "label": "Add foreign key \"feature_id_fkey\" on \"feature\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "feature_id_fkey",
+        "table": "feature"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"feature_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'feature_id_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"feature\"')\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"feature_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"feature\"\nADD CONSTRAINT \"feature_id_fkey\"\nFOREIGN KEY (\"id\")\nREFERENCES \"public\".\"task\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"feature_id_fkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'feature_id_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"feature\"')\n)"
+      }
+    ]
+  }
+]
