@@ -11,7 +11,7 @@ import {
   postgresTarget,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
-import { unboundTables } from './unbound-tables';
+import { unboundTables } from './unbound-tables.test';
 
 describe('prismaContract provider helper', () => {
   const originalCwd = process.cwd();
@@ -88,12 +88,13 @@ describe('prismaContract provider helper', () => {
         storage: {
           namespaces: {
             public: {
-              entries: { table: {
-                user: expect.any(Object),
+              entries: {
+                table: {
+                  user: expect.any(Object),
+                },
               },
             },
           },
-        },
         },
       });
     });
@@ -126,12 +127,13 @@ describe('prismaContract provider helper', () => {
         storage: {
           namespaces: {
             public: {
-              entries: { table: {
-                user: expect.any(Object),
+              entries: {
+                table: {
+                  user: expect.any(Object),
+                },
               },
             },
           },
-        },
         },
       });
     });
@@ -456,20 +458,21 @@ model Document {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            entries: { table: {
-              user: {
-                columns: {
-                  dbExpr: {
-                    default: {
-                      kind: 'function',
-                      expression: 'gen_random_uuid()',
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    dbExpr: {
+                      default: {
+                        kind: 'function',
+                        expression: 'gen_random_uuid()',
+                      },
                     },
                   },
                 },
               },
             },
           },
-        },
         },
       });
     });

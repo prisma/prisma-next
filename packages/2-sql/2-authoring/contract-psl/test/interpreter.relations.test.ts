@@ -9,7 +9,7 @@ import {
   postgresTarget,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
-import { unboundTables } from './unbound-tables';
+import { unboundTables } from './unbound-tables.test';
 
 const baseInput = {
   target: postgresTarget,

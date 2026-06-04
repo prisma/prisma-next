@@ -16,7 +16,7 @@ import {
   testEnumEntityContributions,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
-import { unboundTables } from './unbound-tables';
+import { unboundTables } from './unbound-tables.test';
 
 const testIndexPack = {
   kind: 'extension',
@@ -63,17 +63,18 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            user: {
-              columns: {
-                email: {
-                  codecId: 'custom/text@1',
-                  nativeType: 'custom_text',
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  email: {
+                    codecId: 'custom/text@1',
+                    nativeType: 'custom_text',
+                  },
                 },
               },
             },
           },
-        },
         },
       },
     });
@@ -167,17 +168,18 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            user: {
-              columns: {
-                slug: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  slug: {
+                    codecId: 'pg/text@1',
+                    nativeType: 'text',
+                  },
                 },
               },
             },
           },
-        },
         },
       },
     });
@@ -246,16 +248,17 @@ model Comment {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-                email: { codecId: 'pg/text@1', nativeType: 'text' },
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+                  email: { codecId: 'pg/text@1', nativeType: 'text' },
+                },
+                primaryKey: { columns: ['id'] },
               },
-              primaryKey: { columns: ['id'] },
             },
           },
-        },
         },
       },
     });
@@ -294,16 +297,17 @@ model Comment {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            idlessThing: {
-              columns: {
-                email: { codecId: 'pg/text@1', nativeType: 'text' },
-                token: { codecId: 'pg/text@1', nativeType: 'text' },
+          entries: {
+            table: {
+              idlessThing: {
+                columns: {
+                  email: { codecId: 'pg/text@1', nativeType: 'text' },
+                  token: { codecId: 'pg/text@1', nativeType: 'text' },
+                },
+                uniques: [{ columns: ['email'] }],
               },
-              uniques: [{ columns: ['email'] }],
             },
           },
-        },
         },
       },
     });
@@ -348,12 +352,13 @@ model Comment {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            compositeThing: {
-              primaryKey: { columns: ['email', 'token'] },
+          entries: {
+            table: {
+              compositeThing: {
+                primaryKey: { columns: ['email', 'token'] },
+              },
             },
           },
-        },
         },
       },
     });
@@ -383,15 +388,16 @@ model Comment {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            composite_thing: {
-              primaryKey: {
-                columns: ['email_address', 'api_token'],
-                name: 'composite_thing_pkey',
+          entries: {
+            table: {
+              composite_thing: {
+                primaryKey: {
+                  columns: ['email_address', 'api_token'],
+                  name: 'composite_thing_pkey',
+                },
               },
             },
           },
-        },
         },
       },
     });
@@ -494,38 +500,39 @@ model Member {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            org_team: {
-              columns: {
-                team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-              },
-              primaryKey: { columns: ['team_id'] },
-            },
-            team_member: {
-              columns: {
-                member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-                team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
-              },
-              primaryKey: { columns: ['member_id'] },
-              indexes: [{ columns: ['team_ref'] }],
-              uniques: [{ columns: ['team_ref', 'member_id'] }],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: 'public',
-                    tableName: 'team_member',
-                    columns: ['team_ref'],
-                  },
-                  target: {
-                    namespaceId: 'public',
-                    tableName: 'org_team',
-                    columns: ['team_id'],
-                  },
+          entries: {
+            table: {
+              org_team: {
+                columns: {
+                  team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
                 },
-              ],
+                primaryKey: { columns: ['team_id'] },
+              },
+              team_member: {
+                columns: {
+                  member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+                  team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
+                },
+                primaryKey: { columns: ['member_id'] },
+                indexes: [{ columns: ['team_ref'] }],
+                uniques: [{ columns: ['team_ref', 'member_id'] }],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: 'public',
+                      tableName: 'team_member',
+                      columns: ['team_ref'],
+                    },
+                    target: {
+                      namespaceId: 'public',
+                      tableName: 'org_team',
+                      columns: ['team_id'],
+                    },
+                  },
+                ],
+              },
             },
           },
-        },
         },
       },
     });
@@ -603,16 +610,17 @@ model OrderItem {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            entries: { table: {
-              order_item: {
-                primaryKey: {
-                  columns: ['order_id', 'product_id'],
-                  name: 'order_item_pkey',
+            entries: {
+              table: {
+                order_item: {
+                  primaryKey: {
+                    columns: ['order_id', 'product_id'],
+                    name: 'order_item_pkey',
+                  },
                 },
               },
             },
           },
-        },
         },
       });
     });
@@ -642,12 +650,13 @@ model OrderItem {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            membership: {
-              primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
+          entries: {
+            table: {
+              membership: {
+                primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
+              },
             },
           },
-        },
         },
       },
     });
@@ -677,20 +686,21 @@ model OrderItem {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            entries: { table: {
-              doc: {
-                indexes: [
-                  {
-                    columns: ['body'],
-                    name: 'doc_body_bm25_idx',
-                    type: 'bm25',
-                    options: { key_field: 'id' },
-                  },
-                ],
+            entries: {
+              table: {
+                doc: {
+                  indexes: [
+                    {
+                      columns: ['body'],
+                      name: 'doc_body_bm25_idx',
+                      type: 'bm25',
+                      options: { key_field: 'id' },
+                    },
+                  ],
+                },
               },
             },
           },
-        },
         },
       });
     });
@@ -716,13 +726,14 @@ model OrderItem {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            entries: { table: {
-              doc: {
-                indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
+            entries: {
+              table: {
+                doc: {
+                  indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
+                },
               },
             },
           },
-        },
         },
       });
     });
