@@ -68,16 +68,33 @@ export function parseChangesFrontmatter(src) {
     return { ok: true, changes: [] };
   }
 
-  // Block sequence: `changes:` followed by `  - id: …` lines
+  // Inline non-empty flow array: `changes: [foo]` or `changes: [a, b]`
+  // Must have at least one non-whitespace character inside the brackets.
+  if (/^changes:\s*\[.*\S.*\]/m.test(fm)) {
+    const flowMatch = /^changes:\s*\[(.+)\]/m.exec(fm);
+    const elements = flowMatch
+      ? flowMatch[1]
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    return { ok: true, changes: elements };
+  }
+
+  // Block sequence: `changes:` followed by indented `- ` bullet lines.
+  // Detect entries by their `- ` bullet regardless of which key appears first
+  // on the bullet line (YAML does not mandate `id:` first). The regex captures
+  // bullet lines only (continuation lines are not included by the lazy match);
+  // we count bullets to determine the entry count.
   const blockMatch = /^changes:\s*\n((?:[ \t]+-[ \t]+[\s\S]*?)*)(?=\n\S|$)/m.exec(fm);
   if (blockMatch) {
-    const ids = [];
-    for (const line of blockMatch[1].split('\n')) {
-      const idMatch = /^\s+-\s+id:\s+(.+)$/.exec(line);
-      if (idMatch) ids.push({ id: idMatch[1].trim() });
-    }
-    if (ids.length > 0) {
-      return { ok: true, changes: ids };
+    const bulletLines = blockMatch[1].split('\n').filter((l) => /^\s+-\s/.test(l));
+    if (bulletLines.length > 0) {
+      const entries = bulletLines.map((line) => {
+        const idMatch = /^\s+-\s+id:\s+(.+)$/.exec(line);
+        return idMatch ? { id: idMatch[1].trim() } : {};
+      });
+      return { ok: true, changes: entries };
     }
   }
 

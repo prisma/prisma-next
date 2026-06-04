@@ -633,6 +633,35 @@ describe('parseChangesFrontmatter', () => {
     const result = parseChangesFrontmatter('# No frontmatter here\n');
     assert.equal(result.ok, false);
   });
+
+  it('(finding 1) non-empty flow array with one element: changes: [foo] is ok with length 1', () => {
+    const result = parseChangesFrontmatter('---\nchanges: [foo]\n---\n');
+    assert.equal(result.ok, true);
+    assert.equal(result.changes.length, 1);
+  });
+
+  it('(finding 1) non-empty flow array with multiple elements: changes: [a, b] is ok with length >= 1', () => {
+    const result = parseChangesFrontmatter('---\nchanges: [a, b]\n---\n');
+    assert.equal(result.ok, true);
+    assert.ok(result.changes.length >= 1);
+  });
+
+  it('(finding 1) regression: empty flow array changes: [] still returns ok:true with length 0', () => {
+    const result = parseChangesFrontmatter('---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n');
+    assert.equal(result.ok, true);
+    assert.equal(result.changes.length, 0);
+  });
+
+  it('(finding 2) block entry whose first key is summary (not id) is ok with length >= 1', () => {
+    const result = parseChangesFrontmatter('---\nchanges:\n  - summary: foo\n    id: bar\n---\n');
+    assert.equal(result.ok, true);
+    assert.ok(result.changes.length >= 1);
+  });
+
+  it('(regression) absent changes: key still returns ok:false', () => {
+    const result = parseChangesFrontmatter('---\nfrom: "0.7"\nto: "0.8"\n---\n');
+    assert.equal(result.ok, false);
+  });
 });
 
 describe('check-upgrade-coverage — per-PR correspondence rule', () => {
