@@ -566,10 +566,12 @@ export function buildSqlContractFromDefinition(
           id,
           entries: {
             table: tablesByNamespace[id] ?? {},
-            ...ifDefined('type', enumTypes),
           },
         };
-        return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
+        return [
+          id,
+          createNamespace ? createNamespace(nsInput, enumTypes) : buildSqlNamespace(nsInput),
+        ];
       }),
     ),
   );

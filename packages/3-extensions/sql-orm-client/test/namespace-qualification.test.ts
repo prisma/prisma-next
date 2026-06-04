@@ -51,6 +51,7 @@ const publicPostgresContract = {
         id: PUBLIC_NAMESPACE_ID,
         entries: {
           table: { users: new StorageTable(usersTableInput) },
+          type: {},
         },
       }),
     },

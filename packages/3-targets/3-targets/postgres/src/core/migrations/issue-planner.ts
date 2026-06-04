@@ -29,6 +29,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
+import { isPostgresSchema } from '../postgres-schema';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -73,7 +74,7 @@ function locateNamespaceTypeInStorage(
   typeName: string,
 ): unknown {
   const ns = storage.namespaces[namespaceId];
-  return ns?.entries.type?.[typeName];
+  return isPostgresSchema(ns) ? ns.entries.type[typeName] : undefined;
 }
 
 // ============================================================================

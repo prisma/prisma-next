@@ -626,8 +626,8 @@ describe('compileSelect MTI JOINs', () => {
       namespaces: Record<
         string,
         {
-          entries?: {
-            table?: Record<string, { columns: Record<string, { codecId: string }> }>;
+          entries: {
+            table: Record<string, { columns: Record<string, { codecId: string }> }>;
           };
         }
       >;

@@ -29,13 +29,15 @@ function makeContract(
     };
   } = {},
 ): Contract<SqlStorage> {
-  const unboundNs = postgresCreateNamespace({
-    id: UNBOUND_NAMESPACE_ID,
-    entries: {
-      table: overrides.entries?.table ?? {},
-      ...(overrides.entries?.type !== undefined ? { type: overrides.entries.type } : {}),
+  const unboundNs = postgresCreateNamespace(
+    {
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: overrides.entries?.table ?? {},
+      },
     },
-  });
+    overrides.entries?.type,
+  );
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -829,7 +831,7 @@ describe('planIssues', () => {
         ...Object.fromEntries(
           Object.entries(namespaces).map(([id, ns]) => [
             id,
-            new PostgresSchema({ id, entries: { table: ns.entries.table } }),
+            new PostgresSchema({ id, entries: { table: ns.entries.table, type: {} } }),
           ]),
         ),
       };
@@ -945,11 +947,11 @@ describe('planIssues', () => {
             [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
             tenant_a: new PostgresSchema({
               id: 'tenant_a',
-              entries: { table: { users: userTable } },
+              entries: { table: { users: userTable }, type: {} },
             }),
             tenant_b: new PostgresSchema({
               id: 'tenant_b',
-              entries: { table: { users: userTable } },
+              entries: { table: { users: userTable }, type: {} },
             }),
           },
         }),

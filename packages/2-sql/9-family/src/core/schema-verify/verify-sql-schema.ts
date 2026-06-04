@@ -153,13 +153,13 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     >),
   };
   for (const ns of Object.values(contract.storage.namespaces)) {
-    const nsEnums = ns.entries['type'];
+    const nsEnums = blindCast<
+      { readonly type?: Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>> },
+      'postgres target namespace entries carry a type slot beyond the family-shared SqlNamespace.entries type'
+    >(ns.entries).type;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
-        allStorageTypesMap[k] = blindCast<
-          PostgresEnumStorageEntry | StorageTypeInstance,
-          'entries.type holds postgres-specific enum entries at runtime; family verifier reads them opaquely'
-        >(v);
+        allStorageTypesMap[k] = v;
       }
     }
   }

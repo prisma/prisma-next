@@ -292,14 +292,14 @@ type NamespacedStorageWalk = {
   readonly namespaces: Readonly<
     Record<
       string,
-      Namespace & { readonly entries?: { readonly table?: Readonly<Record<string, object>> } }
+      Namespace & { readonly entries: { readonly table: Readonly<Record<string, object>> } }
     >
   >;
 };
 
 function eachStorageTable(storage: NamespacedStorageWalk) {
   return Object.entries(storage.namespaces).flatMap(([namespaceId, ns]) =>
-    Object.entries(ns.entries?.table ?? {}).map(([tableName, table]) => ({
+    Object.entries(ns.entries.table).map(([tableName, table]) => ({
       namespaceId,
       tableName,
       table,

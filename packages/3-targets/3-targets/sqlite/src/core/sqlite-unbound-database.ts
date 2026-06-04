@@ -1,6 +1,5 @@
 import {
   freezeNode,
-  materializeAndFreezeEntries,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
@@ -20,14 +19,6 @@ export type SqliteDatabaseInput = {
 };
 
 const SQLITE_NAMESPACE_KIND = 'sqlite-namespace' as const;
-
-const SQLITE_TABLE_REGISTRY: ReadonlyMap<string, (raw: unknown) => StorageTable> = new Map([
-  [
-    'table',
-    (raw: unknown) =>
-      raw instanceof StorageTable ? raw : new StorageTable(raw as StorageTableInput),
-  ],
-]);
 
 function isMaterializedSqliteNamespace(
   ns: Namespace | SqlNamespaceTablesInput,
@@ -58,10 +49,16 @@ export class SqliteDatabase extends NamespaceBase {
   constructor(input: SqliteDatabaseInput) {
     super();
     this.id = input.id;
-    this.entries = blindCast<
-      SqliteDatabase['entries'],
-      'materializeAndFreezeEntries with SQLITE_TABLE_REGISTRY produces StorageTable instances under table slot'
-    >(materializeAndFreezeEntries(input.entries, SQLITE_TABLE_REGISTRY));
+    this.entries = Object.freeze({
+      table: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.table).map(([k, v]) => [
+            k,
+            v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
+          ]),
+        ),
+      ),
+    });
     Object.defineProperty(this, 'kind', {
       value: SQLITE_NAMESPACE_KIND,
       writable: false,

@@ -135,9 +135,8 @@ const DEFAULT_ENUM_NAMESPACE_ID = 'public';
 
 function namespaceHasEnum(storage: SqlStorage, namespaceId: string, typeName: string): boolean {
   const ns = storage.namespaces[namespaceId];
-  const types = ns?.entries.type;
-  if (!types) return false;
-  return types[typeName] !== undefined;
+  if (!isPostgresSchema(ns)) return false;
+  return ns.entries.type[typeName] !== undefined;
 }
 
 /**
@@ -645,9 +644,10 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
 function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
   for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-    const nsEnums = ns.entries.type;
-    if (!nsEnums) continue;
-    for (const [name, instance] of Object.entries(nsEnums).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!isPostgresSchema(ns)) continue;
+    for (const [name, instance] of Object.entries(ns.entries.type).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       if (instance instanceof PostgresEnumType) {
         result.set(enumCompoundKey(nsId, name), instance);
       }

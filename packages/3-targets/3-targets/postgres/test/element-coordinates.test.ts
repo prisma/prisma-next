@@ -15,7 +15,7 @@ describe('elementCoordinates with PostgresSchema', () => {
   it('walks Postgres-promoted namespace (kind === schema)', () => {
     const schema = new PostgresSchema({
       id: 'public',
-      entries: { table: { users: emptyTableInput } },
+      entries: { table: { users: emptyTableInput }, type: {} },
     });
     expect(schema.kind).toBe('schema');
 

@@ -11,7 +11,11 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  NamespaceBase,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
   buildSqlNamespace,
@@ -35,6 +39,29 @@ import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migra
  */
 export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }>();
 
+class TestEnumNamespace extends NamespaceBase {
+  override readonly kind = 'schema' as const;
+  readonly id: string;
+  readonly entries: Readonly<{
+    readonly table: Readonly<Record<string, StorageTable>>;
+    readonly type: Readonly<Record<string, PostgresEnumStorageEntry>>;
+  }>;
+
+  constructor(
+    id: string,
+    table: Record<string, StorageTable>,
+    type: Record<string, PostgresEnumStorageEntry> = {},
+  ) {
+    super();
+    this.id = id;
+    this.entries = Object.freeze({
+      table: Object.freeze(table),
+      type: Object.freeze(type),
+    });
+    freezeNode(this);
+  }
+}
+
 /**
  * Creates a minimal valid contract for testing.
  */
@@ -47,6 +74,10 @@ export function createTestContract(
     enums?: Record<string, PostgresEnumStorageEntry>;
   },
 ): Contract<SqlStorage> {
+  const namespace =
+    contractOverrides?.enums !== undefined
+      ? new TestEnumNamespace(UNBOUND_NAMESPACE_ID, tables, contractOverrides.enums)
+      : buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -56,13 +87,7 @@ export function createTestContract(
     storage: new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          entries: {
-            table: tables,
-            ...ifDefined('type', contractOverrides?.enums),
-          },
-        }),
+        [UNBOUND_NAMESPACE_ID]: namespace,
       },
       ...ifDefined('types', storageTypes),
     }),

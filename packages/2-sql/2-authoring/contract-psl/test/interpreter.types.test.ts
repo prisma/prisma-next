@@ -3,6 +3,7 @@ import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
+  buildEnumCapturingFactory,
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
   postgresScalarTypeDescriptors,
@@ -77,51 +78,52 @@ model Event {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            event: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'uuid', nullable: false, typeRef: 'Id' },
-                slug: {
-                  codecId: 'sql/varchar@1',
-                  nativeType: 'character varying',
-                  nullable: false,
-                  typeRef: 'Slug',
+          entries: {
+            table: {
+              event: {
+                columns: {
+                  id: { codecId: 'pg/text@1', nativeType: 'uuid', nullable: false, typeRef: 'Id' },
+                  slug: {
+                    codecId: 'sql/varchar@1',
+                    nativeType: 'character varying',
+                    nullable: false,
+                    typeRef: 'Slug',
+                  },
+                  rating: {
+                    codecId: 'pg/int2@1',
+                    nativeType: 'int2',
+                    nullable: false,
+                    typeRef: 'Rating',
+                  },
+                  happenedAt: {
+                    codecId: 'pg/time@1',
+                    nativeType: 'time',
+                    nullable: false,
+                    typeRef: 'HappenedAt',
+                  },
+                  publishDay: {
+                    codecId: 'pg/timestamptz@1',
+                    nativeType: 'date',
+                    nullable: false,
+                    typeRef: 'PublishDay',
+                  },
+                  payload: {
+                    codecId: 'pg/json@1',
+                    nativeType: 'json',
+                    nullable: false,
+                    typeRef: 'Payload',
+                  },
+                  amount: {
+                    codecId: 'pg/numeric@1',
+                    nativeType: 'numeric',
+                    nullable: false,
+                    typeRef: 'Amount',
+                  },
                 },
-                rating: {
-                  codecId: 'pg/int2@1',
-                  nativeType: 'int2',
-                  nullable: false,
-                  typeRef: 'Rating',
-                },
-                happenedAt: {
-                  codecId: 'pg/time@1',
-                  nativeType: 'time',
-                  nullable: false,
-                  typeRef: 'HappenedAt',
-                },
-                publishDay: {
-                  codecId: 'pg/timestamptz@1',
-                  nativeType: 'date',
-                  nullable: false,
-                  typeRef: 'PublishDay',
-                },
-                payload: {
-                  codecId: 'pg/json@1',
-                  nativeType: 'json',
-                  nullable: false,
-                  typeRef: 'Payload',
-                },
-                amount: {
-                  codecId: 'pg/numeric@1',
-                  nativeType: 'numeric',
-                  nullable: false,
-                  typeRef: 'Amount',
-                },
+                primaryKey: { columns: ['id'] },
               },
-              primaryKey: { columns: ['id'] },
             },
           },
-        },
         },
       },
     });
@@ -149,8 +151,10 @@ model User {
       sourceId: 'schema.prisma',
     });
 
+    const { createNamespace, capturedEnumTypes } = buildEnumCapturingFactory();
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
+      createNamespace,
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -158,25 +162,26 @@ model User {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    expect(capturedEnumTypes['public']).toMatchObject({
+      UserRole: {
+        kind: 'postgres-enum',
+        name: 'UserRole',
+        nativeType: 'user_role',
+        values: ['USER', 'ADMIN'],
+      },
+      Role: {
+        kind: 'postgres-enum',
+        name: 'Role',
+        nativeType: 'Role',
+        values: ['OWNER'],
+      },
+    });
+
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
           id: 'public',
           entries: {
-            type: {
-              UserRole: {
-                kind: 'postgres-enum',
-                name: 'UserRole',
-                nativeType: 'user_role',
-                values: ['USER', 'ADMIN'],
-              },
-              Role: {
-                kind: 'postgres-enum',
-                name: 'Role',
-                nativeType: 'Role',
-                values: ['OWNER'],
-              },
-            },
             table: {
               user: {
                 columns: {
@@ -262,44 +267,45 @@ model Event {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          entries: { table: {
-            event: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                code: {
-                  codecId: 'sql/char@1',
-                  nativeType: 'character',
-                  nullable: false,
-                  typeRef: 'Code',
-                },
-                score: {
-                  codecId: 'pg/float4@1',
-                  nativeType: 'float4',
-                  nullable: false,
-                  typeRef: 'Score',
-                },
-                createdAt: {
-                  codecId: 'pg/timestamp@1',
-                  nativeType: 'timestamp',
-                  nullable: false,
-                  typeRef: 'CreatedAt',
-                },
-                publishedAt: {
-                  codecId: 'pg/timestamptz@1',
-                  nativeType: 'timestamptz',
-                  nullable: false,
-                  typeRef: 'PublishedAt',
-                },
-                reminderAt: {
-                  codecId: 'pg/timetz@1',
-                  nativeType: 'timetz',
-                  nullable: false,
-                  typeRef: 'ReminderAt',
+          entries: {
+            table: {
+              event: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  code: {
+                    codecId: 'sql/char@1',
+                    nativeType: 'character',
+                    nullable: false,
+                    typeRef: 'Code',
+                  },
+                  score: {
+                    codecId: 'pg/float4@1',
+                    nativeType: 'float4',
+                    nullable: false,
+                    typeRef: 'Score',
+                  },
+                  createdAt: {
+                    codecId: 'pg/timestamp@1',
+                    nativeType: 'timestamp',
+                    nullable: false,
+                    typeRef: 'CreatedAt',
+                  },
+                  publishedAt: {
+                    codecId: 'pg/timestamptz@1',
+                    nativeType: 'timestamptz',
+                    nullable: false,
+                    typeRef: 'PublishedAt',
+                  },
+                  reminderAt: {
+                    codecId: 'pg/timetz@1',
+                    nativeType: 'timetz',
+                    nullable: false,
+                    typeRef: 'ReminderAt',
+                  },
                 },
               },
             },
           },
-        },
         },
       },
     });
@@ -321,8 +327,10 @@ model Account {
       sourceId: 'schema.prisma',
     });
 
+    const { createNamespace, capturedEnumTypes } = buildEnumCapturingFactory();
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
+      createNamespace,
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -330,22 +338,11 @@ model Account {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.storage).toMatchObject({
-      namespaces: {
-        public: {
-          id: 'public',
-          entries: {
-            type: {
-              UserRole: { kind: 'postgres-enum', values: ['ADMIN', 'USER'] },
-            },
-          },
-        },
-      },
+    expect(capturedEnumTypes['public']).toMatchObject({
+      UserRole: { kind: 'postgres-enum', values: ['ADMIN', 'USER'] },
     });
-    const storageNs = (
-      result.value.storage as unknown as { namespaces: Record<string, { entries?: { type?: unknown } }> }
-    ).namespaces;
-    expect(storageNs['auth']).toBeUndefined();
+    expect(capturedEnumTypes['auth']).toBeUndefined();
+    expect(result.value.storage.namespaces['public']).toBeDefined();
   });
 
   it('lowers a namespace-scoped enum into storage.namespaces[nsId].entries.type', () => {
@@ -365,8 +362,10 @@ model Account {
       sourceId: 'schema.prisma',
     });
 
+    const { createNamespace, capturedEnumTypes } = buildEnumCapturingFactory();
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
+      createNamespace,
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
     });
@@ -374,20 +373,10 @@ model Account {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.storage).toMatchObject({
-      namespaces: {
-        auth: {
-          entries: {
-            type: {
-              user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
-            },
-          },
-        },
-      },
+    expect(capturedEnumTypes['auth']).toMatchObject({
+      user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
     });
-    const storageNs2 = (
-      result.value.storage as unknown as { namespaces: Record<string, { entries?: { type?: unknown } }> }
-    ).namespaces;
-    expect(storageNs2['public']!.entries?.type).toBeUndefined();
+    expect(capturedEnumTypes['public']).toBeUndefined();
+    expect(result.value.storage.namespaces['auth']).toBeDefined();
   });
 });

@@ -88,7 +88,7 @@ describe('snapshot-read shape fixtures — per-kind round-trip (TML-2536)', () =
     const raw = JSON.parse(readFileSync(join(FIXTURES_DIR, 'postgres-enum.json'), 'utf-8'));
     const contract = serializer.deserializeContract(raw);
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const entry = contract.storage.namespaces['public']?.entries.type?.['user_role'];
+    const entry = contract.storage.namespaces['public']?.entries['type']?.['user_role'];
     expect(entry).toBeInstanceOf(PostgresEnumType);
     expect(entry).toMatchObject({
       kind: 'postgres-enum',

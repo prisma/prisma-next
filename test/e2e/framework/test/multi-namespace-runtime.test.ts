@@ -76,12 +76,14 @@ function buildMultiNamespaceRuntimeContract(): Contract<SqlStorage> {
           id: 'auth',
           entries: {
             table: { user: new StorageTable(userTable) },
+            type: {},
           },
         }),
         public: new PostgresSchema({
           id: 'public',
           entries: {
             table: { note: new StorageTable(noteTable) },
+            type: {},
           },
         }),
       },

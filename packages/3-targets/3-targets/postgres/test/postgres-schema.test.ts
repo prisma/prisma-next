@@ -18,18 +18,18 @@ const emptyTableInput = {
 
 describe('PostgresSchema', () => {
   it('exposes its id and renders a quoted-identifier qualifier', () => {
-    const schema = new PostgresSchema({ id: 'auth' });
+    const schema = new PostgresSchema({ id: 'auth', entries: { table: {}, type: {} } });
     expect(schema.id).toBe('auth');
     expect(schema.qualifier()).toBe('"auth"');
   });
 
   it('qualifies a table name with the schema prefix', () => {
-    const schema = new PostgresSchema({ id: 'auth' });
+    const schema = new PostgresSchema({ id: 'auth', entries: { table: {}, type: {} } });
     expect(schema.qualifyTable('users')).toBe('"auth"."users"');
   });
 
   it('quotes the schema name even when it would otherwise collide with a Postgres keyword', () => {
-    const schema = new PostgresSchema({ id: 'public' });
+    const schema = new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } });
     expect(schema.qualifier()).toBe('"public"');
     expect(schema.qualifyTable('users')).toBe('"public"."users"');
   });
@@ -37,7 +37,7 @@ describe('PostgresSchema', () => {
   it('normalises plain table inputs into StorageTable instances', () => {
     const schema = new PostgresSchema({
       id: 'app',
-      entries: { table: { users: emptyTableInput } },
+      entries: { table: { users: emptyTableInput }, type: {} },
     });
     expect(schema.entries.table['users']).toBeInstanceOf(StorageTable);
   });
@@ -46,12 +46,13 @@ describe('PostgresSchema', () => {
     const schema = new PostgresSchema({
       id: 'app',
       entries: {
+        table: {},
         type: {
           role: { name: 'Role', values: ['admin', 'member'] },
         },
       },
     });
-    expect(schema.entries.type?.['role']).toBeInstanceOf(PostgresEnumType);
+    expect(schema.entries.type['role']).toBeInstanceOf(PostgresEnumType);
   });
 });
 
@@ -82,7 +83,7 @@ describe('ddlSchemaName', () => {
   const storageWithPublic = new SqlStorage({
     storageHash: coreHash('sha256:test-with-public'),
     namespaces: {
-      public: new PostgresSchema({ id: 'public' }),
+      public: new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } }),
       [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
     },
   });
@@ -90,18 +91,18 @@ describe('ddlSchemaName', () => {
   const storageWithoutPublic = new SqlStorage({
     storageHash: coreHash('sha256:test-without-public'),
     namespaces: {
-      auth: new PostgresSchema({ id: 'auth' }),
+      auth: new PostgresSchema({ id: 'auth', entries: { table: {}, type: {} } }),
       [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
     },
   });
 
   it('returns its own id for a named public schema', () => {
-    const schema = new PostgresSchema({ id: 'public' });
+    const schema = new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } });
     expect(schema.ddlSchemaName(storageWithPublic)).toBe('public');
   });
 
   it('returns its own id for a named non-public schema', () => {
-    const schema = new PostgresSchema({ id: 'auth' });
+    const schema = new PostgresSchema({ id: 'auth', entries: { table: {}, type: {} } });
     expect(schema.ddlSchemaName(storageWithoutPublic)).toBe('auth');
   });
 

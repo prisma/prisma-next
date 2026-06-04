@@ -21,8 +21,6 @@ export interface SqlNamespaceTablesInput {
   readonly id: string;
   readonly entries: {
     readonly table: Record<string, StorageTable | StorageTableInput>;
-    /** Target-specific pass-through: postgres enum entries under `type`. */
-    readonly type?: Record<string, unknown>;
   };
 }
 
@@ -62,8 +60,6 @@ export interface SqlStorageInput<THash extends string = string> {
 export type SqlNamespace = Namespace & {
   readonly entries: Readonly<{
     readonly table: Readonly<Record<string, StorageTable>>;
-    /** Target-specific pass-through: postgres enum entries under `type`. */
-    readonly type?: Readonly<Record<string, unknown>>;
   }>;
   /**
    * Render a dialect-qualified table reference for runtime SQL emission.

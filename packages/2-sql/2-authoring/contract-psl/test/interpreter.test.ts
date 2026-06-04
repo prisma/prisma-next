@@ -8,6 +8,7 @@ import {
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
 import {
+  buildEnumCapturingFactory,
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
   modelsOf,
@@ -934,16 +935,16 @@ namespace tenant_a {
 `,
         sourceId: 'schema.prisma',
       });
+      const { createNamespace, capturedEnumTypes } = buildEnumCapturingFactory();
       const result = interpretPslDocumentToSqlContract({
+        createNamespace,
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const enums = storage.namespaces['tenant_a']?.entries.type ?? {};
-      expect(enums).toHaveProperty('Status');
-      expect(enums).toHaveProperty('Tier');
+      expect(capturedEnumTypes['tenant_a']).toHaveProperty('Status');
+      expect(capturedEnumTypes['tenant_a']).toHaveProperty('Tier');
     });
 
     it('Postgres routes a mixed top-level + multi-namespace document into the right slots', () => {

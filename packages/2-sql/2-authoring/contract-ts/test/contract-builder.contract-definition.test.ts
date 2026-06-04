@@ -1,5 +1,10 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import {
+  buildSqlNamespace,
+  type PostgresEnumStorageEntry,
+  type SqlNamespaceTablesInput,
+} from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
@@ -362,9 +367,19 @@ describe('shared contract definition lowering', () => {
     );
   });
 
-  it('routes namespaceTypes enums to storage.namespaces[nsId].entries.type', () => {
+  it('routes namespaceTypes enums to the createNamespace factory as second argument', () => {
+    const collectedEnumTypes: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: (
+        input: SqlNamespaceTablesInput,
+        enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+      ) => {
+        if (enumTypes && Object.keys(enumTypes).length > 0) {
+          collectedEnumTypes[input.id] = { ...(collectedEnumTypes[input.id] ?? {}), ...enumTypes };
+        }
+        return buildSqlNamespace(input);
+      },
       namespaceTypes: {
         auth: {
           user_type: {
@@ -394,12 +409,10 @@ describe('shared contract definition lowering', () => {
       ],
     });
 
-    const nsStorage = contract.storage as unknown as {
-      namespaces: Record<string, { entries?: { type?: Record<string, unknown> } }>;
-    };
-    expect(nsStorage.namespaces['auth']?.entries?.type).toMatchObject({
+    expect(collectedEnumTypes['auth']).toMatchObject({
       user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
     });
-    expect(nsStorage.namespaces['public']?.entries?.type).toBeUndefined();
+    expect(collectedEnumTypes['public']).toBeUndefined();
+    expect(contract.storage.namespaces['auth']).toBeDefined();
   });
 });

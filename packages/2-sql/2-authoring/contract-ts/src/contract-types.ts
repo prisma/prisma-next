@@ -6,11 +6,11 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { StorageType } from '@prisma-next/framework-components/ir';
 import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type {
   ContractWithTypeMaps,
   Index,
-  PostgresEnumStorageEntry,
   ReferentialAction,
   StorageTypeInstance,
   TypeMaps,
@@ -144,10 +144,7 @@ type DefinitionNamespaces<Definition> = Definition extends {
 type DefinitionTypes<Definition> = Definition extends {
   readonly types?: unknown;
 }
-  ? Present<Definition['types']> extends Record<
-      string,
-      StorageTypeInstance | PostgresEnumStorageEntry
-    >
+  ? Present<Definition['types']> extends Record<string, StorageType>
     ? Present<Definition['types']>
     : Record<never, never>
   : Record<never, never>;
@@ -311,10 +308,7 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
   ? TypeRef
   : undefined;
 
-type LookupNamedStorageTypeKeyByValue<
-  Definition,
-  TypeRef extends StorageTypeInstance | PostgresEnumStorageEntry,
-> = {
+type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageType> = {
   [TypeName in keyof DefinitionTypes<Definition> & string]: [TypeRef] extends [
     DefinitionTypes<Definition>[TypeName],
   ]
@@ -326,7 +320,7 @@ type LookupNamedStorageTypeKeyByValue<
 
 type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
   ? TypeRef
-  : TypeRef extends StorageTypeInstance | PostgresEnumStorageEntry
+  : TypeRef extends StorageType
     ? [LookupNamedStorageTypeKeyByValue<Definition, TypeRef>] extends [never]
       ? string
       : LookupNamedStorageTypeKeyByValue<Definition, TypeRef>
@@ -564,9 +558,9 @@ type BuiltStorageTables<Definition> = {
 };
 
 type BuiltDocumentScopedTypes<Definition> = {
-  readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends PostgresEnumStorageEntry
-    ? never
-    : K]: DefinitionTypes<Definition>[K];
+  readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends StorageTypeInstance
+    ? K
+    : never]: DefinitionTypes<Definition>[K];
 };
 
 type BuiltDomain<Definition> =
@@ -599,7 +593,6 @@ type BuiltStorage<Definition> = {
       readonly kind: string;
       readonly entries: {
         readonly table: BuiltStorageTables<Definition>;
-        readonly type?: Readonly<Record<string, PostgresEnumStorageEntry>>;
       };
     };
   } & {
@@ -611,7 +604,6 @@ type BuiltStorage<Definition> = {
       readonly kind: string;
       readonly entries: {
         readonly table: Record<never, never>;
-        readonly type?: Readonly<Record<string, PostgresEnumStorageEntry>>;
       };
     };
   };

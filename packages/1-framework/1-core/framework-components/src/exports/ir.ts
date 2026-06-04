@@ -1,7 +1,6 @@
 export { domainElementCoordinates } from '../ir/domain';
 export type { IRNode } from '../ir/ir-node';
 export { freezeNode, IRNodeBase } from '../ir/ir-node';
-export { materializeAndFreezeEntries } from '../ir/materialize-and-freeze-entries';
 export type { Namespace } from '../ir/namespace';
 export { NamespaceBase, UNBOUND_NAMESPACE_ID } from '../ir/namespace';
 export type { EntityCoordinate, Storage } from '../ir/storage';

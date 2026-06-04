@@ -1,6 +1,5 @@
 import {
   freezeNode,
-  materializeAndFreezeEntries,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
@@ -11,14 +10,6 @@ import { SqlUnboundNamespace } from './sql-unbound-namespace';
 import { StorageTable, type StorageTableInput } from './storage-table';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
-
-const SQL_NAMESPACE_REGISTRY: ReadonlyMap<string, (raw: unknown) => StorageTable> = new Map([
-  [
-    'table',
-    (raw: unknown) =>
-      raw instanceof StorageTable ? raw : new StorageTable(raw as StorageTableInput),
-  ],
-]);
 
 function isMaterializedSqlNamespace(ns: Namespace | SqlNamespaceTablesInput): ns is SqlNamespace {
   if (typeof ns !== 'object' || ns === null) {
@@ -50,10 +41,16 @@ class SqlBoundNamespace extends NamespaceBase {
   private constructor(input: SqlNamespaceTablesInput) {
     super();
     this.id = input.id;
-    this.entries = blindCast<
-      SqlBoundNamespace['entries'],
-      'materializeAndFreezeEntries with SQL_NAMESPACE_REGISTRY produces StorageTable instances under table slot'
-    >(materializeAndFreezeEntries({ table: input.entries.table }, SQL_NAMESPACE_REGISTRY));
+    this.entries = Object.freeze({
+      table: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.table).map(([k, v]) => [
+            k,
+            v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
+          ]),
+        ),
+      ),
+    });
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,

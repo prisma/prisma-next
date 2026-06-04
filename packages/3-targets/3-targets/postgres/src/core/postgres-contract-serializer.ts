@@ -121,7 +121,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       id,
       entries: {
         table: entries.table,
-        ...(typeSlot !== undefined ? { type: typeSlot } : {}),
+        type: typeSlot ?? {},
       },
     });
   }

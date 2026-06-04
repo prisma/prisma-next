@@ -145,8 +145,14 @@ export interface ContractDefinition {
    * Target-supplied factory that materialises a `Namespace` concretion
    * for a declared namespace coordinate. Mirrors
    * `ContractInput.createNamespace`.
+   *
+   * The optional second argument carries target-specific enum types for the
+   * namespace (e.g. postgres enum registrations keyed by type name).
    */
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace?: (
+    input: SqlNamespaceTablesInput,
+    enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+  ) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
 }

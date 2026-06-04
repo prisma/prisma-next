@@ -292,7 +292,13 @@ export const sqlEmission = {
 
     if (column.typeRef) {
       const ns = storage.namespaces[storageNamespaceId];
-      const nsEnums = ns?.entries.type;
+      const nsEnums =
+        ns !== undefined
+          ? blindCast<
+              { readonly type?: Readonly<Record<string, PostgresEnumStorageEntry>> },
+              'postgres target namespace entries carry a type slot beyond the family-shared SqlNamespace.entries type'
+            >(ns.entries).type
+          : undefined;
       const fromNamespace = nsEnums?.[column.typeRef];
       const typeInstance = fromNamespace ?? storage.types?.[column.typeRef];
       if (typeInstance === undefined) return undefined;
@@ -523,13 +529,17 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
     const tablesType = generateTablesMapType(
       (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
     );
-    const typeSlotRaw = ns.kind === 'schema' ? ns.entries['type'] : undefined;
     const typeSlot =
-      typeSlotRaw !== undefined
+      ns.kind === 'schema'
         ? blindCast<
-            Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>,
-            'schema namespace entries.type holds PostgresEnumStorageEntry instances materialized by the Postgres authoring entity registry'
-          >(typeSlotRaw)
+            Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>> | undefined,
+            'postgres schema namespace entries carry a type slot beyond the family-shared SqlNamespace.entries type'
+          >(
+            blindCast<
+              { readonly type?: Readonly<Record<string, unknown>> },
+              'access opaque type slot on postgres target namespace entries'
+            >(ns.entries).type,
+          )
         : undefined;
     const entriesParts = [`readonly table: ${tablesType}`];
     if (typeSlot !== undefined) {

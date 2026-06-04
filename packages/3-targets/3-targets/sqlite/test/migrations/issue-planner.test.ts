@@ -12,11 +12,11 @@ import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 
 function makeContract(
-  overrides: { entries?: { table?: Record<string, StorageTableInput> } } = {},
+  overrides: { entries: { table: Record<string, StorageTableInput> } } = { entries: { table: {} } },
 ): Contract<SqlStorage> {
   const unboundNs = buildSqlNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    entries: { table: overrides.entries?.table ?? {} },
+    entries: { table: overrides.entries.table },
   });
   return {
     target: 'sqlite',

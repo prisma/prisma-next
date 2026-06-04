@@ -1,43 +1,25 @@
 import {
   freezeNode,
-  type IRNode,
-  materializeAndFreezeEntries,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
+  type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
   type SqlStorage,
   StorageTable,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import { blindCast } from '@prisma-next/utils/casts';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
 
 export interface PostgresSchemaInput {
   readonly id: string;
-  readonly entries?: {
-    readonly table?: Record<string, StorageTable | StorageTableInput>;
-    readonly type?: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
+  readonly entries: {
+    readonly table: Record<string, StorageTable | StorageTableInput>;
+    readonly type: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
   };
 }
-
-const POSTGRES_SCHEMA_REGISTRY: ReadonlyMap<string, (raw: unknown) => IRNode> = new Map<
-  string,
-  (raw: unknown) => IRNode
->([
-  [
-    'table',
-    (raw: unknown) =>
-      raw instanceof StorageTable ? raw : new StorageTable(raw as StorageTableInput),
-  ],
-  [
-    'type',
-    (raw: unknown) =>
-      raw instanceof PostgresEnumType ? raw : new PostgresEnumType(raw as PostgresEnumTypeInput),
-  ],
-]);
 
 /**
  * Postgres target `Namespace` concretion — a Postgres schema (`CREATE
@@ -73,14 +55,24 @@ export class PostgresSchema extends NamespaceBase {
   constructor(input: PostgresSchemaInput) {
     super();
     this.id = input.id;
-    const rawEntries: Record<string, Record<string, unknown>> = {
-      table: (input.entries?.table ?? {}) as Record<string, unknown>,
-      type: (input.entries?.type ?? {}) as Record<string, unknown>,
-    };
-    this.entries = blindCast<
-      PostgresSchema['entries'],
-      'materializeAndFreezeEntries with POSTGRES_SCHEMA_REGISTRY produces StorageTable under table and PostgresEnumType under type'
-    >(materializeAndFreezeEntries(rawEntries, POSTGRES_SCHEMA_REGISTRY));
+    this.entries = Object.freeze({
+      table: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.table).map(([k, v]) => [
+            k,
+            v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
+          ]),
+        ),
+      ),
+      type: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.type).map(([k, v]) => [
+            k,
+            v instanceof PostgresEnumType ? v : new PostgresEnumType(v as PostgresEnumTypeInput),
+          ]),
+        ),
+      ),
+    });
     Object.defineProperty(this, 'kind', {
       value: 'schema',
       writable: false,
@@ -170,7 +162,7 @@ export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
 
   constructor(input?: PostgresSchemaInput) {
-    super(input ?? { id: UNBOUND_NAMESPACE_ID });
+    super(input ?? { id: UNBOUND_NAMESPACE_ID, entries: { table: {}, type: {} } });
   }
 
   override qualifier(): string {
@@ -212,19 +204,19 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  * by reference and trust the resulting `SqlStorage.namespaces` map to
  * be value-stable for a given input set.
  */
-export function postgresCreateNamespace(input: SqlNamespaceTablesInput): PostgresSchema {
+export function postgresCreateNamespace(
+  input: SqlNamespaceTablesInput,
+  enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+): PostgresSchema {
+  const schemaInput: PostgresSchemaInput = {
+    id: input.id,
+    entries: {
+      table: input.entries.table,
+      type: (enumTypes ?? {}) as Record<string, PostgresEnumTypeInput>,
+    },
+  };
   if (input.id === UNBOUND_NAMESPACE_ID) {
-    return new PostgresUnboundSchema(
-      blindCast<
-        PostgresSchemaInput,
-        'type slot carries PostgresEnumTypeInput at the postgres target layer'
-      >({ id: UNBOUND_NAMESPACE_ID, entries: input.entries }),
-    );
+    return new PostgresUnboundSchema(schemaInput);
   }
-  return new PostgresSchema(
-    blindCast<
-      PostgresSchemaInput,
-      'type slot carries PostgresEnumTypeInput at the postgres target layer'
-    >({ id: input.id, entries: input.entries }),
-  );
+  return new PostgresSchema(schemaInput);
 }
