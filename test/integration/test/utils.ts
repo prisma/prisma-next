@@ -19,9 +19,10 @@ import {
   createRuntime,
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
-import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
+import { setupTestDatabase as setupTestDatabaseBase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Client } from 'pg';
+import { bootstrapPostgresSignMarkerTables } from './postgres-bootstrap';
 
 export interface CreateTestRuntimeOptions {
   readonly verifyMarker?: VerifyMarkerOption;
@@ -123,5 +124,12 @@ export async function setupE2EDatabase(
   await setupTestDatabase(client, contract, setupFn);
 }
 
-// Re-export setupTestDatabase for convenience
-export { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
+export async function setupTestDatabase(
+  client: Client,
+  contract: Contract<SqlStorage>,
+  setupFn: (client: Client) => Promise<void>,
+): Promise<void> {
+  await setupTestDatabaseBase(client, contract, setupFn, bootstrapPostgresSignMarkerTables);
+}
+
+export { bootstrapPostgresSignMarkerTables } from './postgres-bootstrap';

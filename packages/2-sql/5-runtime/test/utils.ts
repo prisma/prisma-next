@@ -1,4 +1,3 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import {
   type Contract,
   type ContractModelBase,
@@ -38,10 +37,8 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { SelectAst as SelectAstCtor, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { buildSignMarkerBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import { applicationDomainOf, collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
-import type { SqlStatement } from '../src/exports';
 import {
   createExecutionContext,
   type createRuntime,
@@ -85,56 +82,25 @@ export async function drainPlanExecution(
   return drainAsyncIterable(runtime.execute(plan));
 }
 
-const postgresControlAdapter = createPostgresAdapter();
-const postgresControlLowererContext = { contract: {} as Contract<SqlStorage> };
-
-/**
- * Executes a SQL statement on a database client.
- */
-export async function executeStatement(client: Client, statement: SqlStatement): Promise<void> {
-  if (statement.params.length > 0) {
-    await client.query(statement.sql, [...statement.params]);
-    return;
-  }
-
-  await client.query(statement.sql);
-}
-
-export async function executeLoweredStatement(
-  client: Client,
-  statement: LoweredStatement,
-): Promise<void> {
-  if (statement.params.length > 0) {
-    await client.query(statement.sql, [...statement.params]);
-    return;
-  }
-
-  await client.query(statement.sql);
-}
-
-export async function bootstrapPostgresSignMarkerTables(client: Client): Promise<void> {
-  for (const query of buildSignMarkerBootstrapQueries()) {
-    await executeLoweredStatement(
-      client,
-      postgresControlAdapter.lower(query, postgresControlLowererContext),
-    );
-  }
-}
-
 /**
  * Sets up database schema and data, then writes the contract marker. This helper DRYs up the common pattern of database setup in tests.
+ *
+ * Callers must supply `bootstrapMarkerTables` (typically
+ * `bootstrapPostgresSignMarkerTables` from integration `postgres-bootstrap.ts`)
+ * so this package does not depend on the postgres adapter/target packs.
  */
 export async function setupTestDatabase(
   client: Client,
   contract: Contract<SqlStorage>,
   setupFn: (client: Client) => Promise<void>,
+  bootstrapMarkerTables: (client: Client) => Promise<void>,
 ): Promise<void> {
   await client.query('drop schema if exists prisma_contract cascade');
   await client.query('create schema if not exists public');
 
   await setupFn(client);
 
-  await bootstrapPostgresSignMarkerTables(client);
+  await bootstrapMarkerTables(client);
   await writeTestContractMarker(client, contract);
 }
 

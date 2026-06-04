@@ -19,13 +19,14 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
+import { MARKER_TABLE_NAME } from '../control-tables';
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
-import { MARKER_TABLE_NAME, type SqlStatement } from './statement-builders';
 
 export function createSqliteMigrationRunner(
   family: SqlControlFamilyInstance,
@@ -661,7 +662,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
   private async executeStatement(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
-    statement: SqlStatement,
+    statement: LoweredStatement,
   ): Promise<void> {
     if (statement.params.length > 0) {
       await driver.query(statement.sql, statement.params);

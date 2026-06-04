@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
@@ -13,11 +14,13 @@ import {
   buildSynthMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { buildControlTableBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import type { SqlStatement } from '@prisma-next/target-postgres/statement-builders';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import type { PostgresContract } from '../../../src/core/types';
 import postgresAdapterDescriptor from '../../../src/exports/control';
 
 export const contract: Contract<SqlStorage> = {
@@ -146,9 +149,32 @@ export function createLedgerTestPlan<TDetails extends PostgresPlanTargetDetails>
   });
 }
 
+const postgresControlAdapter = createPostgresAdapter();
+const postgresControlLowererContext = { contract: {} as PostgresContract };
+
+export async function bootstrapPostgresControlSchema(driver: PostgresControlDriver): Promise<void> {
+  const schemaQuery = buildControlTableBootstrapQueries()[0];
+  if (!schemaQuery) {
+    throw new Error('expected prisma_contract schema bootstrap query');
+  }
+  await executeStatement(
+    driver,
+    postgresControlAdapter.lower(schemaQuery, postgresControlLowererContext),
+  );
+}
+
+export async function bootstrapPostgresControlTables(driver: PostgresControlDriver): Promise<void> {
+  for (const query of buildControlTableBootstrapQueries()) {
+    await executeStatement(
+      driver,
+      postgresControlAdapter.lower(query, postgresControlLowererContext),
+    );
+  }
+}
+
 export async function executeStatement(
   driver: PostgresControlDriver,
-  statement: SqlStatement,
+  statement: LoweredStatement,
 ): Promise<void> {
   if (statement.params.length > 0) {
     await driver.query(statement.sql, statement.params);

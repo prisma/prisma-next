@@ -8,11 +8,14 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { ensureSchemaStatement, ensureTableStatement } from '@prisma-next/sql-runtime';
-import { executeStatement, seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
+import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import testContractSpaceExtension from './contract-space-fixture/control';
+import {
+  bootstrapPostgresSignMarkerTables,
+  executeLoweredStatement as executeStatement,
+} from './postgres-bootstrap';
 import {
   executeCommand,
   getExitCode,
@@ -142,8 +145,7 @@ withTempDir(({ createTempDir }) => {
               )
             `);
 
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
+            await bootstrapPostgresSignMarkerTables(client);
 
             await seedTestMarker(client, {
               space: APP_SPACE_ID,

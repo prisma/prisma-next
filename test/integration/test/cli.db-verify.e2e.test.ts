@@ -6,11 +6,14 @@ import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
-import { ensureSchemaStatement, ensureTableStatement } from '@prisma-next/sql-runtime';
-import { executeStatement, seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
+import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  bootstrapPostgresSignMarkerTables,
+  executeLoweredStatement as executeStatement,
+} from './postgres-bootstrap';
 import {
   executeCommand,
   getExitCode,
@@ -113,8 +116,7 @@ async function writeMatchingMarker(
   contract: Contract<SqlStorage>,
 ): Promise<void> {
   await withClient(connectionString, async (client) => {
-    await executeStatement(client, ensureSchemaStatement);
-    await executeStatement(client, ensureTableStatement);
+    await bootstrapPostgresSignMarkerTables(client);
 
     await seedTestMarker(client, {
       storageHash: contract.storage.storageHash,
@@ -332,8 +334,7 @@ withTempDir(({ createTempDir }) => {
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table but don't write marker
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
+            await bootstrapPostgresSignMarkerTables(client);
             // withClient will close the client after this callback returns
           });
 
@@ -886,8 +887,7 @@ withTempDir(({ createTempDir }) => {
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table but don't write marker
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
+            await bootstrapPostgresSignMarkerTables(client);
             // withClient will close the client after this callback returns
           });
 
@@ -976,8 +976,7 @@ withTempDir(({ createTempDir }) => {
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
+            await bootstrapPostgresSignMarkerTables(client);
 
             // Write marker matching contract
             await seedTestMarker(client, {

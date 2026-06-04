@@ -1,14 +1,11 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import {
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
-  ensurePrismaContractSchemaStatement,
-} from '@prisma-next/target-postgres/statement-builders';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { expectNoMarkerOrLedgerWrites } from '../utils/dbAssertions';
 import {
+  bootstrapPostgresControlSchema,
+  bootstrapPostgresControlTables,
   contract,
   createDriver,
   createFailingPlan,
@@ -128,7 +125,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       // used to auto-promote: `id smallint primary key` with no `space`
       // column. The detection step at boot must surface this rather than
       // silently rebuilding the table.
-      await executeStatement(driver!, ensurePrismaContractSchemaStatement);
+      await bootstrapPostgresControlSchema(driver!);
       await driver!.query(`create table prisma_contract.marker (
           id smallint primary key default 1,
           core_hash text not null,
@@ -195,9 +192,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
     it('fails with MARKER_ORIGIN_MISMATCH error and does not modify marker or append ledger', {
       timeout: testTimeout,
     }, async () => {
-      await executeStatement(driver!, ensurePrismaContractSchemaStatement);
-      await executeStatement(driver!, ensureMarkerTableStatement);
-      await executeStatement(driver!, ensureLedgerTableStatement);
+      await bootstrapPostgresControlTables(driver!);
 
       await familyInstance.initMarker({
         driver: driver!,

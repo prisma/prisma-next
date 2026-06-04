@@ -15,12 +15,15 @@ import { defineContract, field, model } from '@prisma-next/postgres/contract-bui
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
-import { ensureSchemaStatement, ensureTableStatement } from '@prisma-next/sql-runtime';
-import { executeStatement, seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
+import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { emit } from '../utils/emit';
+import {
+  bootstrapPostgresSignMarkerTables,
+  executeLoweredStatement as executeStatement,
+} from './postgres-bootstrap';
 import { createIntegrationTestDir } from './utils/cli-test-helpers';
 
 /**
@@ -157,8 +160,7 @@ describe('family instance verify - basic', () => {
 
           await withClient(connectionString, async (client) => {
             // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
+            await bootstrapPostgresSignMarkerTables(client);
 
             // Write marker matching contract
             await seedTestMarker(client, {

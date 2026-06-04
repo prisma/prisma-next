@@ -1,13 +1,10 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
-import {
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
-} from '@prisma-next/target-sqlite/statement-builders';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  bootstrapSqliteControlTables,
   contract,
   createFailingPlan,
   createMigrationPlan,
@@ -98,8 +95,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     testDb = createTestDatabase();
     const { driver } = testDb;
 
-    await executeStatement(driver, ensureMarkerTableStatement);
-    await executeStatement(driver, ensureLedgerTableStatement);
+    await bootstrapSqliteControlTables(driver);
     await familyInstance.initMarker({
       driver,
       space: APP_SPACE_ID,

@@ -21,6 +21,7 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
+import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
@@ -29,7 +30,6 @@ import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { createResolveExistingEnumValues } from './enum-planning';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
-import type { SqlStatement } from './statement-builders';
 
 interface ApplyPlanSuccessValue {
   readonly operationsExecuted: number;
@@ -693,7 +693,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
   private async executeStatement(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    statement: SqlStatement,
+    statement: LoweredStatement,
   ): Promise<void> {
     if (statement.params.length > 0) {
       await driver.query(statement.sql, statement.params);

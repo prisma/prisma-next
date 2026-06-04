@@ -69,7 +69,7 @@
     "./render-ops": "./dist/render-ops.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./sql-utils": "./dist/sql-utils.mjs",
-    "./statement-builders": "./dist/statement-builders.mjs",
+    "./control-tables": "./dist/control-tables.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

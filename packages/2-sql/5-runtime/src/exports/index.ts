@@ -53,12 +53,6 @@ export {
   createExecutionContext,
   createSqlExecutionStack,
 } from '../sql-context';
-export type { SqlStatement } from '../sql-marker';
-export {
-  APP_SPACE_ID,
-  ensureSchemaStatement,
-  ensureTableStatement,
-} from '../sql-marker';
 export type {
   CreateRuntimeOptions,
   Runtime,
