@@ -2,10 +2,10 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import ppgDriver, { type PpgBinding } from '@prisma-next/driver-ppg-serverless/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
-import { type OrmClient, orm as ormBuilder } from '@prisma-next/sql-orm-client';
+import { type OrmClient, orm } from '@prisma-next/sql-orm-client';
 import type { CodecTypesBase, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
 import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -200,7 +200,7 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
 
     return runtimeInstance;
   };
-  const orm: OrmClient<TContract> = ormBuilder({
+  const ormClient: OrmClient<TContract> = orm({
     runtime: {
       execute(plan) {
         return getRuntime().execute(plan);
@@ -212,11 +212,11 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
     context,
   });
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
+  const sqlClient: Db<TContract> = sql<TContract>({ context, rawCodecInferer });
 
   return {
-    sql,
-    orm,
+    sql: sqlClient,
+    orm: ormClient,
     raw: rawSqlTag,
     context,
     stack,
@@ -261,19 +261,19 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
       declaration: D,
       callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
     ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
-      return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
+      return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sqlClient, params));
     },
 
     transaction<R>(
       fn: (tx: PrismaPostgresServerlessTransactionContext<TContract>) => PromiseLike<R>,
     ): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
-        const txSql: Db<TContract> = sqlBuilder<TContract>({
+        const txSql: Db<TContract> = sql<TContract>({
           context,
           rawCodecInferer,
         });
 
-        const txOrm: OrmClient<TContract> = ormBuilder({
+        const txOrm: OrmClient<TContract> = orm({
           runtime: {
             execute(plan) {
               return txCtx.execute(plan);
