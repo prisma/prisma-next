@@ -36,7 +36,7 @@ import contractJson from './contract.json' with { type: 'json' };
 
 export const db = prismaPostgresServerless<Contract>({
   contractJson,
-  url: process.env['PPG_URL']!,
+  binding: { kind: 'url', url: process.env['PPG_URL']! },
 });
 ```
 
@@ -56,7 +56,7 @@ export default {
   async fetch(_req: Request, env: Env): Promise<Response> {
     const db = prismaPostgresServerless<Contract>({
       contractJson,
-      url: env.PPG_URL,
+      binding: { kind: 'url', url: env.PPG_URL },
     });
     try {
       const rows = await db.orm.User.findMany();
@@ -123,12 +123,15 @@ The migration plane runs over a direct TCP connection (re-exported `./control` f
 
 ## Binding variants
 
-The `runtime()` factory accepts one of three binding inputs (exactly one):
+The `runtime()` factory takes a `binding` of one of two kinds:
 
 ```typescript
 // (a) Connection-string URL — the facade constructs and owns the PPG client.
 //     Array-OID parsers are registered automatically.
-const db = prismaPostgresServerless({ contractJson, url: env.PPG_URL });
+const db = prismaPostgresServerless({
+  contractJson,
+  binding: { kind: 'url', url: env.PPG_URL },
+});
 
 // (b) Pre-built @prisma/ppg Client — the caller owns the lifecycle.
 //     Wire array parsers in yourself if you read array-typed columns
@@ -141,12 +144,9 @@ const ppgClient = createPpgClient({
   ...config,
   parsers: withArrayParsers(config.parsers ?? []),
 });
-const db = prismaPostgresServerless({ contractJson, ppgClient });
-
-// (c) Explicit driver binding — pass a `PpgBinding` discriminated union.
 const db = prismaPostgresServerless({
   contractJson,
-  binding: { kind: 'url', url: env.PPG_URL },
+  binding: { kind: 'ppgClient', client: ppgClient },
 });
 ```
 
@@ -166,7 +166,7 @@ await db.transaction(async (tx) => {
 
 - Build a static Prisma Postgres execution stack from target, adapter, and driver descriptors.
 - Build a typed SQL authoring surface and ORM root from the execution context.
-- Normalise runtime binding input (`binding`, `url`, `ppgClient`).
+- Forward the caller's `PpgBinding` through to the driver.
 - Lazily instantiate runtime resources on first `db.runtime()` or `db.connect(...)` call; memoise so repeated calls return one instance.
 - Forward the control / config / contract-builder surfaces from `@prisma-next/postgres` so consumers get a single-import experience.
 

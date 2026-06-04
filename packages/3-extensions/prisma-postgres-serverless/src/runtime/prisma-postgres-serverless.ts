@@ -1,4 +1,3 @@
-import type { Client } from '@prisma/ppg';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import ppgDriver, { type PpgBinding } from '@prisma-next/driver-ppg-serverless/runtime';
@@ -36,15 +35,6 @@ import { ifDefined } from '@prisma-next/utils/defined';
 const sqlBuilder = sqlBuilderModule.sql;
 const ormBuilder = ormClientModule.orm;
 
-// REVIEW: STOP WITH THOSE STUPID ALIASES
-type PpgClient = Client;
-
-import {
-  type PpgServerlessBindingInput,
-  resolveOptionalPpgServerlessBinding,
-  resolvePpgServerlessBinding,
-} from './binding';
-
 export type PpgServerlessTargetId = 'postgres';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
@@ -60,7 +50,7 @@ export interface PrismaPostgresServerlessClient<TContract extends Contract<SqlSt
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PpgServerlessTargetId>;
-  connect(bindingInput?: PpgServerlessBindingInput): Promise<Runtime>;
+  connect(binding?: PpgBinding): Promise<Runtime>;
   runtime(): Runtime;
   transaction<R>(
     fn: (tx: PrismaPostgresServerlessTransactionContext<TContract>) => PromiseLike<R>,
@@ -85,8 +75,6 @@ export interface PrismaPostgresServerlessOptionsBase {
 
 export interface PrismaPostgresServerlessBindingOptions {
   readonly binding?: PpgBinding;
-  readonly url?: string;
-  readonly ppgClient?: PpgClient;
 }
 
 export type PrismaPostgresServerlessOptionsWithContract<TContract extends Contract<SqlStorage>> =
@@ -146,7 +134,7 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
   options: PrismaPostgresServerlessOptions<TContract>,
 ): PrismaPostgresServerlessClient<TContract> {
   const contract = resolveContract(options);
-  let binding = resolveOptionalPpgServerlessBinding(options);
+  let binding = options.binding;
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
@@ -257,12 +245,12 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
       }
 
       if (bindingInput !== undefined) {
-        binding = resolvePpgServerlessBinding(bindingInput);
+        binding = bindingInput;
       }
 
       if (binding === undefined) {
         throw new Error(
-          'Prisma Postgres serverless binding not configured. Pass url/ppgClient/binding to runtime(...) or call db.connect({ ... }).',
+          'Prisma Postgres serverless binding not configured. Pass binding to runtime(...) or call db.connect(binding).',
         );
       }
 

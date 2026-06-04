@@ -214,7 +214,7 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
       await controlClient.close();
     }
 
-    db = prismaPostgresServerless({ contract, url: ppgUrl });
+    db = prismaPostgresServerless({ contract, binding: { kind: 'url', url: ppgUrl } });
     await db.connect();
   }, 120_000);
 

@@ -103,7 +103,7 @@ describe('prisma-postgres-serverless', () => {
     it('accepts { contract } and constructs synchronously', () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       const thenable = db as unknown as { then?: unknown };
@@ -117,7 +117,7 @@ describe('prisma-postgres-serverless', () => {
 
       prismaPostgresServerless({
         contractJson,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       expect(mocks.deserializeContract).toHaveBeenCalledTimes(1);
@@ -129,7 +129,7 @@ describe('prisma-postgres-serverless', () => {
     it('exposes sql / orm / raw / context / stack / connect / runtime / transaction / prepare / close / [Symbol.asyncDispose]', () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       expect(db).toMatchObject({
@@ -150,7 +150,7 @@ describe('prisma-postgres-serverless', () => {
     it('builds sql eagerly without instantiating the driver / runtime', () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       expect(mocks.sqlBuilder).toHaveBeenCalledTimes(1);
@@ -165,7 +165,7 @@ describe('prisma-postgres-serverless', () => {
     it('lazily instantiates driver and runtime on first runtime() call, memoised thereafter', () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       const first = db.runtime();
@@ -180,7 +180,7 @@ describe('prisma-postgres-serverless', () => {
     it('driver.create() is called with no argument (no PPG cursor mode)', () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
       db.runtime();
       expect(mocks.driverCreate).toHaveBeenCalledTimes(1);
@@ -188,11 +188,11 @@ describe('prisma-postgres-serverless', () => {
     });
   });
 
-  describe('binding resolution', () => {
-    it('routes a { url } input to the driver as { kind: "url", url } (no Pool wrapping)', async () => {
+  describe('binding forwarding', () => {
+    it('forwards a { kind: "url" } binding to the driver unchanged', async () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       await db.connect();
@@ -203,14 +203,12 @@ describe('prisma-postgres-serverless', () => {
       });
     });
 
-    it('routes a { ppgClient } input to the driver as { kind: "ppgClient", client }', async () => {
-      // The facade-level type asks for a real PpgClient; the wiring test
-      // doesn't care about the client's shape, only that it's forwarded.
+    it('forwards a { kind: "ppgClient" } binding to the driver unchanged', async () => {
       const fakeClient = { __brand: 'ppg' };
 
       const db = prismaPostgresServerless({
         contract,
-        ppgClient: fakeClient,
+        binding: { kind: 'ppgClient', client: fakeClient },
       } as unknown as Parameters<typeof prismaPostgresServerless<typeof contract>>[0]);
       await db.connect();
 
@@ -225,13 +223,13 @@ describe('prisma-postgres-serverless', () => {
     it('rejects a second connect with "already connected"', async () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       await db.connect();
-      await expect(db.connect({ url: 'postgres://localhost:5432/db2' })).rejects.toThrow(
-        'Prisma Postgres serverless client already connected',
-      );
+      await expect(
+        db.connect({ kind: 'url', url: 'postgres://localhost:5432/db2' }),
+      ).rejects.toThrow('Prisma Postgres serverless client already connected');
 
       expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
     });
@@ -251,7 +249,7 @@ describe('prisma-postgres-serverless', () => {
     it('delegates to withTransaction with the lazy runtime', async () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       const result = await db.transaction(async () => 'tx-value');
@@ -284,7 +282,7 @@ describe('prisma-postgres-serverless', () => {
 
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
 
       let receivedTx: { sql?: unknown; orm?: unknown } | undefined;
@@ -302,7 +300,7 @@ describe('prisma-postgres-serverless', () => {
     it('close() is idempotent (no-op on second call)', async () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
       db.runtime();
       await Promise.resolve();
@@ -319,7 +317,7 @@ describe('prisma-postgres-serverless', () => {
       async function run() {
         await using db = prismaPostgresServerless({
           contract,
-          url: 'postgres://localhost:5432/db',
+          binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
         });
         db.runtime();
         await Promise.resolve();
@@ -334,7 +332,7 @@ describe('prisma-postgres-serverless', () => {
     it('close() before any connect is a clean no-op', async () => {
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
       await db.close();
       // No throw; no driver work attempted.
@@ -351,7 +349,7 @@ describe('prisma-postgres-serverless', () => {
       );
       const db = prismaPostgresServerless({
         contract,
-        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db' },
       });
       db.runtime();
 
