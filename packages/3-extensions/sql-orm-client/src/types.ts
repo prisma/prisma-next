@@ -53,6 +53,7 @@ export interface IncludeCombine<ResultShape extends Record<string, unknown>>
 export interface IncludeExpr {
   readonly relationName: string;
   readonly relatedModelName: string;
+  readonly relatedNamespaceId?: string | undefined;
   readonly relatedTableName: string;
   readonly targetColumn: string;
   readonly localColumn: string;
