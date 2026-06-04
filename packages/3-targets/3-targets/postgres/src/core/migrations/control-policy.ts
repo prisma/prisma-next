@@ -205,7 +205,7 @@ export function resolvePostgresIssueControlPolicySubject(
     const namespaceId =
       'namespaceId' in issue && issue.namespaceId ? issue.namespaceId : UNBOUND_NAMESPACE_ID;
     const ns = contract.storage.namespaces[namespaceId];
-    const rawEnum = ns && 'enum' in ns && ns.enum != null ? ns.enum[issue.typeName] : undefined;
+    const rawEnum = ns?.entries.type?.[issue.typeName];
     const controlPolicy = isPostgresEnumStorageEntry(rawEnum) ? rawEnum.control : undefined;
     return {
       namespaceId,
