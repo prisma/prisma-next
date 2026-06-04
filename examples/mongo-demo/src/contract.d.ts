@@ -90,109 +90,110 @@ type ContractBase = Omit<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly entries: { readonly collection: {
-            readonly posts: {
-              readonly kind: 'mongo-collection';
-              readonly indexes: readonly [
-                {
-                  readonly kind: 'mongo-index';
-                  readonly keys: readonly [{ readonly field: 'summary'; readonly direction: 1 }];
-                  readonly unique: true;
-                  readonly partialFilterExpression: { readonly kind: 'article' };
-                },
-              ];
-              readonly validator: {
-                readonly kind: 'mongo-validator';
-                readonly jsonSchema: {
-                  readonly bsonType: 'object';
-                  readonly properties: {
-                    readonly _id: { readonly bsonType: 'objectId' };
-                    readonly title: { readonly bsonType: 'string' };
-                    readonly content: { readonly bsonType: 'string' };
-                    readonly kind: { readonly bsonType: 'string' };
-                    readonly authorId: { readonly bsonType: 'objectId' };
-                    readonly createdAt: { readonly bsonType: 'date' };
-                  };
-                  readonly required: readonly [
-                    '_id',
-                    'authorId',
-                    'content',
-                    'createdAt',
-                    'kind',
-                    'title',
-                  ];
-                  readonly oneOf: readonly [
-                    {
-                      readonly properties: {
-                        readonly _id: { readonly bsonType: 'objectId' };
-                        readonly title: { readonly bsonType: 'string' };
-                        readonly content: { readonly bsonType: 'string' };
-                        readonly kind: { readonly enum: readonly ['article'] };
-                        readonly authorId: { readonly bsonType: 'objectId' };
-                        readonly createdAt: { readonly bsonType: 'date' };
-                        readonly summary: { readonly bsonType: 'string' };
-                      };
-                      readonly required: readonly ['kind', 'summary'];
-                      readonly additionalProperties: false;
-                    },
-                    {
-                      readonly properties: {
-                        readonly _id: { readonly bsonType: 'objectId' };
-                        readonly title: { readonly bsonType: 'string' };
-                        readonly content: { readonly bsonType: 'string' };
-                        readonly kind: { readonly enum: readonly ['tutorial'] };
-                        readonly authorId: { readonly bsonType: 'objectId' };
-                        readonly createdAt: { readonly bsonType: 'date' };
-                        readonly difficulty: { readonly bsonType: 'string' };
-                        readonly duration: { readonly bsonType: 'int' };
-                      };
-                      readonly required: readonly ['difficulty', 'duration', 'kind'];
-                      readonly additionalProperties: false;
-                    },
-                  ];
-                };
-                readonly validationLevel: 'strict';
-                readonly validationAction: 'error';
-              };
-            };
-            readonly users: {
-              readonly kind: 'mongo-collection';
-              readonly validator: {
-                readonly kind: 'mongo-validator';
-                readonly jsonSchema: {
-                  readonly bsonType: 'object';
-                  readonly properties: {
-                    readonly _id: { readonly bsonType: 'objectId' };
-                    readonly name: { readonly bsonType: 'string' };
-                    readonly email: { readonly bsonType: 'string' };
-                    readonly bio: { readonly bsonType: readonly ['null', 'string'] };
-                    readonly address: {
-                      readonly oneOf: readonly [
-                        { readonly bsonType: 'null' },
-                        {
-                          readonly bsonType: 'object';
-                          readonly properties: {
-                            readonly street: { readonly bsonType: 'string' };
-                            readonly city: { readonly bsonType: 'string' };
-                            readonly zip: { readonly bsonType: readonly ['null', 'string'] };
-                            readonly country: { readonly bsonType: 'string' };
-                          };
-                          readonly additionalProperties: false;
-                          readonly required: readonly ['city', 'country', 'street'];
-                        },
-                      ];
+          readonly entries: {
+            readonly collection: {
+              readonly posts: {
+                readonly kind: 'mongo-collection';
+                readonly indexes: readonly [
+                  {
+                    readonly kind: 'mongo-index';
+                    readonly keys: readonly [{ readonly field: 'summary'; readonly direction: 1 }];
+                    readonly unique: true;
+                    readonly partialFilterExpression: { readonly kind: 'article' };
+                  },
+                ];
+                readonly validator: {
+                  readonly kind: 'mongo-validator';
+                  readonly jsonSchema: {
+                    readonly bsonType: 'object';
+                    readonly properties: {
+                      readonly _id: { readonly bsonType: 'objectId' };
+                      readonly title: { readonly bsonType: 'string' };
+                      readonly content: { readonly bsonType: 'string' };
+                      readonly kind: { readonly bsonType: 'string' };
+                      readonly authorId: { readonly bsonType: 'objectId' };
+                      readonly createdAt: { readonly bsonType: 'date' };
                     };
+                    readonly required: readonly [
+                      '_id',
+                      'authorId',
+                      'content',
+                      'createdAt',
+                      'kind',
+                      'title',
+                    ];
+                    readonly oneOf: readonly [
+                      {
+                        readonly properties: {
+                          readonly _id: { readonly bsonType: 'objectId' };
+                          readonly title: { readonly bsonType: 'string' };
+                          readonly content: { readonly bsonType: 'string' };
+                          readonly kind: { readonly enum: readonly ['article'] };
+                          readonly authorId: { readonly bsonType: 'objectId' };
+                          readonly createdAt: { readonly bsonType: 'date' };
+                          readonly summary: { readonly bsonType: 'string' };
+                        };
+                        readonly required: readonly ['kind', 'summary'];
+                        readonly additionalProperties: false;
+                      },
+                      {
+                        readonly properties: {
+                          readonly _id: { readonly bsonType: 'objectId' };
+                          readonly title: { readonly bsonType: 'string' };
+                          readonly content: { readonly bsonType: 'string' };
+                          readonly kind: { readonly enum: readonly ['tutorial'] };
+                          readonly authorId: { readonly bsonType: 'objectId' };
+                          readonly createdAt: { readonly bsonType: 'date' };
+                          readonly difficulty: { readonly bsonType: 'string' };
+                          readonly duration: { readonly bsonType: 'int' };
+                        };
+                        readonly required: readonly ['difficulty', 'duration', 'kind'];
+                        readonly additionalProperties: false;
+                      },
+                    ];
                   };
-                  readonly additionalProperties: false;
-                  readonly required: readonly ['_id', 'email', 'name'];
+                  readonly validationLevel: 'strict';
+                  readonly validationAction: 'error';
                 };
-                readonly validationLevel: 'strict';
-                readonly validationAction: 'error';
+              };
+              readonly users: {
+                readonly kind: 'mongo-collection';
+                readonly validator: {
+                  readonly kind: 'mongo-validator';
+                  readonly jsonSchema: {
+                    readonly bsonType: 'object';
+                    readonly properties: {
+                      readonly _id: { readonly bsonType: 'objectId' };
+                      readonly name: { readonly bsonType: 'string' };
+                      readonly email: { readonly bsonType: 'string' };
+                      readonly bio: { readonly bsonType: readonly ['null', 'string'] };
+                      readonly address: {
+                        readonly oneOf: readonly [
+                          { readonly bsonType: 'null' },
+                          {
+                            readonly bsonType: 'object';
+                            readonly properties: {
+                              readonly street: { readonly bsonType: 'string' };
+                              readonly city: { readonly bsonType: 'string' };
+                              readonly zip: { readonly bsonType: readonly ['null', 'string'] };
+                              readonly country: { readonly bsonType: 'string' };
+                            };
+                            readonly additionalProperties: false;
+                            readonly required: readonly ['city', 'country', 'street'];
+                          },
+                        ];
+                      };
+                    };
+                    readonly additionalProperties: false;
+                    readonly required: readonly ['_id', 'email', 'name'];
+                  };
+                  readonly validationLevel: 'strict';
+                  readonly validationAction: 'error';
+                };
               };
             };
           };
         };
-      };
       };
       readonly storageHash: StorageHash;
     },
@@ -246,8 +247,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['authorId'];
               readonly targetFields: readonly ['_id'];
             };
+          };
         };
-      };
         readonly storage: { readonly collection: 'posts' };
         readonly discriminator: { readonly field: 'kind' };
         readonly variants: {
@@ -304,8 +305,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['_id'];
               readonly targetFields: readonly ['authorId'];
             };
+          };
         };
-      };
         readonly storage: { readonly collection: 'users' };
       };
     }
@@ -460,8 +461,8 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
               };
             };
+          };
         };
-      };
       };
     };
   };

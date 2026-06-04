@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:62797f2d5fe89634e37cb97870980a71b692c2ec3047efa9cf4f335e29ee01b5'>;
+  StorageHashBase<'sha256:5736eda44575a2e995e8c1d5ed6d7884859a882e9551844f776d2a497c6d0154'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:aa79980d83d295977c2ca3fd5a1407ea2bc67b4538b19971512d2f47ff71338e'>;
 export type ProfileHash =
@@ -71,88 +71,89 @@ type ContractBase = Omit<
       readonly namespaces: {
         readonly __unbound__: {
           readonly id: '__unbound__';
-          readonly kind: 'sql-namespace';
-          readonly entries: { readonly table: {
-            readonly post: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
-                };
-                readonly title: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly userId: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
-                };
-                readonly createdAt: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/datetime@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
-              };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [
-                {
-                  readonly source: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'post';
-                    readonly columns: readonly ['userId'];
+          readonly kind: 'sqlite-namespace';
+          readonly entries: {
+            readonly table: {
+              readonly post: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
                   };
-                  readonly target: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'user';
-                    readonly columns: readonly ['id'];
+                  readonly title: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
                   };
-                  readonly name: 'post_userId_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
-                },
-              ];
-            };
-            readonly user: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+                  readonly userId: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                  readonly createdAt: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/datetime@1';
+                    readonly nullable: false;
+                    readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  };
                 };
-                readonly email: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly displayName: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly createdAt: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/datetime@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [
+                  {
+                    readonly source: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'post';
+                      readonly columns: readonly ['userId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'user';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly name: 'post_userId_fkey';
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                ];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
+              readonly user: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                  readonly email: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly displayName: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly createdAt: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/datetime@1';
+                    readonly nullable: false;
+                    readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  };
+                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
+              };
             };
           };
         };
-      };
       };
       readonly storageHash: StorageHash;
     },
@@ -195,8 +196,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['userId'];
               readonly targetFields: readonly ['id'];
             };
+          };
         };
-      };
         readonly storage: {
           readonly table: 'post';
           readonly namespaceId: '__unbound__';
@@ -242,8 +243,8 @@ type ContractBase = Omit<
               readonly localFields: readonly ['id'];
               readonly targetFields: readonly ['userId'];
             };
+          };
         };
-      };
         readonly storage: {
           readonly table: 'user';
           readonly namespaceId: '__unbound__';
@@ -366,8 +367,8 @@ type ContractBase = Omit<
                 readonly createdAt: { readonly column: 'createdAt' };
               };
             };
+          };
         };
-      };
       };
     };
   };

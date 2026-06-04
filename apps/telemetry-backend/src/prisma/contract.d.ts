@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:50aadcf996213451cd2876e3caf50c2752b5b8c9ce1aa55dcae24918518b4ffb'>;
+  StorageHashBase<'sha256:be92c3521871ea0d863f15c8889093bd38747d60e97bd1dca404da27d0b13bc7'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -92,101 +92,107 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'sql-namespace';
+          readonly entries: { readonly table: {} };
+        };
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly entries: { readonly table: {
-            readonly telemetry_event: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'int8';
-                  readonly codecId: 'pg/int8@1';
-                  readonly nullable: false;
-                  readonly default: {
-                    readonly kind: 'function';
-                    readonly expression: 'autoincrement()';
+          readonly entries: {
+            readonly table: {
+              readonly telemetry_event: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'int8';
+                    readonly codecId: 'pg/int8@1';
+                    readonly nullable: false;
+                    readonly default: {
+                      readonly kind: 'function';
+                      readonly expression: 'autoincrement()';
+                    };
+                  };
+                  readonly ingestedAt: {
+                    readonly nativeType: 'timestamptz';
+                    readonly codecId: 'pg/timestamptz@1';
+                    readonly nullable: false;
+                    readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  };
+                  readonly installationId: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly version: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly command: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly flags: {
+                    readonly nativeType: 'jsonb';
+                    readonly codecId: 'pg/jsonb@1';
+                    readonly nullable: false;
+                  };
+                  readonly runtimeName: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly runtimeVersion: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly os: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly arch: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly packageManager: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: true;
+                  };
+                  readonly databaseTarget: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: true;
+                  };
+                  readonly tsVersion: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: true;
+                  };
+                  readonly agent: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: true;
+                  };
+                  readonly extensions: {
+                    readonly nativeType: 'jsonb';
+                    readonly codecId: 'pg/jsonb@1';
+                    readonly nullable: false;
                   };
                 };
-                readonly ingestedAt: {
-                  readonly nativeType: 'timestamptz';
-                  readonly codecId: 'pg/timestamptz@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
-                readonly installationId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly version: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly command: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly flags: {
-                  readonly nativeType: 'jsonb';
-                  readonly codecId: 'pg/jsonb@1';
-                  readonly nullable: false;
-                };
-                readonly runtimeName: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly runtimeVersion: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly os: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly arch: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly packageManager: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly databaseTarget: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly tsVersion: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly agent: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly extensions: {
-                  readonly nativeType: 'jsonb';
-                  readonly codecId: 'pg/jsonb@1';
-                  readonly nullable: false;
-                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [{ readonly columns: readonly ['ingestedAt'] }];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [{ readonly columns: readonly ['ingestedAt'] }];
-              foreignKeys: readonly [];
             };
           };
         };
-      };
       };
       readonly storageHash: StorageHash;
     },
@@ -382,8 +388,8 @@ type ContractBase = Omit<
                 readonly extensions: { readonly column: 'extensions' };
               };
             };
+          };
         };
-      };
       };
     };
   };

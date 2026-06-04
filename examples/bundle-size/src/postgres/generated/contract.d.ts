@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:138746dc9cdea3438f85871ce903d7f873af538feae65760086f29f702dd5c1c'>;
+  StorageHashBase<'sha256:adabd2234a33fa7715386b63e7b6ac96f3493e2094f8611b5c98e2b5f7258bd5'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:13b32dc5b41ba6f7d635fefd3a3fdc581490a54d10a654f9ea323638ad66c726'>;
 export type ProfileHash =
@@ -57,27 +57,33 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'sql-namespace';
+          readonly entries: { readonly table: {} };
+        };
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
-          readonly entries: { readonly table: {
-            readonly Note: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+          readonly entries: {
+            readonly table: {
+              readonly Note: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
                 };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
             };
           };
         };
-      };
       };
       readonly storageHash: StorageHash;
     },
@@ -91,8 +97,8 @@ type ContractBase = Omit<
               readonly codecId: 'sql/char@1';
               readonly typeParams: { readonly length: 36 };
             };
+          };
         };
-      };
         readonly relations: Record<string, never>;
         readonly storage: {
           readonly table: 'Note';
@@ -130,8 +136,8 @@ type ContractBase = Omit<
               readonly namespaceId: 'public';
               readonly fields: { readonly id: { readonly column: 'id' } };
             };
+          };
         };
-      };
       };
     };
   };
