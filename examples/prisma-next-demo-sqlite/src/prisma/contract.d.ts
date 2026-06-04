@@ -292,6 +292,7 @@ type ContractBase = Omit<
             };
             readonly through: {
               readonly table: 'post_tag';
+              readonly namespaceId: '__unbound__';
               readonly parentColumns: readonly ['postId'];
               readonly childColumns: readonly ['tagId'];
               readonly targetColumns: readonly ['id'];
@@ -366,6 +367,7 @@ type ContractBase = Omit<
             };
             readonly through: {
               readonly table: 'post_tag';
+              readonly namespaceId: '__unbound__';
               readonly parentColumns: readonly ['tagId'];
               readonly childColumns: readonly ['postId'];
               readonly targetColumns: readonly ['id'];
@@ -498,6 +500,7 @@ type ContractBase = Omit<
                 };
                 readonly through: {
                   readonly table: 'post_tag';
+                  readonly namespaceId: '__unbound__';
                   readonly parentColumns: readonly ['postId'];
                   readonly childColumns: readonly ['tagId'];
                   readonly targetColumns: readonly ['id'];
@@ -572,6 +575,7 @@ type ContractBase = Omit<
                 };
                 readonly through: {
                   readonly table: 'post_tag';
+                  readonly namespaceId: '__unbound__';
                   readonly parentColumns: readonly ['tagId'];
                   readonly childColumns: readonly ['postId'];
                   readonly targetColumns: readonly ['id'];
