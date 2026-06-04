@@ -15,15 +15,17 @@ export type { ResolvedDomainModel, ResolvedStorageTable };
 export function resolveTableForContract(
   contract: Contract<SqlStorage>,
   tableName: string,
+  namespaceId?: string,
 ): ResolvedStorageTable | undefined {
-  return resolveStorageTable(contract.storage, tableName);
+  return resolveStorageTable(contract.storage, tableName, namespaceId);
 }
 
 export function requireStorageTableForContract(
   contract: Contract<SqlStorage>,
   tableName: string,
+  namespaceId?: string,
 ): ResolvedStorageTable {
-  const resolved = resolveTableForContract(contract, tableName);
+  const resolved = resolveTableForContract(contract, tableName, namespaceId);
   if (resolved === undefined) {
     throw new Error(`Unknown table "${tableName}"`);
   }
@@ -33,8 +35,9 @@ export function requireStorageTableForContract(
 export function storageTableForContract(
   contract: Contract<SqlStorage>,
   tableName: string,
+  namespaceId?: string,
 ): StorageTable {
-  return requireStorageTableForContract(contract, tableName).table;
+  return requireStorageTableForContract(contract, tableName, namespaceId).table;
 }
 
 export function resolveDomainModelForContract(
@@ -76,8 +79,9 @@ export function tableSourceForContract(
   contract: Contract<SqlStorage>,
   tableName: string,
   alias?: string,
+  namespaceId?: string,
 ): TableSource {
-  const { namespaceId } = requireStorageTableForContract(contract, tableName);
+  const resolved = requireStorageTableForContract(contract, tableName, namespaceId);
   const effectiveAlias = alias !== undefined && alias !== tableName ? alias : undefined;
-  return TableSource.named(tableName, effectiveAlias, namespaceId);
+  return TableSource.named(tableName, effectiveAlias, resolved.namespaceId);
 }

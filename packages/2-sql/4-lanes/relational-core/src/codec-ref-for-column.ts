@@ -1,10 +1,10 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
+import { resolveStorageTable } from '@prisma-next/sql-contract/resolve-storage-table';
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
   type SqlStorage,
-  type StorageTable,
 } from '@prisma-next/sql-contract/types';
 
 /**
@@ -17,21 +17,20 @@ import {
  * - non-parameterized column → `{codecId}` with `typeParams` undefined.
  *
  * Returns `undefined` when the table or column is unknown, or when a `typeRef` column references a `storage.types` entry that does not exist.
+ *
+ * When `namespaceId` is supplied the table is resolved strictly within that
+ * namespace; when omitted a bare table name that is ambiguous across namespaces
+ * throws a fail-fast diagnostic (see {@link resolveStorageTable}).
  */
 export function codecRefForStorageColumn(
   storage: SqlStorage,
   tableName: string,
   columnName: string,
+  namespaceId?: string,
 ): CodecRef | undefined {
-  let tableDef: StorageTable | undefined;
-  for (const ns of Object.values(storage.namespaces)) {
-    const candidate = ns.entries.table[tableName] as StorageTable | undefined;
-    if (candidate !== undefined) {
-      tableDef = candidate;
-      break;
-    }
-  }
-  if (!tableDef) return undefined;
+  const resolved = resolveStorageTable(storage, tableName, namespaceId);
+  if (resolved === undefined) return undefined;
+  const tableDef = resolved.table;
   const columnDef = tableDef.columns[columnName];
   if (!columnDef) return undefined;
   if (columnDef.typeRef !== undefined) {
