@@ -1,5 +1,4 @@
 #!/usr/bin/env -S node
-import pgvector from '@prisma-next/extension-pgvector/runtime';
 import {
   addColumn,
   addForeignKey,
@@ -8,14 +7,6 @@ import {
   MigrationCLI,
   setNotNull,
 } from '@prisma-next/postgres/migration';
-import postgres from '@prisma-next/postgres/runtime';
-import type { Contract } from './end-contract.d';
-import endContract from './end-contract.json' with { type: 'json' };
-
-// The migration's own end-contract drives the data-transform query builder, so
-// `dataTransform`'s storage-hash assertion holds. No connection is opened here —
-// `postgres(...)` only materialises the offline query lane (`db.sql`).
-const db = postgres<Contract>({ contractJson: endContract, extensions: [pgvector] });
 
 export default class M extends Migration {
   override describe() {
@@ -27,30 +18,26 @@ export default class M extends Migration {
 
   override get operations() {
     return [
+      // An MTI variant row's `id` must equal its parent `task.id`: the same
+      // identity links a `task` row to its `bug`/`feature` detail row, and a
+      // validating foreign key to `task(id)` follows below. There is therefore
+      // no correct backfill — a variant id can never be fabricated, and rows
+      // that predate this link column carry nothing that maps them back to
+      // their base. The runtime always writes a variant together with its base
+      // (see scripts/seed.ts), so a database provisioned this way has no rows
+      // to fill and the `SET NOT NULL` below is a no-op.
+      //
+      // On a database that does hold pre-link variant rows, the `SET NOT NULL`
+      // precheck ("ensure no NULL values in id") halts the migration before any
+      // destructive step. Those rows are unlinkable orphans: the operator must
+      // resolve them by hand — map each to the correct `task.id`, or delete it —
+      // and re-run. We deliberately ship no backfill rather than fabricate ids
+      // that the cascading FK to `task(id)` would immediately reject.
       addColumn('public', 'bug', {
         name: 'id',
         typeSql: 'character(36)',
         defaultSql: '',
         nullable: true,
-      }),
-      // Each MTI variant row's `id` mirrors its parent `task.id`; variants are
-      // always written together with their base (see scripts/seed.ts), so a
-      // freshly-provisioned database has no orphaned rows to fill. This backfill
-      // assigns an id to any pre-existing variant row missing one, keeping the
-      // migration self-consistent for legacy data while staying a no-op on the
-      // demo's empty tables.
-      this.dataTransform(db.context.contract, 'backfill-bug-id', {
-        check: () =>
-          db.sql.bug
-            .select('id')
-            .where((f, fns) => fns.eq(f.id, null))
-            .limit(1),
-        run: () =>
-          db.sql.bug
-            .update((_f, fns) => ({
-              id: fns.raw`gen_random_uuid()::char(36)`.returns({ codecId: 'sql/char@1' }),
-            }))
-            .where((f, fns) => fns.eq(f.id, null)),
       }),
       setNotNull('public', 'bug', 'id'),
       addColumn('public', 'feature', {
@@ -58,19 +45,6 @@ export default class M extends Migration {
         typeSql: 'character(36)',
         defaultSql: '',
         nullable: true,
-      }),
-      this.dataTransform(db.context.contract, 'backfill-feature-id', {
-        check: () =>
-          db.sql.feature
-            .select('id')
-            .where((f, fns) => fns.eq(f.id, null))
-            .limit(1),
-        run: () =>
-          db.sql.feature
-            .update((_f, fns) => ({
-              id: fns.raw`gen_random_uuid()::char(36)`.returns({ codecId: 'sql/char@1' }),
-            }))
-            .where((f, fns) => fns.eq(f.id, null)),
       }),
       setNotNull('public', 'feature', 'id'),
       addPrimaryKey('public', 'bug', 'bug_pkey', ['id']),
