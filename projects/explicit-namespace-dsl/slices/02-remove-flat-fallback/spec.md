@@ -29,6 +29,8 @@ One reviewable PR = "the flat fallback is gone and the facade projects the end-s
 | Internal consumers that call `orm.<Model>` / `sql.<table>` flat on a multi-namespace contract | Must be migrated to qualified in this slice | Upgrade-instructions scope; grep `packages/3-extensions/*` + `examples/` for flat bypass sites. |
 | Dual-shape relocated under a new name during removal | Hard stop (F1) | Grep gates above are dispatch DoD. |
 | Unknown namespace id from a runtime-widened contract | Fail fast with a diagnostic naming the namespace (project FR11) | Lands with the removal of the flat fallback path. |
+| Flat multi-namespace access currently **throws** (interim, from slice 01's ns-required refactor) | bare=default replaces the throw with default-namespace resolution | Slice 01 made flat `orm.<Model>` on a multi-namespace contract fail-fast via `soleDomainNamespaceId` (over the old silent first-match). When this slice lands bare=default at the facade, **retarget the throw-asserting tests** (`orm-namespaced.test.ts`, `orm-namespace-resolution.test.ts`, `namespace-qualification.test.ts`) to assert default-namespace resolution. |
+| `resolvePrimaryKeyColumn`'s `'id'` fallback can't be discriminated when both same-bare-named tables share PK column `'id'` | Add a fixture with **differing PK column names** per namespace | Surfaced in slice-01 refactor review: the same-bare-table-name discrimination suite (cols `email` vs `token`) can't catch a coordinate miswire on the PK path because both fixtures use PK `'id'`. A differing-PK-name fixture tightens it. |
 
 ## Slice-specific done conditions
 
