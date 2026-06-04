@@ -127,7 +127,13 @@ describe('extractComponentIds', () => {
 describe('assembleAuthoringContributions', () => {
   it('returns empty namespaces for descriptors without authoring', () => {
     const result = assembleAuthoringContributions([createDescriptor()]);
-    expect(result).toEqual({ field: {}, type: {}, entityTypes: {} });
+    expect(result).toEqual({
+      field: {},
+      type: {},
+      entityTypes: {},
+      pslBlocks: {},
+      pslPrinters: {},
+    });
   });
 
   it('merges field namespaces from multiple descriptors', () => {
@@ -252,6 +258,252 @@ describe('assembleAuthoringContributions', () => {
       }),
     ]);
     expect(Object.keys(result.entityTypes)).toEqual(['enum', 'demo']);
+  });
+
+  it('merges pslBlocks namespaces from multiple descriptors', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          entityTypes: {
+            policyEntity: {
+              kind: 'entity',
+              discriminator: 'postgres-policy',
+              output: { factory: () => ({}) },
+            },
+            roleEntity: {
+              kind: 'entity',
+              discriminator: 'postgres-role',
+              output: { factory: () => ({}) },
+            },
+          },
+          pslBlocks: {
+            policyBlock: {
+              kind: 'pslBlock',
+              discriminator: 'postgres-policy',
+              parser: () => ({ kind: 'postgres-policy' }),
+            },
+          },
+          pslPrinters: {
+            policyPrinter: {
+              kind: 'pslPrinter',
+              discriminator: 'postgres-policy',
+              printer: () => undefined,
+            },
+          },
+        },
+      }),
+      createDescriptor({
+        id: 'other',
+        authoring: {
+          pslBlocks: {
+            roleBlock: {
+              kind: 'pslBlock',
+              discriminator: 'postgres-role',
+              parser: () => ({ kind: 'postgres-role' }),
+            },
+          },
+          pslPrinters: {
+            rolePrinter: {
+              kind: 'pslPrinter',
+              discriminator: 'postgres-role',
+              printer: () => undefined,
+            },
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.pslBlocks)).toEqual(['policyBlock', 'roleBlock']);
+    expect(Object.keys(result.pslPrinters)).toEqual(['policyPrinter', 'rolePrinter']);
+  });
+
+  it('throws on duplicate pslBlocks paths from different descriptors', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            pslBlocks: {
+              foo: {
+                kind: 'pslBlock',
+                discriminator: 'pack-foo',
+                parser: () => ({}),
+              },
+            },
+          },
+        }),
+        createDescriptor({
+          id: 'other',
+          authoring: {
+            pslBlocks: {
+              foo: {
+                kind: 'pslBlock',
+                discriminator: 'pack-foo',
+                parser: () => ({}),
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate authoring pslBlock helper "foo"/);
+  });
+
+  it('throws on duplicate pslPrinters paths from different descriptors', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            pslPrinters: {
+              foo: {
+                kind: 'pslPrinter',
+                discriminator: 'pack-foo',
+                printer: () => undefined,
+              },
+            },
+          },
+        }),
+        createDescriptor({
+          id: 'other',
+          authoring: {
+            pslPrinters: {
+              foo: {
+                kind: 'pslPrinter',
+                discriminator: 'pack-foo',
+                printer: () => undefined,
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate authoring pslPrinter helper "foo"/);
+  });
+
+  it('rejects path collision between pslBlocks and entityTypes', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              foo: {
+                kind: 'entity',
+                discriminator: 'pack-foo',
+                output: { factory: () => ({}) },
+              },
+            },
+          },
+        }),
+        createDescriptor({
+          id: 'other',
+          authoring: {
+            pslBlocks: {
+              foo: {
+                kind: 'pslBlock',
+                discriminator: 'pack-foo',
+                parser: () => ({}),
+              },
+            },
+            pslPrinters: {
+              foo: {
+                kind: 'pslPrinter',
+                discriminator: 'pack-foo',
+                printer: () => undefined,
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Ambiguous authoring registry path "foo"/);
+  });
+
+  it('rejects pslBlocks contribution missing matching pslPrinters', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              fooEntity: {
+                kind: 'entity',
+                discriminator: 'pack-foo',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslBlocks: {
+              fooBlock: {
+                kind: 'pslBlock',
+                discriminator: 'pack-foo',
+                parser: () => ({}),
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/pslBlock.*"pack-foo".*pslPrinter/);
+  });
+
+  it('rejects pslBlocks contribution missing matching entityTypes', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            pslBlocks: {
+              fooBlock: {
+                kind: 'pslBlock',
+                discriminator: 'pack-foo',
+                parser: () => ({}),
+              },
+            },
+            pslPrinters: {
+              fooPrinter: {
+                kind: 'pslPrinter',
+                discriminator: 'pack-foo',
+                printer: () => undefined,
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/pslBlock.*"pack-foo".*entityType/);
+  });
+
+  it('rejects pslPrinters contribution missing matching pslBlocks', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              fooEntity: {
+                kind: 'entity',
+                discriminator: 'pack-foo',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslPrinters: {
+              fooPrinter: {
+                kind: 'pslPrinter',
+                discriminator: 'pack-foo',
+                printer: () => undefined,
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/pslPrinter.*"pack-foo".*pslBlock/);
+  });
+
+  it('accepts entityTypes-only contributions without pslBlocks/pslPrinters', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              enum: {
+                kind: 'entity',
+                discriminator: 'postgres-enum',
+                output: { factory: () => ({}) },
+              },
+            },
+          },
+        }),
+      ]),
+    ).not.toThrow();
   });
 });
 
@@ -519,7 +771,13 @@ describe('createControlStack', () => {
     expect(state.codecTypeImports).toEqual([]);
     expect(state.queryOperationTypeImports).toEqual([]);
     expect(state.extensionIds).toEqual(['fam', 'tgt']);
-    expect(state.authoringContributions).toEqual({ field: {}, type: {}, entityTypes: {} });
+    expect(state.authoringContributions).toEqual({
+      field: {},
+      type: {},
+      entityTypes: {},
+      pslBlocks: {},
+      pslPrinters: {},
+    });
   });
 });
 

@@ -1,15 +1,20 @@
+import { blindCast } from '@prisma-next/utils/casts';
 import type { Codec } from '../shared/codec';
 import type { CodecLookup, CodecMeta } from '../shared/codec-types';
 import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringPslBlockNamespace,
+  AuthoringPslPrinterNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
   isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
+  isAuthoringPslBlockDescriptor,
+  isAuthoringPslPrinterDescriptor,
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
@@ -32,6 +37,8 @@ export interface AssembledAuthoringContributions {
   readonly field: AuthoringFieldNamespace;
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
+  readonly pslBlocks: AuthoringPslBlockNamespace;
+  readonly pslPrinters: AuthoringPslPrinterNamespace;
 }
 
 export interface ControlStack<
@@ -148,9 +155,11 @@ export function extractComponentIds(
 export function assembleAuthoringContributions(
   descriptors: ReadonlyArray<{ readonly authoring?: AuthoringContributions }>,
 ): AssembledAuthoringContributions {
-  const field = {} as Record<string, unknown>;
-  const type = {} as Record<string, unknown>;
-  const entityTypes = {} as Record<string, unknown>;
+  const field: Record<string, unknown> = {};
+  const type: Record<string, unknown> = {};
+  const entityTypes: Record<string, unknown> = {};
+  const pslBlocks: Record<string, unknown> = {};
+  const pslPrinters: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
@@ -180,17 +189,60 @@ export function assembleAuthoringContributions(
         'entity',
       );
     }
+    if (descriptor.authoring?.pslBlocks) {
+      mergeAuthoringNamespaces(
+        pslBlocks,
+        descriptor.authoring.pslBlocks,
+        [],
+        isAuthoringPslBlockDescriptor,
+        'pslBlock',
+      );
+    }
+    if (descriptor.authoring?.pslPrinters) {
+      mergeAuthoringNamespaces(
+        pslPrinters,
+        descriptor.authoring.pslPrinters,
+        [],
+        isAuthoringPslPrinterDescriptor,
+        'pslPrinter',
+      );
+    }
   }
 
-  const fieldNamespace = field as AuthoringFieldNamespace;
-  const typeNamespace = type as AuthoringTypeNamespace;
-  const entityTypeNamespace = entityTypes as AuthoringEntityTypeNamespace;
-  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace, entityTypeNamespace);
+  const fieldNamespace = blindCast<
+    AuthoringFieldNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(field);
+  const typeNamespace = blindCast<
+    AuthoringTypeNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(type);
+  const entityTypeNamespace = blindCast<
+    AuthoringEntityTypeNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(entityTypes);
+  const pslBlockNamespace = blindCast<
+    AuthoringPslBlockNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(pslBlocks);
+  const pslPrinterNamespace = blindCast<
+    AuthoringPslPrinterNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(pslPrinters);
+  assertNoCrossRegistryCollisions(
+    typeNamespace,
+    fieldNamespace,
+    entityTypeNamespace,
+    pslBlockNamespace,
+    pslPrinterNamespace,
+  );
 
   return {
     field: fieldNamespace,
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
+    pslBlocks: pslBlockNamespace,
+    pslPrinters: pslPrinterNamespace,
   };
 }
 

@@ -18,7 +18,13 @@ function createMongoTestContext(overrides?: Partial<ContractSourceContext>): Con
   return {
     composedExtensionPacks: [],
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
-    authoringContributions: { field: {}, type: {}, entityTypes: {} },
+    authoringContributions: {
+      field: {},
+      type: {},
+      entityTypes: {},
+      pslBlocks: {},
+      pslPrinters: {},
+    },
     codecLookup: emptyCodecLookup,
     controlMutationDefaults: {
       defaultFunctionRegistry: new Map(),

@@ -7,6 +7,7 @@ import {
   isColumnDefaultLiteralInputValue,
   isExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 
@@ -157,10 +158,62 @@ export type AuthoringEntityTypeNamespace = {
   readonly [name: string]: AuthoringEntityTypeDescriptor | AuthoringEntityTypeNamespace;
 };
 
+/**
+ * Pack-contributed parser for a top-level PSL block keyword.
+ *
+ * The `context` and `bounds` parameters are typed `unknown` here as a
+ * placeholder for D1 of the substrate slice — the parser SPI is
+ * extracted in D2, at which point `context` becomes the parser-context
+ * handle (token cursor, source text, diagnostic sink) and `bounds`
+ * becomes the brace-delimited block bounds. What's load-bearing today
+ * is the `Output` generic narrowing to the AST node shape the matching
+ * `pslPrinters` descriptor consumes and the matching `entityTypes`
+ * factory hydrates — the three contributions form a triple bundle
+ * keyed by a shared `discriminator` string.
+ */
+export interface AuthoringPslBlockDescriptor<Output = unknown> {
+  readonly kind: 'pslBlock';
+  readonly discriminator: string;
+  readonly parser: (context: unknown, bounds: unknown) => Output;
+  readonly validatorSchema?: Type<unknown>;
+}
+
+/**
+ * Pack-contributed printer for a top-level PSL block keyword.
+ *
+ * The printer-context type is `unknown` as a placeholder for D1 of
+ * the substrate slice — the printer SPI is wired in D3, at which
+ * point the second parameter becomes the print-document builder
+ * handle. What's load-bearing today is the `Input` generic narrowing
+ * to the AST node shape the matching `pslBlocks` descriptor produces
+ * and the matching `entityTypes` factory accepts.
+ *
+ * `Input` defaults to `never` for the same contravariance reason
+ * documented on {@link AuthoringEntityTypeFactoryOutput}: a pack
+ * literal declaring a concrete `Input` type via `as const satisfies
+ * AuthoringPslPrinterNamespace` only assigns to the base shape if the
+ * base sits at the bottom of the contravariant position.
+ */
+export interface AuthoringPslPrinterDescriptor<Input = never> {
+  readonly kind: 'pslPrinter';
+  readonly discriminator: string;
+  readonly printer: (input: Input, context: unknown) => unknown;
+}
+
+export type AuthoringPslBlockNamespace = {
+  readonly [name: string]: AuthoringPslBlockDescriptor | AuthoringPslBlockNamespace;
+};
+
+export type AuthoringPslPrinterNamespace = {
+  readonly [name: string]: AuthoringPslPrinterDescriptor | AuthoringPslPrinterNamespace;
+};
+
 export interface AuthoringContributions {
   readonly type?: AuthoringTypeNamespace;
   readonly field?: AuthoringFieldNamespace;
   readonly entityTypes?: AuthoringEntityTypeNamespace;
+  readonly pslBlocks?: AuthoringPslBlockNamespace;
+  readonly pslPrinters?: AuthoringPslPrinterNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -226,6 +279,46 @@ export function isAuthoringEntityTypeDescriptor(
   const factory = (output as { factory?: unknown }).factory;
   const template = (output as { template?: unknown }).template;
   return typeof factory === 'function' || template !== undefined;
+}
+
+export function isAuthoringPslBlockDescriptor(
+  value: unknown,
+): value is AuthoringPslBlockDescriptor {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const record = blindCast<
+    Record<string, unknown>,
+    'type-guard probing an unknown candidate-descriptor object for known property names'
+  >(value);
+  if (record['kind'] !== 'pslBlock') {
+    return false;
+  }
+  const discriminator = record['discriminator'];
+  if (typeof discriminator !== 'string' || discriminator.length === 0) {
+    return false;
+  }
+  return typeof record['parser'] === 'function';
+}
+
+export function isAuthoringPslPrinterDescriptor(
+  value: unknown,
+): value is AuthoringPslPrinterDescriptor {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const record = blindCast<
+    Record<string, unknown>,
+    'type-guard probing an unknown candidate-descriptor object for known property names'
+  >(value);
+  if (record['kind'] !== 'pslPrinter') {
+    return false;
+  }
+  const discriminator = record['discriminator'];
+  if (typeof discriminator !== 'string' || discriminator.length === 0) {
+    return false;
+  }
+  return typeof record['printer'] === 'function';
 }
 
 /**
@@ -331,7 +424,10 @@ function collectAuthoringLeafPaths(
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       paths.push(
         ...collectAuthoringLeafPaths(
-          value as Readonly<Record<string, unknown>>,
+          blindCast<
+            Readonly<Record<string, unknown>>,
+            'walker descends into a sub-namespace whose keys are unknown until inspected'
+          >(value),
           isLeaf,
           currentPath,
         ),
@@ -341,10 +437,52 @@ function collectAuthoringLeafPaths(
   return paths;
 }
 
+interface AuthoringLeafEntry {
+  readonly path: string;
+  readonly discriminator: string;
+}
+
+function collectAuthoringLeafDiscriminators(
+  namespace: Readonly<Record<string, unknown>>,
+  isLeaf: (value: unknown) => boolean,
+  path: readonly string[] = [],
+): AuthoringLeafEntry[] {
+  const entries: AuthoringLeafEntry[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isLeaf(value)) {
+      const record = blindCast<
+        Record<string, unknown>,
+        'discriminator extraction from a leaf already validated by isLeaf'
+      >(value);
+      const discriminator = record['discriminator'];
+      if (typeof discriminator === 'string' && discriminator.length > 0) {
+        entries.push({ path: currentPath.join('.'), discriminator });
+      }
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      entries.push(
+        ...collectAuthoringLeafDiscriminators(
+          blindCast<
+            Readonly<Record<string, unknown>>,
+            'walker descends into a sub-namespace whose keys are unknown until inspected'
+          >(value),
+          isLeaf,
+          currentPath,
+        ),
+      );
+    }
+  }
+  return entries;
+}
+
 export function assertNoCrossRegistryCollisions(
   typeNamespace: AuthoringTypeNamespace,
   fieldNamespace: AuthoringFieldNamespace,
   entityTypeNamespace: AuthoringEntityTypeNamespace = {},
+  pslBlockNamespace: AuthoringPslBlockNamespace = {},
+  pslPrinterNamespace: AuthoringPslPrinterNamespace = {},
 ): void {
   const typePaths = new Set(
     collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
@@ -355,22 +493,104 @@ export function assertNoCrossRegistryCollisions(
   const entityPaths = new Set(
     collectAuthoringLeafPaths(entityTypeNamespace, isAuthoringEntityTypeDescriptor),
   );
+  const pslBlockPaths = new Set(
+    collectAuthoringLeafPaths(pslBlockNamespace, isAuthoringPslBlockDescriptor),
+  );
+  const pslPrinterPaths = new Set(
+    collectAuthoringLeafPaths(pslPrinterNamespace, isAuthoringPslPrinterDescriptor),
+  );
   // Within-registry duplicate detection is handled upstream by the merge
   // walker (`mergeAuthoringNamespaces` in control-stack.ts and
   // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
   // on same-path registrations within any single registry before this check
   // runs. This function only handles the cross-registry case.
+  const ambiguityHint =
+    'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes / authoringContributions.pslBlocks / authoringContributions.pslPrinters.';
   for (const fieldPath of fieldPaths) {
     if (typePaths.has(fieldPath)) {
       throw new Error(
-        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.`,
+        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. ${ambiguityHint}`,
       );
     }
   }
   for (const entityPath of entityPaths) {
     if (typePaths.has(entityPath) || fieldPaths.has(entityPath)) {
       throw new Error(
-        `Ambiguous authoring registry path "${entityPath}". The same path is registered as an entity contribution AND as a type constructor or field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.`,
+        `Ambiguous authoring registry path "${entityPath}". The same path is registered as an entity contribution AND as a type constructor or field preset; PSL resolution would be ambiguous. ${ambiguityHint}`,
+      );
+    }
+  }
+  for (const blockPath of pslBlockPaths) {
+    if (typePaths.has(blockPath) || fieldPaths.has(blockPath) || entityPaths.has(blockPath)) {
+      throw new Error(
+        `Ambiguous authoring registry path "${blockPath}". The same path is registered as a pslBlock contribution AND in another authoring registry; PSL resolution would be ambiguous. ${ambiguityHint}`,
+      );
+    }
+  }
+  for (const printerPath of pslPrinterPaths) {
+    if (typePaths.has(printerPath) || fieldPaths.has(printerPath) || entityPaths.has(printerPath)) {
+      throw new Error(
+        `Ambiguous authoring registry path "${printerPath}". The same path is registered as a pslPrinter contribution AND in another authoring registry; PSL resolution would be ambiguous. ${ambiguityHint}`,
+      );
+    }
+  }
+
+  assertTripleBundleConsistency(entityTypeNamespace, pslBlockNamespace, pslPrinterNamespace);
+}
+
+/**
+ * `pslBlocks`, `pslPrinters`, and `entityTypes` form a triple bundle:
+ * a pack-contributed PSL keyword needs all three (parser + printer +
+ * factory) to round-trip through `parse → lower → IR → print → re-parse`.
+ * `entityTypes` on its own is fine — that's the TS-builder-only path
+ * (`helpers.enum({...})` reaches the factory directly without ever
+ * touching PSL). Only `pslBlocks` and `pslPrinters` require all three;
+ * the check is asymmetric for that reason.
+ */
+function assertTripleBundleConsistency(
+  entityTypeNamespace: AuthoringEntityTypeNamespace,
+  pslBlockNamespace: AuthoringPslBlockNamespace,
+  pslPrinterNamespace: AuthoringPslPrinterNamespace,
+): void {
+  const blockEntries = collectAuthoringLeafDiscriminators(
+    pslBlockNamespace,
+    isAuthoringPslBlockDescriptor,
+  );
+  const printerEntries = collectAuthoringLeafDiscriminators(
+    pslPrinterNamespace,
+    isAuthoringPslPrinterDescriptor,
+  );
+  const entityEntries = collectAuthoringLeafDiscriminators(
+    entityTypeNamespace,
+    isAuthoringEntityTypeDescriptor,
+  );
+
+  const printerDiscriminators = new Set(printerEntries.map((entry) => entry.discriminator));
+  const entityDiscriminators = new Set(entityEntries.map((entry) => entry.discriminator));
+  const blockDiscriminators = new Set(blockEntries.map((entry) => entry.discriminator));
+
+  for (const block of blockEntries) {
+    if (!printerDiscriminators.has(block.discriminator)) {
+      throw new Error(
+        `Incomplete pack contribution bundle: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no pslPrinter contribution shares that discriminator. A pack-contributed PSL block requires a matching pslPrinter (and entityType) so the round-trip parse → IR → print can complete; add a pslPrinter helper with discriminator "${block.discriminator}".`,
+      );
+    }
+    if (!entityDiscriminators.has(block.discriminator)) {
+      throw new Error(
+        `Incomplete pack contribution bundle: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no entityType contribution shares that discriminator. A pack-contributed PSL block requires a matching entityType factory so the parsed AST node can lower to an IR class instance; add an entityType helper with discriminator "${block.discriminator}".`,
+      );
+    }
+  }
+
+  for (const printer of printerEntries) {
+    if (!blockDiscriminators.has(printer.discriminator)) {
+      throw new Error(
+        `Incomplete pack contribution bundle: pslPrinter helper "${printer.path}" registers discriminator "${printer.discriminator}" but no pslBlock contribution shares that discriminator. A pack-contributed PSL printer requires a matching pslBlock parser so contract inference round-trips through the same keyword; add a pslBlock helper with discriminator "${printer.discriminator}".`,
+      );
+    }
+    if (!entityDiscriminators.has(printer.discriminator)) {
+      throw new Error(
+        `Incomplete pack contribution bundle: pslPrinter helper "${printer.path}" registers discriminator "${printer.discriminator}" but no entityType contribution shares that discriminator. A pack-contributed PSL printer requires a matching entityType factory; add an entityType helper with discriminator "${printer.discriminator}".`,
       );
     }
   }
