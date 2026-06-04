@@ -17,6 +17,36 @@ function tableNamed(_name: string): StorageTable {
   });
 }
 
+function tableWithColumn(columnName: string): StorageTable {
+  return new StorageTable({
+    columns: {
+      id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+      [columnName]: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  });
+}
+
+function twoNamespaceSameTableName(): {
+  storage: SqlStorage;
+  publicUsers: StorageTable;
+  authUsers: StorageTable;
+} {
+  const publicUsers = tableWithColumn('email_addr');
+  const authUsers = tableWithColumn('token_col');
+  const storage = new SqlStorage({
+    storageHash: 'sha256:test',
+    namespaces: {
+      public: buildSqlNamespace({ id: 'public', tables: { users: publicUsers } }),
+      auth: buildSqlNamespace({ id: 'auth', tables: { users: authUsers } }),
+    },
+  });
+  return { storage, publicUsers, authUsers };
+}
+
 describe('resolveStorageTable', () => {
   it('finds a table in whichever namespace declares it', () => {
     const authOnly = tableNamed('auth-only');
@@ -59,5 +89,32 @@ describe('resolveStorageTable', () => {
     });
 
     expect(resolveStorageTable(storage, 'missing')).toBeUndefined();
+  });
+
+  it('resolves a same-bare-name table strictly within the given namespace', () => {
+    const { storage, publicUsers, authUsers } = twoNamespaceSameTableName();
+
+    expect(resolveStorageTable(storage, 'users', 'public')).toEqual({
+      namespaceId: 'public',
+      table: publicUsers,
+    });
+    expect(resolveStorageTable(storage, 'users', 'auth')).toEqual({
+      namespaceId: 'auth',
+      table: authUsers,
+    });
+  });
+
+  it('throws naming the candidate namespaces for an ambiguous bare table name', () => {
+    const { storage } = twoNamespaceSameTableName();
+
+    expect(() => resolveStorageTable(storage, 'users')).toThrow(/ambiguous/i);
+    expect(() => resolveStorageTable(storage, 'users')).toThrow(/auth/);
+    expect(() => resolveStorageTable(storage, 'users')).toThrow(/public/);
+  });
+
+  it('returns undefined for an unknown table within a given namespace', () => {
+    const { storage } = twoNamespaceSameTableName();
+
+    expect(resolveStorageTable(storage, 'missing', 'public')).toBeUndefined();
   });
 });
