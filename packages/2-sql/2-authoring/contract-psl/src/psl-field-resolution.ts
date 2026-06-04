@@ -42,6 +42,24 @@ export type ModelNameMapping = {
   readonly fieldColumns: Map<string, string>;
 };
 
+/**
+ * A PSL model paired with its resolved namespace coordinate (undefined when
+ * the target leaves the model late-bound). Two models may share a bare name
+ * across namespaces, so structures that must distinguish them are keyed by
+ * the `(namespaceId, modelName)` coordinate produced by
+ * {@link modelCoordinateKey} rather than the bare model name.
+ */
+export type ModelNamespaceEntry = {
+  readonly model: PslModel;
+  readonly namespaceId: string | undefined;
+};
+
+const MODEL_COORDINATE_SEPARATOR = '\u0000';
+
+export function modelCoordinateKey(namespaceId: string, modelName: string): string {
+  return `${namespaceId}${MODEL_COORDINATE_SEPARATOR}${modelName}`;
+}
+
 export interface CollectResolvedFieldsInput {
   readonly model: PslModel;
   readonly mapping: ModelNameMapping;
@@ -424,12 +442,13 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
 }
 
 export function buildModelMappings(
-  models: readonly PslModel[],
+  modelEntries: readonly ModelNamespaceEntry[],
+  defaultNamespaceId: string,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
 ): Map<string, ModelNameMapping> {
   const result = new Map<string, ModelNameMapping>();
-  for (const model of models) {
+  for (const { model, namespaceId } of modelEntries) {
     const mapAttribute = getAttribute(model.attributes, 'map');
     const tableName = parseMapName({
       attribute: mapAttribute,
@@ -452,7 +471,7 @@ export function buildModelMappings(
       });
       fieldColumns.set(field.name, columnName);
     }
-    result.set(model.name, {
+    result.set(modelCoordinateKey(namespaceId ?? defaultNamespaceId, model.name), {
       model,
       tableName,
       fieldColumns,

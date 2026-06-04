@@ -42,6 +42,8 @@ export type FkRelationMetadata = {
   readonly declaringTableName: string;
   readonly targetModelName: string;
   readonly targetTableName: string;
+  /** Resolved namespace coordinate of the related model, when known. */
+  readonly targetNamespaceId?: string;
   readonly relationName?: string;
   readonly localColumns: readonly string[];
   readonly referencedColumns: readonly string[];
@@ -251,6 +253,7 @@ export function indexFkRelations(input: {
       fieldName: relation.declaringFieldName,
       toModel: relation.targetModelName,
       toTable: relation.targetTableName,
+      ...ifDefined('toNamespaceId', relation.targetNamespaceId),
       cardinality: 'N:1',
       on: {
         parentTable: relation.declaringTableName,
