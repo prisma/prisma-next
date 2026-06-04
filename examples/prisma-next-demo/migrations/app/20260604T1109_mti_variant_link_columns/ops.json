@@ -32,35 +32,6 @@
     ]
   },
   {
-    "id": "data_migration.backfill-bug-id",
-    "label": "Data transform: backfill-bug-id",
-    "operationClass": "data",
-    "target": {
-      "id": "postgres"
-    },
-    "precheck": [
-      {
-        "description": "Check backfill-bug-id has work to do",
-        "sql": "SELECT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"bug\" WHERE \"id\" IS NULL LIMIT 1) AS ok",
-        "params": []
-      }
-    ],
-    "execute": [
-      {
-        "description": "Run backfill-bug-id",
-        "sql": "UPDATE \"public\".\"bug\" SET \"id\" = gen_random_uuid()::char(36) WHERE \"id\" IS NULL",
-        "params": []
-      }
-    ],
-    "postcheck": [
-      {
-        "description": "Verify backfill-bug-id resolved all violations",
-        "sql": "SELECT NOT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"bug\" WHERE \"id\" IS NULL LIMIT 1) AS ok",
-        "params": []
-      }
-    ]
-  },
-  {
     "id": "alterNullability.setNotNull.bug.id",
     "label": "Set NOT NULL on \"bug\".\"id\"",
     "operationClass": "destructive",
@@ -125,35 +96,6 @@
       {
         "description": "verify column \"id\" exists",
         "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'feature'\n    AND column_name = 'id'\n)"
-      }
-    ]
-  },
-  {
-    "id": "data_migration.backfill-feature-id",
-    "label": "Data transform: backfill-feature-id",
-    "operationClass": "data",
-    "target": {
-      "id": "postgres"
-    },
-    "precheck": [
-      {
-        "description": "Check backfill-feature-id has work to do",
-        "sql": "SELECT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"feature\" WHERE \"id\" IS NULL LIMIT 1) AS ok",
-        "params": []
-      }
-    ],
-    "execute": [
-      {
-        "description": "Run backfill-feature-id",
-        "sql": "UPDATE \"public\".\"feature\" SET \"id\" = gen_random_uuid()::char(36) WHERE \"id\" IS NULL",
-        "params": []
-      }
-    ],
-    "postcheck": [
-      {
-        "description": "Verify backfill-feature-id resolved all violations",
-        "sql": "SELECT NOT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"feature\" WHERE \"id\" IS NULL LIMIT 1) AS ok",
-        "params": []
       }
     ]
   },

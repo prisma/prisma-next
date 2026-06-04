@@ -81,7 +81,13 @@ prisma-next migration plan --name mti-variant-link-columns
 prisma-next migrate
 ```
 
-The plan adds the variant `id` column, sets it `NOT NULL`, adds the primary key, and adds the cascading foreign key to the base table. Because `id` is added `NOT NULL`, the planner scaffolds a `migration.ts` with a `dataTransform` backfill slot for each variant table: the runtime always wrote variant rows with the same `id` as their parent base row, so on a database provisioned this way there are no orphaned rows to fill. Author each backfill's `check`/`run` against the migration's `end-contract.json` (the data-transform `check` is a rowset query whose presence of a row signals "work remains" — e.g. `select('id').where(({ id }) => id IS NULL).limit(1)`), then run `node <migration>.ts` (or `pnpm exec tsx <migration>.ts`) to self-emit `ops.json` and attest the package before `prisma-next migrate`.
+The plan adds the variant `id` column, sets it `NOT NULL`, adds the primary key, and adds the cascading foreign key to the base table.
+
+A variant row's `id` **must equal its parent base row's `id`** — that shared identity is what links a `task` row to its `bug`/`feature` detail row, and the cascading foreign key to `task(id)` enforces it. There is therefore no correct backfill, and you must **never fabricate** a variant id (for example with `gen_random_uuid()`): a fabricated id has no matching `task` row, so the validating foreign key in this same migration would immediately reject it.
+
+The runtime always wrote each variant row together with its base row, sharing the same `id`. On a database provisioned that way there are no rows missing an `id`, so the `SET NOT NULL` step is a no-op and the migration applies cleanly with no backfill. Author the migration with no `dataTransform` — just `addColumn` (nullable) → `setNotNull` → primary key → foreign key — then run `node <migration>.ts` (or `pnpm exec tsx <migration>.ts`) to self-emit `ops.json` and attest the package before `prisma-next migrate`.
+
+If your database does hold variant rows that predate the link column, they are unlinkable orphans — nothing in those rows maps them back to their `task`. The `SET NOT NULL` precheck ("ensure no NULL values") halts the migration before any destructive step. Resolve those rows by hand — map each to the correct `task.id`, or delete it — and re-run. Do not paper over the halt with a fabricated id.
 
 ### Validation
 
