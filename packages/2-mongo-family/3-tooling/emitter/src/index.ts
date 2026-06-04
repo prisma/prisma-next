@@ -61,9 +61,7 @@ function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): st
   }
   const parts: string[] = [];
   for (const [name, ns] of sorted) {
-    const collectionsType = generateMongoNamespaceCollectionsType(
-      ns.entries.collection as Readonly<Record<string, MongoCollection>>,
-    );
+    const collectionsType = generateMongoNamespaceCollectionsType(ns.entries.collection);
     parts.push(
       `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; ${mongoNamespaceSerializedKind(ns)}; readonly entries: { readonly collection: ${collectionsType} } }`,
     );

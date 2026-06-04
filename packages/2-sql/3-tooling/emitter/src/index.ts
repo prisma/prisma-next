@@ -17,6 +17,7 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 
 function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined): string {
   if (!params || Object.keys(params).length === 0) {
@@ -404,24 +405,10 @@ function generatePostgresNamespaceTypesType(
   return `{ ${typeEntries.join('; ')} }`;
 }
 
-function isPostgresSchemaNamespace(ns: Namespace): ns is Namespace & {
-  readonly entries: {
-    readonly type: Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>;
-  };
-} {
-  const typeSlot = ns.entries?.['type'];
-  return (
-    (ns as { kind?: unknown }).kind === 'schema' &&
-    typeSlot !== undefined &&
-    typeof typeSlot === 'object' &&
-    Object.keys(typeSlot).length > 0
-  );
-}
-
 const SQL_NAMESPACE_KIND_FALLBACK = 'sql-namespace' as const;
 
 function namespaceSerializedKind(ns: Namespace): string {
-  const kind = (ns as { kind?: unknown }).kind;
+  const kind = ns.kind;
   if (kind === 'schema') {
     const id = ns.id;
     const lit = id === UNBOUND_NAMESPACE_ID ? 'postgres-unbound-schema' : 'postgres-schema';
@@ -536,10 +523,16 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
     const tablesType = generateTablesMapType(
       (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
     );
-    const isPg = isPostgresSchemaNamespace(ns);
-    const typeSlot = ns.entries['type'];
+    const typeSlotRaw = ns.kind === 'schema' ? ns.entries['type'] : undefined;
+    const typeSlot =
+      typeSlotRaw !== undefined
+        ? blindCast<
+            Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>,
+            'schema namespace entries.type holds PostgresEnumStorageEntry instances materialized by the Postgres authoring entity registry'
+          >(typeSlotRaw)
+        : undefined;
     const entriesParts = [`readonly table: ${tablesType}`];
-    if (isPg && typeSlot !== undefined) {
+    if (typeSlot !== undefined) {
       entriesParts.push(`readonly type: ${generatePostgresNamespaceTypesType(typeSlot)}`);
     }
     const entriesType = `{ ${entriesParts.join('; ')} }`;
