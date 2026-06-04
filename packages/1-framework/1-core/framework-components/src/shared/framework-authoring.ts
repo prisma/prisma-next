@@ -493,19 +493,24 @@ export function assertNoCrossRegistryCollisions(
   const entityPaths = new Set(
     collectAuthoringLeafPaths(entityTypeNamespace, isAuthoringEntityTypeDescriptor),
   );
-  const pslBlockPaths = new Set(
-    collectAuthoringLeafPaths(pslBlockNamespace, isAuthoringPslBlockDescriptor),
-  );
-  const pslPrinterPaths = new Set(
-    collectAuthoringLeafPaths(pslPrinterNamespace, isAuthoringPslPrinterDescriptor),
-  );
   // Within-registry duplicate detection is handled upstream by the merge
   // walker (`mergeAuthoringNamespaces` in control-stack.ts and
   // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
   // on same-path registrations within any single registry before this check
   // runs. This function only handles the cross-registry case.
+  //
+  // Cross-registry collisions are checked among `type` / `field` /
+  // `entityTypes` only — these three are user-facing helper paths
+  // (`helpers.<path>(...)`) that PSL must resolve unambiguously.
+  // `pslBlocks` and `pslPrinters` are internal framework indices
+  // consumed by parser and printer dispatch, not user-facing helper
+  // paths; the natural authoring pattern is the same path key across
+  // all three of `entityTypes` / `pslBlocks` / `pslPrinters` for a
+  // single triple-bundle contribution. Same-path consistency across
+  // those bundle members is enforced by `assertTripleBundleConsistency`
+  // via the discriminator string, not by path.
   const ambiguityHint =
-    'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes / authoringContributions.pslBlocks / authoringContributions.pslPrinters.';
+    'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.';
   for (const fieldPath of fieldPaths) {
     if (typePaths.has(fieldPath)) {
       throw new Error(
@@ -517,20 +522,6 @@ export function assertNoCrossRegistryCollisions(
     if (typePaths.has(entityPath) || fieldPaths.has(entityPath)) {
       throw new Error(
         `Ambiguous authoring registry path "${entityPath}". The same path is registered as an entity contribution AND as a type constructor or field preset; PSL resolution would be ambiguous. ${ambiguityHint}`,
-      );
-    }
-  }
-  for (const blockPath of pslBlockPaths) {
-    if (typePaths.has(blockPath) || fieldPaths.has(blockPath) || entityPaths.has(blockPath)) {
-      throw new Error(
-        `Ambiguous authoring registry path "${blockPath}". The same path is registered as a pslBlock contribution AND in another authoring registry; PSL resolution would be ambiguous. ${ambiguityHint}`,
-      );
-    }
-  }
-  for (const printerPath of pslPrinterPaths) {
-    if (typePaths.has(printerPath) || fieldPaths.has(printerPath) || entityPaths.has(printerPath)) {
-      throw new Error(
-        `Ambiguous authoring registry path "${printerPath}". The same path is registered as a pslPrinter contribution AND in another authoring registry; PSL resolution would be ambiguous. ${ambiguityHint}`,
       );
     }
   }

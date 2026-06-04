@@ -376,41 +376,37 @@ describe('assembleAuthoringContributions', () => {
     ).toThrow(/Duplicate authoring pslPrinter helper "foo"/);
   });
 
-  it('rejects path collision between pslBlocks and entityTypes', () => {
-    expect(() =>
-      assembleAuthoringContributions([
-        createDescriptor({
-          authoring: {
-            entityTypes: {
-              foo: {
-                kind: 'entity',
-                discriminator: 'pack-foo',
-                output: { factory: () => ({}) },
-              },
+  it('accepts pslBlocks/pslPrinters/entityTypes contributions sharing the same path with matching discriminators', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          entityTypes: {
+            policy: {
+              kind: 'entity',
+              discriminator: 'postgres-policy',
+              output: { factory: () => ({}) },
             },
           },
-        }),
-        createDescriptor({
-          id: 'other',
-          authoring: {
-            pslBlocks: {
-              foo: {
-                kind: 'pslBlock',
-                discriminator: 'pack-foo',
-                parser: () => ({}),
-              },
-            },
-            pslPrinters: {
-              foo: {
-                kind: 'pslPrinter',
-                discriminator: 'pack-foo',
-                printer: () => undefined,
-              },
+          pslBlocks: {
+            policy: {
+              kind: 'pslBlock',
+              discriminator: 'postgres-policy',
+              parser: () => ({}),
             },
           },
-        }),
-      ]),
-    ).toThrow(/Ambiguous authoring registry path "foo"/);
+          pslPrinters: {
+            policy: {
+              kind: 'pslPrinter',
+              discriminator: 'postgres-policy',
+              printer: () => undefined,
+            },
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.entityTypes)).toEqual(['policy']);
+    expect(Object.keys(result.pslBlocks)).toEqual(['policy']);
+    expect(Object.keys(result.pslPrinters)).toEqual(['policy']);
   });
 
   it('rejects pslBlocks contribution missing matching pslPrinters', () => {
