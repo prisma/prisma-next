@@ -6,9 +6,9 @@ import { col, makeFakeClient, row } from './_fakes';
  * Direct tests for the bound impl (`PpgServerlessBoundDriverImpl`), bypassing
  * the unbound wrapper. The wrapper intercepts every public call before the
  * delegate is consulted, so the bound impl's own guards (closed-state checks,
- * the misuse `connect()` throw, the `ownsClient` accessor) are unreachable
- * through the runtime entry point. Exercising the factory directly is the
- * only way to keep coverage on those paths.
+ * the misuse `connect()` throw) are unreachable through the runtime entry
+ * point. Exercising the factory directly is the only way to keep coverage
+ * on those paths.
  */
 describe('@prisma-next/driver-ppg-serverless / bound impl (direct)', () => {
   describe('connect()', () => {
@@ -19,22 +19,6 @@ describe('@prisma-next/driver-ppg-serverless / bound impl (direct)', () => {
       await expect(bound.connect({ kind: 'ppgClient', client: fake.client })).rejects.toThrow(
         /already-bound/,
       );
-    });
-  });
-
-  describe('ownsClient', () => {
-    it('is true when constructed from a { kind: "url" } binding', () => {
-      const bound = createBoundDriverFromBinding({
-        kind: 'url',
-        url: 'postgres://user:pass@example.invalid:5432/db',
-      });
-      expect(bound.ownsClient).toBe(true);
-    });
-
-    it('is false when constructed from a { kind: "ppgClient" } binding', () => {
-      const fake = makeFakeClient(() => ({ columns: [], rows: [] }));
-      const bound = createBoundDriverFromBinding({ kind: 'ppgClient', client: fake.client });
-      expect(bound.ownsClient).toBe(false);
     });
   });
 

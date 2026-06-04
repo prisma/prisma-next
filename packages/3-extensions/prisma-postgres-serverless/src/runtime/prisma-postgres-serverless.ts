@@ -35,6 +35,8 @@ import { ifDefined } from '@prisma-next/utils/defined';
 
 const sqlBuilder = sqlBuilderModule.sql;
 const ormBuilder = ormClientModule.orm;
+
+// REVIEW: STOP WITH THOSE STUPID ALIASES
 type PpgClient = Client;
 
 import {

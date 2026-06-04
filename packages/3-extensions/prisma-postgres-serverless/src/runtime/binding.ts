@@ -1,8 +1,10 @@
 import type { Client } from '@prisma/ppg';
 import type { PpgBinding } from '@prisma-next/driver-ppg-serverless/runtime';
 
+// REVIEW: Remove this type alias
 type PpgClient = Client;
 
+// REVIEW: What is the point of this type? Just use PpgBinding as an inpu
 /**
  * Input shape accepted by `runtime(...)` and `db.connect(...)`. Callers pass
  * exactly one of `binding` (explicit) / `url` (string shortcut) /

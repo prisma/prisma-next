@@ -26,6 +26,7 @@ import { normalizePpgError } from './normalize-error';
  * (No `{ kind: 'ppgPool' }` variant: PPG handles pooling on the wire side,
  * unlike `pg` where the driver manages a `Pool`.)
  */
+// REVIEW: isn't that a clone of ppg type?
 export type PpgBinding =
   | { readonly kind: 'url'; readonly url: string }
   | { readonly kind: 'ppgClient'; readonly client: Client };
@@ -163,13 +164,11 @@ class PpgServerlessBoundDriverImpl extends PpgServerlessQueryable implements Sql
   readonly targetId = 'postgres' as const;
 
   readonly #client: Client;
-  readonly #ownsClient: boolean;
   #closed = false;
 
-  constructor(ppgClient: Client, ownsClient: boolean) {
+  constructor(ppgClient: Client) {
     super();
     this.#client = ppgClient;
-    this.#ownsClient = ownsClient;
   }
 
   get state(): SqlDriverState {
@@ -215,15 +214,6 @@ class PpgServerlessBoundDriverImpl extends PpgServerlessQueryable implements Sql
 
   protected override async releaseSession(session: Session): Promise<void> {
     session.close();
-  }
-
-  /**
-   * Used by the unbound wrapper's `close()` to decide whether to drop the
-   * client reference. Exposed package-private; the field is not part of the
-   * SqlDriver surface.
-   */
-  get ownsClient(): boolean {
-    return this.#ownsClient;
   }
 }
 
@@ -356,10 +346,10 @@ export function createBoundDriverFromBinding(
         ...config,
         parsers: withArrayParsers(config.parsers ?? []),
       });
-      return new PpgServerlessBoundDriverImpl(ppgClient, /* ownsClient */ true);
+      return new PpgServerlessBoundDriverImpl(ppgClient);
     }
     case 'ppgClient': {
-      return new PpgServerlessBoundDriverImpl(binding.client, /* ownsClient */ false);
+      return new PpgServerlessBoundDriverImpl(binding.client);
     }
   }
 }

@@ -1,3 +1,5 @@
+// REVIEW: Remove this test unless you can find equivalent test from other facedes
+// If you keep it: tune down commenting, stop describing implementation
 /**
  * End-to-end smoke: facade → real driver → fake `@prisma/ppg` Client.
  *
