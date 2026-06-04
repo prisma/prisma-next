@@ -126,11 +126,25 @@ So the contract-free DML surface keeps full JS round-tripping (object ↔ `jsonb
 - **Upsert via `INSERT … ON CONFLICT`** — collapse the insert/update branching. **Working position:** yes where capability-supported (both Postgres and SQLite).
 - **"Single SPI" altitude** — per-family vs a shared cross-family marker-ops interface hoisted to `framework-components`. **Working position:** per-family; hoist only if clean.
 
+## Mongo slice (TML-2825) — contract-free construction surface
+
+_Settled in a `drive-discussion` (architect lens) + codebase verification, 2026-06-04. Slice spec: [`./slices/mongo-marker-ledger-through-adapter/spec.md`](./slices/mongo-marker-ledger-through-adapter/spec.md)._
+
+The Mongo slice is structurally unlike the SQL slices: Mongo has **no column/expression algebra**; its ops are command nodes over BSON documents. The settled design and the reasoning behind each decision:
+
+- **Build the canonical *structured* command nodes (`AggregateCommand` / `InsertOneCommand` / `FindOneAndUpdateCommand`), not the `Raw*` family.** *Why:* the structured nodes are the query AST the user-facing builder already produces and the adapter already lowers (`structuralLower` → `resolveParams`); `Raw*` lowers as opaque pass-through (plain `Document`), which is the very construction surface this slice replaces. No new AST layer — the surface produces the canonical nodes directly (the Mongo analogue of SQL `table.ts` returning a real `InsertAst`).
+- **Reuse the existing contract-free `createFieldAccessor` in place — do not build a new one.** *Why:* `createFieldAccessor` is already contract-free (parameterized by a plain `DocShape`; the contract coupling lives only in `query.ts`/`result-shape.ts`/`lookup-builder.ts`). **Correction to a mid-discussion turn:** we briefly considered mirroring SQL's self-contained `table.ts` by writing a *new* handle in `mongo-query-ast`. That mirror does not apply — SQL was *forced* to build its own only because its user-facing field machinery is contract-bound; Mongo's isn't, so reuse is strictly better. The adapter depends on `@prisma-next/mongo-query-builder` (cross-domain `targets → mongo`, verified allowed with no layer restriction).
+- **Route through the adapter exactly as SQL does.** `createMongoAdapter().lower(plan, {})` → `MongoDriverImpl.fromDb(db).execute(wireCommand)`. Both halves already exist; this is *not* new plumbing — it is the Mongo analogue of SQL `adapter.lower()` → `driver.query(sql, params)`. The wire-command `execute` transport is what lets `extractDb` (and the two `as` casts, and the three local executors) drop out. `CodecCallContext` is `{ signal? }`, constructed as `{}`.
+- **Reads stay aggregate pipelines; `RawFindOneCommand` is struck.** *Why:* `findOne` is a deliberately-avoided legacy Mongo API. The ticket's proposed new node is not created.
+- **`$type`/`$expr` reads expressed in our own AST, additively.** *Why (operator preference):* `$type` rides `MongoFieldFilter`'s generic `op`; `$expr` already exists (`MongoExprFilter`); `$eq`-of-field-refs is `fn.eq` over `MongoAggFieldRef`. Surface `.type()` / `expr(...)` helpers — zero new AST nodes, no raw escape hatch. The invariant-merge follows the same principle: server-side typed agg-expression (`$setUnion`/`$sortArray`/`$ifNull`) via named helpers or the generic `MongoOperatorExpr` (consistent with this doc's "Invariant-merge realization" entry — Mongo keeps its server-side `$setUnion`).
+
+**Alternatives rejected:** the literal-ticket `Raw*` + new `RawFindOneCommand` path (F21 ceremony over already-clean constructors; `findOne` is legacy); a new self-contained field handle in `mongo-query-ast` (needless duplication — the existing accessor is already contract-free); a raw-pipeline escape hatch for `$type`/`$expr` (the AST already nearly expresses them; operator wants queries in our own AST).
+
 ## References
 
 - Project spec: [`./spec.md`](./spec.md)
 - Project plan: [`./plan.md`](./plan.md)
-- Linear ticket: TML-2253
+- Linear ticket: TML-2253 (umbrella); TML-2825 (Mongo slice)
 - ADRs: 021 (Contract Marker Storage), 190 (CAS concurrency, Mongo), 195 (Planner IR with two renderers), 198 (Runner decoupled via visitor SPIs), 204 (Domain actions vs composable primitives), 212 (Contract spaces).
 - Patterns: [`three-layer-polymorphic-ir.md`](../../docs/architecture%20docs/patterns/three-layer-polymorphic-ir.md), [`frozen-class-ast.md`](../../docs/architecture%20docs/patterns/frozen-class-ast.md), [`adapter-spi.md`](../../docs/architecture%20docs/patterns/adapter-spi.md).
 - Subsystems: [`5. Adapters & Targets`](../../docs/architecture%20docs/subsystems/5.%20Adapters%20%26%20Targets.md), [`7. Migration System`](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md)
