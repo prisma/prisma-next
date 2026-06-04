@@ -131,9 +131,9 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
       const user = await db.orm.User.where({ email: v('multi-op@example.com') }).first();
       expect(user).not.toBeNull();
 
-      const posts = [...(await db.orm.Post.where({ userId: user!.id }).all())].sort((a, b) =>
-        a.title.localeCompare(b.title),
-      );
+      const posts = await db.orm.Post.where({ userId: user!.id })
+        .orderBy((p) => p.title.asc())
+        .all();
       expect(posts).toHaveLength(2);
       expect(posts[0]!.title).toBe('First Post');
       expect(posts[1]!.title).toBe('Second Post');

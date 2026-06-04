@@ -35,14 +35,17 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
     it('with ordering', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = [...(await ormClient.User.all())].sort((a, b) => b.id - a.id);
+        const users = await ormClient.User.orderBy((u) => u.id.desc()).all();
         expect(users[0]!.id).toBe(4);
       });
     });
 
     it('with take and skip', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = [...(await ormClient.User.all())].sort((a, b) => a.id - b.id).slice(1, 3);
+        const users = await ormClient.User.orderBy((u) => u.id.asc())
+          .skip(1)
+          .take(2)
+          .all();
         expect(users).toHaveLength(2);
         expect(users[0]!.id).toBe(2);
       });
