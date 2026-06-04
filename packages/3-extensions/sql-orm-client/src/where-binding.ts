@@ -22,11 +22,19 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 
-export function bindWhereExpr(contract: Contract<SqlStorage>, expr: AnyExpression): AnyExpression {
-  return bindWhereExprNode(contract, expr);
+export function bindWhereExpr(
+  contract: Contract<SqlStorage>,
+  expr: AnyExpression,
+  namespaceId?: string,
+): AnyExpression {
+  return bindWhereExprNode(contract, expr, namespaceId);
 }
 
-function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression): AnyExpression {
+function bindWhereExprNode(
+  contract: Contract<SqlStorage>,
+  expr: AnyExpression,
+  namespaceId?: string,
+): AnyExpression {
   return expr.accept<AnyExpression>({
     columnRef(expr) {
       return bindExpression(contract, expr);
@@ -68,13 +76,17 @@ function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression):
       const left = bindExpression(contract, expr.left);
       const bindingColumn = left.kind === 'column-ref' ? (left as ColumnRef) : undefined;
 
-      return new BinaryExpr(expr.op, left, bindComparable(contract, expr.right, bindingColumn));
+      return new BinaryExpr(
+        expr.op,
+        left,
+        bindComparable(contract, expr.right, bindingColumn, namespaceId),
+      );
     },
     and(expr) {
-      return AndExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part)));
+      return AndExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part, namespaceId)));
     },
     or(expr) {
-      return OrExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part)));
+      return OrExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part, namespaceId)));
     },
     exists(expr) {
       return expr.notExists
@@ -87,7 +99,7 @@ function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression):
         : NullCheckExpr.isNotNull(bindExpression(contract, expr.expr));
     },
     not(expr) {
-      return new NotExpr(bindWhereExprNode(contract, expr.expr));
+      return new NotExpr(bindWhereExprNode(contract, expr.expr, namespaceId));
     },
     rawExpr(expr) {
       return expr;
@@ -99,6 +111,7 @@ function bindComparable(
   contract: Contract<SqlStorage>,
   comparable: AnyExpression,
   bindingColumn: ColumnRef | undefined,
+  namespaceId?: string,
 ): AnyExpression {
   if (comparable.kind === 'param-ref' || bindingColumn === undefined) {
     return comparable.kind === 'param-ref'
@@ -109,13 +122,15 @@ function bindComparable(
   }
 
   if (comparable.kind === 'literal') {
-    return createParamRef(contract, bindingColumn, comparable.value);
+    return createParamRef(contract, bindingColumn, comparable.value, namespaceId);
   }
 
   if (comparable.kind === 'list') {
     return ListExpression.of(
       comparable.values.map((value) =>
-        value.kind === 'literal' ? createParamRef(contract, bindingColumn, value.value) : value,
+        value.kind === 'literal'
+          ? createParamRef(contract, bindingColumn, value.value, namespaceId)
+          : value,
       ),
     );
   }
@@ -127,14 +142,24 @@ function createParamRef(
   contract: Contract<SqlStorage>,
   columnRef: ColumnRef,
   value: unknown,
+  namespaceId?: string,
 ): ParamRef {
-  const tableInAnyNs = Object.values(contract.storage.namespaces).find(
-    (ns) => ns.entries.table[columnRef.table] !== undefined,
-  )?.entries.table[columnRef.table];
+  const tableInNs =
+    namespaceId !== undefined
+      ? contract.storage.namespaces[namespaceId]?.entries.table[columnRef.table]
+      : Object.values(contract.storage.namespaces).find(
+          (ns) => ns.entries.table[columnRef.table] !== undefined,
+        )?.entries.table[columnRef.table];
+  const tableInAnyNs = tableInNs as StorageTable | undefined;
   if (!tableInAnyNs?.columns[columnRef.column]) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
-  const codec = codecRefForStorageColumn(contract.storage, columnRef.table, columnRef.column);
+  const codec = codecRefForStorageColumn(
+    contract.storage,
+    columnRef.table,
+    columnRef.column,
+    namespaceId,
+  );
   return ParamRef.of(value, codec ? { codec } : undefined);
 }
 
