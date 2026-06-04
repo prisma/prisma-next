@@ -11,10 +11,9 @@ import type {
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
-import { blindCast } from '@prisma-next/utils/casts';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
+import { PostgresControlAdapter } from './control-adapter';
 import { renderLoweredDdl } from './ddl-renderer';
-import { readMarker } from './marker-ledger';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -47,19 +46,25 @@ class PostgresAdapterImpl
 
   constructor(options?: PostgresAdapterOptions) {
     this.codecLookup = options?.codecLookup ?? createPostgresBuiltinCodecLookup();
+    const controlAdapter = new PostgresControlAdapter(this.codecLookup);
     this.profile = Object.freeze({
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
       capabilities: defaultCapabilities,
       readMarker: (queryable: SqlQueryable) =>
-        readMarker(
-          (ast) =>
-            renderLoweredSql(
-              ast,
-              blindCast<PostgresContract, 'Catalog probe has no contract'>(undefined),
-              this.codecLookup,
-            ),
-          queryable,
+        controlAdapter.readMarkerDiscriminated(
+          {
+            familyId: 'sql',
+            targetId: 'postgres',
+            query: async <Row = Record<string, unknown>>(
+              sql: string,
+              params?: readonly unknown[],
+            ) => {
+              const result = await queryable.query<Row>(sql, params);
+              return { rows: [...result.rows] };
+            },
+            close: async () => {},
+          },
           APP_SPACE_ID,
         ),
     });

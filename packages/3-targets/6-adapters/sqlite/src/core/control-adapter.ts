@@ -12,6 +12,7 @@ import type {
   DdlNode,
   LoweredStatement,
   LowererContext,
+  MarkerReadResult,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -35,7 +36,15 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
 import { renderLoweredDdl } from './ddl-renderer';
 import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
-import * as markerLedger from './marker-ledger';
+import {
+  decodeSqliteMarkerRow,
+  execute,
+  ledger,
+  marker,
+  mergeInvariants,
+  NOW,
+  sqliteCatalog,
+} from './marker-ledger';
 import type { SqliteContract } from './types';
 
 const SQLITE_MARKER_TABLE = '_prisma_marker';
@@ -122,17 +131,16 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
     driver: ControlDriverInstance<'sql', 'sqlite'>,
     space: string,
   ): Promise<ContractMarkerRecord | null> {
-    const markerContext = { space, markerLocation: SQLITE_MARKER_TABLE };
-    const result = await withMarkerReadErrorHandling(
-      () =>
-        markerLedger.readMarker(
-          (query) => this.lower(query, { contract: undefined }),
-          driver,
-          space,
-        ),
-      markerContext,
-    );
+    const result = await this.readMarkerDiscriminated(driver, space);
     return result.kind === 'present' ? result.record : null;
+  }
+
+  async readMarkerDiscriminated(
+    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    space: string,
+  ): Promise<MarkerReadResult> {
+    const markerContext = { space, markerLocation: SQLITE_MARKER_TABLE };
+    return withMarkerReadErrorHandling(() => this.readMarkerResult(driver, space), markerContext);
   }
 
   /**
@@ -187,14 +195,10 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
     for (const row of result.rows) {
       rows.set(
         row.space,
-        parseMarkerRowSafely(
-          row,
-          (raw) => parseContractMarkerRow(markerLedger.decodeSqliteMarkerRow(raw)),
-          {
-            space: row.space,
-            markerLocation: SQLITE_MARKER_TABLE,
-          },
-        ),
+        parseMarkerRowSafely(row, (raw) => parseContractMarkerRow(decodeSqliteMarkerRow(raw)), {
+          space: row.space,
+          markerLocation: SQLITE_MARKER_TABLE,
+        }),
       );
     }
     return rows;
@@ -276,11 +280,22 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<void> {
-    await markerLedger.insertMarker(
+    await execute(
       (query) => this.lower(query, { contract: undefined }),
       driver,
-      space,
-      destination,
+      marker
+        .insert({
+          space,
+          core_hash: destination.storageHash,
+          profile_hash: destination.profileHash,
+          contract_json: null,
+          canonical_version: null,
+          updated_at: NOW,
+          app_tag: null,
+          meta: {},
+          invariants: destination.invariants ?? [],
+        })
+        .build(),
     );
   }
 
@@ -293,11 +308,33 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<void> {
-    await markerLedger.initMarker(
+    await execute(
       (query) => this.lower(query, { contract: undefined }),
       driver,
-      space,
-      destination,
+      marker
+        .upsert({
+          space,
+          core_hash: destination.storageHash,
+          profile_hash: destination.profileHash,
+          contract_json: null,
+          canonical_version: null,
+          updated_at: NOW,
+          app_tag: null,
+          meta: {},
+          invariants: destination.invariants ?? [],
+        })
+        .onConflict(marker.space)
+        .doUpdate((excluded) => ({
+          core_hash: excluded.core_hash,
+          profile_hash: excluded.profile_hash,
+          contract_json: excluded.contract_json,
+          canonical_version: excluded.canonical_version,
+          updated_at: NOW,
+          app_tag: excluded.app_tag,
+          meta: excluded.meta,
+          invariants: excluded.invariants,
+        }))
+        .build(),
     );
   }
 
@@ -319,14 +356,25 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       destination.invariants === undefined
         ? []
         : ((await this.readMarker(driver, space))?.invariants ?? []);
-    return markerLedger.updateMarker(
-      (query) => this.lower(query, { contract: undefined }),
-      driver,
-      space,
-      expectedFrom,
-      destination,
-      currentInvariants,
-    );
+    const mergedInvariants =
+      destination.invariants === undefined
+        ? undefined
+        : mergeInvariants(currentInvariants, destination.invariants);
+
+    const query = marker
+      .update()
+      .set({
+        core_hash: destination.storageHash,
+        profile_hash: destination.profileHash,
+        updated_at: NOW,
+        ...(mergedInvariants !== undefined ? { invariants: mergedInvariants } : {}),
+      })
+      .where(marker.space.eq(space).and(marker.core_hash.eq(expectedFrom)))
+      .returning(marker.space)
+      .build();
+
+    const rows = await execute((q) => this.lower(q, { contract: undefined }), driver, query);
+    return rows.length > 0;
   }
 
   /**
@@ -345,12 +393,51 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       readonly operations: readonly unknown[];
     },
   ): Promise<void> {
-    await markerLedger.writeLedgerEntry(
+    await execute(
       (query) => this.lower(query, { contract: undefined }),
       driver,
-      space,
-      entry,
+      ledger
+        .insert({
+          space,
+          migration_name: entry.migrationName,
+          migration_hash: entry.migrationHash,
+          origin_core_hash: entry.from,
+          destination_core_hash: entry.to,
+          operations: entry.operations,
+        })
+        .build(),
     );
+  }
+
+  private async readMarkerResult(driver: ControlDriverInstance<'sql', 'sqlite'>, space: string) {
+    const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
+    const probe = sqliteCatalog
+      .select(sqliteCatalog.name)
+      .where(sqliteCatalog.type.eq('table').and(sqliteCatalog.name.eq('_prisma_marker')))
+      .build();
+    const exists = await execute(lower, driver, probe);
+    if (exists.length === 0) return { kind: 'no-table' as const };
+
+    const fetch = marker
+      .select(
+        marker.core_hash,
+        marker.profile_hash,
+        marker.contract_json,
+        marker.canonical_version,
+        marker.updated_at,
+        marker.app_tag,
+        marker.meta,
+        marker.invariants,
+      )
+      .where(marker.space.eq(space))
+      .build();
+    const result = await execute(lower, driver, fetch);
+    const row = result[0];
+    if (!row) return { kind: 'absent' as const };
+    return {
+      kind: 'present' as const,
+      record: parseContractMarkerRow(decodeSqliteMarkerRow(row)),
+    };
   }
 
   async introspect(

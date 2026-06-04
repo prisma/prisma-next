@@ -36,9 +36,8 @@ import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
-import { blindCast } from '@prisma-next/utils/casts';
+import { SqliteControlAdapter } from './control-adapter';
 import { renderLoweredDdl } from './ddl-renderer';
-import { readMarker } from './marker-ledger';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({
@@ -59,18 +58,25 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   readonly profile: AdapterProfile<'sqlite'>;
 
   constructor(options?: SqliteAdapterOptions) {
+    const controlAdapter = new SqliteControlAdapter();
     this.profile = Object.freeze({
       id: options?.profileId ?? 'sqlite/default@1',
       target: 'sqlite',
       capabilities: defaultCapabilities,
       readMarker: (queryable: SqlQueryable) =>
-        readMarker(
-          (ast) =>
-            renderLoweredSql(
-              ast,
-              blindCast<SqliteContract, 'Catalog probe has no contract'>(undefined),
-            ),
-          queryable,
+        controlAdapter.readMarkerDiscriminated(
+          {
+            familyId: 'sql',
+            targetId: 'sqlite',
+            query: async <Row = Record<string, unknown>>(
+              sql: string,
+              params?: readonly unknown[],
+            ) => {
+              const result = await queryable.query<Row>(sql, params);
+              return { rows: [...result.rows] };
+            },
+            close: async () => {},
+          },
           APP_SPACE_ID,
         ),
     });
