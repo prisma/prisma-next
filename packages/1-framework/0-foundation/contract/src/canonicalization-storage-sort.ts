@@ -14,7 +14,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 export function compareByNameProperty(a: unknown, b: unknown): number {
   const nameA = isPlainRecord(a) && typeof a['name'] === 'string' ? a['name'] : '';
   const nameB = isPlainRecord(b) && typeof b['name'] === 'string' ? b['name'] : '';
-  return nameA.localeCompare(nameB);
+  return nameA < nameB ? -1 : nameA > nameB ? 1 : 0;
 }
 
 function sortArrayKeysOnRecord(
