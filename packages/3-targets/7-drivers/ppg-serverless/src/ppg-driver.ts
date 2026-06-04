@@ -276,6 +276,7 @@ export function createBoundDriverFromBinding(
       const config = defaultClientConfig(binding.url);
       const ppgClient = client({
         ...config,
+        /* v8 ignore next — `defaultClientConfig` always populates `parsers`; the `?? []` is a defensive fallback for the optional type only. */
         parsers: withArrayParsers(config.parsers ?? []),
       });
       return new PpgServerlessBoundDriverImpl(ppgClient);

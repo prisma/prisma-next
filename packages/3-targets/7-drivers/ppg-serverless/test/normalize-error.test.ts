@@ -106,6 +106,38 @@ describe('normalizePpgError', () => {
         expect.fail('expected SqlConnectionError');
       }
     });
+
+    it.each([
+      [1006, 'abnormal closure'],
+      [1012, 'service restart'],
+      [1013, 'try again later'],
+      [1014, 'bad gateway'],
+    ])('maps server/temporary closure %d (%s) to transient', (closureCode, label) => {
+      const wsErr = new WebSocketError({ message: label, closureCode });
+      const normalized = normalizePpgError(wsErr);
+
+      if (SqlConnectionError.is(normalized)) {
+        expect(normalized.transient).toBe(true);
+      } else {
+        expect.fail('expected SqlConnectionError');
+      }
+    });
+
+    it.each([
+      [1002, 'protocol error'],
+      [1003, 'unsupported data'],
+      [1008, 'policy violation'],
+      [1009, 'message too big'],
+    ])('maps protocol/policy closure %d (%s) to non-transient', (closureCode, label) => {
+      const wsErr = new WebSocketError({ message: label, closureCode });
+      const normalized = normalizePpgError(wsErr);
+
+      if (SqlConnectionError.is(normalized)) {
+        expect(normalized.transient).toBe(false);
+      } else {
+        expect.fail('expected SqlConnectionError');
+      }
+    });
   });
 
   describe('HttpResponseError', () => {

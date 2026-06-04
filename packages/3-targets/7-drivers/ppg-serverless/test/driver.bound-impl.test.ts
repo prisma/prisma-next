@@ -11,6 +11,16 @@ import { col, makeFakeClient, row } from './_fakes';
  * on those paths.
  */
 describe('@prisma-next/driver-ppg-serverless / bound impl (direct)', () => {
+  describe('createBoundDriverFromBinding', () => {
+    it('constructs from a { kind: "url" } binding (builds its own PPG client)', () => {
+      const bound = createBoundDriverFromBinding({
+        kind: 'url',
+        url: 'postgres://user:pass@example.invalid:5432/db',
+      });
+      expect(bound.state).toBe('connected');
+    });
+  });
+
   describe('connect()', () => {
     it('throws because the bound impl is constructed already-bound', async () => {
       const fake = makeFakeClient(() => ({ columns: [], rows: [] }));
