@@ -1,6 +1,5 @@
 import type { CliErrorEnvelope } from '@prisma-next/errors/control';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMigrationStatusCommand } from '../../src/commands/migration-status';
 import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
 
 const mocks = vi.hoisted(() => ({
@@ -66,6 +65,7 @@ describe('migration status missing-DB precondition', () => {
   it('emits the shared missing-DB envelope with meta.missingFlags when no db and no --from', async () => {
     mocks.loadConfig.mockResolvedValue({ ...baseConfig, db: {} });
 
+    const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
     await runAndCaptureExit(() => executeCommand(createMigrationStatusCommand(), ['--json']));
     const envelope = firstJsonLine<CliErrorEnvelope>(consoleOutput);
 
@@ -76,6 +76,7 @@ describe('migration status missing-DB precondition', () => {
   it('uses the same envelope when only the driver is missing', async () => {
     mocks.loadConfig.mockResolvedValue({ ...baseConfig, driver: undefined });
 
+    const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
     await runAndCaptureExit(() =>
       executeCommand(createMigrationStatusCommand(), [
         '--json',
