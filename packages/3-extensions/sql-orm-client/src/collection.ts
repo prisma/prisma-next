@@ -479,6 +479,7 @@ export class Collection<
         DefaultCollectionTypeState
       >(relation.relatedModelName as RelatedName, {
         tableName: relation.relatedTableName,
+        namespaceId: relation.relatedNamespaceId,
         state: emptyState(),
         includeRefinementMode: true,
       });
@@ -519,6 +520,7 @@ export class Collection<
     const includeExpr: IncludeExpr = {
       relationName: relationName as string,
       relatedModelName: relation.relatedModelName,
+      relatedNamespaceId: relation.relatedNamespaceId,
       relatedTableName: relation.relatedTableName,
       targetColumn: relation.targetColumn,
       localColumn: relation.localColumn,
@@ -2230,6 +2232,7 @@ export class Collection<
       (Collection as unknown as CollectionConstructor<TContract>);
     return new Ctor(this.ctx, modelName, {
       tableName: options.tableName,
+      namespaceId: options.namespaceId,
       state: options.state,
       registry:
         options.registry ??

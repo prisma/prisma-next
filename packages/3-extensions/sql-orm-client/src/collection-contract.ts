@@ -291,6 +291,7 @@ interface ResolvedThrough extends ContractRelationThrough {
 
 interface ResolvedRelation {
   readonly to: string;
+  readonly toNamespace: string | undefined;
   readonly cardinality: RelationCardinalityTag | undefined;
   readonly on: {
     readonly localFields: readonly string[];
@@ -301,6 +302,7 @@ interface ResolvedRelation {
 
 export interface ResolvedIncludeRelation {
   readonly relatedModelName: string;
+  readonly relatedNamespaceId: string | undefined;
   readonly relatedTableName: string;
   readonly targetColumn: string;
   readonly localColumn: string;
@@ -326,12 +328,18 @@ export function resolveIncludeRelation(
     );
   }
 
-  const relatedTableName = resolveModelTableName(contract, relation.to);
+  const relatedTableName = resolveModelTableName(contract, relation.to, relation.toNamespace);
   const localColumn = resolveFieldToColumn(contract, modelName, localField, namespaceId);
-  const targetColumn = resolveFieldToColumn(contract, relation.to, targetField);
+  const targetColumn = resolveFieldToColumn(
+    contract,
+    relation.to,
+    targetField,
+    relation.toNamespace,
+  );
 
   return {
     relatedModelName: relation.to,
+    relatedNamespaceId: relation.toNamespace,
     relatedTableName,
     targetColumn,
     localColumn,
@@ -413,6 +421,7 @@ export function resolveModelRelations(
 
     resolved[name] = {
       to: rel.to.model,
+      toNamespace: typeof rel.to.namespace === 'string' ? rel.to.namespace : undefined,
       cardinality: parseRelationCardinality(rel.cardinality),
       on: {
         localFields: localFields as readonly string[],

@@ -69,10 +69,12 @@ export function hasNestedMutationCallbacks(
   data: Record<string, unknown>,
   namespaceId?: string,
 ): boolean {
+  // Only the base model's relation names are needed to detect nested-mutation
+  // callbacks; resolving relation targets here would eagerly resolve
+  // cross-namespace targets (and throw on a non-existent target namespace),
+  // so enumerate names directly without target resolution.
   const relationNames = new Set(
-    getRelationDefinitions(contract, modelName, namespaceId).map(
-      (relation) => relation.relationName,
-    ),
+    Object.keys(resolveModelRelations(contract, modelName, namespaceId)),
   );
   for (const [fieldName, value] of Object.entries(data)) {
     if (!relationNames.has(fieldName)) {
@@ -698,19 +700,20 @@ function getRelationDefinitions(
   if (cached) return cached;
 
   // The base model's relations resolve within its namespace; relation
-  // targets (`relation.to`) keep the default resolution — cross-namespace
-  // relation-target threading is out of slice scope.
+  // targets resolve within the target model's namespace (`relation.toNamespace`,
+  // carried by the cross-reference) so a cross-namespace relation does not
+  // fall back to the default/first-match path.
   const relations = resolveModelRelations(contract, modelName, namespaceId);
   const definitions = Object.entries(relations).map(([relationName, relation]) => ({
     relationName,
     relatedModelName: relation.to,
-    relatedTableName: resolveModelTableName(contract, relation.to),
+    relatedTableName: resolveModelTableName(contract, relation.to, relation.toNamespace),
     cardinality: relation.cardinality,
     localColumns: relation.on.localFields.map((f) =>
       resolveFieldToColumn(contract, modelName, f, namespaceId),
     ),
     targetColumns: relation.on.targetFields.map((f) =>
-      resolveFieldToColumn(contract, relation.to, f),
+      resolveFieldToColumn(contract, relation.to, f, relation.toNamespace),
     ),
   }));
 

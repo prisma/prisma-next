@@ -307,7 +307,9 @@ function decodeIncludePayload(
     : (childRow: Record<string, unknown>) =>
         mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
   const mappedChildren = rawChildren.map((childRow) => {
-    const mapped = mapChildRow(childRow);
+    const mapped = mapChildRow(childRow,
+      include.relatedNamespaceId,
+    );
     // Source each nested-include payload from the RAW child row: it always
     // carries the payload under its relation alias. `mapChildRow` may be the
     // polymorphic mapper, which keeps only variant model-field columns and so
