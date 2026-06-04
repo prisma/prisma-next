@@ -167,7 +167,7 @@ function migrationGraphJson(result: {
 }
 
 function migrationLogJson(
-  result: readonly {
+  entries: readonly {
     space: string;
     migrationName: string;
     migrationHash: string;
@@ -177,7 +177,7 @@ function migrationLogJson(
     operationCount: number;
   }[],
 ): string {
-  return JSON.stringify(result, null, 2);
+  return JSON.stringify({ ok: true, entries }, null, 2);
 }
 
 describe('read commands --json golden', () => {
@@ -294,10 +294,14 @@ describe('read commands --json golden', () => {
         appliedAt: appliedAt.toISOString(),
       })),
     );
-    const parsed = JSON.parse(json) as Array<{ migrationName: string; appliedAt: string }>;
-    expect(parsed).toHaveLength(2);
-    expect(parsed.map((entry) => entry.migrationName)).toEqual([dirInit, dirNext]);
-    expect(parsed[0]!.appliedAt).toBe('2026-03-01T08:00:00.000Z');
+    const parsed = JSON.parse(json) as {
+      ok: boolean;
+      entries: Array<{ migrationName: string; appliedAt: string }>;
+    };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.entries).toHaveLength(2);
+    expect(parsed.entries.map((entry) => entry.migrationName)).toEqual([dirInit, dirNext]);
+    expect(parsed.entries[0]!.appliedAt).toBe('2026-03-01T08:00:00.000Z');
     expect(json).not.toContain('markerHash');
   });
 

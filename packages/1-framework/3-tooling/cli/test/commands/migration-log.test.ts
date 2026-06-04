@@ -1,8 +1,16 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
-import { describe, expect, it, vi } from 'vitest';
-import { executeMigrationLogCommand } from '../../src/commands/migration-log';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  createMigrationLogCommand,
+  executeMigrationLogCommand,
+} from '../../src/commands/migration-log';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
+import {
+  executeCommand,
+  parseJsonObjectFromCliCapture,
+  setupCommandMocks,
+} from '../utils/test-helpers';
 
 const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
@@ -128,5 +136,63 @@ describe('executeMigrationLogCommand', () => {
     if (!result.ok) return;
     expect(result.value).toHaveLength(3);
     expect(result.value.every((row) => row.migrationName === '20260303_add')).toBe(true);
+  });
+});
+
+describe('migration log --json envelope', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('emits { ok: true, entries: [...] } for a populated ledger', async () => {
+    mocks.loadConfig.mockResolvedValue(baseConfig);
+    mocks.connect.mockResolvedValue(undefined);
+    mocks.readLedger.mockResolvedValue([ledgerEntry({ migrationName: '20260301_init' })]);
+    mocks.close.mockResolvedValue(undefined);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await executeCommand(createMigrationLogCommand(), [
+        '--json',
+        '--db',
+        'postgres://localhost/test',
+      ]);
+    } finally {
+      cleanup();
+    }
+
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
+      ok: boolean;
+      entries: ReadonlyArray<{ migrationName: string }>;
+    };
+    expect(envelope.ok).toBe(true);
+    expect(Array.isArray(envelope.entries)).toBe(true);
+    expect(envelope.entries).toHaveLength(1);
+    expect(envelope.entries[0]?.migrationName).toBe('20260301_init');
+  });
+
+  it('emits { ok: true, entries: [] } for an empty ledger', async () => {
+    mocks.loadConfig.mockResolvedValue(baseConfig);
+    mocks.connect.mockResolvedValue(undefined);
+    mocks.readLedger.mockResolvedValue([]);
+    mocks.close.mockResolvedValue(undefined);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await executeCommand(createMigrationLogCommand(), [
+        '--json',
+        '--db',
+        'postgres://localhost/test',
+      ]);
+    } finally {
+      cleanup();
+    }
+
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
+      ok: boolean;
+      entries: readonly unknown[];
+    };
+    expect(envelope.ok).toBe(true);
+    expect(envelope.entries).toEqual([]);
   });
 });

@@ -24,6 +24,7 @@ import { createAnsiMigrationListStyler } from '../utils/formatters/migration-lis
 import {
   MIGRATION_LOG_EMPTY_MESSAGE,
   renderMigrationLogTable,
+  type SerializedLedgerEntryRecord,
   serializeLedgerEntriesForJson,
 } from '../utils/formatters/migration-log-table';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -36,6 +37,11 @@ interface MigrationLogOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly utc?: boolean;
+}
+
+export interface MigrationLogResult {
+  readonly ok: true;
+  readonly entries: readonly SerializedLedgerEntryRecord[];
 }
 
 export async function executeMigrationLogCommand(
@@ -131,7 +137,11 @@ export function createMigrationLogCommand(): Command {
       const result = await executeMigrationLogCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, (entries) => {
         if (flags.json) {
-          ui.output(JSON.stringify(serializeLedgerEntriesForJson(entries), null, 2));
+          const result: MigrationLogResult = {
+            ok: true,
+            entries: serializeLedgerEntriesForJson(entries),
+          };
+          ui.output(JSON.stringify(result, null, 2));
         } else if (!flags.quiet) {
           if (entries.length === 0) {
             ui.output(MIGRATION_LOG_EMPTY_MESSAGE);

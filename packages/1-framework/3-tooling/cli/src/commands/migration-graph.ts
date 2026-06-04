@@ -53,6 +53,20 @@ export interface MigrationGraphResult {
   readonly summary: string;
 }
 
+export interface MigrationGraphJsonEdge {
+  readonly dirName: string;
+  readonly from: string;
+  readonly to: string;
+  readonly migrationHash: string;
+}
+
+export interface MigrationGraphJsonResult {
+  readonly ok: true;
+  readonly nodes: readonly string[];
+  readonly edges: readonly MigrationGraphJsonEdge[];
+  readonly summary: string;
+}
+
 function computeGraphSummary(graph: MigrationGraph): string {
   return `${graph.nodes.size} node(s), ${graph.migrationByHash.size} edge(s)`;
 }
@@ -232,24 +246,21 @@ export function createMigrationGraphCommand(): Command {
           ui.output(lines.join('\n'));
         } else if (flags.json) {
           const nodes = [...graphResult.graph.nodes];
-          const edges = [...graphResult.graph.migrationByHash.values()].map((e) => ({
-            dirName: e.dirName,
-            from: e.from,
-            to: e.to,
-            migrationHash: e.migrationHash,
-          }));
-          ui.output(
-            JSON.stringify(
-              {
-                ok: true,
-                nodes,
-                edges,
-                summary: `${graphResult.graph.nodes.size} node(s), ${graphResult.graph.migrationByHash.size} edge(s)`,
-              },
-              null,
-              2,
-            ),
+          const edges = [...graphResult.graph.migrationByHash.values()].map(
+            (e): MigrationGraphJsonEdge => ({
+              dirName: e.dirName,
+              from: e.from,
+              to: e.to,
+              migrationHash: e.migrationHash,
+            }),
           );
+          const jsonResult: MigrationGraphJsonResult = {
+            ok: true,
+            nodes,
+            edges,
+            summary: `${graphResult.graph.nodes.size} node(s), ${graphResult.graph.migrationByHash.size} edge(s)`,
+          };
+          ui.output(JSON.stringify(jsonResult, null, 2));
         } else if (!flags.quiet) {
           ui.output(formatMigrationGraphHumanOutput(graphResult));
         }
