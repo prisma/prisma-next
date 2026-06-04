@@ -33,6 +33,7 @@ import { combineWhereExprs } from './where-utils';
 
 interface GroupedCollectionInit {
   readonly tableName: string;
+  readonly namespaceId: string | undefined;
   readonly baseFilters: readonly AnyExpression[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
@@ -53,6 +54,7 @@ export class GroupedCollection<
   private readonly contract: TContract;
   readonly modelName: ModelName;
   readonly tableName: string;
+  readonly namespaceId: string | undefined;
   readonly baseFilters: readonly AnyExpression[];
   readonly groupByFields: readonly string[];
   readonly groupByColumns: readonly string[];
@@ -67,6 +69,7 @@ export class GroupedCollection<
     this.contract = ctx.context.contract;
     this.modelName = modelName;
     this.tableName = options.tableName;
+    this.namespaceId = options.namespaceId;
     this.baseFilters = options.baseFilters;
     this.groupByFields = options.groupByFields;
     this.groupByColumns = options.groupByColumns;
@@ -77,10 +80,11 @@ export class GroupedCollection<
     predicate: (having: HavingBuilder<TContract, ModelName>) => AnyExpression,
   ): GroupedCollection<TContract, ModelName, GroupFields> {
     const havingExpr = predicate(
-      createHavingBuilder(this.contract, this.modelName, this.tableName),
+      createHavingBuilder(this.contract, this.modelName, this.tableName, this.namespaceId),
     );
     return new GroupedCollection(this.ctx, this.modelName, {
       tableName: this.tableName,
+      namespaceId: this.namespaceId,
       baseFilters: this.baseFilters,
       groupByFields: this.groupByFields,
       groupByColumns: this.groupByColumns,
@@ -105,7 +109,9 @@ export class GroupedCollection<
       >
     >
   > {
-    const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
+    const aggregateSpec = fn(
+      createAggregateBuilder(this.contract, this.modelName, this.namespaceId),
+    );
     const aggregateEntries = Object.entries(aggregateSpec);
     if (aggregateEntries.length === 0) {
       throw new Error('groupBy().aggregate() requires at least one aggregation selector');
@@ -134,6 +140,7 @@ export class GroupedCollection<
         this.groupByColumns,
         aggregateSpec,
         combineWhereExprs(this.havingFilters),
+        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -143,7 +150,12 @@ export class GroupedCollection<
     ).toArray();
 
     return rows.map((row) => {
-      const mapped = mapStorageRowToModelFields(this.contract, this.modelName, row);
+      const mapped = mapStorageRowToModelFields(
+        this.contract,
+        this.modelName,
+        row,
+        this.namespaceId,
+      );
       for (const [alias, selector] of aggregateEntries) {
         mapped[alias] = coerceAggregateValue(selector.fn, row[alias]);
       }
@@ -160,8 +172,9 @@ function createHavingBuilder<TContract extends Contract<SqlStorage>, ModelName e
   contract: TContract,
   modelName: ModelName,
   tableName: string,
+  namespaceId?: string,
 ): HavingBuilder<TContract, ModelName> {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName);
+  const fieldToColumn = getFieldToColumnMap(contract, modelName, namespaceId);
   const createMetricExpr = (
     fn: Exclude<AggregateExpr['fn'], 'count'>,
     fieldName: string,

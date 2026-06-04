@@ -660,6 +660,7 @@ export class Collection<
 
     return new GroupedCollection(this.ctx, this.modelName, {
       tableName: this.tableName,
+      namespaceId: this.namespaceId,
       baseFilters: this.state.filters,
       groupByFields: [...fields],
       groupByColumns,
@@ -1099,7 +1100,9 @@ export class Collection<
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<AggregateResult<Spec>> {
-    const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
+    const aggregateSpec = fn(
+      createAggregateBuilder(this.contract, this.modelName, this.namespaceId),
+    );
     const entries = Object.entries(aggregateSpec);
     if (entries.length === 0) {
       throw new Error('aggregate() requires at least one aggregation selector');
@@ -1114,7 +1117,13 @@ export class Collection<
     const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'read', 'aggregate');
 
     const compiled = mergeAnnotations(
-      compileAggregate(this.contract, this.tableName, this.state.filters, aggregateSpec),
+      compileAggregate(
+        this.contract,
+        this.tableName,
+        this.state.filters,
+        aggregateSpec,
+        this.namespaceId,
+      ),
       annotationsMap,
     );
     const rows = await executeQueryPlan<Record<string, unknown>>(
