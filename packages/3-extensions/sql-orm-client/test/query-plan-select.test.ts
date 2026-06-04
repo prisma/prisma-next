@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
@@ -823,7 +822,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
 
     expect(childRows.joins).toEqual([
       JoinAst.left(
-        TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
+        TableSource.named('features', undefined, 'public'),
         EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
       ),
     ]);
@@ -847,7 +846,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
 
     expect(childRows.joins).toEqual([
       JoinAst.inner(
-        TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
+        TableSource.named('features', undefined, 'public'),
         EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
       ),
     ]);
@@ -866,7 +865,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
 
     expect(childRows.joins).toEqual([
       JoinAst.left(
-        TableSource.named('features', undefined, UNBOUND_NAMESPACE_ID),
+        TableSource.named('features', undefined, 'public'),
         EqColJoinOn.of(ColumnRef.of('subtasks__child', 'id'), ColumnRef.of('features', 'id')),
       ),
     ]);

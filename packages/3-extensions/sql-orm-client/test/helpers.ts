@@ -224,6 +224,7 @@ export function buildMixedPolyContract(): TestContract {
       },
     },
     storage: {
+      namespaceId: 'public',
       table: 'projects_tbl',
       fields: { id: { column: 'id' }, name: { column: 'name' } },
     },
@@ -266,7 +267,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.projects_tbl = {
+  raw.storage.namespaces.public.tables.projects_tbl = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -340,6 +341,7 @@ export function buildStiPolyContract(): TestContract {
       },
     },
     storage: {
+      namespaceId: 'public',
       table: 'accounts',
       fields: { id: { column: 'id' }, name: { column: 'name' } },
     },
@@ -387,7 +389,7 @@ export function buildStiPolyContract(): TestContract {
     nullable: true,
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.accounts = {
+  raw.storage.namespaces.public.tables.accounts = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
