@@ -7,17 +7,11 @@ export interface SqlStatement {
   readonly params: readonly unknown[];
 }
 
-export const MARKER_TABLE_NAME = '_prisma_marker';
-export const LEDGER_TABLE_NAME = '_prisma_ledger';
-
-/**
- * Control tables the runner creates/manages. The planner must not drop these
- * when reconciling "extra" tables against the contract.
- */
-export const CONTROL_TABLE_NAMES: ReadonlySet<string> = new Set([
-  MARKER_TABLE_NAME,
+export {
+  CONTROL_TABLE_NAMES,
   LEDGER_TABLE_NAME,
-]);
+  MARKER_TABLE_NAME,
+} from '../control-tables';
 
 /**
  * Schema for `_prisma_marker`. The `space TEXT PRIMARY KEY` shape
