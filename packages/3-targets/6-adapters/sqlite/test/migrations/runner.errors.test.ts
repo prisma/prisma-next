@@ -9,7 +9,6 @@ import {
   createFailingPlan,
   createMigrationPlan,
   createTestDatabase,
-  executeStatement,
   expectNoMarkerOrLedgerWrites,
   familyInstance,
   frameworkComponents,

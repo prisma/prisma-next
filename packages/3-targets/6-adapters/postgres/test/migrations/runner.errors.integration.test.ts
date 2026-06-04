@@ -11,7 +11,6 @@ import {
   createFailingPlan,
   createMigrationPlan,
   createTestDatabase,
-  executeStatement,
   familyInstance,
   frameworkComponents,
   type PostgresControlDriver,

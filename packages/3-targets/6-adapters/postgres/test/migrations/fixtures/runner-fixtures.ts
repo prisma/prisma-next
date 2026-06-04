@@ -18,6 +18,7 @@ import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
+import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import type { PostgresContract } from '../../../src/core/types';
@@ -157,17 +158,19 @@ export async function bootstrapPostgresControlSchema(driver: PostgresControlDriv
   if (!schemaQuery) {
     throw new Error('expected prisma_contract schema bootstrap query');
   }
+  const postgresSchemaQuery = schemaQuery as unknown as PostgresDdlNode;
   await executeStatement(
     driver,
-    postgresControlAdapter.lower(schemaQuery, postgresControlLowererContext),
+    postgresControlAdapter.lower(postgresSchemaQuery, postgresControlLowererContext),
   );
 }
 
 export async function bootstrapPostgresControlTables(driver: PostgresControlDriver): Promise<void> {
   for (const query of buildControlTableBootstrapQueries()) {
+    const postgresQuery = query as unknown as PostgresDdlNode;
     await executeStatement(
       driver,
-      postgresControlAdapter.lower(query, postgresControlLowererContext),
+      postgresControlAdapter.lower(postgresQuery, postgresControlLowererContext),
     );
   }
 }

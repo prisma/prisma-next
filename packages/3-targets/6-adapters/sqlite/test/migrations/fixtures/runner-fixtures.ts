@@ -22,6 +22,7 @@ import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-sqlite/contract-free';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
+import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import type { SqliteContract } from '../../../src/core/types';
@@ -191,7 +192,11 @@ const sqliteControlLowererContext = { contract: {} as SqliteContract };
 
 export async function bootstrapSqliteControlTables(driver: SqliteControlDriver): Promise<void> {
   for (const query of buildControlTableBootstrapQueries()) {
-    await executeStatement(driver, sqliteControlAdapter.lower(query, sqliteControlLowererContext));
+    const sqliteQuery = query as unknown as SqliteDdlNode;
+    await executeStatement(
+      driver,
+      sqliteControlAdapter.lower(sqliteQuery, sqliteControlLowererContext),
+    );
   }
 }
 

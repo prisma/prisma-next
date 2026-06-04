@@ -57,6 +57,7 @@
     "./codecs": "./dist/codecs.mjs",
     "./contract-free": "./dist/contract-free.mjs",
     "./control": "./dist/control.mjs",
+    "./control-tables": "./dist/control-tables.mjs",
     "./ddl": "./dist/ddl.mjs",
     "./default-normalizer": "./dist/default-normalizer.mjs",
     "./migration": "./dist/migration.mjs",
@@ -69,7 +70,6 @@
     "./render-ops": "./dist/render-ops.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./sql-utils": "./dist/sql-utils.mjs",
-    "./control-tables": "./dist/control-tables.mjs",
     "./package.json": "./package.json"
   },
   "engines": {
