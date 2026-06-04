@@ -1,76 +1,24 @@
 #!/usr/bin/env -S node
 import {
   addForeignKey,
+  createEnumType,
   createIndex,
   createTable,
   Migration,
   MigrationCLI,
-  rawSql,
-} from '@prisma-next/target-postgres/migration';
+} from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:76c1bd5f5733774ae1182e83ca882f623cdf12e78a76c2fb06666d60bbdd6452',
+      to: 'sha256:1375f137fa3186c77cda92aba4048c49714ed5fe65993ca7d5eed3bcd9e85cb7',
     };
   }
 
   override get operations() {
     return [
-      rawSql({
-        id: 'extension.vector',
-        label: 'Enable extension "vector"',
-        summary: 'Ensures the vector extension is available for pgvector operations',
-        operationClass: 'additive',
-        target: { id: 'postgres' },
-        precheck: [
-          {
-            description: 'verify extension "vector" is not already enabled',
-            sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-          },
-        ],
-        execute: [
-          {
-            description: 'create extension "vector"',
-            sql: 'CREATE EXTENSION IF NOT EXISTS vector',
-          },
-        ],
-        postcheck: [
-          {
-            description: 'confirm extension "vector" is enabled',
-            sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-          },
-        ],
-      }),
-      rawSql({
-        id: 'type.user_type',
-        label: 'Create type user_type',
-        summary: 'Creates enum type user_type',
-        operationClass: 'additive',
-        target: {
-          id: 'postgres',
-          details: { schema: 'public', objectType: 'type', name: 'user_type' },
-        },
-        precheck: [
-          {
-            description: 'ensure type "user_type" does not exist',
-            sql: "SELECT NOT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)",
-          },
-        ],
-        execute: [
-          {
-            description: 'create type "user_type"',
-            sql: 'CREATE TYPE "public"."user_type" AS ENUM (\'admin\', \'user\')',
-          },
-        ],
-        postcheck: [
-          {
-            description: 'verify type "user_type" exists',
-            sql: "SELECT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)",
-          },
-        ],
-      }),
+      createEnumType('public', 'user_type', ['admin', 'user']),
       createTable('public', 'bug', [
         { name: 'severity', typeSql: 'text', defaultSql: '', nullable: false },
         { name: 'stepsToRepro', typeSql: 'text', defaultSql: '', nullable: true },
@@ -131,24 +79,25 @@ export default class M extends Migration {
             defaultSql: 'DEFAULT (now())',
             nullable: false,
           },
+          { name: 'displayName', typeSql: 'text', defaultSql: '', nullable: false },
           { name: 'email', typeSql: 'text', defaultSql: '', nullable: false },
           { name: 'id', typeSql: 'character(36)', defaultSql: '', nullable: false },
           { name: 'kind', typeSql: '"user_type"', defaultSql: '', nullable: false },
         ],
         { columns: ['id'] },
       ),
+      createIndex('public', 'post', 'post_userId_idx', ['userId']),
+      createIndex('public', 'task', 'task_userId_idx', ['userId']),
       addForeignKey('public', 'post', {
         name: 'post_userId_fkey',
         columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        references: { schema: 'public', table: 'user', columns: ['id'] },
       }),
-      createIndex('public', 'post', 'post_userId_idx', ['userId']),
       addForeignKey('public', 'task', {
         name: 'task_userId_fkey',
         columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        references: { schema: 'public', table: 'user', columns: ['id'] },
       }),
-      createIndex('public', 'task', 'task_userId_idx', ['userId']),
     ];
   }
 }
