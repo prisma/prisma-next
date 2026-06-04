@@ -24,6 +24,15 @@
  *                              Compound filters + select/include via ORM client
  * - repo-post-feed <postTitleTerm> [limit]
  *                              Posts with to-one include via ORM client
+ * - repo-task-board [limit]    Users with their polymorphic `tasks` included —
+ *                              each task comes back shaped per its variant
+ *                              (Bug: severity/stepsToRepro, Feature: priority/targetRelease)
+ * - repo-bug-triage [severity] [limit]
+ *                              Users with a `.variant('Bug')`-narrowed include,
+ *                              filtered by the Bug-only `severity` column
+ * - repo-feature-roadmap <targetRelease> [limit]
+ *                              Users with a `.variant('Feature')`-narrowed include,
+ *                              filtered by the Feature-only `targetRelease` column
  * - repo-users-cursor [cursor] [limit]
  *                              Cursor pagination via ORM client
  * - repo-latest-per-kind       DISTINCT ON example via ORM client
@@ -69,12 +78,15 @@ import { ormClientFindUserByEmail } from './orm-client/find-user-by-email';
 import { ormClientFindUserByIdCached } from './orm-client/find-user-by-id-cached';
 import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from './orm-client/get-dashboard-users';
+import { ormClientGetFeatureRoadmap } from './orm-client/get-feature-roadmap';
 import { ormClientGetLatestUserPerKind } from './orm-client/get-latest-user-per-kind';
 import { ormClientGetPostFeed } from './orm-client/get-post-feed';
 import { ormClientGetBugs, ormClientGetFeatures, ormClientGetTasks } from './orm-client/get-tasks';
+import { ormClientGetUserBugTriage } from './orm-client/get-user-bug-triage';
 import { ormClientGetUserInsights } from './orm-client/get-user-insights';
 import { ormClientGetUserKindBreakdown } from './orm-client/get-user-kind-breakdown';
 import { ormClientGetUserPosts } from './orm-client/get-user-posts';
+import { ormClientGetUserTaskBoard } from './orm-client/get-user-task-board';
 import { ormClientGetUsers } from './orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from './orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
@@ -231,6 +243,27 @@ async function main() {
       const features = await ormClientGetFeatures(limit, runtime);
 
       console.log(JSON.stringify(features, null, 2));
+    } else if (cmd === 'repo-task-board') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const board = await ormClientGetUserTaskBoard(limit, runtime);
+
+      console.log(JSON.stringify(board, null, 2));
+    } else if (cmd === 'repo-bug-triage') {
+      const [severity, limitStr] = args;
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const triage = await ormClientGetUserBugTriage(severity ?? 'critical', limit, runtime);
+
+      console.log(JSON.stringify(triage, null, 2));
+    } else if (cmd === 'repo-feature-roadmap') {
+      const [targetRelease, limitStr] = args;
+      if (!targetRelease) {
+        console.error('Usage: pnpm start -- repo-feature-roadmap <targetRelease> [limit]');
+        process.exit(1);
+      }
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const roadmap = await ormClientGetFeatureRoadmap(targetRelease, limit, runtime);
+
+      console.log(JSON.stringify(roadmap, null, 2));
     } else if (cmd === 'repo-upsert-user') {
       const [id, email, kind] = args;
       if (!id || !email || !kind) {
@@ -477,6 +510,8 @@ async function main() {
           'repo-user <email> | repo-posts <userId> [limit] | ' +
           'repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser] | ' +
           'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +
+          'repo-task-board [limit] | repo-bug-triage [severity] [limit] | ' +
+          'repo-feature-roadmap <targetRelease> [limit] | ' +
           'repo-latest-per-kind | repo-user-insights [limit] | repo-kind-breakdown [minUsers] | ' +
           'repo-upsert-user <id> <email> <kind> | repo-create-user-address <id> <email> <kind> | ' +
           'repo-similar-posts <postId> [limit] | repo-search-posts <embedding> <maxDistance> [limit] | ' +

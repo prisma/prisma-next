@@ -101,6 +101,9 @@ The demo includes ORM client examples under `src/orm-client/`:
 - `ormClientGetUserPosts(userId, limit, runtime)` — fetch user posts with collection filters + ordering
 - `ormClientGetDashboardUsers(emailDomain, postTitleTerm, limit, postsPerUser, runtime)` — compound `and/or/not` filters + relation filters + `select()` and `include()` composition
 - `ormClientGetPostFeed(postTitleTerm, limit, runtime)` — to-one include (`post -> user`) with projected fields
+- `ormClientGetUserTaskBoard(limit, runtime)` — **polymorphic-target include**: `User.include('tasks')` where `Task` is a discriminated base; each included row is decoded into its variant shape (`Bug` → `severity`/`stepsToRepro`, `Feature` → `priority`/`targetRelease`) in a single read
+- `ormClientGetUserBugTriage(severity, limit, runtime)` — `.variant('Bug')`-narrowed include filtered by the Bug-only `severity` column
+- `ormClientGetFeatureRoadmap(targetRelease, limit, runtime)` — `.variant('Feature')`-narrowed include filtered by the Feature-only `targetRelease` column (a multi-table-inheritance variant column reached through the variant join)
 - `ormClientGetUsersByIdCursor(cursor, limit, runtime)` — cursor pagination with `orderBy()` + `cursor()`
 - `ormClientGetLatestUserPerKind(runtime)` — `distinctOn()` with deterministic ordering
 - `ormClientGetUserInsights(limit, runtime)` — `include().combine()` metrics and latest related row
@@ -118,12 +121,68 @@ pnpm start -- repo-user admin@example.com
 pnpm start -- repo-posts user_001 10
 pnpm start -- repo-dashboard example.com post 10 2
 pnpm start -- repo-post-feed post 10
+pnpm start -- repo-task-board 10
+pnpm start -- repo-bug-triage critical 10
+pnpm start -- repo-feature-roadmap v2.0 10
 pnpm start -- repo-users-cursor user_001 5
 pnpm start -- repo-latest-per-kind
 pnpm start -- repo-user-insights 5
 pnpm start -- repo-kind-breakdown 1
 pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example.com user
 ```
+
+## Polymorphic Includes
+
+The `Task` model is a discriminated base (`@@discriminator(type)`) with two
+variants stored in their own tables: `Bug` (`severity`, `stepsToRepro`) and
+`Feature` (`priority`, `targetRelease`). `User.tasks` points at that base, so
+including it is a **polymorphic-target include** — the read joins the variant
+tables and decodes each row into the shape its discriminator selects.
+
+The task-board include takes the **default projection** (no `select(...)`), so
+each included row comes back in its full default shape: the shared `Task`
+columns plus the columns of whichever variant the discriminator selects:
+
+```bash
+pnpm start -- repo-task-board 10
+```
+
+```jsonc
+[
+  {
+    "id": "…", "displayName": "Alice", "kind": "admin",
+    "tasks": [
+      // Bug rows carry the shared Task columns + the Bug columns…
+      { "id": "…", "title": "Login crashes on Safari", "description": null,
+        "status": "open", "type": "bug", "userId": "…",
+        "createdAt": "2024-03-01T00:00:00+00:00", "severity": "critical",
+        "stepsToRepro": "Open Safari → click \"Sign in\" → blank white screen" },
+      // …Feature rows carry the shared Task columns + the Feature columns,
+      // all from one query.
+      { "id": "…", "title": "Dark mode", "description": null,
+        "status": "open", "type": "feature", "userId": "…",
+        "createdAt": "2024-03-02T00:00:00+00:00", "priority": "P1",
+        "targetRelease": "v2.0" }
+    ]
+  }
+]
+```
+
+`.variant(...)` narrows the include to a single variant so the refinement's
+`where` can filter on that variant's own columns — even when, as with
+`Feature`, those columns live in a separate table reached through the variant
+join:
+
+```bash
+# Only critical bugs, per user.
+pnpm start -- repo-bug-triage critical 10
+
+# Only features targeting a release, per user.
+pnpm start -- repo-feature-roadmap v2.0 10
+```
+
+The source files: `src/orm-client/get-user-task-board.ts`,
+`get-user-bug-triage.ts`, and `get-feature-roadmap.ts`.
 
 ## Cache Middleware Examples
 
