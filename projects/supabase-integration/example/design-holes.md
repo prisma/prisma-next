@@ -14,7 +14,7 @@ Status legend:
 
 **Resolution:** target presence is the gate. The Postgres target carries RLS support; pack-aware typing makes the `.rls(...)` slot visible on the model builder only when the target supports it (same mechanism `IndexTypes` uses today in `SqlContext` — see [`contract-dsl.ts`](../../../packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts) `PackAwareSqlConstraints<IndexTypes>`). Non-Postgres targets simply don't expose the slot; no capability flag is required.
 
-Verifier strictness opt-out (e.g. "skip RLS checks for this table") is a *separate* concern handled by table-level `control` policy (see [`projects/control-policy/spec.md`](../../control-policy/spec.md)), not a capability switch.
+Verifier strictness opt-out (e.g. "skip RLS checks for this table") is a *separate* concern handled by table-level `control` policy (see [ADR 224](../../../docs/architecture%20docs/adrs/ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md)), not a capability switch.
 
 The example app should drop `capabilities.postgres['postgres.rls']: true` from its contract config.
 
