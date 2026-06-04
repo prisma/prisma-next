@@ -130,18 +130,26 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
     const through = relObj['through'] as
       | {
           table?: string;
+          namespaceId?: string;
           parentColumns?: string[];
           childColumns?: string[];
           targetColumns?: string[];
         }
       | undefined;
-    if (through?.table && through.parentColumns && through.childColumns && through.targetColumns) {
+    if (
+      through?.table &&
+      through.namespaceId &&
+      through.parentColumns &&
+      through.childColumns &&
+      through.targetColumns
+    ) {
       const table = serializeValue(through.table);
+      const namespaceId = serializeValue(through.namespaceId);
       const parentColumns = through.parentColumns.map((c) => serializeValue(c)).join(', ');
       const childColumns = through.childColumns.map((c) => serializeValue(c)).join(', ');
       const targetColumns = through.targetColumns.map((c) => serializeValue(c)).join(', ');
       parts.push(
-        `readonly through: { readonly table: ${table}; readonly parentColumns: readonly [${parentColumns}]; readonly childColumns: readonly [${childColumns}]; readonly targetColumns: readonly [${targetColumns}] }`,
+        `readonly through: { readonly table: ${table}; readonly namespaceId: ${namespaceId}; readonly parentColumns: readonly [${parentColumns}]; readonly childColumns: readonly [${childColumns}]; readonly targetColumns: readonly [${targetColumns}] }`,
       );
     }
 

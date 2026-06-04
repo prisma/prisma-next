@@ -407,6 +407,7 @@ describe('resolveModelRelations() through descriptor', () => {
                     on: { localFields: ['id'], targetFields: targetColumns },
                     through: {
                       table: junctionTable,
+                      namespaceId: 'public',
                       parentColumns,
                       childColumns,
                       targetColumns,
@@ -433,27 +434,29 @@ describe('resolveModelRelations() through descriptor', () => {
         namespaces: {
           public: {
             id: 'public',
-            tables: {
-              parents: {
-                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
-              children: {
-                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
-              [junctionTable]: {
-                columns: junctionStorageColumns,
-                primaryKey: { columns: [...parentColumns, ...childColumns] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+            entries: {
+              table: {
+                parents: {
+                  columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+                children: {
+                  columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+                [junctionTable]: {
+                  columns: junctionStorageColumns,
+                  primaryKey: { columns: [...parentColumns, ...childColumns] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
               },
             },
           },

@@ -32,6 +32,7 @@ export type ContractRelationOn = {
 
 export type ContractRelationThrough = {
   readonly table: string;
+  readonly namespaceId: string;
   readonly parentColumns: readonly string[];
   readonly childColumns: readonly string[];
   readonly targetColumns: readonly string[];
