@@ -4,10 +4,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  StorageTable,
-  type SqlNamespaceTablesInput,
-} from '@prisma-next/sql-contract/types';
+import { type SqlNamespaceTablesInput, StorageTable } from '@prisma-next/sql-contract/types';
 import { castAs } from '@prisma-next/utils/casts';
 
 export type SqliteDatabaseInput = {
