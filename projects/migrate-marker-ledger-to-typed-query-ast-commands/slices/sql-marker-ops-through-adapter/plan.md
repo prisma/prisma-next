@@ -150,3 +150,72 @@ Three more dispatches, **all to `claude-4.6-sonnet-high-thinking` (mid tier)**. 
 - Reviewer check: representative call site (e.g. `updateMarker` with CAS-WHERE) reads cleanly as a downstream human author would.
 
 _Sequencing: D8 → D9 → D10 (D9 depends on D8's shape; D10 is small + independent but rides on D9's branch state to keep PR-on-PR cost down)._
+
+## Corrective dispatches round 3 (added 2026-06-04 after D8/D9/D10 reviewed at PR #712)
+
+D8/D9/D10 closed SATISFIED but operator review surfaced three further findings — two real smells the round-2 work left unaddressed plus stylistic cleanup operator-elevated to slice scope. See [spec round 3 corrective scope](./spec.md#corrective-scope-round-3-added-2026-06-04-after-d8d9d10-reviewed-at-pr-712). Three more dispatches, all `composer-2.5-fast` (mechanical refactors with well-specified outcomes; no design judgement required after the round-3 spec edits).
+
+### D11 — Marker/ledger operations become methods on control adapter classes (Postgres + SQLite + Mongo)
+
+- **Outcome (property statement):** marker/ledger operations are methods on each control adapter class, not module functions with thin class delegation. `packages/3-targets/6-adapters/{postgres,sqlite}/src/core/marker-ledger.ts` and `packages/3-mongo-target/2-mongo-adapter/src/core/marker-ledger.ts` either no longer exist or contain only target-private helpers (not the per-operation functions). Class methods use `this.lower(...)` (SQL) or `extractDb(...)` (Mongo) directly; no threaded `lower` parameter.
+- **Builds on:** D9's authoring surface (the fluent contract-free builder); D9's collapse of `marker-read.ts` + `marker-ledger-writes.ts` into a single `marker-ledger.ts`.
+- **Hands to:** symmetric SPI shape — the class **is** the SPI implementation, end-to-end, no module-function indirection.
+- **Focus:** mechanical refactor. Move each function body into its class-method counterpart on `PostgresControlAdapter` / `SqliteControlAdapter` / `MongoControlAdapterImpl`. Replace the threaded `lower` parameter with `this.lower(...)`. Delete the standalone module function. Update the existing unit tests to invoke through class instances (the tests already construct the class — they were calling the module functions for testability-in-isolation, which is the smell being removed). The shared `execute()` helper and any other private utilities can stay as module-private helpers in the file, or move to a static class method — implementer's call.
+- **Why not a "common abstract base class with shared helpers":** the operations are dialect-specific (postgres uses `INSERT … ON CONFLICT`, sqlite same shape but different codec wiring, mongo uses commands entirely). The only shared piece across SQL adapters is `parseContractMarkerRow` (already shared in `family-sql/verify.ts`). Resist any urge to introduce a `SqlControlAdapterBase` or "marker mixin".
+- **Composer constraints:**
+  - **One commit per family** (or one combined commit — implementer's call): postgres + sqlite + mongo.
+  - **Do not change behaviour.** `pnpm fixtures:check` byte-identical; all existing marker-ledger tests pass without modification of the assertions (only the call form changes — `markerLedger.foo(this.lower, driver, ...)` becomes `this.foo(driver, ...)`).
+  - **Do not introduce new shared abstractions.** If you find yourself wanting to factor common bits across PG + SQLite, HALT — that urge is the F18 anti-pattern recapitulated.
+  - **Mongo:** same move, but `extractDb(driver)` becomes a class-private helper (or stays a module-private helper in the same file). The class methods take `driver` per call (driver-bound-adapter refactor is the follow-up [TML-2820](https://linear.app/prisma-company/issue/TML-2820/driver-bound-control-spi-common-markerreader-abstraction), **not** in this dispatch).
+- **Stop conditions:**
+  - If you find a public callsite outside the class that imports a `marker-ledger.ts` function directly (rather than calling the SPI method on an adapter instance), HALT and surface — that's a real consumer the smell was hiding, and it changes the dispatch scope.
+
+### D12 — Delete bootstrap-DDL residue (`sql-marker.ts`, both `statement-builders.ts`, `SqlStatement`)
+
+- **Outcome (property statement):** `packages/2-sql/5-runtime/src/sql-marker.ts` and both `packages/3-targets/3-targets/{postgres,sqlite}/src/core/migrations/statement-builders.ts` are deleted. Their public exports are removed (`5-runtime/src/exports/index.ts` drops the `ensure*Statement` + `SqlStatement` + `APP_SPACE_ID` re-exports; both `{postgres,sqlite}/src/exports/statement-builders.ts` are deleted entirely). `SqlStatement` type is deleted from the workspace; `runner.executeStatement` uses the existing lowered-query type. SQLite's `MARKER_TABLE_NAME` / `LEDGER_TABLE_NAME` / `CONTROL_TABLE_NAMES` constants move to a new `packages/3-targets/3-targets/sqlite/src/core/control-tables.ts`. Test setup helpers (currently using `ensureSchemaStatement` + `ensureTableStatement` for raw DB setup) are rewritten in `packages/2-sql/5-runtime/test/utils.ts` using the contract-free DDL builders (`createSchema` / `createTable` from `postgres/contract-free/ddl.ts` etc.) + `control-adapter.lower()`. Byte-match oracle assertions in `packages/3-targets/6-adapters/{postgres,sqlite}/test/migrations/ddl-lowering.test.ts` (the assertions pinning lowered AST to `ensure*Statement.sql`) are deleted.
+- **Builds on:** Slice 1's contract-free DDL builders + control-adapter lowering seam.
+- **Hands to:** clean production source dirs (no test-only code in production); single source of truth for control-table names (sqlite); zero `SqlStatement` redundancy.
+- **Focus:** deletion + migration. The deletion is the headline; the migration is making the consumers work without the deleted code. **Important:** the 5 integration tests under `test/integration/test/` that import `ensureSchemaStatement` / `ensureTableStatement` need to import from `5-runtime/test/utils.ts` (or wherever the new helpers land) — they're the real consumers of the deletion.
+- **Composer constraints:**
+  - **Three commits, ordered:** (1) move sqlite constants to `control-tables.ts` + update `issue-planner.ts` import; (2) rewrite test setup helpers in `5-runtime/test/utils.ts` against contract-free DDL builders + lower; (3) delete the three files + their exports + `SqlStatement` type + byte-match assertions, update integration test imports.
+  - **`SqlStatement` replacement:** find the type the lowerer returns (`renderLoweredSql` or `executeQuery` return shape — `{ sql, params }` is already a structural type used elsewhere). Use that directly. If the structural type is anonymous, declare a single shared type in a sensible existing location (do **not** create a new file for one type). HALT and surface if the existing location is unclear.
+  - **`APP_SPACE_ID`:** import directly from `@prisma-next/framework-components/control` at use sites; do not create a new re-export.
+  - **The byte-match oracle deletion:** identify the specific assertions to delete (the ones comparing lowered AST output to a string the test itself defines). Keep any assertion that pins a *property* of the lowered AST (e.g. "the schema is `prisma_contract`") — that's not tautology. If unsure on a specific assertion, surface in the dispatch report; default to delete.
+  - **Do not introduce a "test-fixtures package".** The helpers live in each package's `test/utils.ts`. If multiple packages need the same helper, replicate (the duplication is small and local).
+- **Stop conditions:**
+  - If a production callsite imports `SqlStatement` (not just tests / fixtures), HALT and surface — that means the structural type **is** load-bearing in production and the deletion needs more care.
+  - If the contract-free DDL builders can't express the bootstrap DDL exactly (column types, defaults, etc.), HALT and surface — that's a gap in the contract-free DDL surface that should be filled in a separate dispatch, not papered over with raw SQL.
+
+### D13 — `as` cast cleanup in test files + README L26 + column-helper test simplification
+
+- **Outcome (property statement):** no bare `as T` casts in the 4 test files modified by this slice (relational-core `table.test.ts`, postgres `columns.test.ts`, postgres `control-adapter.test.ts`) — `as const` and `as unknown as X` (where TypeScript narrowing forces it) are exempt and preserved. README L26 of `packages/2-sql/5-runtime/README.md` is updated from "SQL Marker Management: ... (writes go through the control adapter SPI)" to reflect that reads + writes both go through the SPI now. Per-helper column-shape tests in `columns.test.ts` (postgres + sqlite) collapse into property-shape assertions.
+- **Builds on:** Nothing structural — purely stylistic ride-along.
+- **Hands to:** consistent test style; correct README prose; reduced test bulk.
+- **Focus:** rule for `as` cleanup:
+  - **Assignment cast (`const x = y as T`) → annotation (`const x: T = y`).**
+  - **Property-access cast (`(x as T).prop`) → `const local = castAs<T>(x); local.prop` (or bind multiple props into a typed local).**
+  - **`as unknown as X` (TypeScript narrowing forces it through `unknown`)** → preserved as-is. Do **not** translate to `blindCast<T, "Reason">` — the reason-string maintenance outweighs the safety in tests. Operator has elevated this preference.
+  - **`as const`** → preserved (rule-exempt; correct usage).
+- **Companion fixes (same commit):**
+  - README L26: update prose to reflect SPI carries reads now.
+  - `columns.test.ts` × 2: collapse `it('text() returns ...')` / `it('int4() returns ...')` per-helper assertions into a single `it('column helpers return expected shape')` with `toEqual` over a literals object.
+- **Composer constraints:**
+  - **One commit.** Subject: `chore(test): clean up bare as casts in slice 2 test files + README L26 + column-helper test simplification (TML-2753)`.
+  - **Do not touch production code.** This dispatch is test files + one README only.
+  - **Do not touch `marker-ledger-writes.test.ts`** — D11 will rewrite that test as part of the methods-on-class move. (Avoids merge conflict; D11's rewrite supersedes any cast cleanup here.)
+  - **Note on `as unknown as` at table.test.ts:767 and columns.test.ts:2139:** both are TypeScript-narrowing-forced (discriminated union `onConflict.action`). Leave them as `as unknown as`; don't try to narrow with `if (action.kind === ...)` unless the narrowing falls out trivially.
+- **Stop conditions:**
+  - If a production file (non-test, non-README) has a bare `as` cast in the slice diff, surface it — that's an actual `no-bare-casts` rule violation worth a separate dispatch (not bundled here).
+
+### Validation gate for D11 + D12 + D13 (in addition to the all-dispatches gate above)
+
+- `pnpm typecheck` clean.
+- `pnpm fixtures:check` byte-identical (refactor + deletion; no lowered-SQL change).
+- `pnpm test:packages` filtered to `@prisma-next/relational-core` + `@prisma-next/family-sql` + `@prisma-next/adapter-postgres` + `@prisma-next/adapter-sqlite` + `@prisma-next/mongo-adapter` + `@prisma-next/target-postgres` + `@prisma-next/target-sqlite` + `@prisma-next/sql-runtime`.
+- `pnpm test:integration` (covers the integration-test consumers of the deleted `ensure*Statement` helpers).
+- **D11 grep:** `rg 'markerLedger\.(readMarker|insertMarker|initMarker|updateMarker|writeLedgerEntry)' packages/` returns zero.
+- **D12 grep (file existence):** `ls packages/2-sql/5-runtime/src/sql-marker.ts packages/3-targets/3-targets/{postgres,sqlite}/src/core/migrations/statement-builders.ts 2>&1 | grep -c 'No such'` returns 3.
+- **D12 grep (SqlStatement):** `rg 'SqlStatement' packages/ test/` returns zero.
+- **D13 grep (bare casts):** `rg -nE '\bas\s+[A-Z][A-Za-z]*\b' packages/2-sql/4-lanes/relational-core/test/contract-free/table.test.ts packages/3-targets/3-targets/postgres/test/contract-free/columns.test.ts packages/3-targets/3-targets/sqlite/test/contract-free/columns.test.ts packages/3-targets/6-adapters/postgres/test/control-adapter.test.ts | rg -v 'as const|as unknown as'` returns zero.
+
+_Sequencing: D11 + D12 + D13 in parallel (different file sets); babysit consolidates after all three review SATISFIED; final PR re-review + merge._
