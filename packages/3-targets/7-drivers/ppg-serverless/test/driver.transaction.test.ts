@@ -45,7 +45,7 @@ describe('@prisma-next/driver-ppg-serverless / transaction', () => {
       await connection.release();
     });
 
-    it('routes execute / query / executePrepared through the same held session', async () => {
+    it('routes execute and query through the same held session', async () => {
       const fake = makeFakeClient(
         withTxnControlStatements(() => ({ columns: [col('x')], rows: [row(1)] })),
       );

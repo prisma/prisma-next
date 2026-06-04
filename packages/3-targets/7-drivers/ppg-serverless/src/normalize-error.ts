@@ -58,13 +58,19 @@ export function normalizePpgError(error: unknown): SqlQueryError | SqlConnection
   return new Error(String(error));
 }
 
-// Conservative: a missing or unknown code is non-transient (callers retrying
-// on `transient: true` must have evidence the failure is recoverable). 1000
-// (normal) and 1001 (going away) are clean closures; treat as non-transient
-// if seen as errors. Anything else (1006 abnormal, 1011 server, 1012/1013
-// restart/try-again-later, 1014 bad gateway, …) is retryable.
+// Per RFC 6455: only server-side / temporary closure codes are retryable.
+// Protocol / policy / data-shape codes (1002, 1003, 1007, 1008, 1009, 1010)
+// won't succeed on retry without the caller changing something, so they are
+// non-transient. Unknown / missing codes are conservatively non-transient.
 function isTransientWebSocketClosure(code: number | undefined): boolean {
-  if (code === undefined) return false;
-  if (code === 1000 || code === 1001) return false;
-  return true;
+  switch (code) {
+    case 1006: // abnormal closure
+    case 1011: // internal server error
+    case 1012: // service restart
+    case 1013: // try again later
+    case 1014: // bad gateway
+      return true;
+    default:
+      return false;
+  }
 }

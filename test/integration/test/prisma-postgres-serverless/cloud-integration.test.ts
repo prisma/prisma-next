@@ -212,12 +212,12 @@ describe.skipIf(!SERVICE_TOKEN)('prisma-postgres-serverless / cloud ORM round-tr
   it('rolls back a transaction on thrown error', async () => {
     if (!db) throw new Error('db not initialised — beforeAll failed');
     const carolId = randomUUID();
-    await db
-      .transaction(async (tx) => {
+    await expect(
+      db.transaction(async (tx) => {
         await tx.orm.Item.create({ id: carolId, name: 'carol' });
         throw new Error('intentional rollback');
-      })
-      .catch(() => {});
+      }),
+    ).rejects.toThrow('intentional rollback');
 
     const rows = await db.orm.Item.all();
     const names = rows.map((row) => row.name).sort();

@@ -28,7 +28,10 @@ const ALREADY_CONNECTED_MESSAGE =
   'driver-ppg-serverless: driver already connected. Call close() before reconnecting with a new binding.';
 
 interface DriverRuntimeError extends Error {
-  readonly code: 'DRIVER.NOT_CONNECTED' | 'DRIVER.ALREADY_CONNECTED';
+  readonly code:
+    | 'DRIVER.NOT_CONNECTED'
+    | 'DRIVER.ALREADY_CONNECTED'
+    | 'DRIVER.EXPLAIN_NOT_SUPPORTED';
   readonly category: 'RUNTIME';
   readonly severity: 'error';
   readonly details?: Record<string, unknown>;
@@ -155,7 +158,10 @@ class PpgServerlessUnboundDriverImpl implements PpgServerlessRuntimeDriver {
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
     const delegate = this.#requireDelegate();
     if (delegate.explain === undefined) {
-      throw driverError('DRIVER.NOT_CONNECTED', USE_BEFORE_CONNECT_MESSAGE);
+      throw driverError(
+        'DRIVER.EXPLAIN_NOT_SUPPORTED',
+        'driver-ppg-serverless: explain is not supported by this driver.',
+      );
     }
     return delegate.explain(request);
   }

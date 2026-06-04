@@ -202,7 +202,7 @@ flowchart TD
 
 ## Related Docs
 
-- Architecture: [`docs/Architecture Overview.md`](../../docs/Architecture%20Overview.md)
-- Subsystem: [`docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md`](../../docs/architecture%20docs/subsystems/4.%20Runtime%20%26%20Middleware%20Framework.md)
-- Subsystem: [`docs/architecture docs/subsystems/5. Adapters & Targets.md`](../../docs/architecture%20docs/subsystems/5.%20Adapters%20%26%20Targets.md)
-- ADR: [`docs/architecture docs/adrs/ADR 207 - Per-environment facade asymmetry.md`](../../docs/architecture%20docs/adrs/ADR%20207%20-%20Per-environment%20facade%20asymmetry.md)
+- Architecture: [`docs/Architecture Overview.md`](../../../docs/Architecture%20Overview.md)
+- Subsystem: [`docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md`](../../../docs/architecture%20docs/subsystems/4.%20Runtime%20%26%20Middleware%20Framework.md)
+- Subsystem: [`docs/architecture docs/subsystems/5. Adapters & Targets.md`](../../../docs/architecture%20docs/subsystems/5.%20Adapters%20%26%20Targets.md)
+- ADR: [`docs/architecture docs/adrs/ADR 207 - Per-environment facade asymmetry.md`](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Per-environment%20facade%20asymmetry.md)

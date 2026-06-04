@@ -236,7 +236,7 @@ export default function prismaPostgresServerless<TContract extends Contract<SqlS
 
       if (binding === undefined) {
         throw new Error(
-          'Prisma Postgres serverless binding not configured. Pass binding to runtime(...) or call db.connect(binding).',
+          'Prisma Postgres serverless binding not configured. Pass binding in prismaPostgresServerless(...) options or call db.connect(binding).',
         );
       }
 

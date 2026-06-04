@@ -23,8 +23,9 @@ export type PpgBinding =
  * Reserved for a future codec-customisation hook. `descriptor.create` keeps
  * its option-bag arity so adding a field later does not break callers.
  */
-// biome-ignore lint/suspicious/noEmptyInterface: reserved future surface
-export interface PpgServerlessDriverCreateOptions {}
+export type PpgServerlessDriverCreateOptions = {
+  readonly _reservedForFutureCodecCustomisation?: never;
+};
 
 interface DriverRuntimeError extends Error {
   readonly code: 'DRIVER.CLOSED' | 'DRIVER.CONNECTION_RELEASED';
