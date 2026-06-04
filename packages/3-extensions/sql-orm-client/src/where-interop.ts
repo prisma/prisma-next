@@ -6,6 +6,7 @@ import { bindWhereExpr } from './where-binding';
 
 interface NormalizeWhereArgOptions {
   readonly contract?: Contract<SqlStorage>;
+  readonly namespaceId?: string | undefined;
 }
 
 export function normalizeWhereArg(arg: undefined): undefined;
@@ -33,7 +34,7 @@ export function normalizeWhereArg(
   }
 
   if (options?.contract) {
-    return bindWhereExpr(options.contract, arg);
+    return bindWhereExpr(options.contract, arg, options.namespaceId);
   }
   return arg;
 }

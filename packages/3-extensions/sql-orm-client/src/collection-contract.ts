@@ -487,8 +487,12 @@ export function resolveModelTableName(
   throw new Error(`Model "${modelName}" has invalid or missing storage.table in the contract`);
 }
 
-export function resolvePrimaryKeyColumn(contract: Contract<SqlStorage>, tableName: string): string {
-  const resolved = resolveTableForContract(contract, tableName);
+export function resolvePrimaryKeyColumn(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+  namespaceId?: string,
+): string {
+  const resolved = resolveTableForContract(contract, tableName, namespaceId);
   return resolved?.table.primaryKey?.columns[0] ?? 'id';
 }
 

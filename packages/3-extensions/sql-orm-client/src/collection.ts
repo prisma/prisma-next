@@ -295,7 +295,10 @@ export class Collection<
         : isWhereDirectInput(input)
           ? input
           : shorthandToWhereExpr(this.ctx.context, this.modelName, input, this.namespaceId);
-    const filter = normalizeWhereArg(whereArg, { contract: this.contract });
+    const filter = normalizeWhereArg(whereArg, {
+      contract: this.contract,
+      namespaceId: this.namespaceId,
+    });
 
     if (!filter) {
       return this as Collection<TContract, ModelName, Row, WithWhereState<State>>;
@@ -1287,6 +1290,7 @@ export class Collection<
         this.tableName,
         mappedRows,
         selectedForInsert,
+        this.namespaceId,
       ).map((plan) => mergeAnnotations(plan, annotationsMap));
       return dispatchSplitMutationRows<Row>({
         contract: this.contract,
@@ -1303,7 +1307,13 @@ export class Collection<
     }
 
     const compiled = mergeAnnotations(
-      compileInsertReturning(this.contract, this.tableName, mappedRows, selectedForInsert),
+      compileInsertReturning(
+        this.contract,
+        this.tableName,
+        mappedRows,
+        selectedForInsert,
+        this.namespaceId,
+      ),
       annotationsMap,
     );
     return dispatchMutationRows<Row>({
@@ -1366,6 +1376,7 @@ export class Collection<
     const runtime = collectionCtx.runtime;
     const tableName = this.tableName;
     const modelName = this.modelName;
+    const namespaceId = this.namespaceId;
 
     const baseFieldColumns = new Set(Object.values(baseFieldToColumn));
     const variantFieldColumns = new Set(Object.values(variantFieldToColumn));
@@ -1394,7 +1405,13 @@ export class Collection<
 
         const merged = await withMutationScope(runtime, async (scope) => {
           applyCreateDefaults(collectionCtx, tableName, [baseRow]);
-          const baseCompiled = compileInsertReturning(contract, tableName, [baseRow], undefined);
+          const baseCompiled = compileInsertReturning(
+            contract,
+            tableName,
+            [baseRow],
+            undefined,
+            namespaceId,
+          );
           const baseResult = await executeQueryPlan<Record<string, unknown>>(
             scope,
             baseCompiled,
@@ -1412,6 +1429,7 @@ export class Collection<
             variant.table,
             [variantRow],
             undefined,
+            namespaceId,
           );
           const variantResult = await executeQueryPlan<Record<string, unknown>>(
             scope,
@@ -1522,9 +1540,12 @@ export class Collection<
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
 
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
-      const plans = compileInsertCountSplit(this.contract, this.tableName, mappedRows).map((plan) =>
-        mergeAnnotations(plan, annotationsMap),
-      );
+      const plans = compileInsertCountSplit(
+        this.contract,
+        this.tableName,
+        mappedRows,
+        this.namespaceId,
+      ).map((plan) => mergeAnnotations(plan, annotationsMap));
       for (const plan of plans) {
         await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, plan).toArray();
       }
@@ -1532,7 +1553,7 @@ export class Collection<
     }
 
     const compiled = mergeAnnotations(
-      compileInsertCount(this.contract, this.tableName, mappedRows),
+      compileInsertCount(this.contract, this.tableName, mappedRows, this.namespaceId),
       annotationsMap,
     );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
@@ -1615,6 +1636,7 @@ export class Collection<
         updateValues,
         conflictColumns,
         selectedForUpsert,
+        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -1799,6 +1821,7 @@ export class Collection<
         mappedData,
         this.state.filters,
         selectedForUpdate,
+        this.namespaceId,
       ),
       annotationsMap,
     );
@@ -1849,20 +1872,36 @@ export class Collection<
     // Annotations attach to the write, not the matching read.
     const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'updateCount');
 
-    const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
+    const primaryKeyColumn = resolvePrimaryKeyColumn(
+      this.contract,
+      this.tableName,
+      this.namespaceId,
+    );
     const countState: CollectionState = {
       ...emptyState(),
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
     };
-    const countCompiled = compileSelect(this.contract, this.tableName, countState);
+    const countCompiled = compileSelect(
+      this.contract,
+      this.tableName,
+      countState,
+      undefined,
+      this.namespaceId,
+    );
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
       countCompiled,
     ).toArray();
 
     const compiled = mergeAnnotations(
-      compileUpdateCount(this.contract, this.tableName, mappedData, this.state.filters),
+      compileUpdateCount(
+        this.contract,
+        this.tableName,
+        mappedData,
+        this.state.filters,
+        this.namespaceId,
+      ),
       annotationsMap,
     );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
@@ -1949,7 +1988,13 @@ export class Collection<
 
     const { selectedForQuery: selectedForDelete, hiddenColumns } = this.#augmentMutationSelection();
     const compiled = mergeAnnotations(
-      compileDeleteReturning(this.contract, this.tableName, this.state.filters, selectedForDelete),
+      compileDeleteReturning(
+        this.contract,
+        this.tableName,
+        this.state.filters,
+        selectedForDelete,
+        this.namespaceId,
+      ),
       annotationsMap,
     );
     return dispatchMutationRows<Row>({
@@ -1994,7 +2039,12 @@ export class Collection<
           namespaceId: collection.namespaceId,
         }).toArray();
         const deletePlan = mergeAnnotations(
-          compileDeleteCount(collection.contract, collection.tableName, collection.state.filters),
+          compileDeleteCount(
+            collection.contract,
+            collection.tableName,
+            collection.state.filters,
+            collection.namespaceId,
+          ),
           annotationsMap,
         );
         await executeQueryPlan<Record<string, unknown>>(scope, deletePlan).toArray();
@@ -2026,20 +2076,30 @@ export class Collection<
     // Annotations attach to the write, not the matching read.
     const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'deleteCount');
 
-    const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
+    const primaryKeyColumn = resolvePrimaryKeyColumn(
+      this.contract,
+      this.tableName,
+      this.namespaceId,
+    );
     const countState: CollectionState = {
       ...emptyState(),
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
     };
-    const countCompiled = compileSelect(this.contract, this.tableName, countState);
+    const countCompiled = compileSelect(
+      this.contract,
+      this.tableName,
+      countState,
+      undefined,
+      this.namespaceId,
+    );
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
       countCompiled,
     ).toArray();
 
     const compiled = mergeAnnotations(
-      compileDeleteCount(this.contract, this.tableName, this.state.filters),
+      compileDeleteCount(this.contract, this.tableName, this.state.filters, this.namespaceId),
       annotationsMap,
     );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();

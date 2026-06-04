@@ -239,7 +239,14 @@ export class InsertQueryImpl<
     }
 
     const paramRows = this.#rows.map((rowValues) =>
-      buildParamValues(rowValues, this.#table, this.#tableName, 'create', this.ctx),
+      buildParamValues(
+        rowValues,
+        this.#table,
+        this.#tableName,
+        'create',
+        this.ctx,
+        this.#tableSource.namespaceId,
+      ),
     );
 
     let ast = InsertAst.into(this.#tableSource).withRows(paramRows);
