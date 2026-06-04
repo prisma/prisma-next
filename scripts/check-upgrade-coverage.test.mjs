@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import {
   coverageTransitionChain,
   inFlightTransitionLabel,
+  parseChangesFrontmatter,
   parseTransitionFromPath,
   parseVersion,
 } from './check-upgrade-coverage.mjs';
@@ -607,5 +608,148 @@ describe('check-upgrade-coverage — in-flight minor source-of-truth', () => {
     assert.notEqual(b.status, 0);
     assert.match(b.stderr, /upgrades\/0\.6-to-0\.7/);
     assert.match(b.stderr, /upgrades\/0\.7-to-0\.8/);
+  });
+});
+
+describe('parseChangesFrontmatter', () => {
+  it('returns an empty array for inline changes: []', () => {
+    const result = parseChangesFrontmatter('---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n');
+    assert.deepEqual(result, { ok: true, changes: [] });
+  });
+
+  it('returns a non-empty array for a block-sequence changes list', () => {
+    const result = parseChangesFrontmatter(
+      '---\nfrom: "0.10"\nto: "0.11"\nchanges:\n  - id: foo\n    summary: bar\n---\n',
+    );
+    assert.deepEqual(result, { ok: true, changes: [{ id: 'foo' }] });
+  });
+
+  it('returns ok:false when changes key is absent', () => {
+    const result = parseChangesFrontmatter('---\nfrom: "0.7"\nto: "0.8"\n---\n');
+    assert.equal(result.ok, false);
+  });
+
+  it('returns ok:false when the frontmatter block is missing entirely', () => {
+    const result = parseChangesFrontmatter('# No frontmatter here\n');
+    assert.equal(result.ok, false);
+  });
+});
+
+describe('check-upgrade-coverage — per-PR correspondence rule', () => {
+  it('substrate touched + in-flight instructions.md NOT in diff → violation', () => {
+    writePackageJson('0.7.0');
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    commitAll('prev — directory already exists');
+    const prev = git('rev-parse', 'HEAD');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 2;\n');
+    commitAll('head — substrate touched but instructions.md unchanged');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /per-pr-declaration/);
+    assert.match(
+      result.stderr,
+      /skills\/upgrade\/prisma-next-upgrade\/upgrades\/0\.7-to-0\.8\/instructions\.md/,
+    );
+  });
+
+  it('substrate touched + instructions.md in diff with non-empty changes[] → pass', () => {
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 2;\n');
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges:\n  - id: my-change\n    summary: Some migration step.\n---\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+
+  it('substrate touched + instructions.md in diff with changes: [] → pass (incidental diff)', () => {
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 2;\n');
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+
+  it('substrate NOT touched → no per-PR-declaration requirement (no false positive)', () => {
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writeRepoFile('docs/notes.md', 'unrelated\n');
+    commitAll('head — no substrate diff');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+
+  it('both clusters touched → each independently requires its own declaration', () => {
+    // Both transition directories exist before this PR (committed in prev),
+    // so the directory-existence coverage check passes. The per-PR
+    // correspondence check then fires independently for each cluster.
+    writePackageJson('0.7.0');
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'skills/extension-author/prisma-next-extension-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    commitAll('prev — both directories already exist');
+    const prev = git('rev-parse', 'HEAD');
+
+    // Both substrates changed but only user-skill instructions.md updated.
+    writeRepoFile('examples/demo/src/main.ts', 'b\n');
+    writeRepoFile('packages/3-extensions/pgvector/src/main.ts', 'b\n');
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\nupdated\n',
+    );
+    commitAll('head — only user-skill instructions.md updated');
+    const missingExt = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(missingExt.status, 0);
+    assert.match(missingExt.stderr, /per-pr-declaration/);
+    assert.match(
+      missingExt.stderr,
+      /skills\/extension-author\/prisma-next-extension-upgrade\/upgrades\/0\.7-to-0\.8\/instructions\.md/,
+    );
+    assert.doesNotMatch(
+      missingExt.stderr,
+      /skills\/upgrade\/prisma-next-upgrade\/upgrades\/0\.7-to-0\.8\/instructions\.md/,
+    );
+
+    writeRepoFile(
+      'skills/extension-author/prisma-next-extension-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\nupdated\n',
+    );
+    commitAll('head — both instructions.md updated');
+    const both = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(both.status, 0, `expected exit 0; stderr=${both.stderr}`);
+  });
+
+  it('instructions.md in diff but changes key absent → violation', () => {
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 2;\n');
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\n---\n',
+    );
+    commitAll('head — instructions.md missing changes key');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /per-pr-declaration/);
   });
 });
