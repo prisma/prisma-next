@@ -1,6 +1,6 @@
 import { defineConfig } from '@prisma-next/postgres/config';
 
 export default defineConfig({
-  contract: './schema.prisma',
+  contract: './contract.prisma',
   outputPath: 'generated',
 });
