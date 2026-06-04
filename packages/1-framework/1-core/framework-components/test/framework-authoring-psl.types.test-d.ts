@@ -4,7 +4,9 @@
  * load-bearing property: a pack literal that declares the matching
  * descriptors with `as const satisfies` produces a parser whose
  * `Output` type is the same AST node shape its printer's `Input`
- * consumes and its factory's `Input` accepts.
+ * consumes and its factory's `Input` accepts. The parser's
+ * `Output` is also constrained to extend `PslPackBlock` so the
+ * framework AST slot can hold it.
  *
  * Ref: TML-2804.
  */
@@ -15,13 +17,12 @@ import type {
   AuthoringPslBlockNamespace,
   AuthoringPslPrinterNamespace,
 } from '../src/shared/framework-authoring';
+import type { PslPackBlock, PslPackBlockParserContext } from '../src/shared/psl-substrate';
 
-type FixtureAst = {
+interface FixtureAst extends PslPackBlock {
   readonly kind: 'fixture-block';
-  readonly name: string;
-  readonly span: { readonly start: number; readonly end: number };
   readonly predicate: string;
-};
+}
 
 type FixtureInput = {
   readonly name: string;
@@ -32,10 +33,10 @@ const fixturePslBlocks = {
   fixture: {
     kind: 'pslBlock',
     discriminator: 'fixture-block',
-    parser: (_context: unknown, _bounds: unknown): FixtureAst => ({
+    parser: (ctx: PslPackBlockParserContext): FixtureAst => ({
       kind: 'fixture-block',
-      name: '',
-      span: { start: 0, end: 0 },
+      name: ctx.name,
+      span: ctx.lineRangeSpan(ctx.bounds.startLine, ctx.bounds.endLine),
       predicate: '',
     }),
   },
@@ -57,7 +58,10 @@ const fixtureEntityTypes = {
       factory: (_input: FixtureInput): FixtureAst => ({
         kind: 'fixture-block',
         name: '',
-        span: { start: 0, end: 0 },
+        span: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 0, line: 1, column: 1 },
+        },
         predicate: '',
       }),
     },
@@ -70,7 +74,7 @@ test('parser Output narrows to AST shape consumed by printer Input', () => {
 
   expectTypeOf<ParserOutput>().toEqualTypeOf<FixtureAst>();
   expectTypeOf<PrinterInput>().toEqualTypeOf<FixtureAst>();
-  expectTypeOf<ParserOutput>().toMatchTypeOf<PrinterInput>();
+  expectTypeOf<ParserOutput>().toExtend<PrinterInput>();
 });
 
 test('parser Output narrows to AST shape produced by entityTypes factory', () => {
@@ -78,6 +82,11 @@ test('parser Output narrows to AST shape produced by entityTypes factory', () =>
   type FactoryOutput = ReturnType<typeof fixtureEntityTypes.fixture.output.factory>;
 
   expectTypeOf<ParserOutput>().toEqualTypeOf<FactoryOutput>();
+});
+
+test('parser Output extends PslPackBlock so it fits the AST packBlocks slot', () => {
+  type ParserOutput = ReturnType<typeof fixturePslBlocks.fixture.parser>;
+  expectTypeOf<ParserOutput>().toExtend<PslPackBlock>();
 });
 
 test('discriminator strings carry as literal types', () => {

@@ -1,28 +1,15 @@
-export interface PslPosition {
-  readonly offset: number;
-  readonly line: number;
-  readonly column: number;
-}
+import type { AuthoringPslBlockNamespace } from '../shared/framework-authoring';
+import type { PslDiagnosticCode, PslPackBlock, PslSpan } from '../shared/psl-substrate';
 
-export interface PslSpan {
-  readonly start: PslPosition;
-  readonly end: PslPosition;
-}
-
-export type PslDiagnosticCode =
-  | 'PSL_UNTERMINATED_BLOCK'
-  | 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK'
-  | 'PSL_INVALID_NAMESPACE_BLOCK'
-  | 'PSL_INVALID_ATTRIBUTE_SYNTAX'
-  | 'PSL_INVALID_MODEL_MEMBER'
-  | 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE'
-  | 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE'
-  | 'PSL_INVALID_RELATION_ATTRIBUTE'
-  | 'PSL_INVALID_REFERENTIAL_ACTION'
-  | 'PSL_INVALID_DEFAULT_VALUE'
-  | 'PSL_INVALID_ENUM_MEMBER'
-  | 'PSL_INVALID_TYPES_MEMBER'
-  | 'PSL_INVALID_QUALIFIED_TYPE';
+export type {
+  PslDiagnosticCode,
+  PslPackBlock,
+  PslPackBlockBounds,
+  PslPackBlockDiagnostic,
+  PslPackBlockParserContext,
+  PslPosition,
+  PslSpan,
+} from '../shared/psl-substrate';
 
 export interface PslDiagnostic {
   readonly code: PslDiagnosticCode;
@@ -203,6 +190,16 @@ export interface PslNamespace {
   readonly models: readonly PslModel[];
   readonly enums: readonly PslEnum[];
   readonly compositeTypes: readonly PslCompositeType[];
+  /**
+   * Pack-contributed top-level blocks parsed inside this namespace.
+   * The slot is always present (defaults to `[]` when no
+   * contributed-keyword blocks land here). Order matches source
+   * order within the namespace; pack-contributed and built-in
+   * blocks live in their own slots, so a namespace mixing
+   * `model X { … }` and `policy Y { … }` keeps the model in
+   * `models` and the policy in `packBlocks`.
+   */
+  readonly packBlocks: readonly PslPackBlock[];
   readonly span: PslSpan;
 }
 
@@ -239,6 +236,17 @@ export function flatPslCompositeTypes(ast: PslDocumentAst): readonly PslComposit
 export interface ParsePslDocumentInput {
   readonly schema: string;
   readonly sourceId: string;
+  /**
+   * Pack-contributed parser contributions, indexed by the top-level
+   * keyword the parser dispatches on. Typically an
+   * `AssembledAuthoringContributions.pslBlocks` namespace produced by
+   * `assembleAuthoringContributions` — but the parser only consumes
+   * the structural shape, so callers may pass a hand-rolled namespace
+   * (e.g. test fixtures). When absent or empty, the parser surfaces
+   * the existing `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` diagnostic for any
+   * unrecognised top-level keyword.
+   */
+  readonly pslBlocks?: AuthoringPslBlockNamespace;
 }
 
 export interface ParsePslDocumentResult {

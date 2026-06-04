@@ -10,6 +10,7 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
+import type { PslPackBlock, PslPackBlockParserContext } from './psl-substrate';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -159,22 +160,24 @@ export type AuthoringEntityTypeNamespace = {
 };
 
 /**
- * Pack-contributed parser for a top-level PSL block keyword.
+ * Pack-contributed parser for a top-level PSL block keyword. The
+ * framework parser dispatches an unrecognised opener line of the
+ * shape `<keyword> <name> { … }` to the `pslBlocks.<keyword>`
+ * contribution, building a {@link PslPackBlockParserContext} handle
+ * from the framework's parser state and passing it as the sole
+ * argument. The contribution returns the AST node the lowering
+ * factory and matching `pslPrinters` descriptor consume — the
+ * `Output` generic narrows that shape end to end across the triple
+ * bundle (parser → printer → factory) keyed by `discriminator`.
  *
- * The `context` and `bounds` parameters are typed `unknown` here as a
- * placeholder for D1 of the substrate slice — the parser SPI is
- * extracted in D2, at which point `context` becomes the parser-context
- * handle (token cursor, source text, diagnostic sink) and `bounds`
- * becomes the brace-delimited block bounds. What's load-bearing today
- * is the `Output` generic narrowing to the AST node shape the matching
- * `pslPrinters` descriptor consumes and the matching `entityTypes`
- * factory hydrates — the three contributions form a triple bundle
- * keyed by a shared `discriminator` string.
+ * The context handle is intentionally minimal — only the helpers
+ * needed to write a parser for a `keyword Name { key = value }`
+ * block. See `PslPackBlockParserContext`'s JSDoc for the calibration.
  */
-export interface AuthoringPslBlockDescriptor<Output = unknown> {
+export interface AuthoringPslBlockDescriptor<Output extends PslPackBlock = PslPackBlock> {
   readonly kind: 'pslBlock';
   readonly discriminator: string;
-  readonly parser: (context: unknown, bounds: unknown) => Output;
+  readonly parser: (context: PslPackBlockParserContext) => Output;
   readonly validatorSchema?: Type<unknown>;
 }
 
