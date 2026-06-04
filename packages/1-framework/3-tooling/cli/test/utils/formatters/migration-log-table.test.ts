@@ -161,6 +161,24 @@ describe('renderMigrationLogTable', () => {
     expect(renderMigrationLogTable([])).toBe('');
   });
 
+  it('uses ASCII glyphs when glyph mode is ascii', () => {
+    const table = renderMigrationLogTable(
+      [
+        entry({
+          migrationName: '20260301_init',
+          from: null,
+          to: 'sha256:ef9de27abc',
+          appliedAt: new Date('2026-06-01T08:00:00.000Z'),
+        }),
+      ],
+      { utc: true, glyphMode: 'ascii' },
+    );
+    expect(table).toContain('- -> ef9de27');
+    expect(table).not.toContain(MIGRATION_LIST_FORWARD_EDGE_GLYPH);
+    expect(table).not.toContain(MIGRATION_LIST_EMPTY_SOURCE);
+    expect(table).not.toContain('─');
+  });
+
   it('uses UTC timestamps when utc is true', () => {
     const table = renderMigrationLogTable(
       [entry({ migrationName: '20260301_init', appliedAt: new Date('2026-06-01T08:00:00.000Z') })],

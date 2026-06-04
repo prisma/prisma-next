@@ -1,9 +1,10 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import stringWidth from 'string-width';
+import type { GlyphMode } from '../glyph-mode';
 import {
   abbreviateContractHash,
-  MIGRATION_LIST_EMPTY_SOURCE,
-  MIGRATION_LIST_FORWARD_EDGE_GLYPH,
+  migrationListEmptySource,
+  migrationListForwardArrow,
 } from './migration-list-data-column';
 import { IDENTITY_MIGRATION_LIST_STYLER, type MigrationListStyler } from './migration-list-render';
 
@@ -12,6 +13,7 @@ export type LedgerTimestampMode = 'local' | 'utc' | 'iso';
 export interface RenderMigrationLogTableOptions {
   readonly utc?: boolean;
   readonly styler?: MigrationListStyler;
+  readonly glyphMode?: GlyphMode;
 }
 
 export interface SerializedLedgerEntryRecord {
@@ -31,6 +33,7 @@ const HEADING_CHANGE = 'Change';
 const HEADING_OPS = 'Ops';
 const COLUMN_SEPARATOR = ' ';
 const DIVIDER_CHAR = '─';
+const ASCII_DIVIDER_CHAR = '-';
 
 export function sortLedgerEntries(entries: readonly LedgerEntryRecord[]): LedgerEntryRecord[] {
   return [...entries].sort((left, right) => {
@@ -65,27 +68,32 @@ export function formatLedgerAppliedAt(date: Date, mode: LedgerTimestampMode): st
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())} ${sign}${offsetHours}:${offsetMins}`;
 }
 
-export function formatHashEndpoint(hash: string | null): string {
+export function formatHashEndpoint(hash: string | null, glyphMode: GlyphMode = 'unicode'): string {
   if (hash === null) {
-    return MIGRATION_LIST_EMPTY_SOURCE;
+    return migrationListEmptySource(glyphMode);
   }
   return abbreviateContractHash(hash);
 }
 
-export function formatHashTransition(from: string | null, to: string): string {
-  return `${formatHashEndpoint(from)} ${MIGRATION_LIST_FORWARD_EDGE_GLYPH} ${abbreviateContractHash(to)}`;
+export function formatHashTransition(
+  from: string | null,
+  to: string,
+  glyphMode: GlyphMode = 'unicode',
+): string {
+  return `${formatHashEndpoint(from, glyphMode)} ${migrationListForwardArrow(glyphMode)} ${abbreviateContractHash(to)}`;
 }
 
 export function styleHashTransition(
   from: string | null,
   to: string,
   styler: MigrationListStyler,
+  glyphMode: GlyphMode = 'unicode',
 ): string {
   const fromPart =
     from === null
-      ? styler.glyph(MIGRATION_LIST_EMPTY_SOURCE)
+      ? styler.glyph(migrationListEmptySource(glyphMode))
       : styler.sourceHash(abbreviateContractHash(from));
-  const arrow = styler.glyph(MIGRATION_LIST_FORWARD_EDGE_GLYPH);
+  const arrow = styler.glyph(migrationListForwardArrow(glyphMode));
   const dest = styler.destHash(abbreviateContractHash(to));
   return `${fromPart} ${arrow} ${dest}`;
 }
@@ -99,8 +107,8 @@ function columnWidth(values: readonly string[]): number {
   return values.reduce((max, value) => Math.max(max, stringWidth(value)), 0);
 }
 
-function padDividerCell(valueWidth: number): string {
-  return DIVIDER_CHAR.repeat(valueWidth + 2);
+function padDividerCell(valueWidth: number, dividerChar: string): string {
+  return dividerChar.repeat(valueWidth + 2);
 }
 
 function padTextCell(value: string, valueWidth: number): string {
@@ -122,13 +130,15 @@ export function renderMigrationLogTable(
   }
 
   const styler = options.styler ?? IDENTITY_MIGRATION_LIST_STYLER;
+  const glyphMode = options.glyphMode ?? 'unicode';
+  const dividerChar = glyphMode === 'ascii' ? ASCII_DIVIDER_CHAR : DIVIDER_CHAR;
   const showSpace = new Set(sorted.map((entry) => entry.space)).size > 1;
   const timestampMode: LedgerTimestampMode = options.utc ? 'utc' : 'local';
   const rows = sorted.map((entry) => ({
     appliedAt: formatLedgerAppliedAt(entry.appliedAt, timestampMode),
     space: entry.space,
     migrationName: entry.migrationName,
-    transition: formatHashTransition(entry.from, entry.to),
+    transition: formatHashTransition(entry.from, entry.to, glyphMode),
     ops: `${entry.operationCount} ops`,
     from: entry.from,
     to: entry.to,
@@ -151,14 +161,14 @@ export function renderMigrationLogTable(
   );
   const heading = headingParts.join(COLUMN_SEPARATOR);
 
-  const dividerParts = [padDividerCell(appliedAtWidth)];
+  const dividerParts = [padDividerCell(appliedAtWidth, dividerChar)];
   if (showSpace) {
-    dividerParts.push(padDividerCell(spaceWidth));
+    dividerParts.push(padDividerCell(spaceWidth, dividerChar));
   }
   dividerParts.push(
-    padDividerCell(nameWidth),
-    padDividerCell(transitionWidth),
-    padDividerCell(opsWidth),
+    padDividerCell(nameWidth, dividerChar),
+    padDividerCell(transitionWidth, dividerChar),
+    padDividerCell(opsWidth, dividerChar),
   );
   const divider = dividerParts.map((cell) => styler.summary(cell)).join(COLUMN_SEPARATOR);
 
@@ -169,7 +179,7 @@ export function renderMigrationLogTable(
     }
     parts.push(
       padTextCell(styler.dirName(row.migrationName), nameWidth),
-      padTextCell(styleHashTransition(row.from, row.to, styler), transitionWidth),
+      padTextCell(styleHashTransition(row.from, row.to, styler, glyphMode), transitionWidth),
       padOpsCell(row.ops, opsWidth),
     );
     return parts.join(COLUMN_SEPARATOR);

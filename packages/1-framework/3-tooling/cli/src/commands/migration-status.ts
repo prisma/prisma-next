@@ -76,6 +76,7 @@ interface MigrationStatusOptions extends CommonCommandOptions {
   readonly from?: string;
   readonly space?: string;
   readonly legend?: boolean;
+  readonly ascii?: boolean;
 }
 
 export interface MigrationStatusMigrationEntry extends MigrationListEntry {
@@ -377,7 +378,7 @@ async function executeMigrationStatusCommand(
       ui.stderr(
         renderMigrationGraphLegend({
           colorize: flags.color !== false,
-          glyphMode: ui.resolveGlyphMode(false),
+          glyphMode: ui.resolveGlyphMode(options.ascii === true),
         }),
       );
       ui.stderr('');
@@ -452,7 +453,7 @@ async function executeMigrationStatusCommand(
 
   const showAppliedOverlay = connected && !usingFromOverride;
   const showDbMarker = connected && !usingFromOverride;
-  const glyphMode = ui.resolveGlyphMode(false);
+  const glyphMode = ui.resolveGlyphMode(options.ascii === true);
   const colorize = flags.color !== false;
 
   const statusSpaces: MigrationStatusSpaceResult[] = [];
@@ -662,6 +663,7 @@ export function createMigrationStatusCommand(): Command {
       'Origin contract reference; same grammar as --to. Supplying --from switches to offline path computation.',
     )
     .option('--legend', 'Print a key for the tree glyphs and lane colors')
+    .option('--ascii', 'Use ASCII glyphs (pipe-friendly)')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);

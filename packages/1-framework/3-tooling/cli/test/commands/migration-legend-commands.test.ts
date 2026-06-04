@@ -297,3 +297,36 @@ describe('migration status --legend', () => {
     }
   });
 });
+
+describe('migration status --ascii', () => {
+  it('renders the tree with ASCII glyphs', async () => {
+    const commandMocks = setupCommandMocks();
+    mockConfig();
+    const cwd = await buildFixture();
+    createdDirs.push(cwd);
+    const originalCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      const exitCode = await executeCommand(createMigrationStatusCommand(), [
+        '--ascii',
+        '--from',
+        EMPTY_CONTRACT_HASH,
+        '--no-color',
+      ]);
+      expect(exitCode).toBe(0);
+      const stdout = commandMocks.consoleOutput.join('\n');
+      const migrationLine = stdout
+        .split('\n')
+        .find((line) => line.includes('20260422T0720_initial'));
+      expect(migrationLine).toBeDefined();
+      expect(migrationLine).toContain('|^');
+      expect(migrationLine).toContain('- -> 4cb4256');
+      expect(migrationLine).not.toContain('│↑');
+      expect(migrationLine).not.toContain('→');
+    } finally {
+      process.chdir(originalCwd);
+      commandMocks.cleanup();
+    }
+  });
+});

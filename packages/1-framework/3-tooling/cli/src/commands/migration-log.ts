@@ -37,6 +37,7 @@ interface MigrationLogOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly utc?: boolean;
+  readonly ascii?: boolean;
 }
 
 export interface MigrationLogResult {
@@ -129,6 +130,7 @@ export function createMigrationLogCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--utc', 'Render human timestamps in UTC instead of local time')
+    .option('--ascii', 'Use ASCII glyphs (pipe-friendly)')
     .action(async (options: MigrationLogOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
@@ -145,7 +147,13 @@ export function createMigrationLogCommand(): Command {
             ui.output(MIGRATION_LOG_EMPTY_MESSAGE);
           } else {
             const styler = createAnsiMigrationListStyler({ useColor: ui.useColor });
-            ui.output(renderMigrationLogTable(entries, { utc: options.utc === true, styler }));
+            ui.output(
+              renderMigrationLogTable(entries, {
+                utc: options.utc === true,
+                styler,
+                glyphMode: ui.resolveGlyphMode(options.ascii === true),
+              }),
+            );
           }
         }
       });
