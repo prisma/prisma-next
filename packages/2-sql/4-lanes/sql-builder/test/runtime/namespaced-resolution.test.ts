@@ -47,6 +47,7 @@ type TwoNamespaceDb = {
   public: { users: TableHandle; sessions: undefined };
   auth: { users: TableHandle; sessions: TableHandle };
   users: TableHandle;
+  posts: TableHandle;
 };
 
 function db() {
@@ -72,7 +73,13 @@ describe('namespaced table resolution', () => {
     expect(db().auth.sessions.buildAst().namespaceId).toBe('auth');
   });
 
-  it('keeps the flat surface resolving a bare table name', () => {
-    expect(db().users.buildAst().namespaceId).toBe('public');
+  it('keeps the flat surface resolving a unique bare table name', () => {
+    // `posts` is declared only in `public`, so the flat surface resolves it
+    // unambiguously.
+    expect(db().posts.buildAst().namespaceId).toBe('public');
+  });
+
+  it('throws on flat access to a bare table name shared across namespaces', () => {
+    expect(() => db().users).toThrow(/ambiguous/i);
   });
 });
