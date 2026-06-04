@@ -82,13 +82,21 @@ export function parseChangesFrontmatter(src) {
   }
 
   // Block sequence: `changes:` followed by indented `- ` bullet lines.
-  // Detect entries by their `- ` bullet regardless of which key appears first
-  // on the bullet line (YAML does not mandate `id:` first). The regex captures
-  // bullet lines only (continuation lines are not included by the lazy match);
-  // we count bullets to determine the entry count.
-  const blockMatch = /^changes:\s*\n((?:[ \t]+-[ \t]+[\s\S]*?)*)(?=\n\S|$)/m.exec(fm);
-  if (blockMatch) {
-    const bulletLines = blockMatch[1].split('\n').filter((l) => /^\s+-\s/.test(l));
+  // Walk lines linearly to avoid ReDoS from nested quantifiers on multi-line
+  // patterns. Collect bullet lines after `changes:` until the first non-blank,
+  // non-indented line.
+  const lines = fm.split('\n');
+  const changesIdx = lines.findIndex((l) => /^changes:\s*$/.test(l));
+  if (changesIdx !== -1) {
+    const bulletLines = [];
+    for (let i = changesIdx + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line === '' || /^\s/.test(line)) {
+        if (/^\s+-\s/.test(line)) bulletLines.push(line);
+      } else {
+        break;
+      }
+    }
     if (bulletLines.length > 0) {
       const entries = bulletLines.map((line) => {
         const idMatch = /^\s+-\s+id:\s+(.+)$/.exec(line);
