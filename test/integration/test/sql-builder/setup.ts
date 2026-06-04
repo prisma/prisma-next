@@ -11,12 +11,12 @@ import {
   createSqlExecutionStack,
   type Runtime,
 } from '@prisma-next/sql-runtime';
-import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { blindCast } from '@prisma-next/utils/casts';
 import { Client } from 'pg';
 import { afterAll, beforeAll } from 'vitest';
+import { setupTestDatabase } from '../utils';
 import { contract } from './fixtures/contract';
 import type { Contract } from './fixtures/generated/contract';
 

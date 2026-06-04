@@ -21,6 +21,7 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
+import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
@@ -29,11 +30,6 @@ import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { createResolveExistingEnumValues } from './enum-planning';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
-import {
-  buildLedgerInsertStatement,
-  buildMergeMarkerStatements,
-  type SqlStatement,
-} from './statement-builders';
 
 interface ApplyPlanSuccessValue {
   readonly operationsExecuted: number;
@@ -165,13 +161,9 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       isSelfEdge && applyValue.operationsExecuted === 0 && incomingIsSubsetOfExisting;
 
     if (!isSelfEdgeNoOp) {
-      await this.upsertMarker(driver, options, existingMarker, space);
-      await this.recordLedgerEntries(
-        driver,
-        options,
-        existingMarker,
-        applyValue.executedOperations,
-      );
+      const markerResult = await this.upsertMarker(driver, options, existingMarker, space);
+      if (!markerResult.ok) return markerResult;
+      await this.recordLedgerEntries(driver, options, applyValue.executedOperations);
     }
 
     return runnerSuccess({
@@ -603,36 +595,48 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
     space: string,
-  ): Promise<void> {
-    const incomingInvariants = options.plan.providedInvariants ?? [];
-    const writeStatements = buildMergeMarkerStatements({
-      space,
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    const destination = {
       storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??
         options.destinationContract.profileHash ??
         options.plan.destination.storageHash,
-      contractJson: options.destinationContract,
-      canonicalVersion: null,
-      meta: {},
-      invariants: incomingInvariants,
+      invariants: options.plan.providedInvariants ?? [],
+    };
+    if (!existingMarker) {
+      await this.family.initMarker({ driver, space, destination });
+      return okVoid();
+    }
+    const updated = await this.family.updateMarker({
+      driver,
+      space,
+      expectedFrom: existingMarker.storageHash,
+      destination,
     });
-    const statement = existingMarker ? writeStatements.update : writeStatements.insert;
-    await this.executeStatement(driver, statement);
+    if (!updated) {
+      return runnerFailure(
+        'MARKER_CAS_FAILURE',
+        'Marker was modified by another process during migration execution.',
+        {
+          meta: {
+            space,
+            expectedStorageHash: existingMarker.storageHash,
+            destinationStorageHash: options.plan.destination.storageHash,
+          },
+        },
+      );
+    }
+    return okVoid();
   }
 
   private async recordLedgerEntries(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
-    existingMarker: ContractMarkerRecord | null,
     executedOperations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[],
   ): Promise<void> {
     const plan = options.plan;
     const space = plan.spaceId;
-    const destinationProfileHash =
-      plan.destination.profileHash ??
-      options.destinationContract.profileHash ??
-      plan.destination.storageHash;
     const edges = options.migrationEdges;
     const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
     if (totalEdgeOps !== plan.operations.length) {
@@ -644,31 +648,21 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     // are substituted with skip records (empty `execute`) by `applyPlan`, so the
     // journal reflects what actually ran rather than the raw plan.
     let offset = 0;
-    const lastIndex = edges.length - 1;
-    for (const [i, edge] of edges.entries()) {
+    for (const edge of edges) {
       const edgeOps = executedOperations.slice(offset, offset + edge.operationCount);
       offset += edge.operationCount;
-      const isFirst = i === 0;
-      const isLast = i === lastIndex;
-      await this.executeStatement(
+      await this.family.writeLedgerEntry({
         driver,
-        buildLedgerInsertStatement({
-          space,
+        space,
+        entry: {
+          edgeId: `${edge.from}->${edge.to}`,
+          from: edge.from,
+          to: edge.to,
           migrationName: edge.dirName,
           migrationHash: edge.migrationHash,
-          originStorageHash: edge.from === '' ? null : edge.from,
-          originProfileHash:
-            isFirst && existingMarker?.storageHash === edge.from
-              ? (existingMarker.profileHash ?? null)
-              : null,
-          destinationStorageHash: edge.to,
-          destinationProfileHash:
-            isLast && edge.to === plan.destination.storageHash ? destinationProfileHash : null,
-          contractJsonBefore: isFirst ? (existingMarker?.contractJson ?? null) : null,
-          contractJsonAfter: isLast ? options.destinationContract : null,
           operations: edgeOps,
-        }),
-      );
+        },
+      });
     }
   }
 
@@ -699,7 +693,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
   private async executeStatement(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    statement: SqlStatement,
+    statement: LoweredStatement,
   ): Promise<void> {
     if (statement.params.length > 0) {
       await driver.query(statement.sql, statement.params);

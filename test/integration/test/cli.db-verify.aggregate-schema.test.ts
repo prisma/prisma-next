@@ -8,15 +8,11 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import {
-  ensureSchemaStatement,
-  ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
+import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import testContractSpaceExtension from './contract-space-fixture/control';
+import { bootstrapPostgresSignMarkerTables } from './postgres-bootstrap';
 import {
   executeCommand,
   getExitCode,
@@ -146,19 +142,17 @@ withTempDir(({ createTempDir }) => {
               )
             `);
 
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
+            await bootstrapPostgresSignMarkerTables(client);
 
-            const appMarker = writeContractMarker({
+            await seedTestMarker(client, {
               space: APP_SPACE_ID,
               storageHash: appContract.storage.storageHash,
               profileHash: appContract.profileHash ?? appContract.storage.storageHash,
               contractJson: appContract,
               canonicalVersion: 1,
             });
-            await executeStatement(client, appMarker.insert);
 
-            const extMarker = writeContractMarker({
+            await seedTestMarker(client, {
               space: EXT_SPACE_ID,
               storageHash: extContractJson.storage.storageHash,
               profileHash: extContractJson.profileHash ?? extContractJson.storage.storageHash,
@@ -166,7 +160,6 @@ withTempDir(({ createTempDir }) => {
               canonicalVersion: 1,
               invariants: [...extHeadRef.invariants],
             });
-            await executeStatement(client, extMarker.insert);
           });
 
           consoleOutput.length = 0;

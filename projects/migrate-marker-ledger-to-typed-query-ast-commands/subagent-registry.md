@@ -6,12 +6,21 @@ The Orchestrator's record of which spawned sub-agent ID belongs to which role/va
 
 > **Re-scope boundary (2026-06-01).** PR #661 was rejected and the project re-spec'd (target-contributed DDL + adapter visitor; no generic-core enum; no `family-sql` shared surface). The implementer/reviewer below worked the **rejected** design and are **not resumed** — resuming would carry the wrong mental model (deliberate pivot of role intent per `drive-build-workflow § Subagent continuity`). Fresh spawns for slice `ddl-in-query-ast`.
 
-### Slice `ddl-in-query-ast` (TML-2761) — active
+### Slice `sql-marker-ops-through-adapter` (TML-2753) — active
+
+> **Continuity:** project-level implementer + reviewer resumed from slice `ddl-in-query-ast` (same project; they carry the DDL-surface + contract-free-constructor mental model that this slice builds on). Not a pivot of role intent, so resume rather than fresh-spawn.
 
 | Role / variant | Sub-agent ID | Tier | Status | Last used |
 |---|---|---|---|---|
-| implementer (opus) | f9bb427a-865c-4736-8bb1-580207f52b96 | **claude-opus-4-8-thinking-high** | active (D7) | 2026-06-02 |
-| reviewer/fast | 4277daba-8e6d-476f-abe8-7a6ad4cdd694 | **claude-opus-4-8-thinking-high** | active (D7 R1) | 2026-06-02 |
+| implementer (opus) | f9bb427a-865c-4736-8bb1-580207f52b96 | **claude-opus-4-8-thinking-high** | active (slice 2 D1) | 2026-06-02 |
+| reviewer (opus) | 4277daba-8e6d-476f-abe8-7a6ad4cdd694 | **claude-opus-4-8-thinking-high** | resumed for slice 2 | 2026-06-02 |
+
+### Slice `ddl-in-query-ast` (TML-2761) — landed (PR #672, merged a04c042b0)
+
+| Role / variant | Sub-agent ID | Tier | Status | Last used |
+|---|---|---|---|---|
+| implementer (opus) | f9bb427a-865c-4736-8bb1-580207f52b96 | **claude-opus-4-8-thinking-high** | resumed onto slice 2 | 2026-06-02 |
+| reviewer/fast | 4277daba-8e6d-476f-abe8-7a6ad4cdd694 | **claude-opus-4-8-thinking-high** | resumed onto slice 2 | 2026-06-02 |
 
 ### Retired — slice `ddl-in-query-ast`
 

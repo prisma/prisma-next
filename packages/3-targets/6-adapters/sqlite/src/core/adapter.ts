@@ -19,7 +19,6 @@ import type {
   LiteralExpr,
   LoweredParam,
   LowererContext,
-  MarkerReadResult,
   NullCheckExpr,
   OperationExpr,
   OrderByItem,
@@ -35,9 +34,9 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
-import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
+import { SqliteControlAdapter } from './control-adapter';
 import { renderLoweredDdl } from './ddl-renderer';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
@@ -59,11 +58,27 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   readonly profile: AdapterProfile<'sqlite'>;
 
   constructor(options?: SqliteAdapterOptions) {
+    const controlAdapter = new SqliteControlAdapter();
     this.profile = Object.freeze({
       id: options?.profileId ?? 'sqlite/default@1',
       target: 'sqlite',
       capabilities: defaultCapabilities,
-      readMarker: (queryable: SqlQueryable) => readSqliteMarker(queryable),
+      readMarker: (queryable: SqlQueryable) =>
+        controlAdapter.readMarkerDiscriminated(
+          {
+            familyId: 'sql',
+            targetId: 'sqlite',
+            query: async <Row = Record<string, unknown>>(
+              sql: string,
+              params?: readonly unknown[],
+            ) => {
+              const result = await queryable.query<Row>(sql, params);
+              return { rows: [...result.rows] };
+            },
+            close: async () => {},
+          },
+          APP_SPACE_ID,
+        ),
     });
   }
 
@@ -515,6 +530,8 @@ function renderInsertValue(value: InsertValue): string {
       return '?';
     case 'column-ref':
       return renderColumn(value);
+    case 'raw-expr':
+      return renderExpr(value);
     case 'default-value':
       throw new Error('SQLite does not support DEFAULT as a value in INSERT ... VALUES');
     default:
@@ -616,32 +633,6 @@ function renderReturning(returning: ReadonlyArray<ProjectionItem> | undefined): 
       return `${renderExpr(item.expr)} AS ${quoteIdentifier(item.alias)}`;
     })
     .join(', ')}`;
-}
-
-async function readSqliteMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
-  const exists = await queryable.query(
-    "select 1 from sqlite_master where type = 'table' and name = ?",
-    ['_prisma_marker'],
-  );
-  if (exists.rows.length === 0) {
-    return { kind: 'no-table' };
-  }
-
-  const result = await queryable.query(
-    'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where space = ?',
-    [APP_SPACE_ID],
-  );
-  const row = result.rows[0];
-  if (!row) {
-    return { kind: 'absent' };
-  }
-  // SQLite stores arrays as JSON-encoded TEXT (no native array type), so the driver returns `invariants` as a string. Decode before delegating to the shared row schema, which expects `string[]`.
-  const raw = row as Record<string, unknown>;
-  const invariants =
-    typeof raw['invariants'] === 'string'
-      ? (JSON.parse(raw['invariants']) as unknown)
-      : raw['invariants'];
-  return { kind: 'present', record: parseContractMarkerRow({ ...raw, invariants }) };
 }
 
 export function createSqliteAdapter(options?: SqliteAdapterOptions) {

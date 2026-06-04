@@ -142,9 +142,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     expect(ops).toHaveLength(1);
     expect(ops[0]?.id).toBe('edge.single.op');
     expect(parseNullableJsonColumn(rows[0]!.contract_json_before)).toBeNull();
-    expect(parseNullableJsonColumn(rows[0]!.contract_json_after)).toMatchObject({
-      storage: { storageHash: destHash },
-    });
+    expect(parseNullableJsonColumn(rows[0]!.contract_json_after)).toBeNull();
 
     const ledger = await ledgerAdapter.readLedger(driver, LEDGER_TEST_SPACE_ID);
     expectReadLedger(ledger, [
@@ -349,9 +347,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     expect(parseNullableJsonColumn(rows[1]!.contract_json_before)).toBeNull();
     expect(parseNullableJsonColumn(rows[1]!.contract_json_after)).toBeNull();
     expect(parseNullableJsonColumn(rows[2]!.contract_json_before)).toBeNull();
-    expect(parseNullableJsonColumn(rows[2]!.contract_json_after)).toMatchObject({
-      storage: { storageHash: destHash },
-    });
+    expect(parseNullableJsonColumn(rows[2]!.contract_json_after)).toBeNull();
 
     const ledger = await ledgerAdapter.readLedger(driver, LEDGER_TEST_SPACE_ID);
     expectReadLedger(ledger, [

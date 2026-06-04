@@ -22,11 +22,11 @@ import {
   type SqlRuntimeDriverInstance,
   type SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
-import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { setupTestDatabase } from '../utils';
 import { contract } from './fixtures/contract';
 import type { Contract } from './fixtures/generated/contract';
 

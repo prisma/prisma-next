@@ -11,7 +11,7 @@ import {
   readMarker,
   updateMarker,
   writeLedgerEntry,
-} from '../src/core/marker-ledger';
+} from '../src/exports/control';
 
 const APP = 'app';
 const EXT = 'cipherstash';

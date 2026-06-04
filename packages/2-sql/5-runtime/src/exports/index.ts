@@ -2,14 +2,15 @@ export type {
   AfterExecuteResult,
   RuntimeLog as Log,
 } from '@prisma-next/framework-components/runtime';
-export type { MarkerReadResult, MarkerStatement } from '@prisma-next/sql-relational-core/ast';
+export type { MarkerReadResult } from '@prisma-next/sql-relational-core/ast';
+export { createAstCodecRegistry } from '../codecs/ast-codec-registry';
+export { deriveParamMetadata, encodeParamsWithMetadata } from '../codecs/encoding';
 export {
   extractCodecIds,
   validateCodecRegistryCompleteness,
   validateContractCodecMappings,
 } from '../codecs/validation';
 export { lowerSqlPlan } from '../lower-sql-plan';
-export { parseContractMarkerRow } from '../marker';
 export type { BudgetsOptions } from '../middleware/budgets';
 export { budgets } from '../middleware/budgets';
 export type { LintsOptions } from '../middleware/lints';
@@ -52,14 +53,6 @@ export {
   createExecutionContext,
   createSqlExecutionStack,
 } from '../sql-context';
-export type { SqlStatement } from '../sql-marker';
-export {
-  APP_SPACE_ID,
-  ensureSchemaStatement,
-  ensureTableStatement,
-  readContractMarker,
-  writeContractMarker,
-} from '../sql-marker';
 export type {
   CreateRuntimeOptions,
   Runtime,

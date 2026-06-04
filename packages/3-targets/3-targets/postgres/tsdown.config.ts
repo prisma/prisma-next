@@ -29,7 +29,6 @@ export default defineConfig({
     'src/exports/render-typescript.ts',
     'src/exports/runtime.ts',
     'src/exports/sql-utils.ts',
-    'src/exports/statement-builders.ts',
     'src/exports/types.ts',
   ],
 });

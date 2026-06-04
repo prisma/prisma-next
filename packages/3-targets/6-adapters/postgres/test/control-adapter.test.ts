@@ -23,7 +23,7 @@ function createMockDriver(
     targetId: 'postgres',
     query: async <Row = Record<string, unknown>>(sql: string) => {
       const handler = handlers.find((entry) => entry.match(sql));
-      return { rows: (handler?.rows ?? []) as Row[] };
+      return { rows: (handler?.rows ?? []) as unknown as Row[] };
     },
     close: async () => {},
   };
@@ -42,7 +42,7 @@ describe('PostgresControlAdapter', () => {
       const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>() => ({ rows: [] as Row[] }),
+        query: async <Row = Record<string, unknown>>() => ({ rows: [] as unknown as Row[] }),
         close: async () => {},
       };
 
@@ -67,10 +67,10 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_enum')) {
             return {
@@ -80,13 +80,13 @@ describe('PostgresControlAdapter', () => {
                   type_name: 'role',
                   values: ['USER', 'ADMIN'],
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('version()')) {
-            return { rows: [{ version: 'PostgreSQL 16.1' }] as Row[] };
+            return { rows: [{ version: 'PostgreSQL 16.1' }] as unknown as Row[] };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -114,7 +114,7 @@ describe('PostgresControlAdapter', () => {
           _queryCallCount++;
           if (sql.includes('information_schema.tables')) {
             return {
-              rows: [{ table_name: 'user' }] as Row[],
+              rows: [{ table_name: 'user' }] as unknown as Row[],
             };
           }
           if (sql.includes('information_schema.columns')) {
@@ -140,7 +140,7 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: null,
                   numeric_scale: null,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
@@ -152,30 +152,30 @@ describe('PostgresControlAdapter', () => {
                   column_name: 'id',
                   ordinal_position: 1,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_enum')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1 on x86_64-pc-linux-gnu' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1 on x86_64-pc-linux-gnu' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -201,7 +201,7 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
           }
           if (sql.includes('information_schema.columns')) {
             return {
@@ -216,33 +216,33 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: null,
                   numeric_scale: null,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_enum')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -259,7 +259,7 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
           }
           if (sql.includes('information_schema.columns')) {
             return {
@@ -274,33 +274,33 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: 10,
                   numeric_scale: 2,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_enum')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -317,7 +317,7 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
           }
           if (sql.includes('information_schema.columns')) {
             return {
@@ -332,33 +332,33 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: 10,
                   numeric_scale: null,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_enum')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -375,7 +375,7 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
           }
           if (sql.includes('information_schema.columns')) {
             return {
@@ -390,30 +390,30 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: null,
                   numeric_scale: null,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -430,7 +430,7 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'event' }] as Row[] };
+            return { rows: [{ table_name: 'event' }] as unknown as Row[] };
           }
           if (sql.includes('information_schema.columns')) {
             return {
@@ -455,33 +455,33 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: null,
                   numeric_scale: null,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_enum')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -1072,7 +1072,7 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
           }
           if (sql.includes('information_schema.columns')) {
             return {
@@ -1087,7 +1087,7 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: null,
                   numeric_scale: null,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
@@ -1099,14 +1099,14 @@ describe('PostgresControlAdapter', () => {
                   column_name: 'id',
                   ordinal_position: 1,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
             return {
@@ -1125,18 +1125,18 @@ describe('PostgresControlAdapter', () => {
                   attname: 'id',
                   index_position: 2,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -1155,17 +1155,17 @@ describe('PostgresControlAdapter', () => {
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
             expect(sql).toContain('$1');
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -1184,17 +1184,17 @@ describe('PostgresControlAdapter', () => {
           targetId: 'postgres',
           query: async <Row = Record<string, unknown>>(sql: string) => {
             if (sql.includes('information_schema.tables')) {
-              return { rows: [] as Row[] };
+              return { rows: [] as unknown as Row[] };
             }
             if (sql.includes('pg_extension')) {
-              return { rows: [] as Row[] };
+              return { rows: [] as unknown as Row[] };
             }
             if (sql.includes('version()')) {
               return {
-                rows: [{ version: 'Unknown database version' }] as Row[],
+                rows: [{ version: 'Unknown database version' }] as unknown as Row[],
               };
             }
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           },
           close: async () => {},
         };
@@ -1213,15 +1213,15 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -1238,7 +1238,7 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
           }
           if (sql.includes('information_schema.columns')) {
             return {
@@ -1253,30 +1253,30 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: null,
                   numeric_scale: null,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -1293,7 +1293,7 @@ describe('PostgresControlAdapter', () => {
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
           }
           if (sql.includes('information_schema.columns')) {
             return {
@@ -1308,7 +1308,7 @@ describe('PostgresControlAdapter', () => {
                   numeric_precision: null,
                   numeric_scale: null,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('PRIMARY KEY')) {
@@ -1320,27 +1320,27 @@ describe('PostgresControlAdapter', () => {
                   column_name: 'id',
                   ordinal_position: 1,
                 },
-              ] as Row[],
+              ] as unknown as Row[],
             };
           }
           if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
+            return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('version()')) {
             return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
             };
           }
-          return { rows: [] as Row[] };
+          return { rows: [] as unknown as Row[] };
         },
         close: async () => {},
       };
@@ -1657,15 +1657,20 @@ describe('PostgresControlAdapter', () => {
 
     it('returns null when marker table is absent', async () => {
       const adapter = new PostgresControlAdapter();
-      const driver = createMockDriver([{ match: includes('information_schema.tables'), rows: [] }]);
+      const driver = createMockDriver([
+        { match: includes('"information_schema"."tables"'), rows: [] },
+      ]);
       await expect(adapter.readMarker(driver, 'app')).resolves.toBeNull();
     });
 
     it('returns null when marker table exists but row is absent', async () => {
       const adapter = new PostgresControlAdapter();
       const driver = createMockDriver([
-        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
-        { match: includes('from prisma_contract.marker'), rows: [] },
+        {
+          match: includes('"information_schema"."tables"'),
+          rows: [{ table_schema: 'prisma_contract' }],
+        },
+        { match: includes('"prisma_contract"."marker"'), rows: [] },
       ]);
       await expect(adapter.readMarker(driver, 'app')).resolves.toBeNull();
     });
@@ -1673,16 +1678,19 @@ describe('PostgresControlAdapter', () => {
     it('throws PN-RUN-3005 when marker row fails validation', async () => {
       const adapter = new PostgresControlAdapter();
       const driver = createMockDriver([
-        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
         {
-          match: includes('from prisma_contract.marker'),
+          match: includes('"information_schema"."tables"'),
+          rows: [{ table_schema: 'prisma_contract' }],
+        },
+        {
+          match: includes('"prisma_contract"."marker"'),
           rows: [{ ...validMarkerRow, invariants: null }],
         },
       ]);
 
       await expect(adapter.readMarker(driver, 'app')).rejects.toSatisfy((err: unknown) => {
         expect(CliStructuredError.is(err)).toBe(true);
-        expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
         return true;
       });
     });
@@ -1693,8 +1701,8 @@ describe('PostgresControlAdapter', () => {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [{ '?column?': 1 }] as Row[] };
+          if (sql.includes('"information_schema"."tables"')) {
+            return { rows: [{ table_schema: 'prisma_contract' }] as unknown as Row[] };
           }
           throw new Error('permission denied for table marker');
         },
@@ -1702,7 +1710,7 @@ describe('PostgresControlAdapter', () => {
       };
 
       await expect(adapter.readMarker(driver, 'app')).rejects.toSatisfy((err: unknown) => {
-        expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3006');
+        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3006');
         return true;
       });
     });
@@ -1712,9 +1720,9 @@ describe('PostgresControlAdapter', () => {
     it('throws PN-RUN-3005 on first corrupt row', async () => {
       const adapter = new PostgresControlAdapter();
       const driver = createMockDriver([
-        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
+        { match: includes('"information_schema"."tables"'), rows: [{ '?column?': 1 }] },
         {
-          match: includes('from prisma_contract.marker'),
+          match: includes('"prisma_contract"."marker"'),
           rows: [
             {
               space: 'app',
@@ -1733,7 +1741,7 @@ describe('PostgresControlAdapter', () => {
 
       await expect(adapter.readAllMarkers(driver)).rejects.toSatisfy((err: unknown) => {
         expect(CliStructuredError.is(err)).toBe(true);
-        expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
         return true;
       });
     });

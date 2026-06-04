@@ -82,7 +82,6 @@
     "./render-typescript": "./dist/render-typescript.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./sql-utils": "./dist/sql-utils.mjs",
-    "./statement-builders": "./dist/statement-builders.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   },
