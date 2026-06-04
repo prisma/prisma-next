@@ -1,7 +1,5 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import stripAnsi from 'strip-ansi';
@@ -10,7 +8,7 @@ import {
   executeCommand,
   getExitCode,
   setupCommandMocks,
-  setupTestDirectoryFromFixtures,
+  setupDbTestFixture,
   withTempDir,
 } from './utils/cli-test-helpers';
 import { runDbInit } from './utils/db-init-test-helpers';
@@ -41,58 +39,27 @@ const LEGACY_JOBS_SEED_SQL = `
 
 const CONTROL_POLICY_BASE_SEED_SQL = `${AUTH_USERS_SEED_SQL}\n${LEGACY_JOBS_SEED_SQL}`;
 
-/**
- * `db init` / `db update` read `config.contract.output` from disk, not the live
- * config loader. Serialize the authored `contract.ts` to that path so fields like
- * `defaultControlPolicy` survive into the CLI pipeline.
- */
-async function writeEmittedContractArtifacts(testDir: string): Promise<void> {
-  const contractModule = (await import(pathToFileURL(join(testDir, 'contract.ts')).href)) as {
-    contract: Parameters<SqlContractSerializer['serializeContract']>[0];
-  };
-  const contractJson = new SqlContractSerializer().serializeContract(contractModule.contract);
-  const emittedContractDir = join(testDir, 'src/prisma');
-  mkdirSync(emittedContractDir, { recursive: true });
-  writeFileSync(join(emittedContractDir, 'contract.json'), JSON.stringify(contractJson), 'utf-8');
-  writeFileSync(join(emittedContractDir, 'contract.d.ts'), 'export {};\n', 'utf-8');
-}
-
 async function setupControlPolicyPostgresFixture(
   connectionString: string,
   createTempDir: () => string,
-  extraSchemaSql?: string,
 ): Promise<{ testSetup: DbUpdateTestSetup; configPath: string }> {
-  await withClient(connectionString, async (client) => {
-    await client.query(CONTROL_POLICY_BASE_SEED_SQL);
-    if (extraSchemaSql) {
-      await client.query(extraSchemaSql);
-    }
-  });
-
-  const testSetup = setupTestDirectoryFromFixtures(
+  return setupDbTestFixture({
+    connectionString,
     createTempDir,
     fixtureSubdir,
-    'prisma-next.config.with-db.ts',
-    { '{{DB_URL}}': connectionString },
-  );
-  await writeEmittedContractArtifacts(testSetup.testDir);
-
-  return { testSetup, configPath: testSetup.configPath };
+    schemaSql: CONTROL_POLICY_BASE_SEED_SQL,
+  });
 }
 
 async function setupExternalFloorFixture(
   connectionString: string,
   createTempDir: () => string,
 ): Promise<{ testSetup: DbUpdateTestSetup; configPath: string }> {
-  const testSetup = setupTestDirectoryFromFixtures(
+  return setupDbTestFixture({
+    connectionString,
     createTempDir,
-    externalFloorFixtureSubdir,
-    'prisma-next.config.with-db.ts',
-    { '{{DB_URL}}': connectionString },
-  );
-  await writeEmittedContractArtifacts(testSetup.testDir);
-
-  return { testSetup, configPath: testSetup.configPath };
+    fixtureSubdir: externalFloorFixtureSubdir,
+  });
 }
 
 async function tableExists(
@@ -142,6 +109,24 @@ function extractJson(lines: string[]): Record<string, unknown> {
   return JSON.parse(joined.slice(start, end + 1)) as Record<string, unknown>;
 }
 
+interface EmittedTable {
+  readonly control?: string;
+}
+
+interface EmittedNamespace {
+  readonly tables?: Record<string, EmittedTable>;
+}
+
+interface EmittedContract {
+  readonly defaultControlPolicy?: string;
+  readonly storage: { readonly namespaces: Record<string, EmittedNamespace> };
+}
+
+function readEmittedContract(testSetup: DbUpdateTestSetup): EmittedContract {
+  const path = join(testSetup.testDir, 'src/prisma/contract.json');
+  return JSON.parse(readFileSync(path, 'utf-8')) as EmittedContract;
+}
+
 async function runDbVerifyJson(
   testSetup: DbUpdateTestSetup,
   configPath: string,
@@ -179,6 +164,46 @@ withTempDir(({ createTempDir }) => {
     afterEach(() => {
       cleanupMocks();
     });
+
+    // Pins `prisma-next contract emit` end-to-end for every ControlPolicy value:
+    // per-table `control` survives canonicalisation, and missing-control on the
+    // table left at the contract default is omitted (default-omission). The
+    // contract-level `defaultControlPolicy` round-trip is pinned by the
+    // external-namespace-floor test below, which would not exhibit its
+    // suppression warning unless contract.json carried the field.
+    it(
+      'contract.json carries every ControlPolicy value emitted by the real CLI pipeline',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup } = await setupControlPolicyPostgresFixture(
+            connectionString,
+            createTempDir,
+          );
+          const contract = readEmittedContract(testSetup);
+          const tables = contract.storage.namespaces['public']?.tables ?? {};
+          expect(tables['app_users']?.control).toBeUndefined();
+          expect(tables['audit_log']?.control).toBe('tolerated');
+          expect(tables['legacy_jobs']?.control).toBe('observed');
+          expect(tables['auth_users']?.control).toBe('external');
+          expect(contract.defaultControlPolicy).toBeUndefined();
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'contract.json carries top-level defaultControlPolicy from the external-namespace-floor fixture',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup } = await setupExternalFloorFixture(connectionString, createTempDir);
+          const contract = readEmittedContract(testSetup);
+          expect(contract.defaultControlPolicy).toBe('external');
+          const sessions = contract.storage.namespaces['auth']?.tables?.['sessions'];
+          expect(sessions?.control).toBe('managed');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     it(
       'managed: creates table on init and verifier fails after out-of-band drop',
