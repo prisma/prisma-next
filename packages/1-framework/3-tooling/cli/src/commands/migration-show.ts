@@ -13,7 +13,7 @@ import { castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { isAbsolute, relative, resolve } from 'pathe';
+import { relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
@@ -36,6 +36,11 @@ import { formatMigrationShowOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import {
+  findPackageByDirPath,
+  looksLikePath,
+  resolveAppTargetPath,
+} from '../utils/migration-path-target';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
@@ -65,33 +70,6 @@ export interface MigrationShowResult {
   readonly migration: MigrationShowPresent;
 }
 
-function looksLikePath(target: string): boolean {
-  return target.includes('/') || target.includes('\\');
-}
-
-export function resolveAppTargetPath(
-  target: string,
-  appMigrationsDir: string,
-  appMigrationsRelative: string,
-): Result<string, CliStructuredError> {
-  const targetPath = resolve(target);
-  const relativeToApp = relative(appMigrationsDir, targetPath);
-  const isOutsideAppDir =
-    relativeToApp === '' ||
-    relativeToApp === '.' ||
-    relativeToApp.startsWith('..') ||
-    isAbsolute(relativeToApp);
-  if (isOutsideAppDir) {
-    return notOk(
-      errorRuntime('Target must point to an app-space migration', {
-        why: `Expected a path under ${appMigrationsRelative}, got ${target}`,
-        fix: 'Pass an app-space migration directory or use a hash prefix.',
-      }),
-    );
-  }
-  return ok(targetPath);
-}
-
 function pkgToPresent(
   spaceId: string,
   pkg: OnDiskMigrationPackage,
@@ -115,14 +93,6 @@ function pkgToPresent(
     preview,
     summary: `${ops.length} operation(s)`,
   };
-}
-
-function findPackageByDirPath(
-  packages: readonly OnDiskMigrationPackage[],
-  resolvedDirPath: string,
-): OnDiskMigrationPackage | undefined {
-  const normalized = resolve(resolvedDirPath);
-  return packages.find((p) => resolve(p.dirPath) === normalized);
 }
 
 async function executeMigrationShowCommand(
@@ -273,7 +243,7 @@ export function createMigrationShowCommand(): Command {
     { verb: 'migration graph', oneLiner: 'Show the migration graph topology' },
   ]);
   addGlobalOptions(command)
-    .argument('<target>', 'Migration reference: directory name, hash/prefix, or path')
+    .argument('<target>', 'Migration reference: directory name, hash/prefix, ref, or path')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string, options: MigrationShowOptions) => {
       const flags = parseGlobalFlagsOrExit(options);

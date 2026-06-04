@@ -30,6 +30,11 @@ import {
   type CheckFailure,
   integrityViolationToCheckFailure,
 } from '../utils/integrity-violation-to-check-failure';
+import {
+  findPackageByDirPath,
+  looksLikePath,
+  resolveAppTargetPath,
+} from '../utils/migration-path-target';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 import { INTEGRITY_FAILED, OK, PRECONDITION } from './migration-check/exit-codes';
 
@@ -176,18 +181,25 @@ async function executeMigrationCheckCommand(
   }
 
   if (target) {
-    const refs = await readRefs(refsDir);
-    const migResult = parseMigrationRef(target, { graph, refs });
-    if (!migResult.ok) {
-      return {
-        error: mapRefResolutionError(migResult.failure),
-        exitCode: PRECONDITION,
-      };
+    let matchedPkg: OnDiskMigrationPackage | undefined;
+    if (looksLikePath(target)) {
+      const resolved = resolveAppTargetPath(target, appMigrationsDir, appMigrationsRelative);
+      if (!resolved.ok) {
+        return { error: resolved.failure, exitCode: PRECONDITION };
+      }
+      matchedPkg = findPackageByDirPath(bundles, resolved.value);
+    } else {
+      const refs = await readRefs(refsDir);
+      const migResult = parseMigrationRef(target, { graph, refs });
+      if (!migResult.ok) {
+        return {
+          error: mapRefResolutionError(migResult.failure),
+          exitCode: PRECONDITION,
+        };
+      }
+      matchedPkg = bundles.find((p) => p.metadata.migrationHash === migResult.value.migrationHash);
     }
 
-    const matchedPkg = bundles.find(
-      (p) => p.metadata.migrationHash === migResult.value.migrationHash,
-    );
     if (!matchedPkg) {
       return {
         result: {
@@ -294,7 +306,7 @@ export function createMigrationCheckCommand(): Command {
   ]);
   command.exitOverride();
   addGlobalOptions(command)
-    .argument('[migration]', 'Migration reference (directory name or hash) to check')
+    .argument('[target]', 'Migration reference: directory name, hash/prefix, ref, or path')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string | undefined, options: MigrationCheckOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
