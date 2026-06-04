@@ -91,7 +91,10 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     if (raw instanceof NamespaceBase) {
       return raw;
     }
-    const hydrated = super.hydrateSqlNamespaceEntry(nsId, raw) as SqlNamespaceTablesInput;
+    const hydrated = blindCast<
+      SqlNamespaceTablesInput,
+      'super.hydrateSqlNamespaceEntry returns the tables form when raw is not a NamespaceBase'
+    >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
     const tables = entries?.table ?? {};
     const typeSlot = entries?.type;

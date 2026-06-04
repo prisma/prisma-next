@@ -1,6 +1,7 @@
 import { MongoContractSerializerBase } from '@prisma-next/family-mongo/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type MongoContract, MongoStorage } from '@prisma-next/mongo-contract';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { MongoTargetContract } from './mongo-target-contract';
 import { MongoTargetDatabase, MongoTargetUnboundDatabase } from './mongo-target-database';
@@ -45,12 +46,15 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
         entries: { collection: collectionsOut },
       };
     }
-    return {
+    return blindCast<
+      JsonObject,
+      'rest carries plain domain/capabilities JSON fields; storage has been serialized to JSON-safe form'
+    >({
       ...rest,
       storage: {
         storageHash: String(storage.storageHash),
         namespaces: namespacesJson,
       },
-    } as unknown as JsonObject;
+    });
   }
 }
