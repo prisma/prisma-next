@@ -510,6 +510,7 @@ async function main() {
           'repo-user <email> | repo-posts <userId> [limit] | ' +
           'repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser] | ' +
           'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +
+          'repo-tasks [limit] | repo-bugs [limit] | repo-features [limit] | ' +
           'repo-task-board [limit] | repo-bug-triage [severity] [limit] | ' +
           'repo-feature-roadmap <targetRelease> [limit] | ' +
           'repo-latest-per-kind | repo-user-insights [limit] | repo-kind-breakdown [minUsers] | ' +
