@@ -1,4 +1,4 @@
-export { int4, jsonb, pgTable, text, textArray, timestamptz } from '../contract-free/columns';
+export { int4, int8, jsonb, pgTable, text, textArray, timestamptz } from '../contract-free/columns';
 export {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,

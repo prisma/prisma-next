@@ -7,6 +7,7 @@ import {
 import { PostgresTableSource } from '../core/ast/table-source';
 import {
   PG_INT4_CODEC_ID,
+  PG_INT8_CODEC_ID,
   PG_JSONB_CODEC_ID,
   PG_TEXT_ARRAY_CODEC_ID,
   PG_TEXT_CODEC_ID,
@@ -22,6 +23,7 @@ const desc = (codecId: string, opts?: ColOpts): ColumnDescriptor => ({
 
 export const text = (opts?: ColOpts): ColumnDescriptor => desc(PG_TEXT_CODEC_ID, opts);
 export const int4 = (opts?: ColOpts): ColumnDescriptor => desc(PG_INT4_CODEC_ID, opts);
+export const int8 = (opts?: ColOpts): ColumnDescriptor => desc(PG_INT8_CODEC_ID, opts);
 export const jsonb = (opts?: ColOpts): ColumnDescriptor => desc(PG_JSONB_CODEC_ID, opts);
 export const textArray = (opts?: ColOpts): ColumnDescriptor => desc(PG_TEXT_ARRAY_CODEC_ID, opts);
 export const timestamptz = (opts?: ColOpts): ColumnDescriptor =>

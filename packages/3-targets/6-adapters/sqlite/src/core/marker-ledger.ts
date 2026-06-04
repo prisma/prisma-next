@@ -33,13 +33,33 @@ export const marker = sqliteTable('_prisma_marker', {
   invariants: jsonText(),
 });
 
+/**
+ * Writeable subset of `_prisma_ledger`. Omits the DB-generated `id`
+ * (`INTEGER PRIMARY KEY AUTOINCREMENT`) and `created_at` (default
+ * `strftime(...)`).
+ */
 export const ledger = sqliteTable('_prisma_ledger', {
   space: text(),
   migration_name: text(),
   migration_hash: text(),
-  origin_core_hash: text(),
+  origin_core_hash: text({ nullable: true }),
   destination_core_hash: text(),
   operations: jsonText(),
+});
+
+/**
+ * Read-side handle covering every column of `_prisma_ledger`, including
+ * the DB-generated `id` (for ORDER BY) and `created_at`.
+ */
+export const ledgerReadShape = sqliteTable('_prisma_ledger', {
+  id: integer(),
+  space: text(),
+  migration_name: text(),
+  migration_hash: text(),
+  origin_core_hash: text({ nullable: true }),
+  destination_core_hash: text(),
+  operations: jsonText(),
+  created_at: text(),
 });
 
 export const sqliteCatalog = sqliteTable('sqlite_master', { type: text(), name: text() });

@@ -54,12 +54,30 @@ import {
   introspectPostgresEnumTypes,
   type PostgresEnumStorageTypeAnnotation,
 } from './enum-control-hooks';
-import { execute, infoSchemaTables, ledger, marker, mergeInvariants, NOW } from './marker-ledger';
+import {
+  execute,
+  infoSchemaTables,
+  ledger,
+  ledgerReadShape,
+  marker,
+  mergeInvariants,
+  NOW,
+} from './marker-ledger';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
 const POSTGRES_MARKER_TABLE = 'prisma_contract.marker';
 const POSTGRES_LEDGER_TABLE = 'prisma_contract.ledger';
+
+type PostgresLedgerRow = {
+  readonly space: string;
+  readonly migration_name: string;
+  readonly migration_hash: string;
+  readonly origin_core_hash: string | null;
+  readonly destination_core_hash: string;
+  readonly operations: unknown;
+  readonly created_at: Date | string;
+};
 
 /**
  * Postgres control plane adapter for control-plane operations like introspection.
@@ -180,51 +198,48 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: ControlDriverInstance<'sql', 'postgres'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
     const markerContext = { space: APP_SPACE_ID, markerLocation: POSTGRES_MARKER_TABLE };
-    const exists = await withMarkerReadErrorHandling(
-      () =>
-        driver.query(
-          `select 1
-       from information_schema.tables
-       where table_schema = $1 and table_name = $2`,
-          ['prisma_contract', 'marker'],
-        ),
-      markerContext,
-    );
-    if (exists.rows.length === 0) {
+    return withMarkerReadErrorHandling(() => this.readAllMarkersResult(driver), markerContext);
+  }
+
+  private async readAllMarkersResult(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+  ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+    const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
+    const probe = infoSchemaTables
+      .select(infoSchemaTables.table_schema)
+      .where(
+        infoSchemaTables.table_schema
+          .eq('prisma_contract')
+          .and(infoSchemaTables.table_name.eq('marker')),
+      )
+      .build();
+    const exists = await execute(lower, driver, probe);
+    if (exists.length === 0) {
       return new Map();
     }
 
-    const result = await withMarkerReadErrorHandling(
-      () =>
-        driver.query<{
-          space: string;
-          core_hash: string;
-          profile_hash: string;
-          contract_json: unknown | null;
-          canonical_version: number | null;
-          updated_at: Date | string;
-          app_tag: string | null;
-          meta: unknown | null;
-          invariants: readonly string[];
-        }>(
-          `select
-         space,
-         core_hash,
-         profile_hash,
-         contract_json,
-         canonical_version,
-         updated_at,
-         app_tag,
-         meta,
-         invariants
-       from prisma_contract.marker`,
-        ),
-      markerContext,
-    );
+    const fetch = marker
+      .select(
+        marker.space,
+        marker.core_hash,
+        marker.profile_hash,
+        marker.contract_json,
+        marker.canonical_version,
+        marker.updated_at,
+        marker.app_tag,
+        marker.meta,
+        marker.invariants,
+      )
+      .build();
+    const rawRows = await execute(lower, driver, fetch);
+    const rows = blindCast<
+      ReadonlyArray<{ space: string } & Record<string, unknown>>,
+      'Driver returns rows shaped by SELECT'
+    >(rawRows);
 
-    const rows = new Map<string, ContractMarkerRecord>();
-    for (const row of result.rows) {
-      rows.set(
+    const out = new Map<string, ContractMarkerRecord>();
+    for (const row of rows) {
+      out.set(
         row.space,
         parseMarkerRowSafely(row, parseContractMarkerRow, {
           space: row.space,
@@ -232,7 +247,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         }),
       );
     }
-    return rows;
+    return out;
   }
 
   /**
@@ -246,59 +261,54 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     space?: string,
   ): Promise<readonly LedgerEntryRecord[]> {
     const ledgerContext = { space: space ?? '*', markerLocation: POSTGRES_LEDGER_TABLE };
-    const exists = await withMarkerReadErrorHandling(
-      () =>
-        driver.query(
-          `select 1
-       from information_schema.tables
-       where table_schema = $1 and table_name = $2`,
-          ['prisma_contract', 'ledger'],
-        ),
-      ledgerContext,
-    );
-    if (exists.rows.length === 0) {
+    return withMarkerReadErrorHandling(() => this.readLedgerResult(driver, space), ledgerContext);
+  }
+
+  private async readLedgerResult(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    space: string | undefined,
+  ): Promise<readonly LedgerEntryRecord[]> {
+    const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
+    const probe = infoSchemaTables
+      .select(infoSchemaTables.table_schema)
+      .where(
+        infoSchemaTables.table_schema
+          .eq('prisma_contract')
+          .and(infoSchemaTables.table_name.eq('ledger')),
+      )
+      .build();
+    const exists = await execute(lower, driver, probe);
+    if (exists.length === 0) {
       return [];
     }
 
-    type LedgerQueryRow = {
-      space: string;
-      migration_name: string;
-      migration_hash: string;
-      origin_core_hash: string | null;
-      destination_core_hash: string;
-      operations: unknown;
-      created_at: Date | string;
-    };
-    let sql = `select
-         space,
-         migration_name,
-         migration_hash,
-         origin_core_hash,
-         destination_core_hash,
-         operations,
-         created_at
-       from prisma_contract.ledger`;
-    if (space !== undefined) {
-      sql += `
-       where space = $1`;
-    }
-    sql += `
-       order by id`;
-
-    const result = await withMarkerReadErrorHandling(
-      () => driver.query<LedgerQueryRow>(sql, space === undefined ? undefined : [space]),
-      ledgerContext,
+    const base = ledgerReadShape.select(
+      ledgerReadShape.space,
+      ledgerReadShape.migration_name,
+      ledgerReadShape.migration_hash,
+      ledgerReadShape.origin_core_hash,
+      ledgerReadShape.destination_core_hash,
+      ledgerReadShape.operations,
+      ledgerReadShape.created_at,
+    );
+    const filtered = space !== undefined ? base.where(ledgerReadShape.space.eq(space)) : base;
+    const rawRows = await execute(lower, driver, filtered.orderBy(ledgerReadShape.id).build());
+    const rows = blindCast<readonly PostgresLedgerRow[], 'Driver returns rows shaped by SELECT'>(
+      rawRows,
     );
 
-    return result.rows.map((row) => ({
-      space: row.space,
-      migrationName: row.migration_name,
-      migrationHash: row.migration_hash,
-      from: ledgerOriginFromStored(row.origin_core_hash),
-      to: row.destination_core_hash,
-      appliedAt: row.created_at instanceof Date ? row.created_at : new Date(row.created_at),
-      operationCount: Array.isArray(row.operations) ? row.operations.length : 0,
-    }));
+    return rows.map((row) => {
+      const appliedAt = row.created_at instanceof Date ? row.created_at : new Date(row.created_at);
+      return {
+        space: row.space,
+        migrationName: row.migration_name,
+        migrationHash: row.migration_hash,
+        from: ledgerOriginFromStored(row.origin_core_hash),
+        to: row.destination_core_hash,
+        appliedAt,
+        operationCount: Array.isArray(row.operations) ? row.operations.length : 0,
+      };
+    });
   }
 
   /**

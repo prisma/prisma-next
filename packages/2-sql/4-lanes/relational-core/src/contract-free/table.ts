@@ -8,6 +8,7 @@ import {
   InsertOnConflict,
   type InsertValue,
   NullCheckExpr,
+  OrderByItem,
   OrExpr,
   ParamRef,
   ProjectionItem,
@@ -216,15 +217,25 @@ export class CfSelectQuery {
     private readonly src: TableSource,
     private readonly projectionItems: ReadonlyArray<ProjectionItem>,
     private readonly whereExpr: CfExpr | undefined = undefined,
+    private readonly orderByItems: ReadonlyArray<OrderByItem> = [],
   ) {}
 
   where(expr: CfExpr): CfSelectQuery {
-    return new CfSelectQuery(this.src, this.projectionItems, expr);
+    return new CfSelectQuery(this.src, this.projectionItems, expr, this.orderByItems);
+  }
+
+  orderBy(column: ColumnProxy, dir: 'asc' | 'desc' = 'asc'): CfSelectQuery {
+    const item = dir === 'asc' ? OrderByItem.asc(column.toRef()) : OrderByItem.desc(column.toRef());
+    return new CfSelectQuery(this.src, this.projectionItems, this.whereExpr, [
+      ...this.orderByItems,
+      item,
+    ]);
   }
 
   build(): SelectAst {
     const base = SelectAst.from(this.src).withProjection(this.projectionItems);
-    return this.whereExpr ? base.withWhere(this.whereExpr.ast) : base;
+    const withWhere = this.whereExpr ? base.withWhere(this.whereExpr.ast) : base;
+    return this.orderByItems.length > 0 ? withWhere.withOrderBy(this.orderByItems) : withWhere;
   }
 }
 

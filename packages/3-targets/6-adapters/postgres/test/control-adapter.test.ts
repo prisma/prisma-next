@@ -1720,9 +1720,9 @@ describe('PostgresControlAdapter', () => {
     it('throws PN-RUN-3005 on first corrupt row', async () => {
       const adapter = new PostgresControlAdapter();
       const driver = createMockDriver([
-        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
+        { match: includes('"information_schema"."tables"'), rows: [{ '?column?': 1 }] },
         {
-          match: includes('from prisma_contract.marker'),
+          match: includes('"prisma_contract"."marker"'),
           rows: [
             {
               space: 'app',

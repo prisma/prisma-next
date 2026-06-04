@@ -13,6 +13,7 @@ import { PG_TIMESTAMPTZ_CODEC_ID } from '@prisma-next/target-postgres/codec-ids'
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import {
   int4,
+  int8,
   jsonb,
   pgTable,
   text,
@@ -37,15 +38,38 @@ export const marker = pgTable(
   },
 );
 
+/**
+ * Writeable subset of the `prisma_contract.ledger` table. Omits the
+ * DB-generated `id` (bigserial) and `created_at` (default `now()`) so the
+ * insert path doesn't have to pass them.
+ */
 export const ledger = pgTable(
   { name: 'ledger', schema: 'prisma_contract' },
   {
     space: text(),
     migration_name: text(),
     migration_hash: text(),
-    origin_core_hash: text(),
+    origin_core_hash: text({ nullable: true }),
     destination_core_hash: text(),
     operations: jsonb(),
+  },
+);
+
+/**
+ * Read-side handle covering every column of `prisma_contract.ledger`,
+ * including the DB-generated `id` (for ORDER BY) and `created_at`.
+ */
+export const ledgerReadShape = pgTable(
+  { name: 'ledger', schema: 'prisma_contract' },
+  {
+    id: int8(),
+    space: text(),
+    migration_name: text(),
+    migration_hash: text(),
+    origin_core_hash: text({ nullable: true }),
+    destination_core_hash: text(),
+    operations: jsonb(),
+    created_at: timestamptz(),
   },
 );
 
