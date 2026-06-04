@@ -158,6 +158,7 @@
                   "column": "tagId"
                 }
               },
+              "namespaceId": "__unbound__",
               "table": "post_tag"
             }
           },
@@ -219,6 +220,7 @@
                   "column": "label"
                 }
               },
+              "namespaceId": "__unbound__",
               "table": "tag"
             }
           },
