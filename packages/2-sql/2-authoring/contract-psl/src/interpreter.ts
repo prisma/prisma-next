@@ -1336,10 +1336,24 @@ function resolvePolymorphism(
   modelNamespaceIds: ReadonlyMap<string, string>,
   defaultNamespaceId: string,
   syntheticPkFieldsByVariant: ReadonlyMap<string, readonly string[]>,
+  stiBaseFieldsByBase: ReadonlyMap<string, readonly string[]>,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): Record<string, ContractModel> {
   let patched = models;
+
+  // STI variant columns were materialised onto the base storage table so the
+  // variants' `storage.fields` resolve. They are storage-only on the base — the
+  // domain field belongs to the variant — so strip them from the base model's
+  // domain + storage field maps (the table column, built upstream, stays).
+  for (const [baseName, fieldNames] of stiBaseFieldsByBase) {
+    const baseModel = patched[baseName];
+    if (!baseModel || fieldNames.length === 0) continue;
+    patched = {
+      ...patched,
+      [baseName]: stripStorageOnlyDomainFields(baseModel, fieldNames),
+    };
+  }
 
   for (const [modelName, decl] of discriminatorDeclarations) {
     if (baseDeclarations.has(modelName)) {
@@ -1563,8 +1577,10 @@ function materializeStiVariantStorageColumns(
   modelNodes: readonly ModelNode[],
   baseDeclarations: ReadonlyMap<string, BaseDeclaration>,
   stiVariantNames: ReadonlySet<string>,
-): ModelNode[] {
-  if (stiVariantNames.size === 0) return [...modelNodes];
+): { modelNodes: ModelNode[]; stiBaseFieldsByBase: Map<string, readonly string[]> } {
+  if (stiVariantNames.size === 0) {
+    return { modelNodes: [...modelNodes], stiBaseFieldsByBase: new Map() };
+  }
 
   const nodeByModel = new Map(modelNodes.map((node) => [node.modelName, node]));
   type StiColumn = ModelNode['fields'][number];
@@ -1591,7 +1607,20 @@ function materializeStiVariantStorageColumns(
     stiColumnsByBase.set(baseDecl.baseName, claimed);
   }
 
-  return modelNodes.map((node): ModelNode => {
+  // The materialised columns exist on the base STORAGE table so the variants'
+  // `storage.fields` resolve, but they are NOT base DOMAIN fields — `severity`
+  // belongs to `Bug`, not to `Task`. Report the materialised field names per
+  // base so the domain patch can strip them from the base model (the table
+  // column stays); this is the STI analogue of `syntheticPkFieldsByVariant`.
+  const stiBaseFieldsByBase = new Map<string, readonly string[]>();
+  for (const [baseName, columns] of stiColumnsByBase) {
+    stiBaseFieldsByBase.set(
+      baseName,
+      columns.map((field) => field.fieldName),
+    );
+  }
+
+  const enriched = modelNodes.map((node): ModelNode => {
     // STI variant: contributes a domain model but no storage table of its own.
     if (stiVariantNames.has(node.modelName)) {
       return { ...node, sharesBaseTable: true };
@@ -1600,6 +1629,8 @@ function materializeStiVariantStorageColumns(
     if (!stiColumns || stiColumns.length === 0) return node;
     return { ...node, fields: [...node.fields, ...stiColumns] };
   });
+
+  return { modelNodes: enriched, stiBaseFieldsByBase };
 }
 
 /**
@@ -1847,7 +1878,7 @@ export function interpretPslDocumentToSqlContract(
 
   const { modelNodes: linkedModelNodes, syntheticPkFieldsByVariant } =
     materializeMtiVariantStorageLinks(modelNodes, baseDeclarations, stiVariantNames);
-  const polyModelNodes = materializeStiVariantStorageColumns(
+  const { modelNodes: polyModelNodes, stiBaseFieldsByBase } = materializeStiVariantStorageColumns(
     linkedModelNodes,
     baseDeclarations,
     stiVariantNames,
@@ -1923,6 +1954,7 @@ export function interpretPslDocumentToSqlContract(
     modelNamespaceIds,
     input.target.defaultNamespaceId,
     syntheticPkFieldsByVariant,
+    stiBaseFieldsByBase,
     sourceId,
     polyDiagnostics,
   );

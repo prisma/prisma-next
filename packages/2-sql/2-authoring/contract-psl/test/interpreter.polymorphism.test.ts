@@ -442,6 +442,43 @@ model Bug {
       });
     });
 
+    it('does not leak the STI variant field onto the base domain model', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // `severity` belongs to `Bug`, not `Task`: it is a base-table column but
+      // not a base domain/storage field, so it never appears in a base query's
+      // default projection.
+      const task = modelsOf(result.value)['Task'];
+      expect(Object.keys(task?.fields ?? {})).not.toContain('severity');
+      expect(Object.keys((task?.storage as SqlModelStorage)?.fields ?? {})).not.toContain(
+        'severity',
+      );
+    });
+
     it('keeps the STI variant domain field at its declared (required) nullability', () => {
       const document = parsePslDocument({
         schema: `model Task {
