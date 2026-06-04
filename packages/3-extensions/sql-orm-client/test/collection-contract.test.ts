@@ -67,6 +67,7 @@ describe('collection-contract capability detection', () => {
 
     expect(resolveIncludeRelation(contract, 'User', 'posts')).toEqual({
       relatedModelName: 'Post',
+      relatedNamespaceId: 'public',
       relatedTableName: 'posts',
       targetColumn: 'user_id',
       localColumn: 'id',
