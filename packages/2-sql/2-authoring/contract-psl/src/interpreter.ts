@@ -742,13 +742,13 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         });
         continue;
       }
+      controlPolicyDeclared = true;
       const parsed = parseControlPolicyAttribute({
         attribute: modelAttribute,
         sourceId,
         diagnostics,
       });
       if (parsed !== undefined) {
-        controlPolicyDeclared = true;
         controlPolicy = parsed;
       }
       continue;

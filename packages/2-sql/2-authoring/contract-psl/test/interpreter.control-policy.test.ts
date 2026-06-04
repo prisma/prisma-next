@@ -145,6 +145,20 @@ describe('@@control model attribute', () => {
     );
   });
 
+  it('emits PSL_DUPLICATE_ATTRIBUTE when a malformed @@control is followed by another', () => {
+    expectDiagnostic(
+      `model User {
+  id Int @id
+  @@control(invalid)
+  @@control(managed)
+}`,
+      {
+        code: 'PSL_DUPLICATE_ATTRIBUTE',
+        message: '`@@control` declared more than once on model "User".',
+      },
+    );
+  });
+
   it('emits PSL_INVALID_ATTRIBUTE_ARGUMENT when @@control uses a named argument', () => {
     expectDiagnostic(
       `model User {
