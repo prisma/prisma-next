@@ -7,6 +7,7 @@ import type {
   ContractMarkerRecord,
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
+import type { AuthoringPslPrinterNamespace } from '@prisma-next/framework-components/authoring';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -931,6 +932,15 @@ export interface ControlClient {
    * @returns PslDocumentAst if the family supports the capability, undefined otherwise
    */
   inferPslContract(schemaIR: unknown): PslDocumentAst | undefined;
+
+  /**
+   * Returns the assembled `pslPrinters` namespace from the control stack.
+   * Pack-contributed PSL block printers register here; the CLI's
+   * `contract infer` command threads this through to `printPsl` so
+   * pack-contributed blocks in the inferred AST round-trip back to PSL
+   * source. Forces `init()` so the stack is built before access.
+   */
+  getPslPrintersNamespace(): AuthoringPslPrinterNamespace;
 
   /**
    * Renders a textual preview of a migration plan's operations for the CLI's

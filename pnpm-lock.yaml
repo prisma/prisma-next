@@ -1468,6 +1468,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:0.12.0
         version: link:../../1-core/framework-components
+      '@prisma-next/utils':
+        specifier: workspace:0.12.0
+        version: link:../../0-foundation/utils
     devDependencies:
       '@prisma-next/psl-parser':
         specifier: workspace:0.12.0

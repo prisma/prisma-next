@@ -10,7 +10,11 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
-import type { PslPackBlock, PslPackBlockParserContext } from './psl-substrate';
+import type {
+  PslPackBlock,
+  PslPackBlockParserContext,
+  PslPackBlockPrinterContext,
+} from './psl-substrate';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -182,25 +186,29 @@ export interface AuthoringPslBlockDescriptor<Output extends PslPackBlock = PslPa
 }
 
 /**
- * Pack-contributed printer for a top-level PSL block keyword.
+ * Pack-contributed printer for a top-level PSL block keyword. The
+ * framework serializer dispatches a pack-contributed AST node to
+ * the `pslPrinters` contribution whose `discriminator` matches the
+ * node's `kind`, building a {@link PslPackBlockPrinterContext}
+ * handle and passing the node + handle as arguments. The
+ * contribution returns the rendered block text — typically a
+ * multi-line string starting with the keyword opener and ending
+ * with the closing brace; the serializer indents the result if the
+ * block lives inside a `namespace { … }`.
  *
- * The printer-context type is `unknown` as a placeholder for D1 of
- * the substrate slice — the printer SPI is wired in D3, at which
- * point the second parameter becomes the print-document builder
- * handle. What's load-bearing today is the `Input` generic narrowing
- * to the AST node shape the matching `pslBlocks` descriptor produces
- * and the matching `entityTypes` factory accepts.
- *
- * `Input` defaults to `never` for the same contravariance reason
- * documented on {@link AuthoringEntityTypeFactoryOutput}: a pack
- * literal declaring a concrete `Input` type via `as const satisfies
- * AuthoringPslPrinterNamespace` only assigns to the base shape if the
- * base sits at the bottom of the contravariant position.
+ * `Input` is constrained to `extend PslPackBlock` so the framework
+ * AST slot can hold the value the matching `pslBlocks` descriptor
+ * produces. The default `never` is load-bearing for assignability:
+ * function parameters are contravariant, so a pack literal declaring
+ * `printer: (input: SomeAst, ctx) => string` only assigns to this
+ * base shape if `Input = never` (the bottom type that anything can
+ * be substituted for in contravariant position). The same idiom is
+ * used by {@link AuthoringEntityTypeFactoryOutput}'s `Input` default.
  */
-export interface AuthoringPslPrinterDescriptor<Input = never> {
+export interface AuthoringPslPrinterDescriptor<Input extends PslPackBlock = never> {
   readonly kind: 'pslPrinter';
   readonly discriminator: string;
-  readonly printer: (input: Input, context: unknown) => unknown;
+  readonly printer: (input: Input, context: PslPackBlockPrinterContext) => string;
 }
 
 export type AuthoringPslBlockNamespace = {

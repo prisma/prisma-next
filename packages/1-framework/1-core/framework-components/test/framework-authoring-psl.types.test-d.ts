@@ -17,7 +17,11 @@ import type {
   AuthoringPslBlockNamespace,
   AuthoringPslPrinterNamespace,
 } from '../src/shared/framework-authoring';
-import type { PslPackBlock, PslPackBlockParserContext } from '../src/shared/psl-substrate';
+import type {
+  PslPackBlock,
+  PslPackBlockParserContext,
+  PslPackBlockPrinterContext,
+} from '../src/shared/psl-substrate';
 
 interface FixtureAst extends PslPackBlock {
   readonly kind: 'fixture-block';
@@ -46,7 +50,8 @@ const fixturePslPrinters = {
   fixture: {
     kind: 'pslPrinter',
     discriminator: 'fixture-block',
-    printer: (_input: FixtureAst, _context: unknown): void => undefined,
+    printer: (input: FixtureAst, ctx: PslPackBlockPrinterContext): string =>
+      `fixture ${input.name} {\n${ctx.indent}predicate = "${ctx.escapeStringLiteral(input.predicate)}"\n}`,
   },
 } as const satisfies AuthoringPslPrinterNamespace;
 
@@ -87,6 +92,17 @@ test('parser Output narrows to AST shape produced by entityTypes factory', () =>
 test('parser Output extends PslPackBlock so it fits the AST packBlocks slot', () => {
   type ParserOutput = ReturnType<typeof fixturePslBlocks.fixture.parser>;
   expectTypeOf<ParserOutput>().toExtend<PslPackBlock>();
+});
+
+test('printer consumes a PslPackBlock-extending Input via PslPackBlockPrinterContext', () => {
+  type PrinterFn = typeof fixturePslPrinters.fixture.printer;
+  type PrinterInput = Parameters<PrinterFn>[0];
+  type PrinterContextArg = Parameters<PrinterFn>[1];
+  type PrinterReturn = ReturnType<PrinterFn>;
+
+  expectTypeOf<PrinterInput>().toExtend<PslPackBlock>();
+  expectTypeOf<PrinterContextArg>().toEqualTypeOf<PslPackBlockPrinterContext>();
+  expectTypeOf<PrinterReturn>().toEqualTypeOf<string>();
 });
 
 test('discriminator strings carry as literal types', () => {

@@ -46,6 +46,10 @@ function stubPackBlockParser(): PslPackBlock {
   return { kind: 'stub', name: 'stub', span: STUB_PSL_SPAN };
 }
 
+function stubPackBlockPrinter(): string {
+  return '';
+}
+
 describe('extractCodecTypeImports', () => {
   it('returns empty array for descriptors without codec types', () => {
     const result = extractCodecTypeImports([createDescriptor()]);
@@ -297,7 +301,7 @@ describe('assembleAuthoringContributions', () => {
             policyPrinter: {
               kind: 'pslPrinter',
               discriminator: 'postgres-policy',
-              printer: () => undefined,
+              printer: stubPackBlockPrinter,
             },
           },
         },
@@ -316,7 +320,7 @@ describe('assembleAuthoringContributions', () => {
             rolePrinter: {
               kind: 'pslPrinter',
               discriminator: 'postgres-role',
-              printer: () => undefined,
+              printer: stubPackBlockPrinter,
             },
           },
         },
@@ -365,7 +369,7 @@ describe('assembleAuthoringContributions', () => {
               foo: {
                 kind: 'pslPrinter',
                 discriminator: 'pack-foo',
-                printer: () => undefined,
+                printer: stubPackBlockPrinter,
               },
             },
           },
@@ -377,7 +381,7 @@ describe('assembleAuthoringContributions', () => {
               foo: {
                 kind: 'pslPrinter',
                 discriminator: 'pack-foo',
-                printer: () => undefined,
+                printer: stubPackBlockPrinter,
               },
             },
           },
@@ -408,7 +412,7 @@ describe('assembleAuthoringContributions', () => {
             policy: {
               kind: 'pslPrinter',
               discriminator: 'postgres-policy',
-              printer: () => undefined,
+              printer: stubPackBlockPrinter,
             },
           },
         },
@@ -460,7 +464,7 @@ describe('assembleAuthoringContributions', () => {
               fooPrinter: {
                 kind: 'pslPrinter',
                 discriminator: 'pack-foo',
-                printer: () => undefined,
+                printer: stubPackBlockPrinter,
               },
             },
           },
@@ -485,7 +489,7 @@ describe('assembleAuthoringContributions', () => {
               fooPrinter: {
                 kind: 'pslPrinter',
                 discriminator: 'pack-foo',
-                printer: () => undefined,
+                printer: stubPackBlockPrinter,
               },
             },
           },

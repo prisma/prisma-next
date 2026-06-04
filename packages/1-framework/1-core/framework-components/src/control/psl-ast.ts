@@ -7,6 +7,7 @@ export type {
   PslPackBlockBounds,
   PslPackBlockDiagnostic,
   PslPackBlockParserContext,
+  PslPackBlockPrinterContext,
   PslPosition,
   PslSpan,
 } from '../shared/psl-substrate';

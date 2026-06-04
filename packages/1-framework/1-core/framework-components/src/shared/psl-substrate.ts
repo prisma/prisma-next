@@ -120,3 +120,31 @@ export interface PslPackBlockParserContext {
   readonly lineRangeSpan: (startLine: number, endLine: number) => PslSpan;
   readonly pushDiagnostic: (diagnostic: PslPackBlockDiagnostic) => void;
 }
+
+/**
+ * Handle a pack-contributed printer receives when the framework
+ * serializer dispatches a pack-contributed AST node. The shape is
+ * intentionally minimal — only what's needed to write a printer for
+ * a `keyword Name { key = "value" }`-shape block:
+ *
+ * - `indent` is the body-line indent string (one level of nesting
+ *   inside the block opener — typically two spaces). Pack printers
+ *   that emit further-nested content can repeat the indent unit.
+ *   The serializer wraps the printer's output with namespace-level
+ *   indentation when applicable, so pack printers always emit at
+ *   the block's own indentation level (i.e. no leading whitespace
+ *   on the opener line, body lines indented by one `indent` unit).
+ * - `escapeStringLiteral` escapes a raw value into a PSL
+ *   double-quoted string body — the contribution wraps the result
+ *   in `"…"` itself. Mirrors the framework's internal helper so
+ *   pack printers don't reimplement quoting.
+ *
+ * The SPI is the printer-side mirror of {@link PslPackBlockParserContext}.
+ * Helpers that turn out to be load-bearing for a real consumer get
+ * lifted from the framework's private serializer into this surface
+ * as a separate follow-up.
+ */
+export interface PslPackBlockPrinterContext {
+  readonly indent: string;
+  readonly escapeStringLiteral: (value: string) => string;
+}

@@ -1,6 +1,61 @@
+import type {
+  AuthoringPslPrinterDescriptor,
+  AuthoringPslPrinterNamespace,
+} from '@prisma-next/framework-components/authoring';
+import { isAuthoringPslPrinterDescriptor } from '@prisma-next/framework-components/authoring';
+import type {
+  PslPackBlock,
+  PslPackBlockPrinterContext,
+} from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { PrintDocument, PrintNamespaceSection } from './print-document';
 import type { PrinterEnumValue, PrinterField, PrinterNamedType } from './types';
+
+/**
+ * Indent unit used for PSL block bodies and namespace nesting.
+ */
+const PSL_INDENT_UNIT = '  ';
+
+/**
+ * Discriminator-keyed map from a registered `pslPrinters` namespace to the
+ * descriptor that handles each AST node `kind`. Built once per
+ * `serializePrintDocument` call so the per-block dispatch in
+ * `serializeNamespaceContents` is constant-time.
+ */
+type PslPrinterDispatchMap = ReadonlyMap<string, AuthoringPslPrinterDescriptor>;
+
+function buildPslPrinterDispatchMap(
+  namespace: AuthoringPslPrinterNamespace | undefined,
+): PslPrinterDispatchMap {
+  const entries = new Map<string, AuthoringPslPrinterDescriptor>();
+  if (!namespace) {
+    return entries;
+  }
+  collectPrinterDescriptors(namespace, entries);
+  return entries;
+}
+
+function collectPrinterDescriptors(
+  namespace: AuthoringPslPrinterNamespace,
+  out: Map<string, AuthoringPslPrinterDescriptor>,
+): void {
+  for (const value of Object.values(namespace)) {
+    if (isAuthoringPslPrinterDescriptor(value)) {
+      out.set(value.discriminator, value);
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      collectPrinterDescriptors(
+        blindCast<
+          AuthoringPslPrinterNamespace,
+          'recursive descent into a sub-namespace whose leaves are still walked by isAuthoringPslPrinterDescriptor'
+        >(value),
+        out,
+      );
+    }
+  }
+}
 
 const PSL_IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
 const ENUM_MEMBER_RESERVED_WORDS = new Set([
@@ -21,7 +76,14 @@ export function escapePslString(value: string): string {
     .replace(/\r/g, '\\r');
 }
 
-export function serializePrintDocument(doc: PrintDocument): string {
+export interface SerializePrintDocumentOptions {
+  readonly pslPrinters?: AuthoringPslPrinterNamespace;
+}
+
+export function serializePrintDocument(
+  doc: PrintDocument,
+  options: SerializePrintDocumentOptions = {},
+): string {
   const sections: string[] = [];
 
   sections.push(doc.headerComment);
@@ -31,8 +93,18 @@ export function serializePrintDocument(doc: PrintDocument): string {
     sections.push(serializeTypesBlock(namedTypeEntries));
   }
 
+  const printerDispatchMap = buildPslPrinterDispatchMap(options.pslPrinters);
+  const printerContext: PslPackBlockPrinterContext = {
+    indent: PSL_INDENT_UNIT,
+    escapeStringLiteral: escapePslString,
+  };
+
   for (const namespace of doc.namespaces) {
-    const namespaceSections = serializeNamespaceContents(namespace);
+    const namespaceSections = serializeNamespaceContents(
+      namespace,
+      printerDispatchMap,
+      printerContext,
+    );
     if (namespaceSections.length === 0) {
       continue;
     }
@@ -49,7 +121,11 @@ export function serializePrintDocument(doc: PrintDocument): string {
   return `${sections.join('\n\n')}\n`;
 }
 
-function serializeNamespaceContents(namespace: PrintNamespaceSection): string[] {
+function serializeNamespaceContents(
+  namespace: PrintNamespaceSection,
+  printerDispatchMap: PslPrinterDispatchMap,
+  printerContext: PslPackBlockPrinterContext,
+): string[] {
   const sections: string[] = [];
   const enumsSorted = [...namespace.enums].sort((a, b) => a.name.localeCompare(b.name));
   for (const e of enumsSorted) {
@@ -58,7 +134,39 @@ function serializeNamespaceContents(namespace: PrintNamespaceSection): string[] 
   for (const model of namespace.models) {
     sections.push(serializeModel(model));
   }
+  for (const packBlock of namespace.packBlocks) {
+    sections.push(serializePackBlock(packBlock, printerDispatchMap, printerContext));
+  }
   return sections;
+}
+
+function serializePackBlock(
+  packBlock: PslPackBlock,
+  printerDispatchMap: PslPrinterDispatchMap,
+  printerContext: PslPackBlockPrinterContext,
+): string {
+  const descriptor = printerDispatchMap.get(packBlock.kind);
+  if (!descriptor) {
+    throw new Error(
+      `No pslPrinter contribution registered for pack-contributed block discriminator "${packBlock.kind}". Provide a matching pslPrinter contribution to printPsl, or remove the block from the input AST.`,
+    );
+  }
+  // The descriptor's `printer` field is declared with `Input extends
+  // PslPackBlock = never` so a pack literal's concrete printer type
+  // (`(node: SomeAst, …) => string`) assigns to the base shape across
+  // the contravariant function-parameter position. At dispatch time we
+  // hold the descriptor as the base shape, so its declared `Input` is
+  // `never` — but the runtime function is the pack's specific
+  // implementation, which expects the actual AST shape. The
+  // discriminator-keyed lookup pairs each `packBlock` with the
+  // descriptor whose pack contributed it (triple-bundle validation
+  // ensures the pairing exists), so the runtime contract holds even
+  // though TypeScript cannot prove the connection at the dispatch site.
+  const printerFn = blindCast<
+    (input: PslPackBlock, context: PslPackBlockPrinterContext) => string,
+    'discriminator-keyed dispatch pairs the descriptor with the AST node its pack produced; runtime contract holds while the static type narrows through `Input = never` for assignability'
+  >(descriptor.printer);
+  return printerFn(packBlock, printerContext);
 }
 
 function wrapNamespaceBlock(name: string, innerSections: readonly string[]): string {
