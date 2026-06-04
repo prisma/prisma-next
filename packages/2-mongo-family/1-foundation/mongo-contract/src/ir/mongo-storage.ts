@@ -9,8 +9,8 @@ import type { MongoCollection, MongoCollectionInput } from './mongo-collection';
 
 export interface MongoNamespaceCollectionsInput {
   readonly id: string;
-  readonly entries?: {
-    readonly collection?: Record<string, MongoCollection | MongoCollectionInput>;
+  readonly entries: {
+    readonly collection: Record<string, MongoCollection | MongoCollectionInput>;
   };
 }
 

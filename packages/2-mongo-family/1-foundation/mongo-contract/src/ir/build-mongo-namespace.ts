@@ -33,7 +33,7 @@ class MongoBoundNamespace extends NamespaceBase {
   }>;
 
   static fromCollectionsInput(input: MongoNamespaceCollectionsInput): MongoNamespace {
-    const collectionCount = Object.keys(input.entries?.collection ?? {}).length;
+    const collectionCount = Object.keys(input.entries.collection).length;
     if (input.id === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
       return castAs<MongoNamespace>(MongoUnboundNamespace.instance);
     }
@@ -46,7 +46,7 @@ class MongoBoundNamespace extends NamespaceBase {
     this.entries = Object.freeze({
       collection: Object.freeze(
         Object.fromEntries(
-          Object.entries(input.entries?.collection ?? {}).map(([name, c]) => [
+          Object.entries(input.entries.collection).map(([name, c]) => [
             name,
             c instanceof MongoCollection ? c : new MongoCollection(c),
           ]),
@@ -78,7 +78,12 @@ export function buildMongoNamespaceMap(
             MongoNamespace,
             'a materialised Mongo-family namespace entry in a namespace map is a MongoNamespace'
           >(ns)
-        : MongoBoundNamespace.fromCollectionsInput(ns),
+        : MongoBoundNamespace.fromCollectionsInput(
+            blindCast<
+              MongoNamespaceCollectionsInput,
+              'non-materialized Mongo namespace map entry is a MongoNamespaceCollectionsInput'
+            >(ns),
+          ),
     ]),
   );
 }

@@ -78,7 +78,7 @@ export function contractToMongoSchemaIR(contract: MongoContract | null): MongoSc
 
   const collections: MongoSchemaCollection[] = [];
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [name, def] of Object.entries(ns.entries?.collection ?? {})) {
+    for (const [name, def] of Object.entries(ns.entries.collection)) {
       collections.push(convertCollection(name, def));
     }
   }

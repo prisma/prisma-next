@@ -59,7 +59,7 @@ class StubNamespace extends NamespaceBase {
 function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
   return new StubNamespace(
     input.id,
-    input.entries?.table as Readonly<Record<string, IRNode>> | undefined,
+    input.entries.table as Readonly<Record<string, IRNode>> | undefined,
   );
 }
 

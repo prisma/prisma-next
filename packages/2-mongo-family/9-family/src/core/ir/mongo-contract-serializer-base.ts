@@ -123,7 +123,7 @@ export abstract class MongoContractSerializerBase<TContract>
     const rawNamespaces = contract.storage.namespaces;
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
-        const rawCollections = nsEnvelope.entries?.collection ?? {};
+        const rawCollections = nsEnvelope.entries.collection;
         const hydratedCollections = Object.fromEntries(
           Object.entries(rawCollections).map(([name, raw]) => [
             name,
