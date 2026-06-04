@@ -34,18 +34,18 @@ import type {
   PerSpaceExecutionEntry,
 } from '../types';
 import {
-  applyMigration,
   buildPerSpaceBreakdown,
   collectOrdered,
   type OrderedResolution,
+  runMigration,
 } from './apply';
 import { stripOperations } from './migration-helpers';
 
 /**
- * Span IDs emitted via `onProgress` during the apply flow.
+ * Span IDs emitted via `onProgress` during the run flow.
  * Stable identifiers consumed by the structured-output renderer and by
  * tests asserting on span ids. The `apply` span itself is owned by
- * the {@link applyMigration} primitive — only the introspect / plan
+ * the {@link runMigration} primitive — only the introspect / plan
  * spans are emitted directly here.
  */
 const SPAN_IDS = {
@@ -54,13 +54,13 @@ const SPAN_IDS = {
 } as const;
 
 /**
- * Inputs shared by `db init` and `db update` apply flows.
+ * Inputs shared by `db init` and `db update` run flows.
  *
  * Accepts the already-validated app contract + descriptor list — the
  * loader gathers the rest from disk + descriptors. The CLI is the
  * descriptor-import boundary; everything downstream is descriptor-free.
  */
-export interface ExecuteApplyOptions<TFamilyId extends string, TTargetId extends string> {
+export interface ExecuteRunOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   readonly contract: Contract;
@@ -98,8 +98,8 @@ export interface ExecuteApplyOptions<TFamilyId extends string, TTargetId extends
  *    transaction across every space; failure on any space rolls back
  *    every space's writes.
  */
-export async function executeApply<TFamilyId extends string, TTargetId extends string>(
-  options: ExecuteApplyOptions<TFamilyId, TTargetId>,
+export async function executeRun<TFamilyId extends string, TTargetId extends string>(
+  options: ExecuteRunOptions<TFamilyId, TTargetId>,
 ): Promise<DbInitResult | DbUpdateResult> {
   const {
     driver,
@@ -213,13 +213,13 @@ export async function executeApply<TFamilyId extends string, TTargetId extends s
     });
   }
 
-  // 5. Apply mode: hand off to the shared `applyMigration` primitive.
+  // 5. Run mode: hand off to the shared `runMigration` primitive.
   // The runner-driving tail is identical for `db init` / `db update` /
   // `migrate` — only how each caller produces `perSpacePlans`
   // differs (synth + graph-walk via planMigration here; graph-walk
   // only for migrate). Each caller produces perSpacePlans differently;
-  // this helper handles the shared apply tail.
-  const applied = await applyMigration({
+  // this helper handles the shared run tail.
+  const applied = await runMigration({
     aggregate,
     perSpacePlans: planResult.value.perSpace,
     applyOrder: planResult.value.applyOrder,

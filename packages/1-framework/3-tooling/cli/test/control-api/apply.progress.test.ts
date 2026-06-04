@@ -11,6 +11,6 @@ describe('progressLabelForAction', () => {
   });
 
   it('returns the migrate label for migrate', () => {
-    expect(progressLabelForAction('migrate')).toBe('Applying migration plan across spaces');
+    expect(progressLabelForAction('migrate')).toBe('Running migration plan across spaces');
   });
 });

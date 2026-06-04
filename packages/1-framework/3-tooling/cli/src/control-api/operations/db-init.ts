@@ -8,14 +8,14 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { DbInitResult, OnControlProgress } from '../types';
-import { executeApply } from './db-apply';
+import { executeRun } from './db-apply';
 
 /**
  * Options for executing the `db init` operation.
  *
  * `db init` runs the loader → planner → runner pipeline:
  *
- * 1. {@link executeApply} loads a `ContractSpaceAggregate` via
+ * 1. {@link executeRun} loads a `ContractSpaceAggregate` via
  *    {@link import('@prisma-next/migration-tools/aggregate').loadContractSpaceAggregate}
  *    from the supplied descriptor set + on-disk on-disk artefacts.
  * 2. The aggregate planner runs with `callerPolicy.ignoreGraphFor`
@@ -68,7 +68,7 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
 export async function executeDbInit<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbInitOptions<TFamilyId, TTargetId>,
 ): Promise<DbInitResult> {
-  const result = await executeApply<TFamilyId, TTargetId>({
+  const result = await executeRun<TFamilyId, TTargetId>({
     driver: options.driver,
     familyInstance: options.familyInstance,
     contract: options.contract,

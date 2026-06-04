@@ -32,7 +32,7 @@ import type {
   OnControlProgress,
   PerSpaceExecutionEntry,
 } from '../types';
-import { applyMigration, buildPerSpaceBreakdown } from './apply';
+import { buildPerSpaceBreakdown, runMigration } from './apply';
 
 /**
  * Inputs for the aggregate-walking `migrate` control-api
@@ -96,7 +96,7 @@ export interface ExecuteMigrateOptions<TFamilyId extends string, TTargetId exten
  *    marker to `member.headRef.hash` (or `refHash` for the app
  *    member when provided). Empty-graph members fail loudly — a
  *    "never planned" space is a user-error condition for replay.
- * 4. Hand off to {@link applyMigration} (the runner-driving tail
+ * 4. Hand off to {@link runMigration} (the runner-driving tail
  *    shared with `db init` / `db update`). Marker advancement is
  *    inside the per-space transaction.
  *
@@ -277,7 +277,7 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
     );
   }
 
-  const applied = await applyMigration({
+  const applied = await runMigration({
     aggregate,
     perSpacePlans,
     applyOrder,

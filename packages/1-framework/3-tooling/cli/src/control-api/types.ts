@@ -546,7 +546,7 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
  * contract-space aggregate, reading per-space marker rows from the
  * live database, plotting per-space paths via `graphWalkStrategy`
  * (replay-only — no synth, no introspection), and dispatching
- * through the shared `applyMigration` primitive. The CLI command
+ * through the shared `runMigration` primitive. The CLI command
  * just resolves the descriptor surface (config, refs, contract
  * envelope, app-space migration packages) and hands the inputs in.
  */
