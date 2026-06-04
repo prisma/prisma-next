@@ -99,7 +99,7 @@ export function storageTableAt(
   namespaceId: string,
   tableName: string,
 ): StorageTable | undefined {
-  return storage.namespaces[namespaceId]?.entries.table?.[tableName];
+  return storage.namespaces[namespaceId]?.entries.table[tableName];
 }
 
 /**

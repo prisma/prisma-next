@@ -111,7 +111,7 @@ export const sqlEmission = {
         }
 
         const tableName = model.storage.table;
-        const table = storage.namespaces[namespaceId]?.entries.table?.[tableName] as
+        const table = storage.namespaces[namespaceId]?.entries.table[tableName] as
           | StorageTable
           | undefined;
         if (!table) {
@@ -207,7 +207,7 @@ export const sqlEmission = {
             }
           }
 
-          const referencedTable = storage.namespaces[fk.target.namespaceId]?.entries.table?.[
+          const referencedTable = storage.namespaces[fk.target.namespaceId]?.entries.table[
             fk.target.tableName
           ] as StorageTable | undefined;
           if (!referencedTable) {
@@ -282,7 +282,7 @@ export const sqlEmission = {
     const storageNamespaceId = sqlModel.storage.namespaceId;
     if (!storageNamespaceId) return undefined;
 
-    const table = storage.namespaces[storageNamespaceId]?.entries.table?.[tableName] as
+    const table = storage.namespaces[storageNamespaceId]?.entries.table[tableName] as
       | StorageTable
       | undefined;
     if (!table) return undefined;

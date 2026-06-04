@@ -701,8 +701,7 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
       }
 
       const storageTable = model.storage.table;
-      const rawTable =
-        contract.storage.namespaces[storageNamespaceId]?.entries.table?.[storageTable];
+      const rawTable = contract.storage.namespaces[storageNamespaceId]?.entries.table[storageTable];
       if (rawTable === undefined) {
         throw new ContractValidationError(
           `Model "${qualifiedName}" references non-existent table "${storageNamespaceId}.${storageTable}"`,
@@ -812,7 +811,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
       }
 
       const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
-      const referencedRaw = targetNamespace?.entries.table?.[fk.target.tableName];
+      const referencedRaw = targetNamespace?.entries.table[fk.target.tableName];
       if (referencedRaw === undefined) {
         throw new ContractValidationError(
           `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,

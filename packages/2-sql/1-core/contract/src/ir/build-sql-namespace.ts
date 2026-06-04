@@ -37,13 +37,11 @@ class SqlBoundNamespace extends NamespaceBase {
   readonly id: string;
   readonly entries: Readonly<{
     readonly table: Readonly<Record<string, StorageTable>>;
-    readonly type?: Readonly<Record<string, unknown>>;
   }>;
 
   static fromTablesInput(input: SqlNamespaceTablesInput): SqlNamespace {
     const tableCount = Object.keys(input.entries.table).length;
-    const typeCount = Object.keys(input.entries.type ?? {}).length;
-    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0 && typeCount === 0) {
+    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0) {
       return castAs<SqlNamespace>(SqlUnboundNamespace.instance);
     }
     return castAs<SqlNamespace>(new SqlBoundNamespace(input));
@@ -55,7 +53,7 @@ class SqlBoundNamespace extends NamespaceBase {
     this.entries = blindCast<
       SqlBoundNamespace['entries'],
       'materializeAndFreezeEntries with SQL_NAMESPACE_REGISTRY produces StorageTable instances under table slot'
-    >(materializeAndFreezeEntries(input.entries, SQL_NAMESPACE_REGISTRY));
+    >(materializeAndFreezeEntries({ table: input.entries.table }, SQL_NAMESPACE_REGISTRY));
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,
