@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e59d6d9829e8c0283838035c851e6ad35862dc3f517a0f046253fba24e9a85ff'>;
+  StorageHashBase<'sha256:a8f5d5bba258f1722003ec229ffbd3c97b52ea8bdcc9aef2a7568501270ff936'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -56,6 +56,11 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'sql-namespace';
+          readonly entries: { readonly table: {} };
+        };
         readonly public: {
           readonly id: 'public';
           readonly kind: 'sql-namespace';
