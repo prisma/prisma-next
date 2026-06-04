@@ -118,6 +118,14 @@ export interface ModelNode {
   readonly foreignKeys?: readonly ForeignKeyNode[];
   readonly relations?: readonly RelationNode[];
   readonly control?: ControlPolicy;
+  /**
+   * Single-table-inheritance variants share their base model's storage table:
+   * the variant's columns are materialised onto the base `ModelNode`, and this
+   * model contributes a domain model but no storage table of its own. When set,
+   * the assembler builds the domain model but skips creating a (shadow) storage
+   * table and a root for this model — the base owns both.
+   */
+  readonly sharesBaseTable?: boolean;
 }
 
 export interface ContractDefinition {

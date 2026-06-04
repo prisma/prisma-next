@@ -42,6 +42,10 @@ Changelog tracking starts at **v0.12.0**, the first release cut after this conve
   }
   ```
 
+### Features
+
+- **STI variants can declare their own fields** (`@prisma-next/sql-contract-psl`) — a PSL `@@base(Parent, "tag")` variant with no own `@@map` (single-table inheritance) may now declare its own scalar fields. Each such field is materialized as a column on the shared base table (always nullable in storage, since the base table also holds sibling-variant rows), and the variant no longer emits a stray shadow table. Previously the variant's column was never added to the base table, so the contract failed to emit with `references non-existent column`. This is purely enabling: existing contracts re-emit identically. ([#669](https://github.com/prisma/prisma-next/pull/669))
+
 ## v0.12.0
 
 Namespaces become first-class: un-namespaced Postgres models now live in `public`, the application plane is symmetric with storage, and every cross-namespace reference is explicit. This release also ratifies a version-support policy (Node 24+), simplifies runtime marker verification, closes MongoDB validators by default, and adds raw SQL to the typed builder. Several contract-shape changes require a one-time re-emit — most are mechanical and covered by the linked upgrade recipes.

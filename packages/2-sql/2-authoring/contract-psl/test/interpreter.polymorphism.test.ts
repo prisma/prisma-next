@@ -391,6 +391,236 @@ model Bug {
     });
   });
 
+  describe('STI variant storage columns', () => {
+    function tablesOf(contract: { storage: unknown }) {
+      const storage = contract.storage as SqlStorage;
+      return storage.namespaces['public']?.tables ?? {};
+    }
+
+    it('materializes an STI variant column onto the base table (nullable in storage)', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // The variant's declared column lands on the SHARED base table. It is
+      // nullable in storage even though the domain field is required, because
+      // the base table also hosts sibling-variant rows (Feature rows have no
+      // `severity`).
+      const tasks = tablesOf(result.value)['tasks'];
+      expect(tasks?.columns['severity']).toMatchObject({
+        codecId: 'pg/text@1',
+        nativeType: 'text',
+        nullable: true,
+      });
+
+      // The variant's own field map points at the base-table column, and the
+      // emitter's storage-reference check is satisfied (the bug this fixes).
+      expect((modelsOf(result.value)['Bug']?.storage as SqlModelStorage).fields).toEqual({
+        severity: { column: 'severity' },
+      });
+    });
+
+    it('keeps the STI variant domain field at its declared (required) nullability', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const severity = modelsOf(result.value)['Bug']?.fields['severity'];
+      expect(severity).toMatchObject({ nullable: false });
+    });
+
+    it('does not emit an orphan storage table for an STI variant', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // The STI variant shares the base table; it must not also produce its
+      // own (empty) table or a root pointing at one.
+      expect(Object.keys(tablesOf(result.value))).toEqual(['tasks']);
+      expect(result.value.roots).not.toHaveProperty('bug');
+    });
+
+    it('materializes columns for two STI variants onto the same base table', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}
+
+model Chore {
+  recurring Boolean
+
+  @@base(Task, "chore")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const tasks = tablesOf(result.value)['tasks'];
+      expect(tasks?.columns['severity']).toMatchObject({ nullable: true });
+      expect(tasks?.columns['recurring']).toMatchObject({ nullable: true });
+      expect(Object.keys(tablesOf(result.value))).toEqual(['tasks']);
+    });
+
+    it('leaves MTI variants untouched (own table keeps its own columns)', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Feature {
+  priority Int
+
+  @@base(Task, "feature")
+  @@map("features")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const tables = tablesOf(result.value);
+      // The MTI variant's column stays on its own table, NOT the base.
+      expect(tables['tasks']?.columns).not.toHaveProperty('priority');
+      expect(tables['features']?.columns['priority']).toMatchObject({ nullable: false });
+    });
+
+    it('materializes the STI column and joins the MTI variant in a mixed hierarchy', () => {
+      const document = parsePslDocument({
+        schema: `model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}
+
+model Feature {
+  priority Int
+
+  @@base(Task, "feature")
+  @@map("features")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const tables = tablesOf(result.value);
+      expect(tables['tasks']?.columns['severity']).toMatchObject({ nullable: true });
+      expect(tables['tasks']?.columns).not.toHaveProperty('priority');
+      expect(tables['features']?.columns['priority']).toMatchObject({ nullable: false });
+      expect(Object.keys(tables).sort()).toEqual(['features', 'tasks']);
+    });
+  });
+
   describe('@@discriminator and @@base — diagnostics', () => {
     it('diagnoses orphaned @@discriminator (no @@base declarations)', () => {
       const document = parsePslDocument({

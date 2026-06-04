@@ -1473,6 +1473,7 @@ function resolvePolymorphism(
 function materializeMtiVariantStorageLinks(
   modelNodes: readonly ModelNode[],
   baseDeclarations: ReadonlyMap<string, BaseDeclaration>,
+  stiVariantNames: ReadonlySet<string>,
 ): { modelNodes: ModelNode[]; syntheticPkFieldsByVariant: Map<string, readonly string[]> } {
   const nodeByModel = new Map(modelNodes.map((node) => [node.modelName, node]));
   const syntheticPkFieldsByVariant = new Map<string, readonly string[]>();
@@ -1482,8 +1483,10 @@ function materializeMtiVariantStorageLinks(
     if (!baseDecl) return node;
     const baseNode = nodeByModel.get(baseDecl.baseName);
     if (!baseNode) return node;
-    // Same table as the base → single-table inheritance; nothing to link.
-    if (node.tableName === baseNode.tableName) return node;
+    // Single-table inheritance (no own `@@map`) shares the base table; it gets
+    // its columns materialised onto the base instead (see
+    // {@link materializeStiVariantStorageColumns}), never a link column.
+    if (stiVariantNames.has(node.modelName)) return node;
     const basePrimaryKey = baseNode.id;
     if (!basePrimaryKey || basePrimaryKey.columns.length === 0) return node;
 
@@ -1535,6 +1538,68 @@ function materializeMtiVariantStorageLinks(
   });
 
   return { modelNodes: enriched, syntheticPkFieldsByVariant };
+}
+
+/**
+ * Single-table-inheritance variants (`@@base` with no own `@@map`) share the
+ * base table: `resolvePolymorphism` points the variant's `storage.table` at the
+ * base, and the ORM reads variant-declared fields straight off the base table.
+ * For that to validate and round-trip, the base storage table must physically
+ * carry every STI variant's declared columns. This enriches the base
+ * `ModelNode` with those columns.
+ *
+ * The materialised columns are always nullable in storage: the base table hosts
+ * every variant's rows, so a column a variant declares as required is still
+ * NULL on sibling-variant rows. The variant's domain field keeps its declared
+ * nullability — required-in-domain / nullable-in-storage is the intended STI
+ * shape.
+ *
+ * Collisions (two variants declaring the same column, or a variant column name
+ * clashing with a base column) are resolved skip-if-exists here, mirroring the
+ * MTI link guard; surfacing them as diagnostics is tracked separately
+ * (TML-2827).
+ */
+function materializeStiVariantStorageColumns(
+  modelNodes: readonly ModelNode[],
+  baseDeclarations: ReadonlyMap<string, BaseDeclaration>,
+  stiVariantNames: ReadonlySet<string>,
+): ModelNode[] {
+  if (stiVariantNames.size === 0) return [...modelNodes];
+
+  const nodeByModel = new Map(modelNodes.map((node) => [node.modelName, node]));
+  type StiColumn = ModelNode['fields'][number];
+  const stiColumnsByBase = new Map<string, StiColumn[]>();
+
+  for (const variantName of stiVariantNames) {
+    const variantNode = nodeByModel.get(variantName);
+    const baseDecl = baseDeclarations.get(variantName);
+    if (!variantNode || !baseDecl) continue;
+    const baseNode = nodeByModel.get(baseDecl.baseName);
+    if (!baseNode) continue;
+
+    const baseColumns = new Set(baseNode.fields.map((field) => field.columnName));
+    const claimed = stiColumnsByBase.get(baseDecl.baseName) ?? [];
+    const claimedColumns = new Set(claimed.map((field) => field.columnName));
+
+    for (const field of variantNode.fields) {
+      if (baseColumns.has(field.columnName) || claimedColumns.has(field.columnName)) {
+        continue;
+      }
+      claimedColumns.add(field.columnName);
+      claimed.push({ ...field, nullable: true });
+    }
+    stiColumnsByBase.set(baseDecl.baseName, claimed);
+  }
+
+  return modelNodes.map((node): ModelNode => {
+    // STI variant: contributes a domain model but no storage table of its own.
+    if (stiVariantNames.has(node.modelName)) {
+      return { ...node, sharesBaseTable: true };
+    }
+    const stiColumns = stiColumnsByBase.get(node.modelName);
+    if (!stiColumns || stiColumns.length === 0) return node;
+    return { ...node, fields: [...node.fields, ...stiColumns] };
+  });
 }
 
 /**
@@ -1764,8 +1829,29 @@ export function interpretPslDocumentToSqlContract(
     diagnostics,
   );
 
+  // A variant with `@@base` but no own `@@map` is single-table inheritance:
+  // it shares the base table. (`@@map` ⇒ multi-table inheritance.) This is the
+  // authoritative STI/MTI signal — the variant's resolved table name is not,
+  // because a no-`@@map` STI variant still gets a `lowerFirst(name)` default
+  // table name that differs from the base before `resolvePolymorphism` rewrites
+  // it onto the base table.
+  const stiVariantNames = new Set<string>();
+  for (const variantName of baseDeclarations.keys()) {
+    const variantMapping = modelMappings.get(variantName);
+    const hasExplicitMap =
+      variantMapping?.model.attributes.some((attr) => attr.name === 'map') ?? false;
+    if (!hasExplicitMap) {
+      stiVariantNames.add(variantName);
+    }
+  }
+
   const { modelNodes: linkedModelNodes, syntheticPkFieldsByVariant } =
-    materializeMtiVariantStorageLinks(modelNodes, baseDeclarations);
+    materializeMtiVariantStorageLinks(modelNodes, baseDeclarations, stiVariantNames);
+  const polyModelNodes = materializeStiVariantStorageColumns(
+    linkedModelNodes,
+    baseDeclarations,
+    stiVariantNames,
+  );
 
   const valueObjects = buildValueObjects({
     compositeTypes,
@@ -1802,7 +1888,7 @@ export function interpretPslDocumentToSqlContract(
       ? { namespaceTypes: namespaceEnumStorageTypes }
       : {}),
     ...ifDefined('createNamespace', input.createNamespace),
-    models: linkedModelNodes.map((model) => ({
+    models: polyModelNodes.map((model) => ({
       ...model,
       ...(modelRelations.has(model.modelName)
         ? {

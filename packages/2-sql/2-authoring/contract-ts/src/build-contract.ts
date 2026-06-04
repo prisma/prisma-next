@@ -338,7 +338,11 @@ export function buildSqlContractFromDefinition(
         ? semanticModel.namespaceId
         : defaultNamespaceId;
     modelNameToNamespaceId.set(semanticModel.modelName, namespaceId);
-    roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
+    // STI variants share the base table; the base model already owns this
+    // table name and its root, so the variant contributes neither.
+    if (!semanticModel.sharesBaseTable) {
+      roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
+    }
 
     // --- Build storage table ---
 
@@ -428,49 +432,54 @@ export function buildSqlContractFromDefinition(
       };
     });
 
-    const existingNs = tableNameToNamespaceId.get(tableName);
-    if (existingNs !== undefined && existingNs !== namespaceId) {
-      throw new Error(
-        `buildSqlContractFromDefinition: table "${tableName}" is mapped in namespace "${namespaceId}" but already exists in namespace "${existingNs}".`,
-      );
-    }
-    tableNameToNamespaceId.set(tableName, namespaceId);
+    // STI variants share the base table: their columns are already
+    // materialised onto the base `ModelNode`, so the variant builds a domain
+    // model (below) but no storage table of its own.
+    if (!semanticModel.sharesBaseTable) {
+      const existingNs = tableNameToNamespaceId.get(tableName);
+      if (existingNs !== undefined && existingNs !== namespaceId) {
+        throw new Error(
+          `buildSqlContractFromDefinition: table "${tableName}" is mapped in namespace "${namespaceId}" but already exists in namespace "${existingNs}".`,
+        );
+      }
+      tableNameToNamespaceId.set(tableName, namespaceId);
 
-    const tableInput: StorageTableInput = {
-      columns,
-      ...ifDefined('control', semanticModel.control),
-      uniques: (semanticModel.uniques ?? []).map((u) => ({
-        columns: u.columns,
-        ...ifDefined('name', u.name),
-      })),
-      indexes: (semanticModel.indexes ?? []).map((i) => ({
-        columns: i.columns,
-        ...ifDefined('name', i.name),
-        ...ifDefined('type', i.type),
-        ...ifDefined('options', i.options),
-      })),
-      foreignKeys,
-      ...(semanticModel.id
-        ? {
-            primaryKey: {
-              columns: semanticModel.id.columns,
-              ...ifDefined('name', semanticModel.id.name),
-            },
-          }
-        : {}),
-    };
+      const tableInput: StorageTableInput = {
+        columns,
+        ...ifDefined('control', semanticModel.control),
+        uniques: (semanticModel.uniques ?? []).map((u) => ({
+          columns: u.columns,
+          ...ifDefined('name', u.name),
+        })),
+        indexes: (semanticModel.indexes ?? []).map((i) => ({
+          columns: i.columns,
+          ...ifDefined('name', i.name),
+          ...ifDefined('type', i.type),
+          ...ifDefined('options', i.options),
+        })),
+        foreignKeys,
+        ...(semanticModel.id
+          ? {
+              primaryKey: {
+                columns: semanticModel.id.columns,
+                ...ifDefined('name', semanticModel.id.name),
+              },
+            }
+          : {}),
+      };
 
-    let nsTables = tablesByNamespace[namespaceId];
-    if (nsTables === undefined) {
-      nsTables = {};
-      tablesByNamespace[namespaceId] = nsTables;
+      let nsTables = tablesByNamespace[namespaceId];
+      if (nsTables === undefined) {
+        nsTables = {};
+        tablesByNamespace[namespaceId] = nsTables;
+      }
+      if (nsTables[tableName] !== undefined) {
+        throw new Error(
+          `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
+        );
+      }
+      nsTables[tableName] = new StorageTable(tableInput);
     }
-    if (nsTables[tableName] !== undefined) {
-      throw new Error(
-        `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
-      );
-    }
-    nsTables[tableName] = new StorageTable(tableInput);
 
     // --- Build contract model ---
 
