@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import {
   type Contract,
   type ContractModelBase,
@@ -9,6 +10,7 @@ import type {
   CodecMeta,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   instantiateExecutionStack,
   type RuntimeDriverDescriptor,
@@ -36,16 +38,14 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { SelectAst as SelectAstCtor, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { buildSignMarkerBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import { applicationDomainOf, collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { SqlStatement } from '../src/exports';
 import {
-  APP_SPACE_ID,
   createExecutionContext,
   type createRuntime,
   createSqlExecutionStack,
-  ensureSchemaStatement,
-  ensureTableStatement,
 } from '../src/exports';
 import type {
   ExecutionContext,
@@ -85,6 +85,9 @@ export async function drainPlanExecution(
   return drainAsyncIterable(runtime.execute(plan));
 }
 
+const postgresControlAdapter = createPostgresAdapter();
+const postgresControlLowererContext = { contract: {} as Contract<SqlStorage> };
+
 /**
  * Executes a SQL statement on a database client.
  */
@@ -95,6 +98,27 @@ export async function executeStatement(client: Client, statement: SqlStatement):
   }
 
   await client.query(statement.sql);
+}
+
+export async function executeLoweredStatement(
+  client: Client,
+  statement: LoweredStatement,
+): Promise<void> {
+  if (statement.params.length > 0) {
+    await client.query(statement.sql, [...statement.params]);
+    return;
+  }
+
+  await client.query(statement.sql);
+}
+
+export async function bootstrapPostgresSignMarkerTables(client: Client): Promise<void> {
+  for (const query of buildSignMarkerBootstrapQueries()) {
+    await executeLoweredStatement(
+      client,
+      postgresControlAdapter.lower(query, postgresControlLowererContext),
+    );
+  }
 }
 
 /**
@@ -110,8 +134,7 @@ export async function setupTestDatabase(
 
   await setupFn(client);
 
-  await executeStatement(client, ensureSchemaStatement);
-  await executeStatement(client, ensureTableStatement);
+  await bootstrapPostgresSignMarkerTables(client);
   await writeTestContractMarker(client, contract);
 }
 
