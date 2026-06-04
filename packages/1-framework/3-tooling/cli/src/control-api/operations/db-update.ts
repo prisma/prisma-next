@@ -9,7 +9,7 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk } from '@prisma-next/utils/result';
 import type { DbUpdateResult, OnControlProgress } from '../types';
-import { executeRun } from './db-apply';
+import { executeRun } from './db-run';
 
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,

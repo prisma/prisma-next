@@ -16,7 +16,7 @@ import {
 } from '@prisma-next/migration-tools/aggregate';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
-import { type RunAction, runMigration } from '../../src/control-api/operations/apply';
+import { type RunAction, runMigration } from '../../src/control-api/operations/run-migration';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 
 const APP_HASH = `sha256:${'a'.repeat(64)}`;

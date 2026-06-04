@@ -1,3 +1,8 @@
+/**
+ * Shared runner tail (`runMigration` + `buildPerSpaceBreakdown`/`collectOrdered`).
+ * Backs no command directly; consumed by db-run and migrate.
+ */
+
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,

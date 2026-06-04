@@ -33,7 +33,7 @@ import { ContractValidationError } from './errors';
 import { executeDbInit } from './operations/db-init';
 import { executeDbUpdate } from './operations/db-update';
 import { type ExecuteDbVerifyResult, executeDbVerify } from './operations/db-verify';
-import { executeMigrate } from './operations/migration-apply';
+import { executeMigrate } from './operations/migrate';
 
 import type {
   ControlActionName,

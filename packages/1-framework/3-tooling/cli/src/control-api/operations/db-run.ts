@@ -1,3 +1,7 @@
+/**
+ * Backs `db init` / `db update`. Strategy: introspect → planMigration; synth-for-app + graph-walk-extensions; plan-mode + orphan-marker preflight.
+ */
+
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -33,13 +37,13 @@ import type {
   OnControlProgress,
   PerSpaceExecutionEntry,
 } from '../types';
+import { stripOperations } from './migration-helpers';
 import {
   buildPerSpaceBreakdown,
   collectOrdered,
   type OrderedResolution,
   runMigration,
-} from './apply';
-import { stripOperations } from './migration-helpers';
+} from './run-migration';
 
 /**
  * Span IDs emitted via `onProgress` during the run flow.

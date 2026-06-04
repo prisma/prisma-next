@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildNeverPlannedFailure,
   buildPathNotFoundFailure,
-} from '../src/control-api/operations/migration-apply';
+} from '../src/control-api/operations/migrate';
 import type { MigrateFailure } from '../src/control-api/types';
 import {
   errorDriverRequired,

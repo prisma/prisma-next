@@ -8,7 +8,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { DbInitResult, OnControlProgress } from '../types';
-import { executeRun } from './db-apply';
+import { executeRun } from './db-run';
 
 /**
  * Options for executing the `db init` operation.

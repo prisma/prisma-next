@@ -1,3 +1,7 @@
+/**
+ * Backs the `migrate` command. Strategy: graph-walk-all-members, replay-only (no introspect/synth/planner).
+ */
+
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -32,7 +36,7 @@ import type {
   OnControlProgress,
   PerSpaceExecutionEntry,
 } from '../types';
-import { buildPerSpaceBreakdown, runMigration } from './apply';
+import { buildPerSpaceBreakdown, runMigration } from './run-migration';
 
 /**
  * Inputs for the aggregate-walking `migrate` control-api
