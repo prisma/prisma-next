@@ -68,12 +68,19 @@ type AggregateBuilderView = {
   count(): unknown;
   max(field: string): unknown;
 };
+type WhereScoped = {
+  deleteAll(): { toArray(): Promise<Record<string, unknown>[]> };
+  update(data: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+  delete(): Promise<Record<string, unknown> | null>;
+};
 type CrudCollection = {
   all(): { toArray(): Promise<Record<string, unknown>[]> };
   create(values: Record<string, unknown>): Promise<Record<string, unknown>>;
-  where(filter: Record<string, unknown>): {
-    deleteAll(): { toArray(): Promise<Record<string, unknown>[]> };
-  };
+  where(filter: Record<string, unknown>): WhereScoped;
+  upsert(input: {
+    create: Record<string, unknown>;
+    update: Record<string, unknown>;
+  }): Promise<Record<string, unknown>>;
   aggregate(
     fn: (aggregate: AggregateBuilderView) => Record<string, unknown>,
   ): Promise<Record<string, unknown>>;
@@ -233,6 +240,66 @@ describe('orm same bare table name across namespaces', () => {
       id: 'pg/int4@1',
       token_col: 'pg/varchar@1',
     });
+  });
+
+  it('resolves identity columns within the namespace for singular update, discriminating by namespace', async () => {
+    const { db, runtime } = setup();
+
+    runtime.setNextResults([[{ id: 1 }], [{ id: 1, email_addr: 'b@example.com' }]]);
+    const publicUpdated = await db.public.User.where({ id: 1 }).update({ email: 'b@example.com' });
+    expect(publicUpdated).toEqual({ id: 1, email: 'b@example.com' });
+    const publicAst = lastWriteAst(runtime);
+    expect(publicAst.table.namespaceId).toBe('public');
+    expect(returningCodecByColumn(publicAst)).toEqual({ id: 'pg/int4@1', email_addr: 'pg/text@1' });
+
+    runtime.setNextResults([[{ id: 2 }], [{ id: 2, token_col: 'tok2' }]]);
+    const authUpdated = await db.auth.User.where({ id: 2 }).update({ token: 'tok2' });
+    expect(authUpdated).toEqual({ id: 2, token: 'tok2' });
+    const authAst = lastWriteAst(runtime);
+    expect(authAst.table.namespaceId).toBe('auth');
+    expect(returningCodecByColumn(authAst)).toEqual({ id: 'pg/int4@1', token_col: 'pg/varchar@1' });
+  });
+
+  it('resolves identity columns within the namespace for singular delete, discriminating by namespace', async () => {
+    const { db, runtime } = setup();
+
+    runtime.setNextResults([[{ id: 1 }], [{ id: 1, email_addr: 'a@example.com' }]]);
+    const publicDeleted = await db.public.User.where({ id: 1 }).delete();
+    expect(publicDeleted).toEqual({ id: 1, email: 'a@example.com' });
+    const publicAst = lastWriteAst(runtime);
+    expect(publicAst.table.namespaceId).toBe('public');
+    expect(returningCodecByColumn(publicAst)).toEqual({ id: 'pg/int4@1', email_addr: 'pg/text@1' });
+
+    runtime.setNextResults([[{ id: 2 }], [{ id: 2, token_col: 'tok' }]]);
+    const authDeleted = await db.auth.User.where({ id: 2 }).delete();
+    expect(authDeleted).toEqual({ id: 2, token: 'tok' });
+    const authAst = lastWriteAst(runtime);
+    expect(authAst.table.namespaceId).toBe('auth');
+    expect(returningCodecByColumn(authAst)).toEqual({ id: 'pg/int4@1', token_col: 'pg/varchar@1' });
+  });
+
+  it('resolves the PK-default conflict target within the namespace for upsert, discriminating by namespace', async () => {
+    const { db, runtime } = setup();
+
+    runtime.setNextResults([[{ id: 1, email_addr: 'a@example.com' }]]);
+    const publicUpserted = await db.public.User.upsert({
+      create: { id: 1, email: 'a@example.com' },
+      update: { email: 'a@example.com' },
+    });
+    expect(publicUpserted).toEqual({ id: 1, email: 'a@example.com' });
+    const publicAst = lastWriteAst(runtime);
+    expect(publicAst.table.namespaceId).toBe('public');
+    expect(returningCodecByColumn(publicAst)).toEqual({ id: 'pg/int4@1', email_addr: 'pg/text@1' });
+
+    runtime.setNextResults([[{ id: 2, token_col: 'tok' }]]);
+    const authUpserted = await db.auth.User.upsert({
+      create: { id: 2, token: 'tok' },
+      update: { token: 'tok' },
+    });
+    expect(authUpserted).toEqual({ id: 2, token: 'tok' });
+    const authAst = lastWriteAst(runtime);
+    expect(authAst.table.namespaceId).toBe('auth');
+    expect(returningCodecByColumn(authAst)).toEqual({ id: 'pg/int4@1', token_col: 'pg/varchar@1' });
   });
 
   it('resolves per-namespace aggregate column codecs, discriminating by namespace', async () => {
