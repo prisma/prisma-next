@@ -46,18 +46,21 @@ function createTestContract(
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          tables: Object.fromEntries(
-            Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
-              name,
-              {
-                columns,
-                primaryKey: { columns: ['id'] },
-                uniques,
-                indexes: [],
-                foreignKeys: [],
-              },
-            ]),
-          ),
+          kind: 'sql-namespace',
+          entries: {
+            table: Object.fromEntries(
+              Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
+                name,
+                {
+                  columns,
+                  primaryKey: { columns: ['id'] },
+                  uniques,
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              ]),
+            ),
+          },
         },
       },
     },

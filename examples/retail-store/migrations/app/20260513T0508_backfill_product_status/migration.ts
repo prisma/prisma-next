@@ -33,7 +33,16 @@ const STORAGE_HASH = endContractJson.storage.storageHash;
 // with the contract if the chain is ever re-emitted. The JSON types these
 // fields as `string`, so narrow them to the literal unions setValidation
 // expects.
-const PRODUCTS_VALIDATOR = endContractJson.storage.collections.products.validator as {
+const endStorage = endContractJson.storage as {
+  collections?: { products: { validator: unknown } };
+  namespaces?: {
+    __unbound__: { entries: { collection: { products: { validator: unknown } } } };
+  };
+};
+const productsCollection =
+  endStorage.namespaces?.__unbound__.entries.collection.products ??
+  endStorage.collections?.products;
+const PRODUCTS_VALIDATOR = productsCollection!.validator as {
   jsonSchema: Record<string, unknown>;
   validationLevel: 'strict' | 'moderate';
   validationAction: 'error' | 'warn';

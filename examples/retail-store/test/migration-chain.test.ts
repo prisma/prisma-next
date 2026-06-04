@@ -53,7 +53,7 @@ function namespacedMongoContract(contract: MongoContract): MongoContract {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
           kind: 'mongo-namespace' as const,
-          collections,
+          entries: { collection: collections },
         },
       },
     },
