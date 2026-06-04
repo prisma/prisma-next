@@ -86,8 +86,10 @@ export interface Codec<
 export interface ContractCodecRegistry {
   /**
    * Resolve the codec for `(table, column)`. Returns the per-instance parameterized codec for parameterized columns, the shared codec for non-parameterized columns, or `undefined` if the column is unknown or the codec isn't registered.
+   *
+   * When `namespaceId` is supplied the column is resolved strictly within that namespace coordinate, so two same-bare-named tables across namespaces resolve to their own per-namespace codecs. When omitted, a bare name unique across namespaces resolves to its sole namespace.
    */
-  forColumn(table: string, column: string): Codec | undefined;
+  forColumn(table: string, column: string, namespaceId?: string): Codec | undefined;
 
   /**
    * Resolve a codec by {@link CodecRef}. The single dispatch shape for AST-bound codec resolution — every codec-bearing AST node carries a `CodecRef` that resolves through this method via the per-`ExecutionContext` `AstCodecResolver`. Two refs with the same `codecId` and structurally equal `typeParams` (regardless of object key order) return the same memoised codec instance. Throws `RUNTIME.CODEC_DESCRIPTOR_MISSING` for unknown `codecId`s and `RUNTIME.TYPE_PARAMS_INVALID` on `paramsSchema` rejection.

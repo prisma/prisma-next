@@ -225,3 +225,61 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     expect(registry.codecRefForColumn('Doc', 'embedding')).toBeUndefined();
   });
 });
+
+describe('buildCodecDescriptorRegistry — codecRefForColumn namespace coordinate', () => {
+  const descriptors = [
+    stub('pg/int4@1', ['int4']),
+    stub('pg/text@1', ['text']),
+    stub('pg/varchar@1', ['varchar']),
+  ];
+
+  function table(columns: Record<string, string>): StorageTableInput {
+    return {
+      columns: Object.fromEntries(
+        Object.entries(columns).map(([name, codecId]) => [
+          name,
+          { nativeType: codecId, codecId, nullable: false },
+        ]),
+      ),
+      primaryKey: { columns: ['id'] },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [],
+    };
+  }
+
+  // Two namespaces declare a table with the same bare name `users` but with
+  // differing columns/codecs. The registry must discriminate by the namespace
+  // coordinate it is handed rather than scanning and first-matching.
+  function twoNamespaceStorage(): SqlStorage {
+    return new SqlStorage({
+      storageHash: 'sha256:test' as SqlStorage['storageHash'],
+      namespaces: {
+        public: buildSqlNamespace({
+          id: 'public',
+          tables: { users: table({ id: 'pg/int4@1', email: 'pg/text@1' }) },
+        }),
+        auth: buildSqlNamespace({
+          id: 'auth',
+          tables: { users: table({ id: 'pg/int4@1', token: 'pg/varchar@1' }) },
+        }),
+      },
+    });
+  }
+
+  it('resolves the per-namespace codec ref for a same bare table name, discriminating by coordinate', () => {
+    const registry = buildCodecDescriptorRegistry(descriptors, twoNamespaceStorage());
+
+    expect(registry.codecRefForColumn('users', 'email', 'public')).toEqual({
+      codecId: 'pg/text@1',
+    });
+    expect(registry.codecRefForColumn('users', 'token', 'auth')).toEqual({
+      codecId: 'pg/varchar@1',
+    });
+
+    // A column present only in the other namespace must not resolve here — proves
+    // the resolution honours the coordinate rather than first-matching by name.
+    expect(registry.codecRefForColumn('users', 'token', 'public')).toBeUndefined();
+    expect(registry.codecRefForColumn('users', 'email', 'auth')).toBeUndefined();
+  });
+});

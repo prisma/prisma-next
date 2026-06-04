@@ -425,10 +425,10 @@ function assertColumnCodecIntegrity(
   storage: SqlStorage,
   codecDescriptors: CodecDescriptorRegistry,
 ): void {
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
     for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const columnName of Object.keys(table.columns)) {
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        const ref = codecDescriptors.codecRefForColumn(tableName, columnName, namespaceId);
         if (!ref) continue;
 
         const descriptor = codecDescriptors.descriptorFor(ref.codecId);
@@ -564,11 +564,11 @@ function buildContractCodecRegistry(
     }
   }
 
-  for (const ns of Object.values(contract.storage.namespaces)) {
+  for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
     for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeRef !== undefined) continue;
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        const ref = codecDescriptors.codecRefForColumn(tableName, columnName, namespaceId);
         if (!ref) continue;
         const key = refKeyOf(ref);
         const site = { table: tableName, column: columnName };
@@ -596,10 +596,10 @@ function buildContractCodecRegistry(
     };
   });
 
-  for (const ns of Object.values(contract.storage.namespaces)) {
+  for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
     for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const columnName of Object.keys(table.columns)) {
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        const ref = codecDescriptors.codecRefForColumn(tableName, columnName, namespaceId);
         if (!ref) continue;
         resolver.forCodecRef(ref);
       }
@@ -607,8 +607,8 @@ function buildContractCodecRegistry(
   }
 
   const registry: ContractCodecRegistry = {
-    forColumn(table, column) {
-      const ref = codecDescriptors.codecRefForColumn(table, column);
+    forColumn(table, column, namespaceId) {
+      const ref = codecDescriptors.codecRefForColumn(table, column, namespaceId);
       return ref ? resolver.forCodecRef(ref) : undefined;
     },
     forCodecRef(ref) {
