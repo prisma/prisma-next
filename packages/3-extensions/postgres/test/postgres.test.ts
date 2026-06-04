@@ -485,7 +485,7 @@ describe('postgres', () => {
       ormCallCount++;
       if (ormCallCount === 1) return { lane: 'orm' };
       return txOrmProxy;
-    }) as typeof ormMock);
+    }) as unknown as typeof ormMock);
 
     const db = postgres({
       contract,
