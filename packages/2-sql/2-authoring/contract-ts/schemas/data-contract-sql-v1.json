@@ -596,6 +596,10 @@
               "type": "string",
               "description": "Junction table name"
             },
+            "namespaceId": {
+              "type": "string",
+              "description": "Namespace the junction table lives in"
+            },
             "parentColumns": {
               "type": "array",
               "description": "Junction columns referencing the parent FK",
@@ -612,7 +616,7 @@
               "items": { "type": "string" }
             }
           },
-          "required": ["table", "parentColumns", "childColumns", "targetColumns"]
+          "required": ["table", "namespaceId", "parentColumns", "childColumns", "targetColumns"]
         }
       },
       "required": ["to", "cardinality"]

@@ -386,6 +386,7 @@ describe('generateModelRelationsType', () => {
         cardinality: 'N:M',
         through: {
           table: 'post_tags',
+          namespaceId: 'public',
           parentColumns: ['postId'],
           childColumns: ['tagId'],
           targetColumns: ['id'],
@@ -396,6 +397,7 @@ describe('generateModelRelationsType', () => {
     expect(result).toContain("readonly cardinality: 'N:M'");
     expect(result).toContain('readonly through:');
     expect(result).toContain("readonly table: 'post_tags'");
+    expect(result).toContain("readonly namespaceId: 'public'");
     expect(result).toContain("readonly parentColumns: readonly ['postId']");
     expect(result).toContain("readonly childColumns: readonly ['tagId']");
     expect(result).toContain("readonly targetColumns: readonly ['id']");
@@ -408,6 +410,7 @@ describe('generateModelRelationsType', () => {
         cardinality: 'N:M',
         through: {
           table: 'user_roles',
+          namespaceId: 'public',
           parentColumns: ['userId', 'tenantId'],
           childColumns: ['roleId'],
           targetColumns: ['id'],

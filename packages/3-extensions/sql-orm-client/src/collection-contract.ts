@@ -242,8 +242,6 @@ export function getCompleteColumnToFieldMap(
 }
 
 interface ResolvedThrough extends ContractRelationThrough {
-  /** Namespace of the junction table, resolved from storage. */
-  readonly namespaceId?: string;
   readonly requiredPayloadColumns: readonly string[];
 }
 
@@ -299,13 +297,20 @@ export function resolveIncludeRelation(
 function resolveThrough(
   contract: Contract<SqlStorage>,
   raw:
-    | { table?: unknown; parentColumns?: unknown; childColumns?: unknown; targetColumns?: unknown }
+    | {
+        table?: unknown;
+        namespaceId?: unknown;
+        parentColumns?: unknown;
+        childColumns?: unknown;
+        targetColumns?: unknown;
+      }
     | undefined,
 ): ResolvedThrough | undefined {
   if (!raw) return undefined;
-  const { table, parentColumns, childColumns, targetColumns } = raw;
+  const { table, namespaceId, parentColumns, childColumns, targetColumns } = raw;
   if (
     typeof table !== 'string' ||
+    typeof namespaceId !== 'string' ||
     !Array.isArray(parentColumns) ||
     !Array.isArray(childColumns) ||
     !Array.isArray(targetColumns)
@@ -317,10 +322,10 @@ function resolveThrough(
     ...castAs<readonly string[]>(parentColumns),
     ...castAs<readonly string[]>(childColumns),
   ]);
-  const resolvedJunction = resolveTableForContract(contract, table);
+  const junctionTable = contract.storage.namespaces[namespaceId]?.entries.table[table];
   const requiredPayloadColumns: string[] = [];
-  if (resolvedJunction) {
-    for (const [colName, col] of Object.entries(resolvedJunction.table.columns)) {
+  if (junctionTable) {
+    for (const [colName, col] of Object.entries(junctionTable.columns)) {
       if (!fkColumnSet.has(colName) && !col.nullable && col.default === undefined) {
         requiredPayloadColumns.push(colName);
       }
@@ -329,11 +334,11 @@ function resolveThrough(
 
   return {
     table,
+    namespaceId,
     parentColumns: castAs<readonly string[]>(parentColumns),
     childColumns: castAs<readonly string[]>(childColumns),
     targetColumns: castAs<readonly string[]>(targetColumns),
     requiredPayloadColumns,
-    ...(resolvedJunction !== undefined ? { namespaceId: resolvedJunction.namespaceId } : {}),
   };
 }
 
@@ -364,6 +369,7 @@ export function resolveModelRelations(
       on?: { localFields?: unknown; targetFields?: unknown };
       through?: {
         table?: unknown;
+        namespaceId?: unknown;
         parentColumns?: unknown;
         childColumns?: unknown;
         targetColumns?: unknown;

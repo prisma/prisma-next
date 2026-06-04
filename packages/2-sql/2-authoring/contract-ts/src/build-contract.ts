@@ -331,6 +331,12 @@ export function buildSqlContractFromDefinition(
   const defaultNamespaceId = definition.target.defaultNamespaceId;
   const targetFamily = 'sql';
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
+  const tableNamespaceByName = new Map(
+    definition.models.map((m) => [
+      m.tableName,
+      m.namespaceId !== undefined && m.namespaceId.length > 0 ? m.namespaceId : defaultNamespaceId,
+    ]),
+  );
 
   const tablesByNamespace: Record<string, Record<string, StorageTable>> = {};
   const tableNameToNamespaceId = new Map<string, string>();
@@ -609,6 +615,7 @@ export function buildSqlContractFromDefinition(
           ? {
               through: {
                 table: relation.through.table,
+                namespaceId: tableNamespaceByName.get(relation.through.table) ?? defaultNamespaceId,
                 parentColumns: relation.through.parentColumns,
                 childColumns: relation.through.childColumns,
                 targetColumns: targetModel.id?.columns ?? ([] as const),

@@ -421,6 +421,7 @@ const ModelStorageSchema = type({
 const ContractRelationThroughSchema = type({
   '+': 'reject',
   table: 'string',
+  namespaceId: 'string',
   parentColumns: type.string.array().readonly(),
   childColumns: type.string.array().readonly(),
   targetColumns: type.string.array().readonly(),
