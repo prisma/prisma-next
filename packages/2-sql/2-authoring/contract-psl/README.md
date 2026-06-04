@@ -14,7 +14,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 ## Responsibilities
 
 - Interpret `ParsePslDocumentResult` into SQL `Contract`
-- Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
+- Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`, `@@control`)
 - Interpret SQL timestamp semantics: `DateTime @default(now())` (or the equivalent `temporal.createdAt()` field-preset call) as a storage default, and `temporal.updatedAt()` as an execution mutation default
 - Lower shared constructor expressions in both `types {}` blocks and inline field positions (for example `ShortName = sql.String(length: 35)` and `embedding pgvector.Vector(length: 1536)?`)
 - Lower supported default functions through composed registry inputs
@@ -71,12 +71,20 @@ Supported timestamp authoring surface:
 - The Prisma-flavored `@updatedAt` attribute is not supported; references produce `PSL_UNSUPPORTED_FIELD_ATTRIBUTE` with a migration hint pointing at `temporal.updatedAt()`. The hint is suppressed when the field already declares any `temporal.*` preset.
 - `@createdAt` is not supported as a PSL alias.
 
+Model-level control policy:
+
+- `@@control(<policy>)` lowers to the storage table's `control` field. The argument is one positional lowercase literal: `managed`, `tolerated`, `external`, or `observed`. Omit `@@control` to leave per-table control unset (the framework default applies at runtime).
+
+Contract-level default (specifier options bag):
+
+- `defaultControlPolicy` on `prismaContract(...)` sets `Contract.defaultControlPolicy` at load time when the interpreted contract does not already define one (source wins when both are present).
+
 ## Public API
 
 - `@prisma-next/sql-contract-psl`
   - `interpretPslDocumentToSqlContract({ document, target, scalarTypeDescriptors, authoringContributions?, controlMutationDefaults?, composedExtensionPacks? })`
 - `@prisma-next/sql-contract-psl/provider`
-  - `prismaContract(schemaPath, { output?, target, scalarTypeDescriptors, authoringContributions?, controlMutationDefaults?, composedExtensionPacks? })`
+  - `prismaContract(schemaPath, { output?, target, defaultControlPolicy?, scalarTypeDescriptors, authoringContributions?, controlMutationDefaults?, composedExtensionPacks? })`
   - Provider input is fully preassembled by composition layers (for example `@prisma-next/family-sql/control` helpers).
 
 ## Dependencies

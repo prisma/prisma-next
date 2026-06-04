@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig } from '@prisma-next/config/config-types';
+import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -13,6 +15,7 @@ export interface PrismaContractOptions {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', string>;
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
+  readonly defaultControlPolicy?: ControlPolicy;
 }
 
 /**
@@ -111,7 +114,9 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           return interpreted;
         }
 
-        return ok(interpreted.value);
+        return ok(
+          applySpecifierDefaultControlPolicy(interpreted.value, options.defaultControlPolicy),
+        );
       },
     },
     output: options.output ?? defaultOutputFromSchemaPath(schemaPath),

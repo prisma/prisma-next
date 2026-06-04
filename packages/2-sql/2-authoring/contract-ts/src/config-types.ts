@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import type { ContractConfig } from '@prisma-next/config/config-types';
-import type { Contract } from '@prisma-next/contract/types';
+import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
+import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok } from '@prisma-next/utils/result';
@@ -19,22 +20,35 @@ function defaultOutputFromContractPath(contractPath: string): string {
   return `${contractPath.slice(0, -ext.length)}.json`;
 }
 
+export interface TypeScriptContractSpecifierOptions {
+  readonly defaultControlPolicy?: ControlPolicy;
+}
+
 export function emptyContract(options: {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', string>;
+  readonly defaultControlPolicy?: ControlPolicy;
 }): ContractConfig {
   return {
     source: {
-      load: async () => ok(buildSqlContractFromDefinition({ target: options.target, models: [] })),
+      load: async () => {
+        const built = buildSqlContractFromDefinition({ target: options.target, models: [] });
+        return ok(applySpecifierDefaultControlPolicy(built, options.defaultControlPolicy));
+      },
     },
     ...ifDefined('output', options.output),
   };
 }
 
-export function typescriptContract(contract: Contract, output?: string): ContractConfig {
+export function typescriptContract(
+  contract: Contract,
+  output?: string,
+  options?: TypeScriptContractSpecifierOptions,
+): ContractConfig {
   return {
     source: {
-      load: async () => ok(contract),
+      load: async () =>
+        ok(applySpecifierDefaultControlPolicy(contract, options?.defaultControlPolicy)),
     },
     // The in-memory variant has no input path to anchor on; fall through to
     // the global default in `normalizeContractConfig` when caller doesn't pin it.
@@ -42,7 +56,11 @@ export function typescriptContract(contract: Contract, output?: string): Contrac
   };
 }
 
-export function typescriptContractFromPath(contractPath: string, output?: string): ContractConfig {
+export function typescriptContractFromPath(
+  contractPath: string,
+  output?: string,
+  options?: TypeScriptContractSpecifierOptions,
+): ContractConfig {
   return {
     source: {
       inputs: [contractPath],
@@ -60,7 +78,7 @@ export function typescriptContractFromPath(contractPath: string, output?: string
             `typescriptContractFromPath: module at "${absolutePath}" has no "default" or "contract" export.`,
           );
         }
-        return ok(contract);
+        return ok(applySpecifierDefaultControlPolicy(contract, options?.defaultControlPolicy));
       },
     },
     output: output ?? defaultOutputFromContractPath(contractPath),
