@@ -1,151 +1,132 @@
-# Project Spec — Target-contributed top-level PSL blocks (PR3 of the target-extensible-ir series)
+# Project Spec — Target-contributed PSL blocks
 
-## Summary
+## What this is
 
-Lift the framework PSL parser from "hardcoded for a small set of top-level keywords" to "extensible via target-pack contributions". Migrate `enum` from framework-parser to Postgres-pack contribution as the load-bearing proof-of-concept. Closes the substrate gap that downstream work (RLS, roles, custom Postgres-domain types) hits the moment it tries to ship target-specific top-level PSL syntax.
+Today the PSL parser and printer are framework-internal: they handle a fixed set of top-level block keywords (`model`, `type`, `types`, `namespace`, `enum`) and there's no way for a target pack to add a new one. Anything that wants a new top-level PSL keyword — Postgres RLS wants `policy { … }`, post-RLS work wants `role { … }`, future Postgres-specific entity types might want others — has to either edit the framework parser (which leaks Postgres concerns into framework code that SQLite + MongoDB users carry), or skip PSL entirely and be authored only via the TypeScript builder (which breaks the framework's "PSL and TS surfaces stay structurally parallel" promise).
 
-This project is **PR3 of the target-extensible-ir series.** PR1 delivered the polymorphic IR + the *semantic-lowering* extensibility (the M3.5 `entityTypes` mechanism — target packs contribute factories that lower already-parsed AST nodes to IR-class instances). PR2 (TML-2520) delivered the namespace exemplar without depending on this work, because `namespace { … }` is a framework concept that every multi-storage target needs and was therefore acceptable as a framework-parsed top-level keyword. PR3 closes the remaining gap: the *parsing-layer* extensibility that PR1 should have shipped.
+This project closes the gap. After it lands, target packs (and any pack participating in `AuthoringContributions`) can contribute their own top-level PSL block keywords by shipping two functions: a parser that recognises the keyword and produces an AST node, and a printer that renders that AST node back to source text. The framework doesn't need to know about the keyword; the registry routes parses and prints through the contributing pack at descriptor-build time.
 
-## Linear
+The first real consumer is RLS. This project doesn't ship RLS — that's a separate project — but it ships the substrate RLS (and roles, and any future Postgres-specific entity types) need.
 
-- **Originating ticket:** [TML-2537 — PR3 — Target-contributed top-level PSL blocks + migrate `enum`](https://linear.app/prisma-company/issue/TML-2537) (blocked by TML-2520).
-- **Linear project:** [Target-Extensible IR + Namespaces](https://linear.app/prisma-company/issue/TML-2459) (same project as TML-2459 and TML-2520; this is the third PR in the series).
+```prisma
+namespace public {
+  model Profile {
+    id       String @id
+    userId   String @unique
+  }
 
-## Why now
+  policy profiles_select_anon {
+    target    = Profile
+    operation = select
+    using     = "true"
+  }
+}
+```
 
-Three downstream projects are blocked or compromised by the absence of target-contributed top-level PSL blocks:
+After this project lands, the example above is parseable, printable, and lowerable purely via pack contributions — the framework parser, printer, and lowering pipeline never learn about the `policy` keyword directly.
 
-1. **Postgres RLS (`projects/postgres-rls/`)** wants `policy { … }` blocks in PSL. Without the registry, this either requires editing the framework parser (which leaves SQLite + Mongo carrying parser surface they can never use) or being authored only via the TS builder (which breaks the framework's "PSL and TS are structurally parallel" promise).
-2. **Postgres roles / privileges** (post-RLS) wants `role { … }` blocks for the same reasons.
-3. **Postgres-specific entity types** (domains, custom operators, possibly future native composite-type DDL) — same shape.
+## Place in the world
 
-Each of these will hit this gap on its first PR. Shipping the registry now means downstream work lands as focused feature PRs rather than each one re-litigating the substrate question.
-
-The `enum` migration also has standalone value beyond serving as the proof-of-concept: today the framework parser knows about `enum { … }` even for SQLite + Mongo targets where the keyword is effectively Postgres-flavoured. SQLite has no native enum type; Mongo has no schema-level enum concept. Pushing `enum` to a Postgres-pack contribution moves the parser regex out of the framework layer where it doesn't structurally belong.
-
-## Context from prior discussions (preserved for posterity)
-
-The decision to defer this work to a follow-up project was made during the PR2 design discussion. Original user framing (Saturday May 16, 2026, 4:25 PM UTC+2):
-
-> "[The framework parser hole] is a massive hole that the first PR was supposed to cover. Everything downstream of this project relies on being able to register new PSL block types: RLS, roles, etc. However, namespace is genuinely a framework-level concept that deserves representation in PSL, but whether it is permitted in a particular target depends on the target. I suppose that can be modeled with validation, and for now we gloss over it by making the PSL parser accept namespace declarations, no matter the target. This is not a target-contributed concept in the PSL parser, but an interpreter of the story. We will need an additional task in this project to add the target-contributed Postgres block feature and migrate enum support to it."
-
-Original sequencing (proposed during PR2 design):
-
-1. **PR1 (merged)** — Target-extensible IR + namespace foundation.
-2. **PR2 (TML-2520, in flight)** — Namespace exemplar + cross-namespace FK references.
-3. **PR3 (this project)** — Target-contributed PSL block registry; migrate `enum`.
-4. **PR4 (DROPPED)** — Originally proposed: migrate `namespace { … }` from framework-parsed to pack-contributed. Dropped because `namespace` is a framework concept that every multi-storage target needs; pushing it to packs gains no semantic clarity and costs the framework's "namespace is a primitive" stance. Per-target *semantic interpretation* of namespace blocks (which targets reject explicit blocks, which targets reserve `unbound`, etc.) is already handled by per-family interpreters per PR2's FR16c — no parser-level pushdown is necessary.
-
-Decision recorded in `projects/target-extensible-ir/spec.md` Non-goals and `plan.md` "PR2 forward concerns".
-
-## Architectural setting
-
-Two extensibility mechanisms exist in tree today; this project adds the third:
+Three architectural layers carry pack contributions today; this project closes the corner that's missing.
 
 | Layer | Mechanism today | Status |
 |---|---|---|
-| **IR (Contract IR + Schema IR)** | 3-layer polymorphic class hierarchy (framework interface → family abstract base → target concrete class) | PR1 shipped |
-| **Semantic lowering (PSL AST → IR)** | M3.5 `entityTypes` contribution mechanism (target packs ship factories keyed by `kind` discriminator) | PR1 shipped |
-| **PSL parsing (source text → AST)** | Framework-parser hardcoded; no extension surface | **This project ships** |
+| IR layer | Three-tier polymorphic class hierarchy (framework interface → family abstract base → target concrete class) per ADR 221 | Shipped |
+| Semantic lowering (AST node → IR class instance) | `AuthoringContributions.entityTypes` registry — packs ship factories keyed by a discriminator string | Shipped |
+| Parsing + printing (source text ↔ AST node) | Framework-internal, hardcoded dispatch | **This project** |
 
-The parsing-layer extension is structurally parallel to the M3.5 mechanism but operates at a different layer: M3.5 lets a pack contribute the *factory that constructs the IR-class instance from an already-parsed AST node*; this project lets a pack contribute the *parser function that recognises a new top-level keyword and produces the AST node in the first place*.
+Each layer has its own contribution surface. The `discriminator` string ties them together: a pack contributing the keyword `policy` ships `pslBlocks.policy` (the parser, which produces an AST node tagged `kind: 'postgres-policy'`), `pslPrinters.policy` (which renders that AST node back to PSL source), and `entityTypes.policy` (which lowers that AST node to an IR class instance). All three carry the same discriminator string; pack-load-time validation rejects mismatches.
 
-## Functional requirements
+The three contributions are a single logical bundle. `pslBlocks` parses; `pslPrinters` prints; `entityTypes` lowers the parsed AST node to an IR class instance. None of the three is useful on its own — a parser without a factory produces AST that nothing can interpret; a factory without a parser is reachable only via the TS builder; a parser without a printer breaks `contract infer`. A pack contributing a new top-level keyword ships all three, with matching discriminators, or pack-load-time validation refuses to load the pack.
 
-### Parser registry
+`entityTypes` is the existing semantic-lowering registry; it's not new. Today it's reached via the TS builder (`entities.enum({ … })` calls the factory directly) and via the framework parser's built-in `enum` lowering. This project adds a third path — pack-contributed PSL blocks — without changing the registry itself.
 
-- **FR1.** Target packs (or any pack participating in `AuthoringContributions`) can contribute new top-level PSL block parsers via a new `pslBlocks` namespace on the contribution surface — structurally parallel to today's `entityTypes`. Each contribution declares: the keyword (`policy`, `role`, `enum`, …), a parser function (consumes the token stream + a block scope, produces an AST node), and the AST node's `kind` discriminator (matches the corresponding `entityTypes` factory's `discriminator` field so the existing lowering registry routes the parsed AST node through the right factory).
+### Why the printer is in scope, not just the parser
 
-- **FR2.** The framework parser's top-level dispatch is extended with a registry lookup: when the parser encounters an unknown top-level identifier, it consults the registered `pslBlocks` keywords before failing. Built-in keywords (`model`, `type`, `types`, `namespace`) continue to be framework-parsed directly — the registry is purely additive at the front of the dispatch.
+The CLI's `contract infer` command renders a contract IR back to PSL source text on disk. Without printer extensibility, every pack-contributed block kind would break that command — `contract infer` would silently drop unknown blocks, or crash, depending on how the printer happens to fail. Parser extensibility without matching printer extensibility ships an asymmetry that bites the moment a user runs the inference command. Parser and printer mechanisms ship together as one project for this reason.
 
-- **FR3.** Pack-contributed PSL block keywords are **target-scoped**: a contract authored for the SQLite target does not see Postgres-pack-contributed keywords. The framework parser is constructed per-contract with the resolved `AuthoringContributions` for that contract's target + extension packs; only keywords contributed by packs in scope are accepted. Out-of-scope keywords surface the same "unknown top-level identifier" diagnostic they surface today — a contract that uses `policy` on a SQLite target gets a clear "this target does not contribute the `policy` block" error pointing at the keyword span.
+## Cross-cutting design constraints
 
-- **FR4.** Contributed parser functions follow a small framework SPI: they receive a parser-context handle (the current token cursor, the diagnostic sink, helpers for parsing common sub-shapes like field lists / attribute lists / brace-delimited bodies) and return either an AST node (consumed by downstream consumers) or a diagnostic (recorded in the parser's diagnostic stream). The contributed parser does not own diagnostic formatting or recovery logic — those live in the framework parser.
+Six commitments thread through the implementation.
 
-### `enum` migration (proof-of-concept)
+### Symmetry with the existing lowering registry
 
-- **FR5.** `enum { … }` parsing moves from the framework parser to the Postgres pack's `pslBlocks` contribution. The Postgres pack contributes both the parser function (the existing framework-level `parseEnumBlock` logic, lifted to a pack-contributed function) and the `entityTypes.enum` factory (already shipped by M4 / M7 — unchanged). The framework parser no longer knows the `enum` keyword.
+`pslBlocks` and `pslPrinters` follow the same pattern as the existing `entityTypes` registry. They live as new namespaces on `AuthoringContributions`. They're assembled at descriptor-build time via the same merge walker, so within-namespace duplicates throw at pack-load time. They participate in the same cross-registry collision check.
 
-- **FR6.** SQLite and Mongo contracts that use the `enum` keyword surface the same "unknown top-level identifier" diagnostic they would get for `policy` or `role` on those targets. The diagnostic names the target and points at the keyword span. (Today's behaviour: SQLite + Mongo *do* accept `enum` blocks at parse time but emit lowering-time diagnostics because no `entityTypes.enum` factory exists for those targets — a worse failure mode than parse-time rejection. The migration improves SQLite/Mongo UX.)
+Implementers reading this spec should expect the new code to look very much like the existing `entityTypes` code, structurally. The mechanism is intentionally a copy, not a redesign.
 
-- **FR7.** Postgres contracts continue to parse `enum { … }` blocks identically to today — same syntax, same AST shape, same lowering behaviour. The migration is transparent to Postgres users and to any contracts authored against any extension pack that contributes `entityTypes.enum` (none today besides Postgres, but the migration preserves the surface for future packs that might).
+### Pack-owned AST types
 
-### Interaction with the M3.5 mechanism
+When a pack contributes a parser for a new block keyword, the AST node it produces is typed by the pack, not by the framework. The framework's `PslNamespace` carries a generic slot for pack-contributed blocks; entries in that slot share a minimal base shape — a `kind` discriminator string, a required `name`, and a `span`. Downstream consumers (printer, lowering registry, tooling) narrow on `kind`.
 
-- **FR8.** Pack-contributed PSL blocks and pack-contributed `entityTypes` use the **same `discriminator` field** to route AST nodes through the lowering registry. The `pslBlocks` contribution names the discriminator on its AST node; the `entityTypes` contribution names the discriminator on its factory. The framework parser tags each parsed AST node with its discriminator; the family-layer interpreter dispatches through the existing registry built from `entityTypes` contributions. No new lowering surface is introduced — only the parsing-layer entry point is new.
+`name` is mandatory because every block kind we've shipped or planned has one (`enum Status`, `policy ProfilesSelectAnon`, `role admin`, `model Article`). The mandatory name keeps the base type narrow and the lowering registry's index simple. If a future pack-contributed kind genuinely needs to be anonymous, the base shape can loosen then.
 
-- **FR9.** A pack that contributes a top-level PSL block (`pslBlocks`) must also contribute the corresponding `entityTypes` factory with matching `discriminator` (otherwise the parse succeeds but the lowering errors with "no factory registered for discriminator X"). Framework-level validation surfaces this as a pack-load-time diagnostic, not a per-contract runtime error.
+The alternative to a generic slot — adding a typed slot to `PslNamespace` for every contributed block kind (the way `enums: readonly PslEnum[]` works today) — would force every new pack-contributed kind to ship a framework PR. That defeats the point of pack-contributed extensibility.
 
-### Out-of-scope namespace migration (decision record)
+This is a structural break from how `enum` is modelled today (`PslEnum` lives in the framework's AST types and `PslNamespace` carries a typed `enums` slot). `enum` does not get migrated as part of this project — see the explicit non-goal — so its current shape is unchanged. The new generic slot is purely additive.
 
-- **FR10.** **The `namespace { … }` block stays framework-parsed.** Even after this project lands, `namespace` is not pushed to a pack contribution. Rationale: `namespace` is a primitive every multi-storage target needs; per-target *semantic interpretation* (which targets reject explicit blocks, which targets reserve `unbound`, etc.) is sufficient and is already handled by per-family interpreters per the target-extensible-ir project's FR16c. Pushing the parser to packs would add complexity (every target ships the same `namespace` block parser) without buying semantic clarity. This is a deliberate decision and any future proposal to revisit it must justify the symmetry cost.
+### Minimal-by-default parser SPI
 
-## Acceptance criteria
+A pack-contributed parser receives a parser-context handle (token cursor, source text, diagnostic sink) and a small set of helpers — only what the integration-test fixture's parser actually consumes. Framework-internal helpers stay framework-private until a real consumer demands lift.
 
-- [ ] **AC1.** `AuthoringContributions` exposes a new `pslBlocks` namespace structurally parallel to `entityTypes`. Type-system surface is end-to-end-strong: a pack's contributed parser's return type narrows to the AST node shape its factory consumes.
+The reason: this project ships the substrate without a real-world migration to validate it. The first real consumer is RLS, in a downstream project. A maximalist SPI shipped now would publish a stable surface that turns out not to fit RLS's needs (or fits them awkwardly). Ship the minimum; let RLS surface gaps as they hit them; lift helpers into the SPI when there's a real second consumer.
 
-- [ ] **AC2.** The framework parser's top-level dispatch consults the `pslBlocks` registry for unknown identifiers. A pack-contributed parser that produces an AST node with discriminator `X` and an `entityTypes` factory with discriminator `X` end-to-end-round-trips through parse → lower → IR-class instance → serialize → hydrate → IR-class instance.
+### Discriminator string convention
 
-- [ ] **AC3.** A Postgres contract using `enum { … }` parses, lowers, emits, and verifies identically to today. No user-visible change for Postgres users. (Verified by the existing enum test suite continuing to pass against the post-migration substrate.)
+Pack-contributed AST nodes use a discriminator string of the form `<target-or-family>-<kind>` — e.g. `postgres-policy`, `postgres-role`, `mongo-collection-validator`. The string is opaque to the framework; the convention is documented as a golden rule, enforced by code review.
 
-- [ ] **AC4.** A SQLite contract using `enum { … }` surfaces a parse-time "unknown top-level identifier `enum`; this target does not contribute the keyword" diagnostic pointing at the keyword span. Same for Mongo.
+The convention exists for namespace hygiene (`postgres-policy` and `pgcrypto-policy` are distinct discriminators) and for diagnostic legibility — when a user sees `unknown discriminator 'postgres-policy'` in a contract that doesn't include the Postgres pack, the error tells them which pack they're missing.
 
-- [ ] **AC5.** A synthetic "fake-target" test that contributes a `pslBlocks.demoBlock` parser + `entityTypes.demoBlock` factory demonstrates the registry mechanism end-to-end. The fake-target test does not depend on Postgres-specific surface; it exercises only the framework SPI.
+### Round-trip is load-bearing
 
-- [ ] **AC6.** Framework parser test coverage: (a) registered keyword parses correctly; (b) unregistered keyword surfaces the expected diagnostic; (c) pack-load-time validation surfaces a clear error when a `pslBlocks` contribution has no matching `entityTypes` factory.
+The existing parser-to-printer-to-parser round-trip test must survive the change: `parsePslDocument → astDocumentToPrintDocument → serializePrintDocument → parsePslDocument` produces an equivalent AST today, and that property must hold for pack-contributed blocks too. The integration-test fixture is the regression test.
 
-- [ ] **AC7.** The framework parser no longer imports `enum`-specific parsing code. The `enum` keyword does not appear in framework-parser source files. (Verified by an `rg` gate.)
+### Pack-load-time validation, no silent precedence
 
-- [ ] **AC8.** Architecture documentation captures the parsing-layer extensibility mechanism alongside the existing M3.5 semantic-lowering mechanism. ADR or docs/architecture-docs entry that names the three extension layers (IR, semantic lowering, parsing) and the discriminator convention that ties parsing to lowering.
+Two packs contributing the same `pslBlocks` keyword fail at pack-load time with a clear diagnostic naming both packs. There are no precedence rules.
 
-## Non-goals
+A `pslBlocks` contribution without a matching `pslPrinters` contribution (same discriminator) fails at pack-load time. Same for the reverse. Same for either of those without a matching `entityTypes` factory.
 
-- **Multi-keyword / compound top-level block grammars.** A pack-contributed block parser handles one top-level keyword. Compound shapes like `if X then Y else Z` at the top level (not a real example, just illustrating) are not in scope; existing block parsers handle bodies of arbitrary complexity via the same helpers framework block parsers use.
+The reasoning: silent precedence is a maintenance trap, and a missing printer is a half-feature footgun (the user can write the syntax but `contract infer` produces broken output for it). All these failure modes surface at pack-load time, are diagnosed clearly, and are fixed by editing pack contributions — never by the user.
 
-- **Custom attribute parsers.** This project covers top-level *blocks* only — pack-contributed field/model attributes (`@policy(...)`, `@auth(...)`) follow a different extension shape and are out of scope. Tracked separately.
+## What this project does not do
 
-- **Pluggable expression grammar.** PSL's expression grammar (used in attribute arguments, default values, etc.) stays framework-owned. Adding expression-grammar extension points is a much larger design question; out of scope.
+**Migrate the `enum` keyword.** An earlier framing of this project was "migrate `enum` from the framework parser to the Postgres pack as the load-bearing proof-of-concept." That framing was wrong: `enum` is an application-level concept that happens to have target-specific storage representations (Postgres native enum, SQLite TEXT, MongoDB string), not a Postgres-flavoured feature that should live only in the Postgres pack. Making `enum` work uniformly across targets is tracked separately in [TML-2815](https://linear.app/prisma-company/issue/TML-2815). This project intentionally leaves `enum` framework-parsed.
 
-- **Migrating `namespace` to pack-contributed.** Per FR10 — deliberate decision, not deferred. The `namespace { … }` block is a framework primitive.
+That decision means this project ships the substrate without a real-world migration to validate it. The integration-test fixture (described in the project DoD) substitutes for that validation; RLS becomes the first real consumer once it lands.
 
-- **Migrating `model`, `type`, `types` to pack-contributed.** Same rationale as `namespace` — these are framework primitives every target needs. Not migrated, not deferred.
+**Custom attribute parsers** (`@policy(…)`, `@auth(…)`, etc.). Attributes live inside other blocks and have a different SPI shape from top-level block parsers — they consume tokens within a parent parse rather than driving one. Different lifecycle, different error-recovery model. This project covers top-level blocks only; attribute extensibility is a separate concern.
 
-- **Backwards compatibility for non-Postgres contracts that currently use `enum`.** Per FR6, the SQLite/Mongo migration is a clean break — those contracts currently fail at lowering time with a worse diagnostic; the migration moves the failure to parse time with a clearer diagnostic. No deprecation window; no compatibility shim. Anyone affected can either move to Postgres (where `enum` works) or use the equivalent column-level constraint shape their target supports.
+**Pluggable expression grammar.** PSL's expression grammar (used in attribute arguments, default values) stays framework-owned.
 
-## Dependencies
+**Migrating `model`, `type`, `types`, `namespace` to pack-contributed.** These are framework primitives every multi-storage target needs; pushing them to packs would mean every target ships the same parser. No semantic clarity is gained.
 
-- **Blocked by:** PR2 (TML-2520) merging. Rationale: PR2 ships substantial PSL parser changes (the `namespace { … }` block + the dot-qualified-type-fallback regex + the Reading D collapse of `PslDocumentAst.models` into `PslDocumentAst.namespaces`). Landing PR3 against an unmerged PR2 would force PR3 to re-derive its understanding of the parser's current shape mid-flight. PR3 starts after PR2 merges to main; no parallel-track.
+**Real RLS implementation.** RLS is a separate project (`projects/postgres-rls/`). This project's integration-test fixture mimics RLS-shaped syntax to exercise the substrate, but ships no real RLS code (no DDL emission, no migration verifier, no runtime enforcement).
 
-- **Blocks (post-this-project):**
-  - **Postgres RLS** (`projects/postgres-rls/`) — wants `policy { … }` blocks. The `policy` block is the first real downstream consumer of the registry mechanism beyond the enum proof-of-concept.
-  - **Postgres roles** (post-RLS) — wants `role { … }` blocks.
-  - **Postgres-specific entity types** (domains, etc.) — uses the same mechanism.
+**Per-target printer variation.** The printer is target-agnostic. Pack-contributed printers are also target-agnostic; if target-specific rendering is ever needed, it belongs in the planner or emitter, not the printer.
 
-## Open questions
+## Project-DoD
 
-These are flagged for the implementer to resolve during pre-implementation reconnaissance (or to surface back to the project owner if architectural):
+This project is done when:
 
-1. **Parser SPI shape.** How much of the framework parser's helper surface (token cursor, diagnostic sink, common sub-shape parsers like field lists / attribute lists / brace-delimited bodies) does a pack-contributed parser need access to? Likely answer: enough to make the `enum` migration mechanical (the existing `parseEnumBlock` lifts directly), no more. The SPI shape is a load-bearing design choice — too narrow and packs reimplement parsing primitives; too wide and the parser internals become framework SPI.
+1. **`AuthoringContributions` exposes `pslBlocks` and `pslPrinters` namespaces.** Each is structurally parallel to the existing `entityTypes` namespace. Type narrowing is end-to-end strong: a pack's contributed parser's return type narrows to the AST node shape its printer and factory consume.
 
-2. **Registry construction timing.** When is the `pslBlocks` registry built — at descriptor-build time (parallel to the `entityTypes` registry, FR8e of target-extensible-ir) or at parse-call time? Likely answer: descriptor-build time, mirroring the lowering registry. This keeps the parser construction zero-overhead per-contract once the descriptor is built.
+2. **Pack-load-time validation is wired up.** Within-namespace duplicates throw via the existing merge walker. Cross-namespace collisions surface via the existing collision check, extended to cover the new namespaces. Discriminator mismatches between `pslBlocks`, `pslPrinters`, and `entityTypes` are caught at pack-load time with a diagnostic naming the contributing pack and the offending discriminator.
 
-3. **Multi-pack contributions.** If two packs contribute the same keyword, what happens? Likely answer: a pack-load-time validation error naming both packs (mirroring the existing duplicate-`entityTypes` check). No silent precedence rules.
+3. **The framework parser's top-level dispatch consults `pslBlocks`** for unknown identifiers before falling back to the existing "unknown top-level keyword" diagnostic. Built-in keywords (`model`, `type`, `types`, `namespace`, `enum`) continue to be framework-parsed directly.
 
-4. **Documentation surface.** Should the contributed parsers self-document via JSDoc / structured metadata so a downstream "generate PSL grammar reference" tool can consume them? Likely answer: yes, but not in this project's scope — flag for a future docs-tooling project.
+4. **The framework printer's two phases consult `pslPrinters`.** The AST-to-PrintDocument phase consults the registry to populate the print-document intermediate for pack-contributed blocks; the PrintDocument-to-string phase consults the registry to render those entries to text.
 
-## Risk register
+5. **An integration test contributes a fixture target pack** that ships a `pslBlocks.<keyword>` parser, a matching `pslPrinters.<keyword>` printer, and a matching `entityTypes.<keyword>` factory — all using the same discriminator. The fixture's keyword and AST shape mimic RLS-style top-level blocks (block name, named-arg body, string-valued predicates) so the SPI gets exercised on a realistic shape. The test runs the round-trip parse → lower → IR class instance → serialize → hydrate → IR class instance → print → re-parse and asserts the result matches the original. The fixture lives in test-only code; no production-pack contribution ships from this project.
 
-- **R1. Mechanical-rename scope.** The enum migration touches Postgres enum test fixtures + the framework parser's enum tests + the SQLite/Mongo "enum is unsupported" diagnostic test sites. Estimated mid-double-digit file count. The PR2 R1 experience (32 fixture files regenerated for one IR constant rename) is instructive: the implementer should pre-flight the fixture surface before committing to a single-commit migration.
-- **R2. Parser SPI shape mismatch.** If the parser SPI is too narrow, the contributed `enum` parser re-implements primitives the framework parser already has, and the resulting pack-side parser is harder to maintain than the original framework-side code. Mitigation: the implementer's first round should be a thin-vertical-slice spike — lift `enum` to a pack contribution with the SPI shape the lift naturally suggests, and let RLS / roles surface any SPI gaps when they consume it next. Don't over-design the SPI for hypothetical future consumers.
-- **R3. SQLite/Mongo UX regression for users who currently get a lowering-time enum diagnostic.** Today they get "no factory registered for kind `sql-enum-type`" or similar — bad UX but a known surface. After this project ships, they get "unknown top-level identifier `enum`; this target does not contribute the keyword" — better, but the diagnostic text needs to clearly direct the user to the right action (use a different column type, or switch to Postgres). Mitigation: the diagnostic copy gets a docs link to the target's "what's supported" reference.
-- **R4. Tooling that walks the framework parser's known-keyword set may break.** Mitigation: surface as part of the pre-implementation reconnaissance (PR2's M5a R2 audit is a good template) — enumerate consumers of the framework parser's keyword set and check they tolerate the migration.
+6. **The existing parser-printer round-trip test continues to pass** for framework-parsed blocks (`model`, `enum`, `type`, etc.).
 
-## Relationship to ADR 211 (target-extensible IR) and the M3.5 ADR
+7. **A clean diagnostic surfaces** when a contract uses a top-level keyword that no in-scope pack contributes. Diagnostic shape names the unknown keyword and points at the offending span.
 
-This project closes a gap that those two ADRs implicitly assumed away: that pack contributions reach the system *only after parsing*. The reality is that some contributions (like `enum`, like future `policy` / `role`) need to participate at the parsing layer too. The ADR layer this project drafts (per AC8) names the three extension layers explicitly:
+8. **`contract infer` works for pack-contributed block kinds.** Verified by the integration-test fixture's round-trip.
 
-1. **IR layer** — 3-layer polymorphic class hierarchy (ADR 211).
-2. **Semantic lowering layer** — M3.5 `entityTypes` mechanism + registry-driven hydration.
-3. **Parsing layer** — `pslBlocks` mechanism + discriminator-tied dispatch (this project).
+9. **Three-layer extensibility ADR lands.** Names IR / lowering / parsing+printing as the three corners; pins the discriminator convention; cites ADR 221 as the IR layer's authority. Subsystem docs reference it.
 
-Each layer is independently extensible by a pack; the discriminator (`kind` field on the AST node = `discriminator` field on the `entityTypes` factory = `discriminator` field on the `pslBlocks` contribution) is the load-bearing convention that ties them together.
+10. **`AGENTS.md` references `AuthoringContributions.entityTypes` correctly.** The current doc-bug (`AuthoringContributions.entities`) is fixed.
+
+11. **Project directory deleted.** `projects/target-contributed-psl-blocks/` removed; in-tree references scrubbed per `.cursor/rules/doc-maintenance.mdc`.
