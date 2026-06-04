@@ -7,31 +7,20 @@ alwaysApply: false
 # Assert the whole result shape, with explicit projections
 
 In `sql-orm-client` tests (unit and integration), assert the **entire** result with `toEqual`
-(or an inline/file snapshot), and pin the projected columns with explicit `.select(...)` (varargs:
-`.select('id', 'name')`) on the root collection **and** on every included relation. Order
-deterministically with
-`.orderBy((c) => c.<baseColumn>.asc())` so `toEqual` on arrays is reliable.
-
-Avoid partial matchers (`toMatchObject`, `toHaveProperty` / `not.toHaveProperty`, lone
-single-field `toBe`/`toEqual`) as the primary assertion for a query result, and avoid `toEqual`
-on a full model row with no `select`.
+(or an inline/file snapshot), and pin the projected columns with explicit varargs `.select(...)`
+(`.select('id', 'name')`) on the root collection **and** on every included relation. Order
+deterministically with a **base-table** column — `.orderBy((c) => c.<baseColumn>.asc())` (typically
+`id`; don't order by a variant table's column unless that path is under test) — so `toEqual` on
+arrays is reliable.
 
 ## Why
 
-Two failure modes this prevents:
-
-1. **Partial matchers pass silently on wrong shapes.** `toMatchObject({ id: 1, role: 'admin' })`
-   succeeds even if the row carries an extra field it shouldn't, a sibling-variant field that
-   should have been dropped, or a misspelled key elsewhere. The result's *shape* is the contract;
-   assert all of it.
-2. **`toEqual` without `select` couples every test to the full model field set.** Adding one field
-   to a model then breaks every test that asserted a full row of it — tests far from the change.
-   An explicit `.select(...)` makes the asserted columns intentional, so unrelated field
-   additions don't ripple into unrelated tests, while `toEqual` still catches any wrong/missing
-   value *within* the selected shape.
-
-Together: `select` + `toEqual` is both **complete** (catches extra/missing/wrong fields in the
-projected shape) and **stable** (immune to unrelated model growth).
+- Partial matchers (`toMatchObject`, `toHaveProperty`/`not.toHaveProperty`, lone single-field
+  `toBe`/`toEqual`) pass silently on wrong shapes — extra fields, a sibling-variant field that
+  should have been dropped, a misspelled key elsewhere. The result's shape is the contract.
+- `toEqual` on a full model row with **no** `select` couples every test to the full model field
+  set, so adding one field breaks tests far from the change. `select` + `toEqual` is both complete
+  (catches extra/missing/wrong fields in the projected shape) and stable (immune to model growth).
 
 ## Good
 
@@ -44,38 +33,24 @@ const rows = await db.orm.Account
 
 expect(rows).toEqual([
   { id: 1, name: 'Acme', members: [
-    { id: 1, kind: 'admin', role: 'superadmin' }, // variant fields surface per the row's variant;
-    { id: 2, kind: 'regular', plan: 'free' },      // pinning them locks the variant shape
+    { id: 1, kind: 'admin', role: 'superadmin' }, // polymorphic: variant fields surface per row's
+    { id: 2, kind: 'regular', plan: 'free' },      // variant — pin them to lock the per-variant shape
   ] },
   { id: 2, name: 'Empty', members: [] },
 ]);
 ```
 
-## Avoid
-
-```ts
-const member = members.find((m) => m.id === 1)!;
-expect(member).toMatchObject({ id: 1, role: 'admin' }); // passes even if `member` has stray fields
-expect(member).not.toHaveProperty('plan');               // enumerating absences ≠ asserting the shape
-```
-
 ## Notes
 
-- **Polymorphic includes:** variant-specific fields surface according to each row's variant. Pin
-  them with `select` + `toEqual` so the per-variant shape (e.g. admin rows carry `role`, regular
-  rows carry `plan`) is asserted, not assumed.
-- **Determinism:** order by a **base-table** column (typically `id`). Don't order by a variant
-  table's column on a variant-narrowed collection unless that path is the thing under test.
-- **Snapshots** (`toMatchInlineSnapshot`) are an acceptable alternative to a hand-written `toEqual`
-  for large shapes, but still pair them with explicit `select` so the snapshot is stable.
-- This is about *result-shape* assertions. Asserting a single scalar (a count, a thrown error
-  code, a boolean) with `toBe`/`expect().rejects` is fine and expected.
 - **Implicit-default-projection tests are the deliberate exception:** a test whose explicit purpose
-  is to verify the default projection (no `.select(...)`) *should* assert the full default row shape
-  with `toEqual`, by design — that's the property under test. Name it as such. Everywhere else, a
-  `toEqual` on a full row with no `select` is the brittleness this rule warns against.
-- **Relationship to `prefer-object-matcher.mdc`:** that rule consolidates scattered
-  `expect().toBe()` calls into one matcher repo-wide. This rule is the stricter, sql-orm-client
-  specialization for *query results*: the result row is the contract, so assert it **completely**
-  with `toEqual` + `select` rather than partially with `toMatchObject`. `toMatchObject` is still
-  fine for the non-result, constructed-object cases `prefer-object-matcher` targets.
+  is to verify the default projection (no `.select(...)`) should assert the full default row shape
+  with `toEqual`; name it as such. Everywhere else, `toEqual` on a full row with no `select` is the
+  brittleness this rule warns against.
+- **Snapshots** (`toMatchInlineSnapshot`) are an acceptable alternative to a hand-written `toEqual`,
+  but still pair them with explicit `select` so the snapshot is stable.
+- Asserting a single scalar (a count, a thrown error code, a boolean) with `toBe`/`expect().rejects`
+  is fine and expected.
+- **Relationship to `prefer-object-matcher.mdc`:** this is the stricter, sql-orm-client
+  specialization of that rule for *query results* — assert the result row completely with
+  `toEqual` + `select` rather than partially. `toMatchObject` stays fine for the non-result,
+  constructed-object cases `prefer-object-matcher` targets.
