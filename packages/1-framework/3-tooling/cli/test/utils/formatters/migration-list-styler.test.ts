@@ -18,11 +18,11 @@ const HASH_D = 'sha256:55bada2f123456789012345678901234567890123456789012';
 let migrationHashSeq = 0;
 
 function migration(
-  overrides: Pick<MigrationListEntry, 'dirName' | 'to'> &
-    Partial<Omit<MigrationListEntry, 'dirName' | 'to'>>,
+  overrides: Pick<MigrationListEntry, 'name' | 'toContract'> &
+    Partial<Omit<MigrationListEntry, 'name' | 'toContract'>>,
 ): MigrationListEntry {
   return {
-    from: null,
+    fromContract: null,
     migrationHash: overrides.migrationHash ?? `sha256:styler-mig-${migrationHashSeq++}`,
     operationCount: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -64,12 +64,12 @@ describe('createAnsiMigrationListStyler', () => {
     const r = result(
       [
         {
-          spaceId: 'app',
+          space: 'app',
           migrations: [
             migration({
-              dirName: '20260422T0720_initial',
-              from: null,
-              to: HASH_C,
+              name: '20260422T0720_initial',
+              fromContract: null,
+              toContract: HASH_C,
             }),
           ],
         },
@@ -133,12 +133,12 @@ describe('renderMigrationListWithStyle', () => {
     const r = result(
       [
         {
-          spaceId: 'app',
+          space: 'app',
           migrations: [
             migration({
-              dirName: '20260601T1200_backfill_emails',
-              from: HASH_D,
-              to: HASH_D,
+              name: '20260601T1200_backfill_emails',
+              fromContract: HASH_D,
+              toContract: HASH_D,
               providedInvariants: ['backfill_emails_v1'],
               refs: ['production', 'db'],
             }),
@@ -167,17 +167,17 @@ describe('renderMigrationListWithStyle', () => {
     const r = result(
       [
         {
-          spaceId: 'app',
+          space: 'app',
           migrations: [
             migration({
-              dirName: '20260422T0720_initial',
-              from: null,
-              to: HASH_C,
+              name: '20260422T0720_initial',
+              fromContract: null,
+              toContract: HASH_C,
             }),
           ],
         },
         {
-          spaceId: 'postgis',
+          space: 'postgis',
           migrations: [],
         },
       ],
@@ -202,17 +202,17 @@ describe('renderMigrationListWithStyle', () => {
     const r = result(
       [
         {
-          spaceId: 'app',
+          space: 'app',
           migrations: [
             migration({
-              dirName: '20260422T0720_initial',
-              from: null,
-              to: HASH_C,
+              name: '20260422T0720_initial',
+              fromContract: null,
+              toContract: HASH_C,
             }),
             migration({
-              dirName: '20260601T1200_latest',
-              from: HASH_C,
-              to: HASH_D,
+              name: '20260601T1200_latest',
+              fromContract: HASH_C,
+              toContract: HASH_D,
             }),
           ],
         },
@@ -243,12 +243,12 @@ describe('IDENTITY_MIGRATION_LIST_STYLER', () => {
     const r = result(
       [
         {
-          spaceId: 'app',
+          space: 'app',
           migrations: [
             migration({
-              dirName: '20260422T0720_initial',
-              from: null,
-              to: HASH_C,
+              name: '20260422T0720_initial',
+              fromContract: null,
+              toContract: HASH_C,
             }),
           ],
         },

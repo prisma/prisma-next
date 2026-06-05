@@ -81,14 +81,14 @@ describe('MigrationStatusResult JSON shape', () => {
       ok: true,
       spaces: [
         {
-          spaceId: 'app',
-          markerHash: 'sha256:marker',
-          targetHash: 'sha256:leaf',
+          space: 'app',
+          currentContract: 'sha256:marker',
+          targetContract: 'sha256:leaf',
           migrations: [
             {
-              dirName: '20260101T1200_init',
-              from: 'sha256:a',
-              to: 'sha256:b',
+              name: '20260101T1200_init',
+              fromContract: 'sha256:a',
+              toContract: 'sha256:b',
               migrationHash: 'sha256:mid',
               operationCount: 3,
               createdAt: '2026-01-01T00:00:00.000Z',

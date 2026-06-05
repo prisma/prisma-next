@@ -335,10 +335,10 @@ export function formatMigrationApplyCommandOutput(
 }
 
 interface MigrationShowPresent {
-  readonly dirName: string;
+  readonly name: string;
   readonly dirPath: string;
-  readonly from: string | null;
-  readonly to: string;
+  readonly fromContract: string | null;
+  readonly toContract: string;
   readonly migrationHash: string;
   readonly createdAt: string;
   readonly operations: readonly {
@@ -360,9 +360,9 @@ function formatSpaceShowBlock(space: MigrationShowPresent, useColor: boolean): r
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   const lines: string[] = [];
-  lines.push(`${formatGreen('✔')} ${space.dirName}`);
-  lines.push(`${formatDimText(`  from: ${space.from ?? '(baseline)'}`)}`);
-  lines.push(`${formatDimText(`  to:   ${space.to}`)}`);
+  lines.push(`${formatGreen('✔')} ${space.name}`);
+  lines.push(`${formatDimText(`  from: ${space.fromContract ?? '(baseline)'}`)}`);
+  lines.push(`${formatDimText(`  to:   ${space.toContract}`)}`);
   lines.push(`${formatDimText(`  migrationHash: ${space.migrationHash}`)}`);
   lines.push(`${formatDimText(`  created: ${space.createdAt}`)}`);
 

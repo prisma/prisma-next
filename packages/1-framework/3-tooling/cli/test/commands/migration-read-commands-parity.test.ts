@@ -179,7 +179,7 @@ function assertIndentedTreesUnderSpaceHeadings(output: string): void {
 }
 
 function multiSpaceGlobalWidths(
-  spaces: readonly { readonly spaceId: string; readonly migrations: readonly unknown[] }[],
+  spaces: readonly { readonly space: string; readonly migrations: readonly unknown[] }[],
   aggregate: Awaited<ReturnType<typeof loadContractSpaceAggregate>>,
   liveContractHash: string,
   showSpaceHeadings: boolean,
@@ -193,7 +193,7 @@ function multiSpaceGlobalWidths(
   const inputs = spaces
     .filter((space) => space.migrations.length > 0)
     .map((space) => ({
-      graph: aggregate.space(space.spaceId)!.graph(),
+      graph: aggregate.space(space.space)!.graph(),
       liveContractHash,
     }));
   if (inputs.length === 0) {
@@ -308,7 +308,7 @@ describe('migration read commands pretty parity', () => {
         ok: true,
         graph: aggregate.app.graph(),
         treeSections: listResult.value.spaces.map((spaceEntry) => {
-          const member = aggregate.space(spaceEntry.spaceId)!;
+          const member = aggregate.space(spaceEntry.space)!;
           const tree =
             spaceEntry.migrations.length === 0
               ? ''
@@ -322,7 +322,7 @@ describe('migration read commands pretty parity', () => {
                   ...globalWidths,
                 });
           return {
-            spaceId: spaceEntry.spaceId,
+            space: spaceEntry.space,
             tree:
               showSpaceHeadings && tree.length > 0
                 ? indentMigrationGraphTreeBlock(tree, '  ')
@@ -365,12 +365,12 @@ describe('migration read commands pretty parity', () => {
       showSpaceHeadings,
     );
     const treeSections = listResult.value.spaces.map((spaceEntry) => {
-      const member = aggregate.space(spaceEntry.spaceId)!;
+      const member = aggregate.space(spaceEntry.space)!;
       const graph = member.graph();
       const targetHash =
-        spaceEntry.spaceId === 'postgis'
+        spaceEntry.space === 'postgis'
           ? HASH_POSTGIS
-          : spaceEntry.spaceId === 'app'
+          : spaceEntry.space === 'app'
             ? HASH_804e018
             : (graph.nodes.values().next().value ?? EMPTY_CONTRACT_HASH);
       const statusOverlay = deriveStatusEdgeAnnotations({
@@ -394,7 +394,7 @@ describe('migration read commands pretty parity', () => {
               ...globalWidths,
             });
       return {
-        spaceId: spaceEntry.spaceId,
+        space: spaceEntry.space,
         tree:
           showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree,
         showHeading: showSpaceHeadings,
@@ -591,11 +591,11 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     const sample: MigrationShowResult = {
       ok: true,
       migration: {
-        spaceId: 'app',
-        dirName: '20260101T0000_init',
+        space: 'app',
+        name: '20260101T0000_init',
         dirPath: 'migrations/app/20260101T0000_init',
-        from: null,
-        to: 'sha256:a',
+        fromContract: null,
+        toContract: 'sha256:a',
         migrationHash: 'sha256:edge',
         createdAt: '2026-01-01T00:00:00.000Z',
         operations: [],

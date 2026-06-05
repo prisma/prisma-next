@@ -16,9 +16,9 @@ function entry(
   migrationHash?: string,
 ): MigrationListEntry {
   return {
-    dirName,
-    from,
-    to,
+    name: dirName,
+    fromContract: from,
+    toContract: to,
     migrationHash: migrationHash ?? `sha256:mig-${hashCounter++}`,
     operationCount: 1,
     createdAt: '2026-02-25T14:00:00.000Z',

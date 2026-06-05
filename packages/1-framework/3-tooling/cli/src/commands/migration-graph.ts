@@ -40,7 +40,7 @@ interface MigrationGraphOptions extends CommonCommandOptions {
 }
 
 export interface MigrationGraphTreeSection {
-  readonly spaceId: string;
+  readonly space: string;
   readonly tree: string;
   readonly showHeading: boolean;
 }
@@ -75,7 +75,7 @@ export function formatMigrationGraphHumanOutput(result: MigrationGraphResult): s
   const sections: string[] = [];
   for (const section of result.treeSections) {
     if (section.showHeading) {
-      sections.push(`${section.spaceId}:`);
+      sections.push(`${section.space}:`);
     }
     if (section.tree.length > 0) {
       sections.push(section.tree);
@@ -148,7 +148,7 @@ export async function executeMigrationGraphCommand(
     ? scopedSpaces
         .filter((spaceEntry) => spaceEntry.migrations.length > 0)
         .map((spaceEntry) => ({
-          graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+          graph: aggregate.space(spaceEntry.space)!.graph(),
           liveContractHash,
         }))
     : [];
@@ -161,7 +161,7 @@ export async function executeMigrationGraphCommand(
 
   const treeSections: MigrationGraphTreeSection[] = [];
   for (const spaceEntry of scopedSpaces) {
-    const member = aggregate.space(spaceEntry.spaceId);
+    const member = aggregate.space(spaceEntry.space);
     if (member === undefined) {
       continue;
     }
@@ -182,7 +182,7 @@ export async function executeMigrationGraphCommand(
     const displayTree =
       showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;
     treeSections.push({
-      spaceId: spaceEntry.spaceId,
+      space: spaceEntry.space,
       tree: displayTree,
       showHeading: showSpaceHeadings,
     });

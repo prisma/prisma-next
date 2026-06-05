@@ -49,11 +49,11 @@ interface MigrationShowOptions extends CommonCommandOptions {
 }
 
 export interface MigrationShowPresent {
-  readonly spaceId: string;
-  readonly dirName: string;
+  readonly space: string;
+  readonly name: string;
   readonly dirPath: string;
-  readonly from: string | null;
-  readonly to: string;
+  readonly fromContract: string | null;
+  readonly toContract: string;
   readonly migrationHash: string;
   readonly createdAt: string;
   readonly operations: readonly {
@@ -78,11 +78,11 @@ function pkgToPresent(
   const ops = castAs<readonly MigrationPlanOperation[]>(pkg.ops);
   const preview: OperationPreview = client.toOperationPreview(ops) ?? { statements: [] };
   return {
-    spaceId,
-    dirName: pkg.dirName,
+    space: spaceId,
+    name: pkg.dirName,
     dirPath: relative(process.cwd(), pkg.dirPath),
-    from: pkg.metadata.from,
-    to: pkg.metadata.to,
+    fromContract: pkg.metadata.from,
+    toContract: pkg.metadata.to,
     migrationHash: pkg.metadata.migrationHash,
     createdAt: pkg.metadata.createdAt,
     operations: ops.map((op) => ({

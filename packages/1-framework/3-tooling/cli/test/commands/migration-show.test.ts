@@ -112,11 +112,11 @@ function setupConfigMock(): void {
 
 function samplePresent(overrides: Partial<MigrationShowPresent> = {}): MigrationShowPresent {
   return {
-    spaceId: 'app',
-    dirName: '20260101_100000_add_user',
+    space: 'app',
+    name: '20260101_100000_add_user',
     dirPath: 'migrations/app/20260101_100000_add_user',
-    from: null,
-    to: 'sha256:hash-a',
+    fromContract: null,
+    toContract: 'sha256:hash-a',
     migrationHash: 'sha256:edge-abc',
     createdAt: '2026-01-01T10:00:00.000Z',
     operations: [{ id: 'table.user', label: 'Create table "user"', operationClass: 'additive' }],
@@ -317,9 +317,9 @@ describe('migration show command', () => {
     expect(getExitCode()).toBe(0);
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
     expect(jsonLine).toBeDefined();
-    const parsed = JSON.parse(jsonLine!) as { ok?: boolean; migration?: { dirName?: string } };
+    const parsed = JSON.parse(jsonLine!) as { ok?: boolean; migration?: { name?: string } };
     expect(parsed.ok).toBe(true);
-    expect(parsed.migration?.dirName).toBe(dirName);
+    expect(parsed.migration?.name).toBe(dirName);
   });
 
   it('errors with contract validation when contract JSON is invalid', async () => {

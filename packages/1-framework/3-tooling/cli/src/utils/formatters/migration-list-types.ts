@@ -1,7 +1,7 @@
 export interface MigrationListEntry {
-  readonly dirName: string;
-  readonly from: string | null;
-  readonly to: string;
+  readonly name: string;
+  readonly fromContract: string | null;
+  readonly toContract: string;
   readonly migrationHash: string;
   readonly operationCount: number;
   readonly createdAt: string;
@@ -10,7 +10,7 @@ export interface MigrationListEntry {
 }
 
 export interface MigrationSpaceListEntry {
-  readonly spaceId: string;
+  readonly space: string;
   readonly migrations: readonly MigrationListEntry[];
 }
 

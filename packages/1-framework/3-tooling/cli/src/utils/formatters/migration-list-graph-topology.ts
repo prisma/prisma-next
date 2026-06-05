@@ -320,9 +320,9 @@ export function classifyMigrationListGraphTopology(
 ): MigrationListGraphTopology {
   const normalized: NormalizedEdge[] = entries.map((entry) => ({
     hash: entry.migrationHash,
-    from: canonicalFrom(entry.from),
-    to: entry.to,
-    dirName: entry.dirName,
+    from: canonicalFrom(entry.fromContract),
+    to: entry.toContract,
+    dirName: entry.name,
   }));
   return classifyNormalizedEdges(normalized);
 }

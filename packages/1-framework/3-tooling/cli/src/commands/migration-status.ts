@@ -84,9 +84,9 @@ export interface MigrationStatusMigrationEntry extends MigrationListEntry {
 }
 
 export interface MigrationStatusSpaceResult {
-  readonly spaceId: string;
-  readonly markerHash: string | null;
-  readonly targetHash: string;
+  readonly space: string;
+  readonly currentContract: string | null;
+  readonly targetContract: string;
   readonly migrations: readonly MigrationStatusMigrationEntry[];
 }
 
@@ -100,7 +100,7 @@ export interface MigrationStatusResult {
 }
 
 export interface MigrationStatusTreeSection {
-  readonly spaceId: string;
+  readonly space: string;
   readonly tree: string;
   readonly showHeading: boolean;
 }
@@ -225,7 +225,7 @@ export function formatStatusHumanOutput(result: MigrationStatusResult, colorize:
   const sections: string[] = [];
   for (const section of result.treeSections) {
     if (section.showHeading) {
-      sections.push(`${section.spaceId}:`);
+      sections.push(`${section.space}:`);
     }
     if (section.tree.length > 0) {
       sections.push(section.tree);
@@ -414,7 +414,7 @@ async function executeMigrationStatusCommand(
       connected = true;
       const read = await readMarkersAndLedgers({
         client,
-        spaceIds: scopedSpaces.map((s) => s.spaceId),
+        spaceIds: scopedSpaces.map((s) => s.space),
       });
       markersBySpace = new Map(read.markersBySpace);
       ledgersBySpace = new Map(read.ledgersBySpace);
@@ -467,7 +467,7 @@ async function executeMigrationStatusCommand(
     ? scopedSpaces
         .filter((spaceEntry) => spaceEntry.migrations.length > 0)
         .map((spaceEntry) => ({
-          graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+          graph: aggregate.space(spaceEntry.space)!.graph(),
           liveContractHash: contractHash,
         }))
     : [];
@@ -479,18 +479,18 @@ async function executeMigrationStatusCommand(
     globalLayoutInputs.length > 0 ? computeGlobalMaxDirNameWidth(globalLayoutInputs) : undefined;
 
   for (const spaceEntry of scopedSpaces) {
-    const member = aggregate.space(spaceEntry.spaceId);
+    const member = aggregate.space(spaceEntry.space);
     if (member === undefined) {
       continue;
     }
     const graph = member.graph();
     const spaceContractHash = member.contract().storage.storageHash;
     const targetHash = resolveTarget(spaceContractHash, activeRefHash);
-    if (spaceEntry.spaceId === aggregate.app.spaceId) {
+    if (spaceEntry.space === aggregate.app.spaceId) {
       headlineTargetHash = targetHash;
     }
 
-    const markerRecord = markersBySpace.get(spaceEntry.spaceId);
+    const markerRecord = markersBySpace.get(spaceEntry.space);
     const markerHash = usingFromOverride
       ? fromOverrideHash
       : (markerRecord?.storageHash ?? undefined);
@@ -521,7 +521,7 @@ async function executeMigrationStatusCommand(
       });
     }
 
-    const ledger = ledgersBySpace.get(spaceEntry.spaceId) ?? [];
+    const ledger = ledgersBySpace.get(spaceEntry.space) ?? [];
     const appliedHashes = showAppliedOverlay ? appliedHashesFromLedger(ledger) : new Set<string>();
 
     const annotations = deriveStatusEdgeAnnotations({
@@ -548,15 +548,15 @@ async function executeMigrationStatusCommand(
     totalPending += pending;
 
     statusSpaces.push({
-      spaceId: spaceEntry.spaceId,
-      markerHash: markerHash ?? null,
-      targetHash,
+      space: spaceEntry.space,
+      currentContract: markerHash ?? null,
+      targetContract: targetHash,
       migrations,
     });
     const displayTree =
       showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;
     treeSections.push({
-      spaceId: spaceEntry.spaceId,
+      space: spaceEntry.space,
       tree: displayTree,
       showHeading: showSpaceHeadings,
     });
