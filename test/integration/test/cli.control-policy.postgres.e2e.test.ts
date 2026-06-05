@@ -114,7 +114,7 @@ interface EmittedTable {
 }
 
 interface EmittedNamespace {
-  readonly tables?: Record<string, EmittedTable>;
+  readonly entries?: { readonly table?: Record<string, EmittedTable> };
 }
 
 interface EmittedContract {
@@ -180,7 +180,7 @@ withTempDir(({ createTempDir }) => {
             createTempDir,
           );
           const contract = readEmittedContract(testSetup);
-          const tables = contract.storage.namespaces['public']?.tables ?? {};
+          const tables = contract.storage.namespaces['public']?.entries?.table ?? {};
           expect(tables['app_users']?.control).toBeUndefined();
           expect(tables['audit_log']?.control).toBe('tolerated');
           expect(tables['legacy_jobs']?.control).toBe('observed');
@@ -198,7 +198,7 @@ withTempDir(({ createTempDir }) => {
           const { testSetup } = await setupExternalFloorFixture(connectionString, createTempDir);
           const contract = readEmittedContract(testSetup);
           expect(contract.defaultControlPolicy).toBe('external');
-          const sessions = contract.storage.namespaces['auth']?.tables?.['sessions'];
+          const sessions = contract.storage.namespaces['auth']?.entries?.table?.['sessions'];
           expect(sessions?.control).toBe('managed');
         });
       },

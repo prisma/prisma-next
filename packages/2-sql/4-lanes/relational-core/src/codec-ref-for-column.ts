@@ -10,7 +10,7 @@ import {
 /**
  * Derive the canonical {@link CodecRef} for a `(table, column)` pair against a {@link SqlStorage}. This is the build-time path every column-bound `ParamRef` / `ProjectionItem` uses to stamp its `codec` slot before the AST is handed to the runtime — the runtime resolver then materialises a memoised {@link import('@prisma-next/sql-relational-core/ast').Codec} for the same `CodecRef` via `forCodecRef`.
  *
- * Resolution rules over `storage.tables[table].columns[column]`:
+ * Resolution rules over namespace `entries.table[table].columns[column]`:
  *
  * - `typeRef` column → `{codecId, typeParams}` from `storage.types[typeRef]` (multiple columns sharing the typeRef share one ref → one memoised codec).
  * - inline `typeParams` column → `{codecId, typeParams}` from the column itself.
@@ -38,13 +38,11 @@ export function codecRefForStorageColumn(
     let instance: unknown = storage.types?.[columnDef.typeRef];
     if (!instance) {
       for (const ns of Object.values(storage.namespaces)) {
-        const nsEnums = (ns as { enum?: Record<string, unknown> }).enum;
-        if (nsEnums) {
-          const nsEntry = nsEnums[columnDef.typeRef];
-          if (nsEntry !== undefined) {
-            instance = nsEntry;
-            break;
-          }
+        const typeSlot = (ns.entries as { type?: Record<string, unknown> }).type;
+        const nsEntry = typeSlot?.[columnDef.typeRef];
+        if (nsEntry !== undefined) {
+          instance = nsEntry;
+          break;
         }
       }
     }

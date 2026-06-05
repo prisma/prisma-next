@@ -8,6 +8,7 @@ import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import postgresControl from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 
 const int4Column = {
@@ -41,6 +42,7 @@ function interpretWithRealPacks(schema: string) {
     authoringContributions: stack.authoringContributions,
     composedExtensionPacks: [pgvectorControl.id],
     composedExtensionPackRefs: [pgvectorPack],
+    createNamespace: postgresCreateNamespace,
   });
 }
 

@@ -64,22 +64,23 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
-            _ext_helper: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                ...(version === 2
-                  ? {
-                      note: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
-                    }
-                  : {}),
+              _ext_helper: {
+                columns: {
+                  id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                  ...(version === 2
+                    ? {
+                        note: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+                      }
+                    : {}),
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
-        }}),
+        }),
       },
     }),
     roots: {},
@@ -451,22 +452,23 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
             id: UNBOUND_NAMESPACE_ID,
             entries: {
               table: {
-              user: {
-                columns: {
-                  id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                  email: {
-                    nativeType: 'text',
-                    codecId: HOOKED_CODEC,
-                    nullable: false,
+                user: {
+                  columns: {
+                    id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                    email: {
+                      nativeType: 'text',
+                      codecId: HOOKED_CODEC,
+                      nullable: false,
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [{ columns: ['email'] }],
+                  indexes: [{ columns: ['email'] }],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [{ columns: ['email'] }],
-                indexes: [{ columns: ['email'] }],
-                foreignKeys: [],
               },
             },
-          }}),
+          }),
         },
       }),
       profileHash: profileHash('sha256:app-with-hooked-email'),

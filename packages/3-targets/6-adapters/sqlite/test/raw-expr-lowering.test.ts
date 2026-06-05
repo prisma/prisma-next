@@ -28,16 +28,16 @@ const contract = new SqlContractSerializer().deserializeContract({
         id: '__unbound__',
         entries: {
           table: {
-          user: {
-            columns: {
-              id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-              email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+            user: {
+              columns: {
+                id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+                email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
-        },
         },
       },
     },
