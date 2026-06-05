@@ -13,6 +13,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { buildSqlContractFromDefinition } from './build-contract';
 import {
   type ComposedAuthoringHelpers,
@@ -399,15 +400,17 @@ export function buildBoundContract(
   const full = { ...definition, family, target };
 
   if (factory !== undefined) {
+    const built = factory(
+      createComposedAuthoringHelpers({
+        family,
+        target,
+        extensionPacks: definition.extensionPacks,
+      }),
+    );
     return buildContractFromDsl({
       ...full,
-      ...factory(
-        createComposedAuthoringHelpers({
-          family,
-          target,
-          extensionPacks: definition.extensionPacks,
-        }),
-      ),
+      ...ifDefined('types', built.types),
+      ...ifDefined('models', built.models),
     });
   }
 
