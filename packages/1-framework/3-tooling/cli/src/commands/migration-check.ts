@@ -396,6 +396,26 @@ interface SingleTargetInputs {
 }
 
 /**
+ * Ranks ref-resolution failure kinds by how informative they are, so a
+ * single-target check surfaces the most useful failure across spaces instead of
+ * whichever space failed first. `not-found` (the input matched nothing here)
+ * says the least; a malformed input, a wrong grammar, or an in-space ambiguity
+ * all say more.
+ */
+function refFailureSpecificity(error: RefResolutionError): number {
+  switch (error.kind) {
+    case 'wrong-grammar':
+      return 3;
+    case 'ambiguous':
+      return 2;
+    case 'invalid-format':
+      return 1;
+    case 'not-found':
+      return 0;
+  }
+}
+
+/**
  * Single-target (`check <ref/path>`) mode — resolves a migration reference
  * across all contract spaces (or the one space narrowed by `--space <id>`).
  *
@@ -458,16 +478,19 @@ async function checkSingleTarget(
   } else {
     // Ref resolution: try each in-scope space, collect all hits.
     const hits: Array<{ space: CheckSpace; pkg: OnDiskMigrationPackage }> = [];
-    let firstParseFailure: RefResolutionError | undefined;
+    let bestParseFailure: RefResolutionError | undefined;
     for (const space of scopedSpaces) {
       const migResult = parseMigrationRef(target, { graph: space.graph, refs: space.refs });
       if (!migResult.ok) {
-        // Record the first failure but keep scanning. The failure kind (including
-        // wrong-grammar, which fires when the target is a ref name in this space)
-        // is space-dependent, so a later space may still hold a hit that must not
-        // be discarded; the failure is surfaced via the shared envelope only when
-        // no space yields a hit.
-        if (firstParseFailure === undefined) firstParseFailure = migResult.failure;
+        // Keep scanning — a later space may hold a hit that must not be discarded.
+        // When no space yields a hit, keep the most informative failure rather than
+        // whichever space failed first (the kind is space-dependent).
+        if (
+          bestParseFailure === undefined ||
+          refFailureSpecificity(migResult.failure) > refFailureSpecificity(bestParseFailure)
+        ) {
+          bestParseFailure = migResult.failure;
+        }
         continue;
       }
       const pkg = space.packages.find(
@@ -489,12 +512,12 @@ async function checkSingleTarget(
     if (hits.length === 1) {
       matchedSpace = hits[0]!.space;
       matchedPkg = hits[0]!.pkg;
-    } else if (firstParseFailure !== undefined) {
-      // The ref didn't resolve in any in-scope space — emit the shared
-      // ref-resolution envelope (PN-RUN-3000) the D2 contract asserts, rather
-      // than a bespoke string. (Ref-resolved-but-no-package falls through to the
-      // "not found on disk" result below.)
-      return { error: mapRefResolutionError(firstParseFailure), exitCode: PRECONDITION };
+    } else if (bestParseFailure !== undefined) {
+      // The ref didn't resolve in any in-scope space — surface the most informative
+      // parse failure through the shared ref-resolution envelope (PN-RUN-3000) the
+      // earlier work established, rather than a bespoke string. (Ref-resolved-but-
+      // no-package falls through to the "not found on disk" result below.)
+      return { error: mapRefResolutionError(bestParseFailure), exitCode: PRECONDITION };
     }
   }
 

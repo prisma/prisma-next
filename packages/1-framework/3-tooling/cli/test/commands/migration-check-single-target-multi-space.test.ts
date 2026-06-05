@@ -314,4 +314,28 @@ describe('migration check <ref> — single-target multi-space resolution', () =>
 
     expect(exitCode).toBe(2);
   });
+
+  it('keeps the most informative parse failure across spaces (wrong-grammar beats an earlier not-found)', async () => {
+    const { createMigrationCheckCommand } = await import('../../src/commands/migration-check');
+    tempDir = await writeFixtureWithExtSpace();
+    // `dbref` is a ref only in postgis, so parseMigrationRef returns wrong-grammar
+    // there but not-found in app (which is searched first). The reported error must
+    // reflect postgis's wrong-grammar failure, not app's earlier not-found.
+    await writeRef(join(tempDir, 'migrations', 'postgis', 'refs'), 'dbref', {
+      hash: HASH_EXT,
+      invariants: [],
+    });
+    process.chdir(tempDir);
+
+    const exitCode = await runAndCaptureExit(() =>
+      executeCommand(createMigrationCheckCommand(), ['dbref', '--json']),
+    );
+    const envelope = firstJsonLine<CliErrorEnvelope>(consoleOutput);
+
+    expect(exitCode).toBe(2);
+    expect(envelope.ok).toBe(false);
+    // wrong-grammar envelopes carry meta.expectedGrammar; not-found carries meta.grammar.
+    expect(envelope.meta?.['expectedGrammar']).toBeDefined();
+    expect(envelope.meta?.['grammar']).toBeUndefined();
+  });
 });
