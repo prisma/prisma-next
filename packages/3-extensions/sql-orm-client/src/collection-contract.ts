@@ -6,7 +6,6 @@ import {
   domainModelsAtDefaultNamespace,
 } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import { castAs } from '@prisma-next/utils/casts';
 import {
   resolveDomainModelForContract,
   resolveTableForContract,
@@ -254,48 +253,28 @@ export function resolveIncludeRelation(
 
 function resolveThrough(
   contract: Contract<SqlStorage>,
-  raw:
-    | {
-        table?: unknown;
-        namespaceId?: unknown;
-        parentColumns?: unknown;
-        childColumns?: unknown;
-        targetColumns?: unknown;
-      }
-    | undefined,
+  through: ContractRelationThrough | undefined,
 ): ResolvedThrough | undefined {
-  if (!raw) return undefined;
-  const { table, namespaceId, parentColumns, childColumns, targetColumns } = raw;
-  if (
-    typeof table !== 'string' ||
-    typeof namespaceId !== 'string' ||
-    !Array.isArray(parentColumns) ||
-    !Array.isArray(childColumns) ||
-    !Array.isArray(targetColumns)
-  ) {
-    return undefined;
-  }
+  if (!through) return undefined;
+  const { table, namespaceId, parentColumns, childColumns, targetColumns } = through;
 
-  const fkColumnSet = new Set<string>([
-    ...castAs<readonly string[]>(parentColumns),
-    ...castAs<readonly string[]>(childColumns),
-  ]);
   const junctionTable = contract.storage.namespaces[namespaceId]?.entries.table[table];
+  if (!junctionTable) return undefined;
+
+  const fkColumnSet = new Set<string>([...parentColumns, ...childColumns]);
   const requiredPayloadColumns: string[] = [];
-  if (junctionTable) {
-    for (const [colName, col] of Object.entries(junctionTable.columns)) {
-      if (!fkColumnSet.has(colName) && !col.nullable && col.default === undefined) {
-        requiredPayloadColumns.push(colName);
-      }
+  for (const [colName, col] of Object.entries(junctionTable.columns)) {
+    if (!fkColumnSet.has(colName) && !col.nullable && col.default === undefined) {
+      requiredPayloadColumns.push(colName);
     }
   }
 
   return {
     table,
     namespaceId,
-    parentColumns: castAs<readonly string[]>(parentColumns),
-    childColumns: castAs<readonly string[]>(childColumns),
-    targetColumns: castAs<readonly string[]>(targetColumns),
+    parentColumns,
+    childColumns,
+    targetColumns,
     requiredPayloadColumns,
   };
 }
@@ -325,13 +304,7 @@ export function resolveModelRelations(
       to?: CrossReference;
       cardinality?: unknown;
       on?: { localFields?: unknown; targetFields?: unknown };
-      through?: {
-        table?: unknown;
-        namespaceId?: unknown;
-        parentColumns?: unknown;
-        childColumns?: unknown;
-        targetColumns?: unknown;
-      };
+      through?: ContractRelationThrough;
     };
     const localFields = rel.on?.localFields;
     const targetFields = rel.on?.targetFields;
