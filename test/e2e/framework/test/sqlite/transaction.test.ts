@@ -122,7 +122,7 @@ describe('transaction e2e via sqlite() facade', { timeout: timeouts.databaseOper
     expect(rows).toHaveLength(1);
   });
 
-  it('escaped AsyncIterableResult rejects after the transaction has ended', async () => {
+  it('escaped AsyncIterableResult rejects with TRANSACTION_CLOSED after the transaction has ended', async () => {
     const { db } = handle;
 
     // Capture the result inside the callback WITHOUT awaiting it, then return
@@ -134,11 +134,8 @@ describe('transaction e2e via sqlite() facade', { timeout: timeouts.databaseOper
       return { rows: tx.execute(tx.sql.users.select('id').build()) };
     });
 
-    // SQLite's synchronous driver closes the physical transaction connection
-    // before the AsyncIterableResult guard in withTransaction can fire, so the
-    // driver-level error surfaces instead of RUNTIME.TRANSACTION_CLOSED.
-    // The discriminating property — that consuming an escaped result rejects —
-    // is verified here; the exact error is noted as a known gap.
-    await expect(escaped.rows.toArray()).rejects.toThrow();
+    await expect(escaped.rows.toArray()).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_CLOSED',
+    });
   });
 });
