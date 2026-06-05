@@ -156,7 +156,7 @@ For v0.1, hand-authored. The contract describes the slice of Supabase's schemas 
 
 Three properties:
 
-- **`defaultControl: 'external'`** is the contract-level default; the framework's verifier under [control-policy](../control-policy/spec.md) treats every model in this contract as "verify it exists with compatible shape; emit no DDL." App contracts cascade-delete from `auth.users` rely on the verifier confirming the table is present and the FK target column has the expected type, but the framework owns no migration responsibility for `auth.*`.
+- **`defaultControl: 'external'`** is the contract-level default; the framework's verifier under [control-policy](../control-policy/spec.md) treats every model in this contract as "verify it exists with exactly-matching declared columns; emit no DDL." App contracts cascade-delete from `auth.users` rely on the verifier confirming the table is present and the FK target column has the expected type, but the framework owns no migration responsibility for `auth.*`.
 - **Not every column is modelled.** Only the columns app code is likely to reference (`id`, `email`, timestamps). The verifier under `control: 'external'` tolerates extra columns, so the package ships a minimal slice and grows it as user needs surface.
 - **Roles are first-class IR** (per the [postgres-rls](../postgres-rls/spec.md) project's `PostgresRole` IR shape). The Supabase pack declares `anon` / `authenticated` / `service_role` as `external` — verified to exist via `pg_roles` introspection, not created. App authors don't need to know the role wire names; they reference `supabaseRoles.anon` from the `/contract` subpath.
 
