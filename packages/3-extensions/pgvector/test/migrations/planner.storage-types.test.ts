@@ -73,24 +73,26 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            entries: { table: {
-              user: {
-                columns: {
-                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  role: {
-                    nativeType: 'role',
-                    codecId: 'pg/enum@1',
-                    nullable: false,
-                    typeRef: 'Role',
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                    role: {
+                      nativeType: 'role',
+                      codecId: 'pg/enum@1',
+                      nullable: false,
+                      typeRef: 'Role',
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
-          }}),
+          }),
         },
       }),
       roots: {},
@@ -244,24 +246,26 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            entries: { table: {
-              user: {
-                columns: {
-                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  kind: {
-                    nativeType: 'UserKind',
-                    codecId: 'pg/enum@1',
-                    nullable: false,
-                    typeRef: 'UserKind',
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                    kind: {
+                      nativeType: 'UserKind',
+                      codecId: 'pg/enum@1',
+                      nullable: false,
+                      typeRef: 'UserKind',
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
-          }}),
+          }),
         },
       }),
       roots: {},
@@ -311,24 +315,26 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            entries: { table: {
-              document: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  embedding: {
-                    nativeType: 'vector',
-                    codecId: 'pg/vector@1',
-                    nullable: false,
-                    typeRef: 'Embedding1536',
+            entries: {
+              table: {
+                document: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    embedding: {
+                      nativeType: 'vector',
+                      codecId: 'pg/vector@1',
+                      nullable: false,
+                      typeRef: 'Embedding1536',
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
-          }}),
+          }),
         },
       }),
       roots: {},
@@ -376,24 +382,26 @@ describe('PostgresMigrationPlanner - storage types', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            entries: { table: {
-              document: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  embedding: {
-                    nativeType: 'vector',
-                    codecId: 'pg/vector@1',
-                    nullable: false,
-                    typeRef: 'Embedding1536',
+            entries: {
+              table: {
+                document: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    embedding: {
+                      nativeType: 'vector',
+                      codecId: 'pg/vector@1',
+                      nullable: false,
+                      typeRef: 'Embedding1536',
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
-          }}),
+          }),
         },
       }),
       roots: {},

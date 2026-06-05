@@ -24,26 +24,27 @@ type EmittedContract = Contract<
       readonly public: {
         readonly id: 'public';
         readonly kind: 'sql-namespace';
-        readonly entries: { readonly table: {
-          readonly user: {
-            readonly columns: {
-              readonly id: {
-                readonly nativeType: 'int4';
-                readonly codecId: 'pg/int4@1';
-                readonly nullable: false;
+        readonly entries: {
+          readonly table: {
+            readonly user: {
+              readonly columns: {
+                readonly id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly email: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
               };
-              readonly email: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
+              readonly primaryKey: { readonly columns: readonly ['id'] };
+              readonly uniques: readonly [];
+              readonly indexes: readonly [];
+              readonly foreignKeys: readonly [];
             };
-            readonly primaryKey: { readonly columns: readonly ['id'] };
-            readonly uniques: readonly [];
-            readonly indexes: readonly [];
-            readonly foreignKeys: readonly [];
           };
-        };
         };
       };
     };
@@ -192,9 +193,8 @@ describe('contract emit command (CLI process e2e)', () => {
 
       expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
       expect(validatedContract.target).toBe(originalContract.target);
-      const tables = (validatedContract.storage as SqlStorage).namespaces['public']?.entries.table as
-        | Record<string, unknown>
-        | undefined;
+      const tables = (validatedContract.storage as SqlStorage).namespaces['public']?.entries
+        .table as Record<string, unknown> | undefined;
       const originalTables = (originalContract.storage as SqlStorage | undefined)?.namespaces[
         'public'
       ]?.entries.table as Record<string, unknown> | undefined;

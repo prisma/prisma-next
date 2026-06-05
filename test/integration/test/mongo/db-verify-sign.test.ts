@@ -37,13 +37,15 @@ const baseContract: MongoContract = {
       __unbound__: {
         id: '__unbound__' as const,
         kind: 'mongo-namespace' as const,
-        entries: { collection: {
-          users: new MongoCollection({
-            indexes: [
-              new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
-            ],
-          }),
-        } },
+        entries: {
+          collection: {
+            users: new MongoCollection({
+              indexes: [
+                new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+              ],
+            }),
+          },
+        },
       },
     },
     storageHash: coreHash('sha256:verify-test'),

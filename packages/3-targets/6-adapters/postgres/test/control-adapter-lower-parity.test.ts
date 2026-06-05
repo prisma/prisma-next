@@ -37,18 +37,19 @@ const contract = new SqlContractSerializer().deserializeContract({
         id: '__unbound__',
         entries: {
           table: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              profile: { codecId: 'pg/jsonb@1', nativeType: 'jsonb', nullable: true },
-              settings: { codecId: 'pg/json@1', nativeType: 'json', nullable: true },
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                profile: { codecId: 'pg/jsonb@1', nativeType: 'jsonb', nullable: true },
+                settings: { codecId: 'pg/json@1', nativeType: 'json', nullable: true },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
-        }},
+        },
       },
     },
   },

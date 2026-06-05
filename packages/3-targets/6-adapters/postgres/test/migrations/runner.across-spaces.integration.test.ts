@@ -26,7 +26,10 @@ const extensionContract: Contract<SqlStorage> = {
   storage: new SqlStorage({
     storageHash: coreHash('sha256:ext-contract'),
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } }),
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { table: {} },
+      }),
     },
   }),
   roots: {},

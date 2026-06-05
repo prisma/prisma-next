@@ -62,7 +62,7 @@ type GeneratedLikeContractBase = Contract<
               uniques: [];
               indexes: [];
               foreignKeys: [];
-            },
+            };
             post: {
               columns: {
                 id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
@@ -73,8 +73,8 @@ type GeneratedLikeContractBase = Contract<
               uniques: [];
               indexes: [];
               foreignKeys: [];
-            },
-          },
+            };
+          };
         };
       };
     };
@@ -418,8 +418,8 @@ type VOContractBase = Contract<
               uniques: [];
               indexes: [];
               foreignKeys: [];
-            },
-          },
+            };
+          };
         };
       };
     };

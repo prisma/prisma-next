@@ -60,7 +60,10 @@ interface MongoShapedExtensionContract {
             string,
             {
               readonly indexes: ReadonlyArray<{
-                readonly keys: ReadonlyArray<{ readonly field: string; readonly direction: 1 | -1 }>;
+                readonly keys: ReadonlyArray<{
+                  readonly field: string;
+                  readonly direction: 1 | -1;
+                }>;
                 readonly unique?: boolean;
               }>;
             }

@@ -255,10 +255,12 @@ describe('builder integration', () => {
         codecId: fixtureContract.storage.namespaces['public'].entries.table.user.columns.id.codecId,
       },
       email: {
-        codecId: fixtureContract.storage.namespaces['public'].entries.table.user.columns.email.codecId,
+        codecId:
+          fixtureContract.storage.namespaces['public'].entries.table.user.columns.email.codecId,
       },
       createdAt: {
-        codecId: fixtureContract.storage.namespaces['public'].entries.table.user.columns.createdAt.codecId,
+        codecId:
+          fixtureContract.storage.namespaces['public'].entries.table.user.columns.createdAt.codecId,
       },
     });
     type ModelShape = {
@@ -280,15 +282,15 @@ describe('builder integration', () => {
 
     // Verify table and column types match
     expectTypeOf(builderContract.storage.namespaces['public'].entries.table).toHaveProperty('user');
-    expectTypeOf(builderContract.storage.namespaces['public'].entries.table.user.columns).toHaveProperty(
-      'id',
-    );
-    expectTypeOf(builderContract.storage.namespaces['public'].entries.table.user.columns).toHaveProperty(
-      'email',
-    );
-    expectTypeOf(builderContract.storage.namespaces['public'].entries.table.user.columns).toHaveProperty(
-      'createdAt',
-    );
+    expectTypeOf(
+      builderContract.storage.namespaces['public'].entries.table.user.columns,
+    ).toHaveProperty('id');
+    expectTypeOf(
+      builderContract.storage.namespaces['public'].entries.table.user.columns,
+    ).toHaveProperty('email');
+    expectTypeOf(
+      builderContract.storage.namespaces['public'].entries.table.user.columns,
+    ).toHaveProperty('createdAt');
 
     // Verify model types match
     expectTypeOf(builderContract.domain.namespaces['public']!.models).toHaveProperty('User');
@@ -349,7 +351,9 @@ describe('builder integration', () => {
       },
     });
     // Contract builds successfully - invalid codecId will cause errors at runtime
-    expect(contract.storage.namespaces['public'].entries.table.user.columns.id.codecId).toBe('invalid');
+    expect(contract.storage.namespaces['public'].entries.table.user.columns.id.codecId).toBe(
+      'invalid',
+    );
   });
 
   describe('relation builder', () => {

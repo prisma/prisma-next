@@ -12,9 +12,7 @@ type UserId = DefaultModelRow<Contract, 'User'>['id'];
  */
 export async function ormClientGetUserPosts(userId: string, limit: number, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  return db.User.include('posts', (post) =>
-    post.orderBy((p) => p.createdAt.desc()).take(limit),
-  )
+  return db.User.include('posts', (post) => post.orderBy((p) => p.createdAt.desc()).take(limit))
     .where({ id: userId as UserId })
     .first();
 }

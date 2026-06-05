@@ -310,15 +310,16 @@ describe('contract/stack validation errors', () => {
             id: '__unbound__',
             entries: {
               table: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            }},
+            },
           }),
         },
       }),
@@ -359,16 +360,17 @@ describe('contract/stack validation errors', () => {
             id: '__unbound__',
             entries: {
               table: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                  slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                    slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            }},
+            },
           }),
         },
       }),
@@ -411,15 +413,16 @@ describe('contract/stack validation errors', () => {
             id: '__unbound__',
             entries: {
               table: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            }},
+            },
           }),
         },
       }),
@@ -452,17 +455,18 @@ describe('applyMutationDefaults', () => {
           id: '__unbound__',
           entries: {
             table: {
-            user: {
-              columns: {
-                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              user: {
+                columns: {
+                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          }},
+          },
         }),
       },
     }),
@@ -570,16 +574,17 @@ describe('applyMutationDefaults', () => {
             id: '__unbound__',
             entries: {
               table: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                  touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                    touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            }},
+            },
           }),
         },
       }),
@@ -666,17 +671,18 @@ describe('applyMutationDefaults', () => {
             id: '__unbound__',
             entries: {
               table: {
-              event: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                event: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            }},
+            },
           }),
         },
       }),
@@ -754,15 +760,16 @@ describe('applyMutationDefaults', () => {
             id: '__unbound__',
             entries: {
               table: {
-              user: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                user: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            }},
+            },
           }),
         },
       }),

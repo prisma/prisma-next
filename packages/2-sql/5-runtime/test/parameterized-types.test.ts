@@ -64,16 +64,17 @@ function createParamTypesTestContract(
           id: '__unbound__',
           entries: {
             table: {
-            test: {
-              columns: options?.tableColumns ?? {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              test: {
+                columns: options?.tableColumns ?? {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          }},
+          },
         }),
       },
       ...ifDefined('types', options?.types),

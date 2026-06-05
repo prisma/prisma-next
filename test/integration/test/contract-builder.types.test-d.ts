@@ -144,7 +144,9 @@ test('refined object contract preserves downstream model token inference', () =>
 
   const validated = new SqlContractSerializer().deserializeContract(contract) as typeof contract;
   type RefinedUserColumns = NonNullable<
-    NonNullable<(typeof validated.storage.namespaces)['public']['entries']['table']['user']>['columns']
+    NonNullable<
+      (typeof validated.storage.namespaces)['public']['entries']['table']['user']
+    >['columns']
   >;
 
   expectTypeOf<(typeof validated.storage.namespaces)['public']['entries']['table']>().toExtend<

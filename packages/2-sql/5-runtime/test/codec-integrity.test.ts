@@ -124,22 +124,23 @@ describe('createExecutionContext — column codec integrity', () => {
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
-            Doc: {
-              columns: {
-                field: {
-                  nativeType: column.nativeType,
-                  codecId: column.codecId,
-                  nullable: false,
-                  ...(column.typeParams ? { typeParams: column.typeParams } : {}),
-                  ...(column.typeRef ? { typeRef: column.typeRef } : {}),
+              Doc: {
+                columns: {
+                  field: {
+                    nativeType: column.nativeType,
+                    codecId: column.codecId,
+                    nullable: false,
+                    ...(column.typeParams ? { typeParams: column.typeParams } : {}),
+                    ...(column.typeRef ? { typeRef: column.typeRef } : {}),
+                  },
                 },
+                primaryKey: { columns: ['field'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['field'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          }},
+          },
         }),
       },
     });
@@ -275,21 +276,22 @@ describe('createExecutionContext — column codec integrity', () => {
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
-            Doc: {
-              columns: {
-                embedding: {
-                  nativeType: 'vector',
-                  codecId: 'pgvector/vector@1',
-                  nullable: false,
-                  typeRef: 'V1536',
+              Doc: {
+                columns: {
+                  embedding: {
+                    nativeType: 'vector',
+                    codecId: 'pgvector/vector@1',
+                    nullable: false,
+                    typeRef: 'V1536',
+                  },
                 },
+                primaryKey: { columns: ['embedding'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['embedding'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          }},
+          },
         }),
       },
       types: {

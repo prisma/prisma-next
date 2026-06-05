@@ -14,15 +14,15 @@ const storageBody = {
       id: UNBOUND_NAMESPACE_ID,
       entries: {
         table: {
-        [TEST_BOX_TABLE]: {
-          columns: {
-            x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            y: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          [TEST_BOX_TABLE]: {
+            columns: {
+              x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              y: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
         },
       },
     },

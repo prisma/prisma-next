@@ -14,17 +14,17 @@ type TestContract = Contract<
         readonly entries: {
           readonly table: {
             readonly document: {
-            readonly columns: {
-              readonly id: {
-                readonly nativeType: 'int4';
-                readonly codecId: 'pg/int4@1';
-                nullable: false;
+              readonly columns: {
+                readonly id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  nullable: false;
+                };
               };
-            };
-            readonly primaryKey: { readonly columns: readonly ['id'] };
-            readonly uniques: readonly [];
-            readonly indexes: readonly [];
-            readonly foreignKeys: readonly [];
+              readonly primaryKey: { readonly columns: readonly ['id'] };
+              readonly uniques: readonly [];
+              readonly indexes: readonly [];
+              readonly foreignKeys: readonly [];
             };
           };
         };

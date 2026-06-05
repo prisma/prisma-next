@@ -26,15 +26,16 @@ const testContract: Contract<SqlStorage> = {
         id: '__unbound__',
         entries: {
           table: {
-          user: {
-            columns: {
-              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            user: {
+              columns: {
+                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
-        }},
+        },
       }),
     },
   }),

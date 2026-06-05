@@ -38,8 +38,8 @@ type CreateInputContract = Contract<
               uniques: [];
               indexes: [];
               foreignKeys: [];
-            },
-          },
+            };
+          };
         };
       };
     };

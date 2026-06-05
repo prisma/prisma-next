@@ -955,42 +955,43 @@ describe('interpretPslDocumentToMongoContract', () => {
               id: UNBOUND_NAMESPACE_ID,
               entries: {
                 collection: {
-                users: new MongoCollection({
-                  validator: new MongoValidator({
-                    jsonSchema: {
-                      bsonType: 'object',
-                      required: ['_id', 'email', 'name'],
-                      properties: {
-                        _id: { bsonType: 'objectId' },
-                        name: { bsonType: 'string' },
-                        email: { bsonType: 'string' },
-                        bio: { bsonType: ['null', 'string'] },
+                  users: new MongoCollection({
+                    validator: new MongoValidator({
+                      jsonSchema: {
+                        bsonType: 'object',
+                        required: ['_id', 'email', 'name'],
+                        properties: {
+                          _id: { bsonType: 'objectId' },
+                          name: { bsonType: 'string' },
+                          email: { bsonType: 'string' },
+                          bio: { bsonType: ['null', 'string'] },
+                        },
+                        additionalProperties: false,
                       },
-                      additionalProperties: false,
-                    },
-                    validationLevel: 'strict',
-                    validationAction: 'error',
+                      validationLevel: 'strict',
+                      validationAction: 'error',
+                    }),
                   }),
-                }),
-                posts: new MongoCollection({
-                  validator: new MongoValidator({
-                    jsonSchema: {
-                      bsonType: 'object',
-                      required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
-                      properties: {
-                        _id: { bsonType: 'objectId' },
-                        title: { bsonType: 'string' },
-                        content: { bsonType: 'string' },
-                        authorId: { bsonType: 'objectId' },
-                        createdAt: { bsonType: 'date' },
+                  posts: new MongoCollection({
+                    validator: new MongoValidator({
+                      jsonSchema: {
+                        bsonType: 'object',
+                        required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
+                        properties: {
+                          _id: { bsonType: 'objectId' },
+                          title: { bsonType: 'string' },
+                          content: { bsonType: 'string' },
+                          authorId: { bsonType: 'objectId' },
+                          createdAt: { bsonType: 'date' },
+                        },
+                        additionalProperties: false,
                       },
-                      additionalProperties: false,
-                    },
-                    validationLevel: 'strict',
-                    validationAction: 'error',
+                      validationLevel: 'strict',
+                      validationAction: 'error',
+                    }),
                   }),
-                }),
-              }},
+                },
+              },
             }),
           },
         }),

@@ -82,18 +82,20 @@ function appContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          entries: { collection: {
-            users: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'email', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
+          entries: {
+            collection: {
+              users: {
+                kind: 'mongo-collection' as const,
+                indexes: [
+                  {
+                    kind: 'mongo-index' as const,
+                    keys: [{ field: 'email', direction: 1 as const }],
+                    unique: true,
+                  },
+                ],
+              },
             },
-          } },
+          },
         },
       },
       storageHash: coreHash('sha256:tc18-app-contract'),
@@ -116,18 +118,20 @@ function extContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          entries: { collection: {
-            cipherstash_state: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'tenantId', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
+          entries: {
+            collection: {
+              cipherstash_state: {
+                kind: 'mongo-collection' as const,
+                indexes: [
+                  {
+                    kind: 'mongo-index' as const,
+                    keys: [{ field: 'tenantId', direction: 1 as const }],
+                    unique: true,
+                  },
+                ],
+              },
             },
-          } },
+          },
         },
       },
       storageHash: coreHash('sha256:tc18-ext-contract'),
