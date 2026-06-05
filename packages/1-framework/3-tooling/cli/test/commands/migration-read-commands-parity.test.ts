@@ -603,17 +603,16 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     // (removing `ok` or removing/renaming `migration`) fails at typecheck.
     const sample: MigrationShowResult = {
       ok: true,
+      summary: 'Migration 20260101T0000_init in app: 0 operation(s)',
       migration: {
         space: 'app',
         name: '20260101T0000_init',
-        dirPath: 'migrations/app/20260101T0000_init',
         fromContract: null,
         toContract: 'sha256:a',
-        migrationHash: 'sha256:edge',
+        hash: 'sha256:edge',
         createdAt: '2026-01-01T00:00:00.000Z',
         operations: [],
         preview: { statements: [] },
-        summary: '0 operation(s)',
       },
     };
     const parsed = JSON.parse(JSON.stringify(sample)) as { ok: boolean; migration: unknown };

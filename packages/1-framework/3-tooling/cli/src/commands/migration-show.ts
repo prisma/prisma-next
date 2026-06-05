@@ -4,7 +4,6 @@ import {
   APP_SPACE_ID,
   createControlStack,
   type MigrationPlanOperation,
-  type OperationPreview,
 } from '@prisma-next/framework-components/control';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
@@ -43,6 +42,7 @@ import {
 } from '../utils/migration-path-target';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import type { MigrationShowResult } from './json/schemas';
 
 interface MigrationShowOptions extends CommonCommandOptions {
   readonly config?: string;
@@ -51,24 +51,17 @@ interface MigrationShowOptions extends CommonCommandOptions {
 export interface MigrationShowPresent {
   readonly space: string;
   readonly name: string;
-  readonly dirPath: string;
   readonly fromContract: string | null;
   readonly toContract: string;
-  readonly migrationHash: string;
+  readonly hash: string;
   readonly createdAt: string;
-  readonly operations: readonly {
-    readonly id: string;
-    readonly label: string;
-    readonly operationClass: string;
-  }[];
-  readonly preview: OperationPreview;
-  readonly summary: string;
+  readonly operations: { id: string; label: string; operationClass: string }[];
+  readonly preview: {
+    statements: { text: string; language: string }[];
+  };
 }
 
-export interface MigrationShowResult {
-  readonly ok: true;
-  readonly migration: MigrationShowPresent;
-}
+export type { MigrationShowResult };
 
 function pkgToPresent(
   spaceId: string,
@@ -76,22 +69,20 @@ function pkgToPresent(
   client: ReturnType<typeof createControlClient>,
 ): MigrationShowPresent {
   const ops = castAs<readonly MigrationPlanOperation[]>(pkg.ops);
-  const preview: OperationPreview = client.toOperationPreview(ops) ?? { statements: [] };
+  const rawPreview = client.toOperationPreview(ops) ?? { statements: [] };
   return {
     space: spaceId,
     name: pkg.dirName,
-    dirPath: relative(process.cwd(), pkg.dirPath),
     fromContract: pkg.metadata.from,
     toContract: pkg.metadata.to,
-    migrationHash: pkg.metadata.migrationHash,
+    hash: pkg.metadata.migrationHash,
     createdAt: pkg.metadata.createdAt,
     operations: ops.map((op) => ({
       id: op.id,
       label: op.label,
       operationClass: op.operationClass,
     })),
-    preview,
-    summary: `${ops.length} operation(s)`,
+    preview: { statements: [...rawPreview.statements] },
   };
 }
 
@@ -218,9 +209,11 @@ async function executeMigrationShowCommand(
     appPkg = matchedPkg;
   }
 
+  const migration = pkgToPresent(APP_SPACE_ID, appPkg, client);
   return ok({
     ok: true,
-    migration: pkgToPresent(APP_SPACE_ID, appPkg, client),
+    summary: `Migration ${migration.name} in ${migration.space}: ${migration.operations.length} operation(s)`,
+    migration,
   });
 }
 

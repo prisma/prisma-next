@@ -139,3 +139,39 @@ export const migrationLogResultSchema = successEnvelopeBaseSchema.and(
 );
 
 export type MigrationLogResult = typeof migrationLogResultSchema.infer;
+
+export const showOperationSchema = type({
+  id: 'string',
+  label: 'string',
+  operationClass: 'string',
+});
+
+export type ShowOperation = typeof showOperationSchema.infer;
+
+export const showPreviewStatementSchema = type({
+  text: 'string',
+  language: 'string',
+});
+
+export const showMigrationSchema = type({
+  space: 'string',
+  name: 'string',
+  hash: 'string',
+  fromContract: 'string | null',
+  toContract: 'string',
+  createdAt: 'string',
+  operations: showOperationSchema.array(),
+  preview: type({
+    statements: showPreviewStatementSchema.array(),
+  }),
+});
+
+export type ShowMigration = typeof showMigrationSchema.infer;
+
+export const migrationShowResultSchema = successEnvelopeBaseSchema.and(
+  type({
+    migration: showMigrationSchema,
+  }),
+);
+
+export type MigrationShowResult = typeof migrationShowResultSchema.infer;
