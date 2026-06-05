@@ -50,9 +50,9 @@ Pinned models. Columns are intentionally a minimal subset: under `external` cont
 - **No roles.** Roles are not representable (no `PostgresRole` IR) — they are not in this contract. See Alternatives.
 - **Only `auth` + `storage` namespaces.** `realtime`/`extensions` are **omitted in M1** — they would be empty (no models), and we declare a namespace when a model needs it. (Confirm at dispatch — see [To confirm](#to-confirm-at-dispatch).)
 
-**`/pack`.** `src/pack/index.ts` default-exports `supabasePack: ExtensionPack` carrying the emitted `contract.json` + `spaceId: 'supabase'`, plus `supabasePackWith(options: { contractOverride?: unknown })`. Constraint: `/pack` must not transitively import runtime code (tree-shaking discipline, decision C6).
+**`/pack`.** `src/pack/index.ts` default-exports `supabasePack: ExtensionPack` carrying the emitted `contract.json` + `spaceId: 'supabase'`, plus `supabasePackWith(options: { contractOverride?: unknown })`. Constraint: `/pack` must not transitively import runtime code (tree-shaking discipline, decision C6). Like pgvector, the pack ships a **zero-ops baseline migration** under `migrations/` so the migration aggregate loader can load its contract space — but it creates **no DDL** (the `auth.*`/`storage.*` tables are external, Supabase-managed; the baseline only establishes the head ref). _(Discovered at D6, 2026-06-05: D3's `migrations: []` pack couldn't be loaded by the migrate flow; pgvector ships migrations, so this aligns the pack with the canonical pattern the spec already mandated.)_
 
-**`/runtime`.** `src/exports/runtime.ts` is an empty stub so the subpath resolves; the real `SupabaseRuntime` is M2. There is **no `/contract` export** in M1.
+**`/runtime`.** `src/exports/runtime.ts` is a **minimal runtime descriptor** (no codec types, no query operations) — just enough that the stock postgres runtime's check "every composed `extensionPacks` entry has a matching runtime component" (`sql-context.ts`) passes when the example composes the pack. It is **not** the real `SupabaseRuntime` (no `asUser()`/`asAnon()` role-binding) — that is still M2. _(Discovered at D6: a `never` stub fails the runtime's pack-requirements check; pgvector ships a runtime export, so a minimal descriptor is the canonical shape.)_ There is **no `/contract` export** in M1.
 
 ### B. The example app `examples/supabase`
 
