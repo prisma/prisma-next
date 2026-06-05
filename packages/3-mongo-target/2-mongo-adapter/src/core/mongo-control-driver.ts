@@ -33,10 +33,6 @@ class MongoControlDriverImpl implements MongoControlDriverInstance {
     return this.#driver.execute<Row>(wireCommand);
   }
 
-  query(): Promise<never> {
-    throw new Error('MongoDB control driver does not support SQL queries');
-  }
-
   async close(): Promise<void> {
     await this.#client.close();
   }

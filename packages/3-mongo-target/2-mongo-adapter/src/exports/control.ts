@@ -29,7 +29,6 @@ function controlDriverFromDb(db: Db): ControlDriverInstance<'mongo', 'mongo'> & 
     familyId: 'mongo',
     targetId: 'mongo',
     db,
-    query: () => Promise.reject(new Error('MongoDB control driver does not support SQL queries')),
     close: async () => {},
   };
 }

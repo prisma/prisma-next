@@ -18,10 +18,6 @@ export class MongoControlDriver implements ControlDriverInstance<'mongo', 'mongo
     this.#client = client;
   }
 
-  query(_sql: string, _params?: readonly unknown[]): Promise<never> {
-    throw new Error('MongoDB control driver does not support SQL queries');
-  }
-
   async close(): Promise<void> {
     await this.#client.close();
   }

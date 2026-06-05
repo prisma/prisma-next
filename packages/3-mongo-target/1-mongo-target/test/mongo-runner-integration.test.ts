@@ -981,13 +981,6 @@ describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', ()
 });
 
 describe('MongoControlDriver', () => {
-  it('query() throws because MongoDB does not support SQL', () => {
-    const driver = createMongoControlDriver(db, client);
-    expect(() => driver.query('SELECT 1')).toThrow(
-      'MongoDB control driver does not support SQL queries',
-    );
-  });
-
   it('close() delegates to the underlying MongoClient', async () => {
     const closeClient = new MongoClient(replSet.getUri());
     await closeClient.connect();
