@@ -122,7 +122,9 @@ The suite is committed `describe.skip`-ped with a `TODO` noting it ungates when 
 
 ## Contract-impact
 
-A **new, package-local** contract authored in PSL, emitted to `contract.json` + `contract.d.ts`. **No shared contract-IR changes** and **no new PSL grammar** — it uses existing `namespace { … }` blocks and the landed `prismaContract({ defaultControlPolicy })` option. No `roles` in the emitted contract (no `PostgresRole` IR).
+A **new, package-local** contract authored in PSL, emitted to `contract.json` + `contract.d.ts`. **No new PSL grammar** — it uses existing `namespace { … }` blocks and the landed `prismaContract({ defaultControlPolicy })` option. No `roles` in the emitted contract (no `PostgresRole` IR).
+
+**One enabling framework change (operator decision, 2026-06-05).** The Supabase contract is multi-namespace (`auth` + `storage`), and the emitter's `assert-single-domain-namespace-for-emission.ts` currently **throws** on >1 domain namespace, so `prisma-next contract emit` produces nothing. That assert is purely defensive — the `.d.ts` generation flattens namespaces and would let the first bare name win on a collision, so it fails loudly rather than silently dropping. We **relax it now** so multi-namespace contracts emit (flatten the `.d.ts` model map, first-bare-name-wins); our skeleton has no colliding bare names, so the degradation is harmless, and `contract.json` carries every namespace correctly regardless. The proper per-namespace `.d.ts` redesign stays `explicit-namespace-dsl`'s (PR 720 / TML-2816 — multi-namespace `contract.json` emit is its AC6; the `.d.ts` redesign is its declared non-goal). **Single-namespace emission must stay byte-identical** (`fixtures:check` green). This is the slice's only shared-framework change; it ships as its own commit.
 
 ## Adapter-impact
 
