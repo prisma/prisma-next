@@ -13,7 +13,12 @@ import {
   resolveRowIdentityColumns,
   resolveUpsertConflictColumns,
 } from '../src/collection-contract';
-import { buildMixedPolyContract, getTestContract, withPatchedDomainModels } from './helpers';
+import {
+  buildMixedPolyContract,
+  deserializeTestContract,
+  getTestContract,
+  withPatchedDomainModels,
+} from './helpers';
 import { unboundTables } from './unbound-tables';
 
 describe('collection-contract capability detection', () => {
@@ -378,92 +383,78 @@ describe('resolveModelRelations() through descriptor', () => {
     childColumns: string[];
     targetColumns: string[];
     extraColumns?: Record<string, RawColumn>;
+    omitJunctionStorage?: boolean;
   }): Contract<SqlStorage> {
-    const { junctionTable, parentColumns, childColumns, targetColumns, extraColumns = {} } = opts;
+    const {
+      junctionTable,
+      parentColumns,
+      childColumns,
+      targetColumns,
+      extraColumns = {},
+      omitJunctionStorage = false,
+    } = opts;
 
     const junctionStorageColumns: Record<string, RawColumn> = {};
-    for (const col of parentColumns) {
-      junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
-    }
-    for (const col of childColumns) {
+    for (const col of [...parentColumns, ...childColumns]) {
       junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
     }
     for (const [name, col] of Object.entries(extraColumns)) {
       junctionStorageColumns[name] = col;
     }
 
-    return {
-      domain: {
-        namespaces: {
-          public: {
-            id: 'public',
-            models: {
-              Parent: {
-                fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
-                relations: {
-                  children: {
-                    to: { model: 'Child', namespace: 'public' },
-                    cardinality: 'N:M',
-                    on: { localFields: ['id'], targetFields: targetColumns },
-                    through: {
-                      table: junctionTable,
-                      namespaceId: 'public',
-                      parentColumns,
-                      childColumns,
-                      targetColumns,
-                    },
-                  },
-                },
-                storage: { table: 'parents', fields: { id: { column: 'id' } } },
-              },
-              Child: {
-                fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
-                relations: {},
-                storage: { table: 'children', fields: { id: { column: 'id' } } },
-              },
-              Junction: {
-                fields: {},
-                relations: {},
-                storage: { table: junctionTable, fields: {} },
-              },
-            },
+    const raw = JSON.parse(JSON.stringify(getTestContract()));
+    const domainModels = raw.domain.namespaces.public.models;
+    const storageTables = raw.storage.namespaces.public.entries.table;
+
+    domainModels['Parent'] = {
+      fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+      relations: {
+        children: {
+          to: { model: 'Child', namespace: 'public' },
+          cardinality: 'N:M',
+          on: { localFields: ['id'], targetFields: targetColumns },
+          through: {
+            table: junctionTable,
+            namespaceId: 'public',
+            parentColumns,
+            childColumns,
+            targetColumns,
           },
         },
       },
-      storage: {
-        namespaces: {
-          public: {
-            id: 'public',
-            entries: {
-              table: {
-                parents: {
-                  columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
-                children: {
-                  columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
-                [junctionTable]: {
-                  columns: junctionStorageColumns,
-                  primaryKey: { columns: [...parentColumns, ...childColumns] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
-              },
-            },
-          },
-        },
-      },
-      capabilities: {},
-    } as unknown as Contract<SqlStorage>;
+      storage: { namespaceId: 'public', table: 'parents', fields: { id: { column: 'id' } } },
+    };
+    domainModels['Child'] = {
+      fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+      relations: {},
+      storage: { namespaceId: 'public', table: 'children', fields: { id: { column: 'id' } } },
+    };
+
+    storageTables['parents'] = {
+      columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+      primaryKey: { columns: ['id'] },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [],
+    };
+    storageTables['children'] = {
+      columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+      primaryKey: { columns: ['id'] },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [],
+    };
+    if (!omitJunctionStorage) {
+      storageTables[junctionTable] = {
+        columns: junctionStorageColumns,
+        primaryKey: { columns: [...new Set([...parentColumns, ...childColumns])] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+    }
+
+    return deserializeTestContract(raw);
   }
 
   it('populates through descriptor for a simple single-column M:N relation', () => {
@@ -532,12 +523,25 @@ describe('resolveModelRelations() through descriptor', () => {
           nativeType: 'timestamptz',
           codecId: 'pg/timestamptz@1',
           nullable: false,
-          default: { kind: 'expression', sql: 'now()' },
+          default: { kind: 'function', expression: 'now()' },
         },
       },
     });
 
     const relations = resolveModelRelations(contract, 'Parent');
     expect(relations['children']?.through?.requiredPayloadColumns).toEqual([]);
+  });
+
+  it('omits through when the junction table is absent from its declared namespace', () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+      omitJunctionStorage: true,
+    });
+
+    const relations = resolveModelRelations(contract, 'Parent');
+    expect(relations['children']?.through).toBeUndefined();
   });
 });
