@@ -1,24 +1,33 @@
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import { blindCast } from '@prisma-next/utils/casts';
+import baselineMigrationJson from '../../migrations/20260605T0000_establish_external_supabase_tables/migration.json' with {
+  type: 'json',
+};
+import baselineOpsJson from '../../migrations/20260605T0000_establish_external_supabase_tables/ops.json' with {
+  type: 'json',
+};
+import headRefJson from '../../migrations/refs/head.json' with { type: 'json' };
 import type { Contract } from '../contract/contract.d';
 import contractJson from '../contract/contract.json' with { type: 'json' };
 
 const SUPABASE_SPACE_ID = 'supabase' as const;
+const SUPABASE_DIR_NAME = '20260605T0000_establish_external_supabase_tables' as const;
 
 /**
- * The head ref for the supabase extension contract space.
+ * The baseline migration for the supabase extension contract space.
  *
- * No migrations — the external `auth.*`/`storage.*` tables are managed by
- * Supabase, not by our migration runner.  The hash is the storageHash
- * emitted by `prisma-next contract emit`; it is verified against the
- * contractJson at descriptor-load time by assertDescriptorSelfConsistency.
+ * The supabase extension ships one zero-ops baseline migration: its graph
+ * transitions from `EMPTY_CONTRACT_HASH` (null) to the supabase storage hash,
+ * establishing the head ref without emitting any DDL. The `auth.*` and
+ * `storage.*` tables are managed by Supabase; this migration records that the
+ * supabase contract space has been "installed" (i.e. those tables are expected
+ * to exist) but takes no action to create them.
  */
-const SUPABASE_HEAD_REF_INVARIANTS: readonly string[] = [];
-
-const supabaseHeadRef = {
-  hash: contractJson.storage.storageHash,
-  invariants: SUPABASE_HEAD_REF_INVARIANTS,
-};
+const supabaseBaselineMigration = {
+  dirName: SUPABASE_DIR_NAME,
+  metadata: baselineMigrationJson,
+  ops: baselineOpsJson,
+} as const;
 
 function buildContractSpace(contractOverride?: unknown) {
   return {
@@ -26,8 +35,8 @@ function buildContractSpace(contractOverride?: unknown) {
       Contract,
       'JSON import narrowed to emitted Contract type; assertDescriptorSelfConsistency verifies the storageHash at load time'
     >(contractOverride ?? contractJson),
-    migrations: [] as const,
-    headRef: supabaseHeadRef,
+    migrations: [supabaseBaselineMigration] as const,
+    headRef: headRefJson,
   };
 }
 

@@ -1229,6 +1229,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:0.12.0
         version: link:../../packages/1-framework/3-tooling/cli
+      '@prisma-next/migration-tools':
+        specifier: workspace:0.12.0
+        version: link:../../packages/1-framework/3-tooling/migration
       '@prisma-next/sql-contract-psl':
         specifier: workspace:0.12.0
         version: link:../../packages/2-sql/2-authoring/contract-psl

@@ -199,9 +199,17 @@ function repinHeadRef(headRefPath, newHash) {
  * `src/contract.d.ts` is formatted by prettier during emission and already
  * carries a trailing newline; it is copied verbatim.
  */
-function syncEndContract(extDir, headMigrationDir) {
+/**
+ * Sync `end-contract.{json,d.ts}` from the resolved contract source directory.
+ *
+ * `contractSrcDir` is the directory containing `contract.json` and
+ * `contract.d.ts` — either `extDir/src` (TypeScript-authored extensions) or
+ * `extDir/src/contract` (PSL-authored extensions). The caller is responsible
+ * for resolving the correct path via the same lookup that found contractJsonPath.
+ */
+function syncEndContract(contractSrcDir, headMigrationDir) {
   for (const ext of ['json', 'd.ts']) {
-    const src = join(extDir, 'src', `contract.${ext}`);
+    const src = join(contractSrcDir, `contract.${ext}`);
     const dest = join(headMigrationDir, `end-contract.${ext}`);
     const content = readFileSync(src, 'utf8');
     const normalized = content.endsWith('\n') ? content : `${content}\n`;
@@ -219,11 +227,19 @@ function processExtension(extDir) {
     return 'skipped';
   }
 
-  const contractJsonPath = join(extDir, 'src', 'contract.json');
+  // PSL-authored extensions place the emitted contract under
+  // src/contract/contract.json; TypeScript-authored ones use src/contract.json
+  // directly. Try both locations.
+  let contractJsonPath = join(extDir, 'src', 'contract.json');
   if (!existsSync(contractJsonPath)) {
-    throw new Error(
-      `regen-extension-migrations: ${extDir} has migrations/ but no src/contract.json`,
-    );
+    const nestedPath = join(extDir, 'src', 'contract', 'contract.json');
+    if (existsSync(nestedPath)) {
+      contractJsonPath = nestedPath;
+    } else {
+      throw new Error(
+        `regen-extension-migrations: ${extDir} has migrations/ but no src/contract.json or src/contract/contract.json`,
+      );
+    }
   }
 
   const contractJson = readJson(contractJsonPath);
@@ -259,7 +275,8 @@ function processExtension(extDir) {
   biomeFormatInPlace(join(headMigrationDir, 'migration.json'));
   biomeFormatInPlace(join(headMigrationDir, 'ops.json'));
   repinHeadRef(headRefPath, newHash);
-  syncEndContract(extDir, headMigrationDir);
+  const contractSrcDir = dirname(contractJsonPath);
+  syncEndContract(contractSrcDir, headMigrationDir);
   biomeFormatInPlace(join(headMigrationDir, 'end-contract.json'));
 
   return 'updated';
