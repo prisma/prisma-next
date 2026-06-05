@@ -48,8 +48,8 @@ export interface MigrationEdgeAnnotation {
   readonly invariants?: readonly string[];
   /**
    * Path-highlight annotation for `migrate --show` preview.
-   * - `'on-path'`: migration is on the chosen path; rendered in bright green.
-   * - `'off-path'`: migration is off the chosen path; rendered dim and without name.
+   * - `'on-path'`: migration is on the chosen path; rendered in bright green (nodes, hashes, names, lane lines).
+   * - `'off-path'`: migration is off the chosen path; fully drawn but in uniform dim grey.
    */
   readonly pathHighlight?: 'on-path' | 'off-path';
 }
@@ -459,10 +459,7 @@ function formatEdgeAnnotationSuffix(
   if (annotation === undefined) {
     return '';
   }
-  // Off-path migrations are rendered without a suffix — their name is already hidden.
-  if (annotation.pathHighlight === 'off-path') {
-    return '';
-  }
+  const isOffPath = annotation.pathHighlight === 'off-path';
   const segments: string[] = [];
   if (annotation.operationCount !== undefined) {
     segments.push(`${annotation.operationCount} ops`);
@@ -494,7 +491,8 @@ function formatEdgeAnnotationSuffix(
   if (segments.length === 0) {
     return '';
   }
-  return `  ${segments.join('  ')}`;
+  const suffix = `  ${segments.join('  ')}`;
+  return opts.colorize && isOffPath ? dim(suffix) : suffix;
 }
 
 function formatEdgeHashColumn(
@@ -745,11 +743,22 @@ export function renderMigrationGraphTree(
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
     const laneIndex = row.laneIndex ?? 0;
 
+    // For path-highlight rows, tint the lane/gutter before padding so the
+    // direction arrow and branch lines read in the same hue as the migration name.
+    const styledGutter =
+      opts.colorize && isOffPath
+        ? dim(gutter)
+        : opts.colorize && isOnPath
+          ? greenBright(gutter)
+          : gutter;
+    const edgeGutterPad = padVisible(styledGutter, labelColumn);
+
     let dirName: string;
     if (isOffPath) {
-      // Off-path migrations are unlabelled: show spaces where the name would be,
-      // dim the hash column.
-      dirName = ' '.repeat(dirNameWidth);
+      // Off-path migrations: fully drawn but in uniform dim grey — name, hash, and lanes.
+      dirName = opts.colorize
+        ? `${dim(edge.dirName)}${dirNamePadding}`
+        : `${edge.dirName}${dirNamePadding}`;
     } else if (isOnPath && opts.colorize) {
       // On-path migrations: bright green name.
       dirName = `${greenBright(bold(edge.dirName))}${dirNamePadding}`;
@@ -764,10 +773,15 @@ export function renderMigrationGraphTree(
     }
 
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
-    const styledHashColumn = isOffPath && opts.colorize ? dim(hashColumn) : hashColumn;
+    const styledHashColumn =
+      opts.colorize && isOffPath
+        ? dim(hashColumn)
+        : opts.colorize && isOnPath
+          ? greenBright(hashColumn)
+          : hashColumn;
     const annotationSuffix = formatEdgeAnnotationSuffix(edge.migrationHash, opts, style);
     lines.push(
-      trimTrailingWhitespace(`${gutterPad}${dirName}${styledHashColumn}${annotationSuffix}`),
+      trimTrailingWhitespace(`${edgeGutterPad}${dirName}${styledHashColumn}${annotationSuffix}`),
     );
   }
 
