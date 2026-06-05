@@ -12,6 +12,7 @@ import {
   type ContractField,
   type ContractModel,
   type ContractRelation,
+  type ContractRelationThrough,
   type ContractValueObject,
   type CrossReference,
   coreHash,
@@ -54,6 +55,7 @@ import type {
   ContractDefinition,
   FieldNode,
   ModelNode,
+  RelationNode,
   ValueObjectFieldNode,
 } from './contract-definition';
 
@@ -166,6 +168,43 @@ function resolveModelNamespaceId(
     return model.namespaceId;
   }
   return modelNameToNamespaceId.get(model.modelName) ?? defaultNamespaceId;
+}
+
+function buildThroughDescriptor(
+  through: NonNullable<RelationNode['through']>,
+  tableNamespaceByName: ReadonlyMap<string, string>,
+  targetModel: ModelNode,
+  modelName: string,
+  fieldName: string,
+): ContractRelationThrough {
+  const namespaceId = tableNamespaceByName.get(through.table);
+  if (namespaceId === undefined) {
+    throw new Error(
+      `buildSqlContractFromDefinition: junction table "${through.table}" for relation "${modelName}.${fieldName}" is not a declared model.`,
+    );
+  }
+
+  return {
+    table: through.table,
+    namespaceId,
+    parentColumns: through.parentColumns,
+    childColumns: through.childColumns,
+    targetColumns: targetColumnsForJunction(targetModel, fieldName),
+  };
+}
+
+function targetColumnsForJunction(targetModel: ModelNode, fieldName: string): readonly string[] {
+  const primaryKeyColumns = targetModel.id?.columns;
+  if (primaryKeyColumns && primaryKeyColumns.length > 0) {
+    return primaryKeyColumns;
+  }
+  const firstUnique = targetModel.uniques?.find((u) => u.columns.length > 0);
+  if (firstUnique) {
+    return firstUnique.columns;
+  }
+  throw new Error(
+    `M:N target model "${targetModel.modelName}" (relation field "${fieldName}") has no primary id or unique key to derive junction targetColumns.`,
+  );
 }
 
 function buildStorageColumn(
@@ -613,13 +652,13 @@ export function buildSqlContractFromDefinition(
         },
         ...(relation.through
           ? {
-              through: {
-                table: relation.through.table,
-                namespaceId: tableNamespaceByName.get(relation.through.table) ?? defaultNamespaceId,
-                parentColumns: relation.through.parentColumns,
-                childColumns: relation.through.childColumns,
-                targetColumns: targetModel.id?.columns ?? ([] as const),
-              },
+              through: buildThroughDescriptor(
+                relation.through,
+                tableNamespaceByName,
+                targetModel,
+                semanticModel.modelName,
+                relation.fieldName,
+              ),
             }
           : undefined),
       };
