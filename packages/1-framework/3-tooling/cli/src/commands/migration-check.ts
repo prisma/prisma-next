@@ -462,11 +462,12 @@ async function checkSingleTarget(
     for (const space of scopedSpaces) {
       const migResult = parseMigrationRef(target, { graph: space.graph, refs: space.refs });
       if (!migResult.ok) {
+        // Record the first failure but keep scanning. The failure kind (including
+        // wrong-grammar, which fires when the target is a ref name in this space)
+        // is space-dependent, so a later space may still hold a hit that must not
+        // be discarded; the failure is surfaced via the shared envelope only when
+        // no space yields a hit.
         if (firstParseFailure === undefined) firstParseFailure = migResult.failure;
-        // wrong-grammar is space-independent — exit immediately with the shared envelope.
-        if (migResult.failure.kind === 'wrong-grammar') {
-          return { error: mapRefResolutionError(migResult.failure), exitCode: PRECONDITION };
-        }
         continue;
       }
       const pkg = space.packages.find(
@@ -552,8 +553,9 @@ export function createMigrationCheckCommand(): Command {
     'Validates that on-disk migration packages are internally consistent\n' +
       '(hashes match, manifests are complete) and that the graph is well-formed\n' +
       '(edges connect, refs point at valid nodes). The whole-graph check spans\n' +
-      'every contract space by default; pass --space <id> to narrow to one, or\n' +
-      'a migration reference to check a single app-space package.\n' +
+      'every contract space by default; pass --space <id> to narrow to one. A\n' +
+      'migration reference checks a single package, resolved across all contract\n' +
+      'spaces (narrow with --space; an ambiguous reference is a precondition failure).\n' +
       'Offline — does not consult the database.\n' +
       'Exit codes: 0 = all checks passed, 2 = precondition failed\n' +
       '(unresolved target or unknown --space), 4 = integrity failure(s) found.',
@@ -562,6 +564,7 @@ export function createMigrationCheckCommand(): Command {
     'prisma-next migration check',
     'prisma-next migration check --space app',
     'prisma-next migration check 20260101-add-users',
+    'prisma-next migration check 20260101-add-users --space app',
     'prisma-next migration check --json',
   ]);
   setCommandSeeAlso(command, [
