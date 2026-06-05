@@ -6,6 +6,7 @@ import {
   assembleAuthoringContributions,
   assembleControlMutationDefaults,
   assembleScalarTypeDescriptors,
+  assertNoNamespaceOwnershipCollisions,
   buildExtensionLoadOrder,
   createControlStack,
   extractCodecLookup,
@@ -679,5 +680,115 @@ describe('buildExtensionLoadOrder', () => {
         }),
       ),
     ).toThrow(/cycle/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assertNoNamespaceOwnershipCollisions (FR15/FR16, AC6 collision half)
+// ---------------------------------------------------------------------------
+
+function makeContractEntry(
+  spaceId: string,
+  namespaces: Record<string, Record<string, Record<string, unknown>>>,
+): {
+  spaceId: string;
+  storage: {
+    namespaces: Record<string, { id: string; entries: Record<string, Record<string, unknown>> }>;
+  };
+} {
+  return {
+    spaceId,
+    storage: {
+      namespaces: Object.fromEntries(
+        Object.entries(namespaces).map(([nsId, entries]) => [nsId, { id: nsId, entries }]),
+      ),
+    },
+  };
+}
+
+describe('assertNoNamespaceOwnershipCollisions', () => {
+  it('passes when no contracts are provided', () => {
+    expect(() => assertNoNamespaceOwnershipCollisions([])).not.toThrow();
+  });
+
+  it('passes when a single contract owns all its primitives', () => {
+    const entry = makeContractEntry('app', {
+      public: { table: { users: {}, posts: {} } },
+    });
+    expect(() => assertNoNamespaceOwnershipCollisions([entry])).not.toThrow();
+  });
+
+  it('passes when two contracts contribute DIFFERENT primitives to the same namespace', () => {
+    const app = makeContractEntry('app', {
+      public: { table: { users: {} } },
+    });
+    const ext = makeContractEntry('ext-posts', {
+      public: { table: { posts: {} } },
+    });
+    expect(() => assertNoNamespaceOwnershipCollisions([app, ext])).not.toThrow();
+  });
+
+  it('throws when two EXTENSION contracts declare the same (namespaceId, name) primitive', () => {
+    const extA = makeContractEntry('ext-a', {
+      public: { table: { users: {} } },
+    });
+    const extB = makeContractEntry('ext-b', {
+      public: { table: { users: {} } },
+    });
+    expect(() => assertNoNamespaceOwnershipCollisions([extA, extB])).toThrow(/ext-a/);
+    expect(() => assertNoNamespaceOwnershipCollisions([extA, extB])).toThrow(/ext-b/);
+    expect(() => assertNoNamespaceOwnershipCollisions([extA, extB])).toThrow(/users/);
+    expect(() => assertNoNamespaceOwnershipCollisions([extA, extB])).toThrow(/public/);
+  });
+
+  it('throws when the APP and an EXTENSION declare the same (namespaceId, name) primitive', () => {
+    const app = makeContractEntry('app', {
+      public: { table: { users: {} } },
+    });
+    const ext = makeContractEntry('ext-auth', {
+      public: { table: { users: {} } },
+    });
+    expect(() => assertNoNamespaceOwnershipCollisions([app, ext])).toThrow(/app/);
+    expect(() => assertNoNamespaceOwnershipCollisions([app, ext])).toThrow(/ext-auth/);
+    expect(() => assertNoNamespaceOwnershipCollisions([app, ext])).toThrow(/users/);
+  });
+
+  it('throws naming BOTH conflicting contracts for extension-vs-extension collision', () => {
+    const extA = makeContractEntry('ext-a', {
+      ns1: { type: { MyEnum: {} } },
+    });
+    const extB = makeContractEntry('ext-b', {
+      ns1: { type: { MyEnum: {} } },
+    });
+    const msg = (() => {
+      try {
+        assertNoNamespaceOwnershipCollisions([extA, extB]);
+        return '';
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    })();
+    expect(msg).toMatch(/ext-a/);
+    expect(msg).toMatch(/ext-b/);
+  });
+
+  it('passes when contracts have non-overlapping namespaces entirely', () => {
+    const app = makeContractEntry('app', {
+      ns1: { table: { widget: {} } },
+    });
+    const ext = makeContractEntry('ext', {
+      ns2: { table: { gadget: {} } },
+    });
+    expect(() => assertNoNamespaceOwnershipCollisions([app, ext])).not.toThrow();
+  });
+
+  it('detects collision across different entity kinds within the same namespace', () => {
+    const extA = makeContractEntry('ext-a', {
+      public: { collection: { orders: {} } },
+    });
+    const extB = makeContractEntry('ext-b', {
+      public: { collection: { orders: {} } },
+    });
+    expect(() => assertNoNamespaceOwnershipCollisions([extA, extB])).toThrow(/orders/);
   });
 });
