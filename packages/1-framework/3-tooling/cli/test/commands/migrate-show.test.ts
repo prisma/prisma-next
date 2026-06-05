@@ -207,10 +207,11 @@ describe('migrate --show (read-only + faithfulness)', () => {
     }
 
     expect(getExitCode()).toBe(0);
-    const output = consoleOutput.join('\n');
-    // Should show the migrations in order (EMPTY → C1 → C2)
-    expect(stripAnsi(output)).toContain('111111');
-    expect(stripAnsi(output)).toContain('222222');
+    const output = stripAnsi(consoleOutput.join('\n'));
+    // Should show both migrations in order (EMPTY → C1 → C2)
+    expect(output).toContain('20260101_100000_111111');
+    expect(output).toContain('20260101_100000_222222');
+    expect(output).toContain('Will run, in order:');
   });
 
   it('shows "nothing to run" when already at target', async () => {
@@ -293,5 +294,44 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const envelope = JSON.parse(jsonLine!) as { code?: string; message?: string };
     // Should be a structured error — either connection-required or not-found
     expect(envelope.code).toBeTruthy();
+  });
+
+  it('graph visualization: DB one migration behind target (worked example snapshot)', async () => {
+    // Fixture: linear chain EMPTY → C1 → C2; from-state = C1 (DB one migration behind).
+    // Expected: C2 (@contract) at top, C1 (@db if using live marker - here explicit --from),
+    // on-path edge (C1→C2) labelled, C2-migration row visible + annotated.
+    // Off-path edges (EMPTY→C1 in this case) are unlabelled (dirName hidden).
+    const { cwd } = await buildFixture();
+    process.chdir(cwd);
+
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+
+    try {
+      // from=C1 (DB one migration behind) to C2 (the current contract)
+      await executeCommand(createMigrateCommand(), [
+        '--show',
+        '--from',
+        C1.slice(7, 13), // hex prefix for C1
+        '--no-color',
+      ]);
+    } catch {
+      // process.exit on success
+    }
+
+    expect(getExitCode()).toBe(0);
+    const output = stripAnsi(consoleOutput.join('\n'));
+
+    // Graph should be present in the output
+    // C2 node (target/contract) should appear
+    expect(output).toContain(C2.slice(7, 13));
+    // C1 node (from-state) should appear
+    expect(output).toContain(C1.slice(7, 13));
+    // The on-path migration (C1→C2) dirName should appear in the graph
+    expect(output).toContain('20260101_100000_222222');
+    // The off-path migration (EMPTY→C1) dirName should NOT appear — it's unlabelled
+    expect(output).not.toContain('20260101_100000_111111');
+    // The ordered list should appear
+    expect(output).toContain('Will run, in order:');
+    expect(output).toContain('1 migration will run');
   });
 });

@@ -55,6 +55,10 @@ import {
   refuseContractSpaceIntegrity,
 } from '../utils/contract-space-aggregate-loader';
 import { toDeclaredExtensionsFromRaw } from '../utils/extension-pack-inputs';
+import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
+import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
+import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
+import { renderMigrationGraphTree } from '../utils/formatters/migration-graph-tree-render';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -88,6 +92,12 @@ export interface MigrateShowResult {
   readonly ok: true;
   readonly migrations: readonly MigrateShowMigration[];
   readonly summary: string;
+  /**
+   * Pre-rendered Tier-3 graph tree for human output. On-path migrations are
+   * highlighted bright green; off-path are dimmed and unlabelled.
+   * Only present in human (non-JSON) mode.
+   */
+  readonly graphOutput?: string;
 }
 
 export interface MigrateResult {
@@ -364,12 +374,58 @@ async function executeMigrateShowCommand(
       ? 'Already up to date — nothing to run'
       : `${count} migration${count === 1 ? '' : 's'} will run`;
 
-  return ok({ ok: true, migrations: orderedMigrations, summary });
+  // Build the Tier-3 graph visualization (human mode only; skipped for --json).
+  // Reuses the existing annotation hook — no parallel renderer.
+  let graphOutput: string | undefined;
+  if (!flags.json) {
+    const onPathHashes = new Set(orderedMigrations.map((m) => m.migrationHash));
+    const edgeAnnotationsByHash = new Map<string, MigrationEdgeAnnotation>();
+    // Annotate every edge in the app graph: on-path or off-path.
+    for (const edge of aggregate.app.graph().migrationByHash.values()) {
+      edgeAnnotationsByHash.set(edge.migrationHash, {
+        pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
+      });
+    }
+
+    // Build the refs map from aggregate refs (for node overlay labels).
+    const appRefs = aggregate.app.refs;
+    const refsByHash = new Map<string, readonly string[]>();
+    for (const [refName, ref] of Object.entries(appRefs)) {
+      if (ref) {
+        const existing = refsByHash.get(ref.hash) ?? [];
+        refsByHash.set(ref.hash, [...existing, refName]);
+      }
+    }
+
+    const appGraph = aggregate.app.graph();
+    const rowModel = buildMigrationGraphRows(appGraph, { contractHash: targetHash });
+    const layout = buildMigrationGraphLayout(rowModel);
+    const fromHash = fromHashBySpace.get(aggregate.app.spaceId) ?? EMPTY_CONTRACT_HASH;
+    graphOutput = renderMigrationGraphTree(layout, {
+      contractHash: targetHash,
+      ...(needsLiveMarker ? { dbHash: fromHash } : {}),
+      refsByHash,
+      edgeAnnotationsByHash,
+      colorize: flags.color !== false,
+    });
+  }
+
+  return ok({
+    ok: true,
+    migrations: orderedMigrations,
+    summary,
+    ...(graphOutput !== undefined ? { graphOutput } : {}),
+  });
 }
 
 function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags): string {
   if (flags.quiet) return '';
   const lines: string[] = [];
+  // Graph tree first (shows the full topology with on-path highlighted).
+  if (result.graphOutput !== undefined && result.graphOutput.length > 0) {
+    lines.push(result.graphOutput);
+    lines.push('');
+  }
   lines.push(result.summary);
   if (result.migrations.length > 0) {
     lines.push('');

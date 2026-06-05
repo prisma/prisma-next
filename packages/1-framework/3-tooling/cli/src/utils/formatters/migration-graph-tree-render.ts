@@ -1,5 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { bold, createColors, green, yellow } from 'colorette';
+import { bold, createColors, dim, green, greenBright, yellow } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
 import {
@@ -46,6 +46,12 @@ export interface MigrationEdgeAnnotation {
   readonly status?: 'applied' | 'pending';
   readonly operationCount?: number;
   readonly invariants?: readonly string[];
+  /**
+   * Path-highlight annotation for `migrate --show` preview.
+   * - `'on-path'`: migration is on the chosen path; rendered in bright green.
+   * - `'off-path'`: migration is off the chosen path; rendered dim and without name.
+   */
+  readonly pathHighlight?: 'on-path' | 'off-path';
 }
 
 export interface RenderMigrationGraphTreeOptions {
@@ -453,6 +459,10 @@ function formatEdgeAnnotationSuffix(
   if (annotation === undefined) {
     return '';
   }
+  // Off-path migrations are rendered without a suffix — their name is already hidden.
+  if (annotation.pathHighlight === 'off-path') {
+    return '';
+  }
   const segments: string[] = [];
   if (annotation.operationCount !== undefined) {
     segments.push(`${annotation.operationCount} ops`);
@@ -470,6 +480,15 @@ function formatEdgeAnnotationSuffix(
     } else {
       const styler = status === 'applied' ? green : yellow;
       segments.push(styler(`${glyph} ${label}`));
+    }
+  }
+  if (annotation.pathHighlight === 'on-path') {
+    const glyph = opts.glyphMode === 'ascii' ? '>' : '↑';
+    const label = 'will run';
+    if (!opts.colorize) {
+      segments.push(`${glyph} ${label}`);
+    } else {
+      segments.push(greenBright(`${glyph} ${label}`));
     }
   }
   if (segments.length === 0) {
@@ -719,18 +738,37 @@ export function renderMigrationGraphTree(
     const edge = row.edge;
     if (edge === undefined) continue;
 
+    const edgeAnnotation = opts.edgeAnnotationsByHash?.get(edge.migrationHash);
+    const isOffPath = edgeAnnotation?.pathHighlight === 'off-path';
+    const isOnPath = edgeAnnotation?.pathHighlight === 'on-path';
+
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
     const laneIndex = row.laneIndex ?? 0;
-    // A branched name keeps its bold (via `style.dirName`) and adds the lane
-    // hue, so it reads as one with its lane/arrow; column-0 names stay bold-only.
-    const dirNameStyler =
-      opts.colorize && laneIndex > NEUTRAL_LANE_COLUMN
-        ? (text: string) => forcedBold(laneColorForColumn(laneIndex)(text))
-        : style.dirName;
-    const dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
+
+    let dirName: string;
+    if (isOffPath) {
+      // Off-path migrations are unlabelled: show spaces where the name would be,
+      // dim the hash column.
+      dirName = ' '.repeat(dirNameWidth);
+    } else if (isOnPath && opts.colorize) {
+      // On-path migrations: bright green name.
+      dirName = `${greenBright(bold(edge.dirName))}${dirNamePadding}`;
+    } else {
+      // A branched name keeps its bold (via `style.dirName`) and adds the lane
+      // hue, so it reads as one with its lane/arrow; column-0 names stay bold-only.
+      const dirNameStyler =
+        opts.colorize && laneIndex > NEUTRAL_LANE_COLUMN
+          ? (text: string) => forcedBold(laneColorForColumn(laneIndex)(text))
+          : style.dirName;
+      dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
+    }
+
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
+    const styledHashColumn = isOffPath && opts.colorize ? dim(hashColumn) : hashColumn;
     const annotationSuffix = formatEdgeAnnotationSuffix(edge.migrationHash, opts, style);
-    lines.push(trimTrailingWhitespace(`${gutterPad}${dirName}${hashColumn}${annotationSuffix}`));
+    lines.push(
+      trimTrailingWhitespace(`${gutterPad}${dirName}${styledHashColumn}${annotationSuffix}`),
+    );
   }
 
   return lines.join('\n');
