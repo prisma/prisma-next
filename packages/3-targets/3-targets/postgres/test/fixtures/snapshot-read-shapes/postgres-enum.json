@@ -19,20 +19,24 @@
       "__unbound__": {
         "id": "__unbound__",
         "kind": "postgres-unbound-schema",
-        "tables": {},
-        "enum": {}
+        "entries": {
+          "table": {},
+          "type": {}
+        }
       },
       "public": {
         "id": "public",
         "kind": "postgres-schema",
-        "tables": {},
-        "enum": {
-          "user_role": {
-            "kind": "postgres-enum",
-            "name": "user_role",
-            "nativeType": "user_role",
-            "values": ["admin", "user"],
-            "codecId": "pg/enum@1"
+        "entries": {
+          "table": {},
+          "type": {
+            "user_role": {
+              "kind": "postgres-enum",
+              "name": "user_role",
+              "nativeType": "user_role",
+              "values": ["admin", "user"],
+              "codecId": "pg/enum@1"
+            }
           }
         }
       }

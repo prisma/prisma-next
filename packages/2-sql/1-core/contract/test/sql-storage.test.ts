@@ -25,7 +25,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
 
   const unboundWithUsers = buildSqlNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    tables: { users: baseTable },
+    entries: { table: { users: baseTable } },
   });
 
   it('accepts a tagged codec-instance entry unchanged', () => {

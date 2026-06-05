@@ -281,7 +281,8 @@ describe('emptyContract', () => {
       string,
       unknown
     >;
-    expect(publicNamespace['tables']).toEqual({});
+    const entries = publicNamespace['entries'] as Record<string, unknown>;
+    expect(entries['table']).toEqual({});
   });
 
   it('sets output when passed and omits it otherwise', () => {

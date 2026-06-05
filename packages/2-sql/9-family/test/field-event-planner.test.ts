@@ -39,7 +39,10 @@ function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
   const storage = new SqlStorage({
     storageHash: 'sha256:test' as StorageHashBase<string>,
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { table: tables },
+      }),
     },
   });
   return {

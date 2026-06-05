@@ -341,8 +341,18 @@ describe('serializeLedgerEntriesForJson', () => {
       }),
     ]);
     expect(json).toHaveLength(2);
-    expect(json[0]!.migrationName).toBe('001_first');
+    expect(json[0]!.name).toBe('001_first');
     expect(json[0]!.appliedAt).toBe('2026-06-01T08:00:00.000Z');
     expect(json[1]!.appliedAt).toBe('2026-06-02T08:00:00.000Z');
+  });
+
+  it('uses name and hash field names (not migrationName/migrationHash)', () => {
+    const json = serializeLedgerEntriesForJson([
+      entry({ migrationName: '001_init', migrationHash: 'sha256:deadbeef' }),
+    ]);
+    expect(json[0]).toHaveProperty('name', '001_init');
+    expect(json[0]).toHaveProperty('hash', 'sha256:deadbeef');
+    expect(json[0]).not.toHaveProperty('migrationName');
+    expect(json[0]).not.toHaveProperty('migrationHash');
   });
 });

@@ -9,7 +9,7 @@ function storageDeclaresCollection(
   collectionName: string,
 ): boolean {
   for (const ns of Object.values(storage.namespaces)) {
-    if (Object.hasOwn(ns.collections, collectionName)) {
+    if (Object.hasOwn(ns.entries.collection, collectionName)) {
       return true;
     }
   }

@@ -13,7 +13,7 @@ function tableInNamespace(
   if (namespace === undefined) {
     return undefined;
   }
-  const tables = namespace.tables;
+  const tables = namespace.entries.table;
   if (!Object.hasOwn(tables, tableName)) {
     return undefined;
   }

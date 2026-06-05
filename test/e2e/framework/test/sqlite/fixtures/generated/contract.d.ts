@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:186fcdbaea38e0170df75d754c49bdc9c8a8de164cbcc0a0df5c7340d856dd1d'>;
+  StorageHashBase<'sha256:713d00a72dcba37a15c259fc3932797150465fca8dfe672130391ce3a16cc973'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:3cc333ecad9f3f4c7229370a9d2c37e908cdce0f8d2e9fb132d50605b024eff2'>;
@@ -114,169 +114,171 @@ type ContractBase = Omit<
       readonly namespaces: {
         readonly __unbound__: {
           readonly id: '__unbound__';
-          readonly kind: 'sql-namespace';
-          readonly tables: {
-            readonly comments: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
-                };
-                readonly body: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly post_id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
-                };
-              };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
-            };
-            readonly items: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
-                };
-                readonly name: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly label: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                  readonly default: {
-                    readonly kind: 'literal';
-                    readonly value: DefaultLiteralValue<'sqlite/text@1', 'unnamed'>;
+          readonly kind: 'sqlite-namespace';
+          readonly entries: {
+            readonly table: {
+              readonly comments: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly body: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly post_id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
                   };
                 };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
-            };
-            readonly posts: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
+              readonly items: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly name: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly label: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                    readonly default: {
+                      readonly kind: 'literal';
+                      readonly value: DefaultLiteralValue<'sqlite/text@1', 'unnamed'>;
+                    };
+                  };
                 };
-                readonly title: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly user_id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
-                };
-                readonly views: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
-                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
-            };
-            readonly profiles: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
+              readonly posts: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly title: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly user_id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly views: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
                 };
-                readonly user_id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
-                };
-                readonly bio: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
-            };
-            readonly typed_rows: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
+              readonly profiles: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly user_id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly bio: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
                 };
-                readonly active: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
-                };
-                readonly created_at: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/datetime@1';
-                  readonly nullable: false;
-                };
-                readonly metadata: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/json@1';
-                  readonly nullable: true;
-                };
-                readonly label: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
-            };
-            readonly users: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: false;
+              readonly typed_rows: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly active: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly created_at: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/datetime@1';
+                    readonly nullable: false;
+                  };
+                  readonly metadata: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/json@1';
+                    readonly nullable: true;
+                  };
+                  readonly label: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
                 };
-                readonly name: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly email: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly invited_by_id: {
-                  readonly nativeType: 'integer';
-                  readonly codecId: 'sqlite/integer@1';
-                  readonly nullable: true;
-                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
+              readonly users: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: false;
+                  };
+                  readonly name: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly email: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly invited_by_id: {
+                    readonly nativeType: 'integer';
+                    readonly codecId: 'sqlite/integer@1';
+                    readonly nullable: true;
+                  };
+                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
+              };
             };
           };
         };

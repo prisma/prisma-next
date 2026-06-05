@@ -13,6 +13,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { buildSqlContractFromDefinition } from './build-contract';
 import {
   type ComposedAuthoringHelpers,
@@ -292,6 +293,130 @@ function buildContractFromDsl<Definition extends ContractInput>(
   >(buildSqlContractFromDefinition(buildContractDefinition(definition), definition.codecLookup));
 }
 
+// Input for buildBoundContract — all fields from ContractInput except family/target
+// (those are injected by the builder, pre-bound at the call site).
+type BoundDefinitionInput<
+  Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = Record<
+    never,
+    never
+  >,
+  Models extends Record<string, ModelLike> = Record<never, never>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
+  Naming extends ContractInput['naming'] | undefined = undefined,
+  StorageHash extends string | undefined = undefined,
+  ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
+  Namespaces extends readonly string[] | undefined = undefined,
+> = {
+  readonly extensionPacks?: ExtensionPacks;
+  readonly naming?: Naming;
+  readonly storageHash?: StorageHash;
+  readonly foreignKeyDefaults?: ForeignKeyDefaults;
+  readonly defaultControlPolicy?: ControlPolicy;
+  readonly namespaces?: Namespaces;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly types?: Types;
+  readonly models?: Models;
+  readonly codecLookup?: CodecLookup;
+};
+
+// Merges a bound input with the pre-bound family/target to produce a full ContractDefinition.
+type WithFamilyTarget<
+  Input,
+  F extends FamilyPackRef<string>,
+  T extends TargetPackRef<'sql', string>,
+> = Input & { readonly family: F; readonly target: T };
+
+/**
+ * Shared builder that assembles a SqlContract with pre-bound family and target.
+ * Extension wrappers keep their own public overloads and delegate their impl body here;
+ * this is a plain overloaded function (not a factory returning an overloaded function)
+ * so no overloaded-function-return cast is needed.
+ *
+ * Overload 1: definition form (no factory).
+ */
+export function buildBoundContract<
+  const F extends FamilyPackRef<string>,
+  const T extends TargetPackRef<'sql', string>,
+  const Definition extends BoundDefinitionInput<
+    Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+    Record<string, ModelLike>,
+    Record<string, ExtensionPackRef<'sql', string>> | undefined,
+    ContractInput['naming'] | undefined,
+    string | undefined,
+    ForeignKeyDefaultsState | undefined,
+    readonly string[] | undefined
+  >,
+>(
+  family: F,
+  target: T,
+  definition: Definition,
+  factory?: undefined,
+): SqlContractResult<WithFamilyTarget<Definition, F, T>>;
+/**
+ * Overload 2: factory form.
+ */
+export function buildBoundContract<
+  const F extends FamilyPackRef<string>,
+  const T extends TargetPackRef<'sql', string>,
+  const Definition extends BoundDefinitionInput<
+    Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+    Record<string, ModelLike>,
+    Record<string, ExtensionPackRef<'sql', string>> | undefined,
+    ContractInput['naming'] | undefined,
+    string | undefined,
+    ForeignKeyDefaultsState | undefined,
+    readonly string[] | undefined
+  >,
+  const Built extends {
+    readonly types?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+    readonly models?: Record<string, ModelLike>;
+  },
+>(
+  family: F,
+  target: T,
+  definition: Definition,
+  factory: (
+    helpers: ComposedAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>,
+  ) => Built,
+): SqlContractResult<WithFamilyTarget<Definition & Built, F, T>>;
+/** Implementation. */
+export function buildBoundContract(
+  family: FamilyPackRef<string>,
+  target: TargetPackRef<'sql', string>,
+  definition: Omit<ContractInput, 'family' | 'target'>,
+  factory?:
+    | ((
+        helpers: ComposedAuthoringHelpers<
+          FamilyPackRef<string>,
+          TargetPackRef<'sql', string>,
+          Record<string, ExtensionPackRef<'sql', string>> | undefined
+        >,
+      ) => {
+        readonly types?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+        readonly models?: Record<string, ModelLike>;
+      })
+    | undefined,
+) {
+  const full = { ...definition, family, target };
+
+  if (factory !== undefined) {
+    const built = factory(
+      createComposedAuthoringHelpers({
+        family,
+        target,
+        extensionPacks: definition.extensionPacks,
+      }),
+    );
+    return buildContractFromDsl({
+      ...full,
+      ...ifDefined('types', built.types),
+      ...ifDefined('models', built.models),
+    });
+  }
+
+  return buildContractFromDsl(full);
+}
+
 export function defineContract<
   const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
@@ -387,22 +512,10 @@ export function defineContract(
     );
   }
 
-  if (!factory) {
-    return buildContractFromDsl(definition);
+  if (factory !== undefined) {
+    return buildBoundContract(definition.family, definition.target, definition, factory);
   }
-
-  const builtDefinition = {
-    ...definition,
-    ...factory(
-      createComposedAuthoringHelpers({
-        family: definition.family,
-        target: definition.target,
-        extensionPacks: definition.extensionPacks,
-      }),
-    ),
-  };
-
-  return buildContractFromDsl(builtDefinition);
+  return buildBoundContract(definition.family, definition.target, definition);
 }
 
 export type {

@@ -402,6 +402,42 @@ export type ModelAccessor<
   ModelName extends string,
 > = ScalarModelAccessor<TContract, ModelName> & RelationModelAccessor<TContract, ModelName>;
 
+/**
+ * The predicate accessor for a collection narrowed to a variant. When a real
+ * variant is selected its (possibly MTI) fields are merged onto the base
+ * accessor so `t.variant('Feature').where(x => x.priority…)` type-checks; with
+ * no variant the accessor is the plain base `ModelAccessor` and is unchanged.
+ */
+export type VariantAwareModelAccessor<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VariantName extends string | undefined,
+> = [VariantName] extends [string]
+  ? VariantName extends VariantNames<TContract, ModelName>
+    ? ScalarModelAccessor<TContract, ModelName> &
+        ScalarModelAccessor<TContract, VariantName> &
+        // Relations are surfaced from the base model only, not the variant.
+        // A variant model may declare its own relations in the contract, but
+        // the runtime `createModelAccessor` resolves relations against the
+        // base `modelName`, so surfacing variant relations here would type a
+        // predicate the runtime can't honour. Variant-relation predicates are
+        // therefore deliberately not exposed on the variant-narrowed accessor.
+        RelationModelAccessor<TContract, ModelName>
+    : ModelAccessor<TContract, ModelName>
+  : ModelAccessor<TContract, ModelName>;
+
+/**
+ * The flat default row of a single model: its own declared fields mapped to
+ * their JS types, with no variant flattening. Use this when you want exactly
+ * one model's fields (e.g. building the variant pieces, create/update inputs,
+ * column-name maps).
+ *
+ * Contrast with {@link InferRootRow}, which is the *read-shape* of a root
+ * collection: for a polymorphic base it discriminates over the variants and
+ * flattens each variant's own `DefaultModelRow` onto the base. `InferRootRow`
+ * is built from `DefaultModelRow`, not the other way around, so it can't be
+ * re-expressed in terms of `InferRootRow`.
+ */
 export type DefaultModelRow<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
 };
@@ -578,7 +614,7 @@ type FieldColumnName<
 
 type NamespaceTableDef<TContract extends Contract<SqlStorage>, TableName extends string> = {
   [K in keyof TContract['storage']['namespaces']]: TContract['storage']['namespaces'][K] extends {
-    readonly tables: infer Tables;
+    readonly entries: { readonly table: infer Tables };
   }
     ? TableName extends keyof Tables
       ? Tables[TableName]

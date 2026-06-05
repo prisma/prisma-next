@@ -57,6 +57,7 @@ Rules below are listed by bare filename; the canonical file is `.agents/rules/<n
 - `vitest-expect-typeof.mdc` — Type test patterns
 - `test-mocking-patterns.mdc` — Test-only assertions and mocking patterns
 - `prefer-object-matcher.mdc` — Prefer object matchers over multiple individual expect().toBe() calls
+- `sql-orm-client-whole-shape-assertions.mdc` — In sql-orm-client tests, assert the whole result shape (`toEqual`/snapshot) with explicit `select`
 - `prefer-to-throw.mdc` — Use `expect().toThrow()` instead of manual try/catch blocks
 - `no-tautological-tests.mdc` — Avoid tests that only restate fixture input structure
 - `use-ast-factories.mdc` — Use factory functions for creating AST nodes instead of manual object creation

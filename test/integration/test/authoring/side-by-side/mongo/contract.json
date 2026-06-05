@@ -128,73 +128,75 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "collections": {
-          "posts": {
-            "kind": "mongo-collection",
-            "validator": {
-              "jsonSchema": {
-                "additionalProperties": false,
-                "bsonType": "object",
-                "properties": {
-                  "_id": {
-                    "bsonType": "objectId"
+        "entries": {
+          "collection": {
+            "posts": {
+              "kind": "mongo-collection",
+              "validator": {
+                "jsonSchema": {
+                  "additionalProperties": false,
+                  "bsonType": "object",
+                  "properties": {
+                    "_id": {
+                      "bsonType": "objectId"
+                    },
+                    "authorId": {
+                      "bsonType": "objectId"
+                    },
+                    "publishedAt": {
+                      "bsonType": [
+                        "null",
+                        "date"
+                      ]
+                    },
+                    "title": {
+                      "bsonType": "string"
+                    }
                   },
-                  "authorId": {
-                    "bsonType": "objectId"
-                  },
-                  "publishedAt": {
-                    "bsonType": [
-                      "null",
-                      "date"
-                    ]
-                  },
-                  "title": {
-                    "bsonType": "string"
-                  }
+                  "required": [
+                    "_id",
+                    "authorId",
+                    "title"
+                  ]
                 },
-                "required": [
-                  "_id",
-                  "authorId",
-                  "title"
-                ]
-              },
-              "kind": "mongo-validator",
-              "validationAction": "error",
-              "validationLevel": "strict"
-            }
-          },
-          "users": {
-            "kind": "mongo-collection",
-            "validator": {
-              "jsonSchema": {
-                "additionalProperties": false,
-                "bsonType": "object",
-                "properties": {
-                  "_id": {
-                    "bsonType": "objectId"
+                "kind": "mongo-validator",
+                "validationAction": "error",
+                "validationLevel": "strict"
+              }
+            },
+            "users": {
+              "kind": "mongo-collection",
+              "validator": {
+                "jsonSchema": {
+                  "additionalProperties": false,
+                  "bsonType": "object",
+                  "properties": {
+                    "_id": {
+                      "bsonType": "objectId"
+                    },
+                    "bio": {
+                      "bsonType": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "email": {
+                      "bsonType": "string"
+                    },
+                    "name": {
+                      "bsonType": "string"
+                    }
                   },
-                  "bio": {
-                    "bsonType": [
-                      "null",
-                      "string"
-                    ]
-                  },
-                  "email": {
-                    "bsonType": "string"
-                  },
-                  "name": {
-                    "bsonType": "string"
-                  }
+                  "required": [
+                    "_id",
+                    "email",
+                    "name"
+                  ]
                 },
-                "required": [
-                  "_id",
-                  "email",
-                  "name"
-                ]
-              },
-              "kind": "mongo-validator",
-              "validationAction": "error",
-              "validationLevel": "strict"
+                "kind": "mongo-validator",
+                "validationAction": "error",
+                "validationLevel": "strict"
+              }
             }
           }
         },
@@ -202,7 +204,7 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:5a009d33405083e69af2619504032cbf6d159d02972c26898375ab46613992b5"
+    "storageHash": "sha256:cc4f62dd7f0bd951dee72c7acf01aba3425652ac2ee0e18688ae8424041000bb"
   },
   "capabilities": {},
   "extensionPacks": {},

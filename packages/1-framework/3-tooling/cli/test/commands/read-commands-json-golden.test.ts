@@ -6,9 +6,15 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { applicationDomainOf } from '@prisma-next/test-utils';
+import { type } from 'arktype';
 import { join } from 'pathe';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbSignCommand } from '../../src/commands/db-sign';
+import {
+  type MigrationSpaceGraphEntry,
+  migrationGraphJsonResultSchema,
+  migrationLogResultSchema,
+} from '../../src/commands/json/schemas';
 import { executeMigrationGraphCommand } from '../../src/commands/migration-graph';
 import { executeMigrationLogCommand } from '../../src/commands/migration-log';
 import { executeRefSetCommand } from '../../src/commands/ref';
@@ -147,37 +153,25 @@ async function writeEndContract(packageDir: string, storageHash: string): Promis
 }
 
 function migrationGraphJson(result: {
-  graph: {
-    nodes: ReadonlySet<string>;
-    migrationByHash: ReadonlyMap<
-      string,
-      { dirName: string; from: string; to: string; migrationHash: string }
-    >;
-  };
+  spaces: readonly MigrationSpaceGraphEntry[];
   summary: string;
 }): string {
-  const nodes = [...result.graph.nodes];
-  const edges = [...result.graph.migrationByHash.values()].map((e) => ({
-    dirName: e.dirName,
-    from: e.from,
-    to: e.to,
-    migrationHash: e.migrationHash,
-  }));
-  return JSON.stringify({ ok: true, nodes, edges, summary: result.summary }, null, 2);
+  return JSON.stringify({ ok: true, spaces: [...result.spaces], summary: result.summary }, null, 2);
 }
 
 function migrationLogJson(
-  entries: readonly {
+  records: readonly {
     space: string;
-    migrationName: string;
-    migrationHash: string;
-    from: string | null;
-    to: string;
+    name: string;
+    hash: string;
+    fromContract: string | null;
+    toContract: string;
     appliedAt: string;
     operationCount: number;
   }[],
+  summary: string,
 ): string {
-  return JSON.stringify({ ok: true, entries }, null, 2);
+  return JSON.stringify({ ok: true, records, summary }, null, 2);
 }
 
 describe('read commands --json golden', () => {
@@ -221,31 +215,47 @@ describe('read commands --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    expect(migrationGraphJsonResultSchema(result.value) instanceof type.errors).toBe(false);
+
     const json = migrationGraphJson(result.value);
     expect(json).toBe(
       [
         '{',
         '  "ok": true,',
-        '  "nodes": [',
-        `    "${EMPTY_CONTRACT_HASH}",`,
-        `    "${HASH_A}",`,
-        `    "${HASH_B}"`,
-        '  ],',
-        '  "edges": [',
+        '  "spaces": [',
         '    {',
-        `      "dirName": "${dirInit}",`,
-        `      "from": "${EMPTY_CONTRACT_HASH}",`,
-        `      "to": "${HASH_A}",`,
-        '      "migrationHash": "sha256:d5c8739bfe8617fa82603875980b18d7dee1e02637499fd451ec7f1a7087e920"',
-        '    },',
-        '    {',
-        `      "dirName": "${dirNext}",`,
-        `      "from": "${HASH_A}",`,
-        `      "to": "${HASH_B}",`,
-        '      "migrationHash": "sha256:ca2593661d91c77720887ec8ff9ff6de7a7009df17757b7a5952fde8ceae9747"',
+        '      "space": "app",',
+        '      "contracts": [',
+        '        {',
+        `          "hash": "${EMPTY_CONTRACT_HASH}",`,
+        '          "refs": []',
+        '        },',
+        '        {',
+        `          "hash": "${HASH_A}",`,
+        '          "refs": []',
+        '        },',
+        '        {',
+        `          "hash": "${HASH_B}",`,
+        '          "refs": []',
+        '        }',
+        '      ],',
+        '      "migrations": [',
+        '        {',
+        `          "name": "${dirInit}",`,
+        '          "hash": "sha256:d5c8739bfe8617fa82603875980b18d7dee1e02637499fd451ec7f1a7087e920",',
+        `          "fromContract": null,`,
+        `          "toContract": "${HASH_A}"`,
+        '        },',
+        '        {',
+        `          "name": "${dirNext}",`,
+        '          "hash": "sha256:ca2593661d91c77720887ec8ff9ff6de7a7009df17757b7a5952fde8ceae9747",',
+        `          "fromContract": "${HASH_A}",`,
+        `          "toContract": "${HASH_B}"`,
+        '        }',
+        '      ]',
         '    }',
         '  ],',
-        '  "summary": "3 node(s), 2 edge(s)"',
+        '  "summary": "1 space(s), 3 contract(s), 2 migration(s)"',
         '}',
       ].join('\n'),
     );
@@ -288,21 +298,29 @@ describe('read commands --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const json = migrationLogJson(
-      result.value.map(({ appliedAt, ...rest }) => ({
-        ...rest,
-        appliedAt: appliedAt.toISOString(),
-      })),
-    );
+    const serialized = result.value.map((entry) => ({
+      space: entry.space,
+      name: entry.migrationName,
+      hash: entry.migrationHash,
+      fromContract: entry.from,
+      toContract: entry.to,
+      appliedAt: entry.appliedAt.toISOString(),
+      operationCount: entry.operationCount,
+    }));
+    const summary = `${result.value.length} migration(s) applied`;
+    const json = migrationLogJson(serialized, summary);
     const parsed = JSON.parse(json) as {
       ok: boolean;
-      entries: Array<{ migrationName: string; appliedAt: string }>;
+      records: Array<{ name: string; appliedAt: string }>;
+      summary: string;
     };
     expect(parsed.ok).toBe(true);
-    expect(parsed.entries).toHaveLength(2);
-    expect(parsed.entries.map((entry) => entry.migrationName)).toEqual([dirInit, dirNext]);
-    expect(parsed.entries[0]!.appliedAt).toBe('2026-03-01T08:00:00.000Z');
+    expect(parsed.records).toHaveLength(2);
+    expect(parsed.records.map((r) => r.name)).toEqual([dirInit, dirNext]);
+    expect(parsed.records[0]!.appliedAt).toBe('2026-03-01T08:00:00.000Z');
+    expect(typeof parsed.summary).toBe('string');
     expect(json).not.toContain('markerHash');
+    expect(migrationLogResultSchema(parsed) instanceof type.errors).toBe(false);
   });
 
   it('pins ref set --json when resolving a migration dir name', async () => {

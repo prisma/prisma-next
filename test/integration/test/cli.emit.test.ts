@@ -71,8 +71,10 @@ describe('emit command functionality', () => {
         storage: {
           namespaces: {
             public: {
-              tables: {
-                user: expect.anything(),
+              entries: {
+                table: {
+                  user: expect.anything(),
+                },
               },
             },
           },

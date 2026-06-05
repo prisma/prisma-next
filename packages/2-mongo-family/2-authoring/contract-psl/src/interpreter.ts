@@ -1158,7 +1158,7 @@ export function interpretPslDocumentToMongoContract(
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        collections: collectionsAsClasses,
+        entries: { collection: collectionsAsClasses },
       },
     },
   };
@@ -1173,7 +1173,7 @@ export function interpretPslDocumentToMongoContract(
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
         id: UNBOUND_NAMESPACE_ID,
-        collections: collectionsAsClasses,
+        entries: { collection: collectionsAsClasses },
       }),
     },
   }) as Contract['storage'];

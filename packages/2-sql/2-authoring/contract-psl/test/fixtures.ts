@@ -15,8 +15,10 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { SqlNode } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import { buildSqlNamespace, SqlNode } from '@prisma-next/sql-contract/types';
 
 /**
  * Layer-isolated enum-shaped IR class for `sql-contract-psl` unit tests.
@@ -504,4 +506,29 @@ export function valueObjectsOf(contract: Contract) {
 
 export function documentScopedTypes(contract: { readonly storage?: unknown }) {
   return (contract.storage as { readonly types?: Record<string, unknown> } | undefined)?.types;
+}
+
+/**
+ * Returns a `createNamespace` factory that captures enum types keyed by namespace id,
+ * plus the accumulated map. Useful for asserting on postgres enum routing without
+ * depending on the postgres target pack's concrete namespace class.
+ */
+export function buildEnumCapturingFactory(): {
+  createNamespace: (
+    input: SqlNamespaceTablesInput,
+    enumTypes?: Readonly<Record<string, unknown>>,
+  ) => Namespace;
+  capturedEnumTypes: Record<string, Record<string, unknown>>;
+} {
+  const capturedEnumTypes: Record<string, Record<string, unknown>> = {};
+  const createNamespace = (
+    input: SqlNamespaceTablesInput,
+    enumTypes?: Readonly<Record<string, unknown>>,
+  ): Namespace => {
+    if (enumTypes && Object.keys(enumTypes).length > 0) {
+      capturedEnumTypes[input.id] = { ...(capturedEnumTypes[input.id] ?? {}), ...enumTypes };
+    }
+    return buildSqlNamespace(input);
+  };
+  return { createNamespace, capturedEnumTypes };
 }

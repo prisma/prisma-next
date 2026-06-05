@@ -7,15 +7,18 @@ import { MongoCollection, type MongoCollectionInput } from '@prisma-next/mongo-c
 
 export interface MongoTargetDatabaseInput {
   readonly id: string;
-  readonly collections?: Record<string, MongoCollection | MongoCollectionInput>;
+  readonly entries?: {
+    readonly collection?: Record<string, MongoCollection | MongoCollectionInput>;
+  };
 }
 
 /**
  * Mongo target `Namespace` concretion. In Mongo the "namespace" concept
  * binds to the connection's `db` field — a `MongoTargetDatabase` instance
- * names the database the collections live under. The unbound singleton
- * (below) is the late-bound slot whose binding the connection's `db`
- * resolves at runtime rather than at authoring time.
+ * names the database the collections live under. `entries.collection`
+ * holds collection IR. The unbound singleton (below) is the late-bound
+ * slot whose binding the connection's `db` resolves at runtime rather
+ * than at authoring time.
  *
  * Qualifier emission is the rendering seam: query / DDL emission asks the
  * namespace for its qualifier (e.g. `"<db>.<collection>"`) and consumes
@@ -26,19 +29,23 @@ export interface MongoTargetDatabaseInput {
 export class MongoTargetDatabase extends NamespaceBase {
   readonly kind = 'database' as const;
   readonly id: string;
-  readonly collections: Readonly<Record<string, MongoCollection>>;
+  readonly entries: Readonly<{
+    readonly collection: Readonly<Record<string, MongoCollection>>;
+  }>;
 
   constructor(input: MongoTargetDatabaseInput) {
     super();
     this.id = input.id;
-    this.collections = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.collections ?? {}).map(([name, c]) => [
-          name,
-          c instanceof MongoCollection ? c : new MongoCollection(c),
-        ]),
+    this.entries = Object.freeze({
+      collection: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries?.collection ?? {}).map(([name, c]) => [
+            name,
+            c instanceof MongoCollection ? c : new MongoCollection(c),
+          ]),
+        ),
       ),
-    );
+    });
     freezeNode(this);
   }
 

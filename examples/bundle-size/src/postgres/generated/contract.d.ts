@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:138746dc9cdea3438f85871ce903d7f873af538feae65760086f29f702dd5c1c'>;
+  StorageHashBase<'sha256:fb127991d1ae8b347b90a6cdf3857900af37c577d7d7ca0a189de8f5e6aea617'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:13b32dc5b41ba6f7d635fefd3a3fdc581490a54d10a654f9ea323638ad66c726'>;
 export type ProfileHash =
@@ -57,24 +57,32 @@ type ContractBase = Omit<
   ContractType<
     {
       readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'postgres-unbound-schema';
+          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
+        };
         readonly public: {
           readonly id: 'public';
-          readonly kind: 'sql-namespace';
-          readonly tables: {
-            readonly Note: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+          readonly kind: 'postgres-schema';
+          readonly entries: {
+            readonly table: {
+              readonly Note: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
                 };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
             };
+            readonly type: Record<string, never>;
           };
         };
       };

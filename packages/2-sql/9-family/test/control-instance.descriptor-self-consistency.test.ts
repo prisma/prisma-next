@@ -32,7 +32,10 @@ const fixtureTables = {
 
 const fixtureHashBody = {
   namespaces: {
-    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: fixtureTables },
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: fixtureTables },
+    },
   },
 };
 
@@ -40,7 +43,7 @@ const fixtureStorageBody = {
   namespaces: {
     [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
-      tables: fixtureTables,
+      entries: { table: fixtureTables },
     }),
   },
 };

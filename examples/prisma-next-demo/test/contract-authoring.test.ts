@@ -3,7 +3,7 @@ import { contract } from '../prisma/contract';
 
 describe('demo TS contract authoring', () => {
   it('keeps Post.userId storage aligned with User.id', () => {
-    const tables = contract.storage.namespaces['public'].tables;
+    const tables = contract.storage.namespaces['public'].entries.table;
     const userIdColumn = tables.post.columns.userId;
     const userIdTargetColumn = tables.user.columns.id;
 

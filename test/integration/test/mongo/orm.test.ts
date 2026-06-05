@@ -11,7 +11,7 @@ const contract = new MongoContractSerializer().deserializeContract(ormContractJs
 
 describeWithMongoDB('mongoOrm integration', (ctx) => {
   it('loads generated collection indexes and options', () => {
-    expect(contract.storage.namespaces.__unbound__.collections.users).toEqual({
+    expect(contract.storage.namespaces.__unbound__.entries.collection.users).toEqual({
       kind: 'mongo-collection',
       indexes: [{ kind: 'mongo-index', keys: [{ field: 'email', direction: 1 }], unique: true }],
       options: {

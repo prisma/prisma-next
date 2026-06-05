@@ -16,7 +16,7 @@ import type {
   VerificationStatus,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
@@ -28,6 +28,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import type { CodecControlHooks } from '../migrations/types';
@@ -41,8 +42,6 @@ import {
   verifyPrimaryKey,
   verifyUniqueConstraints,
 } from './verify-helpers';
-
-export type ColumnsCompatible = (declared: string, live: string) => boolean;
 
 /**
  * Function type for normalizing raw database default expressions into ColumnDefault.
@@ -107,11 +106,6 @@ export interface VerifySqlSchemaOptions {
     enumType: PostgresEnumStorageEntry,
     namespaceId: string,
   ) => readonly string[] | null;
-  /**
-   * Target-supplied compatible-shape relation for `external` column type checks.
-   * Defaults to exact string equality when omitted.
-   */
-  readonly columnsCompatible?: ColumnsCompatible;
 }
 
 /**
@@ -134,7 +128,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     normalizeDefault,
     normalizeNativeType,
     resolveExistingEnumValues,
-    columnsCompatible,
   } = options;
   const startTime = Date.now();
 
@@ -152,7 +145,10 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     >),
   };
   for (const ns of Object.values(contract.storage.namespaces)) {
-    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    const nsEnums = blindCast<
+      { readonly type?: Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>> },
+      'postgres target namespace entries carry a type slot beyond the family-shared SqlNamespace.entries type'
+    >(ns.entries).type;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
         allStorageTypesMap[k] = v;
@@ -171,7 +167,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
-    ...ifDefined('columnsCompatible', columnsCompatible),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -223,23 +218,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     });
   };
 
-  // Top-level `storage.types`: codec-typed entries via codec hooks; a
-  // defensive top-level enum is verified under the unbound coordinate.
+  // Top-level `storage.types`: codec-typed entries via codec hooks.
   for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
-    if (isPostgresEnumStorageEntry(typeInstance)) {
-      pushTypeNode(
-        typeName,
-        `storage.types.${typeName}`,
-        verifyEnumType({
-          typeName,
-          typeInstance,
-          schema,
-          resolveExistingEnumValues,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-        }),
-        effectiveControlPolicy(typeInstance.control, contract.defaultControlPolicy),
-      );
-    } else if (isStorageTypeInstance(typeInstance)) {
+    if (isStorageTypeInstance(typeInstance)) {
       const hook = codecHooks.get(typeInstance.codecId);
       pushTypeNode(
         typeName,
@@ -254,13 +235,13 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   for (const nsId of Object.keys(contract.storage.namespaces)) {
     const ns = contract.storage.namespaces[nsId];
     if (!ns) continue;
-    const nsEnums = ns.enum;
+    const nsEnums = ns.entries['type'];
     if (!nsEnums) continue;
     for (const [typeName, entry] of Object.entries(nsEnums)) {
       if (!isPostgresEnumStorageEntry(entry)) continue;
       pushTypeNode(
         typeName,
-        `storage.namespaces.${nsId}.enum.${typeName}`,
+        `storage.namespaces.${nsId}.entries.type.${typeName}`,
         verifyEnumType({
           typeName,
           typeInstance: entry,
@@ -419,7 +400,6 @@ function verifySchemaTables(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
-  columnsCompatible?: ColumnsCompatible;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
   const {
     contract,
@@ -430,7 +410,6 @@ function verifySchemaTables(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
-    columnsCompatible,
   } = options;
   const contractDefaultControl = contract.defaultControlPolicy;
   const issues: SchemaIssue[] = [];
@@ -443,10 +422,10 @@ function verifySchemaTables(options: {
   for (const namespaceId of namespaceIds) {
     const ns = contract.storage.namespaces[namespaceId];
     if (!ns) continue;
-    for (const [tableName, contractTableRaw] of Object.entries(ns.tables)) {
+    for (const [tableName, contractTableRaw] of Object.entries(ns.entries.table)) {
       if (!(contractTableRaw instanceof StorageTable)) {
         throw new Error(
-          `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.tables.${tableName}`,
+          `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.entries.table.${tableName}`,
         );
       }
       const contractTable = contractTableRaw;
@@ -455,7 +434,7 @@ function verifySchemaTables(options: {
         contractDefaultControl,
       );
       const schemaTable = schemaTables[tableName];
-      const tablePath = `storage.namespaces.${namespaceId}.tables.${tableName}`;
+      const tablePath = `storage.namespaces.${namespaceId}.entries.table.${tableName}`;
 
       if (!schemaTable) {
         const issue: SchemaIssue = {
@@ -498,7 +477,6 @@ function verifySchemaTables(options: {
         storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
-        ...ifDefined('columnsCompatible', columnsCompatible),
       });
       rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
     }
@@ -507,7 +485,8 @@ function verifySchemaTables(options: {
   if (strict) {
     for (const tableName of Object.keys(schemaTables)) {
       const claimed = namespaceIds.some(
-        (namespaceId) => contract.storage.namespaces[namespaceId]?.tables[tableName] !== undefined,
+        (namespaceId) =>
+          contract.storage.namespaces[namespaceId]?.entries.table[tableName] !== undefined,
       );
       if (!claimed) {
         const extraTableControlPolicy = effectiveControlPolicy(undefined, contractDefaultControl);
@@ -523,7 +502,7 @@ function verifySchemaTables(options: {
             status: 'fail',
             kind: 'table',
             name: `table ${tableName}`,
-            contractPath: `storage.namespaces.*.tables.${tableName}`,
+            contractPath: `storage.namespaces.*.entries.table.${tableName}`,
             code: 'extra_table',
             message: `Extra table "${tableName}" found`,
             expected: undefined,
@@ -554,7 +533,6 @@ function verifyTableChildren(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
-  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -570,7 +548,6 @@ function verifyTableChildren(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
-    columnsCompatible,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
@@ -587,7 +564,6 @@ function verifyTableChildren(options: {
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
-    ...ifDefined('columnsCompatible', columnsCompatible),
   });
   if (columnNodes.length > 0) {
     tableChildren.push(buildColumnsNode(tablePath, columnNodes));
@@ -750,7 +726,6 @@ function collectContractColumnNodes(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
-  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -766,7 +741,6 @@ function collectContractColumnNodes(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
-    columnsCompatible,
   } = options;
   const columnNodes: SchemaVerificationNode[] = [];
 
@@ -818,7 +792,6 @@ function collectContractColumnNodes(options: {
         storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
-        ...ifDefined('columnsCompatible', columnsCompatible),
       }),
     );
   }
@@ -891,7 +864,6 @@ function verifyColumn(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
-  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode {
   const {
     tableName,
@@ -907,7 +879,6 @@ function verifyColumn(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
-    columnsCompatible,
   } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
@@ -923,11 +894,7 @@ function verifyColumn(options: {
   const schemaNativeType =
     normalizeNativeType?.(schemaColumn.nativeType) ?? schemaColumn.nativeType;
 
-  const typesMatch =
-    contractNativeType === schemaNativeType ||
-    (tableControlPolicy === 'external' &&
-      (columnsCompatible?.(contractNativeType, schemaNativeType) ??
-        contractNativeType === schemaNativeType));
+  const typesMatch = contractNativeType === schemaNativeType;
 
   if (!typesMatch) {
     const issue: SchemaIssue = {

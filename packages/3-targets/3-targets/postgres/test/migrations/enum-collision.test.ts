@@ -53,13 +53,17 @@ function makeCollisionContract(
         [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
         audit: new PostgresSchema({
           id: 'audit',
-          tables: overrides.audit?.tables ?? {},
-          ...(auditEnum !== undefined ? { enum: { Status: auditEnum } } : {}),
+          entries: {
+            table: overrides.audit?.tables ?? {},
+            type: auditEnum !== undefined ? { Status: auditEnum } : {},
+          },
         }),
         public: new PostgresSchema({
           id: 'public',
-          tables: overrides.public?.tables ?? {},
-          ...(publicEnum !== undefined ? { enum: { Status: publicEnum } } : {}),
+          entries: {
+            table: overrides.public?.tables ?? {},
+            type: publicEnum !== undefined ? { Status: publicEnum } : {},
+          },
         }),
       },
     }),
@@ -304,14 +308,16 @@ describe('enum namespace collision planning', () => {
           namespaces: {
             public: new PostgresSchema({
               id: 'public',
-              tables: {},
-              enum: {
-                status: new PostgresEnumType({ name: 'status', values: ['active', 'archived'] }),
+              entries: {
+                table: {},
+                type: {
+                  status: new PostgresEnumType({ name: 'status', values: ['active', 'archived'] }),
+                },
               },
             }),
             [UNBOUND_NAMESPACE_ID]: new PostgresUnboundSchema({
               id: UNBOUND_NAMESPACE_ID,
-              tables: { user: userTable },
+              entries: { table: { user: userTable }, type: {} },
             }),
           },
         }),

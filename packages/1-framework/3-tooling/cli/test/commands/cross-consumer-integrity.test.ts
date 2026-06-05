@@ -331,7 +331,7 @@ interface CliErrorEnvelope {
 
 interface CheckEnvelope {
   readonly ok: boolean;
-  readonly failures?: ReadonlyArray<{ readonly pnCode: string; readonly where: string }>;
+  readonly failures?: ReadonlyArray<{ readonly code: string; readonly where: string }>;
 }
 
 async function runAndCaptureExit(invoke: () => Promise<number>): Promise<number> {
@@ -396,7 +396,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
       const envelope = firstJsonLine<CheckEnvelope>(consoleOutput);
 
       expect(envelope.ok).toBe(false);
-      const codes = (envelope.failures ?? []).map((f) => f.pnCode);
+      const codes = (envelope.failures ?? []).map((f) => f.code);
       expect(codes).toContain('PN-MIG-CHECK-001'); // hash mismatch
       expect(codes).toContain('PN-MIG-CHECK-007'); // self-edge (sameSourceAndTarget)
       expect(codes).toContain('PN-MIG-CHECK-008'); // orphan space dir
@@ -423,7 +423,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
       // through the shared mapper (no app-only legacy pass):
       // unreported. It now surfaces, located in the extension space.
       expect(envelope.ok).toBe(false);
-      const hashFailures = (envelope.failures ?? []).filter((f) => f.pnCode === 'PN-MIG-CHECK-001');
+      const hashFailures = (envelope.failures ?? []).filter((f) => f.code === 'PN-MIG-CHECK-001');
       expect(hashFailures).toHaveLength(1);
       expect(hashFailures[0]?.where).toContain(fixture.extId);
     },

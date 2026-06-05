@@ -326,7 +326,8 @@ describe('mongoEmission.generateContractTypes', () => {
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('readonly namespaces:');
-      expect(types).toContain('readonly collections:');
+      expect(types).toContain('readonly entries:');
+      expect(types).toContain('readonly collection:');
       expect(types).toContain('readonly users: MongoCollection');
       expect(types).toContain('readonly posts: MongoCollection');
     });
@@ -354,7 +355,8 @@ describe('mongoEmission.generateContractTypes', () => {
     it('generates empty collections map under the default namespace', () => {
       const contract = createMongoContract({ storage: namespacedMongoStorageFromCollections({}) });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
-      expect(types).toContain('readonly collections: Record<string, never>');
+      expect(types).toContain('readonly entries:');
+      expect(types).toContain('readonly collection: Record<string, never>');
     });
   });
 

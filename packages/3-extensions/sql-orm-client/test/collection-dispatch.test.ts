@@ -1,8 +1,42 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { resolveIncludeRelation } from '../src/collection-contract';
 import { dispatchCollectionRows } from '../src/collection-dispatch';
+import { type CollectionState, emptyState, type IncludeExpr } from '../src/types';
 import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
-import { getTestContract, withCapabilities } from './helpers';
+import {
+  buildMixedPolyContract,
+  buildStiPolyContract,
+  createMockRuntime,
+  getTestContract,
+  withCapabilities,
+} from './helpers';
+
+function includeFor(
+  contract: Contract<SqlStorage>,
+  parentModel: string,
+  relationName: string,
+  nested: CollectionState = emptyState(),
+): IncludeExpr {
+  const relation = resolveIncludeRelation(contract, parentModel, relationName);
+  return {
+    relationName,
+    relatedModelName: relation.relatedModelName,
+    relatedTableName: relation.relatedTableName,
+    targetColumn: relation.targetColumn,
+    localColumn: relation.localColumn,
+    cardinality: relation.cardinality,
+    nested,
+    scalar: undefined,
+    combine: undefined,
+  };
+}
+
+function stateWithInclude(include: IncludeExpr): CollectionState {
+  return { ...emptyState(), includes: [include] };
+}
 
 function withSingleQueryCapabilities(contract: TestContract) {
   return withCapabilities(contract, {
@@ -333,6 +367,215 @@ describe('collection-dispatch', () => {
         author: null,
       },
     ]);
+  });
+
+  it('dispatchCollectionRows() decodes STI-target include child rows to their discriminator variant', async () => {
+    const contract = withSingleQueryCapabilities(buildStiPolyContract());
+    const runtime = createMockRuntime();
+    const state = stateWithInclude(includeFor(contract, 'Account', 'members'));
+    // Both STI variant columns live in the base table, so the child SELECT
+    // projects both for every row; the non-matching variant's column is NULL.
+    // Decoding by discriminator must keep the matching variant's field and
+    // strip the other variant's NULL column entirely.
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Acme',
+          members:
+            '[{"id":10,"name":"Ada","email":"ada@example.com","kind":"admin","role":"owner","plan":null},{"id":11,"name":"Bo","email":"bo@example.com","kind":"regular","role":null,"plan":"free"}]',
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state,
+      tableName: 'accounts',
+      modelName: 'Account',
+    });
+
+    const members = (rows[0] as { members: Record<string, unknown>[] }).members;
+    expect(members[0]).toEqual({
+      id: 10,
+      name: 'Ada',
+      email: 'ada@example.com',
+      kind: 'admin',
+      role: 'owner',
+    });
+    expect(members[1]).toEqual({
+      id: 11,
+      name: 'Bo',
+      email: 'bo@example.com',
+      kind: 'regular',
+      plan: 'free',
+    });
+  });
+
+  it('dispatchCollectionRows() decodes MTI-target include child rows, surfacing variant columns under their field names', async () => {
+    const contract = withSingleQueryCapabilities(buildMixedPolyContract());
+    const runtime = createMockRuntime();
+    const state = stateWithInclude(includeFor(contract, 'Project', 'tasks'));
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Roadmap',
+          tasks:
+            '[{"id":10,"title":"Crash","type":"bug","severity":"critical","project_id":1,"features__priority":null},{"id":11,"title":"Dark mode","type":"feature","severity":null,"project_id":1,"features__priority":7}]',
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state,
+      tableName: 'projects_tbl',
+      modelName: 'Project',
+    }).toArray();
+
+    const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
+    expect(tasks[0]).toEqual({
+      id: 10,
+      title: 'Crash',
+      type: 'bug',
+      severity: 'critical',
+      projectId: 1,
+    });
+    expect(tasks[1]).toEqual({
+      id: 11,
+      title: 'Dark mode',
+      type: 'feature',
+      priority: 7,
+      projectId: 1,
+    });
+  });
+
+  it('dispatchCollectionRows() decodes a nested include hanging off a poly-target child from the raw child row, for both an MTI and a non-MTI variant', async () => {
+    // Regression guard: a nested include through a polymorphic include target
+    // used to decode the grandchild to an empty value for every row. The poly
+    // branch maps the child row via `mapPolymorphicRow` (which drops every
+    // column not in the variant model-field map — including the nested
+    // payload's relation alias), then read the nested payload from the MAPPED
+    // row, so it was always gone. The fix reads each nested payload from the
+    // RAW child row. This must hold for a variant WITH an MTI table (Feature ->
+    // features) and one WITHOUT (Bug, STI on the base table) — the bug hit both.
+    const contract = withSingleQueryCapabilities(buildMixedPolyContract());
+    const runtime = createMockRuntime();
+    const state = stateWithInclude(
+      includeFor(contract, 'Project', 'tasks', {
+        ...emptyState(),
+        includes: [includeFor(contract, 'Task', 'subtasks')],
+      }),
+    );
+
+    // Each task child row carries its `subtasks` nested payload under the
+    // relation alias (already parsed by the outer JSON.parse, so an array).
+    // The poly columns (`severity` for the STI Bug, `features__priority` for
+    // the MTI Feature) plus the sibling-variant NULL columns are present, as
+    // the per-variant SELECT emits them.
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Roadmap',
+          tasks: JSON.stringify([
+            {
+              id: 10,
+              title: 'Crash',
+              type: 'bug',
+              severity: 'critical',
+              project_id: 1,
+              features__priority: null,
+              subtasks: [{ id: 100, title: 'Repro', type: 'bug', parent_id: 10 }],
+            },
+            {
+              id: 11,
+              title: 'Dark mode',
+              type: 'feature',
+              severity: null,
+              project_id: 1,
+              features__priority: 7,
+              subtasks: [{ id: 101, title: 'Toggle', type: 'feature', parent_id: 11 }],
+            },
+          ]),
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state,
+      tableName: 'projects_tbl',
+      modelName: 'Project',
+    }).toArray();
+
+    const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
+
+    // Non-MTI (STI) variant: grandchild decodes to its real value, and the
+    // parent poly row is variant-shaped — the sibling-variant `priority`
+    // column is dropped, so it is absent from the whole-shape assertion.
+    expect(tasks[0]).toEqual({
+      id: 10,
+      title: 'Crash',
+      type: 'bug',
+      severity: 'critical',
+      projectId: 1,
+      subtasks: [{ id: 100, title: 'Repro', type: 'bug', parentId: 10 }],
+    });
+
+    // MTI variant: grandchild decodes to its real value, and the parent poly
+    // row is variant-shaped — the sibling-variant `severity` column is dropped.
+    expect(tasks[1]).toEqual({
+      id: 11,
+      title: 'Dark mode',
+      type: 'feature',
+      priority: 7,
+      projectId: 1,
+      subtasks: [{ id: 101, title: 'Toggle', type: 'feature', parentId: 11 }],
+    });
+  });
+
+  it('dispatchCollectionRows() maps a variant-narrowed include via its named variant', async () => {
+    const contract = withSingleQueryCapabilities(buildMixedPolyContract());
+    const runtime = createMockRuntime();
+    // A variant-narrowed include carries `variantName` on the include's nested
+    // state. The decode side reads that to map every child row to the named
+    // variant rather than resolving per-row by discriminator.
+    const state = stateWithInclude(
+      includeFor(contract, 'Project', 'tasks', { ...emptyState(), variantName: 'Feature' }),
+    );
+
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Roadmap',
+          tasks:
+            '[{"id":11,"title":"Dark mode","type":"feature","project_id":1,"features__priority":7}]',
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state,
+      tableName: 'projects_tbl',
+      modelName: 'Project',
+    }).toArray();
+
+    const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
+    expect(tasks[0]).toEqual({
+      id: 11,
+      title: 'Dark mode',
+      type: 'feature',
+      priority: 7,
+      projectId: 1,
+    });
   });
 
   // ---------------------------------------------------------------------------

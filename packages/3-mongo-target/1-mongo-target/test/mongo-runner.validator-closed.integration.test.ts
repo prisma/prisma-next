@@ -78,7 +78,7 @@ function makeContractWithValidator(
         __unbound__: {
           id: '__unbound__',
           kind: 'mongo-namespace',
-          collections: { [collectionName]: collection },
+          entries: { collection: { [collectionName]: collection } },
         },
       },
     },

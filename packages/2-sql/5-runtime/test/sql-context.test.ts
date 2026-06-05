@@ -308,14 +308,16 @@ describe('contract/stack validation errors', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
           }),
@@ -356,15 +358,17 @@ describe('contract/stack validation errors', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                  slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                    slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
           }),
@@ -407,14 +411,16 @@ describe('contract/stack validation errors', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
           }),
@@ -447,16 +453,18 @@ describe('applyMutationDefaults', () => {
       namespaces: {
         __unbound__: buildSqlNamespace({
           id: '__unbound__',
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         }),
@@ -564,15 +572,17 @@ describe('applyMutationDefaults', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                  touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                    touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
           }),
@@ -659,16 +669,18 @@ describe('applyMutationDefaults', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
-              event: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            entries: {
+              table: {
+                event: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
           }),
@@ -746,14 +758,16 @@ describe('applyMutationDefaults', () => {
         namespaces: {
           __unbound__: buildSqlNamespace({
             id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
           }),

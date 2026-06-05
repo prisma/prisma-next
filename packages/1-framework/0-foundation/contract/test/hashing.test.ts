@@ -7,8 +7,8 @@ const sqlPreserveEmpty: PreserveEmptyPredicate = (path) => {
   const len = path.length;
   if (len < 2 || path[0] !== 'storage') return false;
   if (path[1] === 'namespaces') {
-    if (len === 4 && path[3] === 'tables') return true;
-    if (len === 5 && path[3] === 'tables') return true;
+    if (len === 5 && path[3] === 'entries' && path[4] === 'table') return true;
+    if (len === 6 && path[3] === 'entries' && path[4] === 'table') return true;
   }
   return false;
 };
@@ -19,7 +19,7 @@ const SQL_HOOKS = { shouldPreserveEmpty: sqlPreserveEmpty, sortStorage: sqlSortS
 
 const emptyNamespacedStorage = () => ({
   namespaces: {
-    __unbound__: { id: '__unbound__' as const, tables: {} },
+    __unbound__: { id: '__unbound__' as const, entries: { table: {} } },
   },
 });
 
@@ -53,9 +53,11 @@ describe('computeStorageHash', () => {
         namespaces: {
           __unbound__: {
             id: '__unbound__',
-            tables: {
-              user: {
-                columns: { id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false } },
+            entries: {
+              table: {
+                user: {
+                  columns: { id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false } },
+                },
               },
             },
           },
@@ -91,9 +93,11 @@ describe('computeStorageHash', () => {
         namespaces: {
           __unbound__: {
             id: '__unbound__',
-            tables: {
-              a: { columns: { x: { codecId: 'pg/text@1', nativeType: 'text' } } },
-              b: { columns: { y: { codecId: 'pg/text@1', nativeType: 'text' } } },
+            entries: {
+              table: {
+                a: { columns: { x: { codecId: 'pg/text@1', nativeType: 'text' } } },
+                b: { columns: { y: { codecId: 'pg/text@1', nativeType: 'text' } } },
+              },
             },
           },
         },
@@ -106,9 +110,11 @@ describe('computeStorageHash', () => {
         namespaces: {
           __unbound__: {
             id: '__unbound__',
-            tables: {
-              b: { columns: { y: { codecId: 'pg/text@1', nativeType: 'text' } } },
-              a: { columns: { x: { codecId: 'pg/text@1', nativeType: 'text' } } },
+            entries: {
+              table: {
+                b: { columns: { y: { codecId: 'pg/text@1', nativeType: 'text' } } },
+                a: { columns: { x: { codecId: 'pg/text@1', nativeType: 'text' } } },
+              },
             },
           },
         },
@@ -131,12 +137,12 @@ describe('computeStorageHash', () => {
     };
     const withoutKind = {
       namespaces: {
-        public: { id: 'public', tables },
+        public: { id: 'public', entries: { table: tables } },
       },
     };
     const withKind = {
       namespaces: {
-        public: { id: 'public', kind: 'postgres-schema', tables },
+        public: { id: 'public', kind: 'postgres-schema', entries: { table: tables } },
       },
     };
     const base = { target: 'postgres', targetFamily: 'sql', ...SQL_HOOKS };

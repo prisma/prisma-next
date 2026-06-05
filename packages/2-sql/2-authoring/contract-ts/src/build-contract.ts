@@ -21,6 +21,7 @@ import {
 } from '@prisma-next/contract/types';
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
@@ -244,6 +245,27 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
   return ids;
 }
 
+function ensureUnboundNamespaceSlot(
+  namespaces: SqlStorageInput['namespaces'],
+  createNamespace: ContractDefinition['createNamespace'],
+): SqlStorageInput['namespaces'] {
+  if (Object.hasOwn(namespaces, UNBOUND_NAMESPACE_ID)) {
+    return namespaces;
+  }
+  const unboundInput: SqlNamespaceTablesInput = {
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { table: {} },
+  };
+  const unbound = createNamespace ? createNamespace(unboundInput) : buildSqlNamespace(unboundInput);
+  return blindCast<
+    SqlStorageInput['namespaces'],
+    'createNamespace may return a target namespace concretion; the unbound slot matches SqlNamespace at runtime'
+  >({
+    [UNBOUND_NAMESPACE_ID]: unbound,
+    ...namespaces,
+  });
+}
+
 const POSTGRES_ENUM_NAMESPACE_ID = 'public';
 
 function partitionStorageTypesForTarget(
@@ -251,10 +273,10 @@ function partitionStorageTypesForTarget(
   types: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
   namespaceTypes?: Readonly<Record<string, Readonly<Record<string, PostgresEnumStorageEntry>>>>,
 ): {
-  readonly documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+  readonly documentTypes: Record<string, StorageTypeInstance>;
   readonly namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>>;
 } {
-  const documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  const documentTypes: Record<string, StorageTypeInstance> = {};
   const namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
   for (const [name, entry] of Object.entries(types)) {
     if (isPostgresEnumStorageEntry(entry)) {
@@ -316,7 +338,11 @@ export function buildSqlContractFromDefinition(
         ? semanticModel.namespaceId
         : defaultNamespaceId;
     modelNameToNamespaceId.set(semanticModel.modelName, namespaceId);
-    roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
+    // STI variants share the base table; the base model already owns this
+    // table name and its root, so the variant contributes neither.
+    if (!semanticModel.sharesBaseTable) {
+      roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
+    }
 
     // --- Build storage table ---
 
@@ -406,49 +432,54 @@ export function buildSqlContractFromDefinition(
       };
     });
 
-    const existingNs = tableNameToNamespaceId.get(tableName);
-    if (existingNs !== undefined && existingNs !== namespaceId) {
-      throw new Error(
-        `buildSqlContractFromDefinition: table "${tableName}" is mapped in namespace "${namespaceId}" but already exists in namespace "${existingNs}".`,
-      );
-    }
-    tableNameToNamespaceId.set(tableName, namespaceId);
+    // STI variants share the base table: their columns are already
+    // materialised onto the base `ModelNode`, so the variant builds a domain
+    // model (below) but no storage table of its own.
+    if (!semanticModel.sharesBaseTable) {
+      const existingNs = tableNameToNamespaceId.get(tableName);
+      if (existingNs !== undefined && existingNs !== namespaceId) {
+        throw new Error(
+          `buildSqlContractFromDefinition: table "${tableName}" is mapped in namespace "${namespaceId}" but already exists in namespace "${existingNs}".`,
+        );
+      }
+      tableNameToNamespaceId.set(tableName, namespaceId);
 
-    const tableInput: StorageTableInput = {
-      columns,
-      ...ifDefined('control', semanticModel.control),
-      uniques: (semanticModel.uniques ?? []).map((u) => ({
-        columns: u.columns,
-        ...ifDefined('name', u.name),
-      })),
-      indexes: (semanticModel.indexes ?? []).map((i) => ({
-        columns: i.columns,
-        ...ifDefined('name', i.name),
-        ...ifDefined('type', i.type),
-        ...ifDefined('options', i.options),
-      })),
-      foreignKeys,
-      ...(semanticModel.id
-        ? {
-            primaryKey: {
-              columns: semanticModel.id.columns,
-              ...ifDefined('name', semanticModel.id.name),
-            },
-          }
-        : {}),
-    };
+      const tableInput: StorageTableInput = {
+        columns,
+        ...ifDefined('control', semanticModel.control),
+        uniques: (semanticModel.uniques ?? []).map((u) => ({
+          columns: u.columns,
+          ...ifDefined('name', u.name),
+        })),
+        indexes: (semanticModel.indexes ?? []).map((i) => ({
+          columns: i.columns,
+          ...ifDefined('name', i.name),
+          ...ifDefined('type', i.type),
+          ...ifDefined('options', i.options),
+        })),
+        foreignKeys,
+        ...(semanticModel.id
+          ? {
+              primaryKey: {
+                columns: semanticModel.id.columns,
+                ...ifDefined('name', semanticModel.id.name),
+              },
+            }
+          : {}),
+      };
 
-    let nsTables = tablesByNamespace[namespaceId];
-    if (nsTables === undefined) {
-      nsTables = {};
-      tablesByNamespace[namespaceId] = nsTables;
+      let nsTables = tablesByNamespace[namespaceId];
+      if (nsTables === undefined) {
+        nsTables = {};
+        tablesByNamespace[namespaceId] = nsTables;
+      }
+      if (nsTables[tableName] !== undefined) {
+        throw new Error(
+          `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
+        );
+      }
+      nsTables[tableName] = new StorageTable(tableInput);
     }
-    if (nsTables[tableName] !== undefined) {
-      throw new Error(
-        `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
-      );
-    }
-    nsTables[tableName] = new StorageTable(tableInput);
 
     // --- Build contract model ---
 
@@ -564,16 +595,20 @@ export function buildSqlContractFromDefinition(
         const enumTypes = namespaceEnumTypesById[id];
         const nsInput: SqlNamespaceTablesInput = {
           id,
-          tables: tablesByNamespace[id] ?? {},
-          ...ifDefined('enum', enumTypes),
+          entries: {
+            table: tablesByNamespace[id] ?? {},
+          },
         };
-        return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
+        return [
+          id,
+          createNamespace ? createNamespace(nsInput, enumTypes) : buildSqlNamespace(nsInput),
+        ];
       }),
     ),
   );
   const storageWithoutHash = {
     ...(Object.keys(documentTypes).length > 0 ? { types: documentTypes } : {}),
-    namespaces,
+    namespaces: ensureUnboundNamespaceSlot(namespaces, createNamespace),
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)

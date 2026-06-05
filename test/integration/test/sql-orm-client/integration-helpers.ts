@@ -1,3 +1,5 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
@@ -47,9 +49,13 @@ export function createReturningTagsCollection(runtime: PgIntegrationRuntime) {
 
 export async function withCollectionRuntime(
   fn: (runtime: PgIntegrationRuntime) => Promise<void>,
+  // Build the runtime against a non-base contract (the emitted polymorphism
+  // fixture) when a test drives that contract: the runtime validates each
+  // plan's storageHash against the contract it was built with.
+  contractOverride?: Contract<SqlStorage>,
 ): Promise<void> {
   await withDevDatabase(async ({ connectionString }) => {
-    const runtime = await createPgIntegrationRuntime(connectionString);
+    const runtime = await createPgIntegrationRuntime(connectionString, contractOverride);
 
     try {
       await setupTestSchema(runtime);

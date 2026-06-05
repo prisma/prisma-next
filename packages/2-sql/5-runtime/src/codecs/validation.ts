@@ -15,7 +15,7 @@ export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const table of Object.values(ns.tables as SqlNamespaceTables)) {
+    for (const table of Object.values(ns.entries.table as SqlNamespaceTables)) {
       for (const column of Object.values(table.columns)) {
         const codecId = column.codecId;
         codecIds.add(codecId);
@@ -30,7 +30,7 @@ function extractCodecIdsFromColumns(contract: Contract<SqlStorage>): Map<string,
   const codecIds = new Map<string, string>();
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
+    for (const [tableName, table] of Object.entries(ns.entries.table as SqlNamespaceTables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         const codecId = column.codecId;
         const key = `${tableName}.${columnName}`;

@@ -68,7 +68,7 @@ describe('demo contract visualization DX', () => {
     }
 
     for (const [, ns] of Object.entries(contract.storage.namespaces)) {
-      for (const [, table] of Object.entries(ns.tables)) {
+      for (const [, table] of Object.entries(ns.entries.table)) {
         expect(table.columns).toBeDefined();
       }
     }

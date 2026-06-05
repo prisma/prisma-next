@@ -223,7 +223,9 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            tables: { test_box: { columns: { x: {}, y: {} } } },
+            entries: {
+              table: { test_box: { columns: { x: {}, y: {} } } },
+            },
           },
         },
       },
@@ -257,7 +259,9 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            tables: { user: { columns: { id: {} } } },
+            entries: {
+              table: { user: { columns: { id: {} } } },
+            },
           },
         },
       },

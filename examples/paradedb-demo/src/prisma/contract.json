@@ -70,60 +70,69 @@
   },
   "storage": {
     "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema"
+      },
       "public": {
-        "id": "public",
-        "kind": "postgres-schema",
-        "tables": {
-          "item": {
-            "columns": {
-              "category": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "description": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "rating": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [
-              {
-                "columns": [
-                  "id",
-                  "description",
-                  "category",
-                  "rating"
-                ],
-                "name": "item_bm25_idx",
-                "options": {
-                  "key_field": "id"
+        "entries": {
+          "table": {
+            "item": {
+              "columns": {
+                "category": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
-                "type": "bm25"
-              }
-            ],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
+                "description": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "rating": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "id",
+                    "description",
+                    "category",
+                    "rating"
+                  ],
+                  "name": "item_bm25_idx",
+                  "options": {
+                    "key_field": "id"
+                  },
+                  "type": "bm25"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:5cf089c5e9bb470f953a45c8ed2234ff65dd569701f235b4d6ee6c5555fa7d88"
+    "storageHash": "sha256:02d0dd40a88408e941bb73c7ee8f20ae299895a154be94990e34feadb042200f"
   },
   "capabilities": {
     "postgres": {

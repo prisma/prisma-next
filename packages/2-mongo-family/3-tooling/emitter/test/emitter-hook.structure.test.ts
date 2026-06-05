@@ -53,7 +53,7 @@ describe('mongoEmission.validateStructure', () => {
       storage: namespacedMongoStorageFromCollections({}),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'references collection "users" which is not in storage.namespaces[..].collections',
+      'references collection "users" which is not in storage.namespaces[..].entries.collection',
     );
   });
 

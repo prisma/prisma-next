@@ -15,19 +15,21 @@ function storageWithColumn(control?: unknown) {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-                ...(control !== undefined ? { control } : {}),
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: {
+                  nativeType: 'int4',
+                  codecId: 'pg/int4@1',
+                  nullable: false,
+                  ...(control !== undefined ? { control } : {}),
+                },
               },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -41,15 +43,17 @@ function storageWithTable(control?: unknown) {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+              ...(control !== undefined ? { control } : {}),
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-            ...(control !== undefined ? { control } : {}),
           },
         },
       },

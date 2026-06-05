@@ -17,7 +17,10 @@ import { createTestContract } from './utils';
 function unboundNamespaceTables(tables: Record<string, unknown>) {
   return {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { table: tables },
+      },
     },
   };
 }
@@ -25,7 +28,8 @@ function unboundNamespaceTables(tables: Record<string, unknown>) {
 function tablesFromCanonicalStorage(storage: Record<string, unknown>): Record<string, unknown> {
   const namespaces = storage['namespaces'] as Record<string, unknown>;
   const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
-  return unbound['tables'] as Record<string, unknown>;
+  const entries = unbound['entries'] as Record<string, unknown>;
+  return entries['table'] as Record<string, unknown>;
 }
 
 const identitySerialize = (input: Contract): JsonObject => input as unknown as JsonObject;
@@ -36,15 +40,15 @@ const canonicalizeContract = (
 ): string => canonicalizeContractRaw(c, { serializeContract: identitySerialize, ...opts });
 
 const sqlPreserveEmptyPatterns = [
-  ['storage', 'namespaces', '*', 'tables'],
-  ['storage', 'namespaces', '*', 'tables', '*'],
-  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
-  ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', 'namespaces', '*', 'entries', 'table'],
+  ['storage', 'namespaces', '*', 'entries', 'table', '*'],
+  ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
   ['storage', 'types', '*', 'typeParams'],
 ] as const satisfies readonly PathPattern[];
 
 const sqlSortTargets = [
-  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+  { path: ['namespaces', '*', 'entries', 'table', '*'], arrayKeys: ['indexes', 'uniques'] },
 ] as const satisfies readonly NamedArraySortTarget[];
 
 const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
@@ -187,7 +191,7 @@ describe('canonicalization', () => {
     const ir = createTestContract({
       storage: {
         namespaces: {
-          public: { id: 'public', tables: {} },
+          public: { id: 'public', entries: { table: {} } },
         },
       },
     });
@@ -197,7 +201,7 @@ describe('canonicalization', () => {
     const storage = parsed['storage'] as Record<string, unknown>;
     const namespaces = storage['namespaces'] as Record<string, unknown>;
     const publicNs = namespaces['public'] as Record<string, unknown>;
-    expect(publicNs).toMatchObject({ id: 'public', tables: {} });
+    expect(publicNs).toMatchObject({ id: 'public', entries: { table: {} } });
   });
 
   it('preserves semantic array order for column lists', () => {
@@ -341,7 +345,9 @@ describe('canonicalization', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
-              tables: { users: {}, posts: {} },
+              entries: {
+                table: { users: {}, posts: {} },
+              },
             },
           },
         },
@@ -360,7 +366,9 @@ describe('canonicalization', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
-              tables: { zebras: {}, apples: {}, mangoes: {} },
+              entries: {
+                table: { zebras: {}, apples: {}, mangoes: {} },
+              },
             },
           },
         },
@@ -378,7 +386,9 @@ describe('canonicalization', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
-              tables: { users: {} },
+              entries: {
+                table: { users: {} },
+              },
             },
           },
         },
@@ -388,7 +398,9 @@ describe('canonicalization', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
-              tables: { users: {}, posts: {} },
+              entries: {
+                table: { users: {}, posts: {} },
+              },
             },
           },
         },

@@ -72,24 +72,24 @@ export function migrationGraphFromListEntries(
   const migrationByHash = new Map<string, MigrationEdge>();
 
   for (const entry of entries) {
-    const from = canonicalFrom(entry.from);
+    const from = canonicalFrom(entry.fromContract);
     const edge: MigrationEdge = {
       from,
-      to: entry.to,
-      migrationHash: entry.migrationHash,
-      dirName: entry.dirName,
+      to: entry.toContract,
+      migrationHash: entry.hash,
+      dirName: entry.name,
       createdAt: entry.createdAt,
       invariants: entry.providedInvariants,
     };
     nodes.add(from);
-    nodes.add(entry.to);
+    nodes.add(entry.toContract);
     const forward = forwardChain.get(from);
     if (forward) forward.push(edge);
     else forwardChain.set(from, [edge]);
-    const reverse = reverseChain.get(entry.to);
+    const reverse = reverseChain.get(entry.toContract);
     if (reverse) reverse.push(edge);
-    else reverseChain.set(entry.to, [edge]);
-    migrationByHash.set(entry.migrationHash, edge);
+    else reverseChain.set(entry.toContract, [edge]);
+    migrationByHash.set(entry.hash, edge);
   }
 
   return { nodes, forwardChain, reverseChain, migrationByHash };
@@ -100,7 +100,7 @@ export function buildEdgeAnnotationsByHashFromListEntries(
 ): ReadonlyMap<string, MigrationEdgeAnnotation> {
   const annotations = new Map<string, MigrationEdgeAnnotation>();
   for (const entry of entries) {
-    annotations.set(entry.migrationHash, {
+    annotations.set(entry.hash, {
       operationCount: entry.operationCount,
       invariants: entry.providedInvariants,
     });
@@ -114,7 +114,7 @@ export function buildRefsByHashFromListEntries(
   const refsByHash = new Map<string, readonly string[]>();
   for (const entry of entries) {
     if (entry.refs.length > 0) {
-      refsByHash.set(entry.to, entry.refs);
+      refsByHash.set(entry.toContract, entry.refs);
     }
   }
   return refsByHash;
@@ -193,7 +193,7 @@ export function renderMigrationListWithStyle(
     ? result.spaces
         .filter((space) => space.migrations.length > 0)
         .map((space) => ({
-          graph: graphForSpace(space.spaceId) ?? migrationGraphFromListEntries(space.migrations),
+          graph: graphForSpace(space.space) ?? migrationGraphFromListEntries(space.migrations),
           liveContractHash,
         }))
     : [];
@@ -212,7 +212,7 @@ export function renderMigrationListWithStyle(
     }
     lines.push(
       ...renderSpaceTreeBlock(
-        space.spaceId,
+        space.space,
         space.migrations,
         multiSpace,
         glyphMode,

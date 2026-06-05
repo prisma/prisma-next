@@ -281,13 +281,29 @@ function decodeIncludePayload(
     return decodeCombineIncludePayload(contract, include, include.combine, raw);
   }
   const rawChildren = parseIncludedRows(raw);
+  const polyInfo = resolvePolymorphismInfo(contract, include.relatedModelName);
+  const mapChildRow = polyInfo
+    ? (childRow: Record<string, unknown>) =>
+        mapPolymorphicRow(
+          contract,
+          include.relatedModelName,
+          polyInfo,
+          childRow,
+          include.nested.variantName,
+        )
+    : (childRow: Record<string, unknown>) =>
+        mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
   const mappedChildren = rawChildren.map((childRow) => {
-    const mapped = mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
+    const mapped = mapChildRow(childRow);
+    // Source each nested-include payload from the RAW child row: it always
+    // carries the payload under its relation alias. `mapChildRow` may be the
+    // polymorphic mapper, which keeps only variant model-field columns and so
+    // drops the relation alias — reading from `mapped` would lose it.
     for (const nestedInclude of include.nested.includes) {
       mapped[nestedInclude.relationName] = decodeIncludePayload(
         contract,
         nestedInclude,
-        mapped[nestedInclude.relationName],
+        childRow[nestedInclude.relationName],
       );
     }
     return mapped;

@@ -33,45 +33,49 @@ function buildCrossNamespaceFkContract(): Contract<SqlStorage> {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            post: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                author_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'post',
-                    columns: ['author_id'],
-                  },
-                  target: {
-                    namespaceId: asNamespaceId('auth'),
-                    tableName: 'user',
-                    columns: ['id'],
-                  },
-                  constraint: true,
-                  index: false,
+          entries: {
+            table: {
+              post: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  author_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 },
-              ],
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'post',
+                      columns: ['author_id'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId('auth'),
+                      tableName: 'user',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: false,
+                  },
+                ],
+              },
             },
           },
         }),
         auth: buildSqlNamespace({
           id: 'auth',
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         }),

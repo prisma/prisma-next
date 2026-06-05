@@ -81,8 +81,10 @@ describe('react-router-demo offline emit (e2e)', () => {
       storage: {
         namespaces: {
           public: {
-            tables: {
-              user: { columns: { email: expect.anything() } },
+            entries: {
+              table: {
+                user: { columns: { email: expect.anything() } },
+              },
             },
           },
         },

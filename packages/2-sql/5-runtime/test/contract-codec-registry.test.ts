@@ -140,7 +140,7 @@ function createTestContract(
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        __unbound__: buildSqlNamespace({ id: '__unbound__', tables: tableEntries }),
+        __unbound__: buildSqlNamespace({ id: '__unbound__', entries: { table: tableEntries } }),
       },
       ...ifDefined('types', types),
     }),

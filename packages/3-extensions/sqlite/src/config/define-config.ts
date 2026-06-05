@@ -6,7 +6,7 @@ import sql from '@prisma-next/family-sql/control';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { typescriptContractFromPath } from '@prisma-next/sql-contract-ts/config-types';
-import sqlite from '@prisma-next/target-sqlite/control';
+import sqlite, { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import sqlitePackRef from '@prisma-next/target-sqlite/pack';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extname, join } from 'pathe';
@@ -45,6 +45,7 @@ export function defineConfig(options: SqliteConfigOptions): PrismaNextConfig<'sq
       : prismaContract(options.contract, {
           output,
           target: sqlitePackRef,
+          createNamespace: sqliteCreateNamespace,
         });
 
   return coreDefineConfig({

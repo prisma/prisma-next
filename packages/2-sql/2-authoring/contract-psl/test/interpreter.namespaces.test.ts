@@ -41,7 +41,7 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = storage.namespaces['public']?.tables['post'];
+    const postTable = storage.namespaces['public']?.entries.table?.['post'];
     expect(postTable).toBeDefined();
 
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
@@ -77,7 +77,7 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = storage.namespaces['public']?.tables['post'];
+    const postTable = storage.namespaces['public']?.entries.table?.['post'];
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({

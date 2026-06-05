@@ -49,7 +49,7 @@ function buildContract(
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          collections: builtCollections,
+          entries: { collection: builtCollections },
         },
       },
     },
@@ -1361,7 +1361,7 @@ describe('verifyMongoSchema', () => {
         storage: {
           storageHash: 'sha256:authoring-test',
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: {} },
+            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { collection: {} } },
           },
         },
       } as unknown as MongoContract;

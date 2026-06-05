@@ -6,7 +6,8 @@ import type {
   ContractInput,
   ModelLike,
 } from '@prisma-next/sql-contract-ts/contract-builder';
-import { defineContract as baseDefineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { buildBoundContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
 
 type SqlFamily = typeof sqlFamilyPack;
@@ -19,13 +20,13 @@ type SqliteResult<
   Types extends TypesConstraint,
   Models extends ModelsConstraint,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-> = Omit<
-  ReturnType<typeof baseDefineContract<SqlFamily, SqlitePack, Types, Models, ExtensionPacks>>,
-  'target' | 'targetFamily'
-> & {
-  readonly target: SqlitePack['targetId'];
-  readonly targetFamily: SqlFamily['familyId'];
-};
+> = ReturnType<
+  typeof buildBoundContract<
+    SqlFamily,
+    SqlitePack,
+    { readonly types?: Types; readonly models?: Models; readonly extensionPacks?: ExtensionPacks }
+  >
+>;
 
 type SqliteBaseScaffold<
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
@@ -71,28 +72,18 @@ export function defineContract<
   },
 ): SqliteResult<Types, Models, ExtensionPacks>;
 
+// Implementation — delegates to buildBoundContract which pre-binds family/target,
+// carrying zero casts at this layer.
 export function defineContract(
-  scaffold: Omit<ContractInput, 'family' | 'target'>,
+  definition: SqliteDefinition<TypesConstraint, ModelsConstraint, undefined>,
   factory?: (helpers: ComposedAuthoringHelpers<SqlFamily, SqlitePack, undefined>) => {
     readonly types?: TypesConstraint;
     readonly models?: ModelsConstraint;
   },
 ): SqliteResult<TypesConstraint, ModelsConstraint, undefined> {
-  const full = {
-    ...scaffold,
-    family: sqlFamilyPack,
-    target: sqlitePack,
-  } as ContractInput;
+  const bound = { ...definition, createNamespace: sqliteCreateNamespace };
   if (factory !== undefined) {
-    const { types: _t, models: _m, ...scaffoldOnly } = full;
-    return baseDefineContract(
-      scaffoldOnly,
-      factory as Parameters<typeof baseDefineContract>[1],
-    ) as unknown as SqliteResult<TypesConstraint, ModelsConstraint, undefined>;
+    return buildBoundContract(sqlFamilyPack, sqlitePack, bound, factory);
   }
-  return baseDefineContract(full) as unknown as SqliteResult<
-    TypesConstraint,
-    ModelsConstraint,
-    undefined
-  >;
+  return buildBoundContract(sqlFamilyPack, sqlitePack, bound);
 }

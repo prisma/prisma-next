@@ -9,7 +9,7 @@ describe('elementCoordinates with MongoStorage', () => {
     const storage = new MongoStorage({
       storageHash: coreHash('sha256:element-coordinates-mongo'),
       namespaces: {
-        app: buildMongoNamespace({ id: 'app', collections: { posts: {} } }),
+        app: buildMongoNamespace({ id: 'app', entries: { collection: { posts: {} } } }),
       },
     });
 
@@ -17,7 +17,7 @@ describe('elementCoordinates with MongoStorage', () => {
     expect(coordinates).toContainEqual({
       plane: 'storage',
       namespaceId: 'app',
-      entityKind: 'collections',
+      entityKind: 'collection',
       entityName: 'posts',
     });
   });

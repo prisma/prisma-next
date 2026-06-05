@@ -50,9 +50,9 @@ describe('pgvector extension descriptor (contract-space package layout)', () => 
     expect(space).toBeDefined();
     const namespaces = space!.contractJson.storage.namespaces as Record<
       string,
-      { readonly tables?: Record<string, unknown> }
+      { readonly entries: { readonly table: Record<string, unknown> } }
     >;
-    expect(Object.keys(namespaces[UNBOUND_NAMESPACE_ID]?.tables ?? {})).toEqual([]);
+    expect(Object.keys(namespaces[UNBOUND_NAMESPACE_ID]?.entries.table ?? {})).toEqual([]);
     expect(space!.contractJson.storage.types).toBeDefined();
     expect(space!.contractJson.storage.types?.[PGVECTOR_NATIVE_TYPE]).toMatchObject({
       codecId: VECTOR_CODEC_ID,

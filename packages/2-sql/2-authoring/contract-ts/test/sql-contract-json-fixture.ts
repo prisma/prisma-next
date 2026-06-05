@@ -80,7 +80,7 @@ export function sqlStorageFixture(tables: Record<string, unknown>) {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables,
+        entries: { table: tables },
       },
     },
   };

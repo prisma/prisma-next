@@ -9,7 +9,11 @@ import { makeContractSpaceMember } from '../fixtures';
 type MongoStorageLike = StorageBase & {
   readonly namespaces: Record<
     string,
-    { readonly id: string; readonly kind: string; readonly collections: Record<string, unknown> }
+    {
+      readonly id: string;
+      readonly kind: string;
+      readonly entries: { readonly collection: Record<string, unknown> };
+    }
   >;
 };
 
@@ -30,7 +34,7 @@ type MongoStorageLike = StorageBase & {
 describe('projectSchemaToSpace', () => {
   /**
    * Build a synthetic member with only the fields `projectSchemaToSpace`
-   * inspects (`spaceId`, `contract.storage.namespaces[…].tables`). The rest is filled
+   * inspects (`spaceId`, `contract.storage.namespaces[…].entries.table`). The rest is filled
    * with empty / sentinel values to satisfy the type without committing
    * to a particular family.
    */
@@ -40,7 +44,10 @@ describe('projectSchemaToSpace', () => {
       contract: createSqlContract({
         storage: {
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              entries: { table: tables },
+            },
           },
         },
       }),
@@ -66,7 +73,7 @@ describe('projectSchemaToSpace', () => {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
               kind: 'mongo-namespace',
-              collections,
+              entries: { collection: collections },
             },
           },
         },

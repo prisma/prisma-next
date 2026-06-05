@@ -12,28 +12,30 @@ const storageBody = {
     __unbound__: {
       id: '__unbound__' as const,
       kind: 'mongo-namespace' as const,
-      collections: {
-        [MONGO_TEST_COLLECTION]: {
-          kind: 'mongo-collection' as const,
-          indexes: [
-            {
-              kind: 'mongo-index' as const,
-              keys: [{ field: 'tenantId', direction: 1 as const }],
-              unique: true,
-            },
-          ],
-          validator: {
-            kind: 'mongo-validator' as const,
-            jsonSchema: {
-              bsonType: 'object',
-              required: ['tenantId', 'event'],
-              properties: {
-                tenantId: { bsonType: 'string' },
-                event: { bsonType: 'string' },
+      entries: {
+        collection: {
+          [MONGO_TEST_COLLECTION]: {
+            kind: 'mongo-collection' as const,
+            indexes: [
+              {
+                kind: 'mongo-index' as const,
+                keys: [{ field: 'tenantId', direction: 1 as const }],
+                unique: true,
               },
+            ],
+            validator: {
+              kind: 'mongo-validator' as const,
+              jsonSchema: {
+                bsonType: 'object',
+                required: ['tenantId', 'event'],
+                properties: {
+                  tenantId: { bsonType: 'string' },
+                  event: { bsonType: 'string' },
+                },
+              },
+              validationLevel: 'strict' as const,
+              validationAction: 'error' as const,
             },
-            validationLevel: 'strict' as const,
-            validationAction: 'error' as const,
           },
         },
       },

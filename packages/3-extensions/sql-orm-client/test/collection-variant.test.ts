@@ -1,4 +1,5 @@
 import {
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   type InsertAst,
@@ -12,7 +13,41 @@ import {
   buildStiPolyContract,
   createMockRuntime,
   getTestContext,
+  isSelectAst,
 } from './helpers';
+
+function collectColumnRefs(expr: AnyExpression | undefined): ColumnRef[] {
+  if (!expr) return [];
+  if (expr instanceof ColumnRef) return [expr];
+  const refs: ColumnRef[] = [];
+  const visit = (value: unknown): void => {
+    if (value instanceof ColumnRef) {
+      refs.push(value);
+    } else if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+    } else if (value && typeof value === 'object' && 'kind' in value) {
+      refs.push(...collectColumnRefs(value as AnyExpression));
+    }
+  };
+  for (const value of Object.values(expr as unknown as Record<string, unknown>)) {
+    visit(value);
+  }
+  return refs;
+}
+
+// The mixed poly contract is patched in at runtime, so Project/tasks are
+// absent from the static Models type. This minimal surface lets the runtime
+// test drive include('tasks', t => t.variant('Bug')) and read the resulting
+// nested state without a static contract for the patched models.
+interface PolyVariantRefinement {
+  variant(name: string): PolyVariantRefinement;
+}
+interface PolyParent {
+  include(
+    relation: 'tasks',
+    refine?: (collection: PolyVariantRefinement) => PolyVariantRefinement,
+  ): { state: { includes: { nested: { variantName?: string } }[] } };
+}
 
 function createPolyCollection() {
   const contract = buildStiPolyContract();
@@ -198,6 +233,54 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 1 });
+  });
+
+  it('first() after variant(Feature) resolves the MTI variant field against the variant table', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 2, title: 'Dark mode', type: 'feature', features__priority: 7 }],
+    ]);
+
+    // first()'s predicate is variant-aware like where()'s: under variant(Feature)
+    // the runtime accessor exposes the MTI variant field `priority`, resolved
+    // against the `features` variant table. The patched Task model is absent
+    // from the static type, so the predicate field is reached via `never`.
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    const row = await narrowed.first(((task: Record<string, { gte(value: number): unknown }>) =>
+      task['priority']!.gte(3)) as never);
+
+    expect(row).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 7 });
+
+    const ast = runtime.executions[0]!.plan.ast;
+    expect(isSelectAst(ast)).toBe(true);
+    const featurePriorityRefs = isSelectAst(ast)
+      ? collectColumnRefs(ast.where).filter(
+          (ref) => ref.table === 'features' && ref.column === 'priority',
+        )
+      : [];
+    expect(featurePriorityRefs).toHaveLength(1);
+  });
+
+  it('variant() on a polymorphic-target include refinement sets nested variantName', () => {
+    const contract = buildMixedPolyContract();
+    const context = { ...getTestContext(), contract };
+    const runtime = createMockRuntime();
+    const projects = new Collection({ runtime, context }, 'Project') as unknown as PolyParent;
+
+    const refined = projects.include('tasks', (tasks) => tasks.variant('Bug'));
+
+    expect(refined.state.includes[0]?.nested.variantName).toBe('Bug');
+  });
+
+  it('include of a polymorphic-target relation without refinement leaves variantName unset', () => {
+    const contract = buildMixedPolyContract();
+    const context = { ...getTestContext(), contract };
+    const runtime = createMockRuntime();
+    const projects = new Collection({ runtime, context }, 'Project') as unknown as PolyParent;
+
+    const included = projects.include('tasks');
+
+    expect(included.state.includes[0]?.nested.variantName).toBeUndefined();
   });
 });
 

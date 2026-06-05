@@ -17,7 +17,12 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
-import { getTestContext, getTestContract, withPatchedDomainModels } from './helpers';
+import {
+  buildMixedPolyContract,
+  getTestContext,
+  getTestContract,
+  withPatchedDomainModels,
+} from './helpers';
 import { unboundTables } from './unbound-tables';
 
 describe('createModelAccessor', () => {
@@ -476,6 +481,79 @@ describe('createModelAccessor', () => {
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,
       );
+    });
+  });
+
+  describe('variant-aware field resolution', () => {
+    const polyContext = { ...context, contract: buildMixedPolyContract() };
+
+    // Codecs come from the patched poly contract's storage, not the base
+    // test contract that the outer `paramRef` helper reads.
+    function polyParam(table: string, column: string, value: unknown): ParamRef {
+      const tables = unboundTables(polyContext.contract.storage) as Record<
+        string,
+        { columns: Record<string, { codecId?: string }> } | undefined
+      >;
+      const codecId = tables[table]?.columns[column]?.codecId;
+      return codecId ? ParamRef.of(value, { codec: { codecId } }) : ParamRef.of(value);
+    }
+
+    // The base `Task` accessor type carries only base fields; the patched poly
+    // contract adds variant columns at runtime. View the accessor as a bag of
+    // comparison methods so the runtime resolution can be asserted regardless
+    // of the static base type.
+    interface FieldOps {
+      eq(value: unknown): unknown;
+      gte(value: unknown): unknown;
+    }
+    type FieldBag = Record<string, FieldOps | undefined>;
+
+    it('resolves an MTI variant column against the joined variant table', () => {
+      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      // `priority` lives on the joined `features` table, not the base `tasks`.
+      expect(feature['priority']!.gte(3)).toEqual(
+        new BinaryExpr(
+          'gte',
+          ColumnRef.of('features', 'priority'),
+          polyParam('features', 'priority', 3),
+        ),
+      );
+    });
+
+    it('keeps base columns qualified against the base table when a variant is selected', () => {
+      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      expect(feature['title']!.eq('Dark mode')).toEqual(
+        new BinaryExpr(
+          'eq',
+          ColumnRef.of('tasks', 'title'),
+          polyParam('tasks', 'title', 'Dark mode'),
+        ),
+      );
+    });
+
+    it('does not expose another variant column for the selected variant', () => {
+      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      expect(feature['priority']).toBeDefined();
+      const bug = createModelAccessor(polyContext, 'Task', 'Bug') as unknown as FieldBag;
+      // Bug is STI — its `severity` rides the base table, never the features join.
+      expect(bug['severity']!.eq('critical')).toEqual(
+        new BinaryExpr(
+          'eq',
+          ColumnRef.of('tasks', 'severity'),
+          polyParam('tasks', 'severity', 'critical'),
+        ),
+      );
+      // Selecting an STI variant must not surface the MTI variant column.
+      expect(bug['priority']).toBeUndefined();
+    });
+
+    it('leaves base resolution untouched when no variant is selected', () => {
+      const task = createModelAccessor(polyContext, 'Task') as unknown as FieldBag;
+      expect(task['title']!.eq('x')).toEqual(
+        new BinaryExpr('eq', ColumnRef.of('tasks', 'title'), polyParam('tasks', 'title', 'x')),
+      );
+      // Without a selected variant the MTI variant column is not resolvable.
+      expect(task['priority']).toBeUndefined();
     });
   });
 

@@ -109,7 +109,7 @@ const StorageTypeInstanceSchema = type
   });
 
 /**
- * Postgres native enum entry under `storage.namespaces[namespaceId].enum[name]`.
+ * Postgres native enum entry under `storage.namespaces[namespaceId].entries.type[name]`.
  * Document-scoped `storage.types` carries codec aliases only
  * (`DocumentScopedStorageTypeSchema`).
  */
@@ -240,7 +240,7 @@ function namespaceSlotEntrySchema(
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
  * Pack-contributed `validatorSchema` fragments — keyed by the
  * descriptor's `discriminator` — validate each entry by matching the
- * entry's `kind` field on the `'enum?'` slot.
+ * entry's `kind` field on the `'entries.type'` slot.
  */
 export function createNamespaceEntrySchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
@@ -249,9 +249,12 @@ export function createNamespaceEntrySchema(
     '+': 'reject',
     id: 'string',
     'kind?': 'string',
-    'tables?': type({ '[string]': StorageTableSchema }),
-    'enum?': type({
-      '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
+    entries: type({
+      '+': 'reject',
+      'table?': type({ '[string]': StorageTableSchema }),
+      'type?': type({
+        '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
+      }),
     }),
   }) as Type<unknown>;
 }
@@ -281,20 +284,22 @@ export function createSqlStorageSchema(
 
 const StorageSchema = createSqlStorageSchema();
 
-// SQL-specific namespace walk shape (`tables` is the SQL family's idiom —
-// the framework `Namespace` interface no longer carries it). The wider
-// `object` table value keeps this helper structurally compatible with
-// `SqlNamespace` (whose tables narrow to `StorageTable`) and the JSON
-// envelope variants that lose class identity.
+// SQL-specific namespace walk shape (`entries.table` is the SQL family's
+// idiom). The wider `object` table value keeps this helper structurally
+// compatible with `SqlNamespace` and JSON envelope variants that lose class
+// identity.
 type NamespacedStorageWalk = {
   readonly namespaces: Readonly<
-    Record<string, Namespace & { readonly tables?: Readonly<Record<string, object>> }>
+    Record<
+      string,
+      Namespace & { readonly entries: { readonly table: Readonly<Record<string, object>> } }
+    >
   >;
 };
 
 function eachStorageTable(storage: NamespacedStorageWalk) {
   return Object.entries(storage.namespaces).flatMap(([namespaceId, ns]) =>
-    Object.entries(ns.tables ?? {}).map(([tableName, table]) => ({
+    Object.entries(ns.entries.table).map(([tableName, table]) => ({
       namespaceId,
       tableName,
       table,
@@ -696,7 +701,7 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
       }
 
       const storageTable = model.storage.table;
-      const rawTable = contract.storage.namespaces[storageNamespaceId]?.tables?.[storageTable];
+      const rawTable = contract.storage.namespaces[storageNamespaceId]?.entries.table[storageTable];
       if (rawTable === undefined) {
         throw new ContractValidationError(
           `Model "${qualifiedName}" references non-existent table "${storageNamespaceId}.${storageTable}"`,
@@ -806,7 +811,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
       }
 
       const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
-      const referencedRaw = targetNamespace?.tables?.[fk.target.tableName];
+      const referencedRaw = targetNamespace?.entries.table[fk.target.tableName];
       if (referencedRaw === undefined) {
         throw new ContractValidationError(
           `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,

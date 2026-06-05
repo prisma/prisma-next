@@ -606,27 +606,33 @@ export { EMPTY_CONTRACT_HASH };
 
 export interface MigrationStatusMigrationJson {
   readonly status: 'applied' | 'pending' | null;
-  readonly migrationHash: string;
+  readonly name: string;
+  readonly hash: string;
+  readonly fromContract: string | null;
+  readonly toContract: string;
 }
 
 export interface MigrationStatusSpaceJson {
-  readonly spaceId: string;
-  readonly markerHash: string | null;
-  readonly targetHash: string;
+  readonly space: string;
+  readonly currentContract: string | null;
+  readonly targetContract: string;
   readonly migrations: readonly MigrationStatusMigrationJson[];
+}
+
+export interface MigrationStatusDiagnosticJson {
+  readonly code: string;
+  readonly message: string;
+  readonly severity?: string;
+  readonly hints?: readonly string[];
+  readonly ref?: string;
+  readonly invariants?: readonly string[];
 }
 
 export interface MigrationStatusJson {
   readonly ok: true;
   readonly spaces: readonly MigrationStatusSpaceJson[];
   readonly summary: string;
-  readonly diagnostics?: readonly {
-    code: string;
-    severity: string;
-    message: string;
-    hints: readonly string[];
-  }[];
-  readonly missingInvariants?: string;
+  readonly diagnostics?: readonly MigrationStatusDiagnosticJson[];
 }
 
 export function readEmittedContractStorageHash(ctx: JourneyContext): string {
@@ -644,7 +650,7 @@ export function migrationStatusAppSpace(
   json: MigrationStatusJson,
   spaceId = 'app',
 ): MigrationStatusSpaceJson {
-  const space = json.spaces.find((entry) => entry.spaceId === spaceId);
+  const space = json.spaces.find((entry) => entry.space === spaceId);
   if (space === undefined) {
     throw new Error(`status JSON has no space ${spaceId}`);
   }
