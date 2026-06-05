@@ -2217,6 +2217,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:0.12.0
         version: link:../../../0-config/tsdown
+      mongodb:
+        specifier: 'catalog:'
+        version: 7.2.0(socks@2.8.9)
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(tsx@4.22.3)(typescript@5.9.3)
@@ -3596,9 +3599,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:0.12.0
         version: link:../../1-framework/0-foundation/contract
-      '@prisma-next/driver-mongo':
-        specifier: workspace:0.12.0
-        version: link:../3-mongo-driver
       '@prisma-next/errors':
         specifier: workspace:0.12.0
         version: link:../../1-framework/1-core/errors

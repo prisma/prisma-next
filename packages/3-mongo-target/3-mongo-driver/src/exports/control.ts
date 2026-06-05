@@ -1,25 +1,19 @@
 import { errorRuntime } from '@prisma-next/errors/execution';
-import type {
-  ControlDriverDescriptor,
-  ControlDriverInstance,
-} from '@prisma-next/framework-components/control';
+import type { ControlDriverDescriptor } from '@prisma-next/framework-components/control';
+import type { MongoControlDriverInstance } from '@prisma-next/mongo-lowering';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from '../core/driver-info';
+import { MongoDriverImpl } from '../mongo-driver';
 
-export class MongoControlDriver implements ControlDriverInstance<'mongo', 'mongo'> {
+export class MongoControlDriver extends MongoDriverImpl implements MongoControlDriverInstance {
   readonly familyId = 'mongo' as const;
   readonly targetId = 'mongo' as const;
-  readonly db: Db;
-  readonly #client: MongoClient;
+  override readonly db: Db;
 
-  constructor(db: Db, client: MongoClient) {
+  constructor(db: Db, mongoClient: MongoClient) {
+    super(db, mongoClient);
     this.db = db;
-    this.#client = client;
-  }
-
-  async close(): Promise<void> {
-    await this.#client.close();
   }
 }
 
