@@ -39,7 +39,7 @@ Single PR; dispatches are logical execution order for one implementer (or one re
 - **Outcome:** Supabase-shaped fixture: `namespace public { model Profile … }` plus extension `auth` `users`; emit contract; integration test queries `db.sql.auth.users` and `db.sql.public.profile` (and ORM equivalents) against PGlite; AC1–AC4 satisfied.
 - **Builds on:** D2 runtime resolution.
 - **Hands to:** D4 close-out.
-- **Focus:** Authoring + emit + query in one test; keep example minimal if extension-supabase will own the polished demo.
+- **Focus:** Authoring + emit + query in one test. **Wire this into the `examples/supabase` walking skeleton** (decisions [C13/C14](../supabase-integration/decisions.md)) rather than a throwaway fixture — add the `auth.users`-alongside-`public.users` explicit-accessor query to the running example, tested via PGlite + `bootstrapSupabaseShim`. `extension-supabase` finalizes the polished demo on top.
 
 ### D4 — Close-out (ADR, upgrade instructions, umbrella tracker)
 
@@ -54,6 +54,7 @@ Single PR; dispatches are logical execution order for one implementer (or one re
 - [ ] Collision-behaviour decision recorded (ADR or spec amendment).
 - [ ] `pnpm test:packages` + relevant integration tests green; `pnpm lint:deps` passes.
 - [ ] No regressions on default-namespace demo queries (AC3).
+- [ ] The `examples/supabase` walking skeleton exercises the explicit `auth.users` / `public.users` accessor (cross-cutting walking-skeleton DoD; [README](../supabase-integration/README.md) §"Walking skeleton").
 - [ ] PR linked from [TML-2550](https://linear.app/prisma-company/issue/TML-2550); operator notified that [TML-2503](https://linear.app/prisma-company/issue/TML-2503) explicit-accessor prerequisite is cleared.
 
 ## Risks and mitigations

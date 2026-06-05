@@ -97,6 +97,13 @@ The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each mile
 
 **Validation:** docs review by the team; AC1–AC10 all green and verified through merged PRs.
 
+## Walking-skeleton integration (cross-cutting DoD)
+
+Per the umbrella's walking-skeleton strategy (decisions [C13/C14](../supabase-integration/decisions.md); [README](../supabase-integration/README.md) §"Walking skeleton"), this project's definition of done includes wiring its feature into the running `examples/supabase` app:
+
+- [ ] Add the `Profile.userId → auth.User.id` cross-contract FK (with `onDelete: 'cascade'`) to the `examples/supabase` app contract; confirm the planner emits qualified `REFERENCES "auth"."users"("id")`.
+- [ ] Cover it in the example's hermetic test lane (PGlite + `bootstrapSupabaseShim`): migration creates the FK; a cascade delete from `auth.users` removes the dependent `public.profile` row.
+
 ## Risks and mitigations
 
 - **Risk:** the colon-prefix tokenizer change in PSL is a backwards-incompatible lexer change. Any existing code that used `:` inside a type position (unlikely, but possible in malformed contracts) breaks.
