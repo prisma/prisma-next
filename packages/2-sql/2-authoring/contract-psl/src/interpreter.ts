@@ -1708,7 +1708,7 @@ export function interpretPslDocumentToSqlContract(
           `duplicate model name "${modelName}" across domain namespaces during PSL interpretation`,
         );
       }
-      modelsForPatch[modelName] = model as ContractModel;
+      modelsForPatch[modelName] = model;
     }
   }
   let patchedModels = patchModelDomainFields(modelsForPatch, modelResolvedFields);

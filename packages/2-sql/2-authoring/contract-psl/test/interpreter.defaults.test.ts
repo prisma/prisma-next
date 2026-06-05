@@ -12,7 +12,7 @@ import {
   sqliteTarget,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
-import { unboundTables } from './unbound-tables.test';
+import { unboundTables } from './unbound-tables';
 
 describe('interpretPslDocumentToSqlContract default lowering', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();

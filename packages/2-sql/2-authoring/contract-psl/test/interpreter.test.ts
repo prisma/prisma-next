@@ -17,7 +17,7 @@ import {
   testEnumEntityContributions,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
-import { unboundTables } from './unbound-tables.test';
+import { unboundTables } from './unbound-tables';
 
 const testIndexPack = {
   kind: 'extension',

@@ -14,7 +14,7 @@ import {
 } from './psl-attribute-parsing';
 import { checkUncomposedNamespace, reportUncomposedNamespace } from './psl-column-resolution';
 
-export const REFERENTIAL_ACTION_MAP = {
+export const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction | undefined> = {
   NoAction: 'noAction',
   Restrict: 'restrict',
   Cascade: 'cascade',
@@ -25,7 +25,7 @@ export const REFERENTIAL_ACTION_MAP = {
   cascade: 'cascade',
   setNull: 'setNull',
   setDefault: 'setDefault',
-} as const;
+};
 
 export type ParsedRelationAttribute = {
   readonly relationName?: string;
@@ -71,8 +71,7 @@ export function normalizeReferentialAction(input: {
   readonly span: PslSpan;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): ReferentialAction | undefined {
-  const normalized =
-    REFERENTIAL_ACTION_MAP[input.actionToken as keyof typeof REFERENTIAL_ACTION_MAP];
+  const normalized = REFERENTIAL_ACTION_MAP[input.actionToken];
   if (normalized) {
     return normalized;
   }
