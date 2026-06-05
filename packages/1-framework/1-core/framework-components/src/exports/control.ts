@@ -89,6 +89,9 @@ export type {
   AssembledAuthoringContributions,
   ControlStack,
   CreateControlStackInput,
+  NamespaceCollision,
+  NamespaceCollisionEntry,
+  NamespaceCollisionStorageView,
 } from '../control/control-stack';
 export {
   assembleAuthoringContributions,
@@ -101,6 +104,7 @@ export {
   extractCodecTypeImports,
   extractComponentIds,
   extractQueryOperationTypeImports,
+  findNamespaceOwnershipCollisions,
 } from '../control/control-stack';
 export type {
   SchemaVerifier,

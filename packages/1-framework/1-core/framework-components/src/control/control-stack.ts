@@ -373,13 +373,13 @@ function readDeclaredDependencyIds(descriptor: DependencyDeclaringDescriptor): r
  * in the provided list — add the missing pack to the `extensionPacks` list to
  * resolve the error.
  */
+
 /**
- * A minimal view of a contract's storage — just the namespaces map with their
- * entity-kind slot maps — used by aggregate-load-time collision detection.
+ * A minimal view of a contract's storage used by namespace-collision detection.
  * Matches the shape of `StorageBase.namespaces` from `@prisma-next/contract/types`
  * without importing the full Contract type.
  */
-interface ContractStorageView {
+export interface NamespaceCollisionStorageView {
   readonly namespaces: Readonly<
     Record<
       string,
@@ -390,28 +390,37 @@ interface ContractStorageView {
   >;
 }
 
-interface ContractEntryForCollisionCheck {
+export interface NamespaceCollisionEntry {
   readonly spaceId: string;
-  readonly storage: ContractStorageView;
+  readonly storage: NamespaceCollisionStorageView;
+}
+
+/** A `(namespaceId, entityKind, name)` triple owned by more than one contract space. */
+export interface NamespaceCollision {
+  readonly namespaceId: string;
+  readonly entityKind: string;
+  readonly name: string;
+  readonly contributorSpaceIds: readonly string[];
 }
 
 /**
- * Asserts that across ALL contributing contracts (app + every extension
- * contract space), every primitive — a named `(namespaceId, kind, name)`
- * entity under a namespace's `entries` — is owned by exactly one contract.
+ * Returns every namespace primitive collision across the supplied contracts.
  *
- * Namespaces are open for extension: multiple contracts contributing DIFFERENT
- * primitives to the same namespace is fine. Only duplicate
- * `(namespaceId, kind, name)` triples collide.
+ * A collision is a `(namespaceId, entityKind, name)` triple that appears in
+ * more than one space's storage. Namespaces are open for extension — different
+ * spaces may contribute different primitives to the same namespace — but the
+ * same primitive must be owned by exactly one space.
  *
- * Throws with a clear diagnostic that names both conflicting space ids and
- * the `(namespace, name)` coordinate of the collision.
+ * Returns an empty array when there are no collisions.
  */
-export function assertNoNamespaceOwnershipCollisions(
-  contracts: ReadonlyArray<ContractEntryForCollisionCheck>,
-): void {
-  // Map from "nsId:kind:name" → spaceId that first claimed it
+export function findNamespaceOwnershipCollisions(
+  contracts: ReadonlyArray<NamespaceCollisionEntry>,
+): ReadonlyArray<NamespaceCollision> {
   const ownership = new Map<string, string>();
+  const collisions = new Map<
+    string,
+    { namespaceId: string; entityKind: string; name: string; contributors: string[] }
+  >();
 
   for (const { spaceId, storage } of contracts) {
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
@@ -420,15 +429,34 @@ export function assertNoNamespaceOwnershipCollisions(
           const key = `${nsId}:${kind}:${name}`;
           const existingOwner = ownership.get(key);
           if (existingOwner !== undefined) {
-            throw new Error(
-              `Namespace primitive collision detected: primitive "${name}" (kind "${kind}") in namespace "${nsId}" is declared by both contract space "${existingOwner}" and "${spaceId}". Each primitive must be owned by exactly one contract space.`,
-            );
+            const collision = collisions.get(key);
+            if (collision !== undefined) {
+              collision.contributors.push(spaceId);
+            } else {
+              collisions.set(key, {
+                namespaceId: nsId,
+                entityKind: kind,
+                name,
+                contributors: [existingOwner, spaceId],
+              });
+            }
+          } else {
+            ownership.set(key, spaceId);
           }
-          ownership.set(key, spaceId);
         }
       }
     }
   }
+
+  return [...collisions.keys()].sort().map((key) => {
+    const c = collisions.get(key)!;
+    return {
+      namespaceId: c.namespaceId,
+      entityKind: c.entityKind,
+      name: c.name,
+      contributorSpaceIds: [...c.contributors].sort(),
+    };
+  });
 }
 
 export function buildExtensionLoadOrder(
