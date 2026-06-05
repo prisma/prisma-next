@@ -1,9 +1,36 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createContractSpaceMember } from '../../src/aggregate/aggregate';
 import type { IntegritySpaceState } from '../../src/aggregate/check-integrity';
 import { computeIntegrityViolations } from '../../src/aggregate/check-integrity';
 import { createAttestedPackage } from '../fixtures';
+
+function contractWithTables(tables: readonly string[]): Contract {
+  const tableEntries = Object.fromEntries(tables.map((name) => [name, { columns: { id: {} } }]));
+  return createSqlContract({
+    target: 'postgres',
+    storage: {
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: tableEntries } },
+      },
+    },
+  });
+}
+
+function makeSpaceState(spaceId: string, contract: Contract, isApp = false): IntegritySpaceState {
+  const member = createContractSpaceMember({
+    spaceId,
+    packages: [],
+    refs: {},
+    headRef: isApp ? { hash: contract.storage.storageHash, invariants: [] } : null,
+    refsDir: '/tmp/refs',
+    resolveContract: () => contract,
+    deserializeContract: (raw) => raw as Contract,
+  });
+  return { member, problems: [], refProblems: [], headRefProblem: null, isApp };
+}
 
 describe('computeIntegrityViolations', () => {
   it('surfaces duplicateMigrationHash instead of throwing from graph()', () => {
@@ -46,6 +73,48 @@ describe('computeIntegrityViolations', () => {
       dirNames: ['20260101T0000_first', '20260101T0000_second'],
     });
     expect(() => member.graph()).not.toThrow();
+  });
+
+  describe('namespaceOwnershipCollision (checkContracts)', () => {
+    it('reports a collision when two spaces claim the same (namespace, kind, name) primitive', () => {
+      const app = makeSpaceState('app', contractWithTables(['users']), true);
+      const ext = makeSpaceState('ext-auth', contractWithTables(['users']));
+
+      const violations = computeIntegrityViolations(
+        { targetId: 'postgres', spaces: [app, ext] },
+        { checkContracts: true },
+      );
+
+      const collisions = violations.filter((v) => v.kind === 'namespaceOwnershipCollision');
+      expect(collisions).toHaveLength(1);
+      expect(collisions[0]).toMatchObject({
+        kind: 'namespaceOwnershipCollision',
+        namespace: UNBOUND_NAMESPACE_ID,
+        name: 'users',
+        contributorSpaceIds: expect.arrayContaining(['app', 'ext-auth']),
+      });
+    });
+
+    it('does not report a collision when spaces claim different primitives in the same namespace', () => {
+      const app = makeSpaceState('app', contractWithTables(['users']), true);
+      const ext = makeSpaceState('ext-billing', contractWithTables(['invoices']));
+
+      const violations = computeIntegrityViolations(
+        { targetId: 'postgres', spaces: [app, ext] },
+        { checkContracts: true },
+      );
+
+      expect(violations.filter((v) => v.kind === 'namespaceOwnershipCollision')).toHaveLength(0);
+    });
+
+    it('does not run the collision check without checkContracts', () => {
+      const app = makeSpaceState('app', contractWithTables(['users']), true);
+      const ext = makeSpaceState('ext-auth', contractWithTables(['users']));
+
+      const violations = computeIntegrityViolations({ targetId: 'postgres', spaces: [app, ext] });
+
+      expect(violations.filter((v) => v.kind === 'namespaceOwnershipCollision')).toHaveLength(0);
+    });
   });
 
   it('rethrows when graph() fails for an unexpected reason', () => {

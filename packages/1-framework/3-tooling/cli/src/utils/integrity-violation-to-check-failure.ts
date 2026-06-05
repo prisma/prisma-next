@@ -135,5 +135,12 @@ export function integrityViolationToCheckFailure(
         why: `Multiple migrations in space "${violation.spaceId}" share migrationHash "${violation.migrationHash}" (${violation.dirNames.join(', ')}).`,
         fix: 'Re-emit one of the conflicting packages so each migrationHash is unique.',
       };
+    case 'namespaceOwnershipCollision':
+      return {
+        pnCode: 'PN-MIG-CHECK-017',
+        where: migrationPathRelative(migrationsDir),
+        why: `Namespace primitive "${violation.name}" (kind "${violation.primitiveKind}") in namespace "${violation.namespace}" is claimed by multiple contract spaces: ${violation.contributorSpaceIds.join(', ')}.`,
+        fix: 'Update the contracts so each namespace primitive is owned by exactly one contract space.',
+      };
   }
 }

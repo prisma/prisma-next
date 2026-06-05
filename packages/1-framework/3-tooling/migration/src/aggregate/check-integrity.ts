@@ -114,6 +114,7 @@ export function computeIntegrityViolations(
 
   if (opts?.checkContracts === true) {
     violations.push(...contractViolations(input));
+    violations.push(...namespaceOwnershipCollisionViolations(input));
   }
 
   return violations;
@@ -242,6 +243,79 @@ function contractViolations(input: IntegrityComputationInput): readonly Integrit
     a.kind === 'disjointness' && b.kind === 'disjointness' ? a.element.localeCompare(b.element) : 0,
   );
   out.push(...disjointness);
+  return out;
+}
+
+/**
+ * Collect namespace primitive ownership collisions across all contract spaces.
+ *
+ * A collision is a `(namespaceId, entityKind, entityName)` triple that appears
+ * in more than one space's contract storage. Namespaces are open for extension —
+ * different spaces may contribute different primitives to the same namespace —
+ * but the same primitive must be owned by exactly one space.
+ *
+ * Mirrors the detection logic of `assertNoNamespaceOwnershipCollisions` in
+ * framework-components but collects all collisions rather than throwing at the
+ * first, consistent with this layer's collect-all-violations pattern.
+ *
+ * Runs inside the `checkContracts` gate because it reads `member.contract()`.
+ * Spaces whose `contract()` throws (already surfaced as `contractUnreadable`)
+ * are skipped.
+ */
+function namespaceOwnershipCollisionViolations(
+  input: IntegrityComputationInput,
+): readonly IntegrityViolation[] {
+  const ownership = new Map<string, string>();
+  const collisions = new Map<
+    string,
+    { namespace: string; primitiveKind: string; name: string; contributors: string[] }
+  >();
+
+  for (const { member } of input.spaces) {
+    let contract: ReturnType<ContractSpaceMember['contract']>;
+    try {
+      contract = member.contract();
+    } catch {
+      continue;
+    }
+
+    for (const [nsId, ns] of Object.entries(contract.storage.namespaces)) {
+      for (const [entityKind, slot] of Object.entries(ns.entries)) {
+        for (const name of Object.keys(slot)) {
+          const key = `${nsId}:${entityKind}:${name}`;
+          const existingOwner = ownership.get(key);
+          if (existingOwner !== undefined) {
+            const collision = collisions.get(key);
+            if (collision !== undefined) {
+              collision.contributors.push(member.spaceId);
+            } else {
+              collisions.set(key, {
+                namespace: nsId,
+                primitiveKind: entityKind,
+                name,
+                contributors: [existingOwner, member.spaceId],
+              });
+            }
+          } else {
+            ownership.set(key, member.spaceId);
+          }
+        }
+      }
+    }
+  }
+
+  const out: IntegrityViolation[] = [];
+  const sortedKeys = [...collisions.keys()].sort();
+  for (const key of sortedKeys) {
+    const c = collisions.get(key)!;
+    out.push({
+      kind: 'namespaceOwnershipCollision',
+      namespace: c.namespace,
+      primitiveKind: c.primitiveKind,
+      name: c.name,
+      contributorSpaceIds: [...c.contributors].sort(),
+    });
+  }
   return out;
 }
 
