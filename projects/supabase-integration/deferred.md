@@ -15,7 +15,7 @@ Explicit list of things we've decided are **not** part of the Supabase integrati
 - **Cross-contract-space FKs in PSL.** TS surface ships; PSL surface is deferred pending design work on the PSL `extension <name> from "<pkg>"` import grammar. App authors who need PSL can use the TS builder for the affected models in the interim.
 - **Cascading actions across contract spaces.** Permitted at the DDL level (Postgres allows it), but we don't ship a polished UX around `ON DELETE CASCADE` from app tables into externally-managed extension tables. Users can write the SQL clause; the framework won't help reason about it.
 - **Pre-canned RLS policy patterns.** "Owner can read/write" policy helpers, "public read, owner write" helpers, etc. Tempting but premature; we ship the raw API and revisit after user feedback.
-- **Per-column control override.** Columns inherit their parent table's control policy. No per-column override in v0.1. (Tracked in [`projects/control-policy/spec.md`](../control-policy/spec.md) § "Non-goals".)
+- **Per-column control override.** Columns inherit their parent table's control policy. No per-column override in v0.1. (Tracked in [ADR 224 § "Alternatives considered"](../../docs/architecture%20docs/adrs/ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md).)
 - **`observed` policy in v0.1.** Possibly drop to ship only `managed / tolerated / external` if the design pressure pushes that way. Decided when the control-policy spec is settled; the four-policy story is the working assumption.
 - **RPC / Postgres function call surface.** No typed `rpc('fn_name', args)` equivalent. Not a regression from the status quo (users don't have this without Prisma Next either); raw SQL escape hatch is the v0.1 fallback.
 - **`CREATE EXTENSION` statements.** Handled by target-specific extension packs (e.g., the existing pgvector extension). Not a Supabase-specific concern.
@@ -44,7 +44,7 @@ If your concern is on this list, it's the IR project's problem, not this one's.
 - Verifier and planner dispatch tables.
 - Cross-cutting safety check: planner refuses to emit ops into an `external` namespace.
 
-See [`projects/control-policy/spec.md`](../control-policy/spec.md). Supabase consumes this primitive; it does not introduce it.
+See [ADR 224](../../docs/architecture%20docs/adrs/ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md). Supabase consumes this primitive; it does not introduce it.
 
 ## Carried by other Linear tickets (not redone here)
 

@@ -2,7 +2,7 @@
 
 ## Summary
 
-The project ships in four PRs sequenced contract → runtime → example → polish. M1 scaffolds the `@prisma-next/extension-supabase` package: subpath exports, hand-authored `contract.json`, `contract.d.ts`, branded `/contract` handles, the `/pack` descriptor. M2 builds the runtime facade: `SupabaseRuntime extends PostgresRuntime`, JWT validation (sync via `jwtSecret`, async warmup via `jwksUrl`), `SupabaseDb` with `asUser` / `asAnon` / `asServiceRole`, `RoleBoundDb` extending `Db` with `transaction(...)`, the `SET LOCAL` + implicit-transaction plumbing wired through `withRawConnection`. M3 ships the canonical example app at `packages/3-extensions/supabase/examples/basic/` plus its integration tests against PGlite-with-Supabase-schema. M4 closes out documentation, the launch-blocking real-Supabase-project acceptance test, and the umbrella decisions log.
+The project ships in four PRs sequenced contract → runtime → example → polish, and is the home of the **walking skeleton** — the runnable `examples/supabase` app that every other constituent wires into as it lands (strategy + growth table in the [umbrella README](../supabase-integration/README.md) §"Walking skeleton"; decisions [C13/C14](../supabase-integration/decisions.md)). M1 scaffolds the `@prisma-next/extension-supabase` package (subpath exports, hand-authored `contract.json`, `contract.d.ts`, branded `/contract` handles, the `/pack` descriptor) **and stands up the skeleton** running on the stock `@prisma-next/postgres/runtime`; the Supabase `/runtime` subpath is deferred to M2, so M1 is unblocked by the foundation + control-policy alone. M2 builds the runtime facade: `SupabaseRuntime extends PostgresRuntime`, JWT validation (sync via `jwtSecret`, async warmup via `jwksUrl`), `SupabaseDb` with `asUser` / `asAnon` / `asServiceRole`, `RoleBoundDb` extending `Db` with `transaction(...)`, the `SET LOCAL` + implicit-transaction plumbing wired through `withRawConnection`. M3 finalizes the (by-then incrementally-grown) `examples/supabase` app and adds the live-query RLS-enforcement e2e that depends on M2's role binding, running on the hermetic PGlite + Supabase-shim lane. M4 closes out documentation, the real-Supabase acceptance lane, and the umbrella decisions log.
 
 **Spec:** [`projects/extension-supabase/spec.md`](spec.md)
 **Linear:** _(to be created — see project tracker in umbrella `projects/supabase-integration/README.md`)_
@@ -17,21 +17,21 @@ This project is the integration layer; it consumes **all four** sibling projects
 - **[postgres-rls](../postgres-rls/spec.md)** — `.rls(...)` authoring + `PostgresRole` IR + verifier algorithm.
 - **[runtime-target-layer](../runtime-target-layer/spec.md)** — `PostgresRuntime` base class + `withRawConnection` accessor.
 
-Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy** → **cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer** → **this project** (which is the May 18th launch milestone).
+Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy** → **cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer** → **this project** (the integration / launch milestone).
 
-A slip in any upstream project cascades into a launch-date risk. The implementer should watch upstream PR status weekly and surface blockers early.
+A slip in any upstream project cascades into this project. The implementer should watch upstream PR status and surface blockers early.
 
 ## Milestones
 
 The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each milestone is one PR.
 
-### M1 — Package scaffolding + contract + typed handles
+### M1 — Package scaffolding + contract + typed handles + walking skeleton
 
-**Goal:** the package exists with the subpath exports, the shipped contract is in place, and an app contract can import `AuthUser` and `roles` and reference them. No runtime yet.
+**Goal:** the package exists with the subpath exports, the shipped contract is in place, an app contract can import `AuthUser` and `roles` and reference them, and the `examples/supabase` walking skeleton runs end-to-end against `public.*` on the stock Postgres runtime. No Supabase runtime yet (`/runtime` is M2).
 
 **Tasks:**
 
-- [ ] Scaffold the package at `packages/3-extensions/supabase/`. `package.json` with `exports` field declaring `/pack`, `/contract`, `/runtime` subpaths. `tsconfig.json` matching the existing extension packages (`cipherstash`, `pgvector`).
+- [ ] Scaffold the package at `packages/3-extensions/supabase/`. `package.json` with `exports` field declaring `/pack`, `/contract`, `/runtime` subpaths. `tsconfig.json` matching the existing extension packages (`cipherstash`, `pgvector`). The `/runtime` subpath may be a stub in M1 (filled in by M2); `/pack` + `/contract` are complete.
 - [ ] Hand-author `src/contract/contract.json`. Models: `AuthUser`, `AuthIdentity`, `StorageBucket`, `StorageObject` (the minimum set the example app needs). Roles: `anon`, `authenticated`, `service_role`. `defaultControl: 'external'`. Namespaces: `auth`, `storage`, `realtime`, `extensions`.
 - [ ] Generate `src/contract/contract.d.ts` via the standard emitter pipeline. The contract type is consumed by the runtime facade's generics in M2.
 - [ ] Hand-author `src/contract/index.ts` exporting branded `ModelHandle<'supabase', …>` instances for each model and `roles: { anon, authenticated, serviceRole }` as `RoleRef<'supabase'>` values. Each handle exposes `.refs.<column>` accessors typed from the `contract.d.ts` model shape.
@@ -43,8 +43,10 @@ The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each mile
   - The contract lowers correctly when the app's `defineContract` declares `extensionPacks: [supabasePack]`.
 - [ ] `pnpm lint:deps` passes. `/pack` does not transitively import runtime; `/contract` does not transitively import SDK/runtime.
 - [ ] Bundle-size measurement: `/pack` under 5 KB gzip; `/contract` under 10 KB gzip.
+- [ ] **Stand up the walking skeleton** at `examples/supabase` (top-level, alongside the other example apps). Minimal runnable app: `prisma-next.config.ts` wiring `extensionPacks: [supabasePack]`; an app contract with a `Profile` model in `public`; a `db.ts` that builds a db via the **stock `@prisma-next/postgres/runtime`** factory (not the Supabase `/runtime` — that's M2); one handler that runs a basic `public.*` query. Gate it out of the default test matrix until green (or mark its integration test `.skip` / `todo`) so an intentionally-WIP example never reds CI.
+- [ ] **Author `bootstrapSupabaseShim(client)`** (mirroring [`test/integration/test/postgres-bootstrap.ts`](../../test/integration/test/postgres-bootstrap.ts)) for the hermetic PGlite lane: seeds the `anon`/`authenticated`/`service_role`/`authenticator` roles, the `auth` schema + `auth.users`, and `auth.uid()`/`auth.jwt()`/`auth.role()` SQL functions reading the session GUCs. This is the shared fixture every later constituent's `examples/supabase` test uses (decision [C14](../supabase-integration/decisions.md)).
 
-**Validation:** AC1, AC2, AC3 verified through end-to-end authoring smoke tests. No runtime yet; AC4 onwards land in M2.
+**Validation:** AC1, AC2, AC3 verified through end-to-end authoring smoke tests. The skeleton boots and runs a `public.*` query on the stock Postgres runtime against the shim-bootstrapped PGlite database. No Supabase runtime yet; AC4 onwards land in M2.
 
 ### M2 — Runtime facade (`SupabaseRuntime`, role binding, SET LOCAL)
 
@@ -67,21 +69,21 @@ The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each mile
   - `db.asUser(badJwt)` throws synchronously; no connection acquired.
   - `db.asUser(goodJwt)` returns a `RoleBoundDb`.
   - `SupabaseDb` doesn't expose `.sql.from(...)` at the top level (type-level assertion via a `// @ts-expect-error` test).
-- [ ] Integration tests against PGlite-with-Supabase-schema (a hand-crafted minimal schema mirroring `auth.users` shape):
+- [ ] Integration tests against PGlite seeded with `bootstrapSupabaseShim(client)` (from M1):
   - Statement sequence on `asUser(jwt).sql.from(...).execute()` is `BEGIN; SET LOCAL role; SET LOCAL request.jwt.claims; <query>; COMMIT;`. Verified by hooking the connection and recording statements.
   - User middleware sees only the logical query (the `BEGIN` / `SET LOCAL` / `COMMIT` statements are invisible). Verified by a logging middleware in the test fixture.
   - `asUser(jwt).transaction(async (tx) => { tx.sql..., tx.sql... })` issues one BEGIN + one SET LOCAL + two queries + one COMMIT.
 
 **Validation:** AC4, AC5, AC6, AC7 verified.
 
-### M3 — Example app + RLS-enforcement integration tests
+### M3 — Finalize the example app + live-query RLS-enforcement e2e
 
-**Goal:** the canonical demo runs end-to-end in CI. Every framework primitive is exercised against a real database; RLS enforcement is observable.
+**Goal:** the `examples/supabase` walking skeleton — grown incrementally across the constituent lands — is finalized as the canonical demo, ungated in CI, and the RLS-enforcement e2e that depends on M2's automatic role binding is added. By this point the example already exercises the cross-contract FK, RLS policies, and namespace queries (each wired in by its own constituent's DoD); M3 assembles the full handler flow and proves enforcement through the runtime rather than by hand.
 
 **Tasks:**
 
-- [ ] Scaffold the example app at `packages/3-extensions/supabase/examples/basic/`. App contract (with `Profile` model and cross-contract FK to `AuthUser`, RLS policies), `prisma-next.config.ts`, `db.ts` factory, handler module exposing `listProfiles` / `createProfile` / `updateProfile` / `adminListProfiles`.
-- [ ] Integration tests against PGlite-with-Supabase-schema:
+- [ ] Finalize the example app at `examples/supabase` (stood up in M1, grown by the constituents). Complete the app contract (`Profile` with cross-contract FK to `AuthUser` + RLS policies), `db.ts` switched to the Supabase `/runtime` factory (`supabase({...})`), and the handler module exposing `listProfiles` / `createProfile` / `updateProfile` / `adminListProfiles`. Ungate it from the default test matrix.
+- [ ] Live-query RLS-enforcement integration tests against PGlite seeded with `bootstrapSupabaseShim(client)` — these are the tests that need M2's automatic role binding (policy correctness via manual `SET ROLE` was already proven in the `postgres-rls` project):
   - Migration: `prisma-next push` against the test database creates `public.profile` with FK to `auth.users.id`; creates the RLS policies; enables RLS on the table.
   - RLS enforcement: a query through `asAnon()` returns rows whose policy permits anon read; returns zero rows where it doesn't.
   - RLS enforcement: a query through `asUser(jwtForUserA)` can update User A's row but not User B's row (zero rows updated).
@@ -120,8 +122,8 @@ The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each mile
 
 ## Risks and mitigations
 
-- **Risk:** the May 18th launch date hinges on five upstream projects all landing. Any slip cascades.
-  - **Mitigation:** the four sibling projects + control-policy are independent. The umbrella tracker (in `projects/supabase-integration/README.md`) lists each constituent's status. The implementer of this project watches upstream progress weekly. If a slip is foreseeable >1 week out, scope-cut decisions surface to the team: either delay the launch, or carve a smaller v0.1 (e.g. drop the example app from launch; ship the package without it; backfill the example post-launch).
+- **Risk:** launch hinges on five upstream projects all landing. Any slip cascades.
+  - **Mitigation:** the four sibling projects + control-policy are independent. The umbrella tracker (in `projects/supabase-integration/README.md`) lists each constituent's status. The implementer of this project watches upstream progress. If a slip is foreseeable, scope-cut decisions surface to the team: either delay the launch, or carve a smaller v0.1 (e.g. drop the example app from launch; ship the package without it; backfill the example post-launch).
 - **Risk:** JWT validation has subtle bugs (audience checking, clock-skew tolerance, algorithm confusion). A bad JWT validator is a security hole.
   - **Mitigation:** use `jose` (or another mature library) rather than hand-rolling validation. Set `algorithms` strictly to `['HS256', 'RS256']` (or whatever Supabase actually uses) to prevent algorithm confusion. Test the validation path explicitly against every documented failure mode.
 - **Risk:** PGlite-with-Supabase-schema diverges from real Supabase behaviour in ways that hide bugs.

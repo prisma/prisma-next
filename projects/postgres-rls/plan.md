@@ -117,6 +117,13 @@ The five PRs below correspond to the five milestones (M1, M2, M3, M4, M5). Each 
 
 **Validation:** docs review by the team; AC1–AC12 all green and verified through merged PRs.
 
+## Walking-skeleton integration (cross-cutting DoD)
+
+Per the umbrella's walking-skeleton strategy (decisions [C13/C14](../supabase-integration/decisions.md); [README](../supabase-integration/README.md) §"Walking skeleton"), this project's definition of done includes wiring its feature into the running `examples/supabase` app:
+
+- [ ] Add RLS policies to `Profile` in the `examples/supabase` app contract (`anon` SELECT, `authenticated` UPDATE-own), via `.rls([...])` and — once the [target-contributed-psl-blocks](../target-contributed-psl-blocks/spec.md) substrate lands — the PSL `policy {}` form. Confirm the planner emits `CREATE POLICY` + `ENABLE ROW LEVEL SECURITY` and the verifier diffs clean against `pg_policies`.
+- [ ] Prove **policy correctness** in the hermetic lane (PGlite + `bootstrapSupabaseShim`) by setting the role **by hand** (`SET LOCAL role = 'authenticated'; SET LOCAL request.jwt.claims = '…'`) and asserting RLS filters rows. The automatic `asUser`/`asAnon` live-query e2e is added later by `extension-supabase` M2 — not blocked on it (decision [C14](../supabase-integration/decisions.md)).
+
 ## Risks and mitigations
 
 - **Risk:** the canonical normalizer doesn't cover the full Postgres expression-printer reformatting space. A real-world predicate slips through the normalizer's equivalence relation and surfaces as `rls_policy_tampered` on every build despite being semantically unchanged.

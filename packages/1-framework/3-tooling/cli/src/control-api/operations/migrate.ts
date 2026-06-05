@@ -1,3 +1,7 @@
+/**
+ * Backs the `migrate` command. Strategy: graph-walk-all-members, replay-only (no introspect/synth/planner).
+ */
+
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -25,14 +29,14 @@ import {
   buildContractSpaceAggregate,
 } from '../../utils/contract-space-aggregate-loader';
 import type {
-  MigrationApplyFailure,
-  MigrationApplyPathDecision,
-  MigrationApplyResult,
-  MigrationApplySuccess,
+  MigrateFailure,
+  MigratePathDecision,
+  MigrateResult,
+  MigrateSuccess,
   OnControlProgress,
   PerSpaceExecutionEntry,
 } from '../types';
-import { applyMigration, buildPerSpaceBreakdown } from './apply';
+import { buildPerSpaceBreakdown, runMigration } from './run-migration';
 
 /**
  * Inputs for the aggregate-walking `migrate` control-api
@@ -43,7 +47,7 @@ import { applyMigration, buildPerSpaceBreakdown } from './apply';
  * is the single descriptor-free seam between the CLI and the
  * aggregate runtime.
  */
-export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetId extends string> {
+export interface ExecuteMigrateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   /** Already-validated app contract (the canonical "where we are heading" hash). */
@@ -96,16 +100,16 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
  *    marker to `member.headRef.hash` (or `refHash` for the app
  *    member when provided). Empty-graph members fail loudly — a
  *    "never planned" space is a user-error condition for replay.
- * 4. Hand off to {@link applyMigration} (the runner-driving tail
+ * 4. Hand off to {@link runMigration} (the runner-driving tail
  *    shared with `db init` / `db update`). Marker advancement is
  *    inside the per-space transaction.
  *
  * Encodes the replay-only contract: every contract space must have an
  * authored migration graph on disk before this operation can advance it.
  */
-export async function executeMigrationApply<TFamilyId extends string, TTargetId extends string>(
-  options: ExecuteMigrationApplyOptions<TFamilyId, TTargetId>,
-): Promise<MigrationApplyResult> {
+export async function executeMigrate<TFamilyId extends string, TTargetId extends string>(
+  options: ExecuteMigrateOptions<TFamilyId, TTargetId>,
+): Promise<MigrateResult> {
   const {
     driver,
     familyInstance,
@@ -277,7 +281,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     );
   }
 
-  const applied = await applyMigration({
+  const applied = await runMigration({
     aggregate,
     perSpacePlans,
     applyOrder,
@@ -286,12 +290,12 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     migrations,
     frameworkComponents,
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
-    action: 'migrationApply',
+    action: 'migrate',
     ...ifDefined('onProgress', onProgress),
   });
 
   if (!applied.ok) {
-    const failure: MigrationApplyFailure = {
+    const failure: MigrateFailure = {
       code: 'RUNNER_FAILED',
       summary: applied.failure.summary,
       why: applied.failure.why,
@@ -396,9 +400,9 @@ interface BuildSuccessArgs {
   readonly summary: string;
 }
 
-function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
+function buildSuccess(args: BuildSuccessArgs): MigrateSuccess {
   // The marker hash surfaced at the top level is the **app member's**
-  // post-apply marker (the top-level `markerHash` field).
+  // post-migrate marker (the top-level `markerHash` field).
   // Per-space markers live on `perSpace[].marker.storageHash`.
   const appResolution = args.orderedResolutions.find(
     (r) => r.spaceId === args.aggregate.app.spaceId,
@@ -423,7 +427,7 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
   });
 
   const appPlan = appResolution?.entry;
-  const pathDecision: MigrationApplyPathDecision | undefined = appPlan?.pathDecision
+  const pathDecision: MigratePathDecision | undefined = appPlan?.pathDecision
     ? {
         fromHash: appPlan.pathDecision.fromHash,
         toHash: appPlan.pathDecision.toHash,
@@ -462,10 +466,7 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
  *
  * @internal Exported for testing only.
  */
-export function buildNeverPlannedFailure(
-  spaceId: string,
-  targetHash: string,
-): MigrationApplyFailure {
+export function buildNeverPlannedFailure(spaceId: string, targetHash: string): MigrateFailure {
   return {
     code: 'MIGRATION_PATH_NOT_FOUND',
     summary: `No on-disk migrations for contract space "${spaceId}"`,
@@ -488,7 +489,7 @@ export function buildPathNotFoundFailure(
   spaceId: string,
   marker: ContractMarkerRecordLike | null,
   targetHash: string,
-): MigrationApplyFailure {
+): MigrateFailure {
   const fromHash = marker?.storageHash ?? '<empty>';
   // The app-case phrasing names the user-visible condition (a
   // contract has been emitted that no on-disk migration reaches) so

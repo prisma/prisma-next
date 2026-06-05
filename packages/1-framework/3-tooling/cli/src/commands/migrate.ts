@@ -11,8 +11,8 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type {
-  MigrationApplyFailure,
-  MigrationApplyPathDecision,
+  MigrateFailure,
+  MigratePathDecision,
   PerSpaceExecutionEntry,
 } from '../control-api/types';
 import {
@@ -76,14 +76,14 @@ export interface MigrateResult {
   }[];
   readonly summary: string;
   readonly perSpace: readonly PerSpaceExecutionEntry[];
-  readonly pathDecision?: MigrationApplyPathDecision;
+  readonly pathDecision?: MigratePathDecision;
   readonly timings: {
     readonly total: number;
   };
   readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
 }
 
-function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType {
+function mapApplyFailure(failure: MigrateFailure): CliStructuredErrorType {
   if (failure.code === 'MIGRATION_PATH_NOT_FOUND') {
     return errorPathUnreachable(failure);
   }
@@ -136,7 +136,7 @@ async function executeMigrateCommand(
 
   // Construct the family instance up-front so the on-disk contract read
   // crosses the serializer seam (`familyInstance.deserializeContract`) at
-  // the read site. The downstream `client.migrationApply({ contract })`
+  // the read site. The downstream `client.migrate({ contract })`
   // re-validates internally (no harm — validation is idempotent), but
   // closing the gap at the read site is what makes the cast-pattern
   // lint enforceable and matches the other CLI commands. See TML-2536.
@@ -312,7 +312,7 @@ async function executeMigrateCommand(
       }
     }
 
-    const applyResult = await client.migrationApply({
+    const applyResult = await client.migrate({
       contract: applyContract,
       migrationsDir,
       ...ifDefined('refHash', refEntry?.hash),
