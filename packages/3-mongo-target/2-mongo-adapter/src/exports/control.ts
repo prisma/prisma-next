@@ -3,14 +3,11 @@ import type { MongoControlAdapterDescriptor } from '@prisma-next/family-mongo/co
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type { Db } from 'mongodb';
 
+export type { MongoControlDriverInstance } from '@prisma-next/mongo-lowering';
 export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
 export { introspectSchema } from '../core/introspect-schema';
 export { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
-export {
-  createMongoControlDriver,
-  isMongoControlDriver,
-  type MongoControlDriverInstance,
-} from '../core/mongo-control-driver';
+export { isMongoControlDriver } from '../core/mongo-control-driver';
 export {
   createMongoRunnerDeps,
   extractDb,
