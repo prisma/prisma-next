@@ -3621,6 +3621,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:0.12.0
         version: link:../../1-framework/3-tooling/cli
+      '@prisma-next/driver-postgres':
+        specifier: workspace:0.12.0
+        version: link:../../3-targets/7-drivers/postgres
       '@prisma-next/operations':
         specifier: workspace:0.12.0
         version: link:../../1-framework/1-core/operations
@@ -11782,7 +11785,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@types/node@25.6.0)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.13(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.8.4))
+      vitest: 4.1.6(@types/node@25.6.2)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.13(@types/node@25.6.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.8.4))
 
   '@vitest/expect@4.1.6':
     dependencies:
