@@ -4,10 +4,10 @@
 
 ## Summary
 
-- **Current verdict:** SATISFIED (R2)
+- **Current verdict:** SATISFIED (R3 — F2 accepted-closed by orchestrator; see § Orchestrator notes)
 - **Dispatches SATISFIED:** D1, D2, D3, D4 clean
-- **AC scoreboard totals:** 6 PASS / 0 FAIL / 0 NOT VERIFIED
-- **Open findings:** 0 (F1 resolved in `7206dfd95`)
+- **AC scoreboard totals:** 8 PASS / 0 FAIL / 0 NOT VERIFIED
+- **Open findings:** 0 (F1 resolved `7206dfd95`; F2 routing-covered `b55f9a5a0` + accepted-closed — see notes).
 
 ## Acceptance criteria scoreboard
 
@@ -18,7 +18,9 @@
 | AC-3 | `migrate --show` prints the ordered execution list; default from = live marker, explicit `--from` offline; edge cases (no-path/at-target/multi-space/`@db`-no-conn) | D3 | PASS | `migrate.ts:135-438`; ordered list + summary; edge cases covered in `migrate-show.test.ts` (no-path, at-target, `--db`-required, `@db`-no-conn). Commit `9c5bdd156`. |
 | AC-4 | **Read-only:** `--show` returns before `runMigration()`; no marker/ledger/DDL writes reachable | D3 | PASS | `executeMigrateShowCommand` has no write call; client use limited to `connect`/`readAllMarkers`/`close`. Module-level `runMigration` mock throws on any call; asserted not-called (`migrate-show.test.ts:33-42,169`). Structural, not incidental. Commit `9c5bdd156`. |
 | AC-5 | **Faithfulness:** path computed via `graphWalkStrategy()` — same seam as apply, not a reimplementation | D3 | PASS | Inputs now assembled in ONE shared site: `planMemberPath()` (`operations/migrate.ts:369`) feeds `graphWalkStrategy` `currentMarker: liveMarker` (full record, :413) and `targetInvariants = refInvariants ?? headRef.invariants` (:403-404). Both callers pass equivalent args: `executeMigrate:163` and show `commands/migrate.ts:346`. Divergence structurally impossible. Strengthened faithfulness tests assert call-arg equivalence (incl. invariant-bearing `--to` ref fixture). F1 resolved. Commit `7206dfd95`. |
-| AC-6 | `migrate --show` graph: chosen path bright-green, off-path dimmed/unlabelled, `@`-vocabulary; reuses existing annotation hook (no parallel renderer) | D4 | PASS | `migration-graph-tree-render.ts`: extends `MigrationEdgeAnnotation` with `pathHighlight` (`on-path` greenBright+`↑ will run`; `off-path` blank name + dim hash). Command builds map from on-path hash set (`migrate.ts:381-388`). Snapshot test asserts on/off-path labelling. No parallel renderer. Commit `9bc81455f`. |
+| AC-6 | `migrate --show` graph: chosen path bright-green (nodes/hashes/names **and lane lines**), off-path **fully drawn in uniform dim grey** (not omitted), `@`-vocabulary; reuses existing annotation hook (no parallel renderer) | D4 | PASS (R3-revised) | `migration-graph-tree-render.ts`: `on-path` greenBright gutter+name+hash + `↑ will run` (`:749-752,764,779-780,482-489`); `off-path` dim gutter+name+hash+suffix, name no longer blanked (`:757-761,777-778,495`). Command builds annotation map per space from on-path hash set (`migrate.ts:425-429`). `migrate-show.test.ts:415` asserts off-path name now drawn; correctness of green/grey hues verified on disk but **not test-covered** (F2, should-fix). No parallel renderer. Commits `9bc81455f` + `bfd85a00c`. |
+| AC-7 | `@contract` marks the app's **working contract** (not the `--to` target) and renders **only in the app space** | R3 | PASS | `commands/migrate.ts:188` `contractHash` = working contract from `buildReadAggregate`; `targetHash` (`:194,213`) is the `--to` ref. Render passes `contractHash` not `targetHash` (`:433,442`); extension spaces get `spaceContractHash = undefined` (`:433`). Tests `migrate-show.test.ts` `'@contract marks the working contract…'` (asserts `@contract` line contains C2, not C1, with `--to C1` < working C2) + `'@contract does not appear in extension spaces'` (pgvector section has no `@contract`). Both non-tautological. Commit `8b6792f68`. |
+| AC-8 | Ordered list in graph migration-row format + same green, printed without the Clack `│` gutter | R3 | PASS | List built via `formatShowMigrationRow` reusing `migrationListForwardArrow`/`abbreviateContractHash`/`padFromHashColumn` in `greenBright(bold(...))` (`commands/migrate.ts:473-487`); old `1. name (from → to)` format gone. Printed via `ui.output(...)` not `ui.log(...)` (`:851`). Test asserts graph-row format (`from → to` hash columns) and that the list line carries no `│` (`migrate-show.test.ts:425-432`). Commit `bfd85a00c`. |
 
 Status: `PASS` / `FAIL` / `NOT VERIFIED — <reason>` / `OUT OF SCOPE`.
 
@@ -26,6 +28,15 @@ Status: `PASS` / `FAIL` / `NOT VERIFIED — <reason>` / `OUT OF SCOPE`.
 
 - **Implementer:** `a6794e1e5ade9c01c` (sonnet) — D1–D4 R1. Swap → `ab391f502ed0da567` (sonnet) for R2/F1 (harness exposes no resume tool; fresh subagent per round, recorded per continuity rule).
 - **Reviewer:** `a8004f2c570c470fa` (opus) — R1. Swap → `a7f5d967cb649fe87` (opus) — R2 (same resume-unavailable reason).
+
+## Orchestrator notes (R3 — operator visual review of PR #735)
+
+- Operator gave 6 visual items on the `--show` output: 2 bugs (`@contract` placed at `--to` not the working contract; floating `@contract` leaking into extension spaces) + 4 refinements (off-path fully drawn dim grey; on-path lane lines green; ordered list not via Clack gutter; list in graph-row format + green). Spec § Output (D-MS3 revised) + decisions amended to match.
+- Implementer swap (R3): `a488ab5e72b5ed40e` (sonnet). Commits `8b6792f68` (@contract bugs + off-path) / `bfd85a00c` (grey/green + list). DoD pre-check: diff confined to `migrate.ts` + the renderer + migrate-show test + docs; **no shared `__snapshots__` changed** (graph/status/list output untouched); `ui.output` replaces `ui.log` (Clack gutter gone); @contract-working-contract + extension-space tests present.
+- Reviewer R3: `_(opus, recorded in round)_`.
+- Judgment call to scrutinise: the command now renders **extension spaces too** (was app-only). Correct per spec multi-space behaviour (`migrate` spans app + extensions), but confirm extension spaces render their own heads/path with **no `@contract`**. → Reviewer R3 confirmed correct.
+- **R3 verdict (orchestrator close):** reviewer R3 (`acff1f3bd487b7817`, opus) confirmed all six visual items correct on disk (both `@contract` bugs fixed, off-path grey / on-path green / no-Clack-list / graph-row format), no regression (read-only / faithfulness / shared output intact), multi-space expansion correct. The sole blocker was **F2** (should-fix: colour wrappers untested).
+- **F2 accepted-closed.** R3 implementer (`a488ab5e72b5ed40e`) shipped the 6 fixes; F2-fix implementer (`ad4a992e51544dd31`) added routing coverage (commit `b55f9a5a0`) but found the test env runs `NO_COLOR=1`, no-op'ing colorette — so the literal green/grey ANSI codes can't be asserted without a source seam to force colour. Orchestrator decision (reviewer explicitly authorised the accept): close F2. Rationale — the regression-prone surface is the *routing* (now tested via the `will run` suffix + off-path-name-drawn), the `greenBright`/`dim` constant application is verified on-disk by the reviewer, and the operator visually confirms the hues on PR #735. A source-seam-for-colour-testability change is over-engineering for a should-fix on a visually-confirmed feature. Residual (documented): the literal hue is not asserted in-suite due to the `NO_COLOR` env.
 
 ## Findings log
 
@@ -49,6 +60,20 @@ Status: `PASS` / `FAIL` / `NOT VERIFIED — <reason>` / `OUT OF SCOPE`.
 **Recommended next action:** Make the two callers share the input assembly so divergence is structurally impossible. Either (preferred, the spike's optional wrapper) extract a `previewMigrationPath(member, …)` helper that computes `targetHash` / `targetInvariants` / `currentMarker` once and is called by both `executeMigrate` and `executeMigrateShowCommand`; or, at minimum, in the show command: (a) carry the live marker's `invariants` through `readAllMarkers()` into `currentMarker` instead of `[]`, and (b) capture the `--to` ref's invariants and use them as the target member's `headRef.invariants`. Then strengthen the faithfulness test to assert the `graphWalkStrategy` call arguments match what `executeMigrate` would pass for the same fixture (e.g. an invariant-bearing graph where full-vs-remainder `required` selects different paths), not merely that the function was called.
 
 **Status:** resolved (commit `7206dfd95`). Both original divergences fixed at a single assembly site (`planMemberPath`, `operations/migrate.ts:369`): (1) live-marker invariants now carried — show stores the full `marker ?? null` record (`commands/migrate.ts:316`) and the helper passes `currentMarker: liveMarker` (`:413`), so no stripped `{ invariants: [] }` shell exists on the live path; (2) `--to`-ref invariants captured from the resolved ref (`commands/migrate.ts:201-205`) and applied via `targetInvariants = refInvariants ?? headRef.invariants` (`:403-404`). Empty-graph case aligned: `at-head` → skip (show) / at-head-resolution (apply); `never-planned` → loud error in both. `executeMigrate` is a pure extraction — same error taxonomy (`buildNeverPlannedFailure`/`buildPathNotFoundFailure`/`errorNoInvariantPath`), same `atHeadResolutions`/`perSpacePlans` population, still hands to `runMigration`. Faithfulness tests strengthened to assert call-arg equivalence on an invariant-bearing `--to`-ref fixture; the second test would have failed on the original Bug #2 (asserts `headRef.invariants === ['inv-a']`, was `[]`).
+
+### F2 — the on-path-green / off-path-grey colour wrappers have no test coverage
+
+**Severity:** should-fix
+
+**Where:** `packages/1-framework/3-tooling/cli/src/utils/formatters/migration-graph-tree-render.ts:749-752,757-764,777-780,482-489,495` (the `greenBright(...)`/`dim(...)` wrappers on gutter, name, hash, and `↑ will run` suffix added in commit `bfd85a00c`). No covering test: every `migrate-show.test.ts` case runs with `--no-color` + `stripAnsi`, and the renderer unit test `migration-graph-tree-render.test.ts` has zero `pathHighlight` cases (`grep pathHighlight` → only the two command test files).
+
+**What:** R3 items 3 and 4 (off-path fully drawn in uniform dim grey; on-path lane lines + hash in the same bright green as the name) are correct on disk — I verified the wrappers directly. But no automated test asserts the ANSI hues. The command tests strip colour; the renderer unit test was not extended for the path-highlight branch. The *structural* half of item 3 (off-path name is drawn, not omitted) is covered (`migrate-show.test.ts:415` asserts the off-path dirName now appears), but the *colour* half of 3 and all of 4 are unverified by CI. A future edit that drops `greenBright` from the gutter/hash, or stops dimming the off-path suffix, would pass every test.
+
+**Why it matters:** The operator's R3 feedback was specifically about colour. The fix is correct now and was visually confirmed on PR #735, but the visual contract regresses silently — exactly the kind of change CI should catch. The renderer already has many `colorize: true` assertions; adding one path-highlight case is cheap.
+
+**Recommended next action:** Add one assertion (renderer unit test preferred, or a non-`--no-color` command test) that, given an `edgeAnnotationsByHash` with one `on-path` and one `off-path` edge and `colorize: true`, asserts the on-path gutter+hash+name carry the green escape and the off-path gutter+hash+name+suffix carry the dim escape (e.g. assert the raw output contains `greenBright(...)`/`dim(...)` markers for the expected substrings, or compare against a small colorized inline snapshot).
+
+**Status:** open
 
 ## Round notes
 
@@ -75,6 +100,22 @@ Status: `PASS` / `FAIL` / `NOT VERIFIED — <reason>` / `OUT OF SCOPE`.
 **Findings:** F1 resolved. No new findings.
 
 **For orchestrator:** none. Transient-ID scan on R2 `+` diff: zero hits. Gates trusted (typecheck + cli 1209 + migration-tools 549 green per implementer; `migration-list-json-golden` concurrent flake pre-existing, also on TML-2780).
+
+### Slice migrate-show-preview R3 — ANOTHER ROUND NEEDED
+
+**Scope:** operator visual-review fixes. Commits `8b6792f68` (@contract bugs + off-path) + `bfd85a00c` (grey/green + list), on `d03a89cb9`. Diff confined to `commands/migrate.ts` + `utils/formatters/migration-graph-tree-render.ts` + `migrate-show.test.ts` (+ spec/decisions docs).
+
+**Items (all 6 correct on disk):** (1) `@contract`-placement BUG fixed — renderer gets working `contractHash` (`:433,442`), not `targetHash`; PASS. (2) floating-`@contract` BUG fixed — extensions get `spaceContractHash = undefined`; PASS. (3) off-path fully drawn dim grey (name/hash/gutter/suffix all `dim`, none blanked); correct on disk. (4) on-path lanes + hash `greenBright`; correct on disk. (5) list via `ui.output` not `ui.log` (`:851`); PASS. (6) list reuses graph data-column helpers in green, ad-hoc `1. name (…)` gone; PASS.
+
+**AC delta:** AC-6 evidence revised to the richer render (fully-drawn grey off-path + green lanes); stays PASS on correctness. Added AC-7 (working-contract `@contract`, app-only) PASS — `migrate-show.test.ts` `'@contract marks the working contract…'` + `'@contract does not appear in extension spaces'`, both non-tautological. Added AC-8 (list graph-row format, no Clack gutter) PASS — `migrate-show.test.ts:425-432`. Totals 8 PASS / 0 FAIL.
+
+**No-regression:** read-only intact (`executeMigrateShowCommand` returns `ok` at `:465`, never reaches `runMigration`); faithfulness intact (path still via `planMemberPath`/`graphWalkStrategy` `:346-359`, unchanged from R2); shared graph/status/list output unchanged — `pathHighlight` set only in `--show` (`migrate.ts:428`), no `__snapshots__` in the diff.
+
+**Multi-space judgment:** correct. The command now renders app + extensions per `allMembers` (`:253`), mirroring real multi-space `migrate`; extension spaces show their own head/path with no `@contract` and no floating app-contract node (test-confirmed).
+
+**Findings:** F2 (should-fix) — the on-path-green/off-path-grey colour wrappers (items 3+4) are correct on disk but covered by no test (`migrate-show.test.ts` all run `--no-color`; renderer unit test has no `pathHighlight` case). Blocks SATISFIED per all-severities-block; cheap to close with one colorized assertion.
+
+**For orchestrator:** F2 is in-PR addressable (add one path-highlight colour assertion). Note the operator already visually confirmed the colours on PR #735, so if you judge the visual contract sufficiently covered by human review you may accept F2 as a deferral — flagging the call to you. Transient-ID scan on R3 `+` diff: zero hits. Gates trusted (implementer reports typecheck + cli suite green, shared snapshots unchanged); pre-existing `control-api/client.test.ts` / `migration-list-json-golden` concurrent flakes are not regressions.
 
 ## Orchestrator notes (R1 triage)
 
