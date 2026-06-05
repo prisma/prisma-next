@@ -115,7 +115,13 @@ export function createContract<
 
 type SqlStorageLike = StorageBase & {
   readonly namespaces: Readonly<
-    Record<string, { readonly id: string; readonly entries: Readonly<{ readonly table?: Readonly<Record<string, unknown>> }> }>
+    Record<
+      string,
+      {
+        readonly id: string;
+        readonly entries: Readonly<{ readonly table?: Readonly<Record<string, unknown>> }>;
+      }
+    >
   >;
   readonly types?: Record<string, unknown>;
 };
