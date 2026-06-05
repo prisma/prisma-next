@@ -146,7 +146,7 @@ async function runAndCaptureExit(invoke: () => Promise<number>): Promise<number>
 
 interface CheckResultEnvelope {
   readonly ok: boolean;
-  readonly failures: ReadonlyArray<{ readonly pnCode: string; readonly where: string }>;
+  readonly failures: ReadonlyArray<{ readonly code: string; readonly where: string }>;
   readonly summary: string;
 }
 
@@ -184,7 +184,7 @@ describe('migration check multi-space (command)', () => {
 
     expect(exitCode).toBe(4);
     expect(result.ok).toBe(false);
-    const dangling = result.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-004');
+    const dangling = result.failures.filter((f) => f.code === 'PN-MIG-CHECK-004');
     expect(dangling).toHaveLength(1);
     expect(dangling[0]?.where).toContain('postgis');
   });
@@ -253,7 +253,7 @@ describe('migration check --space narrows aggregate integrity violations (comman
 
     expect(exitCode).toBe(4);
     expect(result.ok).toBe(false);
-    const hashFailures = result.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-001');
+    const hashFailures = result.failures.filter((f) => f.code === 'PN-MIG-CHECK-001');
     expect(hashFailures).toHaveLength(1);
     expect(hashFailures[0]?.where).toContain('app');
   });
@@ -270,7 +270,7 @@ describe('migration check --space narrows aggregate integrity violations (comman
 
     expect(exitCode).toBe(4);
     expect(result.ok).toBe(false);
-    const hashFailures = result.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-001');
+    const hashFailures = result.failures.filter((f) => f.code === 'PN-MIG-CHECK-001');
     expect(hashFailures).toHaveLength(1);
     expect(hashFailures[0]?.where).toContain('app');
   });
@@ -286,7 +286,7 @@ describe('migration check --space narrows aggregate integrity violations (comman
     const result = firstJsonLine<CheckResultEnvelope>(consoleOutput);
 
     const appHashFailures = result.failures.filter(
-      (f) => f.pnCode === 'PN-MIG-CHECK-001' && f.where.includes('app'),
+      (f) => f.code === 'PN-MIG-CHECK-001' && f.where.includes('app'),
     );
     expect(appHashFailures).toHaveLength(0);
   });

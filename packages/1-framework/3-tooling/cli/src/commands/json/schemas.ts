@@ -175,3 +175,21 @@ export const migrationShowResultSchema = successEnvelopeBaseSchema.and(
 );
 
 export type MigrationShowResult = typeof migrationShowResultSchema.infer;
+
+export const checkFailureSchema = type({
+  space: 'string',
+  code: 'string',
+  where: 'string',
+  why: 'string',
+  fix: 'string',
+});
+
+export type CheckFailure = typeof checkFailureSchema.infer;
+
+export const migrationCheckResultSchema = type({
+  ok: 'boolean',
+  failures: checkFailureSchema.array(),
+  summary: 'string',
+});
+
+export type MigrationCheckResult = typeof migrationCheckResultSchema.infer;

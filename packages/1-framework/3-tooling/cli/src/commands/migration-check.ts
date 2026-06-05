@@ -47,10 +47,7 @@ import { formatErrorJson, formatErrorOutput } from '../utils/formatters/errors';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
-import {
-  type CheckFailure,
-  integrityViolationToCheckFailure,
-} from '../utils/integrity-violation-to-check-failure';
+import { integrityViolationToCheckFailure } from '../utils/integrity-violation-to-check-failure';
 import {
   findPackageByDirPath,
   looksLikePath,
@@ -58,6 +55,7 @@ import {
   resolveTargetPathAcrossSpaces,
 } from '../utils/migration-path-target';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import type { CheckFailure, MigrationCheckResult } from './json/schemas';
 import { INTEGRITY_FAILED, OK, PRECONDITION } from './migration-check/exit-codes';
 
 interface MigrationCheckOptions extends CommonCommandOptions {
@@ -65,13 +63,8 @@ interface MigrationCheckOptions extends CommonCommandOptions {
   readonly space?: string;
 }
 
-export type { CheckFailure } from '../utils/integrity-violation-to-check-failure';
-
-export interface MigrationCheckResult {
-  readonly ok: boolean;
-  readonly failures: readonly CheckFailure[];
-  readonly summary: string;
-}
+export type { CheckFailure, MigrationCheckResult } from './json/schemas';
+export { migrationCheckResultSchema } from './json/schemas';
 
 function migrationPathRelative(dirPath: string): string {
   return relative(process.cwd(), dirPath);
@@ -81,10 +74,16 @@ function migrationFileRelative(dirPath: string, fileName: string): string {
   return join(migrationPathRelative(dirPath), fileName);
 }
 
-function checkFileExists(dirPath: string, dirName: string, fileName: string): CheckFailure | null {
+function checkFileExists(
+  spaceId: string,
+  dirPath: string,
+  dirName: string,
+  fileName: string,
+): CheckFailure | null {
   if (!existsSync(join(dirPath, fileName))) {
     return {
-      pnCode: 'PN-MIG-CHECK-002',
+      space: spaceId,
+      code: 'PN-MIG-CHECK-002',
       where: migrationFileRelative(dirPath, fileName),
       why: `${fileName} is missing from ${dirName}`,
       fix: 'Re-emit the migration package or restore from version control.',
@@ -93,7 +92,10 @@ function checkFileExists(dirPath: string, dirName: string, fileName: string): Ch
   return null;
 }
 
-function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | null {
+function checkSnapshotConsistency(
+  spaceId: string,
+  pkg: OnDiskMigrationPackage,
+): CheckFailure | null {
   const endContractPath = join(pkg.dirPath, 'end-contract.json');
   if (!existsSync(endContractPath)) return null;
   try {
@@ -102,7 +104,8 @@ function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | n
     const snapshotHash = storage?.['storageHash'];
     if (typeof snapshotHash === 'string' && snapshotHash !== pkg.metadata.to) {
       return {
-        pnCode: 'PN-MIG-CHECK-005',
+        space: spaceId,
+        code: 'PN-MIG-CHECK-005',
         where: migrationPathRelative(pkg.dirPath),
         why: `Migration "${pkg.dirName}" declares to=${pkg.metadata.to} but end-contract.json has storageHash=${snapshotHash}`,
         fix: 'Re-emit the migration package so migration.json and end-contract.json agree.',
@@ -110,7 +113,8 @@ function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | n
     }
   } catch {
     return {
-      pnCode: 'PN-MIG-CHECK-006',
+      space: spaceId,
+      code: 'PN-MIG-CHECK-006',
       where: migrationPathRelative(pkg.dirPath),
       why: `Migration "${pkg.dirName}" has an unparseable end-contract.json.`,
       fix: 'Re-emit the migration package to repair the snapshot file.',
@@ -189,7 +193,7 @@ function checkManifestFilesPresent(space: CheckSpace): readonly CheckFailure[] {
     }
     if (!loadedDirNames.has(entry)) {
       for (const f of ['migration.json', 'ops.json']) {
-        const fail = checkFileExists(entryPath, entry, f);
+        const fail = checkFileExists(space.spaceId, entryPath, entry, f);
         if (fail) failures.push(fail);
       }
     }
@@ -207,7 +211,8 @@ function checkReachability(space: CheckSpace): readonly CheckFailure[] {
       pkg.metadata.from === 'sha256:empty';
     if (!isReachable) {
       failures.push({
-        pnCode: 'PN-MIG-CHECK-003',
+        space: space.spaceId,
+        code: 'PN-MIG-CHECK-003',
         where: migrationPathRelative(pkg.dirPath),
         why: `Migration "${pkg.dirName}" starts from ${pkg.metadata.from} which no other migration produces`,
         fix: 'This migration is unreachable in the graph. Delete it or re-emit a connecting migration.',
@@ -222,7 +227,8 @@ function checkDanglingRefs(space: CheckSpace): readonly CheckFailure[] {
   for (const [name, entry] of Object.entries(space.refs)) {
     if (!space.graph.nodes.has(entry.hash)) {
       failures.push({
-        pnCode: 'PN-MIG-CHECK-004',
+        space: space.spaceId,
+        code: 'PN-MIG-CHECK-004',
         where: relative(process.cwd(), join(space.refsDir, `${name}.json`)),
         why: `Ref "${name}" points at ${entry.hash} which does not exist in the migration graph`,
         fix: `Update the ref with \`prisma-next ref set ${name} <valid-hash>\` or delete it.`,
@@ -235,7 +241,9 @@ function checkDanglingRefs(space: CheckSpace): readonly CheckFailure[] {
 function checkSpace(space: CheckSpace): readonly CheckFailure[] {
   return [
     ...checkManifestFilesPresent(space),
-    ...space.packages.map(checkSnapshotConsistency).filter((f): f is CheckFailure => f !== null),
+    ...space.packages
+      .map((pkg) => checkSnapshotConsistency(space.spaceId, pkg))
+      .filter((f): f is CheckFailure => f !== null),
     ...checkReachability(space),
     ...checkDanglingRefs(space),
   ];
@@ -535,21 +543,22 @@ async function checkSingleTarget(
   const failures: CheckFailure[] = [...checkManifestFilesPresent(matchedSpace)];
 
   for (const f of ['migration.json', 'ops.json']) {
-    const fail = checkFileExists(matchedPkg.dirPath, matchedPkg.dirName, f);
+    const fail = checkFileExists(matchedSpace.spaceId, matchedPkg.dirPath, matchedPkg.dirName, f);
     if (fail) failures.push(fail);
   }
 
   const verification = verifyMigrationHash(matchedPkg);
   if (!verification.ok) {
     failures.push({
-      pnCode: 'PN-MIG-CHECK-001',
+      space: matchedSpace.spaceId,
+      code: 'PN-MIG-CHECK-001',
       where: migrationFileRelative(matchedPkg.dirPath, 'migration.json'),
       why: `Stored hash ${verification.storedHash} does not match recomputed hash ${verification.computedHash}`,
       fix: 'Re-emit the migration package or restore from version control.',
     });
   }
 
-  const snapshotFailure = checkSnapshotConsistency(matchedPkg);
+  const snapshotFailure = checkSnapshotConsistency(matchedSpace.spaceId, matchedPkg);
   if (snapshotFailure) failures.push(snapshotFailure);
 
   const resolvedSpaceId = matchedSpace.spaceId !== 'app' ? matchedSpace.spaceId : undefined;
@@ -641,7 +650,7 @@ export function createMigrationCheckCommand(): Command {
           ui.log(`✔ ${result.summary}${spaceSuffix}`);
         } else {
           for (const f of result.failures) {
-            ui.log(`✗ [${f.pnCode}] ${f.where}: ${f.why}`);
+            ui.log(`✗ [${f.code}] ${f.where}: ${f.why}`);
             ui.log(`  fix: ${f.fix}`);
           }
           ui.log(`\n${result.summary}`);

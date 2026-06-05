@@ -129,7 +129,7 @@ async function runAndCaptureExit(invoke: () => Promise<number>): Promise<number>
 
 interface CheckResultEnvelope {
   readonly ok: boolean;
-  readonly failures: ReadonlyArray<{ readonly pnCode: string; readonly where: string }>;
+  readonly failures: ReadonlyArray<{ readonly code: string; readonly where: string }>;
   readonly summary: string;
 }
 
