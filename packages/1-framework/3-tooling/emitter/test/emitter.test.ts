@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
@@ -478,7 +477,7 @@ describe('emitter', () => {
     expect(result.contractDts).toContain('export type AddressOutput');
   });
 
-  it('throws when domain has more than one namespace', () => {
+  it('emits successfully when domain has more than one namespace', () => {
     const contract = {
       ...createTestContract(),
       domain: {
@@ -488,12 +487,12 @@ describe('emitter', () => {
         },
       },
     };
-    expect(() =>
-      generateContractDts(contract, mockSqlHook, [], {
-        storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
-        profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
-      }),
-    ).toThrow(DomainNamespaceResolutionError);
+    const dts = generateContractDts(contract, mockSqlHook, [], {
+      storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
+      profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+    });
+    expect(dts).toContain('readonly auth:');
+    expect(dts).toContain('readonly public:');
   });
 
   it('throws when the sole namespace id has no namespace payload on the contract', () => {
