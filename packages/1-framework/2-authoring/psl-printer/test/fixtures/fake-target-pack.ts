@@ -1,5 +1,5 @@
 /**
- * Test-only fixture target pack: registers a `pslBlocks` descriptor
+ * Test-only fixture extension: registers a `pslBlocks` descriptor
  * (carrying both parser + printer) and a matching `entityTypes` factory
  * for one made-up RLS-shaped keyword `fake_policy`. The keyword name
  * is deliberately not a real PSL block so downstream consumers
@@ -15,7 +15,7 @@
  *   ```
  *
  * Future projects (RLS, roles, custom Postgres types) follow this
- * fixture's shape as the canonical example of a pack-contributed
+ * fixture's shape as the canonical example of an extension-contributed
  * top-level block. The slice's round-trip regression test
  * (`../fake-target-pack.round-trip.test.ts`) consumes this fixture.
  *
@@ -28,14 +28,14 @@ import type {
 } from '@prisma-next/framework-components/authoring';
 import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 import type {
-  PslPackBlock,
-  PslPackBlockParserContext,
-  PslPackBlockPrinterContext,
+  PslExtensionBlock,
+  PslExtensionBlockParserContext,
+  PslExtensionBlockPrinterContext,
 } from '@prisma-next/framework-components/psl-ast';
 
 const FAKE_POLICY_DISCRIMINATOR = 'fake-policy';
 
-export interface FakePolicyAst extends PslPackBlock {
+export interface FakePolicyAst extends PslExtensionBlock {
   readonly kind: typeof FAKE_POLICY_DISCRIMINATOR;
   readonly target: string;
   readonly using: string;
@@ -67,7 +67,7 @@ export class FakePolicyIr extends IRNodeBase {
   }
 }
 
-export function isFakePolicyAst(value: PslPackBlock): value is FakePolicyAst {
+export function isFakePolicyAst(value: PslExtensionBlock): value is FakePolicyAst {
   return value.kind === FAKE_POLICY_DISCRIMINATOR;
 }
 
@@ -90,7 +90,7 @@ export function hydrateFakePolicyIrFromJson(value: unknown): FakePolicyIr {
   return new FakePolicyIr({ name, target, using });
 }
 
-function parseFakePolicyBlock(ctx: PslPackBlockParserContext): FakePolicyAst {
+function parseFakePolicyBlock(ctx: PslExtensionBlockParserContext): FakePolicyAst {
   let target = '';
   let using = '';
   for (let lineIndex = ctx.bounds.startLine + 1; lineIndex < ctx.bounds.endLine; lineIndex++) {
@@ -123,7 +123,7 @@ function parseFakePolicyBlock(ctx: PslPackBlockParserContext): FakePolicyAst {
   };
 }
 
-function printFakePolicyBlock(node: FakePolicyAst, ctx: PslPackBlockPrinterContext): string {
+function printFakePolicyBlock(node: FakePolicyAst, ctx: PslExtensionBlockPrinterContext): string {
   const lines: string[] = [];
   lines.push(`fake_policy ${node.name} {`);
   lines.push(`${ctx.indent}target = ${node.target}`);

@@ -1,16 +1,16 @@
 import type { AuthoringPslBlockNamespace } from '../shared/framework-authoring';
-import type { PslDiagnosticCode, PslPackBlock, PslSpan } from '../shared/psl-substrate';
+import type { PslDiagnosticCode, PslExtensionBlock, PslSpan } from '../shared/psl-extension-block';
 
 export type {
   PslDiagnosticCode,
-  PslPackBlock,
-  PslPackBlockBounds,
-  PslPackBlockDiagnostic,
-  PslPackBlockParserContext,
-  PslPackBlockPrinterContext,
+  PslExtensionBlock,
+  PslExtensionBlockBounds,
+  PslExtensionBlockDiagnostic,
+  PslExtensionBlockParserContext,
+  PslExtensionBlockPrinterContext,
   PslPosition,
   PslSpan,
-} from '../shared/psl-substrate';
+} from '../shared/psl-extension-block';
 
 export interface PslDiagnostic {
   readonly code: PslDiagnosticCode;
@@ -192,15 +192,15 @@ export interface PslNamespace {
   readonly enums: readonly PslEnum[];
   readonly compositeTypes: readonly PslCompositeType[];
   /**
-   * Pack-contributed top-level blocks parsed inside this namespace.
+   * Extension-contributed top-level blocks parsed inside this namespace.
    * The slot is always present (defaults to `[]` when no
    * contributed-keyword blocks land here). Order matches source
-   * order within the namespace; pack-contributed and built-in
+   * order within the namespace; extension-contributed and built-in
    * blocks live in their own slots, so a namespace mixing
    * `model X { … }` and `policy Y { … }` keeps the model in
-   * `models` and the policy in `packBlocks`.
+   * `models` and the policy in `extensionBlocks`.
    */
-  readonly packBlocks: readonly PslPackBlock[];
+  readonly extensionBlocks: readonly PslExtensionBlock[];
   readonly span: PslSpan;
 }
 
@@ -238,7 +238,7 @@ export interface ParsePslDocumentInput {
   readonly schema: string;
   readonly sourceId: string;
   /**
-   * Pack-contributed parser contributions, indexed by the top-level
+   * Extension-contributed parser contributions, indexed by the top-level
    * keyword the parser dispatches on. Typically an
    * `AssembledAuthoringContributions.pslBlocks` namespace produced by
    * `assembleAuthoringContributions` — but the parser only consumes

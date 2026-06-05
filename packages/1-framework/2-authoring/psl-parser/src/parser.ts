@@ -15,16 +15,16 @@ import type {
   PslDocumentAst,
   PslEnum,
   PslEnumValue,
+  PslExtensionBlock,
+  PslExtensionBlockBounds,
+  PslExtensionBlockDiagnostic,
+  PslExtensionBlockParserContext,
   PslField,
   PslFieldAttribute,
   PslModel,
   PslModelAttribute,
   PslNamedTypeDeclaration,
   PslNamespace,
-  PslPackBlock,
-  PslPackBlockBounds,
-  PslPackBlockDiagnostic,
-  PslPackBlockParserContext,
   PslPosition,
   PslSpan,
   PslTypeConstructorCall,
@@ -77,7 +77,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     models: PslModel[];
     enums: PslEnum[];
     compositeTypes: PslCompositeType[];
-    packBlocks: PslPackBlock[];
+    extensionBlocks: PslExtensionBlock[];
     span: PslSpan | undefined;
   }
 
@@ -94,7 +94,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         models: [],
         enums: [],
         compositeTypes: [],
-        packBlocks: [],
+        extensionBlocks: [],
         span: spanIfNew,
       };
       namespacesByName.set(name, acc);
@@ -217,11 +217,11 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         continue;
       }
 
-      const packBlockMatch = line.match(/^([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*\{$/);
-      if (packBlockMatch) {
-        const keyword = packBlockMatch[1] ?? '';
-        const blockName = packBlockMatch[2] ?? '';
-        const descriptor = lookupPackBlockDescriptor(pslBlockNamespace, keyword);
+      const extensionBlockMatch = line.match(/^([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*\{$/);
+      if (extensionBlockMatch) {
+        const keyword = extensionBlockMatch[1] ?? '';
+        const blockName = extensionBlockMatch[2] ?? '';
+        const descriptor = lookupExtensionBlockDescriptor(pslBlockNamespace, keyword);
         if (descriptor) {
           const bounds = findBlockBounds(context, lineIndex);
           if (blockName.length > 0) {
@@ -229,7 +229,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
               currentNamespaceName,
               createTrimmedLineSpan(context, lineIndex),
             );
-            const node = invokePackBlockParser(
+            const node = invokeExtensionBlockParser(
               context,
               descriptor,
               keyword,
@@ -238,7 +238,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
               bounds,
             );
             if (node) {
-              acc.packBlocks.push(node);
+              acc.extensionBlocks.push(node);
             }
           }
           lineIndex = bounds.endLine + 1;
@@ -337,7 +337,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       acc.models.length === 0 &&
       acc.enums.length === 0 &&
       acc.compositeTypes.length === 0 &&
-      acc.packBlocks.length === 0
+      acc.extensionBlocks.length === 0
     ) {
       continue;
     }
@@ -371,7 +371,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       models: normalizedModels,
       enums: acc.enums,
       compositeTypes: acc.compositeTypes,
-      packBlocks: acc.packBlocks,
+      extensionBlocks: acc.extensionBlocks,
       span: acc.span ?? documentSpan,
     });
   }
@@ -1504,7 +1504,7 @@ function pushDiagnostic(
   });
 }
 
-function lookupPackBlockDescriptor(
+function lookupExtensionBlockDescriptor(
   namespace: AuthoringPslBlockNamespace,
   keyword: string,
 ): AuthoringPslBlockDescriptor | undefined {
@@ -1515,15 +1515,15 @@ function lookupPackBlockDescriptor(
   return isAuthoringPslBlockDescriptor(value) ? value : undefined;
 }
 
-function invokePackBlockParser(
+function invokeExtensionBlockParser(
   context: ParserContext,
   descriptor: AuthoringPslBlockDescriptor,
   keyword: string,
   blockName: string,
   keywordLineIndex: number,
   bounds: BlockBounds,
-): PslPackBlock | undefined {
-  const handle = createPackBlockParserContext(
+): PslExtensionBlock | undefined {
+  const handle = createExtensionBlockParserContext(
     context,
     keyword,
     blockName,
@@ -1533,14 +1533,14 @@ function invokePackBlockParser(
   return descriptor.parser(handle);
 }
 
-function createPackBlockParserContext(
+function createExtensionBlockParserContext(
   context: ParserContext,
   keyword: string,
   name: string,
   keywordLineIndex: number,
   bounds: BlockBounds,
-): PslPackBlockParserContext {
-  const packBounds: PslPackBlockBounds = {
+): PslExtensionBlockParserContext {
+  const extensionBlockBounds: PslExtensionBlockBounds = {
     startLine: bounds.startLine,
     endLine: bounds.endLine,
     closed: bounds.closed,
@@ -1549,14 +1549,14 @@ function createPackBlockParserContext(
     name,
     keyword,
     keywordSpan: createTrimmedLineSpan(context, keywordLineIndex),
-    bounds: packBounds,
+    bounds: extensionBlockBounds,
     lines: context.lines,
     stripInlineComment,
     trimmedLineSpan: (lineIndex) => createTrimmedLineSpan(context, lineIndex),
     inlineSpan: (lineIndex, startColumn, endColumn) =>
       createInlineSpan(context, lineIndex, startColumn, endColumn),
     lineRangeSpan: (startLine, endLine) => createLineRangeSpan(context, startLine, endLine),
-    pushDiagnostic: (diagnostic: PslPackBlockDiagnostic) =>
+    pushDiagnostic: (diagnostic: PslExtensionBlockDiagnostic) =>
       pushDiagnostic(context, {
         code: diagnostic.code,
         message: diagnostic.message,

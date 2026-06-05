@@ -4,8 +4,8 @@ import type {
 } from '@prisma-next/framework-components/authoring';
 import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
 import type {
-  PslPackBlock,
-  PslPackBlockPrinterContext,
+  PslExtensionBlock,
+  PslExtensionBlockPrinterContext,
 } from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -96,7 +96,7 @@ export function serializePrintDocument(
   }
 
   const blockDispatchMap = buildPslBlockDispatchMap(options.pslBlocks);
-  const printerContext: PslPackBlockPrinterContext = {
+  const printerContext: PslExtensionBlockPrinterContext = {
     indent: PSL_INDENT_UNIT,
     escapeStringLiteral: escapePslString,
   };
@@ -126,7 +126,7 @@ export function serializePrintDocument(
 function serializeNamespaceContents(
   namespace: PrintNamespaceSection,
   blockDispatchMap: PslBlockDispatchMap,
-  printerContext: PslPackBlockPrinterContext,
+  printerContext: PslExtensionBlockPrinterContext,
 ): string[] {
   const sections: string[] = [];
   const enumsSorted = [...namespace.enums].sort((a, b) => a.name.localeCompare(b.name));
@@ -136,30 +136,30 @@ function serializeNamespaceContents(
   for (const model of namespace.models) {
     sections.push(serializeModel(model));
   }
-  for (const packBlock of namespace.packBlocks) {
-    sections.push(serializePackBlock(packBlock, blockDispatchMap, printerContext));
+  for (const extensionBlock of namespace.extensionBlocks) {
+    sections.push(serializeExtensionBlock(extensionBlock, blockDispatchMap, printerContext));
   }
   return sections;
 }
 
-function serializePackBlock(
-  packBlock: PslPackBlock,
+function serializeExtensionBlock(
+  extensionBlock: PslExtensionBlock,
   blockDispatchMap: PslBlockDispatchMap,
-  printerContext: PslPackBlockPrinterContext,
+  printerContext: PslExtensionBlockPrinterContext,
 ): string {
-  const descriptor = blockDispatchMap.get(packBlock.kind);
+  const descriptor = blockDispatchMap.get(extensionBlock.kind);
   if (!descriptor) {
     throw new Error(
-      `No pslBlocks contribution registered for pack-contributed block discriminator "${packBlock.kind}". Provide a matching pslBlocks contribution to printPsl, or remove the block from the input AST.`,
+      `No pslBlocks contribution registered for extension-contributed block discriminator "${extensionBlock.kind}". Provide a matching pslBlocks contribution to printPsl, or remove the block from the input AST.`,
     );
   }
-  // The descriptor is held as the base shape (`Node = PslPackBlock`), so
-  // its `printer` signature is `(node: PslPackBlock, ctx) => string` —
-  // the dispatched `packBlock` is a `PslPackBlock`, so the call is
+  // The descriptor is held as the base shape (`Node = PslExtensionBlock`), so
+  // its `printer` signature is `(node: PslExtensionBlock, ctx) => string` —
+  // the dispatched `extensionBlock` is a `PslExtensionBlock`, so the call is
   // directly type-correct. The discriminator-keyed lookup pairs each
-  // `packBlock` with the descriptor whose parser produced it; the
+  // `extensionBlock` with the descriptor whose parser produced it; the
   // descriptor's own printer renders it.
-  return descriptor.printer(packBlock, printerContext);
+  return descriptor.printer(extensionBlock, printerContext);
 }
 
 function wrapNamespaceBlock(name: string, innerSections: readonly string[]): string {

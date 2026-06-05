@@ -1,17 +1,15 @@
 /**
- * Shape-only PSL substrate types. These live in the shared plane
- * because they participate in the authoring-contributions descriptor
- * surface (`AuthoringPslBlockDescriptor` in `framework-authoring`),
- * which is itself shared so target packs can declare their
- * contribution shape without depending on migration-plane code.
+ * Shape-only types for extension-contributed PSL blocks. These live in
+ * the shared plane because they participate in the authoring-contributions
+ * descriptor surface (`AuthoringPslBlockDescriptor` in
+ * `framework-authoring`), which is itself shared so an extension can
+ * declare its contribution shape without depending on migration-plane code.
  *
  * The PSL AST node types (`PslModel`, `PslEnum`, …) and the parser
  * itself remain in the migration plane — only the source-position
- * primitives, diagnostic codes, and pack-block SPI types are
+ * primitives, diagnostic codes, and extension-block SPI types are
  * factored out here so the descriptor's parser-function shape can
  * narrow without crossing the shared → migration plane boundary.
- *
- * Ref: TML-2804.
  */
 
 export interface PslPosition {
@@ -41,15 +39,15 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_QUALIFIED_TYPE';
 
 /**
- * Base shape for a pack-contributed top-level PSL block. The
+ * Base shape for an extension-contributed top-level PSL block. The
  * framework parser stores instances of this base under
- * `PslNamespace.packBlocks`; each contribution narrows the shape
+ * `PslNamespace.extensionBlocks`; each contribution narrows the shape
  * with its own `kind` discriminator and additional fields the
  * contribution's printer + lowering factory consume. The mandatory
- * `name` lets the lowering registry index pack-contributed entries
+ * `name` lets the lowering registry index extension-contributed entries
  * by name without per-contribution machinery.
  */
-export interface PslPackBlock {
+export interface PslExtensionBlock {
   readonly kind: string;
   readonly name: string;
   readonly span: PslSpan;
@@ -63,26 +61,26 @@ export interface PslPackBlock {
  * `PSL_UNTERMINATED_BLOCK` diagnostic is emitted by the framework
  * before the contribution is invoked).
  */
-export interface PslPackBlockBounds {
+export interface PslExtensionBlockBounds {
   readonly startLine: number;
   readonly endLine: number;
   readonly closed: boolean;
 }
 
 /**
- * Diagnostic shape a pack-contributed parser emits via the SPI's
+ * Diagnostic shape an extension-contributed parser emits via the SPI's
  * `pushDiagnostic`. The framework attaches `sourceId` itself before
  * adding the entry to the document's diagnostics list, so the
  * contribution does not name the source.
  */
-export interface PslPackBlockDiagnostic {
+export interface PslExtensionBlockDiagnostic {
   readonly code: PslDiagnosticCode;
   readonly message: string;
   readonly span: PslSpan;
 }
 
 /**
- * Handle a pack-contributed parser receives when the framework
+ * Handle an extension-contributed parser receives when the framework
  * dispatches a registered top-level keyword. The shape is the
  * minimum needed to write a parser for a `keyword Name { key = value
  * }`-shape block:
@@ -97,7 +95,7 @@ export interface PslPackBlockDiagnostic {
  *   with `bounds`, the contribution iterates body lines without
  *   needing a slice copy.
  * - `stripInlineComment`, `trimmedLineSpan`, `inlineSpan`,
- *   `lineRangeSpan` mirror the framework's internal helpers; pack
+ *   `lineRangeSpan` mirror the framework's internal helpers; extension
  *   parsers reach for these to walk lines and emit spans without
  *   reimplementing position arithmetic.
  * - `pushDiagnostic` appends to the document's diagnostics list.
@@ -108,43 +106,43 @@ export interface PslPackBlockDiagnostic {
  * framework's private parser into this surface as a separate
  * follow-up.
  */
-export interface PslPackBlockParserContext {
+export interface PslExtensionBlockParserContext {
   readonly name: string;
   readonly keyword: string;
   readonly keywordSpan: PslSpan;
-  readonly bounds: PslPackBlockBounds;
+  readonly bounds: PslExtensionBlockBounds;
   readonly lines: readonly string[];
   readonly stripInlineComment: (line: string) => string;
   readonly trimmedLineSpan: (lineIndex: number) => PslSpan;
   readonly inlineSpan: (lineIndex: number, startColumn: number, endColumn: number) => PslSpan;
   readonly lineRangeSpan: (startLine: number, endLine: number) => PslSpan;
-  readonly pushDiagnostic: (diagnostic: PslPackBlockDiagnostic) => void;
+  readonly pushDiagnostic: (diagnostic: PslExtensionBlockDiagnostic) => void;
 }
 
 /**
- * Handle a pack-contributed printer receives when the framework
- * serializer dispatches a pack-contributed AST node. The shape is
+ * Handle an extension-contributed printer receives when the framework
+ * serializer dispatches an extension-contributed AST node. The shape is
  * intentionally minimal — only what's needed to write a printer for
  * a `keyword Name { key = "value" }`-shape block:
  *
  * - `indent` is the body-line indent string (one level of nesting
- *   inside the block opener — typically two spaces). Pack printers
+ *   inside the block opener — typically two spaces). Extension printers
  *   that emit further-nested content can repeat the indent unit.
  *   The serializer wraps the printer's output with namespace-level
- *   indentation when applicable, so pack printers always emit at
+ *   indentation when applicable, so extension printers always emit at
  *   the block's own indentation level (i.e. no leading whitespace
  *   on the opener line, body lines indented by one `indent` unit).
  * - `escapeStringLiteral` escapes a raw value into a PSL
  *   double-quoted string body — the contribution wraps the result
  *   in `"…"` itself. Mirrors the framework's internal helper so
- *   pack printers don't reimplement quoting.
+ *   extension printers don't reimplement quoting.
  *
- * The SPI is the printer-side mirror of {@link PslPackBlockParserContext}.
+ * The SPI is the printer-side mirror of {@link PslExtensionBlockParserContext}.
  * Helpers that turn out to be load-bearing for a real consumer get
  * lifted from the framework's private serializer into this surface
  * as a separate follow-up.
  */
-export interface PslPackBlockPrinterContext {
+export interface PslExtensionBlockPrinterContext {
   readonly indent: string;
   readonly escapeStringLiteral: (value: string) => string;
 }

@@ -1,5 +1,5 @@
 import type { AuthoringPslBlockNamespace } from '@prisma-next/framework-components/authoring';
-import type { PslDocumentAst, PslPackBlock } from '@prisma-next/framework-components/psl-ast';
+import type { PslDocumentAst, PslExtensionBlock } from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
@@ -10,12 +10,12 @@ const ZERO_SPAN = {
   end: { offset: 0, line: 1, column: 1 },
 } as const;
 
-interface TestKeywordAst extends PslPackBlock {
+interface TestKeywordAst extends PslExtensionBlock {
   readonly kind: 'test-keyword';
   readonly predicate: string;
 }
 
-interface OtherKeywordAst extends PslPackBlock {
+interface OtherKeywordAst extends PslExtensionBlock {
   readonly kind: 'other-keyword';
 }
 
@@ -60,7 +60,7 @@ function buildPslBlocks(): AuthoringPslBlockNamespace {
   };
 }
 
-function makeDocAst(packBlocks: readonly PslPackBlock[]): PslDocumentAst {
+function makeDocAst(extensionBlocks: readonly PslExtensionBlock[]): PslDocumentAst {
   return {
     kind: 'document',
     sourceId: 't',
@@ -71,7 +71,7 @@ function makeDocAst(packBlocks: readonly PslPackBlock[]): PslDocumentAst {
         models: [],
         enums: [],
         compositeTypes: [],
-        packBlocks,
+        extensionBlocks,
         span: ZERO_SPAN,
       },
     ],
@@ -79,7 +79,7 @@ function makeDocAst(packBlocks: readonly PslPackBlock[]): PslDocumentAst {
   };
 }
 
-describe('printPslFromAst with pack-contributed pslBlocks', () => {
+describe('printPslFromAst with extension-contributed pslBlocks', () => {
   describe('given a registered discriminator and a matching AST node', () => {
     it('renders the block via the registry into the namespace section', () => {
       const ast = makeDocAst([
@@ -97,7 +97,7 @@ describe('printPslFromAst with pack-contributed pslBlocks', () => {
     });
   });
 
-  describe('given a built-in model and a pack-contributed block in the same namespace', () => {
+  describe('given a built-in model and an extension-contributed block in the same namespace', () => {
     it('round-trips both through parse → print → parse with the pack registries in scope', () => {
       const source = `model User {
   id Int @id
@@ -117,13 +117,13 @@ testKw Foo {
       const ns1 = parsed1.ast.namespaces[0];
       const ns2 = parsed2.ast.namespaces[0];
       expect(ns2?.models.map((m) => m.name)).toEqual(ns1?.models.map((m) => m.name));
-      expect(ns2?.packBlocks.map((b) => ({ kind: b.kind, name: b.name }))).toEqual(
-        ns1?.packBlocks.map((b) => ({ kind: b.kind, name: b.name })),
+      expect(ns2?.extensionBlocks.map((b) => ({ kind: b.kind, name: b.name }))).toEqual(
+        ns1?.extensionBlocks.map((b) => ({ kind: b.kind, name: b.name })),
       );
     });
   });
 
-  describe('given two distinct pack-contributed keywords in the same namespace', () => {
+  describe('given two distinct extension-contributed keywords in the same namespace', () => {
     it('emits both blocks in source order', () => {
       const ast = makeDocAst([
         {
@@ -143,7 +143,7 @@ testKw Foo {
     });
   });
 
-  describe('given an AST with a pack-contributed block but no matching pslBlocks contribution', () => {
+  describe('given an AST with an extension-contributed block but no matching pslBlocks contribution', () => {
     it('throws naming the unknown discriminator', () => {
       const ast = makeDocAst([{ kind: 'unregistered-kind', name: 'Foo', span: ZERO_SPAN }]);
       expect(() => printPslFromAst(ast, { pslBlocks: buildPslBlocks() })).toThrow(
@@ -159,7 +159,7 @@ testKw Foo {
     });
   });
 
-  describe('given a pack-contributed block inside an explicit namespace', () => {
+  describe('given an extension-contributed block inside an explicit namespace', () => {
     it('emits the block indented inside the namespace wrapper', () => {
       const ast: PslDocumentAst = {
         kind: 'document',
@@ -171,7 +171,7 @@ testKw Foo {
             models: [],
             enums: [],
             compositeTypes: [],
-            packBlocks: [
+            extensionBlocks: [
               {
                 kind: 'test-keyword',
                 name: 'Foo',

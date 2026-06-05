@@ -1,4 +1,4 @@
-import type { PslPackBlock } from '@prisma-next/framework-components/psl-ast';
+import type { PslExtensionBlock } from '@prisma-next/framework-components/psl-ast';
 import type { PrinterEnumValue, PrinterModel, PrinterNamedType } from './types';
 
 export type PrintEnumSection = {
@@ -15,18 +15,18 @@ export type PrintEnumSection = {
  * `namespace { … }` wrapper. Named namespaces emit a `namespace <name> { … }`
  * block around their contents.
  *
- * `packBlocks` carries pack-contributed top-level blocks verbatim from the
+ * `extensionBlocks` carries extension-contributed top-level blocks verbatim from the
  * input AST. Phase 1 (`astDocumentToPrintDocument`) does no transformation
  * here — phase 2 (`serializePrintDocument`) consults the registered
  * `pslBlocks` contribution by `kind` discriminator and renders each entry
  * via the descriptor's `printer`. The slot is always present; an empty
- * array means no pack-contributed blocks landed in this namespace.
+ * array means no extension-contributed blocks landed in this namespace.
  */
 export type PrintNamespaceSection = {
   readonly name: string;
   readonly enums: readonly PrintEnumSection[];
   readonly models: readonly PrinterModel[];
-  readonly packBlocks: readonly PslPackBlock[];
+  readonly extensionBlocks: readonly PslExtensionBlock[];
 };
 
 export type PrintDocument = {

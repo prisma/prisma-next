@@ -1,17 +1,17 @@
 import type { AuthoringPslBlockNamespace } from '@prisma-next/framework-components/authoring';
 import type {
-  PslPackBlock,
-  PslPackBlockParserContext,
+  PslExtensionBlock,
+  PslExtensionBlockParserContext,
 } from '@prisma-next/framework-components/psl-ast';
 import { describe, expect, it } from 'vitest';
 import { parsePslDocument } from '../src/parser';
 
-interface TestKeywordAst extends PslPackBlock {
+interface TestKeywordAst extends PslExtensionBlock {
   readonly kind: 'test-keyword';
   readonly extra: string;
 }
 
-interface OtherKeywordAst extends PslPackBlock {
+interface OtherKeywordAst extends PslExtensionBlock {
   readonly kind: 'other-keyword';
 }
 
@@ -20,7 +20,7 @@ function makeTestKwBlocks(): AuthoringPslBlockNamespace {
     testKw: {
       kind: 'pslBlock',
       discriminator: 'test-keyword',
-      parser: (ctx: PslPackBlockParserContext): TestKeywordAst => {
+      parser: (ctx: PslExtensionBlockParserContext): TestKeywordAst => {
         let extra = '';
         for (
           let lineIndex = ctx.bounds.startLine + 1;
@@ -47,9 +47,9 @@ function makeTestKwBlocks(): AuthoringPslBlockNamespace {
   };
 }
 
-describe('parsePslDocument with pack-contributed pslBlocks', () => {
+describe('parsePslDocument with extension-contributed pslBlocks', () => {
   describe('given a registered keyword', () => {
-    it('routes the block to the contribution and lands the AST node in packBlocks', () => {
+    it('routes the block to the contribution and lands the AST node in extensionBlocks', () => {
       const result = parsePslDocument({
         schema: 'testKw Foo {\n  extra = "hello"\n}\n',
         sourceId: 'schema.prisma',
@@ -60,7 +60,7 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
       expect(result.ok).toBe(true);
       const namespace = result.ast.namespaces[0];
       expect(namespace).toBeDefined();
-      expect(namespace?.packBlocks).toEqual([
+      expect(namespace?.extensionBlocks).toEqual([
         expect.objectContaining({
           kind: 'test-keyword',
           name: 'Foo',
@@ -77,7 +77,7 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
           parser: (ctx) => {
             ctx.pushDiagnostic({
               code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-              message: `pack-contributed parser saw block "${ctx.name}"`,
+              message: `extension-contributed parser saw block "${ctx.name}"`,
               span: ctx.trimmedLineSpan(ctx.bounds.startLine),
             });
             return {
@@ -98,7 +98,7 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
       expect(result.diagnostics[0]).toMatchObject({
         code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
         sourceId: 'schema.prisma',
-        message: 'pack-contributed parser saw block "Foo"',
+        message: 'extension-contributed parser saw block "Foo"',
       });
     });
   });
@@ -120,7 +120,7 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
   });
 
   describe('given two registered keywords in the same namespace', () => {
-    it('preserves source order in packBlocks', () => {
+    it('preserves source order in extensionBlocks', () => {
       const blocks: AuthoringPslBlockNamespace = {
         ...makeTestKwBlocks(),
         otherKw: {
@@ -142,15 +142,15 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
       });
 
       expect(result.diagnostics).toEqual([]);
-      const packBlocks = result.ast.namespaces[0]?.packBlocks ?? [];
-      expect(packBlocks.map((block) => ({ kind: block.kind, name: block.name }))).toEqual([
+      const extensionBlocks = result.ast.namespaces[0]?.extensionBlocks ?? [];
+      expect(extensionBlocks.map((block) => ({ kind: block.kind, name: block.name }))).toEqual([
         { kind: 'test-keyword', name: 'First' },
         { kind: 'other-keyword', name: 'Second' },
       ]);
     });
   });
 
-  describe('given a namespace mixing built-in and pack-contributed blocks', () => {
+  describe('given a namespace mixing built-in and extension-contributed blocks', () => {
     it('routes each kind into its own slot and preserves names', () => {
       const result = parsePslDocument({
         schema:
@@ -162,8 +162,8 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
       expect(result.diagnostics).toEqual([]);
       const namespace = result.ast.namespaces[0];
       expect(namespace?.models.map((model) => model.name)).toEqual(['User', 'Post']);
-      expect(namespace?.packBlocks.map((block) => block.name)).toEqual(['Foo']);
-      const fooBlock = namespace?.packBlocks[0];
+      expect(namespace?.extensionBlocks.map((block) => block.name)).toEqual(['Foo']);
+      const fooBlock = namespace?.extensionBlocks[0];
       expect(fooBlock).toMatchObject({
         kind: 'test-keyword',
         name: 'Foo',
@@ -172,7 +172,7 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
     });
   });
 
-  describe('given pack-contributed blocks inside an explicit namespace', () => {
+  describe('given extension-contributed blocks inside an explicit namespace', () => {
     it('routes blocks into the enclosing namespace bucket', () => {
       const result = parsePslDocument({
         schema: 'namespace public {\n  testKw Foo {\n    extra = "y"\n  }\n}\n',
@@ -182,7 +182,7 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
 
       expect(result.diagnostics).toEqual([]);
       const publicNamespace = result.ast.namespaces.find((ns) => ns.name === 'public');
-      expect(publicNamespace?.packBlocks).toEqual([
+      expect(publicNamespace?.extensionBlocks).toEqual([
         expect.objectContaining({ kind: 'test-keyword', name: 'Foo', extra: 'y' }),
       ]);
     });

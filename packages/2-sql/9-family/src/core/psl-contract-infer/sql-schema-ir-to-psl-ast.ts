@@ -170,7 +170,7 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
         models: sortedModels,
         enums,
         compositeTypes: [],
-        packBlocks: [],
+        extensionBlocks: [],
         span: SYNTHETIC_SPAN,
       },
     ],

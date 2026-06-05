@@ -1,17 +1,17 @@
 /**
- * End-to-end round-trip pin for the pack-contributed-PSL-blocks
- * substrate. A test-only fixture target pack registers a `pslBlocks`
+ * End-to-end round-trip pin for the extension-contributed-PSL-blocks
+ * mechanism. A test-only fixture extension registers a `pslBlocks`
  * descriptor (carrying both parser + printer) and a matching
  * `entityTypes` factory for one made-up RLS-shaped keyword and
  * exercises the path:
  *
- *   text → parse → AST.packBlocks → entityTypes factory → IR class
+ *   text → parse → AST.extensionBlocks → entityTypes factory → IR class
  *        → JSON.stringify → JSON.parse → IR class (hydrated)
- *        → print → text → parse → AST.packBlocks (equivalent)
+ *        → print → text → parse → AST.extensionBlocks (equivalent)
  *
  * The fixture lives at `./fixtures/fake-target-pack.ts`. Downstream
  * projects (RLS, roles, custom Postgres types) follow this shape as
- * the canonical example of a pack-contributed top-level block.
+ * the canonical example of an extension-contributed top-level block.
  *
  * Ref: TML-2804.
  */
@@ -38,7 +38,7 @@ describe('fake-target-pack round-trip', () => {
 }
 `;
 
-    it('parses the block into a PslPackBlock with the contributed kind', () => {
+    it('parses the block into a PslExtensionBlock with the contributed kind', () => {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
@@ -49,8 +49,8 @@ describe('fake-target-pack round-trip', () => {
       const namespace = parsed.ast.namespaces.find(
         (ns) => ns.name === UNSPECIFIED_PSL_NAMESPACE_ID,
       );
-      expect(namespace?.packBlocks).toHaveLength(1);
-      const block = namespace?.packBlocks[0];
+      expect(namespace?.extensionBlocks).toHaveLength(1);
+      const block = namespace?.extensionBlocks[0];
       expect(block).toBeDefined();
       if (!block || !isFakePolicyAst(block)) {
         throw new Error('expected one fake-policy block');
@@ -87,7 +87,7 @@ describe('fake-target-pack round-trip', () => {
         sourceId: 'r',
         pslBlocks: assembled.pslBlocks,
       });
-      const block = parsed.ast.namespaces[0]?.packBlocks[0];
+      const block = parsed.ast.namespaces[0]?.extensionBlocks[0];
       if (!block || !isFakePolicyAst(block)) {
         throw new Error('expected one fake-policy block');
       }
@@ -189,7 +189,7 @@ function projectFirstFakePolicy(ast: ReturnType<typeof parsePslDocument>['ast'])
   using: string;
 } {
   const ns = ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-  const block = ns?.packBlocks[0];
+  const block = ns?.extensionBlocks[0];
   if (!block || !isFakePolicyAst(block)) {
     throw new Error('expected one fake-policy block');
   }

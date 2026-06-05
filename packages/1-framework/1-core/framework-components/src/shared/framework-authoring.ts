@@ -11,10 +11,10 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type {
-  PslPackBlock,
-  PslPackBlockParserContext,
-  PslPackBlockPrinterContext,
-} from './psl-substrate';
+  PslExtensionBlock,
+  PslExtensionBlockParserContext,
+  PslExtensionBlockPrinterContext,
+} from './psl-extension-block';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -164,7 +164,7 @@ export type AuthoringEntityTypeNamespace = {
 };
 
 /**
- * Pack-contributed parser + printer for a top-level PSL block
+ * Extension-contributed parser + printer for a top-level PSL block
  * keyword. Parser and printer live on one descriptor because they
  * are one inseparable unit: a parser with no printer breaks
  * `contract infer`, and a printer with no parser parses nothing.
@@ -172,12 +172,12 @@ export type AuthoringEntityTypeNamespace = {
  * - `parser`: the framework parser dispatches an unrecognised opener
  *   line of the shape `<keyword> <name> { … }` to the
  *   `pslBlocks.<keyword>` contribution, building a
- *   {@link PslPackBlockParserContext} handle from its parser state and
+ *   {@link PslExtensionBlockParserContext} handle from its parser state and
  *   passing it as the sole argument. The contribution returns the AST
  *   node tagged with `discriminator` as its `kind`.
- * - `printer`: the framework serializer dispatches a pack-contributed
+ * - `printer`: the framework serializer dispatches an extension-contributed
  *   AST node to the descriptor whose `discriminator` matches the
- *   node's `kind`, passing the node + a {@link PslPackBlockPrinterContext}
+ *   node's `kind`, passing the node + a {@link PslExtensionBlockPrinterContext}
  *   handle. The contribution returns the rendered block text.
  *
  * The `Node` generic narrows end to end: the same AST shape the
@@ -185,24 +185,24 @@ export type AuthoringEntityTypeNamespace = {
  * matching `entityTypes` factory lowers — keyed by `discriminator`.
  *
  * `parser` and `printer` are declared as methods (not arrow-function
- * properties) so their parameters are checked bivariantly. A pack
- * literal declaring `printer(node: SomeAst, ctx)` must assign to the
- * base descriptor shape (`Node = PslPackBlock`) across the otherwise
- * contravariant parameter position; method bivariance permits the
- * narrower `SomeAst`. The framework dispatches by discriminator and
+ * properties) so their parameters are checked bivariantly. An
+ * extension literal declaring `printer(node: SomeAst, ctx)` must assign
+ * to the base descriptor shape (`Node = PslExtensionBlock`) across the
+ * otherwise contravariant parameter position; method bivariance permits
+ * the narrower `SomeAst`. The framework dispatches by discriminator and
  * the contributor owns both the parser and printer for a given
  * `Node`, so bivariance matches the runtime contract — the parser
  * that produced the node is the one whose printer renders it.
  *
  * The context handles are intentionally minimal — only the helpers
  * needed for a `keyword Name { key = value }` block. See the
- * `PslPackBlock*Context` JSDoc for the calibration.
+ * `PslExtensionBlock*Context` JSDoc for the calibration.
  */
-export interface AuthoringPslBlockDescriptor<Node extends PslPackBlock = PslPackBlock> {
+export interface AuthoringPslBlockDescriptor<Node extends PslExtensionBlock = PslExtensionBlock> {
   readonly kind: 'pslBlock';
   readonly discriminator: string;
-  parser(context: PslPackBlockParserContext): Node;
-  printer(node: Node, context: PslPackBlockPrinterContext): string;
+  parser(context: PslExtensionBlockParserContext): Node;
+  printer(node: Node, context: PslExtensionBlockPrinterContext): string;
   readonly validatorSchema?: Type<unknown>;
 }
 
@@ -543,7 +543,7 @@ function assertPslBlocksHaveFactories(
   for (const block of blockEntries) {
     if (!entityDiscriminators.has(block.discriminator)) {
       throw new Error(
-        `Incomplete pack contribution: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no entityType contribution shares that discriminator. A pack-contributed PSL block requires a matching entityType factory so the parsed AST node can lower to an IR class instance; add an entityType helper with discriminator "${block.discriminator}".`,
+        `Incomplete extension contribution: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no entityType contribution shares that discriminator. An extension-contributed PSL block requires a matching entityType factory so the parsed AST node can lower to an IR class instance; add an entityType helper with discriminator "${block.discriminator}".`,
       );
     }
   }

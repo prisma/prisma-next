@@ -4,7 +4,7 @@
  * declared with `as const satisfies` produces a `parser` whose return
  * type is the same AST node shape its own `printer` consumes and its
  * matching `entityTypes` factory accepts. The parser's return is also
- * constrained to extend `PslPackBlock` so the framework AST slot can
+ * constrained to extend `PslExtensionBlock` so the framework AST slot can
  * hold it.
  *
  * Ref: TML-2804.
@@ -16,12 +16,12 @@ import type {
   AuthoringPslBlockNamespace,
 } from '../src/shared/framework-authoring';
 import type {
-  PslPackBlock,
-  PslPackBlockParserContext,
-  PslPackBlockPrinterContext,
-} from '../src/shared/psl-substrate';
+  PslExtensionBlock,
+  PslExtensionBlockParserContext,
+  PslExtensionBlockPrinterContext,
+} from '../src/shared/psl-extension-block';
 
-interface FixtureAst extends PslPackBlock {
+interface FixtureAst extends PslExtensionBlock {
   readonly kind: 'fixture-block';
   readonly predicate: string;
 }
@@ -35,13 +35,13 @@ const fixturePslBlocks = {
   fixture: {
     kind: 'pslBlock',
     discriminator: 'fixture-block',
-    parser: (ctx: PslPackBlockParserContext): FixtureAst => ({
+    parser: (ctx: PslExtensionBlockParserContext): FixtureAst => ({
       kind: 'fixture-block',
       name: ctx.name,
       span: ctx.lineRangeSpan(ctx.bounds.startLine, ctx.bounds.endLine),
       predicate: '',
     }),
-    printer: (input: FixtureAst, ctx: PslPackBlockPrinterContext): string =>
+    printer: (input: FixtureAst, ctx: PslExtensionBlockPrinterContext): string =>
       `fixture ${input.name} {\n${ctx.indent}predicate = "${ctx.escapeStringLiteral(input.predicate)}"\n}`,
   },
 } as const satisfies AuthoringPslBlockNamespace;
@@ -80,19 +80,19 @@ test('parser return narrows to AST shape produced by entityTypes factory', () =>
   expectTypeOf<ParserOutput>().toEqualTypeOf<FactoryOutput>();
 });
 
-test('parser return extends PslPackBlock so it fits the AST packBlocks slot', () => {
+test('parser return extends PslExtensionBlock so it fits the AST extensionBlocks slot', () => {
   type ParserOutput = ReturnType<typeof fixturePslBlocks.fixture.parser>;
-  expectTypeOf<ParserOutput>().toExtend<PslPackBlock>();
+  expectTypeOf<ParserOutput>().toExtend<PslExtensionBlock>();
 });
 
-test('printer consumes a PslPackBlock-extending node via PslPackBlockPrinterContext', () => {
+test('printer consumes a PslExtensionBlock-extending node via PslExtensionBlockPrinterContext', () => {
   type PrinterFn = typeof fixturePslBlocks.fixture.printer;
   type PrinterInput = Parameters<PrinterFn>[0];
   type PrinterContextArg = Parameters<PrinterFn>[1];
   type PrinterReturn = ReturnType<PrinterFn>;
 
-  expectTypeOf<PrinterInput>().toExtend<PslPackBlock>();
-  expectTypeOf<PrinterContextArg>().toEqualTypeOf<PslPackBlockPrinterContext>();
+  expectTypeOf<PrinterInput>().toExtend<PslExtensionBlock>();
+  expectTypeOf<PrinterContextArg>().toEqualTypeOf<PslExtensionBlockPrinterContext>();
   expectTypeOf<PrinterReturn>().toEqualTypeOf<string>();
 });
 

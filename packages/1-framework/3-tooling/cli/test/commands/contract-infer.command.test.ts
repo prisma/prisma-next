@@ -58,7 +58,7 @@ function buildSyntheticUserAst(): PslDocumentAst {
         ],
         enums: [],
         compositeTypes: [],
-        packBlocks: [],
+        extensionBlocks: [],
         span: SYNTHETIC_SPAN,
       },
     ],

@@ -7,14 +7,14 @@ export type PslBlocksNamespace = AuthoringPslBlockNamespace;
 
 export interface PrintPslOptions {
   /**
-   * Pack-contributed PSL block contributions, indexed by user-facing
+   * Extension-contributed PSL block contributions, indexed by user-facing
    * path. Typically an `AssembledAuthoringContributions.pslBlocks`
    * namespace produced by `assembleAuthoringContributions`. The printer
-   * dispatch indexes into this namespace by each pack-contributed AST
+   * dispatch indexes into this namespace by each extension-contributed AST
    * node's `kind` discriminator and renders via the descriptor's
    * `printer` (parser and printer live on the same descriptor).
    *
-   * When absent, an AST that contains pack-contributed blocks throws —
+   * When absent, an AST that contains extension-contributed blocks throws —
    * silently dropping those blocks would lose user-authored content
    * without diagnostic. ASTs that contain only framework-parsed blocks
    * print without any `pslBlocks` argument, which is what existing call

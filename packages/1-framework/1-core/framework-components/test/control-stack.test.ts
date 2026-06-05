@@ -17,7 +17,7 @@ import type { Codec } from '../src/shared/codec';
 import type { AnyCodecDescriptor } from '../src/shared/codec-descriptor';
 import type { CodecLookup } from '../src/shared/codec-types';
 import type { ComponentDescriptor } from '../src/shared/framework-components';
-import type { PslPackBlock } from '../src/shared/psl-substrate';
+import type { PslExtensionBlock } from '../src/shared/psl-extension-block';
 
 function createDescriptor<K extends string = 'target'>(
   overrides: Partial<ComponentDescriptor<string>> & { kind?: K } = {} as Partial<
@@ -42,11 +42,11 @@ const STUB_PSL_SPAN = {
   end: { offset: 0, line: 1, column: 1 },
 } as const;
 
-function stubPackBlockParser(): PslPackBlock {
+function stubExtensionBlockParser(): PslExtensionBlock {
   return { kind: 'stub', name: 'stub', span: STUB_PSL_SPAN };
 }
 
-function stubPackBlockPrinter(): string {
+function stubExtensionBlockPrinter(): string {
   return '';
 }
 
@@ -293,8 +293,8 @@ describe('assembleAuthoringContributions', () => {
             policyBlock: {
               kind: 'pslBlock',
               discriminator: 'postgres-policy',
-              parser: stubPackBlockParser,
-              printer: stubPackBlockPrinter,
+              parser: stubExtensionBlockParser,
+              printer: stubExtensionBlockPrinter,
             },
           },
         },
@@ -306,8 +306,8 @@ describe('assembleAuthoringContributions', () => {
             roleBlock: {
               kind: 'pslBlock',
               discriminator: 'postgres-role',
-              parser: stubPackBlockParser,
-              printer: stubPackBlockPrinter,
+              parser: stubExtensionBlockParser,
+              printer: stubExtensionBlockPrinter,
             },
           },
         },
@@ -325,8 +325,8 @@ describe('assembleAuthoringContributions', () => {
               foo: {
                 kind: 'pslBlock',
                 discriminator: 'pack-foo',
-                parser: stubPackBlockParser,
-                printer: stubPackBlockPrinter,
+                parser: stubExtensionBlockParser,
+                printer: stubExtensionBlockPrinter,
               },
             },
           },
@@ -338,8 +338,8 @@ describe('assembleAuthoringContributions', () => {
               foo: {
                 kind: 'pslBlock',
                 discriminator: 'pack-foo',
-                parser: stubPackBlockParser,
-                printer: stubPackBlockPrinter,
+                parser: stubExtensionBlockParser,
+                printer: stubExtensionBlockPrinter,
               },
             },
           },
@@ -363,8 +363,8 @@ describe('assembleAuthoringContributions', () => {
             policy: {
               kind: 'pslBlock',
               discriminator: 'postgres-policy',
-              parser: stubPackBlockParser,
-              printer: stubPackBlockPrinter,
+              parser: stubExtensionBlockParser,
+              printer: stubExtensionBlockPrinter,
             },
           },
         },
@@ -383,8 +383,8 @@ describe('assembleAuthoringContributions', () => {
               fooBlock: {
                 kind: 'pslBlock',
                 discriminator: 'pack-foo',
-                parser: stubPackBlockParser,
-                printer: stubPackBlockPrinter,
+                parser: stubExtensionBlockParser,
+                printer: stubExtensionBlockPrinter,
               },
             },
           },
