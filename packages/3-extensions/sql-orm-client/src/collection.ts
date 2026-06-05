@@ -105,7 +105,6 @@ import {
   type IncludeExpr,
   type IncludeScalar,
   type InferRootRow,
-  type ModelAccessor,
   type MutationCreateInput,
   type MutationCreateInputWithRelations,
   type MutationUpdateInput,
@@ -620,14 +619,35 @@ export class Collection<
    */
   orderBy(
     selection:
-      | ((model: ModelAccessor<TContract, ModelName>) => OrderByItem)
-      | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByItem>,
+      | ((
+          model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+        ) => OrderByItem)
+      | ReadonlyArray<
+          (
+            model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+          ) => OrderByItem
+        >,
   ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
-    const accessor = createModelAccessor(this.ctx.context, this.namespaceId, this.modelName);
-    const selectors = Array.isArray(selection) ? selection : [selection];
-    const nextOrders = selectors.map((selector) =>
-      selector(accessor as ModelAccessor<TContract, ModelName>),
+    // Mirrors `where()`: the variant name is threaded through the type state
+    // (`State['variantName']`, set by `variant()`), and the runtime proxy
+    // carries the selected variant's fields when `variantName` is passed. The
+    // blindCast bridges the gap because `createModelAccessor` is declared to
+    // return the base `ModelAccessor` — its return type is not
+    // variant-parameterized — so the variant widening is kept callback-param
+    // only and bridged here with a single narrow cast.
+    const accessor = blindCast<
+      VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+      'runtime accessor carries the selected variant fields; the variant widening is callback-param-only'
+    >(
+      createModelAccessor(
+        this.ctx.context,
+        this.namespaceId,
+        this.modelName,
+        this.state.variantName,
+      ),
     );
+    const selectors = Array.isArray(selection) ? selection : [selection];
+    const nextOrders = selectors.map((selector) => selector(accessor));
     const existing = this.state.orderBy ?? [];
     return this.#clone<WithOrderByState<State>>({
       orderBy: [...existing, ...nextOrders],
