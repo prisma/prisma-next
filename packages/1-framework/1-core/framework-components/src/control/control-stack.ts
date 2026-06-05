@@ -345,24 +345,17 @@ export function validateScalarTypeCodecIds(
   return errors;
 }
 
-/**
- * Reads the IDs of extension packs that a descriptor declares as dependencies
- * via its `contractSpace.contractJson.extensionPacks` field. This field is
- * present only on descriptors that contribute a contract space (e.g.
- * `SqlControlExtensionDescriptor`). Descriptors without this field are treated
- * as having no declared dependencies.
- *
- * Uses structural duck-typing to remain family-agnostic — `contractSpace` is a
- * SQL-family concept, not a framework concept, so it is not declared on
- * `ControlExtensionDescriptor` at the type level.
- */
-function readDeclaredDependencyIds(descriptor: { readonly id: string }): readonly string[] {
-  const d = descriptor as {
-    readonly contractSpace?: {
-      readonly contractJson?: { readonly extensionPacks?: Record<string, unknown> };
+interface DependencyDeclaringDescriptor {
+  readonly id: string;
+  readonly contractSpace?: {
+    readonly contractJson?: {
+      readonly extensionPacks?: Readonly<Record<string, unknown>>;
     };
   };
-  const packs = d.contractSpace?.contractJson?.extensionPacks;
+}
+
+function readDeclaredDependencyIds(descriptor: DependencyDeclaringDescriptor): readonly string[] {
+  const packs = descriptor.contractSpace?.contractJson?.extensionPacks;
   if (packs === null || typeof packs !== 'object') return [];
   return Object.keys(packs);
 }
@@ -376,12 +369,12 @@ function readDeclaredDependencyIds(descriptor: { readonly id: string }): readonl
  * Throws if the dependency graph contains a cycle, with an error message that
  * names every extension involved in the cycle.
  *
- * Extensions whose `contractSpace.contractJson.extensionPacks` references an ID
- * that is not present in the provided list are ignored for ordering purposes —
- * the missing pack is a separate validation concern.
+ * Throws if any extension declares a dependency on a pack ID that is not present
+ * in the provided list — add the missing pack to the `extensionPacks` list to
+ * resolve the error.
  */
 export function buildExtensionLoadOrder(
-  extensions: ReadonlyArray<{ readonly id: string }>,
+  extensions: ReadonlyArray<DependencyDeclaringDescriptor>,
 ): readonly string[] {
   if (extensions.length === 0) return [];
 
@@ -396,7 +389,11 @@ export function buildExtensionLoadOrder(
 
   for (const ext of extensions) {
     for (const depId of readDeclaredDependencyIds(ext)) {
-      if (!idSet.has(depId)) continue;
+      if (!idSet.has(depId)) {
+        throw new Error(
+          `Extension "${ext.id}" declares a dependency on "${depId}", but "${depId}" is not in the provided extension set. Add the missing space to extensionPacks.`,
+        );
+      }
       inDegree.set(ext.id, (inDegree.get(ext.id) ?? 0) + 1);
       const list = dependents.get(depId);
       if (list !== undefined) list.push(ext.id);
