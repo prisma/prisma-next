@@ -157,7 +157,10 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
     spanId: SPAN_IDS.introspect,
     label: 'Introspecting database schema',
   });
-  const schemaIR = await familyInstance.introspect({ driver });
+  const schemaIR = await familyInstance.introspect({
+    driver,
+    contract: buildAggregateIntrospectContract(aggregate),
+  });
   onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.introspect, outcome: 'ok' });
 
   // 3. Plan via aggregate planner. App is forced through synth (today's
@@ -268,6 +271,42 @@ function aggregatePlannerWarnings(
 ): readonly MigrationPlannerConflict[] | undefined {
   const warnings = orderedResolutions.flatMap((r) => r.entry.warnings ?? []);
   return warnings.length > 0 ? warnings : undefined;
+}
+
+/**
+ * Builds a synthetic contract-like object whose `storage.namespaces` key set
+ * is the union of every namespace declared across all members of the aggregate
+ * (app + extensions). Passed to `familyInstance.introspect` so the Postgres
+ * adapter walks every declared schema rather than falling back to `public`
+ * only — the fallback is correct for single-namespace contracts but wrong for
+ * composed contracts that declare tables in additional schemas (e.g. the
+ * Supabase extension's `auth` and `storage`).
+ *
+ * The object is structurally minimal: `extractContractNamespaceIds` in the
+ * Postgres adapter only reads `contract.storage.namespaces` as a plain record
+ * and returns `Object.keys(namespaces)`. No other fields are required.
+ */
+function buildAggregateIntrospectContract(
+  aggregate: ContractSpaceAggregate,
+): Record<string, unknown> {
+  const allNamespaces: Record<string, unknown> = {};
+  for (const member of aggregate.spaces()) {
+    try {
+      const contract = member.contract();
+      const namespaces = (contract.storage as { namespaces?: Record<string, unknown> }).namespaces;
+      if (namespaces !== null && typeof namespaces === 'object') {
+        for (const key of Object.keys(namespaces)) {
+          allNamespaces[key] = namespaces[key];
+        }
+      }
+    } catch {
+      // If a member's contract is unreadable at this point, skip it.
+      // Integrity checks elsewhere surface the unreadable contract
+      // as a structured violation; swallowing here keeps introspection
+      // from failing before the planner has a chance to surface the error.
+    }
+  }
+  return { storage: { namespaces: allNamespaces } };
 }
 
 /**

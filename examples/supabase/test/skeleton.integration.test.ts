@@ -28,20 +28,13 @@
  *   (zero-ops baseline migration); the verifier then confirms the declared
  *   external tables are present in the DB.
  *
- * Blocked by a framework gap (D6, 2026-06-05):
- *   `executeRun` and `executeDbVerify` call `familyInstance.introspect({ driver })`
- *   without passing a contract, so the Postgres adapter falls back to introspecting
- *   only the `public` schema. The supabase extension space declares tables in `auth`
- *   and `storage` schemas, which the introspector never reads. As a result,
- *   `db verify` reports those tables as "missing" even when `bootstrapSupabaseShim`
- *   has seeded them. The fix is to pass the aggregate contracts to `introspect` in
- *   `packages/1-framework/3-tooling/cli/src/control-api/operations/db-run.ts` (line
- *   ~160) and `db-verify.ts` so the Postgres adapter walks all declared namespaces.
- *   This is a second operator-approved framework change; surfaced to operator before
- *   proceeding. Track in `projects/extension-supabase/slices/m1-scaffold-and-skeleton`.
+ * Framework fix landed (2026-06-05):
+ *   `executeRun` and `executeDbVerify` now pass a merged aggregate contract to
+ *   `familyInstance.introspect` so the Postgres adapter walks every declared
+ *   namespace (not just `public`). The full proof was confirmed green with this fix
+ *   in place. See `feat(cli): introspect all declared namespaces for db init/verify`.
  *
- * TODO: Remove the `describe.skip` when the example is green end-to-end (M3)
- *       and the multi-schema introspect fix has landed.
+ * TODO: Remove the `describe.skip` when the example is green end-to-end (M3).
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -63,6 +56,9 @@ import { insertAndReadProfile } from '../src/handlers';
 import { db } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
+// Full proof confirmed green as of 2026-06-05 with the multi-namespace introspect fix
+// (feat(cli): introspect all declared namespaces for db init/verify). Kept .skip because
+// the example is still WIP (grown by later constituents) and is not yet part of CI.
 describe.skip('supabase walking skeleton — external-contract migrate/verify + public round-trip', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let migrationsDir: string;
