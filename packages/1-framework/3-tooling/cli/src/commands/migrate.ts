@@ -10,7 +10,6 @@ import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { bold, greenBright } from 'colorette';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
@@ -57,7 +56,11 @@ import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-l
 import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
 import { indentMigrationGraphTreeBlock } from '../utils/formatters/migration-graph-space-render';
 import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
-import { renderMigrationGraphTree } from '../utils/formatters/migration-graph-tree-render';
+import {
+  computeMaxDirNameLengthForLayout,
+  computeMaxEdgeTreePrefixWidthForLayout,
+  renderMigrationGraphTree,
+} from '../utils/formatters/migration-graph-tree-render';
 import {
   abbreviateContractHash,
   MIGRATION_LIST_HASH_WIDTH,
@@ -100,11 +103,16 @@ export interface MigrateShowResult {
   readonly migrations: readonly MigrateShowMigration[];
   readonly summary: string;
   /**
-   * Pre-rendered Tier-3 graph tree for human output. On-path migrations are
-   * highlighted bright green (nodes, hashes, names, lane lines); off-path
-   * migrations are fully drawn in dim grey. Only present in human (non-JSON) mode.
+   * Pre-rendered Tier-3 graph tree for human output. Off-path migrations render
+   * dim; on-path migrations render in ordinary colours. Only present in human
+   * (non-JSON) mode.
    */
   readonly graphOutput?: string;
+  /**
+   * Name column width for the "Will run, in order:" list — globally aligned with
+   * every graph-tree section. Only present in human (non-JSON) mode.
+   */
+  readonly runListDirNameWidth?: number;
 }
 
 export interface MigrateResult {
@@ -421,39 +429,68 @@ async function executeMigrateShowCommand(
   // Build the Tier-3 graph visualization (human mode only; skipped for --json).
   // Reuses the existing annotation hook — no parallel renderer.
   let graphOutput: string | undefined;
+  let runListDirNameWidth: number | undefined;
   if (!flags.json) {
     const onPathHashes = new Set(orderedMigrations.map((m) => m.migrationHash));
     const colorize = flags.color !== false;
 
-    // Render each space (app + extensions) as its own section, with a heading
-    // when more than one space is present.
-    const renderSpaceTree = (member: ContractSpaceMember, isApp: boolean): string => {
+    // Build layouts for all spaces first so we can compute global column widths
+    // before rendering. This ensures the name column, hash column, and ops column
+    // start at the same horizontal offset across every space section AND the
+    // "Will run, in order:" list below.
+    const memberLayouts = allMembers.map((member) => {
+      const isApp = member.spaceId === aggregate.app.spaceId;
       const memberGraph = member.graph();
+      const rowModel = buildMigrationGraphRows(memberGraph, isApp ? { contractHash } : {});
+      const layout = buildMigrationGraphLayout(rowModel);
+      return { member, isApp, memberGraph, layout };
+    });
+
+    // Global max across all space layouts.
+    const globalMaxEdgeTreePrefixWidth =
+      memberLayouts.length > 1
+        ? Math.max(
+            ...memberLayouts.map(({ layout }) => computeMaxEdgeTreePrefixWidthForLayout(layout)),
+          )
+        : undefined;
+    const globalMaxDirNameWidthFromLayouts =
+      memberLayouts.length > 1
+        ? Math.max(...memberLayouts.map(({ layout }) => computeMaxDirNameLengthForLayout(layout)))
+        : undefined;
+    // The run-list name column width must be at least as wide as the global tree dirName
+    // width so that tree sections and the list align at the hash column.
+    const runListMaxFromMigrations =
+      orderedMigrations.length > 0
+        ? Math.max(...orderedMigrations.map((m) => m.dirName.length))
+        : 0;
+    const globalMaxDirNameWidth =
+      globalMaxDirNameWidthFromLayouts !== undefined
+        ? Math.max(globalMaxDirNameWidthFromLayouts, runListMaxFromMigrations)
+        : undefined;
+    runListDirNameWidth = globalMaxDirNameWidth ?? runListMaxFromMigrations;
+
+    // Render each space section with globally computed widths.
+    const showSpaceHeadings = allMembers.length > 1;
+    const sections: string[] = [];
+    for (const { member, isApp, memberGraph, layout } of memberLayouts) {
       const edgeAnnotations = new Map<string, MigrationEdgeAnnotation>();
       for (const edge of memberGraph.migrationByHash.values()) {
         edgeAnnotations.set(edge.migrationHash, {
           pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
         });
       }
-      const rowModel = buildMigrationGraphRows(memberGraph, isApp ? { contractHash } : {});
-      const layout = buildMigrationGraphLayout(rowModel);
       const liveMarker = markerBySpace.get(member.spaceId) ?? null;
       const liveMarkerHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
-      return renderMigrationGraphTree(layout, {
+      const tree = renderMigrationGraphTree(layout, {
         contractHash,
         isAppSpace: isApp,
         ...(needsLiveMarker ? { dbHash: liveMarkerHash } : {}),
         refsByHash: listRefsByContractHash(member),
         edgeAnnotationsByHash: edgeAnnotations,
         colorize,
+        ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
+        ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
       });
-    };
-
-    const showSpaceHeadings = allMembers.length > 1;
-    const sections: string[] = [];
-    for (const member of allMembers) {
-      const isApp = member.spaceId === aggregate.app.spaceId;
-      const tree = renderSpaceTree(member, isApp);
       if (tree.length === 0) continue;
       if (showSpaceHeadings) {
         sections.push(`${member.spaceId}:\n${indentMigrationGraphTreeBlock(tree, '  ')}`);
@@ -469,14 +506,11 @@ async function executeMigrateShowCommand(
     migrations: orderedMigrations,
     summary,
     ...(graphOutput !== undefined ? { graphOutput } : {}),
+    ...(runListDirNameWidth !== undefined ? { runListDirNameWidth } : {}),
   });
 }
 
-function formatShowMigrationRow(
-  m: MigrateShowMigration,
-  dirNameWidth: number,
-  colorize: boolean,
-): string {
+function formatShowMigrationRow(m: MigrateShowMigration, dirNameWidth: number): string {
   const arrow = migrationListForwardArrow('unicode');
   const emptySource = migrationListEmptySource('unicode');
   const fromAbbr =
@@ -485,8 +519,7 @@ function formatShowMigrationRow(
       : abbreviateContractHash(m.from);
   const toAbbr = m.to === EMPTY_CONTRACT_HASH ? emptySource : abbreviateContractHash(m.to);
   const fromPadded = padFromHashColumn(fromAbbr, MIGRATION_LIST_HASH_WIDTH);
-  const row = `${m.dirName.padEnd(dirNameWidth)}  ${fromPadded} ${arrow} ${toAbbr}`;
-  return colorize ? greenBright(bold(row)) : row;
+  return `${m.dirName.padEnd(dirNameWidth)}  ${fromPadded} ${arrow} ${toAbbr}`;
 }
 
 function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags): string {
@@ -499,13 +532,15 @@ function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags):
   }
   lines.push(result.summary);
   if (result.migrations.length > 0) {
-    const colorize = flags.color !== false;
-    // Ordered list in graph migration-row format (name + from→to), green, no Clack gutter.
-    const dirNameWidth = Math.max(...result.migrations.map((m) => m.dirName.length));
+    // Ordered list in graph migration-row format (name + from→to), no Clack gutter.
+    // Use the globally computed name column width so this list aligns with the
+    // graph-tree sections above it when multiple spaces are rendered.
+    const dirNameWidth =
+      result.runListDirNameWidth ?? Math.max(...result.migrations.map((m) => m.dirName.length));
     lines.push('');
     lines.push('Will run, in order:');
     for (const m of result.migrations) {
-      lines.push(`  ${formatShowMigrationRow(m, dirNameWidth, colorize)}`);
+      lines.push(`  ${formatShowMigrationRow(m, dirNameWidth)}`);
     }
   }
   return lines.join('\n');

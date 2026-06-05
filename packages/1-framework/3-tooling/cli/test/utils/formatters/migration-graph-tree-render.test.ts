@@ -9,6 +9,8 @@ import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migrati
 import { buildMigrationGraphRows } from '../../../src/utils/formatters/migration-graph-rows';
 import { renderMigrationGraphSpaceTrees } from '../../../src/utils/formatters/migration-graph-space-render';
 import {
+  computeMaxDirNameLengthForLayout,
+  computeMaxEdgeTreePrefixWidthForLayout,
   renderMigrationGraphLegend,
   renderMigrationGraphTree,
   resolveConnectorLaneColors,
@@ -1850,5 +1852,63 @@ describe('renderMigrationGraphTree isAppSpace gate', () => {
       }),
     );
     expect(output).toContain('@contract');
+  });
+});
+
+describe('renderMigrationGraphTree global column alignment', () => {
+  // Verifies that when globalMaxEdgeTreePrefixWidth and globalMaxDirNameWidth are
+  // passed, the hash column starts at the same horizontal offset in every space
+  // section — including a space with a longer dirName than the other.
+
+  it('hash column aligns across two spaces when global widths are supplied', () => {
+    // Space A: short dirName ("app_short") in a single-edge chain.
+    // Space B: long dirName ("pgvector_long_extension_name") in a single-edge chain.
+    // Without global widths, space A would have a narrower name column than space B.
+    // With global widths, both align.
+    const appEdge = edge(EMPTY_CONTRACT_HASH, 'aaa1111', 'app_short');
+    const extEdge = edge(EMPTY_CONTRACT_HASH, 'bbb2222', 'pgvector_long_extension_name');
+
+    const appGraph = graph([appEdge]);
+    const extGraph = graph([extEdge]);
+
+    const appLayout = buildMigrationGraphLayout(buildMigrationGraphRows(appGraph, {}));
+    const extLayout = buildMigrationGraphLayout(buildMigrationGraphRows(extGraph, {}));
+
+    const globalMaxEdgeTreePrefixWidth = Math.max(
+      computeMaxEdgeTreePrefixWidthForLayout(appLayout),
+      computeMaxEdgeTreePrefixWidthForLayout(extLayout),
+    );
+    const globalMaxDirNameWidth = Math.max(
+      computeMaxDirNameLengthForLayout(appLayout),
+      computeMaxDirNameLengthForLayout(extLayout),
+    );
+
+    const appOutput = stripAnsi(
+      renderMigrationGraphTree(appLayout, {
+        colorize: false,
+        globalMaxEdgeTreePrefixWidth,
+        globalMaxDirNameWidth,
+      }),
+    );
+    const extOutput = stripAnsi(
+      renderMigrationGraphTree(extLayout, {
+        colorize: false,
+        globalMaxEdgeTreePrefixWidth,
+        globalMaxDirNameWidth,
+      }),
+    );
+
+    // Find the edge line in each output and extract the column where '∅' (the hash column) starts.
+    function hashColumnOffset(output: string, dirName: string): number {
+      const line = output.split('\n').find((l) => l.includes(dirName));
+      if (line === undefined) throw new Error(`no line for ${dirName}`);
+      const idx = line.indexOf('∅');
+      if (idx < 0) throw new Error(`no ∅ in: ${line}`);
+      return idx;
+    }
+
+    const appHashCol = hashColumnOffset(appOutput, appEdge.dirName);
+    const extHashCol = hashColumnOffset(extOutput, extEdge.dirName);
+    expect(appHashCol).toBe(extHashCol);
   });
 });
