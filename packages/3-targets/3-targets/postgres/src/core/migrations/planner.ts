@@ -22,7 +22,6 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import { postgresColumnsCompatible } from '../column-type-compatibility';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import {
@@ -258,7 +257,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
-      columnsCompatible: postgresColumnsCompatible,
       resolveExistingEnumValues: createResolveExistingEnumValues(options.contract.storage),
     };
     const verifyResult = verifySqlSchema(verifyOptions);

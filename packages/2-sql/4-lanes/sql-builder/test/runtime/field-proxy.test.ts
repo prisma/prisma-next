@@ -78,7 +78,9 @@ describe('createFieldProxy', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: { Post: table },
+          entries: {
+            table: { Post: table },
+          },
         }),
       },
       types: {

@@ -21,6 +21,7 @@ import {
 } from '@prisma-next/contract/types';
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
@@ -244,6 +245,27 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
   return ids;
 }
 
+function ensureUnboundNamespaceSlot(
+  namespaces: SqlStorageInput['namespaces'],
+  createNamespace: ContractDefinition['createNamespace'],
+): SqlStorageInput['namespaces'] {
+  if (Object.hasOwn(namespaces, UNBOUND_NAMESPACE_ID)) {
+    return namespaces;
+  }
+  const unboundInput: SqlNamespaceTablesInput = {
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { table: {} },
+  };
+  const unbound = createNamespace ? createNamespace(unboundInput) : buildSqlNamespace(unboundInput);
+  return blindCast<
+    SqlStorageInput['namespaces'],
+    'createNamespace may return a target namespace concretion; the unbound slot matches SqlNamespace at runtime'
+  >({
+    [UNBOUND_NAMESPACE_ID]: unbound,
+    ...namespaces,
+  });
+}
+
 const POSTGRES_ENUM_NAMESPACE_ID = 'public';
 
 function partitionStorageTypesForTarget(
@@ -251,10 +273,10 @@ function partitionStorageTypesForTarget(
   types: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
   namespaceTypes?: Readonly<Record<string, Readonly<Record<string, PostgresEnumStorageEntry>>>>,
 ): {
-  readonly documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+  readonly documentTypes: Record<string, StorageTypeInstance>;
   readonly namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>>;
 } {
-  const documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  const documentTypes: Record<string, StorageTypeInstance> = {};
   const namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
   for (const [name, entry] of Object.entries(types)) {
     if (isPostgresEnumStorageEntry(entry)) {
@@ -564,16 +586,20 @@ export function buildSqlContractFromDefinition(
         const enumTypes = namespaceEnumTypesById[id];
         const nsInput: SqlNamespaceTablesInput = {
           id,
-          tables: tablesByNamespace[id] ?? {},
-          ...ifDefined('enum', enumTypes),
+          entries: {
+            table: tablesByNamespace[id] ?? {},
+          },
         };
-        return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
+        return [
+          id,
+          createNamespace ? createNamespace(nsInput, enumTypes) : buildSqlNamespace(nsInput),
+        ];
       }),
     ),
   );
   const storageWithoutHash = {
     ...(Object.keys(documentTypes).length > 0 ? { types: documentTypes } : {}),
-    namespaces,
+    namespaces: ensureUnboundNamespaceSlot(namespaces, createNamespace),
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)

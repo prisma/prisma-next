@@ -69,10 +69,10 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
   ) {
     const namespaces = contract.storage.namespaces as Record<
       string,
-      { readonly tables?: Readonly<Record<string, unknown>> }
+      { readonly entries: { readonly table: Readonly<Record<string, unknown>> } }
     >;
     for (const ns of Object.values(namespaces)) {
-      const tbls = ns.tables;
+      const tbls = ns.entries.table;
       if (typeof tbls !== 'object' || tbls === null) continue;
       for (const table of Object.values(tbls)) {
         if (
@@ -566,7 +566,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
-        ...ifDefined('columnsCompatible', controlAdapter.columnsCompatible),
         ...ifDefined('resolveExistingEnumValues', resolveExistingEnumValues),
       });
     },

@@ -28,7 +28,7 @@ function storageWithItemsCollections(
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
         id: UNBOUND_NAMESPACE_ID,
-        collections,
+        entries: { collection: collections },
       }),
     },
   });

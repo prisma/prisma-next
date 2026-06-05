@@ -20,7 +20,10 @@ function makeContract(
   const storage = new SqlStorage({
     storageHash: coreHash('sha256:test'),
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { table: tables },
+      }),
     },
   });
   return {

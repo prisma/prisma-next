@@ -18,18 +18,18 @@ const emptyTableInput = {
 
 describe('PostgresSchema', () => {
   it('exposes its id and renders a quoted-identifier qualifier', () => {
-    const schema = new PostgresSchema({ id: 'auth' });
+    const schema = new PostgresSchema({ id: 'auth', entries: { table: {}, type: {} } });
     expect(schema.id).toBe('auth');
     expect(schema.qualifier()).toBe('"auth"');
   });
 
   it('qualifies a table name with the schema prefix', () => {
-    const schema = new PostgresSchema({ id: 'auth' });
+    const schema = new PostgresSchema({ id: 'auth', entries: { table: {}, type: {} } });
     expect(schema.qualifyTable('users')).toBe('"auth"."users"');
   });
 
   it('quotes the schema name even when it would otherwise collide with a Postgres keyword', () => {
-    const schema = new PostgresSchema({ id: 'public' });
+    const schema = new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } });
     expect(schema.qualifier()).toBe('"public"');
     expect(schema.qualifyTable('users')).toBe('"public"."users"');
   });
@@ -37,19 +37,22 @@ describe('PostgresSchema', () => {
   it('normalises plain table inputs into StorageTable instances', () => {
     const schema = new PostgresSchema({
       id: 'app',
-      tables: { users: emptyTableInput },
+      entries: { table: { users: emptyTableInput }, type: {} },
     });
-    expect(schema.tables['users']).toBeInstanceOf(StorageTable);
+    expect(schema.entries.table['users']).toBeInstanceOf(StorageTable);
   });
 
   it('normalises plain enum inputs into PostgresEnumType instances', () => {
     const schema = new PostgresSchema({
       id: 'app',
-      enum: {
-        role: { name: 'Role', values: ['admin', 'member'] },
+      entries: {
+        table: {},
+        type: {
+          role: { name: 'Role', values: ['admin', 'member'] },
+        },
       },
     });
-    expect(schema.enum['role']).toBeInstanceOf(PostgresEnumType);
+    expect(schema.entries.type['role']).toBeInstanceOf(PostgresEnumType);
   });
 });
 
@@ -60,10 +63,10 @@ describe('PostgresUnboundSchema', () => {
   });
 
   it('carries empty frozen tables and enum maps on the unbound singleton', () => {
-    expect(PostgresSchema.unbound.tables).toEqual({});
-    expect(Object.isFrozen(PostgresSchema.unbound.tables)).toBe(true);
-    expect(PostgresSchema.unbound.enum).toEqual({});
-    expect(Object.isFrozen(PostgresSchema.unbound.enum)).toBe(true);
+    expect(PostgresSchema.unbound.entries.table).toEqual({});
+    expect(Object.isFrozen(PostgresSchema.unbound.entries.table)).toBe(true);
+    expect(PostgresSchema.unbound.entries.type).toEqual({});
+    expect(Object.isFrozen(PostgresSchema.unbound.entries.type)).toBe(true);
   });
 
   it('elides the schema qualifier so emission paths render unqualified output', () => {
@@ -80,7 +83,7 @@ describe('ddlSchemaName', () => {
   const storageWithPublic = new SqlStorage({
     storageHash: coreHash('sha256:test-with-public'),
     namespaces: {
-      public: new PostgresSchema({ id: 'public' }),
+      public: new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } }),
       [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
     },
   });
@@ -88,18 +91,18 @@ describe('ddlSchemaName', () => {
   const storageWithoutPublic = new SqlStorage({
     storageHash: coreHash('sha256:test-without-public'),
     namespaces: {
-      auth: new PostgresSchema({ id: 'auth' }),
+      auth: new PostgresSchema({ id: 'auth', entries: { table: {}, type: {} } }),
       [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
     },
   });
 
   it('returns its own id for a named public schema', () => {
-    const schema = new PostgresSchema({ id: 'public' });
+    const schema = new PostgresSchema({ id: 'public', entries: { table: {}, type: {} } });
     expect(schema.ddlSchemaName(storageWithPublic)).toBe('public');
   });
 
   it('returns its own id for a named non-public schema', () => {
-    const schema = new PostgresSchema({ id: 'auth' });
+    const schema = new PostgresSchema({ id: 'auth', entries: { table: {}, type: {} } });
     expect(schema.ddlSchemaName(storageWithoutPublic)).toBe('auth');
   });
 
@@ -115,21 +118,21 @@ describe('ddlSchemaName', () => {
 
 describe('postgresCreateNamespace factory', () => {
   it('returns a PostgresUnboundSchema for the framework-reserved sentinel', () => {
-    const namespace = postgresCreateNamespace({ id: UNBOUND_NAMESPACE_ID });
+    const namespace = postgresCreateNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
     expect(namespace).toBeInstanceOf(PostgresUnboundSchema);
     expect(namespace.qualifyTable('users')).toBe('"users"');
   });
 
   it('materialises a fresh PostgresSchema instance for any named coordinate', () => {
-    const auth = postgresCreateNamespace({ id: 'auth' });
+    const auth = postgresCreateNamespace({ id: 'auth', entries: { table: {} } });
     expect(auth).toBeInstanceOf(PostgresSchema);
     expect(auth.id).toBe('auth');
     expect(auth.qualifyTable('users')).toBe('"auth"."users"');
   });
 
   it('returns distinct PostgresSchema instances for distinct named coordinates', () => {
-    const auth = postgresCreateNamespace({ id: 'auth' });
-    const billing = postgresCreateNamespace({ id: 'billing' });
+    const auth = postgresCreateNamespace({ id: 'auth', entries: { table: {} } });
+    const billing = postgresCreateNamespace({ id: 'billing', entries: { table: {} } });
     expect(auth).not.toBe(billing);
     expect(auth.id).toBe('auth');
     expect(billing.id).toBe('billing');

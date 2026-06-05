@@ -12,18 +12,18 @@ const emptyTableInput = {
 
 describe('buildSqlNamespaceMap', () => {
   it('passes through a materialised namespace without re-wrapping tables', () => {
-    const built = buildSqlNamespace({ id: 'app', tables: { users: emptyTableInput } });
+    const built = buildSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } });
     const map = buildSqlNamespaceMap({ app: built });
     expect(map.app).toBe(built);
   });
 
   it('materialises plain tables-input entries', () => {
     const map = buildSqlNamespaceMap({
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID },
-      app: { id: 'app', tables: { users: emptyTableInput } },
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } },
+      app: { id: 'app', entries: { table: { users: emptyTableInput } } },
     });
     expect(map[UNBOUND_NAMESPACE_ID]).toBe(SqlUnboundNamespace.instance);
     expect(map.app.id).toBe('app');
-    expect(map.app.tables.users).toBeDefined();
+    expect(map.app.entries.table.users).toBeDefined();
   });
 });

@@ -35,9 +35,11 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "collections": {
-          "notes": {
-            "kind": "mongo-collection"
+        "entries": {
+          "collection": {
+            "notes": {
+              "kind": "mongo-collection"
+            }
           }
         },
         "id": "__unbound__",

@@ -16,20 +16,24 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
-        "tables": {
-          "embeddings": {
-            "columns": {
-              "vec": {
-                "codecId": "pg/vector@1",
-                "nativeType": "vector",
-                "nullable": false,
-                "typeRef": "Embedding1536"
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": { "columns": ["vec"] },
-            "uniques": []
+        "entries": {
+          "table": {
+            "embeddings": {
+              "columns": {
+                "vec": {
+                  "codecId": "pg/vector@1",
+                  "nativeType": "vector",
+                  "nullable": false,
+                  "typeRef": "Embedding1536"
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["vec"]
+              },
+              "uniques": []
+            }
           }
         }
       }
@@ -39,7 +43,9 @@
         "kind": "codec-instance",
         "codecId": "pg/vector@1",
         "nativeType": "vector",
-        "typeParams": { "length": 1536 }
+        "typeParams": {
+          "length": 1536
+        }
       }
     }
   },

@@ -1,7 +1,7 @@
 {
   "from": null,
-  "to": "sha256:fe392da2aa42388c72b60af5f613f19a501220e1d5c0c06a7524875b3e72f0c1",
+  "to": "sha256:975333779a8ca7ec4dacc25cd0e6816b04896d8f5227e2c6e4921760c60ebaa1",
   "providedInvariants": ["audit:create-audit_event-v1"],
   "createdAt": "2026-05-09T04:24:04.431Z",
-  "migrationHash": "sha256:e65b005c5fc149649861420464191036b62d738049a70952c9b8e68d4b3005aa"
+  "migrationHash": "sha256:ce6ae5017379d979f4a25034e00fc725b023461ab791c66f9038ce28d3f247fa"
 }

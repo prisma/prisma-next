@@ -37,7 +37,10 @@ const expandParameterizedNativeType: NativeTypeExpander = (input) => {
 function ns(tables: Record<string, StorageTable>): Pick<SqlStorageInput, 'namespaces'> {
   return {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { table: tables },
+      }),
     },
   };
 }

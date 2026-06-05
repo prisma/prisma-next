@@ -84,18 +84,18 @@ namespace public {
 
     // Same per-namespace table keys
     for (const nsId of Object.keys(pslStorage.namespaces)) {
-      const pslTables = pslStorage.namespaces[nsId]?.tables ?? {};
-      const tsTables = tsStorage.namespaces[nsId]?.tables ?? {};
+      const pslTables = pslStorage.namespaces[nsId]?.entries.table ?? {};
+      const tsTables = tsStorage.namespaces[nsId]?.entries.table ?? {};
       expect(Object.keys(pslTables).sort()).toEqual(Object.keys(tsTables).sort());
     }
 
     // Same per-table column shapes
-    const pslAuthUser = pslStorage.namespaces['auth']?.tables['user'];
-    const tsAuthUser = tsStorage.namespaces['auth']?.tables['user'];
+    const pslAuthUser = pslStorage.namespaces['auth']?.entries.table['user'];
+    const tsAuthUser = tsStorage.namespaces['auth']?.entries.table['user'];
     expect(pslAuthUser?.columns).toEqual(tsAuthUser?.columns);
 
-    const pslPublicPost = pslStorage.namespaces['public']?.tables['post'];
-    const tsPublicPost = tsStorage.namespaces['public']?.tables['post'];
+    const pslPublicPost = pslStorage.namespaces['public']?.entries.table['post'];
+    const tsPublicPost = tsStorage.namespaces['public']?.entries.table['post'];
     expect(pslPublicPost?.columns).toEqual(tsPublicPost?.columns);
 
     // Same FK source/target

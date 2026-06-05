@@ -4,8 +4,8 @@ import { expectTypeOf, test } from 'vitest';
 import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { type SqlNamespace, SqlStorage } from '../src/ir/sql-storage';
 
-const publicNs = buildSqlNamespace({ id: 'public', tables: {} });
-const unboundNs = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables: {} });
+const publicNs = buildSqlNamespace({ id: 'public', entries: { table: {} } });
+const unboundNs = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } });
 
 test('SqlStorage accepts namespaces with only a public key (no __unbound__)', () => {
   const storage = new SqlStorage({

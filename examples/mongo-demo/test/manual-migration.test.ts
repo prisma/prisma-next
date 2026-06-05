@@ -116,7 +116,7 @@ describe('hand-authored migration (20260415_add-posts-author-index)', {
               __unbound__: {
                 id: '__unbound__',
                 kind: 'mongo-namespace' as const,
-                collections: {},
+                entries: { collection: {} },
               },
             },
           },

@@ -39,7 +39,7 @@ type ContractBase = ContractShape<
       readonly __unbound__: {
         readonly id: '__unbound__';
         readonly kind: 'sql-namespace';
-        readonly tables: {
+        readonly entries: { readonly table: {
           readonly shop: {
             columns: {
               readonly id: {
@@ -72,6 +72,7 @@ type ContractBase = ContractShape<
             indexes: readonly [];
             foreignKeys: readonly [];
           };
+        };
         };
         readonly types: Record<string, never>;
       };
@@ -149,5 +150,5 @@ type ContractBase = ContractShape<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Tables = Contract['storage']['namespaces']['__unbound__']['tables'];
+export type Tables = Contract['storage']['namespaces']['__unbound__']['entries']['table'];
 export type Models = Contract['models'];

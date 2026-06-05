@@ -33,7 +33,7 @@ function unboundCollections(storage: MongoStorageShape): Record<string, MongoCol
   if (!namespace) {
     throw new Error(`expected namespace ${UNBOUND_NAMESPACE_ID}`);
   }
-  const collections = namespace.collections;
+  const collections = namespace.entries.collection;
   const result: Record<string, MongoCollection> = {};
   for (const [name, collection] of Object.entries(collections)) {
     result[name] =
@@ -183,13 +183,17 @@ describe('defineContract mixed default and per-collection controlPolicy', () => 
       readonly storage: {
         readonly namespaces: Record<
           string,
-          { readonly collections: Record<string, RoundTrippedCollection> }
+          {
+            readonly entries: {
+              readonly collection: Record<string, RoundTrippedCollection>;
+            };
+          }
         >;
       };
     };
     const roundTripped = envelope as RoundTrippedEnvelope;
     const roundTrippedCollections =
-      roundTripped.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
+      roundTripped.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.collection;
     const def = roundTripped.defaultControlPolicy;
 
     expect(def).toBe('external');

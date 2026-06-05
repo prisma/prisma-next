@@ -80,7 +80,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: parts.tables,
+          entries: { table: parts.tables },
         }),
       },
       ...ifDefined('types', parts.types),

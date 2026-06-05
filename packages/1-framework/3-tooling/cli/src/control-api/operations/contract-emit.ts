@@ -247,7 +247,7 @@ export async function executeContractEmit(
         validatedContract.value as unknown as Contract,
         frameworkComponents,
       );
-      familyInstance.deserializeContract(enrichedIR);
+      const deserializedContract = familyInstance.deserializeContract(enrichedIR);
       // Each target's descriptor ships a `contractSerializer` SPI; the
       // framework canonicalizer threads its `serializeContract` so the
       // on-disk JSON envelope is constructed by target-owned code
@@ -260,7 +260,7 @@ export async function executeContractEmit(
       const serializeContract = (c: Contract): JsonObject =>
         contractSerializer.serializeContract(c);
       emitResult = await unlessAborted(
-        emit(enrichedIR, stack, config.family.emission, {
+        emit(deserializedContract, stack, config.family.emission, {
           outputJsonPath,
           serializeContract,
           ...ifDefined('shouldPreserveEmpty', contractSerializer.shouldPreserveEmpty),

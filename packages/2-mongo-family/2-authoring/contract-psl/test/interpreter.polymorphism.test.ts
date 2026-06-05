@@ -48,9 +48,9 @@ const mongoCodecLookup: CodecLookup = {
 
 function mongoCollectionsOf(ir: { readonly storage: unknown }): Record<string, unknown> {
   const storage = ir.storage as {
-    namespaces: Record<string, { collections: Record<string, unknown> }>;
+    namespaces: Record<string, { entries: { collection: Record<string, unknown> } }>;
   };
-  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
+  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.collection;
 }
 
 function interpret(schema: string) {

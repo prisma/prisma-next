@@ -68,9 +68,11 @@ type DecodeFixtureStorage = {
     readonly __unbound__: {
       readonly id: '__unbound__';
       readonly kind: 'mongo-namespace';
-      readonly collections: {
-        readonly users: { readonly kind: 'mongo-collection' };
-        readonly posts: { readonly kind: 'mongo-collection' };
+      readonly entries: {
+        readonly collection: {
+          readonly users: { readonly kind: 'mongo-collection' };
+          readonly posts: { readonly kind: 'mongo-collection' };
+        };
       };
     };
   };
@@ -183,9 +185,11 @@ export const decodeFixtureContractJson = {
       __unbound__: {
         id: '__unbound__' as const,
         kind: 'mongo-namespace' as const,
-        collections: {
-          users: { kind: 'mongo-collection' as const },
-          posts: { kind: 'mongo-collection' as const },
+        entries: {
+          collection: {
+            users: { kind: 'mongo-collection' as const },
+            posts: { kind: 'mongo-collection' as const },
+          },
         },
       },
     },

@@ -38,7 +38,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
       },
     );
 
-    const indexes = contract.storage.namespaces['public'].tables.doc.indexes;
+    const indexes = contract.storage.namespaces['public'].entries.table.doc.indexes;
     expect(indexes).toHaveLength(1);
     expect(indexes[0]).toMatchObject({
       columns: ['body'],

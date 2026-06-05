@@ -60,41 +60,50 @@
   },
   "storage": {
     "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema"
+      },
       "public": {
-        "id": "public",
-        "kind": "postgres-schema",
-        "tables": {
-          "user": {
-            "columns": {
-              "createdAt": {
-                "codecId": "pg/timestamptz@1",
-                "nativeType": "timestamptz",
-                "nullable": false
+        "entries": {
+          "table": {
+            "user": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
               },
-              "email": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
               },
-              "id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:3acffbcc5e09f18416f1fabd6671f283b6f984990c841a0cd8f7815ed1998823"
+    "storageHash": "sha256:85e3b661f0d945dd02f0de12289d31fe7494cc031a9c24ad598126963cb151bd"
   },
   "capabilities": {
     "postgres": {

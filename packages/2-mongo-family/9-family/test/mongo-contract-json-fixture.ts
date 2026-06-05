@@ -26,7 +26,10 @@ export function mongoContractJson(params: {
     domain: applicationDomainOf({ models, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
     storage: {
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { collection: collections },
+        },
       },
     },
   };

@@ -100,68 +100,72 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__",
-        "tables": {}
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__"
       },
       "public": {
-        "id": "public",
-        "tables": {
-          "post": {
-            "columns": {
-              "id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "userId": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "onDelete": "cascade",
-                "onUpdate": "cascade",
-                "source": {
-                  "columns": ["userId"],
-                  "namespaceId": "public",
-                  "tableName": "post"
+        "entries": {
+          "table": {
+            "post": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
                 },
-                "target": {
-                  "columns": ["id"],
-                  "namespaceId": "public",
-                  "tableName": "user"
+                "userId": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
                 }
-              }
-            ],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "onDelete": "cascade",
+                  "onUpdate": "cascade",
+                  "source": {
+                    "columns": ["userId"],
+                    "namespaceId": "public",
+                    "tableName": "post"
+                  },
+                  "target": {
+                    "columns": ["id"],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
+              "uniques": []
             },
-            "uniques": []
-          },
-          "user": {
-            "columns": {
-              "id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
+            "user": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public"
       }
     },
-    "storageHash": "sha256:f2c77049c160f3e09a1c4a037a9c39342418623306627210ecf6001dcee3746a"
+    "storageHash": "sha256:7db50149e4c87fcda5e3d9b6d2146711f329079c482720534dffc5b695cb482c"
   },
   "capabilities": {
     "postgres": {

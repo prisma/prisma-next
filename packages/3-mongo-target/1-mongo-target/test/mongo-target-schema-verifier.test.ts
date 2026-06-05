@@ -18,8 +18,10 @@ function deserializedContract() {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
           kind: 'mongo-database',
-          collections: {
-            items: {},
+          entries: {
+            collection: {
+              items: {},
+            },
           },
         },
       },
@@ -54,7 +56,7 @@ describe('MongoTargetSchemaVerifier', () => {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
             kind: 'mongo-database',
-            collections: {},
+            entries: { collection: {} },
           },
         },
       },

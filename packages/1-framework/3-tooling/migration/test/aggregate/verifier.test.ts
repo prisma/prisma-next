@@ -23,7 +23,7 @@ function makeMember(args: {
     target: 'postgres',
     storage: {
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: tables } },
       },
     },
   });

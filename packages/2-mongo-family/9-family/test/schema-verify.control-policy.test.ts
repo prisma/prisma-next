@@ -29,7 +29,7 @@ function buildContract(
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          collections: built,
+          entries: { collection: built },
         },
       },
     },

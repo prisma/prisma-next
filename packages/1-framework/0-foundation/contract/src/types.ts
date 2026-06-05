@@ -57,11 +57,13 @@ export type StorageEntitySlot = Readonly<Record<string, unknown>>;
 
 /**
  * Plain-data namespace entry in a storage block. Every hydrated contract
- * carries at least `id` plus zero or more entity-kind slot maps (`tables`,
- * `collections`, …). Foundation declares only this shape — no IR machinery.
+ * carries at least `id` plus entity-kind slot maps under `entries`
+ * (`table`, `collection`, …). Foundation declares only this shape — no IR
+ * machinery.
  */
 export interface StorageNamespace {
   readonly id: string;
+  readonly entries: Readonly<Record<string, StorageEntitySlot>>;
 }
 
 /**

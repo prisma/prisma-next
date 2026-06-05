@@ -100,7 +100,7 @@ function makeContract(
         __unbound__: {
           id: '__unbound__',
           kind: 'mongo-namespace',
-          collections: storageCollections,
+          entries: { collection: storageCollections },
         },
       },
     },
@@ -116,7 +116,11 @@ function bareContract(storageHash: string): MongoContract {
     storage: {
       storageHash,
       namespaces: {
-        __unbound__: { id: '__unbound__', kind: 'mongo-namespace', collections: {} },
+        __unbound__: {
+          id: '__unbound__',
+          kind: 'mongo-namespace',
+          entries: { collection: {} },
+        },
       },
     },
   } as unknown as MongoContract;

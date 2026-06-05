@@ -50,36 +50,45 @@
   },
   "storage": {
     "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema"
+      },
       "public": {
-        "id": "public",
-        "kind": "postgres-schema",
-        "tables": {
-          "app_user": {
-            "columns": {
-              "email": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
+        "entries": {
+          "table": {
+            "app_user": {
+              "columns": {
+                "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
               },
-              "id": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:ba9d8a7212f1dacd5d202f8abc1c6e01321de261060cc96614af8708f96c3957"
+    "storageHash": "sha256:388e406207560ceeb81693f479a7ee6410877e3fcd79eeb460cf0ac472aa2de0"
   },
   "capabilities": {
     "postgres": {

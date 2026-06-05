@@ -52,7 +52,7 @@ describe('createContract', () => {
     const c2 = createSqlContract({
       storage: {
         namespaces: {
-          public: { id: 'public', tables: { user: { columns: {} } } },
+          public: { id: 'public', entries: { table: { user: { columns: {} } } } },
         },
       },
     });
@@ -73,10 +73,12 @@ describe('createSqlContract', () => {
         namespaces: {
           __unbound__: {
             id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  },
                 },
               },
             },
@@ -86,7 +88,7 @@ describe('createSqlContract', () => {
     });
     const unbound = contract.storage.namespaces['__unbound__'];
     expect(unbound).toBeDefined();
-    const tables = unbound!.tables as Record<string, unknown>;
+    const tables = unbound!.entries['table'] as Record<string, unknown>;
     expect(tables).toHaveProperty('user');
     expect(contract.storage.storageHash).toMatch(/^sha256:/);
   });

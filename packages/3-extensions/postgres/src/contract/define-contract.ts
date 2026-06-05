@@ -11,6 +11,7 @@ import type {
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { defineContract as baseDefineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 
 type SqlFamily = typeof sqlFamilyPack;
 type PostgresPack = typeof postgresPack;
@@ -91,6 +92,7 @@ export function defineContract(
     ...scaffold,
     family: sqlFamilyPack,
     target: postgresPack,
+    createNamespace: postgresCreateNamespace,
   } as ContractInput;
   if (factory !== undefined) {
     const { types: _t, models: _m, ...scaffoldOnly } = full;

@@ -37,16 +37,18 @@ export const contract: Contract<SqlStorage> = {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
         id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [{ columns: ['email'] }],
+              indexes: [{ columns: ['email'] }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['email'] }],
-            indexes: [{ columns: ['email'] }],
-            foreignKeys: [],
           },
         },
       }),

@@ -15,8 +15,9 @@
       "__unbound__": {
         "id": "__unbound__",
         "kind": "postgres-unbound-schema",
-        "tables": {
-          "shop": {
+        "entries": {
+          "table": {
+            "shop": {
             "columns": {
               "id": {
                 "codecId": "pg/int4@1",
@@ -51,6 +52,7 @@
             "uniques": [],
             "indexes": [],
             "foreignKeys": []
+            }
           }
         }
       }

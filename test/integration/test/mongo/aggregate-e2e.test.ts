@@ -90,16 +90,18 @@ function buildAppContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
-            users: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'email', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
+          entries: {
+            collection: {
+              users: {
+                kind: 'mongo-collection' as const,
+                indexes: [
+                  {
+                    kind: 'mongo-index' as const,
+                    keys: [{ field: 'email', direction: 1 as const }],
+                    unique: true,
+                  },
+                ],
+              },
             },
           },
         },

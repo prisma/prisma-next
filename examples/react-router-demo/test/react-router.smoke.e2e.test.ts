@@ -237,9 +237,11 @@ describe('react-router-demo smoke (e2e)', () => {
         storage: {
           namespaces: {
             public: {
-              tables: {
-                user: {
-                  columns: { nickname: expect.anything() },
+              entries: {
+                table: {
+                  user: {
+                    columns: { nickname: expect.anything() },
+                  },
                 },
               },
             },

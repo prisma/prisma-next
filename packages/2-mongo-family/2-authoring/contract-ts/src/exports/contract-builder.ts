@@ -10,6 +10,7 @@ export type {
   ValueObjectBuilder,
 } from '../contract-builder';
 export {
+  buildBoundContract,
   defineContract,
   field,
   index,

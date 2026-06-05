@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * const table = storage.namespaces[namespaceId].tables[tableName];
+ * const table = storage.namespaces[namespaceId].entries.table[tableName];
  * assertDefined(table, `Table "${tableName}" not found`);
  * // table is now narrowed to non-nullable
  * ```

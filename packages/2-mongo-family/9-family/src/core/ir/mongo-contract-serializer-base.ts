@@ -77,7 +77,7 @@ export abstract class MongoContractSerializerBase<TContract>
    * default.
    *
    * The returned `MongoContract` carries class instances under
-   * `storage.namespaces[namespaceId].collections[collectionName]` (each value is a
+   * `storage.namespaces[namespaceId].entries.collection[collectionName]` (each value is a
    * `MongoCollection`, with nested `MongoIndex` / `MongoValidator` /
    * `MongoCollectionOptions` constructed by the `MongoCollection` constructor).
    * The rest of the contract envelope (models, valueObjects, capabilities, …)
@@ -115,7 +115,7 @@ export abstract class MongoContractSerializerBase<TContract>
 
   /**
    * Walk a structurally-validated Mongo contract and convert each
-   * `storage.namespaces[nsId].collections[collectionName]` entry from plain
+   * `storage.namespaces[nsId].entries.collection[collectionName]` entry from plain
    * data into `MongoCollection` IR-class instances. Idempotent: already-class
    * instances pass through unchanged.
    */
@@ -123,7 +123,7 @@ export abstract class MongoContractSerializerBase<TContract>
     const rawNamespaces = contract.storage.namespaces;
     const hydratedNamespaces = Object.fromEntries(
       Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
-        const rawCollections = nsEnvelope.collections ?? {};
+        const rawCollections = nsEnvelope.entries.collection;
         const hydratedCollections = Object.fromEntries(
           Object.entries(rawCollections).map(([name, raw]) => [
             name,
@@ -135,7 +135,7 @@ export abstract class MongoContractSerializerBase<TContract>
           {
             ...nsEnvelope,
             id: nsEnvelope.id,
-            collections: hydratedCollections,
+            entries: { collection: hydratedCollections },
           },
         ];
       }),

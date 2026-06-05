@@ -25,7 +25,6 @@ import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
-import { postgresColumnsCompatible } from '../column-type-compatibility';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { createResolveExistingEnumValues } from './enum-planning';
@@ -141,7 +140,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         frameworkComponents: options.frameworkComponents,
         normalizeDefault: parsePostgresDefault,
         normalizeNativeType: normalizeSchemaNativeType,
-        columnsCompatible: postgresColumnsCompatible,
         resolveExistingEnumValues: createResolveExistingEnumValues(
           options.destinationContract.storage,
         ),

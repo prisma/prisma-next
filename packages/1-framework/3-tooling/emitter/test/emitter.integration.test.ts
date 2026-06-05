@@ -30,16 +30,23 @@ describe('emitter integration', () => {
           },
         },
         storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: {
+                table: {
+                  user: {
+                    columns: {
+                      id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                      email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                    },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
+                  },
+                },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -74,8 +81,15 @@ describe('emitter integration', () => {
         roots: {},
         storage: {
           storageHash: result.storageHash,
-          tables: {
-            user: expect.anything(),
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: {
+                table: {
+                  user: expect.anything(),
+                },
+              },
+            },
           },
         },
       });
@@ -160,16 +174,23 @@ describe('emitter integration', () => {
           },
         },
         storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: {
+                table: {
+                  user: {
+                    columns: {
+                      id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                      email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                    },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
+                  },
+                },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },

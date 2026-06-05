@@ -26,15 +26,17 @@ const contract = new SqlContractSerializer().deserializeContract({
     namespaces: {
       __unbound__: {
         id: '__unbound__',
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-              email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+                email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },

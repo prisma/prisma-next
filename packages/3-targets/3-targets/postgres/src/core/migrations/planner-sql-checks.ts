@@ -20,11 +20,11 @@ import { resolveColumnTypeMetadata } from './planner-type-resolution';
  * site.
  */
 export function qualifyTableName(schema: string, table: string): string {
-  return postgresCreateNamespace({ id: schema }).qualifyTable(table);
+  return postgresCreateNamespace({ id: schema, entries: { table: {} } }).qualifyTable(table);
 }
 
 export function toRegclassLiteral(schema: string, name: string): string {
-  return postgresCreateNamespace({ id: schema }).regclassLiteral(name);
+  return postgresCreateNamespace({ id: schema, entries: { table: {} } }).regclassLiteral(name);
 }
 
 /**
@@ -43,7 +43,7 @@ export function constraintExistsCheck({
   table?: string;
   exists?: boolean;
 }): string {
-  const namespace = postgresCreateNamespace({ id: schema });
+  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
   const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
   const tableFilter = table
     ? `AND c.conrelid = to_regclass(${namespace.regclassLiteral(table)})`
@@ -68,7 +68,7 @@ export function columnExistsCheck({
   column: string;
   exists?: boolean;
 }): string {
-  const namespace = postgresCreateNamespace({ id: schema });
+  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
   const existsClause = exists ? '' : 'NOT ';
   return `SELECT ${existsClause}EXISTS (
   SELECT 1
@@ -90,7 +90,7 @@ export function columnNullabilityCheck({
   column: string;
   nullable: boolean;
 }): string {
-  const namespace = postgresCreateNamespace({ id: schema });
+  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
   const expected = nullable ? 'YES' : 'NO';
   return `SELECT EXISTS (
   SELECT 1
@@ -111,7 +111,7 @@ export function columnHasNoDefaultCheck(opts: {
   table: string;
   column: string;
 }): string {
-  const namespace = postgresCreateNamespace({ id: opts.schema });
+  const namespace = postgresCreateNamespace({ id: opts.schema, entries: { table: {} } });
   return `SELECT NOT EXISTS (
   SELECT 1
   FROM information_schema.columns
@@ -282,7 +282,7 @@ export function columnTypeCheck({
   column: string;
   expectedType: string;
 }): string {
-  const namespace = postgresCreateNamespace({ id: schema });
+  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
   return `SELECT EXISTS (
   SELECT 1
   FROM pg_attribute a
@@ -307,7 +307,7 @@ export function columnDefaultExistsCheck({
   column: string;
   exists?: boolean;
 }): string {
-  const namespace = postgresCreateNamespace({ id: schema });
+  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
   const nullCheck = exists ? 'IS NOT NULL' : 'IS NULL';
   return `SELECT EXISTS (
   SELECT 1
@@ -325,7 +325,7 @@ export function tableHasPrimaryKeyCheck(
   exists: boolean,
   constraintName?: string,
 ): string {
-  const namespace = postgresCreateNamespace({ id: schema });
+  const namespace = postgresCreateNamespace({ id: schema, entries: { table: {} } });
   const comparison = exists ? '' : 'NOT ';
   const constraintFilter = constraintName
     ? `AND c2.relname = '${escapeLiteral(constraintName)}'`

@@ -29,6 +29,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
+import { isPostgresSchema } from '../postgres-schema';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -73,8 +74,7 @@ function locateNamespaceTypeInStorage(
   typeName: string,
 ): unknown {
   const ns = storage.namespaces[namespaceId];
-  if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
-  return (ns.enum as Record<string, unknown>)[typeName];
+  return isPostgresSchema(ns) ? ns.entries.type[typeName] : undefined;
 }
 
 // ============================================================================
@@ -601,7 +601,7 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      // Codec aliases live in storage.types; enum types live in namespace.enum.
+      // Codec aliases live in storage.types; enum types live in namespace.entries.type.
       // Check types first; fall back to the namespace-keyed enum slot using the
       // issue's namespace coordinate (populated by the verifier for enum-related
       // issues per the BaseSchemaIssue.namespaceId contract).

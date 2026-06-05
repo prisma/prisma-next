@@ -130,7 +130,7 @@ export interface ContractDefinition {
   /**
    * Enum types declared inside a named `namespace { enum … }` block,
    * keyed first by namespace id then by type name. These are routed to
-   * `storage.namespaces[nsId].enum` rather than the implicit fallback
+   * `storage.namespaces[nsId].entries.type` rather than the implicit fallback
    * namespace used for top-level `storageTypes` enums.
    */
   readonly namespaceTypes?: Readonly<
@@ -145,8 +145,14 @@ export interface ContractDefinition {
    * Target-supplied factory that materialises a `Namespace` concretion
    * for a declared namespace coordinate. Mirrors
    * `ContractInput.createNamespace`.
+   *
+   * The optional second argument carries target-specific enum types for the
+   * namespace (e.g. postgres enum registrations keyed by type name).
    */
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace?: (
+    input: SqlNamespaceTablesInput,
+    enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+  ) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
 }

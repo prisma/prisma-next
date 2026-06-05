@@ -681,7 +681,10 @@
       "__unbound__": {
         "models": {
           "AddToCartEvent": {
-            "base": "Event",
+            "base": {
+              "namespace": "__unbound__",
+              "model": "Event"
+            },
             "fields": {
               "brand": {
                 "nullable": false,
@@ -739,7 +742,10 @@
                     "_id"
                   ]
                 },
-                "to": "User"
+                "to": {
+                  "namespace": "__unbound__",
+                  "model": "User"
+                }
               }
             },
             "storage": {
@@ -867,7 +873,10 @@
                     "_id"
                   ]
                 },
-                "to": "Order"
+                "to": {
+                  "namespace": "__unbound__",
+                  "model": "Order"
+                }
               }
             },
             "storage": {
@@ -982,7 +991,10 @@
                     "orderId"
                   ]
                 },
-                "to": "Invoice"
+                "to": {
+                  "namespace": "__unbound__",
+                  "model": "Invoice"
+                }
               },
               "user": {
                 "cardinality": "N:1",
@@ -994,7 +1006,10 @@
                     "_id"
                   ]
                 },
-                "to": "User"
+                "to": {
+                  "namespace": "__unbound__",
+                  "model": "User"
+                }
               }
             },
             "storage": {
@@ -1080,7 +1095,10 @@
             }
           },
           "SearchEvent": {
-            "base": "Event",
+            "base": {
+              "namespace": "__unbound__",
+              "model": "Event"
+            },
             "fields": {
               "query": {
                 "nullable": false,
@@ -1137,7 +1155,10 @@
                     "userId"
                   ]
                 },
-                "to": "Cart"
+                "to": {
+                  "namespace": "__unbound__",
+                  "model": "Cart"
+                }
               },
               "orders": {
                 "cardinality": "1:N",
@@ -1149,7 +1170,10 @@
                     "userId"
                   ]
                 },
-                "to": "Order"
+                "to": {
+                  "namespace": "__unbound__",
+                  "model": "Order"
+                }
               }
             },
             "storage": {
@@ -1157,7 +1181,10 @@
             }
           },
           "ViewProductEvent": {
-            "base": "Event",
+            "base": {
+              "namespace": "__unbound__",
+              "model": "Event"
+            },
             "fields": {
               "brand": {
                 "nullable": false,

@@ -50,36 +50,45 @@
   },
   "storage": {
     "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema"
+      },
       "public": {
-        "id": "public",
-        "kind": "postgres-schema",
-        "tables": {
-          "feature_flag": {
-            "columns": {
-              "enabled": {
-                "codecId": "pg/bool@1",
-                "nativeType": "bool",
-                "nullable": false
+        "entries": {
+          "table": {
+            "feature_flag": {
+              "columns": {
+                "enabled": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "key": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
               },
-              "key": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "key"
-              ]
-            },
-            "uniques": []
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "key"
+                ]
+              },
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:abd6046b098e9dd1d014eb490ca1edfa884631957a4727c76e6d4d1f4e3828be"
+    "storageHash": "sha256:a786391c6eeb31a07a792be9a0c74841392a85d687834d1e1a2087ee0a5096e5"
   },
   "capabilities": {
     "postgres": {
