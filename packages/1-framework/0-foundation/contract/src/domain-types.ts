@@ -50,12 +50,21 @@ export type ContractRelationThrough = {
   readonly targetColumns: readonly string[];
 };
 
-export type ContractReferenceRelation = {
+export type ContractManyToManyRelation = {
   readonly to: CrossReference;
-  readonly cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
+  readonly cardinality: 'N:M';
   readonly on: ContractRelationOn;
-  readonly through?: ContractRelationThrough;
+  readonly through: ContractRelationThrough;
 };
+
+export type ContractNonJunctionRelation = {
+  readonly to: CrossReference;
+  readonly cardinality: '1:1' | '1:N' | 'N:1';
+  readonly on: ContractRelationOn;
+  readonly through?: never;
+};
+
+export type ContractReferenceRelation = ContractManyToManyRelation | ContractNonJunctionRelation;
 
 export type ContractEmbedRelation = {
   readonly to: CrossReference;
