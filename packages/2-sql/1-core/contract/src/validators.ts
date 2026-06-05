@@ -13,8 +13,6 @@ import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
 import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 import {
-  type ForeignKeyInput,
-  type ForeignKeyReferenceInput,
   type PrimaryKeyInput,
   type ReferentialAction,
   type SqlModelStorage,
@@ -141,18 +139,32 @@ export const IndexSchema = type({
   'options?': 'Record<string, unknown>',
 });
 
-export const ForeignKeyReferenceSchema = type({
+const LocalForeignKeyReferenceSchema = type({
   '+': 'reject',
   namespaceId: 'string',
   tableName: 'string',
   columns: type.string.array().readonly(),
-}) satisfies Type<ForeignKeyReferenceInput>;
+  'origin?': "'local'",
+});
+
+const SpaceForeignKeyReferenceSchema = type({
+  '+': 'reject',
+  namespaceId: 'string',
+  tableName: 'string',
+  columns: type.string.array().readonly(),
+  origin: "'space'",
+  spaceId: 'string',
+});
+
+export const ForeignKeyReferenceSchema = LocalForeignKeyReferenceSchema.or(
+  SpaceForeignKeyReferenceSchema,
+);
 
 export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
   .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
 
-export const ForeignKeySchema = type.declare<ForeignKeyInput>().type({
+export const ForeignKeySchema = type({
   source: ForeignKeyReferenceSchema,
   target: ForeignKeyReferenceSchema,
   'name?': 'string',
@@ -810,22 +822,24 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         }
       }
 
-      const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
-      const referencedRaw = targetNamespace?.entries.table[fk.target.tableName];
-      if (referencedRaw === undefined) {
-        throw new ContractValidationError(
-          `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,
-          'storage',
-        );
-      }
-      const referencedTable = referencedRaw as StorageTable;
-      const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
-      for (const colName of fk.target.columns) {
-        if (!referencedColumnNames.has(colName)) {
+      if (fk.target.origin !== 'space') {
+        const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
+        const referencedRaw = targetNamespace?.entries.table[fk.target.tableName];
+        if (referencedRaw === undefined) {
           throw new ContractValidationError(
-            `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.target.tableName}"`,
+            `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,
             'storage',
           );
+        }
+        const referencedTable = referencedRaw as StorageTable;
+        const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
+        for (const colName of fk.target.columns) {
+          if (!referencedColumnNames.has(colName)) {
+            throw new ContractValidationError(
+              `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.target.tableName}"`,
+              'storage',
+            );
+          }
         }
       }
 
