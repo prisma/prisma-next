@@ -1,4 +1,4 @@
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -15,7 +15,7 @@ const createMockDriver = (
     numeric_scale: number | null;
     column_default: string | null;
   }>,
-): ControlDriverInstance<'sql', 'postgres'> => ({
+): SqlControlDriverInstance<'postgres'> => ({
   familyId: 'sql',
   targetId: 'postgres',
   query: async <Row = Record<string, unknown>>(sql: string) => {
