@@ -24,7 +24,6 @@
     "@prisma-next/migration-tools": "workspace:0.12.0",
     "@prisma-next/mongo-codec": "workspace:0.12.0",
     "@prisma-next/mongo-contract": "workspace:0.12.0",
-    "@prisma-next/driver-mongo": "workspace:0.12.0",
     "@prisma-next/mongo-lowering": "workspace:0.12.0",
     "@prisma-next/mongo-query-ast": "workspace:0.12.0",
     "@prisma-next/mongo-schema-ir": "workspace:0.12.0",
