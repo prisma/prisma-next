@@ -71,6 +71,75 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ): Promise<readonly LedgerEntryRecord[]>;
 
   /**
+   * Inserts the initial marker row for `space` (`INSERT` only). Fails when a
+   * row for that space already exists. Used by `sign()` so concurrent first-time
+   * stamps cannot silently overwrite each other. `updated_at` is DB-side
+   * (`now()` / `datetime('now')`). Mirrors `MongoControlAdapter.initMarker`.
+   */
+  insertMarker(
+    driver: ControlDriverInstance<'sql', TTarget>,
+    space: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<void>;
+
+  /**
+   * Writes the initial marker row for `space` as an upsert (`INSERT … ON
+   * CONFLICT (space) DO UPDATE SET …`), so re-stamping a space overwrites the
+   * existing row rather than failing. `updated_at` is stamped with a DB-side
+   * time expression (`now()` / `datetime('now')`), never an app-side clock.
+   */
+  initMarker(
+    driver: ControlDriverInstance<'sql', TTarget>,
+    space: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<void>;
+
+  /**
+   * Atomically advances the marker row for `space` (compare-and-swap on
+   * `core_hash = expectedFrom`). Returns `true` when the swap matched a row,
+   * `false` when another process advanced the marker first. `destination.invariants`
+   * is written verbatim when supplied (the union/dedupe policy lives upstream)
+   * and left untouched when omitted. Mirrors `MongoControlAdapter.updateMarker`.
+   */
+  updateMarker(
+    driver: ControlDriverInstance<'sql', TTarget>,
+    space: string,
+    expectedFrom: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<boolean>;
+
+  /**
+   * Appends a ledger entry for `space`. Mirrors `MongoControlAdapter.writeLedgerEntry`.
+   * The SQL ledger table keys rows by an autoincrement id and partitions reads
+   * by `space`, so `entry.edgeId` carries no dedicated column; `from` / `to`
+   * land in `origin_core_hash` / `destination_core_hash`.
+   */
+  writeLedgerEntry(
+    driver: ControlDriverInstance<'sql', TTarget>,
+    space: string,
+    entry: {
+      readonly edgeId: string;
+      readonly from: string;
+      readonly to: string;
+      readonly migrationName: string;
+      readonly migrationHash: string;
+      readonly operations: readonly unknown[];
+    },
+  ): Promise<void>;
+
+  /**
    * Introspects a database schema and returns a raw SqlSchemaIR.
    *
    * This is a pure schema discovery operation that queries the database catalog

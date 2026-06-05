@@ -80,7 +80,7 @@ export interface ExpressionFolder<T> {
 }
 
 export type ProjectionExpr = AnyExpression;
-export type InsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr;
+export type InsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr | RawExpr;
 export type JoinOnExpr = EqColJoinOn | AnyExpression;
 export type WhereArg = AnyExpression | ToWhereExpr;
 export type JsonObjectEntry = {
@@ -205,6 +205,11 @@ function rewriteInsertValue(value: InsertValue, rewriter: AstRewriter): InsertVa
       return rewriter.columnRef ? rewriteColumnRefForInsert(value, rewriter) : value;
     case 'default-value':
       return value;
+    // RawExpr insert values are opaque DB-side expressions (e.g. `now()` /
+    // `datetime('now')`) carried in value position; they are not a rewrite
+    // target on the insert path.
+    case 'raw-expr':
+      return value;
   }
 }
 
@@ -320,16 +325,17 @@ export class TableSource extends FromSource {
    */
   readonly namespaceId: string | undefined;
 
-  constructor(name: string, alias?: string, namespaceId?: string) {
+  protected constructor(name: string, alias?: string, namespaceId?: string) {
     super();
     this.name = name;
     this.alias = alias;
     this.namespaceId = namespaceId;
-    this.freeze();
   }
 
   static named(name: string, alias?: string, namespaceId?: string): TableSource {
-    return new TableSource(name, alias, namespaceId);
+    const source = new TableSource(name, alias, namespaceId);
+    source.freeze();
+    return source;
   }
 
   override rewrite(rewriter: AstRewriter): AnyFromSource {
@@ -1691,6 +1697,8 @@ export class InsertAst extends QueryAst {
       for (const value of Object.values(row)) {
         if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
           refs.push(value);
+        } else if (value.kind === 'raw-expr') {
+          refs.push(...value.collectParamRefs());
         }
       }
     }
@@ -1914,7 +1922,7 @@ export type AnyExpression =
   | RawExpr;
 export type AnyParamRef = ParamRef | PreparedParamRef;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
-export type AnyInsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr;
+export type AnyInsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr | RawExpr;
 export type AnyOperationArg = AnyExpression | ParamRef | PreparedParamRef | LiteralExpr;
 
 export const queryAstKinds: ReadonlySet<string> = new Set<AnyQueryAst['kind']>([

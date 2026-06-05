@@ -251,6 +251,23 @@ describe('canonicalizeContractToObject', () => {
     expect(result).not.toHaveProperty('zebra');
   });
 
+  it('includes defaultControlPolicy when set on the contract', () => {
+    const result = canonicalizeContractToObject(minimal({ defaultControlPolicy: 'external' }));
+    expect(result['defaultControlPolicy']).toBe('external');
+  });
+
+  it('omits defaultControlPolicy when not set', () => {
+    const result = canonicalizeContractToObject(minimal());
+    expect(result).not.toHaveProperty('defaultControlPolicy');
+  });
+
+  it('places defaultControlPolicy after extensionPacks and before meta', () => {
+    const result = canonicalizeContractToObject(minimal({ defaultControlPolicy: 'tolerated' }));
+    const keys = Object.keys(result);
+    expect(keys.indexOf('extensionPacks')).toBeLessThan(keys.indexOf('defaultControlPolicy'));
+    expect(keys.indexOf('defaultControlPolicy')).toBeLessThan(keys.indexOf('meta'));
+  });
+
   it('sorts object keys recursively', () => {
     const result = canonicalizeContractToObject(
       minimal({

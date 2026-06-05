@@ -260,6 +260,14 @@ export default defineConfig({
 });
 ```
 
+Optional third argument (options bag) for `typescriptContract` / `typescriptContractFromPath`, and `defaultControlPolicy` on `emptyContract`:
+
+```typescript
+typescriptContract(contract, 'src/prisma/contract.json', { defaultControlPolicy: 'external' });
+```
+
+The specifier value applies only when the loaded contract omits `defaultControlPolicy` (a value authored on the contract module wins).
+
 ## Dependencies
 
 - **`@prisma-next/config`** - `ContractConfig` types used by `typescriptContract(...)`

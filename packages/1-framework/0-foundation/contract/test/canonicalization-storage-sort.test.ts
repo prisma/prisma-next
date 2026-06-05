@@ -100,4 +100,8 @@ describe('compareByNameProperty', () => {
   it('treats missing name as empty string', () => {
     expect(compareByNameProperty({}, { name: 'a' })).toBeLessThan(0);
   });
+
+  it('uses code-unit order, not locale collation (Z < a)', () => {
+    expect(compareByNameProperty({ name: 'Z' }, { name: 'a' })).toBeLessThan(0);
+  });
 });

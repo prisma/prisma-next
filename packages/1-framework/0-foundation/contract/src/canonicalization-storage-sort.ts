@@ -11,10 +11,17 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+// Order by UTF-16 code unit, not locale collation: canonicalization feeds
+// storageHash, which must be byte-identical across hosts, and locale
+// collation (localeCompare/Intl) varies by the engine's ICU build.
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export function compareByNameProperty(a: unknown, b: unknown): number {
   const nameA = isPlainRecord(a) && typeof a['name'] === 'string' ? a['name'] : '';
   const nameB = isPlainRecord(b) && typeof b['name'] === 'string' ? b['name'] : '';
-  return nameA.localeCompare(nameB);
+  return compareCodeUnits(nameA, nameB);
 }
 
 function sortArrayKeysOnRecord(

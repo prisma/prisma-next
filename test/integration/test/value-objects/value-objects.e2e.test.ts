@@ -10,11 +10,11 @@ import {
   createRuntime,
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
-import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { describeWithMongoDB } from '../mongo/setup';
+import { setupTestDatabase } from '../utils';
 import type { Contract as MongoVOContract } from './fixtures/generated/mongo-contract.d';
 import mongoContractJson from './fixtures/generated/mongo-contract.json';
 import type { Contract as SqlVOContract } from './fixtures/generated/sql-contract.d';

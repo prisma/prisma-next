@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig } from '@prisma-next/config/config-types';
+import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { basename, extname } from 'pathe';
@@ -16,6 +18,7 @@ export interface PrismaContractOptions {
   readonly target: TargetPackRef<'sql', string>;
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly defaultControlPolicy?: ControlPolicy;
 }
 
 /**
@@ -115,7 +118,9 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           return interpreted;
         }
 
-        return ok(interpreted.value);
+        return ok(
+          applySpecifierDefaultControlPolicy(interpreted.value, options.defaultControlPolicy),
+        );
       },
     },
     output: options.output ?? defaultOutputFromSchemaPath(schemaPath),

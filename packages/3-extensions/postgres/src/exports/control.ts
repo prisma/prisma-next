@@ -2,7 +2,7 @@
  * Control-API facade for Postgres.
  *
  * Collapses the five-package wiring required to drive control-side
- * operations (`dbInit`, `dbUpdate`, `dbVerify`, `migrationApply`, …) into
+ * operations (`dbInit`, `dbUpdate`, `dbVerify`, `migrate`, …) into
  * a single `createPostgresControlClient()` call. Mirrors what
  * `@prisma-next/postgres/runtime` did for the query side.
  */

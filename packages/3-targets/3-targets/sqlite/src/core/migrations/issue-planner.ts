@@ -28,6 +28,7 @@ import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { CONTROL_TABLE_NAMES } from '../control-tables';
 import {
   AddColumnCall,
   CreateIndexCall,
@@ -55,7 +56,6 @@ import {
   sqlitePlannerStrategies,
   tableAt,
 } from './planner-strategies';
-import { CONTROL_TABLE_NAMES } from './statement-builders';
 
 export type { CallMigrationStrategy, StrategyContext };
 

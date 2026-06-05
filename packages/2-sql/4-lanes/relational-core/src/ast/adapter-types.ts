@@ -4,11 +4,6 @@ import type { LoweredStatement } from './types';
 
 export type AdapterTarget = string;
 
-export interface MarkerStatement {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-}
-
 /**
  * Outcome of an adapter's marker read. `no-table` means the marker storage itself is absent
  * (e.g. attaching to a database that was never `db init`'d); `absent` means the storage exists

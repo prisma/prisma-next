@@ -1,4 +1,5 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { PslAttribute, PslSpan } from '@prisma-next/psl-parser';
 import { getPositionalArgument, parseQuotedStringLiteral } from '@prisma-next/psl-parser';
 
@@ -409,6 +410,71 @@ export function findDuplicateFieldName(fieldNames: readonly string[]): string | 
     seen.add(name);
   }
   return undefined;
+}
+
+const CONTROL_POLICY_LITERALS = [
+  'managed',
+  'tolerated',
+  'external',
+  'observed',
+] as const satisfies readonly ControlPolicy[];
+
+const CONTROL_POLICY_LITERAL_SET = new Set<string>(CONTROL_POLICY_LITERALS);
+
+function isControlPolicyLiteral(value: string): value is ControlPolicy {
+  return CONTROL_POLICY_LITERAL_SET.has(value);
+}
+
+export function parseControlPolicyAttribute(input: {
+  readonly attribute: PslAttribute;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): ControlPolicy | undefined {
+  const namedArgs = input.attribute.args.filter((arg) => arg.kind === 'named');
+  if (namedArgs.length > 0) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message:
+        '`@@control` does not accept named arguments; pass the policy positionally as `@@control(external)`.',
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+
+  const positionalArgs = getPositionalArguments(input.attribute);
+  if (positionalArgs.length === 0) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message:
+        '`@@control` requires exactly one positional argument: `managed`, `tolerated`, `external`, or `observed`.',
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  if (positionalArgs.length > 1) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `\`@@control\` accepts exactly one positional argument; got ${positionalArgs.length}.`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+
+  const token = unquoteStringLiteral(positionalArgs[0] ?? '').trim();
+  if (!isControlPolicyLiteral(token)) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `\`@@control\` argument \`${token}\` is not a known policy. Allowed: \`managed\`, \`tolerated\`, \`external\`, \`observed\`.`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+
+  return token;
 }
 
 export function mapFieldNamesToColumns(input: {

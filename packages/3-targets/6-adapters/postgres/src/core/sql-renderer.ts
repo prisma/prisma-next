@@ -31,6 +31,7 @@ import {
   type UpdateAst,
   type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { PostgresTableSource } from '@prisma-next/target-postgres/contract-free';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresContract } from './types';
@@ -274,6 +275,9 @@ function qualifyTableFromNamespaceCoordinate(
   table: Pick<TableSource, 'name' | 'namespaceId'>,
   contract: PostgresContract,
 ): string {
+  if (table instanceof PostgresTableSource && table.schema !== undefined) {
+    return `${quoteIdentifier(table.schema)}.${quoteIdentifier(table.name)}`;
+  }
   if (table.namespaceId === undefined) {
     return quoteIdentifier(table.name);
   }
@@ -725,7 +729,11 @@ function getInsertColumnOrder(
   return Object.keys(table.columns);
 }
 
-function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): string {
+function renderInsertValue(
+  value: InsertValue | undefined,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
+): string {
   if (!value || value.kind === 'default-value') {
     return 'DEFAULT';
   }
@@ -736,6 +744,8 @@ function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): 
       return renderParamRef(value, pim);
     case 'column-ref':
       return renderColumn(value);
+    case 'raw-expr':
+      return renderExpr(value, contract, pim);
     // v8 ignore next 4
     default:
       throw new Error(
@@ -773,7 +783,9 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
     const columns = columnOrder.map((column) => quoteIdentifier(column));
     const values = rows
       .map((row) => {
-        const renderedRow = columnOrder.map((column) => renderInsertValue(row[column], pim));
+        const renderedRow = columnOrder.map((column) =>
+          renderInsertValue(row[column], contract, pim),
+        );
         return `(${renderedRow.join(', ')})`;
       })
       .join(', ');

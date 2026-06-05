@@ -75,6 +75,7 @@ const TOP_LEVEL_ORDER = [
   'execution',
   'capabilities',
   'extensionPacks',
+  'defaultControlPolicy',
   'meta',
 ] as const;
 
@@ -262,6 +263,7 @@ export function canonicalizeContractToObject(
     ...ifDefined('execution', serialized['execution']),
     extensionPacks: serialized['extensionPacks'],
     capabilities: serialized['capabilities'],
+    ...ifDefined('defaultControlPolicy', serialized['defaultControlPolicy']),
     meta: serialized['meta'],
   };
   const withDefaultsOmitted = omitDefaults(normalized, [], options.shouldPreserveEmpty) as Record<

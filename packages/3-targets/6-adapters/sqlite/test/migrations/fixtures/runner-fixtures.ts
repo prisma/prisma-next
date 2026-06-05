@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
@@ -17,11 +18,14 @@ import {
   buildSynthMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { buildControlTableBootstrapQueries } from '@prisma-next/target-sqlite/contract-free';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
+import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
-import type { SqlStatement } from '@prisma-next/target-sqlite/statement-builders';
 import { applicationDomainOf } from '@prisma-next/test-utils';
+import type { SqliteContract } from '../../../src/core/types';
 import sqliteAdapterDescriptor from '../../../src/exports/control';
 
 export const contract: Contract<SqlStorage> = {
@@ -35,17 +39,17 @@ export const contract: Contract<SqlStorage> = {
         id: UNBOUND_NAMESPACE_ID,
         entries: {
           table: {
-          user: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+            user: {
+              columns: {
+                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [{ columns: ['email'] }],
+              indexes: [{ columns: ['email'] }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['email'] }],
-            indexes: [{ columns: ['email'] }],
-            foreignKeys: [],
           },
-        },
         },
       }),
     },
@@ -185,9 +189,22 @@ export function createLedgerTestPlan(options: {
   });
 }
 
+const sqliteControlAdapter = createSqliteAdapter();
+const sqliteControlLowererContext = { contract: {} as SqliteContract };
+
+export async function bootstrapSqliteControlTables(driver: SqliteControlDriver): Promise<void> {
+  for (const query of buildControlTableBootstrapQueries()) {
+    const sqliteQuery = query as unknown as SqliteDdlNode;
+    await executeStatement(
+      driver,
+      sqliteControlAdapter.lower(sqliteQuery, sqliteControlLowererContext),
+    );
+  }
+}
+
 export async function executeStatement(
   driver: SqliteControlDriver,
-  statement: SqlStatement,
+  statement: LoweredStatement,
 ): Promise<void> {
   if (statement.params.length > 0) {
     await driver.query(statement.sql, statement.params);

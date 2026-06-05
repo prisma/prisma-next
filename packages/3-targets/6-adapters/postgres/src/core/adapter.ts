@@ -5,15 +5,14 @@ import type {
   AdapterProfile,
   AnyQueryAst,
   LowererContext,
-  MarkerReadResult,
   RawSqlLiteral,
   SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
-import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
+import { PostgresControlAdapter } from './control-adapter';
 import { renderLoweredDdl } from './ddl-renderer';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
@@ -47,11 +46,27 @@ class PostgresAdapterImpl
 
   constructor(options?: PostgresAdapterOptions) {
     this.codecLookup = options?.codecLookup ?? createPostgresBuiltinCodecLookup();
+    const controlAdapter = new PostgresControlAdapter(this.codecLookup);
     this.profile = Object.freeze({
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
       capabilities: defaultCapabilities,
-      readMarker: (queryable: SqlQueryable) => readPostgresMarker(queryable),
+      readMarker: (queryable: SqlQueryable) =>
+        controlAdapter.readMarkerDiscriminated(
+          {
+            familyId: 'sql',
+            targetId: 'postgres',
+            query: async <Row = Record<string, unknown>>(
+              sql: string,
+              params?: readonly unknown[],
+            ) => {
+              const result = await queryable.query<Row>(sql, params);
+              return { rows: [...result.rows] };
+            },
+            close: async () => {},
+          },
+          APP_SPACE_ID,
+        ),
     });
   }
 
@@ -86,27 +101,6 @@ export const postgresRawCodecInferer: RawCodecInferer = {
     );
   },
 };
-
-async function readPostgresMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
-  const exists = await queryable.query(
-    'select 1 from information_schema.tables where table_schema = $1 and table_name = $2',
-    ['prisma_contract', 'marker'],
-  );
-  if (exists.rows.length === 0) {
-    return { kind: 'no-table' };
-  }
-
-  const result = await queryable.query(
-    'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
-    [APP_SPACE_ID],
-  );
-  const row = result.rows[0];
-  if (!row) {
-    return { kind: 'absent' };
-  }
-  // Postgres' driver hydrates `text[]` columns as native JS arrays, so the row is already in the shape the shared parser expects.
-  return { kind: 'present', record: parseContractMarkerRow(row) };
-}
 
 export function createPostgresAdapter(options?: PostgresAdapterOptions) {
   return Object.freeze(new PostgresAdapterImpl(options));

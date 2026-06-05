@@ -1,5 +1,33 @@
 import { describe, expect, it } from 'vitest';
+import { applySpecifierDefaultControlPolicy } from '../src/apply-specifier-default-control-policy';
+import type { Contract } from '../src/contract-types';
 import { effectiveControlPolicy } from '../src/control-policy';
+
+describe('applySpecifierDefaultControlPolicy', () => {
+  const minimalContract = {
+    targetFamily: 'sql',
+    target: 'postgres',
+  } as Contract;
+
+  it('keeps defaultControlPolicy when the contract already defines one', () => {
+    const contract = { ...minimalContract, defaultControlPolicy: 'managed' as const };
+    expect(applySpecifierDefaultControlPolicy(contract, 'external').defaultControlPolicy).toBe(
+      'managed',
+    );
+  });
+
+  it('writes the specifier default when the contract omits defaultControlPolicy', () => {
+    expect(
+      applySpecifierDefaultControlPolicy(minimalContract, 'external').defaultControlPolicy,
+    ).toBe('external');
+  });
+
+  it('returns the contract unchanged when the specifier omits a default', () => {
+    const contract = applySpecifierDefaultControlPolicy(minimalContract, undefined);
+    expect(contract).toBe(minimalContract);
+    expect(contract).not.toHaveProperty('defaultControlPolicy');
+  });
+});
 
 describe('effectiveControlPolicy', () => {
   describe('precedence: node → default → managed', () => {

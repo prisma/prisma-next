@@ -1420,7 +1420,7 @@ try {
 | `sign(options)` | Writes contract marker to database |
 | `dbInit(options)` | Initializes database schema from contract |
 | `dbUpdate(options)` | Updates database schema to match contract |
-| `migrationApply(options)` | Applies pre-planned migration edges to database |
+| `migrate(options)` | Advances the database to the target contract via the migration graph |
 | `introspect(options)` | Introspects database schema |
 
 ### Result Types
@@ -1433,7 +1433,7 @@ Operations return structured result types:
 - `sign()` → `SignDatabaseResult`
 - `dbInit()` → `Result<DbInitSuccess, DbInitFailure>` (uses Result pattern)
 - `dbUpdate()` → `Result<DbUpdateSuccess, DbUpdateFailure>` (uses Result pattern)
-- `migrationApply()` → `Result<MigrationApplySuccess, MigrationApplyFailure>` (uses Result pattern)
+- `migrate()` → `Result<MigrateSuccess, MigrateFailure>` (uses Result pattern)
 - `introspect()` → Schema IR (family-specific)
 
 ### Error Handling

@@ -39,7 +39,6 @@ import type {
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
-import { writeContractMarker } from '@prisma-next/sql-runtime';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -243,6 +242,53 @@ export interface SqlControlFamilyInstance
   inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst;
 
   lowerAst(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
+
+  /**
+   * Inserts the initial marker row for `space` (upsert on `space`).
+   * Delegates to the target control adapter's write SPI; see
+   * `SqlControlAdapter.initMarker`.
+   */
+  initMarker(options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly space: string;
+    readonly destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    };
+  }): Promise<void>;
+
+  /**
+   * Compare-and-swap advance of the marker row for `space`. Returns `true`
+   * when the swap matched a row; see `SqlControlAdapter.updateMarker`.
+   */
+  updateMarker(options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly space: string;
+    readonly expectedFrom: string;
+    readonly destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    };
+  }): Promise<boolean>;
+
+  /**
+   * Appends a ledger entry for `space`; see
+   * `SqlControlAdapter.writeLedgerEntry`.
+   */
+  writeLedgerEntry(options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly space: string;
+    readonly entry: {
+      readonly edgeId: string;
+      readonly from: string;
+      readonly to: string;
+      readonly migrationName: string;
+      readonly migrationHash: string;
+      readonly operations: readonly unknown[];
+    };
+  }): Promise<void>;
 
   bootstrapControlTableQueries(): readonly DdlNode[];
 
@@ -556,14 +602,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       let previousHashes: { storageHash?: string; profileHash?: string } | undefined;
 
       if (!existingMarker) {
-        const write = writeContractMarker({
-          space: APP_SPACE_ID,
+        await controlAdapter.insertMarker(driver, APP_SPACE_ID, {
           storageHash: contractStorageHash,
           profileHash: contractProfileHash,
-          contractJson: contractInput,
-          canonicalVersion: 1,
         });
-        await driver.query(write.insert.sql, write.insert.params);
         markerCreated = true;
       } else {
         const existingStorageHash = existingMarker.storageHash;
@@ -577,14 +619,18 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             storageHash: existingStorageHash,
             profileHash: existingProfileHash,
           };
-          const write = writeContractMarker({
-            space: APP_SPACE_ID,
-            storageHash: contractStorageHash,
-            profileHash: contractProfileHash,
-            contractJson: contractInput,
-            canonicalVersion: existingMarker.canonicalVersion ?? 1,
-          });
-          await driver.query(write.update.sql, write.update.params);
+          const updated = await controlAdapter.updateMarker(
+            driver,
+            APP_SPACE_ID,
+            existingStorageHash,
+            {
+              storageHash: contractStorageHash,
+              profileHash: contractProfileHash,
+            },
+          );
+          if (!updated) {
+            throw new Error('CAS conflict: marker was modified by another process during sign');
+          }
           markerUpdated = true;
         }
       }
@@ -641,6 +687,48 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly space?: string;
     }): Promise<readonly LedgerEntryRecord[]> {
       return getControlAdapter().readLedger(options.driver, options.space);
+    },
+    async initMarker(options: {
+      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly space: string;
+      readonly destination: {
+        readonly storageHash: string;
+        readonly profileHash: string;
+        readonly invariants?: readonly string[];
+      };
+    }): Promise<void> {
+      return getControlAdapter().initMarker(options.driver, options.space, options.destination);
+    },
+    async updateMarker(options: {
+      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly space: string;
+      readonly expectedFrom: string;
+      readonly destination: {
+        readonly storageHash: string;
+        readonly profileHash: string;
+        readonly invariants?: readonly string[];
+      };
+    }): Promise<boolean> {
+      return getControlAdapter().updateMarker(
+        options.driver,
+        options.space,
+        options.expectedFrom,
+        options.destination,
+      );
+    },
+    async writeLedgerEntry(options: {
+      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly space: string;
+      readonly entry: {
+        readonly edgeId: string;
+        readonly from: string;
+        readonly to: string;
+        readonly migrationName: string;
+        readonly migrationHash: string;
+        readonly operations: readonly unknown[];
+      };
+    }): Promise<void> {
+      return getControlAdapter().writeLedgerEntry(options.driver, options.space, options.entry);
     },
     async introspect(options: {
       readonly driver: ControlDriverInstance<'sql', string>;

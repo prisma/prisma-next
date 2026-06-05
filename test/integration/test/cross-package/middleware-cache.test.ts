@@ -32,13 +32,13 @@ import {
   type SqlRuntimeDriverInstance,
   type SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
-import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { contract } from '../sql-builder/fixtures/contract';
 import type { Contract } from '../sql-builder/fixtures/generated/contract';
+import { setupTestDatabase } from '../utils';
 
 /**
  * Integration tests for `@prisma-next/middleware-cache` against real

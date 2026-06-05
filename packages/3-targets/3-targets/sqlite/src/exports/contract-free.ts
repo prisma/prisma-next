@@ -1,3 +1,4 @@
+export { datetime, integer, jsonText, sqliteTable, text } from '../contract-free/columns';
 export {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
