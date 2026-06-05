@@ -1,5 +1,5 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createMigrationLogCommand,
   executeMigrationLogCommand,
@@ -30,6 +30,14 @@ vi.mock('../../src/control-api/client', () => ({
     close: mocks.close,
   })),
 }));
+
+afterAll(() => {
+  // Repo-wide vitest runs with `isolate: false`, so the `vi.mock` leaks
+  // into the next file in the same worker; unmock to restore it.
+  vi.doUnmock('../../src/config-loader');
+  vi.doUnmock('../../src/control-api/client');
+  vi.resetModules();
+});
 
 const baseConfig = {
   family: { familyId: 'sql', create: vi.fn() },

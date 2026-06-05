@@ -11,7 +11,7 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import stripAnsi from 'strip-ansi';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MigrationShowPresent } from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
@@ -25,6 +25,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../src/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
+
+afterAll(() => {
+  // Repo-wide vitest runs with `isolate: false`, so the `vi.mock` leaks
+  // into the next file in the same worker; unmock to restore it.
+  vi.doUnmock('../../src/config-loader');
+  vi.resetModules();
+});
 
 const createdTempDirs: string[] = [];
 
