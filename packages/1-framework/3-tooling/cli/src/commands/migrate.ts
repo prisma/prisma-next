@@ -59,15 +59,9 @@ import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-grap
 import {
   computeMaxDirNameLengthForLayout,
   computeMaxEdgeTreePrefixWidthForLayout,
+  formatOnPathMigrationRow,
   renderMigrationGraphTree,
 } from '../utils/formatters/migration-graph-tree-render';
-import {
-  abbreviateContractHash,
-  MIGRATION_LIST_HASH_WIDTH,
-  migrationListEmptySource,
-  migrationListForwardArrow,
-  padFromHashColumn,
-} from '../utils/formatters/migration-list-data-column';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -510,20 +504,9 @@ async function executeMigrateShowCommand(
   });
 }
 
-function formatShowMigrationRow(m: MigrateShowMigration, dirNameWidth: number): string {
-  const arrow = migrationListForwardArrow('unicode');
-  const emptySource = migrationListEmptySource('unicode');
-  const fromAbbr =
-    m.from === EMPTY_CONTRACT_HASH
-      ? emptySource.padStart(MIGRATION_LIST_HASH_WIDTH, ' ')
-      : abbreviateContractHash(m.from);
-  const toAbbr = m.to === EMPTY_CONTRACT_HASH ? emptySource : abbreviateContractHash(m.to);
-  const fromPadded = padFromHashColumn(fromAbbr, MIGRATION_LIST_HASH_WIDTH);
-  return `${m.dirName.padEnd(dirNameWidth)}  ${fromPadded} ${arrow} ${toAbbr}`;
-}
-
 function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags): string {
   if (flags.quiet) return '';
+  const colorize = flags.color !== false;
   const lines: string[] = [];
   // Graph tree first (shows the full topology with on-path highlighted).
   if (result.graphOutput !== undefined && result.graphOutput.length > 0) {
@@ -532,7 +515,10 @@ function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags):
   }
   lines.push(result.summary);
   if (result.migrations.length > 0) {
-    // Ordered list in graph migration-row format (name + from→to), no Clack gutter.
+    // Ordered list rendered through the SAME on-path row renderer as the tree.
+    // `formatOnPathMigrationRow` uses PATH_HIGHLIGHT_STYLES.onPath so the list and
+    // graph-tree rows are styled identically — changing the on-path colour in future
+    // is a one-line edit in PATH_HIGHLIGHT_STYLES.
     // Use the globally computed name column width so this list aligns with the
     // graph-tree sections above it when multiple spaces are rendered.
     const dirNameWidth =
@@ -540,7 +526,9 @@ function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags):
     lines.push('');
     lines.push('Will run, in order:');
     for (const m of result.migrations) {
-      lines.push(`  ${formatShowMigrationRow(m, dirNameWidth)}`);
+      lines.push(
+        `  ${formatOnPathMigrationRow(m.dirName, m.from, m.to, dirNameWidth, colorize, 'unicode')}`,
+      );
     }
   }
   return lines.join('\n');

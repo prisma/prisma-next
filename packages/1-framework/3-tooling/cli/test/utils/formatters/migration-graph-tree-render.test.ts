@@ -11,6 +11,7 @@ import { renderMigrationGraphSpaceTrees } from '../../../src/utils/formatters/mi
 import {
   computeMaxDirNameLengthForLayout,
   computeMaxEdgeTreePrefixWidthForLayout,
+  formatOnPathMigrationRow,
   renderMigrationGraphLegend,
   renderMigrationGraphTree,
   resolveConnectorLaneColors,
@@ -1966,5 +1967,224 @@ describe('renderMigrationGraphTree global column alignment', () => {
     const appHashCol = hashColumnOffset(appOutput, appEdge.dirName);
     const extHashCol = hashColumnOffset(extOutput, extEdge.dirName);
     expect(appHashCol).toBe(extHashCol);
+  });
+});
+
+describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
+  // Tests verify the path-highlight colour model:
+  //   - app on-path rows and pgvector on-path rows use the same neutral style
+  //   - no rotation codes on any on-path cell (RED/MAGENTA/GREEN_BRIGHT suppressed)
+  //   - off-path rows carry forcedDim (\x1b[2m) — emitted via createColors({ useColor: true })
+  //     even under NO_COLOR=1
+  //   - formatOnPathMigrationRow (run-list) and tree on-path rows share the same plain-text
+  //     dirName (identical under NO_COLOR=1 where ambient bold is identity)
+  //   - normal graph/status/list rotation (laneColorForColumn) applies when no pathHighlight
+  //     annotations are present, even when edgeAnnotationsByHash is provided
+  //
+  // Note: the on-path style uses ambient `bold()` which is identity under NO_COLOR=1.
+  // Bold is NOT asserted via \x1b[1m; instead we verify absence of rotation/dim codes.
+  // forcedDim (\x1b[2m) IS verifiable because it bypasses NO_COLOR.
+
+  const EMPTY = EMPTY_CONTRACT_HASH;
+  const RED = '\x1b[31m';
+  const MAGENTA = '\x1b[35m';
+  const GREEN_BRIGHT = '\x1b[92m';
+  const DIM = '\x1b[2m';
+
+  function renderWithHighlights(
+    edges: readonly ReturnType<typeof edge>[],
+    annotations: Map<string, { pathHighlight: 'on-path' | 'off-path' }>,
+  ): string {
+    const graph: MigrationGraph = (() => {
+      const nodes = new Set<string>();
+      const forwardChain = new Map<string, MigrationEdge[]>();
+      const reverseChain = new Map<string, MigrationEdge[]>();
+      const migrationByHash = new Map<string, MigrationEdge>();
+      for (const e of edges) {
+        nodes.add(e.from);
+        nodes.add(e.to);
+        migrationByHash.set(e.migrationHash, e);
+        const fwd = forwardChain.get(e.from);
+        if (fwd) fwd.push(e);
+        else forwardChain.set(e.from, [e]);
+        const rev = reverseChain.get(e.to);
+        if (rev) rev.push(e);
+        else reverseChain.set(e.to, [e]);
+      }
+      return { nodes, forwardChain, reverseChain, migrationByHash };
+    })();
+    const layout = buildMigrationGraphLayout(buildMigrationGraphRows(graph, {}));
+    return renderMigrationGraphTree(layout, {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+  }
+
+  it('app on-path row and pgvector on-path row carry the same neutral style (no rotation codes)', () => {
+    // Both are single-path (column 0, no branching) — the canonical "neutral single-path style".
+    // Rotation is suppressed; both rows have the same structural codes: no RED, MAGENTA, GREEN_BRIGHT.
+    // Under NO_COLOR=1, ambient bold/dim are identity, so no ANSI codes except forcedDim appear
+    // on off-path. On-path rows render plain except for the `style.sourceHash` (dim+cyan) and
+    // `style.destHash` (cyanBright) which are ambient and therefore identity too.
+    const appEdge = edge(EMPTY, 'aaa1111', 'app_init');
+    const pgEdge = edge(EMPTY, 'bbb2222', 'pgvector_init');
+
+    const appAnno = new Map([[appEdge.migrationHash, { pathHighlight: 'on-path' as const }]]);
+    const pgAnno = new Map([[pgEdge.migrationHash, { pathHighlight: 'on-path' as const }]]);
+
+    const appLine = renderWithHighlights([appEdge], appAnno)
+      .split('\n')
+      .find((l) => l.includes(appEdge.dirName));
+    const pgLine = renderWithHighlights([pgEdge], pgAnno)
+      .split('\n')
+      .find((l) => l.includes(pgEdge.dirName));
+
+    expect(appLine, 'app on-path edge line must exist').toBeDefined();
+    expect(pgLine, 'pgvector on-path edge line must exist').toBeDefined();
+
+    // Neither on-path row must have rotation or green-highlight codes.
+    expect(appLine).not.toContain(RED);
+    expect(appLine).not.toContain(MAGENTA);
+    expect(appLine).not.toContain(GREEN_BRIGHT);
+    expect(pgLine).not.toContain(RED);
+    expect(pgLine).not.toContain(MAGENTA);
+    expect(pgLine).not.toContain(GREEN_BRIGHT);
+
+    // Plain dirName text is present in both (ambient bold is identity under NO_COLOR=1).
+    expect(appLine).toContain(appEdge.dirName);
+    expect(pgLine).toContain(pgEdge.dirName);
+
+    // On-path rows do NOT carry forcedDim.
+    expect(appLine).not.toContain(DIM);
+    expect(pgLine).not.toContain(DIM);
+  });
+
+  it('on-path cells: no rotation codes even when the edge occupies a branched lane', () => {
+    // Branching topology: one on-path edge, one off-path. In normal mode the branched lane
+    // gets a rotation colour (e.g. magenta). Path-highlight suppresses rotation for ALL cells.
+    const trunk = edge(EMPTY, 'trunk11', 'on_trunk'); // on-path
+    const branch = edge(EMPTY, 'branch2', 'off_branch'); // off-path
+
+    const annotations = new Map([
+      [trunk.migrationHash, { pathHighlight: 'on-path' as const }],
+      [branch.migrationHash, { pathHighlight: 'off-path' as const }],
+    ]);
+
+    const rendered = renderWithHighlights([trunk, branch], annotations);
+    const lines = rendered.split('\n');
+
+    const trunkLine = lines.find((l) => l.includes(trunk.dirName));
+    expect(trunkLine, 'on-path trunk line must exist').toBeDefined();
+    expect(trunkLine).not.toContain(RED);
+    expect(trunkLine).not.toContain(MAGENTA);
+    expect(trunkLine).not.toContain(GREEN_BRIGHT);
+    // On-path rows are NOT force-dimmed.
+    expect(trunkLine).not.toContain(DIM);
+  });
+
+  it('off-path cells: every cell is forcedDim (\x1b[2m), no rotation or green', () => {
+    const onPath = edge(EMPTY, 'on11111', 'on_mig');
+    const offPath = edge(EMPTY, 'off2222', 'off_mig');
+
+    const annotations = new Map([
+      [onPath.migrationHash, { pathHighlight: 'on-path' as const }],
+      [offPath.migrationHash, { pathHighlight: 'off-path' as const }],
+    ]);
+
+    const rendered = renderWithHighlights([onPath, offPath], annotations);
+    const lines = rendered.split('\n');
+
+    const offEdgeLine = lines.find((l) => l.includes(offPath.dirName));
+    expect(offEdgeLine, 'off-path edge line must exist').toBeDefined();
+    expect(offEdgeLine).toContain(DIM);
+    expect(offEdgeLine).not.toContain(RED);
+    expect(offEdgeLine).not.toContain(MAGENTA);
+    expect(offEdgeLine).not.toContain(GREEN_BRIGHT);
+
+    // Off-path node row (off2222 hash) must also be dim.
+    const offNodeLine = lines.find((l) => l.includes('off2222') && !l.includes(offPath.dirName));
+    expect(offNodeLine, 'off-path node line must exist').toBeDefined();
+    expect(offNodeLine).toContain(DIM);
+    expect(offNodeLine).not.toContain(RED);
+    expect(offNodeLine).not.toContain(MAGENTA);
+  });
+
+  it('formatOnPathMigrationRow shares the same dirName text and no-rotation-code invariant as the tree on-path row', () => {
+    // The run-list and tree on-path rows use the same styling seam (PATH_HIGHLIGHT_STYLES.onPath).
+    // Under NO_COLOR=1, ambient bold is identity so the dirName appears as plain text in both.
+    // No rotation codes appear on either. The list row omits the gutter; the dirName text matches.
+    const e = edge(EMPTY, 'dest123', 'run_list_mig');
+    const annotations = new Map([[e.migrationHash, { pathHighlight: 'on-path' as const }]]);
+
+    const treeLine = renderWithHighlights([e], annotations)
+      .split('\n')
+      .find((l) => l.includes(e.dirName));
+    expect(treeLine, 'tree on-path line must exist').toBeDefined();
+
+    const listRow = formatOnPathMigrationRow(
+      e.dirName,
+      e.from,
+      e.to,
+      e.dirName.length,
+      true,
+      'unicode',
+    );
+
+    // Both contain the plain dirName (no dim or rotation wrapper).
+    expect(treeLine).toContain(e.dirName);
+    expect(listRow).toContain(e.dirName);
+
+    // Neither has rotation codes.
+    expect(listRow).not.toContain(RED);
+    expect(listRow).not.toContain(MAGENTA);
+    expect(listRow).not.toContain(GREEN_BRIGHT);
+
+    // List row is not force-dimmed.
+    expect(listRow).not.toContain(DIM);
+
+    // Tree on-path row is not force-dimmed.
+    expect(treeLine).not.toContain(DIM);
+  });
+
+  it('normal graph/status/list rendering is unaffected: rotation applies when no pathHighlight annotations exist', () => {
+    // Branching topology: two edges from EMPTY with status-overlay annotations (no pathHighlight).
+    // Column 1 must get a rotation colour (laneColorForColumn(1) = magenta). This confirms
+    // path-highlight mode does NOT activate when annotations lack a pathHighlight field.
+    const edgeA = edge(EMPTY, 'aaa1234', 'col0_mig'); // column 0
+    const edgeB = edge(EMPTY, 'bbb5678', 'col1_mig'); // column 1
+
+    // Status-overlay annotations — no pathHighlight field.
+    const normalAnnotations = new Map([
+      [edgeA.migrationHash, { operationCount: 1 }],
+      [edgeB.migrationHash, { operationCount: 2 }],
+    ]);
+
+    const graph: MigrationGraph = (() => {
+      const nodes = new Set<string>();
+      const forwardChain = new Map<string, MigrationEdge[]>();
+      const reverseChain = new Map<string, MigrationEdge[]>();
+      const migrationByHash = new Map<string, MigrationEdge>();
+      for (const e of [edgeA, edgeB]) {
+        nodes.add(e.from);
+        nodes.add(e.to);
+        migrationByHash.set(e.migrationHash, e);
+        const fwd = forwardChain.get(e.from);
+        if (fwd) fwd.push(e);
+        else forwardChain.set(e.from, [e]);
+        const rev = reverseChain.get(e.to);
+        if (rev) rev.push(e);
+        else reverseChain.set(e.to, [e]);
+      }
+      return { nodes, forwardChain, reverseChain, migrationByHash };
+    })();
+    const layout = buildMigrationGraphLayout(buildMigrationGraphRows(graph, {}));
+    const rendered = renderMigrationGraphTree(layout, {
+      colorize: true,
+      edgeAnnotationsByHash: normalAnnotations,
+    });
+
+    // Column 1 node gets a rotation colour (magenta). This confirms rotation is NOT suppressed
+    // when no pathHighlight entries are present — even when edgeAnnotationsByHash is provided.
+    expect(rendered).toContain(laneColorForColumn(1)('○ '));
   });
 });
