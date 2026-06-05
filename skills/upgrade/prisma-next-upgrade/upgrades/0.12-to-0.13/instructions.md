@@ -50,6 +50,11 @@ dependabot/runtime-deps (PR #761): bumps react 19.2.6→19.2.7, vitest
 8.0.15→8.0.16, lucide-react 1.16.0→1.17.0, @prisma/dev 0.24.8→0.24.9,
 mongodb-memory-server 11.1.0→11.2.0. Touches examples/ only via
 package.json version fields; no runtime, contract, or public-API change.
+
+TML-2843: `@prisma-next/sqlite` gained an additive facade transaction
+API (`db.transaction(async (tx) => …)`) demonstrated in
+`examples/prisma-next-demo-sqlite`. No user action required; incidental
+substrate diff.
 -->
 
 # 0.12 → 0.13 — User upgrade instructions
