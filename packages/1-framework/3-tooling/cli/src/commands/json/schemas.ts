@@ -66,3 +66,56 @@ export const migrationGraphJsonResultSchema = successEnvelopeBaseSchema.and(
 );
 
 export type MigrationGraphJsonResult = typeof migrationGraphJsonResultSchema.infer;
+
+export const migrationStatusEntrySchema = migrationEntrySchema.and(
+  type({
+    status: '"applied" | "pending" | null',
+  }),
+);
+
+export type MigrationStatusEntry = typeof migrationStatusEntrySchema.infer;
+
+const contractUnreadableDiagnosticSchema = type({
+  code: '"CONTRACT.UNREADABLE"',
+  severity: '"warn" | "info"',
+  message: 'string',
+  hints: 'string[]',
+});
+
+const markerNotInHistoryDiagnosticSchema = type({
+  code: '"MIGRATION.MARKER_NOT_IN_HISTORY"',
+  severity: '"warn" | "info"',
+  message: 'string',
+  hints: 'string[]',
+});
+
+const missingInvariantsDiagnosticSchema = type({
+  code: '"MIGRATION.MISSING_INVARIANTS"',
+  'ref?': 'string',
+  invariants: 'string[]',
+  message: 'string',
+});
+
+export const statusDiagnosticSchema = contractUnreadableDiagnosticSchema
+  .or(markerNotInHistoryDiagnosticSchema)
+  .or(missingInvariantsDiagnosticSchema);
+
+export type StatusDiagnosticJson = typeof statusDiagnosticSchema.infer;
+
+export const migrationStatusSpaceSchema = type({
+  space: 'string',
+  currentContract: 'string | null',
+  targetContract: 'string',
+  migrations: migrationStatusEntrySchema.array(),
+});
+
+export type MigrationStatusSpace = typeof migrationStatusSpaceSchema.infer;
+
+export const migrationStatusJsonResultSchema = successEnvelopeBaseSchema.and(
+  type({
+    spaces: migrationStatusSpaceSchema.array(),
+    diagnostics: statusDiagnosticSchema.array(),
+  }),
+);
+
+export type MigrationStatusResult = typeof migrationStatusJsonResultSchema.infer;
