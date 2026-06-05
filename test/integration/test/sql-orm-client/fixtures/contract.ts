@@ -61,7 +61,6 @@ const Tag = model('Tag', {
   fields: {
     id: field.generated(uuidv4()).id(),
     name: field.column(textColumn).unique(),
-    label: field.column(textColumn),
   },
 }).sql({ table: 'tags' });
 
