@@ -119,3 +119,23 @@ export const migrationStatusJsonResultSchema = successEnvelopeBaseSchema.and(
 );
 
 export type MigrationStatusResult = typeof migrationStatusJsonResultSchema.infer;
+
+export const ledgerRecordSchema = type({
+  space: 'string',
+  name: 'string',
+  hash: 'string',
+  fromContract: 'string | null',
+  toContract: 'string',
+  appliedAt: 'string',
+  operationCount: 'number',
+});
+
+export type LedgerRecord = typeof ledgerRecordSchema.infer;
+
+export const migrationLogResultSchema = successEnvelopeBaseSchema.and(
+  type({
+    records: ledgerRecordSchema.array(),
+  }),
+);
+
+export type MigrationLogResult = typeof migrationLogResultSchema.infer;

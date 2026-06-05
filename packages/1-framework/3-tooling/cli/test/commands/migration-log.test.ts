@@ -1,5 +1,7 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
+import { type } from 'arktype';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { migrationLogResultSchema } from '../../src/commands/json/schemas';
 import {
   createMigrationLogCommand,
   executeMigrationLogCommand,
@@ -169,7 +171,7 @@ describe('migration log --json envelope', () => {
     vi.clearAllMocks();
   });
 
-  it('emits { ok: true, entries: [...] } for a populated ledger', async () => {
+  it('emits { ok: true, records: [...], summary } for a populated ledger', async () => {
     mocks.loadConfig.mockResolvedValue(baseConfig);
     mocks.connect.mockResolvedValue(undefined);
     mocks.readLedger.mockResolvedValue([ledgerEntry({ migrationName: '20260301_init' })]);
@@ -188,15 +190,18 @@ describe('migration log --json envelope', () => {
 
     const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
       ok: boolean;
-      entries: ReadonlyArray<{ migrationName: string }>;
+      records: ReadonlyArray<{ name: string }>;
+      summary: string;
     };
     expect(envelope.ok).toBe(true);
-    expect(Array.isArray(envelope.entries)).toBe(true);
-    expect(envelope.entries).toHaveLength(1);
-    expect(envelope.entries[0]?.migrationName).toBe('20260301_init');
+    expect(Array.isArray(envelope.records)).toBe(true);
+    expect(envelope.records).toHaveLength(1);
+    expect(envelope.records[0]?.name).toBe('20260301_init');
+    expect(typeof envelope.summary).toBe('string');
+    expect(migrationLogResultSchema(envelope) instanceof type.errors).toBe(false);
   });
 
-  it('emits { ok: true, entries: [] } for an empty ledger', async () => {
+  it('emits { ok: true, records: [], summary } for an empty ledger', async () => {
     mocks.loadConfig.mockResolvedValue(baseConfig);
     mocks.connect.mockResolvedValue(undefined);
     mocks.readLedger.mockResolvedValue([]);
@@ -215,9 +220,12 @@ describe('migration log --json envelope', () => {
 
     const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
       ok: boolean;
-      entries: readonly unknown[];
+      records: readonly unknown[];
+      summary: string;
     };
     expect(envelope.ok).toBe(true);
-    expect(envelope.entries).toEqual([]);
+    expect(envelope.records).toEqual([]);
+    expect(typeof envelope.summary).toBe('string');
+    expect(migrationLogResultSchema(envelope) instanceof type.errors).toBe(false);
   });
 });
