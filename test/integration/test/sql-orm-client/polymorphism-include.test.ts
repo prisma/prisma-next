@@ -62,7 +62,9 @@ interface PolyIncludeParent {
 // "standalone poly fixture, shared contract stays stable" position.
 type RawContract = {
   domain: { namespaces: Record<string, { models: Record<string, MutableModel> }> };
-  storage: { namespaces: Record<string, { tables: Record<string, RawTable> }> };
+  storage: {
+    namespaces: Record<string, { entries: { table: Record<string, RawTable> } }>;
+  };
 };
 type MutableModel = {
   fields: Record<string, unknown>;
@@ -82,11 +84,14 @@ function rawOf(contract: TestContract): RawContract {
 }
 
 function modelsOf(raw: RawContract): Record<string, MutableModel> {
-  return Object.values(raw.domain.namespaces)[0]!.models;
+  return raw.domain.namespaces['public']!.models;
 }
 
+// Index `public` explicitly rather than the first namespace: the storage
+// envelope now also carries an `__unbound__` namespace (TML-2808), which
+// sorts ahead of `public` and would otherwise shadow it.
 function tablesOf(raw: RawContract): Record<string, RawTable> {
-  return Object.values(raw.storage.namespaces)[0]!.tables;
+  return raw.storage.namespaces['public']!.entries.table;
 }
 
 // Account (parent) --members(1:N)--> User (STI poly target).
