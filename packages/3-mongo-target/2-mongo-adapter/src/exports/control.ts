@@ -8,6 +8,7 @@ export { introspectSchema } from '../core/introspect-schema';
 export { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
 export {
   createMongoControlDriver,
+  isMongoControlDriver,
   type MongoControlDriverInstance,
 } from '../core/mongo-control-driver';
 export {
