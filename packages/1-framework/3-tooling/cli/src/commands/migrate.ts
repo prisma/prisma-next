@@ -344,8 +344,16 @@ async function executeMigrateShowCommand(
   // Walk the path via planMemberPath — the same helper executeMigrate uses.
   // planMemberPath feeds graphWalkStrategy identical inputs (targetHash, targetInvariants,
   // currentMarker with full invariants), so the preview path is always the path migrate runs.
+  //
+  // Canonical schedule order: extensions alphabetically first, then app — mirroring the
+  // runner's `applyOrder` in operations/migrate.ts so the "Will run, in order:" list
+  // reflects the actual execution sequence (extensions install first, app last).
+  const canonicalOrderMembers: ReadonlyArray<ContractSpaceMember> = [
+    ...aggregate.extensions,
+    aggregate.app,
+  ];
   const orderedMigrations: MigrateShowMigration[] = [];
-  for (const member of allMembers) {
+  for (const member of canonicalOrderMembers) {
     const isAppMember = member.spaceId === aggregate.app.spaceId;
     const headRef = requireHeadRef(member);
     const memberTargetHash = isAppMember ? targetHash : headRef.hash;

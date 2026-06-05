@@ -704,4 +704,121 @@ describe('migrate --show (read-only + faithfulness)', () => {
     // (It may appear in the graph as an off-path edge — that's expected.)
     expect(orderedListSection).not.toContain(appMig1.dirName);
   });
+
+  it('canonical schedule order: extension migrations appear before app migrations in "Will run, in order:"', async () => {
+    // Regression guard for the ordering bug: the runner applies extensions first
+    // (alphabetically by spaceId), then the app. The "Will run, in order:" list must
+    // reflect that same sequence — not app-first.
+    //
+    // Fixture: two spaces.
+    //   pgvector: EMPTY → EXT_C1 (one migration to run, extension installs first).
+    //   app:      EMPTY → C1 → C2 (two app migrations to run after the extension).
+    //
+    // Expected ordered list: extension migration first, then the two app migrations.
+    const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-show-order-'));
+    tempDirs.push(cwd);
+
+    const EXT_C1 = `sha256:${'a'.repeat(64)}`;
+    const appMigrationsDir = join(cwd, 'migrations', 'app');
+    const extMigrationsDir = join(cwd, 'migrations', 'pgvector');
+    await mkdir(appMigrationsDir, { recursive: true });
+    await mkdir(extMigrationsDir, { recursive: true });
+
+    // App space: EMPTY → C1 → C2.
+    const appMig1 = await writePkg(appMigrationsDir, {
+      from: EMPTY,
+      to: C1,
+      providedInvariants: [],
+      createdAt: '2026-06-05T12:00:00.000Z',
+    });
+    const appMig2 = await writePkg(appMigrationsDir, {
+      from: C1,
+      to: C2,
+      providedInvariants: [],
+      createdAt: '2026-06-05T12:01:00.000Z',
+    });
+
+    // Extension space (pgvector): EMPTY → EXT_C1.
+    const extMigHash = computeMigrationHash(
+      { from: EMPTY, to: EXT_C1, providedInvariants: [], createdAt: '2026-06-05T11:00:00.000Z' },
+      OPS as MigrationPlanOperation[],
+    );
+    const extDirName = '20260601T0000_install_vector_extension';
+    await writeMigrationPackage(
+      join(extMigrationsDir, extDirName),
+      {
+        from: EMPTY,
+        to: EXT_C1,
+        providedInvariants: [],
+        createdAt: '2026-06-05T11:00:00.000Z',
+        migrationHash: extMigHash,
+      },
+      OPS as MigrationPlanOperation[],
+    );
+    await writeRef(join(extMigrationsDir, 'refs'), 'head', { hash: EXT_C1, invariants: [] });
+    await writeFile(
+      join(extMigrationsDir, 'contract.json'),
+      JSON.stringify(contractEnvelope(EXT_C1)),
+    );
+
+    await writeFile(join(cwd, 'contract.json'), JSON.stringify(contractEnvelope(C2)));
+
+    mocks.loadConfig.mockResolvedValue({
+      family: {
+        familyId: TARGET_FAMILY,
+        create: vi.fn().mockReturnValue({ deserializeContract: (json: unknown) => json }),
+      },
+      target: {
+        id: TARGET,
+        familyId: TARGET_FAMILY,
+        targetId: TARGET,
+        kind: 'target',
+        migrations: {},
+      },
+      adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
+      driver: { kind: 'driver', create: vi.fn() },
+      contract: { output: 'contract.json' },
+      migrations: { dir: 'migrations' },
+      extensionPacks: [
+        {
+          id: 'pgvector',
+          targetId: TARGET,
+          contractSpace: {
+            contractJson: contractEnvelope(EXT_C1),
+            headRef: { hash: EXT_C1, invariants: [] },
+            migrations: [],
+          },
+        },
+      ],
+    });
+
+    process.chdir(cwd);
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+
+    let caughtError: unknown;
+    try {
+      await executeCommand(createMigrateCommand(), ['--show', '--from', EMPTY, '--no-color']);
+    } catch (e) {
+      caughtError = e;
+    }
+
+    expect(caughtError, 'command threw unexpectedly').toBeUndefined();
+    expect(getExitCode()).toBe(0);
+
+    const output = stripAnsi(consoleOutput.join('\n'));
+    const orderedListSection = output.split('Will run, in order:')[1] ?? '';
+
+    // Extension migration and both app migrations must appear.
+    expect(orderedListSection).toContain(extDirName);
+    expect(orderedListSection).toContain(appMig1.dirName);
+    expect(orderedListSection).toContain(appMig2.dirName);
+
+    // The extension migration must appear BEFORE the app migrations.
+    // Canonical runner order: extensions alphabetically first, then app.
+    const extPos = orderedListSection.indexOf(extDirName);
+    const app1Pos = orderedListSection.indexOf(appMig1.dirName);
+    const app2Pos = orderedListSection.indexOf(appMig2.dirName);
+    expect(extPos).toBeLessThan(app1Pos);
+    expect(extPos).toBeLessThan(app2Pos);
+  });
 });
