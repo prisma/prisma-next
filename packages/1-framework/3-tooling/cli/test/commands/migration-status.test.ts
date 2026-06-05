@@ -127,7 +127,7 @@ describe('migration status --json golden', () => {
   afterEach(async () => {
     await Promise.all(createdDirs.map((dir) => rm(dir, { recursive: true, force: true })));
     createdDirs.length = 0;
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('validates against migrationStatusJsonResultSchema for all-pending case', async () => {

@@ -1057,7 +1057,7 @@ describe('migration read-verb --json consistency lock (D8)', () => {
   });
 
   it('ok:true ⇒ exit 0 for list --json; ok:false ⇒ non-zero exit for check --json with failures', async () => {
-    const { cwd } = await buildMultiSpaceFixture();
+    const { cwd, migrationsDir } = await buildMultiSpaceFixture();
     const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
     loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
     process.chdir(cwd);
@@ -1074,28 +1074,29 @@ describe('migration read-verb --json consistency lock (D8)', () => {
     expect(listResult.ok).toBe(true);
     expect(listExitCode).toBe(0);
 
-    const { aggregate, migrationsDir } = await buildMultiSpaceFixture();
-    const checkSpaces = await enumerateCheckSpaces(aggregate, migrationsDir);
-    const danglingRefSpace: (typeof checkSpaces)[0] = {
-      ...checkSpaces[0]!,
-      refs: {
-        ...checkSpaces[0]!.refs,
-        phantom: {
-          hash: 'sha256:doesnotexist000000000000000000000000000000000000000000000000000',
-          invariants: [],
-        },
-      },
-    };
-    const failResult = runMigrationCheck({ spaces: [danglingRefSpace, ...checkSpaces.slice(1)] });
-    expect(failResult.ok).toBe(true);
-    if (!failResult.ok) return;
-    const checkJson = failResult.value;
+    // Plant a dangling ref on disk so the real CLI check command will find a failure.
+    await writeRefFor(migrationsDir, {
+      spaceId: 'app',
+      name: 'phantom',
+      hash: `sha256:${'dead'.repeat(16)}`,
+    });
+
+    const { consoleOutput: checkOutput, cleanup: cleanupCheck } = setupCommandMocks();
+    let checkExitCode: number;
+    try {
+      checkExitCode = await runAndCaptureExit(() =>
+        executeCommand(createMigrationCheckCommand(), ['--json']),
+      );
+    } finally {
+      cleanupCheck();
+    }
+
+    expect(checkExitCode).not.toBe(0);
+    const checkJson = parseJsonObjectFromCliCapture(checkOutput);
     expect(migrationCheckResultSchema(checkJson) instanceof type.errors).toBe(false);
-    expect(checkJson.ok).toBe(false);
-    expect(checkJson.failures.length).toBeGreaterThan(0);
-    const failure = checkJson.failures[0]!;
-    expect(typeof failure.space).toBe('string');
-    expect(typeof failure.code).toBe('string');
+    const checkResult = checkJson as { ok: boolean; failures: unknown[] };
+    expect(checkResult.ok).toBe(false);
+    expect(checkResult.failures.length).toBeGreaterThan(0);
   });
 
   it('space topology: list/graph/status have spaces[]; log has records[]; check has failures[]; show has migration.space', async () => {

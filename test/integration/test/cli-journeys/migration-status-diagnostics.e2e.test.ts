@@ -373,7 +373,7 @@ withTempDir(({ createTempDir }) => {
           const hints =
             statusJson.diagnostics?.flatMap((diagnostic) => [
               diagnostic.message,
-              ...diagnostic.hints,
+              ...(diagnostic.hints ?? []),
             ]) ?? [];
           expect(hints.join('\n')).toMatch(/db sign/i);
           expect(hints.join('\n')).toMatch(/db update/i);
