@@ -1754,6 +1754,62 @@ describe('renderMigrationGraphTree path highlight colors', () => {
       expect(connectorLine).toContain(DIM);
     }
   });
+
+  it('per-segment classification: on-path trunk pass-through in an off-path branch row is not force-dimmed', () => {
+    // FIX D core case: topology where an off-path branch row has a vertical-pass at
+    // column 0 that represents an on-path trunk edge. The pass-through must NOT carry
+    // forced-dim (\x1b[2m) — it should render in the ordinary lane-0 style.
+    //
+    // Under the vitest NO_COLOR=1 environment, ambient dim() from colorette is identity,
+    // so style.lane(│) produces bare '│ ' with no ANSI. The forcedDim from
+    // createColors({ useColor: true }) DOES produce \x1b[2m. So if the pass-through
+    // glyph is NOT wrapped in forcedDim, it will appear as '│ ' without \x1b[2m at that
+    // position. If it IS wrapped (pre-FIX D bug), it would be '\x1b[2m│ \x1b[22m'.
+    //
+    // Topology:
+    //   ∅ → trunk111  (on-path,  column 0)
+    //   ∅ → branch22  (off-path, column 1)
+    //
+    // In the off-path branch row (∅→branch22 at col 1), there is a vertical-pass at col 0
+    // representing the on-path trunk. That cell must NOT be wrapped in \x1b[2m.
+    const DIM_CODE = '\x1b[2m';
+
+    const onPathTrunk = edge(EMPTY_CONTRACT_HASH, 'trunk111', 'on_trunk');
+    const offPathBranch = edge(EMPTY_CONTRACT_HASH, 'branch22', 'off_branch');
+    const annotations = new Map([
+      [onPathTrunk.migrationHash, { pathHighlight: 'on-path' as const }],
+      [offPathBranch.migrationHash, { pathHighlight: 'off-path' as const }],
+    ]);
+    const rendered = tree([onPathTrunk, offPathBranch], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+    const treeLines = rendered.split('\n');
+
+    // The off-path branch line must contain dim (for name/hash) but NOT start with dim
+    // (the trunk pass-through at col 0 comes first and is on-path = no forced-dim).
+    const branchLine = treeLines.find((l) => l.includes(offPathBranch.dirName));
+    expect(branchLine, 'off-path branch edge line must exist').toBeDefined();
+
+    if (branchLine !== undefined) {
+      // The line must contain \x1b[2m somewhere (the off-path name/hash are dim).
+      expect(branchLine, 'off-path branch line must contain dim').toContain(DIM_CODE);
+
+      // The line must NOT start with \x1b[2m — the first cell is the on-path trunk
+      // pass-through (col 0, ordinary) which should not carry forced-dim.
+      // Under NO_COLOR=1, style.lane is identity so the first characters are the
+      // bare glyph (│) without any ANSI prefix.
+      expect(
+        branchLine.startsWith(DIM_CODE),
+        'on-path trunk pass-through must not be the first dim sequence',
+      ).toBe(false);
+    }
+
+    // The on-path trunk edge line must NOT contain dim (on-path = ordinary, no forced-dim).
+    const trunkLine = treeLines.find((l) => l.includes(onPathTrunk.dirName));
+    expect(trunkLine, 'on-path trunk edge line must exist').toBeDefined();
+    expect(trunkLine, 'on-path trunk must not be force-dimmed').not.toContain(DIM_CODE);
+  });
 });
 
 describe('renderMigrationGraphTree isAppSpace gate', () => {

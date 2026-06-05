@@ -826,11 +826,33 @@ export function renderMigrationGraphTree(
     }
     const rowLaneOverride = pathLaneOverride(rowPathHighlight);
 
+    // For vertical-pass cells and edge-lane cells, classify per-cell rather than
+    // using the row-level override. A vertical-pass at column c represents a
+    // DIFFERENT edge passing through, so its dim/ordinary classification comes from
+    // that column's dominant edge annotation (columnHighlights), not from the
+    // current row's edge. An edge-lane cell carries its own migrationHash and can
+    // be classified directly. For all other structural cells (node marker, branch-tee,
+    // etc.), the row-level override applies.
+    //
+    // This prevents off-path edge rows from dimming on-path pass-through lanes and
+    // vice-versa — the core FIX D issue.
     const cellColors = resolveRowArcLaneColors(row.cells);
     let gutter = row.cells
-      .map((cell, column) =>
-        renderCellPair(cell, column, cellColors, opts.colorize, style, palette, rowLaneOverride),
-      )
+      .map((cell, column) => {
+        let override = rowLaneOverride;
+        if (opts.edgeAnnotationsByHash !== undefined && columnHighlights.size > 0) {
+          if (cell.kind === 'vertical-pass') {
+            // Pass-through: colour comes from the column's dominant edge annotation.
+            override = pathLaneOverride(columnHighlights.get(column));
+          } else if (cell.kind === 'edge-lane') {
+            // Own cell: colour comes from this cell's own edge annotation.
+            override = pathLaneOverride(
+              opts.edgeAnnotationsByHash.get(cell.migrationHash)?.pathHighlight,
+            );
+          }
+        }
+        return renderCellPair(cell, column, cellColors, opts.colorize, style, palette, override);
+      })
       .join('');
     let laneSpan = row.cells.length;
     if (row.kind === 'node') {
@@ -985,7 +1007,7 @@ function formatLegendExampleMarkers(colorize: boolean): string {
     return '@contract @db';
   }
   const sigil = green('@');
-  return sigil + bold(green('contract')) + ' ' + sigil + green('db');
+  return `${sigil + bold(green('contract'))} ${sigil}${green('db')}`;
 }
 
 /**
