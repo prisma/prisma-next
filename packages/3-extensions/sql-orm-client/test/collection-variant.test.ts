@@ -263,6 +263,69 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     expect(featurePriorityRefs).toHaveLength(1);
   });
 
+  it('orderBy after variant(Feature) resolves the MTI variant field against the variant table', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 2, title: 'Dark mode', type: 'feature', features__priority: 7 }],
+    ]);
+
+    // orderBy's selector is variant-aware like where()'s/first()'s: under
+    // variant(Feature) the runtime accessor exposes the MTI variant field
+    // `priority`, resolved against the `features` variant table. The patched
+    // Task model is absent from the static type, so the field is reached via
+    // `never`.
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    await narrowed
+      .orderBy(((task: Record<string, { desc(): unknown }>) => task['priority']!.desc()) as never)
+      .all()
+      .toArray();
+
+    const ast = runtime.executions[0]!.plan.ast;
+    expect(isSelectAst(ast)).toBe(true);
+    const orderRefs = isSelectAst(ast)
+      ? (ast.orderBy ?? []).flatMap((item) => collectColumnRefs(item.expr))
+      : [];
+    expect(orderRefs).toEqual([ColumnRef.of('features', 'priority')]);
+    expect(isSelectAst(ast) ? ast.orderBy?.[0]?.dir : undefined).toBe('desc');
+  });
+
+  it('orderBy after variant(Feature) keeps base fields qualified against the base table', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 2, title: 'Dark mode', type: 'feature', features__priority: 7 }],
+    ]);
+
+    const narrowed = collection.variant('Feature' as never) as typeof collection;
+    await narrowed
+      .orderBy(((task: Record<string, { asc(): unknown }>) => task['title']!.asc()) as never)
+      .all()
+      .toArray();
+
+    const ast = runtime.executions[0]!.plan.ast;
+    const orderRefs = isSelectAst(ast)
+      ? (ast.orderBy ?? []).flatMap((item) => collectColumnRefs(item.expr))
+      : [];
+    expect(orderRefs).toEqual([ColumnRef.of('tasks', 'title')]);
+  });
+
+  it('orderBy without a variant resolves fields against the base table', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([
+      [{ id: 2, title: 'Dark mode', type: 'feature', features__priority: 7 }],
+    ]);
+
+    await collection
+      .orderBy(((task: Record<string, { asc(): unknown }>) => task['title']!.asc()) as never)
+      .all()
+      .toArray();
+
+    const ast = runtime.executions[0]!.plan.ast;
+    const orderRefs = isSelectAst(ast)
+      ? (ast.orderBy ?? []).flatMap((item) => collectColumnRefs(item.expr))
+      : [];
+    expect(orderRefs).toEqual([ColumnRef.of('tasks', 'title')]);
+  });
+
   it('variant() on a polymorphic-target include refinement sets nested variantName', () => {
     const contract = buildMixedPolyContract();
     const context = { ...getTestContext(), contract };

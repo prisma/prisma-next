@@ -453,3 +453,43 @@ test('first without a variant exposes only base fields on the predicate model', 
     return task.title.isNotNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// `orderBy()` mirrors `where()`/`first()`: its selector is variant-aware, so
+// `t.variant('X').orderBy(t => t.variantField…)` exposes variant X's fields.
+// ---------------------------------------------------------------------------
+
+test('orderBy after variant("Feature") exposes the MTI variant field on the selector model', () => {
+  tasks.variant('Feature').orderBy((task) => {
+    expectTypeOf(task).toHaveProperty('priority');
+    expectTypeOf(task).toHaveProperty('title');
+    return task.priority.asc();
+  });
+});
+
+test('orderBy after variant("Bug") exposes the Bug variant field and rejects the other variant field', () => {
+  tasks.variant('Bug').orderBy((task) => {
+    expectTypeOf(task).toHaveProperty('severity');
+    // @ts-expect-error priority belongs to the Feature variant, not Bug
+    task.priority;
+    return task.severity.asc();
+  });
+});
+
+test('orderBy without a variant exposes only base fields on the selector model', () => {
+  tasks.orderBy((task) => {
+    expectTypeOf(task).toHaveProperty('title');
+    // @ts-expect-error priority is an MTI variant field, absent on the base selector model
+    task.priority;
+    return task.title.asc();
+  });
+});
+
+test('orderBy after variant("Feature") on an include refinement exposes the MTI variant field', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.variant('Feature').orderBy((task) => {
+      expectTypeOf(task).toHaveProperty('priority');
+      return task.priority.desc();
+    }),
+  );
+});
