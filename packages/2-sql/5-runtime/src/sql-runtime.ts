@@ -774,6 +774,9 @@ export async function withTransaction<R>(
       }
       const inner = transaction.execute(plan, options);
       const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
+        if (invalidated) {
+          throw transactionClosedError();
+        }
         for await (const row of inner) {
           if (invalidated) {
             throw transactionClosedError();
@@ -793,6 +796,9 @@ export async function withTransaction<R>(
       }
       const inner = transaction.executePrepared(ps, params, options);
       const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
+        if (invalidated) {
+          throw transactionClosedError();
+        }
         for await (const row of inner) {
           if (invalidated) {
             throw transactionClosedError();

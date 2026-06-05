@@ -790,6 +790,25 @@ describe('withTransaction', () => {
     );
   });
 
+  it('rejects escaped result with TRANSACTION_CLOSED without consulting the driver', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    let driverBodyEntered = false;
+    driver.__spies.transactionExecute.mockImplementationOnce(async function* () {
+      driverBodyEntered = true;
+      yield { id: 99 };
+    });
+
+    const escaped = await withTransaction(runtime, async (tx) => {
+      return { result: tx.execute(createRawExecutionPlan()) };
+    });
+
+    await expect(escaped.result.toArray()).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_CLOSED',
+    });
+    expect(driverBodyEntered).toBe(false);
+  });
+
   it('sets invalidated flag after commit', async () => {
     const { runtime } = createRuntimeForTransaction();
     let txRef: { invalidated: boolean } | undefined;
