@@ -345,10 +345,102 @@ export function validateScalarTypeCodecIds(
   return errors;
 }
 
+/**
+ * Reads the IDs of extension packs that a descriptor declares as dependencies
+ * via its `contractSpace.contractJson.extensionPacks` field. This field is
+ * present only on descriptors that contribute a contract space (e.g.
+ * `SqlControlExtensionDescriptor`). Descriptors without this field are treated
+ * as having no declared dependencies.
+ *
+ * Uses structural duck-typing to remain family-agnostic — `contractSpace` is a
+ * SQL-family concept, not a framework concept, so it is not declared on
+ * `ControlExtensionDescriptor` at the type level.
+ */
+function readDeclaredDependencyIds(descriptor: { readonly id: string }): readonly string[] {
+  const d = descriptor as {
+    readonly contractSpace?: {
+      readonly contractJson?: { readonly extensionPacks?: Record<string, unknown> };
+    };
+  };
+  const packs = d.contractSpace?.contractJson?.extensionPacks;
+  if (packs === null || typeof packs !== 'object') return [];
+  return Object.keys(packs);
+}
+
+/**
+ * Builds a dependency-respecting load order for the given extension descriptors
+ * using Kahn's topological sort algorithm. Dependencies (packs declared in
+ * `contractSpace.contractJson.extensionPacks`) are placed before the extensions
+ * that depend on them.
+ *
+ * Throws if the dependency graph contains a cycle, with an error message that
+ * names every extension involved in the cycle.
+ *
+ * Extensions whose `contractSpace.contractJson.extensionPacks` references an ID
+ * that is not present in the provided list are ignored for ordering purposes —
+ * the missing pack is a separate validation concern.
+ */
+export function buildExtensionLoadOrder(
+  extensions: ReadonlyArray<{ readonly id: string }>,
+): readonly string[] {
+  if (extensions.length === 0) return [];
+
+  const idSet = new Set(extensions.map((e) => e.id));
+  const inDegree = new Map<string, number>();
+  const dependents = new Map<string, string[]>();
+
+  for (const ext of extensions) {
+    if (!inDegree.has(ext.id)) inDegree.set(ext.id, 0);
+    if (!dependents.has(ext.id)) dependents.set(ext.id, []);
+  }
+
+  for (const ext of extensions) {
+    for (const depId of readDeclaredDependencyIds(ext)) {
+      if (!idSet.has(depId)) continue;
+      inDegree.set(ext.id, (inDegree.get(ext.id) ?? 0) + 1);
+      const list = dependents.get(depId);
+      if (list !== undefined) list.push(ext.id);
+    }
+  }
+
+  const queue: string[] = [];
+  for (const [id, deg] of inDegree) {
+    if (deg === 0) queue.push(id);
+  }
+  queue.sort();
+
+  const result: string[] = [];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    result.push(id);
+    const children = dependents.get(id) ?? [];
+    children.sort();
+    for (const childId of children) {
+      const newDeg = (inDegree.get(childId) ?? 1) - 1;
+      inDegree.set(childId, newDeg);
+      if (newDeg === 0) queue.push(childId);
+    }
+  }
+
+  if (result.length < extensions.length) {
+    const cycleMembers = extensions
+      .map((e) => e.id)
+      .filter((id) => !result.includes(id))
+      .sort();
+    throw new Error(
+      `Extension dependency cycle detected. Cycle members: ${cycleMembers.map((id) => `"${id}"`).join(', ')}.`,
+    );
+  }
+
+  return result;
+}
+
 export function createControlStack<TFamilyId extends string, TTargetId extends string>(
   input: CreateControlStackInput<TFamilyId, TTargetId>,
 ): ControlStack<TFamilyId, TTargetId> {
   const { family, target, adapter, driver, extensionPacks = [] } = input;
+
+  buildExtensionLoadOrder(extensionPacks);
 
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
 
