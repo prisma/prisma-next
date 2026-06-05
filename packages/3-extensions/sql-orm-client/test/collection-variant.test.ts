@@ -277,8 +277,7 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const narrowed = collection.variant('Feature' as never) as typeof collection;
     await narrowed
       .orderBy(((task: Record<string, { desc(): unknown }>) => task['priority']!.desc()) as never)
-      .all()
-      .toArray();
+      .all();
 
     const ast = runtime.executions[0]!.plan.ast;
     expect(isSelectAst(ast)).toBe(true);
@@ -298,8 +297,7 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const narrowed = collection.variant('Feature' as never) as typeof collection;
     await narrowed
       .orderBy(((task: Record<string, { asc(): unknown }>) => task['title']!.asc()) as never)
-      .all()
-      .toArray();
+      .all();
 
     const ast = runtime.executions[0]!.plan.ast;
     const orderRefs = isSelectAst(ast)
@@ -316,8 +314,7 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
 
     await collection
       .orderBy(((task: Record<string, { asc(): unknown }>) => task['title']!.asc()) as never)
-      .all()
-      .toArray();
+      .all();
 
     const ast = runtime.executions[0]!.plan.ast;
     const orderRefs = isSelectAst(ast)
