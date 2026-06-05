@@ -286,14 +286,13 @@ async function executeMigrateShowCommand(
         }
       } else {
         // Offline hypothetical: the --from ref only carries a hash (no live invariants).
-        // Use null for spaces not explicitly identified (planMemberPath treats null as
-        // "no marker" / greenfield), and set a hash-only marker for all spaces.
+        // Apply the from-hash marker to the APP space only. Extension spaces are left
+        // absent from markerBySpace (treated as null / greenfield by planMemberPath),
+        // so they plan from their own marker → own head — exactly as executeMigrate does.
         const fromHash = fromResult.value.hash;
         const offlineMarker: LiveMarker | null =
           fromHash === EMPTY_CONTRACT_HASH ? null : { storageHash: fromHash, invariants: [] };
-        for (const member of allMembers) {
-          markerBySpace.set(member.spaceId, offlineMarker);
-        }
+        markerBySpace.set(aggregate.app.spaceId, offlineMarker);
       }
     }
   }

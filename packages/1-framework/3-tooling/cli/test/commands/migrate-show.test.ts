@@ -573,4 +573,135 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(appSection).toContain('@contract');
     expect(pgvectorSection).not.toContain('@contract');
   });
+
+  it('--from/--to app-space markers do not leak into extension spaces (BUG 1)', async () => {
+    // Repro: with --from <app-hash> --to <app-hash>, extension spaces must NOT receive the
+    // app --from hash as their marker. If they did, planMemberPath would try to walk
+    // extension-graph from that app hash (which doesn't exist there) and return 'unreachable',
+    // producing "No migration path from sha256:76c1bd5 to sha256:... in space 'pgvector'".
+    //
+    // Expected behaviour: extension members ignore --from and plan from their own live marker
+    // (null / greenfield in offline mode) → their own head — exactly as executeMigrate does.
+    // The extension migration (EMPTY → EXT_C1) must appear in the planned migrations list,
+    // confirming it was planned from greenfield and NOT from the app's --from hash.
+    const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-show-leak-'));
+    tempDirs.push(cwd);
+
+    const EXT_C1 = `sha256:${'f'.repeat(64)}`;
+    const appMigrationsDir = join(cwd, 'migrations', 'app');
+    const extMigrationsDir = join(cwd, 'migrations', 'pgvector');
+    await mkdir(appMigrationsDir, { recursive: true });
+    await mkdir(extMigrationsDir, { recursive: true });
+
+    // App space: EMPTY → C1 → C2. We will pass --from C1 --to C2 (one app migration to run).
+    const appMig1 = await writePkg(appMigrationsDir, {
+      from: EMPTY,
+      to: C1,
+      providedInvariants: [],
+      createdAt: '2026-01-01T10:00:00.000Z',
+    });
+    await writePkg(appMigrationsDir, {
+      from: C1,
+      to: C2,
+      providedInvariants: [],
+      createdAt: '2026-01-01T10:01:00.000Z',
+    });
+
+    // Extension space (pgvector): EMPTY → EXT_C1. Its own standalone graph; head = EXT_C1.
+    // The extension marker is absent (offline mode), so planMemberPath should treat it as
+    // greenfield (null) and plan EMPTY → EXT_C1.
+    const extMigHash = computeMigrationHash(
+      { from: EMPTY, to: EXT_C1, providedInvariants: [], createdAt: '2026-01-01T09:00:00.000Z' },
+      OPS as MigrationPlanOperation[],
+    );
+    const extDirName = `20260101_090000_${EXT_C1.slice(7, 13)}`;
+    await writeMigrationPackage(
+      join(extMigrationsDir, extDirName),
+      {
+        from: EMPTY,
+        to: EXT_C1,
+        providedInvariants: [],
+        createdAt: '2026-01-01T09:00:00.000Z',
+        migrationHash: extMigHash,
+      },
+      OPS as MigrationPlanOperation[],
+    );
+    await writeRef(join(extMigrationsDir, 'refs'), 'head', { hash: EXT_C1, invariants: [] });
+    await writeFile(
+      join(extMigrationsDir, 'contract.json'),
+      JSON.stringify(contractEnvelope(EXT_C1)),
+    );
+
+    await writeFile(join(cwd, 'contract.json'), JSON.stringify(contractEnvelope(C2)));
+
+    mocks.loadConfig.mockResolvedValue({
+      family: {
+        familyId: TARGET_FAMILY,
+        create: vi.fn().mockReturnValue({ deserializeContract: (json: unknown) => json }),
+      },
+      target: {
+        id: TARGET,
+        familyId: TARGET_FAMILY,
+        targetId: TARGET,
+        kind: 'target',
+        migrations: {},
+      },
+      adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
+      driver: { kind: 'driver', create: vi.fn() },
+      contract: { output: 'contract.json' },
+      migrations: { dir: 'migrations' },
+      extensionPacks: [
+        {
+          id: 'pgvector',
+          targetId: TARGET,
+          contractSpace: {
+            contractJson: contractEnvelope(EXT_C1),
+            headRef: { hash: EXT_C1, invariants: [] },
+            migrations: [],
+          },
+        },
+      ],
+    });
+
+    process.chdir(cwd);
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+
+    let caughtError: unknown;
+    try {
+      // Pass --from C1 (app hash) --to C2 (app target). Before the fix, the C1 hash was
+      // also applied to the pgvector space, causing "no path in space 'pgvector'" error.
+      await executeCommand(createMigrateCommand(), [
+        '--show',
+        '--from',
+        C1.slice(7, 13),
+        '--to',
+        C2.slice(7, 13),
+        '--no-color',
+      ]);
+    } catch (e) {
+      caughtError = e;
+    }
+
+    // Must not throw — previously would throw "no path in space 'pgvector'".
+    expect(caughtError, 'command threw unexpectedly').toBeUndefined();
+    expect(getExitCode()).toBe(0);
+
+    const output = stripAnsi(consoleOutput.join('\n'));
+
+    // The extension migration (EMPTY → EXT_C1) must appear in the planned ordered list,
+    // proving the extension was planned from greenfield (null marker) → its head,
+    // NOT from the app's --from hash which would have caused "no path" error.
+    expect(output).toContain(extDirName);
+
+    // Split output into graph section and ordered-list section.
+    const orderedListSection = output.split('Will run, in order:')[1] ?? '';
+
+    // The app migration C1 → C2 must appear in the ordered list.
+    expect(orderedListSection).toContain('20260101_100000_222222');
+
+    // The app's first migration (EMPTY → C1) must NOT appear in the ordered list —
+    // --from C1 means we start from C1, so that migration is already applied.
+    // (It may appear in the graph as an off-path edge — that's expected.)
+    expect(orderedListSection).not.toContain(appMig1.dirName);
+  });
 });
