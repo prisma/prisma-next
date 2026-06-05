@@ -257,10 +257,13 @@ function ensureUnboundNamespaceSlot(
     entries: { table: {} },
   };
   const unbound = createNamespace ? createNamespace(unboundInput) : buildSqlNamespace(unboundInput);
-  return {
+  return blindCast<
+    SqlStorageInput['namespaces'],
+    'createNamespace may return a target namespace concretion; the unbound slot matches SqlNamespace at runtime'
+  >({
     [UNBOUND_NAMESPACE_ID]: unbound,
     ...namespaces,
-  };
+  });
 }
 
 const POSTGRES_ENUM_NAMESPACE_ID = 'public';
