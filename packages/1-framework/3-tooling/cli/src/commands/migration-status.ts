@@ -122,7 +122,7 @@ function buildStatusMigrations(
 ): readonly MigrationStatusMigrationEntry[] {
   return listMigrations.map((migration) => ({
     ...migration,
-    status: statusForMigrationHash(migration.migrationHash, annotations),
+    status: statusForMigrationHash(migration.hash, annotations),
   }));
 }
 

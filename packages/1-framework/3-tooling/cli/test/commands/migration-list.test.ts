@@ -737,7 +737,7 @@ describe('runMigrationList — JSON output shape', () => {
     expect(oldest.name).toBe('20260422T0720_initial');
 
     // Full sha256 hash preserved in JSON (no abbreviation).
-    expect(latest.migrationHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(latest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(latest.fromContract).toBe(HASH_4cb4256);
     expect(latest.toContract).toBe(HASH_55bada2);
 

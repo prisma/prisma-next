@@ -76,7 +76,7 @@ export function migrationGraphFromListEntries(
     const edge: MigrationEdge = {
       from,
       to: entry.toContract,
-      migrationHash: entry.migrationHash,
+      migrationHash: entry.hash,
       dirName: entry.name,
       createdAt: entry.createdAt,
       invariants: entry.providedInvariants,
@@ -89,7 +89,7 @@ export function migrationGraphFromListEntries(
     const reverse = reverseChain.get(entry.toContract);
     if (reverse) reverse.push(edge);
     else reverseChain.set(entry.toContract, [edge]);
-    migrationByHash.set(entry.migrationHash, edge);
+    migrationByHash.set(entry.hash, edge);
   }
 
   return { nodes, forwardChain, reverseChain, migrationByHash };
@@ -100,7 +100,7 @@ export function buildEdgeAnnotationsByHashFromListEntries(
 ): ReadonlyMap<string, MigrationEdgeAnnotation> {
   const annotations = new Map<string, MigrationEdgeAnnotation>();
   for (const entry of entries) {
-    annotations.set(entry.migrationHash, {
+    annotations.set(entry.hash, {
       operationCount: entry.operationCount,
       invariants: entry.providedInvariants,
     });

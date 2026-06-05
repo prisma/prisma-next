@@ -111,13 +111,13 @@ export async function migrationSpaceListEntriesFromAggregate(
     const migrations: MigrationListEntry[] = member.packages
       .map((pkg) => ({
         name: pkg.dirName,
+        hash: pkg.metadata.migrationHash,
         fromContract: pkg.metadata.from,
         toContract: pkg.metadata.to,
-        migrationHash: pkg.metadata.migrationHash,
         operationCount: pkg.ops.length,
         createdAt: pkg.metadata.createdAt,
-        refs: refsByHash.get(pkg.metadata.to) ?? [],
-        providedInvariants: pkg.metadata.providedInvariants,
+        refs: [...(refsByHash.get(pkg.metadata.to) ?? [])],
+        providedInvariants: [...pkg.metadata.providedInvariants],
       }))
       .sort(compareDirNamesDescending);
 
@@ -210,7 +210,7 @@ export function runMigrationList(
 
   return ok({
     ok: true,
-    spaces: resultSpaces,
+    spaces: [...resultSpaces],
     summary: computeSummary(resultSpaces),
   });
 }

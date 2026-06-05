@@ -22,8 +22,8 @@ function migration(
     Partial<Omit<MigrationListEntry, 'name' | 'toContract'>>,
 ): MigrationListEntry {
   return {
+    hash: overrides.hash ?? `sha256:styler-mig-${migrationHashSeq++}`,
     fromContract: null,
-    migrationHash: overrides.migrationHash ?? `sha256:styler-mig-${migrationHashSeq++}`,
     operationCount: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
     refs: [],
@@ -33,7 +33,7 @@ function migration(
 }
 
 function result(spaces: readonly MigrationSpaceListEntry[], summary: string): MigrationListResult {
-  return { ok: true, spaces, summary };
+  return { ok: true, spaces: [...spaces], summary };
 }
 
 describe('createAnsiMigrationListStyler', () => {

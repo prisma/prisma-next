@@ -17,9 +17,9 @@ function entry(
 ): MigrationListEntry {
   return {
     name: dirName,
+    hash: migrationHash ?? `sha256:mig-${hashCounter++}`,
     fromContract: from,
     toContract: to,
-    migrationHash: migrationHash ?? `sha256:mig-${hashCounter++}`,
     operationCount: 1,
     createdAt: '2026-02-25T14:00:00.000Z',
     refs: [],
@@ -54,9 +54,9 @@ describe('classifyMigrationListGraphTopology', () => {
     const eComments = entry('20250310_add_comments', 'def5678', 'f03da82');
     const topology = classify([eComments, ePosts, eUsers]);
 
-    expect(kind(topology, eUsers.migrationHash)).toBe('forward');
-    expect(kind(topology, ePosts.migrationHash)).toBe('forward');
-    expect(kind(topology, eComments.migrationHash)).toBe('forward');
+    expect(kind(topology, eUsers.hash)).toBe('forward');
+    expect(kind(topology, ePosts.hash)).toBe('forward');
+    expect(kind(topology, eComments.hash)).toBe('forward');
 
     expect(forwardIn(topology, EMPTY_CONTRACT_HASH)).toBe(0);
     expect(forwardOut(topology, EMPTY_CONTRACT_HASH)).toBe(1);
@@ -77,7 +77,7 @@ describe('classifyMigrationListGraphTopology', () => {
     const topology = classify([eMergeTags, eMergePosts, eTags, ePosts, eUsers]);
 
     for (const e of [eUsers, ePosts, eTags, eMergePosts, eMergeTags]) {
-      expect(kind(topology, e.migrationHash)).toBe('forward');
+      expect(kind(topology, e.hash)).toBe('forward');
     }
 
     expect(forwardOut(topology, 'abc1234')).toBe(2);
@@ -105,8 +105,8 @@ describe('classifyMigrationListGraphTopology', () => {
     const ePostsV2 = entry('20250203_add_posts_v2', 'abc1234', 'def5678');
     const topology = classify([ePostsV2, ePosts, eUsers]);
 
-    expect(kind(topology, ePosts.migrationHash)).toBe('forward');
-    expect(kind(topology, ePostsV2.migrationHash)).toBe('forward');
+    expect(kind(topology, ePosts.hash)).toBe('forward');
+    expect(kind(topology, ePostsV2.hash)).toBe('forward');
     expect(forwardIn(topology, 'def5678')).toBe(2);
     expect(forwardOut(topology, 'abc1234')).toBe(2);
   });
@@ -135,7 +135,7 @@ describe('classifyMigrationListGraphTopology', () => {
     const topology = classify([eMergeTags, eMergePosts, eUnrelated, eTags, ePosts, eUsers]);
 
     expect(forwardIn(topology, 'd41a8c3')).toBe(2);
-    expect(kind(topology, eUnrelated.migrationHash)).toBe('forward');
+    expect(kind(topology, eUnrelated.hash)).toBe('forward');
   });
 
   it('classifies multi-hop rollback as rollback without forward degree bumps', () => {
@@ -145,8 +145,8 @@ describe('classifyMigrationListGraphTopology', () => {
     const eRollback = entry('20250312_full_rollback', 'ghi7890', 'abc1234');
     const topology = classify([eRollback, eComments, ePosts, eUsers]);
 
-    expect(kind(topology, eRollback.migrationHash)).toBe('rollback');
-    expect(kind(topology, eComments.migrationHash)).toBe('forward');
+    expect(kind(topology, eRollback.hash)).toBe('rollback');
+    expect(kind(topology, eComments.hash)).toBe('forward');
     expect(forwardIn(topology, 'abc1234')).toBe(1);
     expect(forwardOut(topology, 'ghi7890')).toBe(0);
     expect(forwardIn(topology, 'ghi7890')).toBe(1);
@@ -160,8 +160,8 @@ describe('classifyMigrationListGraphTopology', () => {
     const eLikes = entry('20250320_add_likes', 'def5678', 'jkl1234');
     const topology = classify([eLikes, eRollback, eComments, ePosts, eUsers]);
 
-    expect(kind(topology, eRollback.migrationHash)).toBe('rollback');
-    expect(kind(topology, eLikes.migrationHash)).toBe('forward');
+    expect(kind(topology, eRollback.hash)).toBe('rollback');
+    expect(kind(topology, eLikes.hash)).toBe('forward');
     expect(forwardOut(topology, 'def5678')).toBe(2);
     expect(forwardIn(topology, 'def5678')).toBe(1);
     expect(forwardOut(topology, 'ghi7890')).toBe(0);
@@ -175,10 +175,10 @@ describe('classifyMigrationListGraphTopology', () => {
     const eCtoB = entry('20250304_c_to_b', 'hash_c', 'hash_b');
     const topology = classify([eCtoB, eBtoC, eAtoB, eAtoC]);
 
-    expect(kind(topology, eBtoC.migrationHash)).toBe('rollback');
-    expect(kind(topology, eCtoB.migrationHash)).toBe('forward');
-    expect(kind(topology, eAtoC.migrationHash)).toBe('forward');
-    expect(kind(topology, eAtoB.migrationHash)).toBe('forward');
+    expect(kind(topology, eBtoC.hash)).toBe('rollback');
+    expect(kind(topology, eCtoB.hash)).toBe('forward');
+    expect(kind(topology, eAtoC.hash)).toBe('forward');
+    expect(kind(topology, eAtoB.hash)).toBe('forward');
   });
 
   it('classifies both converging node-skipping rollbacks as rollback', () => {
@@ -194,10 +194,10 @@ describe('classifyMigrationListGraphTopology', () => {
     const topology = classify([init, m1, m2, m3, m4, m5, m6, rbA, rbB]);
 
     for (const e of [init, m1, m2, m3, m4, m5, m6]) {
-      expect(kind(topology, e.migrationHash)).toBe('forward');
+      expect(kind(topology, e.hash)).toBe('forward');
     }
-    expect(kind(topology, rbA.migrationHash)).toBe('rollback');
-    expect(kind(topology, rbB.migrationHash)).toBe('rollback');
+    expect(kind(topology, rbA.hash)).toBe('rollback');
+    expect(kind(topology, rbB.hash)).toBe('rollback');
     // The chain stays a single forward spine; the rollbacks do not bump degrees.
     expect(forwardIn(topology, 'n1')).toBe(1);
     expect(forwardOut(topology, 'n3')).toBe(1);
@@ -218,11 +218,11 @@ describe('classifyMigrationListGraphTopology', () => {
     const topology = classify([init, m1, m2, m3, m4, m5, m6, rbA, rbB, rbC]);
 
     for (const e of [init, m1, m2, m3, m4, m5, m6]) {
-      expect(kind(topology, e.migrationHash)).toBe('forward');
+      expect(kind(topology, e.hash)).toBe('forward');
     }
-    expect(kind(topology, rbA.migrationHash)).toBe('rollback');
-    expect(kind(topology, rbB.migrationHash)).toBe('rollback');
-    expect(kind(topology, rbC.migrationHash)).toBe('rollback');
+    expect(kind(topology, rbA.hash)).toBe('rollback');
+    expect(kind(topology, rbB.hash)).toBe('rollback');
+    expect(kind(topology, rbC.hash)).toBe('rollback');
     expect(forwardIn(topology, 'n1')).toBe(1);
   });
 
@@ -239,10 +239,10 @@ describe('classifyMigrationListGraphTopology', () => {
     const shuffled = classify([rbB, m4, init, rbA, m6, m1, m5, m2, m3]);
 
     for (const e of [init, m1, m2, m3, m4, m5, m6]) {
-      expect(kind(shuffled, e.migrationHash)).toBe('forward');
+      expect(kind(shuffled, e.hash)).toBe('forward');
     }
-    expect(kind(shuffled, rbA.migrationHash)).toBe('rollback');
-    expect(kind(shuffled, rbB.migrationHash)).toBe('rollback');
+    expect(kind(shuffled, rbA.hash)).toBe('rollback');
+    expect(kind(shuffled, rbB.hash)).toBe('rollback');
   });
 
   it('seeds pure-cycle back-edge lexically when a rooted component is also present', () => {
@@ -252,10 +252,10 @@ describe('classifyMigrationListGraphTopology', () => {
     const eBtoA = entry('20250302_cycle_ba', 'hash_bbb', 'hash_aaa');
     const topology = classify([eBtoA, eAtoB, eNext, eInit]);
 
-    expect(kind(topology, eInit.migrationHash)).toBe('forward');
-    expect(kind(topology, eNext.migrationHash)).toBe('forward');
-    expect(kind(topology, eAtoB.migrationHash)).toBe('forward');
-    expect(kind(topology, eBtoA.migrationHash)).toBe('rollback');
+    expect(kind(topology, eInit.hash)).toBe('forward');
+    expect(kind(topology, eNext.hash)).toBe('forward');
+    expect(kind(topology, eAtoB.hash)).toBe('forward');
+    expect(kind(topology, eBtoA.hash)).toBe('rollback');
   });
 
   it('marks exactly one edge rollback in a two-node cycle', () => {
@@ -263,11 +263,11 @@ describe('classifyMigrationListGraphTopology', () => {
     const eAtoB = entry('20250301_edge_ab', 'hash_a', 'hash_b');
     const topology = classify([eBtoA, eAtoB]);
 
-    const kinds = [kind(topology, eAtoB.migrationHash), kind(topology, eBtoA.migrationHash)];
+    const kinds = [kind(topology, eAtoB.hash), kind(topology, eBtoA.hash)];
     expect(kinds.filter((k) => k === 'rollback')).toHaveLength(1);
     expect(kinds.filter((k) => k === 'forward')).toHaveLength(1);
-    expect(kind(topology, eBtoA.migrationHash)).toBe('rollback');
-    expect(kind(topology, eAtoB.migrationHash)).toBe('forward');
+    expect(kind(topology, eBtoA.hash)).toBe('rollback');
+    expect(kind(topology, eAtoB.hash)).toBe('forward');
     expect(forwardIn(topology, 'hash_b')).toBe(1);
     expect(forwardOut(topology, 'hash_a')).toBe(1);
     expect(forwardIn(topology, 'hash_a')).toBe(0);
@@ -282,8 +282,8 @@ describe('classifyMigrationListGraphTopology', () => {
     expect(forwardIn(topology, 'mid_hash')).toBe(0);
     expect(forwardIn(topology, 'root_a')).toBe(0);
     expect(forwardOut(topology, EMPTY_CONTRACT_HASH)).toBe(0);
-    expect(kind(topology, eBranch.migrationHash)).toBe('forward');
-    expect(kind(topology, eOther.migrationHash)).toBe('forward');
+    expect(kind(topology, eBranch.hash)).toBe('forward');
+    expect(kind(topology, eOther.hash)).toBe('forward');
   });
 
   it('tolerates duplicate migration hash without throwing', () => {
@@ -301,8 +301,8 @@ describe('classifyMigrationListGraphTopology', () => {
     const eForward = entry('20250304_forward', null, contract);
     const topology = classify([eSelf, eForward]);
 
-    expect(kind(topology, eSelf.migrationHash)).toBe('self');
-    expect(kind(topology, eForward.migrationHash)).toBe('forward');
+    expect(kind(topology, eSelf.hash)).toBe('self');
+    expect(kind(topology, eForward.hash)).toBe('forward');
     expect(forwardIn(topology, contract)).toBe(1);
     expect(forwardOut(topology, contract)).toBe(0);
   });

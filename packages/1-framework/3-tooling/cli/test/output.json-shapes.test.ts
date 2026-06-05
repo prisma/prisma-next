@@ -87,9 +87,9 @@ describe('MigrationStatusResult JSON shape', () => {
           migrations: [
             {
               name: '20260101T1200_init',
+              hash: 'sha256:mid',
               fromContract: 'sha256:a',
               toContract: 'sha256:b',
-              migrationHash: 'sha256:mid',
               operationCount: 3,
               createdAt: '2026-01-01T00:00:00.000Z',
               refs: [],
@@ -113,10 +113,10 @@ describe('MigrationStatusResult JSON shape', () => {
       ]
     `);
     expect(Object.keys(result.spaces[0]!).sort()).toEqual([
-      'markerHash',
+      'currentContract',
       'migrations',
-      'spaceId',
-      'targetHash',
+      'space',
+      'targetContract',
     ]);
   });
 });

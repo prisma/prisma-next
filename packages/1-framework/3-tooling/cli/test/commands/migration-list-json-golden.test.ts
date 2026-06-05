@@ -5,8 +5,10 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
+import { type } from 'arktype';
 import { join } from 'pathe';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { migrationListResultSchema } from '../../src/commands/json/schemas';
 import { executeMigrationListCommand } from '../../src/commands/migration-list';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
@@ -141,6 +143,9 @@ describe('migration list --json golden', () => {
     const result = await executeMigrationListCommand({ config: contractPath }, flags, ui);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+
+    const schemaResult = migrationListResultSchema(result.value.list);
+    expect(schemaResult instanceof type.errors).toBe(false);
 
     const json = JSON.stringify(result.value.list, null, 2);
     expect(json).toContain('"ok": true');

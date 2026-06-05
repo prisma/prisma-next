@@ -28,8 +28,8 @@ function migration(
     Partial<Omit<MigrationListEntry, 'name' | 'toContract'>>,
 ): MigrationListEntry {
   return {
+    hash: overrides.hash ?? `sha256:list-mig-${migrationHashSeq++}`,
     fromContract: null,
-    migrationHash: overrides.migrationHash ?? `sha256:list-mig-${migrationHashSeq++}`,
     operationCount: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
     refs: [],
@@ -39,7 +39,7 @@ function migration(
 }
 
 function result(spaces: readonly MigrationSpaceListEntry[], summary: string): MigrationListResult {
-  return { ok: true, spaces, summary };
+  return { ok: true, spaces: [...spaces], summary };
 }
 
 function renderListed(listResult: MigrationListResult): string {
@@ -69,7 +69,7 @@ describe('migrationGraphFromListEntries', () => {
       }),
     ];
     const annotations = buildEdgeAnnotationsByHashFromListEntries(entries);
-    expect(annotations.get(entries[0]!.migrationHash)).toEqual({
+    expect(annotations.get(entries[0]!.hash)).toEqual({
       operationCount: 3,
       invariants: ['inv_a'],
     });
@@ -98,7 +98,7 @@ describe('renderMigrationList', () => {
       name: '20250312_full_rollback',
       fromContract: HASH_C,
       toContract: HASH_A,
-      migrationHash: 'sha256:rollback-edge',
+      hash: 'sha256:rollback-edge',
     });
     const output = renderMigrationListWithStyle(
       result(
@@ -231,7 +231,7 @@ describe('renderMigrationList', () => {
                 name: 'skip_back',
                 fromContract: HASH_C,
                 toContract: HASH_A,
-                migrationHash: 'sha256:skip-back',
+                hash: 'sha256:skip-back',
               }),
             ],
           },
