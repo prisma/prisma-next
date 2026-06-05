@@ -31,12 +31,14 @@ function setupHandle(): TestHandle {
 }
 
 async function teardownHandle(handle: TestHandle): Promise<void> {
-  await handle.db.close();
-  handle.rawDb.close();
   try {
-    rmSync(handle.testDir, { recursive: true, force: true });
-  } catch {
-    // ignore
+    await handle.db.close();
+  } finally {
+    try {
+      handle.rawDb.close();
+    } finally {
+      rmSync(handle.testDir, { recursive: true, force: true });
+    }
   }
 }
 
