@@ -1,11 +1,11 @@
 import {
-  createMongoControlDriver,
   createMongoRunnerDeps,
   readLedger as readMongoLedger,
 } from '@prisma-next/adapter-mongo/control';
 import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import {
@@ -275,7 +275,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     };
     const mongoRunner = new MongoMigrationRunner(
       createMongoRunnerDeps(
-        createMongoControlDriver(mongoDb, mongoClient),
+        new MongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
         makeMongoFamily(),
       ),
@@ -441,7 +441,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     };
     const mongoRunner = new MongoMigrationRunner(
       createMongoRunnerDeps(
-        createMongoControlDriver(mongoDb, mongoClient),
+        new MongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
         makeMongoFamily(),
       ),
@@ -580,7 +580,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     ];
     const mongoRunner = new MongoMigrationRunner(
       createMongoRunnerDeps(
-        createMongoControlDriver(mongoDb, mongoClient),
+        new MongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
         makeMongoFamily(),
       ),
