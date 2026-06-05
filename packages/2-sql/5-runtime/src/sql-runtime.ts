@@ -761,6 +761,21 @@ export async function withTransaction<R>(
   const transaction = await connection.transaction();
 
   let invalidated = false;
+
+  async function* guardedStream<Row>(
+    inner: AsyncIterable<Row>,
+  ): AsyncGenerator<Row, void, unknown> {
+    if (invalidated) {
+      throw transactionClosedError();
+    }
+    for await (const row of inner) {
+      if (invalidated) {
+        throw transactionClosedError();
+      }
+      yield row;
+    }
+  }
+
   const txContext: TransactionContext = {
     get invalidated() {
       return invalidated;
@@ -772,19 +787,7 @@ export async function withTransaction<R>(
       if (invalidated) {
         throw transactionClosedError();
       }
-      const inner = transaction.execute(plan, options);
-      const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
-        if (invalidated) {
-          throw transactionClosedError();
-        }
-        for await (const row of inner) {
-          if (invalidated) {
-            throw transactionClosedError();
-          }
-          yield row;
-        }
-      };
-      return new AsyncIterableResult(guarded());
+      return new AsyncIterableResult(guardedStream(transaction.execute(plan, options)));
     },
     executePrepared<Params, Row>(
       ps: PreparedStatement<Params, Row>,
@@ -794,19 +797,9 @@ export async function withTransaction<R>(
       if (invalidated) {
         throw transactionClosedError();
       }
-      const inner = transaction.executePrepared(ps, params, options);
-      const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
-        if (invalidated) {
-          throw transactionClosedError();
-        }
-        for await (const row of inner) {
-          if (invalidated) {
-            throw transactionClosedError();
-          }
-          yield row;
-        }
-      };
-      return new AsyncIterableResult(guarded());
+      return new AsyncIterableResult(
+        guardedStream(transaction.executePrepared(ps, params, options)),
+      );
     },
   };
 
