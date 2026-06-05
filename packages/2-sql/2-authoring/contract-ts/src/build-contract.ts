@@ -21,6 +21,7 @@ import {
 } from '@prisma-next/contract/types';
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
@@ -242,6 +243,24 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
     }
   }
   return ids;
+}
+
+function ensureUnboundNamespaceSlot(
+  namespaces: SqlStorageInput['namespaces'],
+  createNamespace: ContractDefinition['createNamespace'],
+): SqlStorageInput['namespaces'] {
+  if (Object.hasOwn(namespaces, UNBOUND_NAMESPACE_ID)) {
+    return namespaces;
+  }
+  const unboundInput: SqlNamespaceTablesInput = {
+    id: UNBOUND_NAMESPACE_ID,
+    entries: { table: {} },
+  };
+  const unbound = createNamespace ? createNamespace(unboundInput) : buildSqlNamespace(unboundInput);
+  return {
+    [UNBOUND_NAMESPACE_ID]: unbound,
+    ...namespaces,
+  };
 }
 
 const POSTGRES_ENUM_NAMESPACE_ID = 'public';
@@ -577,7 +596,7 @@ export function buildSqlContractFromDefinition(
   );
   const storageWithoutHash = {
     ...(Object.keys(documentTypes).length > 0 ? { types: documentTypes } : {}),
-    namespaces,
+    namespaces: ensureUnboundNamespaceSlot(namespaces, createNamespace),
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)
