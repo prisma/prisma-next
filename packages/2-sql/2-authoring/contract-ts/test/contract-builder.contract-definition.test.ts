@@ -416,3 +416,109 @@ describe('shared contract definition lowering', () => {
     expect(contract.storage.namespaces['auth']).toBeDefined();
   });
 });
+
+describe('M:N through descriptor lowering', () => {
+  const tagModel = (target: {
+    id?: { columns: readonly string[] };
+    uniques?: readonly { columns: readonly string[] }[];
+  }) => ({
+    modelName: 'Tag',
+    tableName: 'tags',
+    fields: [
+      {
+        fieldName: 'id',
+        columnName: 'id',
+        descriptor: { codecId: 'pg/int4@1', nativeType: 'int4' },
+        nullable: false,
+      },
+      {
+        fieldName: 'slug',
+        columnName: 'slug',
+        descriptor: { codecId: 'pg/text@1', nativeType: 'text' },
+        nullable: false,
+      },
+    ],
+    ...target,
+  });
+
+  const buildWithTag = (target: Parameters<typeof tagModel>[0]) =>
+    buildSqlContractFromDefinition({
+      target: postgresTargetPack,
+      models: [
+        {
+          modelName: 'Post',
+          tableName: 'posts',
+          fields: [
+            {
+              fieldName: 'id',
+              columnName: 'id',
+              descriptor: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              nullable: false,
+            },
+          ],
+          id: { columns: ['id'] },
+          relations: [
+            {
+              fieldName: 'tags',
+              toModel: 'Tag',
+              toTable: 'tags',
+              cardinality: 'N:M',
+              on: {
+                parentTable: 'posts',
+                parentColumns: ['id'],
+                childTable: 'tags',
+                childColumns: ['id'],
+              },
+              through: {
+                table: 'post_tags',
+                parentColumns: ['post_id'],
+                childColumns: ['tag_id'],
+              },
+            },
+          ],
+        },
+        tagModel(target),
+        {
+          modelName: 'PostTag',
+          tableName: 'post_tags',
+          fields: [
+            {
+              fieldName: 'postId',
+              columnName: 'post_id',
+              descriptor: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              nullable: false,
+            },
+            {
+              fieldName: 'tagId',
+              columnName: 'tag_id',
+              descriptor: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              nullable: false,
+            },
+          ],
+          id: { columns: ['post_id', 'tag_id'] },
+        },
+      ],
+    });
+
+  const throughOf = (contract: ReturnType<typeof buildWithTag>) => {
+    const models = modelsOf(contract) as Record<
+      string,
+      { readonly relations: Record<string, { readonly through?: { targetColumns: string[] } }> }
+    >;
+    return models['Post']!.relations['tags']!.through;
+  };
+
+  it('derives junction targetColumns from the target primary id', () => {
+    const through = throughOf(buildWithTag({ id: { columns: ['id'] } }));
+    expect(through?.targetColumns).toEqual(['id']);
+  });
+
+  it('falls back to the first unique constraint when the target has no primary id', () => {
+    const through = throughOf(buildWithTag({ uniques: [{ columns: ['slug'] }] }));
+    expect(through?.targetColumns).toEqual(['slug']);
+  });
+
+  it('throws when the target has neither a primary id nor a unique key', () => {
+    expect(() => buildWithTag({})).toThrow(/no primary id or unique key/);
+  });
+});
