@@ -5,7 +5,7 @@ import type {
   ContractScaffold,
   MongoContractResult,
 } from '@prisma-next/mongo-contract-ts/contract-builder';
-import { defineContract as baseDefineContract } from '@prisma-next/mongo-contract-ts/contract-builder';
+import { buildBoundContract } from '@prisma-next/mongo-contract-ts/contract-builder';
 import mongoTargetPack from '@prisma-next/target-mongo/pack';
 
 type MongoFamilyPack = typeof mongoFamilyPack;
@@ -64,36 +64,21 @@ export function defineContract<
   Definition & Built & { readonly family: MongoFamilyPack; readonly target: MongoTargetPack }
 >;
 
-// Implementation — pre-binds family and target before delegating to the base.
-// The `as unknown` cast is safe: every declared overload produces a MongoContractResult
-// and the only difference between the public overload signatures and the impl is
-// that we union both call forms here.
+// Implementation — delegates to buildBoundContract which pre-binds family/target
+// and calls buildContractFromDefinition directly, carrying zero casts at this layer.
 export function defineContract(
   definition: MongoDefinitionInput,
-  factory?: (helpers: MongoHelpers) => {
-    readonly models?: Record<string, unknown>;
-    readonly valueObjects?: Record<string, unknown>;
-    readonly roots?: Record<string, string>;
-  },
-): MongoContractResult<
-  MongoDefinitionInput & { readonly family: MongoFamilyPack; readonly target: MongoTargetPack }
-> {
-  const full = {
-    ...definition,
-    family: mongoFamilyPack,
-    target: mongoTargetPack,
-  } as ContractDefinition<MongoFamilyPack, MongoTargetPack>;
-
+  factory?: ContractFactory<
+    Record<string, never>,
+    Record<string, never>,
+    undefined,
+    MongoFamilyPack,
+    MongoTargetPack,
+    undefined
+  >,
+) {
   if (factory !== undefined) {
-    return baseDefineContract(
-      full as ContractScaffold<MongoFamilyPack, MongoTargetPack>,
-      factory as unknown as Parameters<typeof baseDefineContract>[1],
-    ) as unknown as MongoContractResult<
-      MongoDefinitionInput & { readonly family: MongoFamilyPack; readonly target: MongoTargetPack }
-    >;
+    return buildBoundContract(mongoFamilyPack, mongoTargetPack, definition, factory);
   }
-
-  return baseDefineContract(full) as unknown as MongoContractResult<
-    MongoDefinitionInput & { readonly family: MongoFamilyPack; readonly target: MongoTargetPack }
-  >;
+  return buildBoundContract(mongoFamilyPack, mongoTargetPack, definition);
 }
