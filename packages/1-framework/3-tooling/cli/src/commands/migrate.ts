@@ -10,6 +10,7 @@ import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { bold, greenBright } from 'colorette';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
@@ -54,8 +55,16 @@ import {
 import { toDeclaredExtensionsFromRaw } from '../utils/extension-pack-inputs';
 import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
 import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
+import { indentMigrationGraphTreeBlock } from '../utils/formatters/migration-graph-space-render';
 import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
 import { renderMigrationGraphTree } from '../utils/formatters/migration-graph-tree-render';
+import {
+  abbreviateContractHash,
+  MIGRATION_LIST_HASH_WIDTH,
+  migrationListEmptySource,
+  migrationListForwardArrow,
+  padFromHashColumn,
+} from '../utils/formatters/migration-list-data-column';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -63,6 +72,7 @@ import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags'
 import { executeRefAdvancement, readContractIR } from '../utils/ref-advancement';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import { listRefsByContractHash } from './migration-list';
 
 interface MigrateCommandOptions extends CommonCommandOptions {
   readonly db?: string;
@@ -91,8 +101,8 @@ export interface MigrateShowResult {
   readonly summary: string;
   /**
    * Pre-rendered Tier-3 graph tree for human output. On-path migrations are
-   * highlighted bright green; off-path are dimmed and unlabelled.
-   * Only present in human (non-JSON) mode.
+   * highlighted bright green (nodes, hashes, names, lane lines); off-path
+   * migrations are fully drawn in dim grey. Only present in human (non-JSON) mode.
    */
   readonly graphOutput?: string;
 }
@@ -406,36 +416,50 @@ async function executeMigrateShowCommand(
   let graphOutput: string | undefined;
   if (!flags.json) {
     const onPathHashes = new Set(orderedMigrations.map((m) => m.migrationHash));
-    const edgeAnnotationsByHash = new Map<string, MigrationEdgeAnnotation>();
-    // Annotate every edge in the app graph: on-path or off-path.
-    for (const edge of aggregate.app.graph().migrationByHash.values()) {
-      edgeAnnotationsByHash.set(edge.migrationHash, {
-        pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
-      });
-    }
+    const colorize = flags.color !== false;
 
-    // Build the refs map from aggregate refs (for node overlay labels).
-    const appRefs = aggregate.app.refs;
-    const refsByHash = new Map<string, readonly string[]>();
-    for (const [refName, ref] of Object.entries(appRefs)) {
-      if (ref) {
-        const existing = refsByHash.get(ref.hash) ?? [];
-        refsByHash.set(ref.hash, [...existing, refName]);
+    // Render each space (app + extensions) as its own section, with a heading
+    // when more than one space is present.
+    const renderSpaceTree = (member: ContractSpaceMember, isApp: boolean): string => {
+      const memberGraph = member.graph();
+      const edgeAnnotations = new Map<string, MigrationEdgeAnnotation>();
+      for (const edge of memberGraph.migrationByHash.values()) {
+        edgeAnnotations.set(edge.migrationHash, {
+          pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
+        });
+      }
+      // BUG 1 fix: contractHash marks the app's working/desired contract.
+      // BUG 2 fix: only the app space gets @contract — extension spaces must not.
+      const spaceContractHash = isApp ? contractHash : undefined;
+      const rowModel = buildMigrationGraphRows(
+        memberGraph,
+        spaceContractHash !== undefined ? { contractHash: spaceContractHash } : {},
+      );
+      const layout = buildMigrationGraphLayout(rowModel);
+      const liveMarker = markerBySpace.get(member.spaceId) ?? null;
+      const liveMarkerHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
+      return renderMigrationGraphTree(layout, {
+        ...(spaceContractHash !== undefined ? { contractHash: spaceContractHash } : {}),
+        ...(needsLiveMarker ? { dbHash: liveMarkerHash } : {}),
+        refsByHash: listRefsByContractHash(member),
+        edgeAnnotationsByHash: edgeAnnotations,
+        colorize,
+      });
+    };
+
+    const showSpaceHeadings = allMembers.length > 1;
+    const sections: string[] = [];
+    for (const member of allMembers) {
+      const isApp = member.spaceId === aggregate.app.spaceId;
+      const tree = renderSpaceTree(member, isApp);
+      if (tree.length === 0) continue;
+      if (showSpaceHeadings) {
+        sections.push(`${member.spaceId}:\n${indentMigrationGraphTreeBlock(tree, '  ')}`);
+      } else {
+        sections.push(tree);
       }
     }
-
-    const appGraph = aggregate.app.graph();
-    const rowModel = buildMigrationGraphRows(appGraph, { contractHash: targetHash });
-    const layout = buildMigrationGraphLayout(rowModel);
-    const appLiveMarker = markerBySpace.get(aggregate.app.spaceId) ?? null;
-    const appFromHash = appLiveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
-    graphOutput = renderMigrationGraphTree(layout, {
-      contractHash: targetHash,
-      ...(needsLiveMarker ? { dbHash: appFromHash } : {}),
-      refsByHash,
-      edgeAnnotationsByHash,
-      colorize: flags.color !== false,
-    });
+    graphOutput = sections.join('\n\n');
   }
 
   return ok({
@@ -444,6 +468,23 @@ async function executeMigrateShowCommand(
     summary,
     ...(graphOutput !== undefined ? { graphOutput } : {}),
   });
+}
+
+function formatShowMigrationRow(
+  m: MigrateShowMigration,
+  dirNameWidth: number,
+  colorize: boolean,
+): string {
+  const arrow = migrationListForwardArrow('unicode');
+  const emptySource = migrationListEmptySource('unicode');
+  const fromAbbr =
+    m.from === EMPTY_CONTRACT_HASH
+      ? emptySource.padStart(MIGRATION_LIST_HASH_WIDTH, ' ')
+      : abbreviateContractHash(m.from);
+  const toAbbr = m.to === EMPTY_CONTRACT_HASH ? emptySource : abbreviateContractHash(m.to);
+  const fromPadded = padFromHashColumn(fromAbbr, MIGRATION_LIST_HASH_WIDTH);
+  const row = `${m.dirName.padEnd(dirNameWidth)}  ${fromPadded} ${arrow} ${toAbbr}`;
+  return colorize ? greenBright(bold(row)) : row;
 }
 
 function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags): string {
@@ -456,11 +497,14 @@ function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags):
   }
   lines.push(result.summary);
   if (result.migrations.length > 0) {
+    const colorize = flags.color !== false;
+    // Ordered list in graph migration-row format (name + from→to), green, no Clack gutter.
+    const dirNameWidth = Math.max(...result.migrations.map((m) => m.dirName.length));
     lines.push('');
     lines.push('Will run, in order:');
-    result.migrations.forEach((m, i) => {
-      lines.push(`  ${i + 1}. ${m.dirName}  (${m.from.slice(7, 14)} → ${m.to.slice(7, 14)})`);
-    });
+    for (const m of result.migrations) {
+      lines.push(`  ${formatShowMigrationRow(m, dirNameWidth, colorize)}`);
+    }
   }
   return lines.join('\n');
 }
@@ -804,7 +848,8 @@ export function createMigrateCommand(): Command {
           if (flags.json) {
             ui.output(JSON.stringify(showResult, null, 2));
           } else {
-            ui.log(formatMigrateShowOutput(showResult, flags));
+            // Print directly to stdout — not via ui.log() which injects Clack's │ gutter.
+            ui.output(formatMigrateShowOutput(showResult, flags));
           }
         });
 

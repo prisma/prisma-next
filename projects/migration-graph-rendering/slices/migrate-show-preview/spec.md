@@ -18,9 +18,9 @@ _Parent project `projects/migration-graph-rendering/`. Outcome: a user about to 
 
 **Render-vocabulary unification (D-MS7):** the shared Tier-3 overlay draws the reserved markers with the **`@`-sigil — `@contract @db` — dropping the angle-bracket form** `<contract, db>` (`migration-list-styler.ts:91-94`); user refs keep parens. The **`--legend`** output moves in lockstep: its example markers (`formatLegendExampleMarkers`, `migration-graph-tree-render.ts:744`) drop the `<…>` form, and its explanatory text teaches `@db`/`@contract` *and* that they're typeable `--from`/`--to` tokens. Both overlay and legend are shared by `graph` / `status` / `list` (legend via `utils/legend.ts`), so the change ships as this slice's **vocabulary-foundation dispatch** ahead of the preview — the preview can't render `@db`-highlighted while siblings still print or legend `<db>` (snapshot regen across all three).
 
-**Output (D-MS3):** two artifacts, one invocation:
-1. The **Tier-3 graph tree** (shared renderer with `graph`/`status`) with the chosen path from-state → target in **bright green**; off-path nodes **dimmed and unlabelled**; only the migrations on the path are named.
-2. A **linear, ordered list** of the migrations that will execute, in execution order — script/loop-friendly and unambiguous.
+**Output (D-MS3, revised per operator visual review):** two artifacts, one invocation:
+1. The **Tier-3 graph tree** (shared renderer with `graph`/`status`), rendering the **whole** graph — nothing omitted. The chosen path renders in **bright green**: its nodes, hashes, migration names, **and its lane/branch lines**. Every **off-path** node, hash, migration, and lane line renders in **uniform dim grey** (not omitted, not unlabelled — fully drawn, just grey). Marker placement: **`@contract` marks the app's working-contract node and is rendered only in the app space — never in an extension space**; `@db` marks the live-marker node; the `--to` ref marks its own node in parens. (`@contract` is the working contract, *not* the `--to` target.)
+2. A **linear, ordered list** of the migrations that will execute, in order — rendered in the **same row format and column alignment as the graph's migration rows** (minus the graph gutter), in the **same green**. **Not** wrapped in Clack output (no `│` left gutter — print directly, not via `ui.log`). Script/loop-friendly.
 
 **Faithfulness constraint (D-MS6) — confirmed by spike.** `migrate --show` computes its path through the **same seam the real `migrate` runs**: `readAllMarkers()` (read-only) for the from-state, then `graphWalkStrategy()` (`@prisma-next/migration-tools/aggregate`, `strategies/graph-walk.ts:51`) — a pure, no-write function that returns the ordered `PerSpacePlan` / `pathDecision.selectedPath`. The preview simply **stops before `runMigration()`** (the write boundary, `operations/migrate.ts:284`). No parallel reimplementation. The Tier-3 renderer is shared with `graph`/`status`. `status --from` already calls the same core path-finder (`findPathWithDecision`, `migration-graph.ts:300`) that `graphWalkStrategy` wraps, so the two commands are deterministically consistent **with no convergence refactor required** (an optional shared `previewMigrationPath` wrapper is a nicety, not a blocker).
 
@@ -29,16 +29,18 @@ Worked sketch (DB one migration behind prod):
 ```
 $ prisma-next migrate --show --to prod --db $DATABASE_URL
 
-○   a94b7b4   @contract (prod)
-│↑  add_posts        ef9de27 → a94b7b4      ← green (will run)
-○   ef9de27   @db
-  ⋯ off-path nodes dimmed ⋯
+app:
+  ○   a94b7b4   @contract            ← app working contract (grey: off-path here)
+  │↑  add_posts        ef9de27 → a94b7b4   1 ops     ← GREEN: node, name, AND lane lines
+  ○   ef9de27   @db (prod)
+  │   old_change       3c1d0a2 → ef9de27   1 ops     ← dim GREY: fully drawn, off-path
+  ○   3c1d0a2
+  ∅
 
-Will run, in order:
-  1. add_posts   (ef9de27 → a94b7b4)
+  add_posts        ef9de27 → a94b7b4   1 ops              ← list: graph row format, GREEN, no gutter
 ```
 
-Reserved markers render with the `@`-sigil — the same spelling you type into `--from`/`--to` (D-MS7) — not the old angle-bracket form `<contract, db>`. User refs keep parens (`(prod)`).
+Green covers the whole on-path run (nodes, hashes, names, lanes); everything off-path is uniform grey but fully drawn. `@contract` sits on the working-contract node (app space only). Reserved markers use the `@`-sigil — the spelling you type into `--from`/`--to` (D-MS7), not `<contract, db>`. User refs keep parens (`(prod)`). The ordered list reuses the graph's migration-row formatter without the gutter, in the same green — not Clack `ui.log`.
 
 ## Coherence rationale
 

@@ -388,9 +388,8 @@ describe('migrate --show (read-only + faithfulness)', () => {
 
   it('graph visualization: DB one migration behind target (worked example snapshot)', async () => {
     // Fixture: linear chain EMPTY → C1 → C2; from-state = C1 (DB one migration behind).
-    // Expected: C2 (@contract) at top, C1 (@db if using live marker - here explicit --from),
-    // on-path edge (C1→C2) labelled, C2-migration row visible + annotated.
-    // Off-path edges (EMPTY→C1 in this case) are unlabelled (dirName hidden).
+    // Expected: C2 (@contract) at top, on-path edge (C1→C2) green, off-path edge (EMPTY→C1)
+    // fully drawn (dim grey — name visible, not omitted).
     const { cwd } = await buildFixture();
     process.chdir(cwd);
 
@@ -411,17 +410,167 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(getExitCode()).toBe(0);
     const output = stripAnsi(consoleOutput.join('\n'));
 
-    // Graph should be present in the output
-    // C2 node (target/contract) should appear
+    // Graph should be present in the output.
+    // C2 node (working contract) should appear with @contract marker.
     expect(output).toContain(C2.slice(7, 13));
-    // C1 node (from-state) should appear
+    expect(output).toContain('@contract');
+    // C1 node (from-state) should appear.
     expect(output).toContain(C1.slice(7, 13));
-    // The on-path migration (C1→C2) dirName should appear in the graph
+    // The on-path migration (C1→C2) dirName should appear in the graph.
     expect(output).toContain('20260101_100000_222222');
-    // The off-path migration (EMPTY→C1) dirName should NOT appear — it's unlabelled
-    expect(output).not.toContain('20260101_100000_111111');
-    // The ordered list should appear
+    // The off-path migration (EMPTY→C1) dirName IS shown — fully drawn in grey (not omitted).
+    expect(output).toContain('20260101_100000_111111');
+    // The ordered list should appear without a Clack │ gutter (it goes to stdout).
     expect(output).toContain('Will run, in order:');
     expect(output).toContain('1 migration will run');
+    // The ordered list uses graph row format (from → to hash columns), not "1. name (from → to)".
+    expect(output).toContain(`${C1.slice(7, 14)} → ${C2.slice(7, 14)}`);
+    // No Clack │ prefix on any list line.
+    const listLines = output
+      .split('\n')
+      .filter((l) => l.includes('20260101_100000_222222') && !l.includes('○') && !l.includes('│'));
+    expect(listLines.length).toBeGreaterThan(0);
+  });
+
+  it('@contract marks the working contract (not the --to target) even when --to < working contract', async () => {
+    // Fixture: EMPTY → C1 → C2; working contract = C2 (from contract.json).
+    // Run --show --from EMPTY --to C1: targetHash = C1, contractHash = C2.
+    // BUG 1 was: renderer received contractHash = targetHash = C1, marking C1 as @contract.
+    // Fix: renderer receives contractHash = working contract = C2.
+    // Expected: @contract marks C2 (the working contract), NOT C1 (the --to target).
+    const { cwd } = await buildFixture();
+    process.chdir(cwd);
+
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+
+    try {
+      await executeCommand(createMigrateCommand(), [
+        '--show',
+        '--from',
+        EMPTY,
+        '--to',
+        C1.slice(7, 13),
+        '--no-color',
+      ]);
+    } catch {}
+
+    expect(getExitCode()).toBe(0);
+    const output = stripAnsi(consoleOutput.join('\n'));
+
+    // @contract must appear exactly once and be on the C2 node (the working contract).
+    const graphSection = output.split('Will run, in order:')[0] ?? output;
+    const contractMarkerCount = (graphSection.match(/@contract/g) ?? []).length;
+    expect(contractMarkerCount).toBe(1);
+    const contractLine = graphSection.split('\n').find((l) => l.includes('@contract'));
+    expect(contractLine).toBeDefined();
+    // @contract marks C2 (working contract), not C1 (the --to target).
+    expect(contractLine).toContain(C2.slice(7, 13));
+    expect(contractLine).not.toContain(C1.slice(7, 13));
+  });
+
+  it('@contract does not appear in extension spaces', async () => {
+    // Build a fixture with two spaces: app and a pgvector extension.
+    // The app space has EMPTY→C1→C2; the extension has its own graph.
+    // @contract must appear only in the app space section, not in the extension section.
+    const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-show-ext-'));
+    tempDirs.push(cwd);
+
+    const EXT_C1 = `sha256:${'e'.repeat(64)}`;
+    const extAppDir = join(cwd, 'migrations', 'app');
+    const extVectorDir = join(cwd, 'migrations', 'pgvector');
+    await mkdir(extAppDir, { recursive: true });
+    await mkdir(extVectorDir, { recursive: true });
+
+    // App space: EMPTY → C1 → C2
+    await writePkg(extAppDir, {
+      from: EMPTY,
+      to: C1,
+      providedInvariants: [],
+      createdAt: '2026-01-01T10:00:00.000Z',
+    });
+    await writePkg(extAppDir, {
+      from: C1,
+      to: C2,
+      providedInvariants: [],
+      createdAt: '2026-01-01T10:01:00.000Z',
+    });
+
+    // Extension space (pgvector): EMPTY → EXT_C1 (standalone graph, head = EXT_C1)
+    const extHash = computeMigrationHash(
+      { from: EMPTY, to: EXT_C1, providedInvariants: [], createdAt: '2026-01-01T09:00:00.000Z' },
+      OPS as MigrationPlanOperation[],
+    );
+    const extDirName = `20260101_090000_${EXT_C1.slice(7, 13)}`;
+    const extPkgDir = join(extVectorDir, extDirName);
+    const extMetadata = {
+      from: EMPTY,
+      to: EXT_C1,
+      providedInvariants: [],
+      createdAt: '2026-01-01T09:00:00.000Z',
+      migrationHash: extHash,
+    };
+    await writeMigrationPackage(extPkgDir, extMetadata, OPS as MigrationPlanOperation[]);
+    // Write head ref for the extension space so aggregate can load it.
+    await writeRef(join(extVectorDir, 'refs'), 'head', { hash: EXT_C1, invariants: [] });
+    // Write extension space contract.json (aggregate reads it from disk).
+    await writeFile(join(extVectorDir, 'contract.json'), JSON.stringify(contractEnvelope(EXT_C1)));
+
+    await writeFile(join(cwd, 'contract.json'), JSON.stringify(contractEnvelope(C2)));
+
+    // Configure with the pgvector extension pack declared.
+    mocks.loadConfig.mockResolvedValue({
+      family: {
+        familyId: TARGET_FAMILY,
+        create: vi.fn().mockReturnValue({ deserializeContract: (json: unknown) => json }),
+      },
+      target: {
+        id: TARGET,
+        familyId: TARGET_FAMILY,
+        targetId: TARGET,
+        kind: 'target',
+        migrations: {},
+      },
+      adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
+      driver: { kind: 'driver', create: vi.fn() },
+      contract: { output: 'contract.json' },
+      migrations: { dir: 'migrations' },
+      extensionPacks: [
+        {
+          id: 'pgvector',
+          targetId: TARGET,
+          // contractSpace must be present (non-undefined) for toDeclaredExtensionsFromRaw
+          // to recognise this as a contract-space extension. The aggregate loader
+          // reads the actual contract from disk (migrations/pgvector/), not from here.
+          contractSpace: {
+            contractJson: contractEnvelope(EXT_C1),
+            headRef: { hash: EXT_C1, invariants: [] },
+            migrations: [],
+          },
+        },
+      ],
+    });
+
+    process.chdir(cwd);
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+
+    let caughtError: unknown;
+    try {
+      await executeCommand(createMigrateCommand(), ['--show', '--from', EMPTY, '--no-color']);
+    } catch (e) {
+      caughtError = e;
+    }
+    expect(caughtError, 'command threw unexpectedly').toBeUndefined();
+    expect(getExitCode()).toBe(0);
+    const output = stripAnsi(consoleOutput.join('\n'));
+
+    // Multi-space output: there should be two space headings.
+    expect(output).toContain('app:');
+    expect(output).toContain('pgvector:');
+
+    // @contract must appear in the app section, not in the pgvector section.
+    const appSection = output.split('pgvector:')[0] ?? '';
+    const pgvectorSection = output.split('pgvector:')[1] ?? '';
+    expect(appSection).toContain('@contract');
+    expect(pgvectorSection).not.toContain('@contract');
   });
 });
