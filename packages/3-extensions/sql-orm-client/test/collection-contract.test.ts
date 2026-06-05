@@ -1,5 +1,3 @@
-import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   assertReturningCapability,
@@ -13,12 +11,7 @@ import {
   resolveRowIdentityColumns,
   resolveUpsertConflictColumns,
 } from '../src/collection-contract';
-import {
-  buildMixedPolyContract,
-  deserializeTestContract,
-  getTestContract,
-  withPatchedDomainModels,
-} from './helpers';
+import { buildMixedPolyContract, getTestContract, withPatchedDomainModels } from './helpers';
 import { unboundTables } from './unbound-tables';
 
 describe('collection-contract capability detection', () => {
@@ -375,101 +368,14 @@ describe('resolvePolymorphismInfo()', () => {
 });
 
 describe('resolveModelRelations() through descriptor', () => {
-  type RawColumn = { nativeType: string; codecId: string; nullable: boolean; default?: unknown };
-
-  function buildManyToManyContract(opts: {
-    junctionTable: string;
-    parentColumns: string[];
-    childColumns: string[];
-    targetColumns: string[];
-    extraColumns?: Record<string, RawColumn>;
-    omitJunctionStorage?: boolean;
-  }): Contract<SqlStorage> {
-    const {
-      junctionTable,
-      parentColumns,
-      childColumns,
-      targetColumns,
-      extraColumns = {},
-      omitJunctionStorage = false,
-    } = opts;
-
-    const junctionStorageColumns: Record<string, RawColumn> = {};
-    for (const col of [...parentColumns, ...childColumns]) {
-      junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
-    }
-    for (const [name, col] of Object.entries(extraColumns)) {
-      junctionStorageColumns[name] = col;
-    }
-
-    const raw = JSON.parse(JSON.stringify(getTestContract()));
-    const domainModels = raw.domain.namespaces.public.models;
-    const storageTables = raw.storage.namespaces.public.entries.table;
-
-    domainModels['Parent'] = {
-      fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
-      relations: {
-        children: {
-          to: { model: 'Child', namespace: 'public' },
-          cardinality: 'N:M',
-          on: { localFields: ['id'], targetFields: targetColumns },
-          through: {
-            table: junctionTable,
-            namespaceId: 'public',
-            parentColumns,
-            childColumns,
-            targetColumns,
-          },
-        },
-      },
-      storage: { namespaceId: 'public', table: 'parents', fields: { id: { column: 'id' } } },
-    };
-    domainModels['Child'] = {
-      fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
-      relations: {},
-      storage: { namespaceId: 'public', table: 'children', fields: { id: { column: 'id' } } },
-    };
-
-    storageTables['parents'] = {
-      columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-      primaryKey: { columns: ['id'] },
-      uniques: [],
-      indexes: [],
-      foreignKeys: [],
-    };
-    storageTables['children'] = {
-      columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-      primaryKey: { columns: ['id'] },
-      uniques: [],
-      indexes: [],
-      foreignKeys: [],
-    };
-    if (!omitJunctionStorage) {
-      storageTables[junctionTable] = {
-        columns: junctionStorageColumns,
-        primaryKey: { columns: [...new Set([...parentColumns, ...childColumns])] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      };
-    }
-
-    return deserializeTestContract(raw);
-  }
-
   it('populates through descriptor for a simple single-column M:N relation', () => {
-    const contract = buildManyToManyContract({
-      junctionTable: 'parent_child',
-      parentColumns: ['parent_id'],
-      childColumns: ['child_id'],
-      targetColumns: ['id'],
-    });
+    const contract = getTestContract();
 
-    const relations = resolveModelRelations(contract, 'Parent');
-    expect(relations['children']?.through).toEqual({
-      table: 'parent_child',
-      parentColumns: ['parent_id'],
-      childColumns: ['child_id'],
+    const relations = resolveModelRelations(contract, 'User');
+    expect(relations['tags']?.through).toEqual({
+      table: 'user_tags',
+      parentColumns: ['user_id'],
+      childColumns: ['tag_id'],
       targetColumns: ['id'],
       requiredPayloadColumns: [],
       namespaceId: 'public',
@@ -477,71 +383,49 @@ describe('resolveModelRelations() through descriptor', () => {
   });
 
   it('populates through descriptor for a composite-key M:N junction', () => {
-    const contract = buildManyToManyContract({
-      junctionTable: 'parent_child',
-      parentColumns: ['tenant_id', 'parent_id'],
-      childColumns: ['tenant_id', 'child_id'],
-      targetColumns: ['tenant_id', 'id'],
-    });
+    const contract = getTestContract();
 
-    const relations = resolveModelRelations(contract, 'Parent');
-    const through = relations['children']?.through;
-    expect(through?.parentColumns).toEqual(['tenant_id', 'parent_id']);
-    expect(through?.childColumns).toEqual(['tenant_id', 'child_id']);
+    const through = resolveModelRelations(contract, 'Project')['related']?.through;
+    expect(through?.parentColumns).toEqual(['src_tenant_id', 'src_id']);
+    expect(through?.childColumns).toEqual(['dst_tenant_id', 'dst_id']);
     expect(through?.targetColumns).toEqual(['tenant_id', 'id']);
     expect(through?.requiredPayloadColumns).toEqual([]);
   });
 
   it('includes NOT-NULL no-default non-FK columns in requiredPayloadColumns', () => {
-    const contract = buildManyToManyContract({
-      junctionTable: 'parent_child',
-      parentColumns: ['parent_id'],
-      childColumns: ['child_id'],
-      targetColumns: ['id'],
-      extraColumns: {
-        assigned_at: { nativeType: 'timestamptz', codecId: 'pg/timestamptz@1', nullable: false },
-        role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-      },
-    });
+    const contract = getTestContract();
 
-    const relations = resolveModelRelations(contract, 'Parent');
-    expect(relations['children']?.through?.requiredPayloadColumns).toEqual(
-      expect.arrayContaining(['assigned_at', 'role']),
-    );
-    expect(relations['children']?.through?.requiredPayloadColumns).toHaveLength(2);
+    expect(
+      resolveModelRelations(contract, 'User')['roles']?.through?.requiredPayloadColumns,
+    ).toEqual(['level']);
   });
 
   it('excludes nullable and defaulted non-FK columns from requiredPayloadColumns', () => {
-    const contract = buildManyToManyContract({
-      junctionTable: 'parent_child',
-      parentColumns: ['parent_id'],
-      childColumns: ['child_id'],
-      targetColumns: ['id'],
-      extraColumns: {
-        note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-        created_at: {
-          nativeType: 'timestamptz',
-          codecId: 'pg/timestamptz@1',
-          nullable: false,
-          default: { kind: 'function', expression: 'now()' },
-        },
-      },
-    });
+    const contract = getTestContract();
 
-    const relations = resolveModelRelations(contract, 'Parent');
-    expect(relations['children']?.through?.requiredPayloadColumns).toEqual([]);
+    // user_tags carries a nullable `note` column and a `created_at` column with a
+    // now() default alongside its FK pair, so neither belongs in the payload.
+    expect(
+      resolveModelRelations(contract, 'User')['tags']?.through?.requiredPayloadColumns,
+    ).toEqual([]);
   });
 
   it('omits through when the junction table is absent from its declared namespace', () => {
-    const contract = buildManyToManyContract({
-      junctionTable: 'parent_child',
-      parentColumns: ['parent_id'],
-      childColumns: ['child_id'],
-      targetColumns: ['id'],
-      omitJunctionStorage: true,
+    const contract = withPatchedDomainModels(getTestContract(), (models) => {
+      const user = models['User'] as { relations: Record<string, { through?: unknown }> };
+      const tags = user.relations['tags'] as { through: { table: string } };
+      return {
+        ...models,
+        User: {
+          ...user,
+          relations: {
+            ...user.relations,
+            tags: { ...tags, through: { ...tags.through, table: 'missing_junction' } },
+          },
+        },
+      };
     });
 
-    const relations = resolveModelRelations(contract, 'Parent');
-    expect(relations['children']?.through).toBeUndefined();
+    expect(resolveModelRelations(contract, 'User')['tags']?.through).toBeUndefined();
   });
 });
