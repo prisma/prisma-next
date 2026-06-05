@@ -239,6 +239,9 @@ function renderConnectorTee(
  * marker takes its own lane's hue (so each node visibly belongs to its branch);
  * the connector follows the arc it belongs to (its owning back-lane hue).
  * Direction arrows are handled elsewhere — they take their edge's lane hue too.
+ *
+ * When `laneOverride` is provided (for path-highlight rows), it replaces both
+ * the marker and connector stylers so no rotation hue bleeds through.
  */
 function renderNodeMarkerPair(
   pair: string,
@@ -246,9 +249,10 @@ function renderNodeMarkerPair(
   arcColumn: number,
   colorize: boolean,
   style: MigrationListStyler,
+  laneOverride?: (text: string) => string,
 ): string {
-  const marker = laneStylerForColumn(nodeColumn, colorize, style);
-  const connector = laneStylerForColumn(arcColumn, colorize, style);
+  const marker = laneOverride ?? laneStylerForColumn(nodeColumn, colorize, style);
+  const connector = laneOverride ?? laneStylerForColumn(arcColumn, colorize, style);
   return marker(pair.slice(0, 1)) + connector(pair.slice(1));
 }
 
@@ -259,17 +263,36 @@ function renderCellPair(
   colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
+  laneOverride?: (text: string) => string,
 ): string {
   const laneColumn = colors.lane[column] ?? column;
-  const lane = laneStylerForColumn(laneColumn, colorize, style);
+  // When a path-highlight override is supplied (on-path → greenBright, off-path → dim),
+  // it replaces the rotating lane colour entirely so the rotation hue is never emitted.
+  // Without an override (every command except migrate --show), the existing rotation
+  // behaviour is unchanged.
+  const lane = laneOverride ?? laneStylerForColumn(laneColumn, colorize, style);
   switch (cell.kind) {
     case 'node': {
       const arcColumn = colors.connector[column] ?? NEUTRAL_LANE_COLUMN;
       if (cell.arcLand === true) {
-        return renderNodeMarkerPair(palette.arcLand, column, arcColumn, colorize, style);
+        return renderNodeMarkerPair(
+          palette.arcLand,
+          column,
+          arcColumn,
+          colorize,
+          style,
+          laneOverride,
+        );
       }
       if (cell.arcTee === true) {
-        return renderNodeMarkerPair(palette.arcTee, column, arcColumn, colorize, style);
+        return renderNodeMarkerPair(
+          palette.arcTee,
+          column,
+          arcColumn,
+          colorize,
+          style,
+          laneOverride,
+        );
       }
       return lane(palette.node);
     }
@@ -278,11 +301,9 @@ function renderCellPair(
     case 'edge-lane':
       return cell.ownsLabel
         ? lane(palette.verticalPass.trimEnd()) +
-            branchStylerOrDefault(
-              column,
-              colorize,
-              style.kind,
-            )(arrowForEdgeKind(cell.edgeKind, palette))
+            (laneOverride ?? branchStylerOrDefault(column, colorize, style.kind))(
+              arrowForEdgeKind(cell.edgeKind, palette),
+            )
         : lane(palette.verticalPass);
     case 'branch-tee':
       return lane(palette.branchTee);
@@ -299,13 +320,17 @@ function renderCellPair(
     case 'arc-land-corner':
       return lane(palette.arcLandCorner);
     case 'arc-land-tee':
-      return renderConnectorTee(
-        palette.arcLandTee,
-        laneColumn,
-        colors.dash[column] ?? laneColumn,
-        colorize,
-        style,
-      );
+      // When a lane override is active, apply it uniformly to both glyph and dash parts
+      // so neither part emits a rotation hue.
+      return laneOverride !== undefined
+        ? laneOverride(palette.arcLandTee)
+        : renderConnectorTee(
+            palette.arcLandTee,
+            laneColumn,
+            colors.dash[column] ?? laneColumn,
+            colorize,
+            style,
+          );
     case 'arc-crossing':
       return lane(palette.arcLandBridge);
     case 'arc-land-bridge':
@@ -638,6 +663,42 @@ export function renderMigrationGraphTree(
     opts.globalMaxEdgeTreePrefixWidth ?? maxEdgeTreePrefixWidth(model.rows, wideLabelColumn);
   const edgeDirNameWidth = rowDirNameWidth(maxEdgePrefixWidth, effectiveMaxDirNameLen, dirNameGap);
 
+  // Build a contract-hash → path-highlight map so node rows can be coloured correctly.
+  // On-path wins: if a contract is both `from` of an on-path edge and `to` of an off-path
+  // edge (or vice-versa), it is treated as on-path.
+  // This map is only populated when edgeAnnotationsByHash is provided (migrate --show);
+  // for every other command (graph/status/list) it is empty and the code below is a no-op.
+  const contractHighlights = new Map<string, 'on-path' | 'off-path'>();
+  if (opts.edgeAnnotationsByHash) {
+    for (const row of model.rows) {
+      if (row.kind !== 'edge' || row.edge === undefined) continue;
+      const annotation = opts.edgeAnnotationsByHash.get(row.edge.migrationHash);
+      if (annotation?.pathHighlight === undefined) continue;
+      const highlight = annotation.pathHighlight;
+      for (const hash of [row.edge.from, row.edge.to]) {
+        if (hash === EMPTY_CONTRACT_HASH) continue;
+        const existing = contractHighlights.get(hash);
+        // On-path wins over off-path when a contract hash appears in both.
+        if (existing !== 'on-path') {
+          contractHighlights.set(hash, highlight);
+        }
+      }
+    }
+  }
+
+  /**
+   * Determine the lane-colour override for a row based on path-highlight annotations.
+   * Returns `dim` for off-path, `greenBright` for on-path, `undefined` for no override
+   * (which preserves the normal rotating-colour behaviour).
+   * Only returns a non-undefined value when `opts.colorize` is true.
+   */
+  function pathLaneOverride(
+    highlight: 'on-path' | 'off-path' | undefined,
+  ): ((text: string) => string) | undefined {
+    if (!opts.colorize || highlight === undefined) return undefined;
+    return highlight === 'on-path' ? greenBright : dim;
+  }
+
   const lines: string[] = [];
 
   for (let rowIndex = 0; rowIndex < model.rows.length; rowIndex++) {
@@ -656,10 +717,22 @@ export function renderMigrationGraphTree(
       continue;
     }
 
+    // Determine the per-row lane override for path-highlight rendering.
+    // For edge rows: derived from the edge's annotation.
+    // For node rows: derived from the contract hash's membership in on/off-path edges.
+    // When undefined, the normal rotating-colour lane styler applies (no-op for all non-show commands).
+    let rowPathHighlight: 'on-path' | 'off-path' | undefined;
+    if (row.kind === 'edge' && row.edge !== undefined) {
+      rowPathHighlight = opts.edgeAnnotationsByHash?.get(row.edge.migrationHash)?.pathHighlight;
+    } else if (row.kind === 'node' && row.contractHash !== undefined) {
+      rowPathHighlight = contractHighlights.get(row.contractHash);
+    }
+    const rowLaneOverride = pathLaneOverride(rowPathHighlight);
+
     const cellColors = resolveRowArcLaneColors(row.cells);
     let gutter = row.cells
       .map((cell, column) =>
-        renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+        renderCellPair(cell, column, cellColors, opts.colorize, style, palette, rowLaneOverride),
       )
       .join('');
     let laneSpan = row.cells.length;
@@ -693,14 +766,14 @@ export function renderMigrationGraphTree(
       gutter = row.cells
         .slice(0, 1)
         .map((cell, column) =>
-          renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+          renderCellPair(cell, column, cellColors, opts.colorize, style, palette, rowLaneOverride),
         )
         .join('');
     } else if (row.kind === 'node' && laneSpan < row.cells.length && !nodeHasArcDecoration(row)) {
       gutter = row.cells
         .slice(0, laneSpan)
         .map((cell, column) =>
-          renderCellPair(cell, column, cellColors, opts.colorize, style, palette),
+          renderCellPair(cell, column, cellColors, opts.colorize, style, palette, rowLaneOverride),
         )
         .join('');
     } else if (gutter.length < laneSpan * 2) {
@@ -718,7 +791,15 @@ export function renderMigrationGraphTree(
         const trailingLanes = row.cells
           .slice(1)
           .map((cell, offset) =>
-            renderCellPair(cell, offset + 1, cellColors, opts.colorize, style, palette),
+            renderCellPair(
+              cell,
+              offset + 1,
+              cellColors,
+              opts.colorize,
+              style,
+              palette,
+              rowLaneOverride,
+            ),
           )
           .join('');
         const emptyGutter = palette.emptySource.padEnd(2, ' ') + trailingLanes;
@@ -754,15 +835,9 @@ export function renderMigrationGraphTree(
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
     const laneIndex = row.laneIndex ?? 0;
 
-    // For path-highlight rows, tint the lane/gutter before padding so the
-    // direction arrow and branch lines read in the same hue as the migration name.
-    const styledGutter =
-      opts.colorize && isOffPath
-        ? dim(gutter)
-        : opts.colorize && isOnPath
-          ? greenBright(gutter)
-          : gutter;
-    const edgeGutterPad = padVisible(styledGutter, labelColumn);
+    // The gutter is already coloured via the per-cell laneOverride threaded into
+    // renderCellPair above — no post-hoc dim/greenBright wrapper needed here.
+    const edgeGutterPad = padVisible(gutter, labelColumn);
 
     let dirName: string;
     if (isOffPath) {

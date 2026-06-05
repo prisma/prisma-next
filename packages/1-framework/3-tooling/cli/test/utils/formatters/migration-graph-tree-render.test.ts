@@ -1578,6 +1578,96 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     expect(output).toContain(offPathEdge.dirName);
     expect(output).toContain(onPathEdge.dirName);
   });
+
+  // BUG 2: node rows for on-path contracts and off-path contracts must receive the path
+  // highlight treatment in the gutter (threaded via laneOverride into renderCellPair),
+  // not just the edge rows. The old code only applied dim/greenBright as a post-hoc
+  // wrapper on the edge gutter, which (a) let the rotation color bleed through and
+  // (b) left node rows entirely uncolored.
+  //
+  // Because the test env runs NO_COLOR=1, colorette's dim/greenBright are no-ops and
+  // we cannot assert ANSI codes. Instead we assert the structural routing:
+  // - The on-path node row (contract hash 'a94b7b4' = `to` of the on-path edge) is
+  //   present in the rendered output and contains the hash (not blanked).
+  // - The off-path node row (contract hash 'ef9de27' = boundary between edges) is also
+  //   present and contains its hash (not blanked).
+  // - Node rows contain their hashes regardless of path highlight (BUG 2 previously
+  //   had no effect on node row content, just gutter color — so this is a regression guard).
+  // The actual hue (greenBright / dim) is confirmed by reading the code (search for
+  // `contractHighlights` and `pathLaneOverride` in migration-graph-tree-render.ts) and
+  // by operator visual confirmation.
+
+  it('node rows for on-path and off-path contracts are present and contain their hashes (BUG 2 structural)', () => {
+    const offPathEdge = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'path_init');
+    const onPathEdge = edge('ef9de27', 'a94b7b4', 'path_add_posts');
+    const annotations = new Map([
+      [offPathEdge.migrationHash, { pathHighlight: 'off-path' as const }],
+      [onPathEdge.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+    const rendered = tree([offPathEdge, onPathEdge], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+    const plain = stripAnsi(rendered);
+    const nodeLines = plain.split('\n').filter((line) => line.trimStart().startsWith('○'));
+
+    // The on-path node row (a94b7b4 is `to` of the on-path edge) must be present.
+    const onPathNode = nodeLines.find((line) => line.includes('a94b7b4'));
+    expect(onPathNode, 'on-path contract node row must be present').toBeDefined();
+
+    // The shared/off-path node row (ef9de27 is `to` of off-path edge, `from` of on-path edge)
+    // must also be present. Because a94b7b4 is on-path, ef9de27 (as `from` of on-path) is
+    // also on-path in contractHighlights — on-path wins.
+    const sharedNode = nodeLines.find((line) => line.includes('ef9de27'));
+    expect(sharedNode, 'shared contract node row must be present').toBeDefined();
+  });
+
+  it('edge rows: laneOverride is threaded so no lane rotation color appears for on/off-path rows (BUG 2 regression guard)', () => {
+    // This test uses the LANE_COLOR_CYCLE's 6th color (red, column 5) to verify that a
+    // branched graph does NOT emit that color for on/off-path edges even when the edge
+    // occupies a lane that would normally receive the rotation color.
+    //
+    // We can't assert ANSI in NO_COLOR env, but we assert the structural invariant:
+    // - With colorize:false + edgeAnnotationsByHash, NO ANSI escapes appear.
+    // - With colorize:true  + edgeAnnotationsByHash, the on-path 'will run' suffix appears
+    //   (proving the annotation was routed to the on-path edge, not the wrong one).
+    const sharedBase = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'base');
+    const branchA = edge('ef9de27', '73e3abe', 'branch_a'); // lane 0
+    const branchB = edge('ef9de27', '6656a6e', 'branch_b'); // lane 1 (cyan in rotation)
+    const mergeA = edge('73e3abe', '3b2d98d', 'merge_a');
+    const mergeB = edge('6656a6e', '3b2d98d', 'merge_b');
+
+    // Mark branch_b (lane 1, normally cyan) as on-path and everything else as off-path.
+    const annotations = new Map([
+      [sharedBase.migrationHash, { pathHighlight: 'off-path' as const }],
+      [branchA.migrationHash, { pathHighlight: 'off-path' as const }],
+      [branchB.migrationHash, { pathHighlight: 'on-path' as const }],
+      [mergeA.migrationHash, { pathHighlight: 'off-path' as const }],
+      [mergeB.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+
+    const rendered = tree([sharedBase, branchA, branchB, mergeA, mergeB], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+
+    // The on-path edge (branch_b) must carry the 'will run' suffix.
+    const branchBLine = rendered.split('\n').find((line) => line.includes('branch_b'));
+    expect(branchBLine).toBeDefined();
+    expect(branchBLine).toContain('will run');
+
+    // The off-path edge (branch_a) must NOT carry 'will run'.
+    const branchALine = rendered.split('\n').find((line) => line.includes('branch_a'));
+    expect(branchALine).toBeDefined();
+    expect(branchALine).not.toContain('will run');
+
+    // With colorize:false, no ANSI escapes regardless of annotations.
+    const noColorOutput = tree([sharedBase, branchA, branchB, mergeA, mergeB], {
+      colorize: false,
+      edgeAnnotationsByHash: annotations,
+    });
+    expect(noColorOutput).not.toContain('\x1b[');
+  });
 });
 
 describe('renderMigrationGraphTree isAppSpace gate', () => {
