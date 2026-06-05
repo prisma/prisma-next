@@ -251,7 +251,7 @@ The `spaceId` is the same identifier the contract aggregate already uses to load
 The verifier walks the loaded aggregate and compares against the introspected schema. For cross-space FKs:
 
 - The FK constraint itself is verified against `pg_constraint` exactly the same way local FKs are.
-- The *target* table is verified by its own control policy (see the parallel [control-policy](../control-policy/spec.md) project) — typically `external` for extension-shipped tables, meaning the table is verified to exist with compatible shape but the planner emits no DDL for it.
+- The *target* table is verified by its own control policy (see the parallel [control-policy](../control-policy/spec.md) project) — typically `external` for extension-shipped tables, meaning the table is verified to exist with exactly-matching declared columns but the planner emits no DDL for it.
 - These are two independent checks that happen to chain through the same FK.
 
 ### Planner / DDL emission
