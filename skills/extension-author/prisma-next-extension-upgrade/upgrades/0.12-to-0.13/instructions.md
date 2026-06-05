@@ -18,3 +18,7 @@ defineContract wrapper to eliminate bare casts via a shared bound
 contract builder. No extension API or behaviour change; incidental
 substrate diff only.
 -->
+
+# 0.12 → 0.13 — Extension-author upgrade instructions
+
+No extension-author action required for this transition. The `defineContract` wrappers in the `@prisma-next/postgres` and `@prisma-next/sqlite` packages were refactored to be cast-free via a shared `buildBoundContract` helper in `@prisma-next/sql-contract-ts`; the consumer-facing API and emitted contract shapes are unchanged.
