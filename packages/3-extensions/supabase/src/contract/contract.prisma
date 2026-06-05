@@ -1,0 +1,48 @@
+// use prisma-next
+
+types {
+  Uuid        = String   @db.Uuid
+  Timestamptz = DateTime @db.Timestamptz
+}
+
+namespace auth {
+  model AuthUser {
+    id         Uuid        @id
+    email      String
+    created_at Timestamptz
+    updated_at Timestamptz
+
+    @@map("users")
+  }
+
+  model AuthIdentity {
+    id         Uuid        @id
+    user_id    Uuid
+    provider   String
+    created_at Timestamptz
+    updated_at Timestamptz
+
+    @@map("identities")
+  }
+}
+
+namespace storage {
+  model StorageBucket {
+    id         String      @id
+    name       String
+    created_at Timestamptz
+    updated_at Timestamptz
+
+    @@map("buckets")
+  }
+
+  model StorageObject {
+    id         Uuid        @id
+    bucket_id  String
+    name       String
+    created_at Timestamptz
+    updated_at Timestamptz
+
+    @@map("objects")
+  }
+}
