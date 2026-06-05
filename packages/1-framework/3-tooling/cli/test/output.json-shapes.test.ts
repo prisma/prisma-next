@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { MigrationStatusResult } from '../src/commands/json/schemas';
 import type { MigrateResult } from '../src/commands/migrate';
-import type { MigrationStatusResult } from '../src/commands/migration-status';
 
 describe('MigrateResult JSON shape (aggregate-walking)', () => {
   it('pins keys for an apply that touched both an extension and the app space', () => {
@@ -101,7 +101,6 @@ describe('MigrationStatusResult JSON shape', () => {
       ],
       summary: 'up to date',
       diagnostics: [],
-      treeSections: [],
     };
     expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
       [
@@ -109,7 +108,6 @@ describe('MigrationStatusResult JSON shape', () => {
         "ok",
         "spaces",
         "summary",
-        "treeSections",
       ]
     `);
     expect(Object.keys(result.spaces[0]!).sort()).toEqual([

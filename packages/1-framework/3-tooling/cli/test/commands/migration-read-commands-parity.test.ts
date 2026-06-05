@@ -46,7 +46,6 @@ import {
 import {
   createMigrationStatusCommand,
   formatStatusHumanOutput,
-  type MigrationStatusResult,
 } from '../../src/commands/migration-status';
 import { deriveStatusEdgeAnnotations } from '../../src/commands/migration-status-overlay';
 import * as configLoader from '../../src/config-loader';
@@ -406,8 +405,8 @@ describe('migration read commands pretty parity', () => {
       };
     });
 
-    const statusResult: MigrationStatusResult = {
-      ok: true,
+    const statusResult = {
+      ok: true as const,
       spaces: [],
       summary: '3 pending — run `prisma-next migrate --to 804e018`',
       diagnostics: [],

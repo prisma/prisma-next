@@ -3,11 +3,11 @@ import {
   buildNoPathSummary,
   buildStatusHeadline,
   formatStatusSummary,
-  type MigrationStatusResult,
+  type StatusDiagnosticJson,
 } from '../../src/commands/migration-status';
 
-const baseResult: MigrationStatusResult = {
-  ok: true,
+const baseResult = {
+  ok: true as const,
   spaces: [],
   summary: 'Up to date',
   diagnostics: [],
@@ -93,31 +93,33 @@ describe('buildStatusHeadline', () => {
 });
 
 describe('formatStatusSummary', () => {
-  it('includes the missing-invariants line when present', () => {
-    const out = formatStatusSummary(
+  it('includes the missing-invariants line when a MIGRATION.MISSING_INVARIANTS diagnostic is present', () => {
+    const diagnostics: StatusDiagnosticJson[] = [
       {
-        ...baseResult,
-        missingInvariantsLine: 'missing invariant(s): users-have-email',
+        code: 'MIGRATION.MISSING_INVARIANTS',
+        invariants: ['users-have-email'],
+        message: 'missing invariant(s): users-have-email',
       },
-      false,
-    );
+    ];
+    const out = formatStatusSummary({ ...baseResult, diagnostics }, false);
     expect(out).toContain('Up to date');
     expect(out).toContain('missing invariant(s): users-have-email');
   });
 
   it('highlights divergence warnings', () => {
+    const diagnostics: StatusDiagnosticJson[] = [
+      {
+        code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
+        severity: 'warn',
+        message: 'marker diverged',
+        hints: [],
+      },
+    ];
     const out = formatStatusSummary(
       {
         ...baseResult,
         summary: 'Database marker abcdef is not in the on-disk migration graph',
-        diagnostics: [
-          {
-            code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
-            severity: 'warn',
-            message: 'marker diverged',
-            hints: [],
-          },
-        ],
+        diagnostics,
       },
       false,
     );
