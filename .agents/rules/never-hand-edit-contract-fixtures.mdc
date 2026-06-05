@@ -4,61 +4,36 @@ alwaysApply: true
 ---
 # Never hand-edit emitted contract fixtures
 
-**CRITICAL**: Never hand-edit `contract.json`, `contract.d.ts`, `expected.contract.json`, or any other file emitted by the contract pipeline. These files are generated; their canonical form is whatever the emitter produces, byte-for-byte.
+**CRITICAL**: Never hand-edit `contract.json`, `contract.d.ts`, `expected.contract.json`, or any other file emitted by the contract pipeline (including migration `start-contract.json` / `end-contract.json` snapshots). These files are generated; their canonical form is whatever the emitter produces, byte-for-byte.
 
-## When the emitted fixtures look out of sync
+To bring fixtures back in sync:
 
-The right tool is **always** the top-level script:
+```bash
+pnpm fixtures:emit   # regenerate everything
+pnpm fixtures:check  # re-emit + git diff --exit-code; fails if stale
+```
+
+`fixtures:emit` knows which packages contribute fixtures (examples, apps, `sql-builder`, `sql-orm-client`, extension `build:contract-space`, migration regen). Don't second-guess it by emitting only one package.
+
+## What's forbidden
+
+For any `contract.json`, `contract.d.ts`, `expected.contract.json`, or migration `{start,end}-contract.json`:
+
+- Writing via `Write`, `StrReplace`, `sed`, `awk`, or manual JSON-stringify-then-write.
+- "Reformatting" the JSON — the canonicalizer owns whitespace and key order.
+- Adding/removing fields by hand, even ones a substrate change clearly necessitates.
+
+If `pnpm fixtures:emit` fails or doesn't cover the file, **fix the emit chain** (substrate / serializer / canonicalizer / regen script), not the fixture. Hand-edited fixtures drift silently from the canonical shape, fail `fixtures:check`, and re-introduce delta on the next emit run.
+
+## Pattern
 
 ```bash
 pnpm fixtures:emit
+git status -- ':(glob)**/contract.*' ':(glob)**/expected.contract.json'
+git add <the specific fixture files>
+git commit -s -m 'chore(fixtures): re-emit after <reason>'
 ```
 
-This runs the emit across every workspace package that contributes fixtures (`./examples/*`, `./apps/*`, `@prisma-next/sql-builder`, `@prisma-next/sql-orm-client`, the extension `build:contract-space` targets, and the migration regen chain) in a single command. It exists precisely so individual agents do **not** have to know which packages emit what.
+## Escape hatch (rare)
 
-To verify nothing is stale:
-
-```bash
-pnpm fixtures:check
-```
-
-Same emit plus a `git diff --exit-code` against the tracked fixtures. Fails if anything is out of date.
-
-## What the prohibition covers
-
-You may not, under any circumstance, perform any of the following on `contract.json` / `contract.d.ts` / `expected.contract.json`:
-
-- Write the file via the `Write` tool.
-- Patch the file via `StrReplace`, `sed`, `awk`, manual JSON-stringify-then-write.
-- "Reformat" the JSON (whitespace, key ordering) — the canonicalizer owns that.
-- Add/remove a field, even one the substrate change clearly necessitates.
-- Re-emit just *one* package's fixtures by hand because "the rest are unaffected." `pnpm fixtures:emit` is what knows which package is affected and which isn't; don't second-guess it.
-
-The only way these files get into your worktree is via `pnpm fixtures:emit`. Then you `git add` the resulting diff explicitly and commit it as a `chore(fixtures): …` commit.
-
-## Why
-
-- The emitter is the source of truth for the canonical byte-level shape. Hand-edits drift from it silently and re-introduce delta the next emit run.
-- A hand-edited fixture that "looks right" can still fail `fixtures:check` (which re-emits and diffs) because canonicalization rules (key sort order, whitespace, line endings, generated header text) are non-obvious.
-- Multiple emit chains exist (examples, apps, sql-builder, sql-orm-client, extensions, migrations) — picking the wrong subset means partial regeneration and broken CI.
-- Hand-editing wastes the agent's time recreating the emitter's output line-by-line, badly, when a single shell command would produce it correctly.
-
-## Pattern to follow
-
-After a substrate / contract-shape change:
-
-```bash
-pnpm fixtures:emit                              # regenerate everything
-git status -- ':(glob)**/contract.*' \
-              ':(glob)**/expected.contract.json'  # review what changed
-git add <the specific fixture files>            # explicit staging
-git commit -s -m 'chore(fixtures): re-emit contracts after <reason>'
-```
-
-If `pnpm fixtures:emit` fails, **fix the emit chain** (the underlying substrate / serializer / canonicalizer), not the fixture files. The fixtures are downstream of the emit; you cannot fix an upstream bug by editing downstream output.
-
-## Escape hatches (rare)
-
-There is one situation where touching a fixture by hand is acceptable: when the fixture lives **inside a unit test** that does not run through the workspace emit chain (e.g. a hand-crafted JSON literal inlined in a `*.test.ts` to pin a specific edge case). Even then, prefer a small builder helper over hand-typed JSON; the JSON literal is acceptable only when the test's *point* is to verify behaviour against a specific byte sequence the emitter would never produce.
-
-This escape hatch does **not** apply to any file at `**/contract.json`, `**/contract.d.ts`, or `**/expected.contract.json` — those are always emitter-owned.
+Hand-crafted JSON in a `*.test.ts` file is acceptable only when the test's point is to pin a specific byte sequence the emitter would never produce. Never applies to `contract.json` / `contract.d.ts` / `expected.contract.json` / migration `{start,end}-contract.json` — those are always emitter-owned.
