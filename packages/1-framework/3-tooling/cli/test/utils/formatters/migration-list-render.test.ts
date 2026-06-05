@@ -372,4 +372,38 @@ describe('renderMigrationList', () => {
         There are no migrations in migrations/postgis/ yet"
     `);
   });
+
+  it('with appSpaceId: @contract appears only under app:, not under extension spaces', () => {
+    // Topology: app chain ∅→HASH_A→HASH_B (liveContractHash = HASH_B = @contract node)
+    //           pgvector chain ∅→HASH_C
+    // With appSpaceId='app', @contract must appear in app section only.
+    const appInit = migration({ dirName: 'app_init', from: null, to: HASH_A });
+    const appNext = migration({ dirName: 'app_next', from: HASH_A, to: HASH_B });
+    const pgvectorInit = migration({ dirName: 'pgvector_init', from: null, to: HASH_C });
+    const listResult = result(
+      [
+        { spaceId: 'app', migrations: [appInit, appNext] },
+        { spaceId: 'pgvector', migrations: [pgvectorInit] },
+      ],
+      '3 migration(s) across 2 contract space(s)',
+    );
+
+    const output = renderMigrationListWithStyle(
+      listResult,
+      IDENTITY_MIGRATION_LIST_STYLER,
+      'unicode',
+      {
+        liveContractHash: HASH_B,
+        appSpaceId: 'app',
+      },
+    );
+
+    const appSection = output.split('pgvector:')[0] ?? '';
+    const pgvectorSection = output.split('pgvector:')[1] ?? '';
+
+    // @contract must appear in the app section (HASH_B is the liveContractHash and matches app)
+    expect(appSection).toContain('@contract');
+    // @contract must NOT appear in the pgvector extension section
+    expect(pgvectorSection).not.toContain('@contract');
+  });
 });

@@ -133,6 +133,7 @@ function renderSpaceTreeBlock(
   colorize: boolean,
   liveContractHash: string,
   graphForSpace: (spaceId: string) => MigrationGraph | undefined,
+  appSpaceId: string | undefined,
   globalMaxEdgeTreePrefixWidth?: number,
   globalMaxDirNameWidth?: number,
 ): readonly string[] {
@@ -145,6 +146,7 @@ function renderSpaceTreeBlock(
   }
 
   const graph = graphForSpace(spaceId) ?? migrationGraphFromListEntries(migrations);
+  const isAppSpace = appSpaceId === undefined ? undefined : spaceId === appSpaceId;
   const treeOutput = renderMigrationGraphSpaceTree({
     graph,
     migrations,
@@ -153,6 +155,7 @@ function renderSpaceTreeBlock(
     colorize,
     refsByHash: buildRefsByHashFromListEntries(migrations),
     styler: style,
+    ...(isAppSpace !== undefined ? { isAppSpace } : {}),
     ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
     ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
   });
@@ -169,6 +172,13 @@ export interface RenderMigrationListWithStyleOptions {
   readonly colorize?: boolean;
   readonly liveContractHash?: string;
   readonly graphForSpace?: (spaceId: string) => MigrationGraph | undefined;
+  /**
+   * The space ID that is the app contract space. When provided, `@contract`
+   * and the floating working-contract node are shown only for this space.
+   * When absent, the renderer falls back to the default (`isAppSpace: true`
+   * for every space), which is safe for single-space callers.
+   */
+  readonly appSpaceId?: string;
 }
 
 /**
@@ -189,6 +199,7 @@ export function renderMigrationListWithStyle(
   const colorize = options.colorize ?? false;
   const liveContractHash = options.liveContractHash ?? EMPTY_CONTRACT_HASH;
   const graphForSpace = options.graphForSpace ?? (() => undefined);
+  const appSpaceId = options.appSpaceId;
   const globalLayoutInputs = multiSpace
     ? result.spaces
         .filter((space) => space.migrations.length > 0)
@@ -220,6 +231,7 @@ export function renderMigrationListWithStyle(
         colorize,
         liveContractHash,
         graphForSpace,
+        appSpaceId,
         globalMaxEdgeTreePrefixWidth,
         globalMaxDirNameWidth,
       ),
