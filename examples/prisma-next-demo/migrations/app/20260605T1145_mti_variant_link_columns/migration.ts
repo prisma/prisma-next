@@ -11,8 +11,8 @@ import {
 export default class M extends Migration {
   override describe() {
     return {
-      from: 'sha256:1375f137fa3186c77cda92aba4048c49714ed5fe65993ca7d5eed3bcd9e85cb7',
-      to: 'sha256:193e40339cb36ff6e2a5e6782103274d90f1515919e79c4694a591fcb50bcd3a',
+      from: 'sha256:7c31c2e1119a16c7cc438e6fd132c34f0872d70bfbc3d2a888a4d5d44730d07b',
+      to: 'sha256:ab50cca9eadd5727aa91cf94a1fd3910efbd8d1c5b8da6526c32ced6bc377a97',
     };
   }
 
@@ -32,7 +32,9 @@ export default class M extends Migration {
       // destructive step. Those rows are unlinkable orphans: the operator must
       // resolve them by hand — map each to the correct `task.id`, or delete it —
       // and re-run. We deliberately ship no backfill rather than fabricate ids
-      // that the cascading FK to `task(id)` would immediately reject.
+      // that the cascading FK to `task(id)` would immediately reject. (`migration
+      // plan` scaffolds dataTransform backfill placeholders for the new NOT NULL
+      // columns; they are stripped here for exactly this reason.)
       addColumn('public', 'bug', {
         name: 'id',
         typeSql: 'character(36)',
