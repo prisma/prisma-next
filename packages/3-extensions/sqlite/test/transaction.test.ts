@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
+  withTransaction: vi.fn(),
   sqlBuilder: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock('@prisma-next/sql-runtime', () => ({
   createExecutionContext: mocks.createExecutionContext,
   createSqlExecutionStack: mocks.createSqlExecutionStack,
   createRuntime: mocks.createRuntime,
-  withTransaction: vi.fn(),
+  withTransaction: mocks.withTransaction,
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -57,12 +58,13 @@ import sqlite from '../src/runtime/sqlite';
 
 const contract = createContract<SqlStorage>();
 
-describe('sqlite close()', () => {
+describe('sqlite transaction()', () => {
   beforeEach(() => {
     mocks.instantiateExecutionStack.mockReset();
     mocks.createRuntime.mockReset();
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
+    mocks.withTransaction.mockReset();
     mocks.driverCreate.mockReset();
     mocks.driverConnect.mockReset();
     mocks.driverClose.mockReset();
@@ -96,73 +98,105 @@ describe('sqlite close()', () => {
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
-  });
-
-  it('releases the facade-owned SQLite driver when constructed from { path }', async () => {
-    const db = sqlite({ contract, path: '/tmp/test.db' });
-    db.runtime();
-    await Promise.resolve();
-
-    await db.close();
-
-    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('is idempotent: calling twice does not throw and does not double-dispose', async () => {
-    const db = sqlite({ contract, path: '/tmp/test.db' });
-    db.runtime();
-    await Promise.resolve();
-
-    await db.close();
-    await db.close();
-
-    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('while a lazy connect is in flight resolves cleanly', async () => {
-    let rejectConnect!: (err: Error) => void;
-    mocks.driverConnect.mockImplementationOnce(
-      () =>
-        new Promise<void>((_, reject) => {
-          rejectConnect = reject;
-        }),
+    mocks.withTransaction.mockImplementation(
+      async (_runtime: unknown, fn: (ctx: unknown) => unknown) => {
+        const mockTxCtx = {
+          invalidated: false,
+          execute: vi.fn(),
+        };
+        return fn(mockTxCtx);
+      },
     );
-
-    const db = sqlite({ contract, path: '/tmp/test.db' });
-    db.runtime();
-
-    const closePromise = db.close();
-    rejectConnect(new Error('connect failed'));
-
-    await expect(closePromise).resolves.toBeUndefined();
   });
 
-  it('before any connect is a no-op', async () => {
-    const db = sqlite({ contract, path: '/tmp/test.db' });
+  it('transaction() delegates to withTransaction with the lazy runtime', async () => {
+    const db = sqlite({
+      contract,
+      path: '/tmp/test.db',
+    });
+
+    const result = await db.transaction(async () => 'tx-value');
+
+    expect(mocks.withTransaction).toHaveBeenCalledOnce();
+    expect(mocks.withTransaction).toHaveBeenCalledWith(
+      mocks.createRuntime.mock.results[0]?.value,
+      expect.any(Function),
+    );
+    expect(result).toBe('tx-value');
+  });
+
+  it('transaction() provides sql on the transaction context', async () => {
+    const txSqlProxy = { lane: 'tx-sql' };
+    let callCount = 0;
+    mocks.sqlBuilder.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return { lane: 'sql' };
+      return txSqlProxy;
+    });
+
+    const db = sqlite({
+      contract,
+      path: '/tmp/test.db',
+    });
+
+    let receivedTx: { sql?: unknown } | undefined;
+    await db.transaction(async (tx) => {
+      receivedTx = tx;
+    });
+
+    expect(receivedTx).toBeDefined();
+    expect(receivedTx!.sql).toBe(txSqlProxy);
+    expect(mocks.sqlBuilder).toHaveBeenCalledTimes(2);
+  });
+
+  it('transaction() provides orm on the transaction context', async () => {
+    const { orm: ormMock } = await import('@prisma-next/sql-orm-client');
+    const txOrmProxy = { lane: 'tx-orm' };
+    let ormCallCount = 0;
+    vi.mocked(ormMock).mockImplementation((() => {
+      ormCallCount++;
+      if (ormCallCount === 1) return { lane: 'orm' };
+      return txOrmProxy;
+    }) as typeof ormMock);
+
+    const db = sqlite({
+      contract,
+      path: '/tmp/test.db',
+    });
+
+    let receivedTx: { orm?: unknown } | undefined;
+    await db.transaction(async (tx) => {
+      receivedTx = tx;
+    });
+
+    expect(receivedTx).toBeDefined();
+    expect(receivedTx!.orm).toBe(txOrmProxy);
+    expect(ormCallCount).toBe(2);
+  });
+
+  it('transaction() lazily creates runtime before connect()', async () => {
+    const db = sqlite({
+      contract,
+      path: '/tmp/test.db',
+    });
+
+    expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
+    expect(mocks.createRuntime).not.toHaveBeenCalled();
+
+    await db.transaction(async () => 'value');
+
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it('transaction() rejects with "SQLite client is closed" after close()', async () => {
+    const db = sqlite({
+      contract,
+      path: '/tmp/test.db',
+    });
+
     await db.close();
-    expect(mocks.driverClose).not.toHaveBeenCalled();
-  });
 
-  it('db.runtime() rejects with "SQLite client is closed" after close()', async () => {
-    const db = sqlite({ contract, path: '/tmp/test.db' });
-    await db.close();
-    expect(() => db.runtime()).toThrow('SQLite client is closed');
-  });
-
-  it('db.connect() rejects with "SQLite client is closed" after close()', async () => {
-    const db = sqlite({ contract, path: '/tmp/test.db' });
-    await db.close();
-    await expect(db.connect({ path: '/tmp/test.db' })).rejects.toThrow('SQLite client is closed');
-  });
-
-  it('await using db executes [Symbol.asyncDispose] on scope exit (driver.close called)', async () => {
-    async function run() {
-      await using db = sqlite({ contract, path: '/tmp/test.db' });
-      db.runtime();
-      await Promise.resolve();
-    }
-
-    await run();
-    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
+    await expect(db.transaction(async () => 'value')).rejects.toThrow('SQLite client is closed');
   });
 });

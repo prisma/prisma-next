@@ -21,12 +21,14 @@ import type {
   SqlExecutionStackWithDriver,
   SqlMiddleware,
   SqlRuntimeExtensionDescriptor,
+  TransactionContext,
   VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
   createRuntime,
   createSqlExecutionStack,
+  withTransaction,
 } from '@prisma-next/sql-runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -34,6 +36,12 @@ import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 
 export type SqliteTargetId = 'sqlite';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
+
+export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>>
+  extends TransactionContext {
+  readonly sql: Db<TContract>;
+  readonly orm: OrmClient<TContract>;
+}
 
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
@@ -51,6 +59,7 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
     declaration: D,
     callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
   ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
+  transaction<R>(fn: (tx: SqliteTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
   close(): Promise<void>;
   [Symbol.asyncDispose](): Promise<void>;
 }
@@ -239,6 +248,41 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
     ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
       return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
+    },
+
+    transaction<R>(fn: (tx: SqliteTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
+      let runtime: ReturnType<typeof getRuntime>;
+      try {
+        runtime = getRuntime();
+      } catch (err) {
+        return Promise.reject(err);
+      }
+      return withTransaction(runtime, (txCtx) => {
+        const txSql: Db<TContract> = sqlBuilder<TContract>({
+          context,
+          rawCodecInferer,
+        });
+
+        const txOrm: OrmClient<TContract> = ormBuilder({
+          runtime: {
+            execute(plan) {
+              return txCtx.execute(plan);
+            },
+          },
+          context,
+        });
+
+        // Use `txCtx` as the prototype instead of spreading it so that live
+        // accessors (notably the `invalidated` getter, which reads a closure
+        // variable in `withTransaction`) remain wired to the original object.
+        // Spreading would evaluate the getter once and freeze its value.
+        const tx: SqliteTransactionContext<TContract> = Object.assign(
+          Object.create(txCtx) as TransactionContext,
+          { sql: txSql, orm: txOrm },
+        );
+
+        return fn(tx);
+      });
     },
 
     close(): Promise<void> {
