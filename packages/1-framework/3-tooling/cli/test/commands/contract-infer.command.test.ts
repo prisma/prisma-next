@@ -74,13 +74,13 @@ const mocks = vi.hoisted(() => {
   const introspectMock = vi.fn();
   const toSchemaViewMock = vi.fn();
   const inferPslContractMock = vi.fn();
-  const getPslPrintersNamespaceMock = vi.fn();
+  const getPslBlocksNamespaceMock = vi.fn();
   const closeMock = vi.fn();
   const createControlClientMock = vi.fn(() => ({
     introspect: introspectMock,
     toSchemaView: toSchemaViewMock,
     inferPslContract: inferPslContractMock,
-    getPslPrintersNamespace: getPslPrintersNamespaceMock,
+    getPslBlocksNamespace: getPslBlocksNamespaceMock,
     close: closeMock,
   }));
 
@@ -89,7 +89,7 @@ const mocks = vi.hoisted(() => {
     introspectMock,
     toSchemaViewMock,
     inferPslContractMock,
-    getPslPrintersNamespaceMock,
+    getPslBlocksNamespaceMock,
     closeMock,
     createControlClientMock,
   };
@@ -165,7 +165,7 @@ describe('createContractInferCommand', () => {
     mocks.introspectMock.mockResolvedValue(schemaIR);
     mocks.toSchemaViewMock.mockReturnValue(undefined);
     mocks.inferPslContractMock.mockReturnValue(buildSyntheticUserAst());
-    mocks.getPslPrintersNamespaceMock.mockReturnValue({});
+    mocks.getPslBlocksNamespaceMock.mockReturnValue({});
     mocks.closeMock.mockResolvedValue(undefined);
     mocks.createControlClientMock.mockClear();
   }, timeouts.typeScriptCompilation);

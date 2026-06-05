@@ -164,59 +164,50 @@ export type AuthoringEntityTypeNamespace = {
 };
 
 /**
- * Pack-contributed parser for a top-level PSL block keyword. The
- * framework parser dispatches an unrecognised opener line of the
- * shape `<keyword> <name> { … }` to the `pslBlocks.<keyword>`
- * contribution, building a {@link PslPackBlockParserContext} handle
- * from the framework's parser state and passing it as the sole
- * argument. The contribution returns the AST node the lowering
- * factory and matching `pslPrinters` descriptor consume — the
- * `Output` generic narrows that shape end to end across the triple
- * bundle (parser → printer → factory) keyed by `discriminator`.
+ * Pack-contributed parser + printer for a top-level PSL block
+ * keyword. Parser and printer live on one descriptor because they
+ * are one inseparable unit: a parser with no printer breaks
+ * `contract infer`, and a printer with no parser parses nothing.
  *
- * The context handle is intentionally minimal — only the helpers
- * needed to write a parser for a `keyword Name { key = value }`
- * block. See `PslPackBlockParserContext`'s JSDoc for the calibration.
+ * - `parser`: the framework parser dispatches an unrecognised opener
+ *   line of the shape `<keyword> <name> { … }` to the
+ *   `pslBlocks.<keyword>` contribution, building a
+ *   {@link PslPackBlockParserContext} handle from its parser state and
+ *   passing it as the sole argument. The contribution returns the AST
+ *   node tagged with `discriminator` as its `kind`.
+ * - `printer`: the framework serializer dispatches a pack-contributed
+ *   AST node to the descriptor whose `discriminator` matches the
+ *   node's `kind`, passing the node + a {@link PslPackBlockPrinterContext}
+ *   handle. The contribution returns the rendered block text.
+ *
+ * The `Node` generic narrows end to end: the same AST shape the
+ * `parser` produces is what the `printer` consumes and what the
+ * matching `entityTypes` factory lowers — keyed by `discriminator`.
+ *
+ * `parser` and `printer` are declared as methods (not arrow-function
+ * properties) so their parameters are checked bivariantly. A pack
+ * literal declaring `printer(node: SomeAst, ctx)` must assign to the
+ * base descriptor shape (`Node = PslPackBlock`) across the otherwise
+ * contravariant parameter position; method bivariance permits the
+ * narrower `SomeAst`. The framework dispatches by discriminator and
+ * the contributor owns both the parser and printer for a given
+ * `Node`, so bivariance matches the runtime contract — the parser
+ * that produced the node is the one whose printer renders it.
+ *
+ * The context handles are intentionally minimal — only the helpers
+ * needed for a `keyword Name { key = value }` block. See the
+ * `PslPackBlock*Context` JSDoc for the calibration.
  */
-export interface AuthoringPslBlockDescriptor<Output extends PslPackBlock = PslPackBlock> {
+export interface AuthoringPslBlockDescriptor<Node extends PslPackBlock = PslPackBlock> {
   readonly kind: 'pslBlock';
   readonly discriminator: string;
-  readonly parser: (context: PslPackBlockParserContext) => Output;
+  parser(context: PslPackBlockParserContext): Node;
+  printer(node: Node, context: PslPackBlockPrinterContext): string;
   readonly validatorSchema?: Type<unknown>;
-}
-
-/**
- * Pack-contributed printer for a top-level PSL block keyword. The
- * framework serializer dispatches a pack-contributed AST node to
- * the `pslPrinters` contribution whose `discriminator` matches the
- * node's `kind`, building a {@link PslPackBlockPrinterContext}
- * handle and passing the node + handle as arguments. The
- * contribution returns the rendered block text — typically a
- * multi-line string starting with the keyword opener and ending
- * with the closing brace; the serializer indents the result if the
- * block lives inside a `namespace { … }`.
- *
- * `Input` is constrained to `extend PslPackBlock` so the framework
- * AST slot can hold the value the matching `pslBlocks` descriptor
- * produces. The default `never` is load-bearing for assignability:
- * function parameters are contravariant, so a pack literal declaring
- * `printer: (input: SomeAst, ctx) => string` only assigns to this
- * base shape if `Input = never` (the bottom type that anything can
- * be substituted for in contravariant position). The same idiom is
- * used by {@link AuthoringEntityTypeFactoryOutput}'s `Input` default.
- */
-export interface AuthoringPslPrinterDescriptor<Input extends PslPackBlock = never> {
-  readonly kind: 'pslPrinter';
-  readonly discriminator: string;
-  readonly printer: (input: Input, context: PslPackBlockPrinterContext) => string;
 }
 
 export type AuthoringPslBlockNamespace = {
   readonly [name: string]: AuthoringPslBlockDescriptor | AuthoringPslBlockNamespace;
-};
-
-export type AuthoringPslPrinterNamespace = {
-  readonly [name: string]: AuthoringPslPrinterDescriptor | AuthoringPslPrinterNamespace;
 };
 
 export interface AuthoringContributions {
@@ -224,7 +215,6 @@ export interface AuthoringContributions {
   readonly field?: AuthoringFieldNamespace;
   readonly entityTypes?: AuthoringEntityTypeNamespace;
   readonly pslBlocks?: AuthoringPslBlockNamespace;
-  readonly pslPrinters?: AuthoringPslPrinterNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -309,27 +299,7 @@ export function isAuthoringPslBlockDescriptor(
   if (typeof discriminator !== 'string' || discriminator.length === 0) {
     return false;
   }
-  return typeof record['parser'] === 'function';
-}
-
-export function isAuthoringPslPrinterDescriptor(
-  value: unknown,
-): value is AuthoringPslPrinterDescriptor {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const record = blindCast<
-    Record<string, unknown>,
-    'type-guard probing an unknown candidate-descriptor object for known property names'
-  >(value);
-  if (record['kind'] !== 'pslPrinter') {
-    return false;
-  }
-  const discriminator = record['discriminator'];
-  if (typeof discriminator !== 'string' || discriminator.length === 0) {
-    return false;
-  }
-  return typeof record['printer'] === 'function';
+  return typeof record['parser'] === 'function' && typeof record['printer'] === 'function';
 }
 
 /**
@@ -456,6 +426,7 @@ interface AuthoringLeafEntry {
 function collectAuthoringLeafDiscriminators(
   namespace: Readonly<Record<string, unknown>>,
   isLeaf: (value: unknown) => boolean,
+  label: string,
   path: readonly string[] = [],
 ): AuthoringLeafEntry[] {
   const entries: AuthoringLeafEntry[] = [];
@@ -473,16 +444,22 @@ function collectAuthoringLeafDiscriminators(
       continue;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      entries.push(
-        ...collectAuthoringLeafDiscriminators(
-          blindCast<
-            Readonly<Record<string, unknown>>,
-            'walker descends into a sub-namespace whose keys are unknown until inspected'
-          >(value),
-          isLeaf,
-          currentPath,
-        ),
-      );
+      const record = blindCast<
+        Readonly<Record<string, unknown>>,
+        'walker inspects a non-leaf value for descriptor-shaped keys before recursing'
+      >(value);
+      // A value carrying descriptor-shaped keys (`kind`/`discriminator`)
+      // that failed the leaf guard is a malformed descriptor — e.g.
+      // `{ kind: 'pslBlock' }` with no `parser`/`printer`. Descending into
+      // it as a sub-namespace would silently skip it, so a half-built
+      // contribution would pass validation. Reject it at load time
+      // instead, naming the path and what's wrong.
+      if (record['kind'] !== undefined || record['discriminator'] !== undefined) {
+        throw new Error(
+          `Malformed authoring ${label} contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/discriminator) but does not satisfy the ${label} descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      entries.push(...collectAuthoringLeafDiscriminators(record, isLeaf, label, currentPath));
     }
   }
   return entries;
@@ -493,7 +470,6 @@ export function assertNoCrossRegistryCollisions(
   fieldNamespace: AuthoringFieldNamespace,
   entityTypeNamespace: AuthoringEntityTypeNamespace = {},
   pslBlockNamespace: AuthoringPslBlockNamespace = {},
-  pslPrinterNamespace: AuthoringPslPrinterNamespace = {},
 ): void {
   const typePaths = new Set(
     collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
@@ -513,13 +489,12 @@ export function assertNoCrossRegistryCollisions(
   // Cross-registry collisions are checked among `type` / `field` /
   // `entityTypes` only — these three are user-facing helper paths
   // (`helpers.<path>(...)`) that PSL must resolve unambiguously.
-  // `pslBlocks` and `pslPrinters` are internal framework indices
-  // consumed by parser and printer dispatch, not user-facing helper
-  // paths; the natural authoring pattern is the same path key across
-  // all three of `entityTypes` / `pslBlocks` / `pslPrinters` for a
-  // single triple-bundle contribution. Same-path consistency across
-  // those bundle members is enforced by `assertTripleBundleConsistency`
-  // via the discriminator string, not by path.
+  // `pslBlocks` is an internal framework index consumed by parser and
+  // printer dispatch, not a user-facing helper path; the natural
+  // authoring pattern is the same path key in `entityTypes` and
+  // `pslBlocks` for a single contribution. The block→factory link is
+  // enforced by `assertPslBlocksHaveFactories` via the discriminator
+  // string, not by path.
   const ambiguityHint =
     'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.';
   for (const fieldPath of fieldPaths) {
@@ -537,62 +512,38 @@ export function assertNoCrossRegistryCollisions(
     }
   }
 
-  assertTripleBundleConsistency(entityTypeNamespace, pslBlockNamespace, pslPrinterNamespace);
+  assertPslBlocksHaveFactories(entityTypeNamespace, pslBlockNamespace);
 }
 
 /**
- * `pslBlocks`, `pslPrinters`, and `entityTypes` form a triple bundle:
- * a pack-contributed PSL keyword needs all three (parser + printer +
- * factory) to round-trip through `parse → lower → IR → print → re-parse`.
- * `entityTypes` on its own is fine — that's the TS-builder-only path
- * (`helpers.enum({...})` reaches the factory directly without ever
- * touching PSL). Only `pslBlocks` and `pslPrinters` require all three;
- * the check is asymmetric for that reason.
+ * Every `pslBlocks` descriptor needs a matching `entityTypes` factory
+ * (same discriminator): the parser would otherwise produce an AST node
+ * nothing can lower to an IR class instance. The link is one-directional
+ * — an `entityTypes` factory may stand alone (e.g. `enum`, reachable from
+ * the TypeScript builder without any PSL block). Parser↔printer needs no
+ * cross-check: they live on the same descriptor, so they cannot diverge.
  */
-function assertTripleBundleConsistency(
+function assertPslBlocksHaveFactories(
   entityTypeNamespace: AuthoringEntityTypeNamespace,
   pslBlockNamespace: AuthoringPslBlockNamespace,
-  pslPrinterNamespace: AuthoringPslPrinterNamespace,
 ): void {
   const blockEntries = collectAuthoringLeafDiscriminators(
     pslBlockNamespace,
     isAuthoringPslBlockDescriptor,
-  );
-  const printerEntries = collectAuthoringLeafDiscriminators(
-    pslPrinterNamespace,
-    isAuthoringPslPrinterDescriptor,
+    'pslBlock',
   );
   const entityEntries = collectAuthoringLeafDiscriminators(
     entityTypeNamespace,
     isAuthoringEntityTypeDescriptor,
+    'entityType',
   );
 
-  const printerDiscriminators = new Set(printerEntries.map((entry) => entry.discriminator));
   const entityDiscriminators = new Set(entityEntries.map((entry) => entry.discriminator));
-  const blockDiscriminators = new Set(blockEntries.map((entry) => entry.discriminator));
 
   for (const block of blockEntries) {
-    if (!printerDiscriminators.has(block.discriminator)) {
-      throw new Error(
-        `Incomplete pack contribution bundle: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no pslPrinter contribution shares that discriminator. A pack-contributed PSL block requires a matching pslPrinter (and entityType) so the round-trip parse → IR → print can complete; add a pslPrinter helper with discriminator "${block.discriminator}".`,
-      );
-    }
     if (!entityDiscriminators.has(block.discriminator)) {
       throw new Error(
-        `Incomplete pack contribution bundle: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no entityType contribution shares that discriminator. A pack-contributed PSL block requires a matching entityType factory so the parsed AST node can lower to an IR class instance; add an entityType helper with discriminator "${block.discriminator}".`,
-      );
-    }
-  }
-
-  for (const printer of printerEntries) {
-    if (!blockDiscriminators.has(printer.discriminator)) {
-      throw new Error(
-        `Incomplete pack contribution bundle: pslPrinter helper "${printer.path}" registers discriminator "${printer.discriminator}" but no pslBlock contribution shares that discriminator. A pack-contributed PSL printer requires a matching pslBlock parser so contract inference round-trips through the same keyword; add a pslBlock helper with discriminator "${printer.discriminator}".`,
-      );
-    }
-    if (!entityDiscriminators.has(printer.discriminator)) {
-      throw new Error(
-        `Incomplete pack contribution bundle: pslPrinter helper "${printer.path}" registers discriminator "${printer.discriminator}" but no entityType contribution shares that discriminator. A pack-contributed PSL printer requires a matching entityType factory; add an entityType helper with discriminator "${printer.discriminator}".`,
+        `Incomplete pack contribution: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no entityType contribution shares that discriminator. A pack-contributed PSL block requires a matching entityType factory so the parsed AST node can lower to an IR class instance; add an entityType helper with discriminator "${block.discriminator}".`,
       );
     }
   }

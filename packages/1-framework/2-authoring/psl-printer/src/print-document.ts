@@ -18,9 +18,9 @@ export type PrintEnumSection = {
  * `packBlocks` carries pack-contributed top-level blocks verbatim from the
  * input AST. Phase 1 (`astDocumentToPrintDocument`) does no transformation
  * here — phase 2 (`serializePrintDocument`) consults the registered
- * `pslPrinters` contribution by `kind` discriminator and renders each
- * entry. The slot is always present; an empty array means no
- * pack-contributed blocks landed in this namespace.
+ * `pslBlocks` contribution by `kind` discriminator and renders each entry
+ * via the descriptor's `printer`. The slot is always present; an empty
+ * array means no pack-contributed blocks landed in this namespace.
  */
 export type PrintNamespaceSection = {
   readonly name: string;

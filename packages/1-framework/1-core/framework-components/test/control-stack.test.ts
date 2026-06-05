@@ -146,7 +146,6 @@ describe('assembleAuthoringContributions', () => {
       type: {},
       entityTypes: {},
       pslBlocks: {},
-      pslPrinters: {},
     });
   });
 
@@ -295,12 +294,6 @@ describe('assembleAuthoringContributions', () => {
               kind: 'pslBlock',
               discriminator: 'postgres-policy',
               parser: stubPackBlockParser,
-            },
-          },
-          pslPrinters: {
-            policyPrinter: {
-              kind: 'pslPrinter',
-              discriminator: 'postgres-policy',
               printer: stubPackBlockPrinter,
             },
           },
@@ -314,12 +307,6 @@ describe('assembleAuthoringContributions', () => {
               kind: 'pslBlock',
               discriminator: 'postgres-role',
               parser: stubPackBlockParser,
-            },
-          },
-          pslPrinters: {
-            rolePrinter: {
-              kind: 'pslPrinter',
-              discriminator: 'postgres-role',
               printer: stubPackBlockPrinter,
             },
           },
@@ -327,7 +314,6 @@ describe('assembleAuthoringContributions', () => {
       }),
     ]);
     expect(Object.keys(result.pslBlocks)).toEqual(['policyBlock', 'roleBlock']);
-    expect(Object.keys(result.pslPrinters)).toEqual(['policyPrinter', 'rolePrinter']);
   });
 
   it('throws on duplicate pslBlocks paths from different descriptors', () => {
@@ -340,6 +326,7 @@ describe('assembleAuthoringContributions', () => {
                 kind: 'pslBlock',
                 discriminator: 'pack-foo',
                 parser: stubPackBlockParser,
+                printer: stubPackBlockPrinter,
               },
             },
           },
@@ -352,6 +339,7 @@ describe('assembleAuthoringContributions', () => {
                 kind: 'pslBlock',
                 discriminator: 'pack-foo',
                 parser: stubPackBlockParser,
+                printer: stubPackBlockPrinter,
               },
             },
           },
@@ -360,37 +348,7 @@ describe('assembleAuthoringContributions', () => {
     ).toThrow(/Duplicate authoring pslBlock helper "foo"/);
   });
 
-  it('throws on duplicate pslPrinters paths from different descriptors', () => {
-    expect(() =>
-      assembleAuthoringContributions([
-        createDescriptor({
-          authoring: {
-            pslPrinters: {
-              foo: {
-                kind: 'pslPrinter',
-                discriminator: 'pack-foo',
-                printer: stubPackBlockPrinter,
-              },
-            },
-          },
-        }),
-        createDescriptor({
-          id: 'other',
-          authoring: {
-            pslPrinters: {
-              foo: {
-                kind: 'pslPrinter',
-                discriminator: 'pack-foo',
-                printer: stubPackBlockPrinter,
-              },
-            },
-          },
-        }),
-      ]),
-    ).toThrow(/Duplicate authoring pslPrinter helper "foo"/);
-  });
-
-  it('accepts pslBlocks/pslPrinters/entityTypes contributions sharing the same path with matching discriminators', () => {
+  it('accepts pslBlocks + entityTypes contributions sharing the same path with matching discriminators', () => {
     const result = assembleAuthoringContributions([
       createDescriptor({
         authoring: {
@@ -406,12 +364,6 @@ describe('assembleAuthoringContributions', () => {
               kind: 'pslBlock',
               discriminator: 'postgres-policy',
               parser: stubPackBlockParser,
-            },
-          },
-          pslPrinters: {
-            policy: {
-              kind: 'pslPrinter',
-              discriminator: 'postgres-policy',
               printer: stubPackBlockPrinter,
             },
           },
@@ -420,35 +372,9 @@ describe('assembleAuthoringContributions', () => {
     ]);
     expect(Object.keys(result.entityTypes)).toEqual(['policy']);
     expect(Object.keys(result.pslBlocks)).toEqual(['policy']);
-    expect(Object.keys(result.pslPrinters)).toEqual(['policy']);
   });
 
-  it('rejects pslBlocks contribution missing matching pslPrinters', () => {
-    expect(() =>
-      assembleAuthoringContributions([
-        createDescriptor({
-          authoring: {
-            entityTypes: {
-              fooEntity: {
-                kind: 'entity',
-                discriminator: 'pack-foo',
-                output: { factory: () => ({}) },
-              },
-            },
-            pslBlocks: {
-              fooBlock: {
-                kind: 'pslBlock',
-                discriminator: 'pack-foo',
-                parser: stubPackBlockParser,
-              },
-            },
-          },
-        }),
-      ]),
-    ).toThrow(/pslBlock.*"pack-foo".*pslPrinter/);
-  });
-
-  it('rejects pslBlocks contribution missing matching entityTypes', () => {
+  it('rejects a pslBlocks contribution with no matching entityTypes factory', () => {
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({
@@ -458,12 +384,6 @@ describe('assembleAuthoringContributions', () => {
                 kind: 'pslBlock',
                 discriminator: 'pack-foo',
                 parser: stubPackBlockParser,
-              },
-            },
-            pslPrinters: {
-              fooPrinter: {
-                kind: 'pslPrinter',
-                discriminator: 'pack-foo',
                 printer: stubPackBlockPrinter,
               },
             },
@@ -473,32 +393,24 @@ describe('assembleAuthoringContributions', () => {
     ).toThrow(/pslBlock.*"pack-foo".*entityType/);
   });
 
-  it('rejects pslPrinters contribution missing matching pslBlocks', () => {
+  it('rejects a malformed pslBlocks descriptor that carries kind but no parser/printer', () => {
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({
           authoring: {
-            entityTypes: {
-              fooEntity: {
-                kind: 'entity',
-                discriminator: 'pack-foo',
-                output: { factory: () => ({}) },
-              },
-            },
-            pslPrinters: {
-              fooPrinter: {
-                kind: 'pslPrinter',
-                discriminator: 'pack-foo',
-                printer: stubPackBlockPrinter,
-              },
+            pslBlocks: {
+              // Descriptor-shaped (has kind + discriminator) but missing
+              // parser/printer — must be rejected at load time, not
+              // silently treated as a sub-namespace.
+              broken: { kind: 'pslBlock', discriminator: 'pack-foo' } as unknown as never,
             },
           },
         }),
       ]),
-    ).toThrow(/pslPrinter.*"pack-foo".*pslBlock/);
+    ).toThrow(/Malformed authoring pslBlock contribution at "broken"/);
   });
 
-  it('accepts entityTypes-only contributions without pslBlocks/pslPrinters', () => {
+  it('accepts entityTypes-only contributions without a pslBlocks descriptor', () => {
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({
@@ -786,7 +698,6 @@ describe('createControlStack', () => {
       type: {},
       entityTypes: {},
       pslBlocks: {},
-      pslPrinters: {},
     });
   });
 });

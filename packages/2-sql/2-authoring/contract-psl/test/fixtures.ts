@@ -159,7 +159,6 @@ export const pgvectorAuthoringContributions = {
   entityTypes: {},
   field: {},
   pslBlocks: {},
-  pslPrinters: {},
   type: {
     pgvector: {
       Vector: {
@@ -255,7 +254,6 @@ export function createPostgresTestContext(
       type: {},
       entityTypes: {},
       pslBlocks: {},
-      pslPrinters: {},
     },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),

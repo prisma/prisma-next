@@ -1,6 +1,6 @@
 /**
- * Test-only fixture target pack: registers all three contributions
- * (`pslBlocks` parser, `pslPrinters` printer, `entityTypes` factory)
+ * Test-only fixture target pack: registers a `pslBlocks` descriptor
+ * (carrying both parser + printer) and a matching `entityTypes` factory
  * for one made-up RLS-shaped keyword `fake_policy`. The keyword name
  * is deliberately not a real PSL block so downstream consumers
  * can't accidentally couple to it as a stable surface.
@@ -172,12 +172,6 @@ export const fakeTargetPackContributions = {
       kind: 'pslBlock',
       discriminator: FAKE_POLICY_DISCRIMINATOR,
       parser: parseFakePolicyBlock,
-    },
-  },
-  pslPrinters: {
-    fake_policy: {
-      kind: 'pslPrinter',
-      discriminator: FAKE_POLICY_DISCRIMINATOR,
       printer: printFakePolicyBlock,
     },
   },

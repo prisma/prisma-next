@@ -29,7 +29,6 @@ const stubContext: ContractSourceContext = {
     type: {},
     entityTypes: {},
     pslBlocks: {},
-    pslPrinters: {},
   },
   codecLookup: {
     get: () => undefined,

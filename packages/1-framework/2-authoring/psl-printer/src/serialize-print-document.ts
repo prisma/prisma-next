@@ -1,8 +1,8 @@
 import type {
-  AuthoringPslPrinterDescriptor,
-  AuthoringPslPrinterNamespace,
+  AuthoringPslBlockDescriptor,
+  AuthoringPslBlockNamespace,
 } from '@prisma-next/framework-components/authoring';
-import { isAuthoringPslPrinterDescriptor } from '@prisma-next/framework-components/authoring';
+import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
 import type {
   PslPackBlock,
   PslPackBlockPrinterContext,
@@ -18,38 +18,40 @@ import type { PrinterEnumValue, PrinterField, PrinterNamedType } from './types';
 const PSL_INDENT_UNIT = '  ';
 
 /**
- * Discriminator-keyed map from a registered `pslPrinters` namespace to the
- * descriptor that handles each AST node `kind`. Built once per
+ * Discriminator-keyed map from a registered `pslBlocks` namespace to the
+ * descriptor whose `printer` renders each AST node `kind`. Built once per
  * `serializePrintDocument` call so the per-block dispatch in
- * `serializeNamespaceContents` is constant-time.
+ * `serializeNamespaceContents` is constant-time. Parser and printer live
+ * on the same descriptor, so the printer is read straight off the block
+ * descriptor — no separate printer namespace.
  */
-type PslPrinterDispatchMap = ReadonlyMap<string, AuthoringPslPrinterDescriptor>;
+type PslBlockDispatchMap = ReadonlyMap<string, AuthoringPslBlockDescriptor>;
 
-function buildPslPrinterDispatchMap(
-  namespace: AuthoringPslPrinterNamespace | undefined,
-): PslPrinterDispatchMap {
-  const entries = new Map<string, AuthoringPslPrinterDescriptor>();
+function buildPslBlockDispatchMap(
+  namespace: AuthoringPslBlockNamespace | undefined,
+): PslBlockDispatchMap {
+  const entries = new Map<string, AuthoringPslBlockDescriptor>();
   if (!namespace) {
     return entries;
   }
-  collectPrinterDescriptors(namespace, entries);
+  collectBlockDescriptors(namespace, entries);
   return entries;
 }
 
-function collectPrinterDescriptors(
-  namespace: AuthoringPslPrinterNamespace,
-  out: Map<string, AuthoringPslPrinterDescriptor>,
+function collectBlockDescriptors(
+  namespace: AuthoringPslBlockNamespace,
+  out: Map<string, AuthoringPslBlockDescriptor>,
 ): void {
   for (const value of Object.values(namespace)) {
-    if (isAuthoringPslPrinterDescriptor(value)) {
+    if (isAuthoringPslBlockDescriptor(value)) {
       out.set(value.discriminator, value);
       continue;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      collectPrinterDescriptors(
+      collectBlockDescriptors(
         blindCast<
-          AuthoringPslPrinterNamespace,
-          'recursive descent into a sub-namespace whose leaves are still walked by isAuthoringPslPrinterDescriptor'
+          AuthoringPslBlockNamespace,
+          'recursive descent into a sub-namespace whose leaves are still walked by isAuthoringPslBlockDescriptor'
         >(value),
         out,
       );
@@ -77,7 +79,7 @@ export function escapePslString(value: string): string {
 }
 
 export interface SerializePrintDocumentOptions {
-  readonly pslPrinters?: AuthoringPslPrinterNamespace;
+  readonly pslBlocks?: AuthoringPslBlockNamespace;
 }
 
 export function serializePrintDocument(
@@ -93,7 +95,7 @@ export function serializePrintDocument(
     sections.push(serializeTypesBlock(namedTypeEntries));
   }
 
-  const printerDispatchMap = buildPslPrinterDispatchMap(options.pslPrinters);
+  const blockDispatchMap = buildPslBlockDispatchMap(options.pslBlocks);
   const printerContext: PslPackBlockPrinterContext = {
     indent: PSL_INDENT_UNIT,
     escapeStringLiteral: escapePslString,
@@ -102,7 +104,7 @@ export function serializePrintDocument(
   for (const namespace of doc.namespaces) {
     const namespaceSections = serializeNamespaceContents(
       namespace,
-      printerDispatchMap,
+      blockDispatchMap,
       printerContext,
     );
     if (namespaceSections.length === 0) {
@@ -123,7 +125,7 @@ export function serializePrintDocument(
 
 function serializeNamespaceContents(
   namespace: PrintNamespaceSection,
-  printerDispatchMap: PslPrinterDispatchMap,
+  blockDispatchMap: PslBlockDispatchMap,
   printerContext: PslPackBlockPrinterContext,
 ): string[] {
   const sections: string[] = [];
@@ -135,38 +137,29 @@ function serializeNamespaceContents(
     sections.push(serializeModel(model));
   }
   for (const packBlock of namespace.packBlocks) {
-    sections.push(serializePackBlock(packBlock, printerDispatchMap, printerContext));
+    sections.push(serializePackBlock(packBlock, blockDispatchMap, printerContext));
   }
   return sections;
 }
 
 function serializePackBlock(
   packBlock: PslPackBlock,
-  printerDispatchMap: PslPrinterDispatchMap,
+  blockDispatchMap: PslBlockDispatchMap,
   printerContext: PslPackBlockPrinterContext,
 ): string {
-  const descriptor = printerDispatchMap.get(packBlock.kind);
+  const descriptor = blockDispatchMap.get(packBlock.kind);
   if (!descriptor) {
     throw new Error(
-      `No pslPrinter contribution registered for pack-contributed block discriminator "${packBlock.kind}". Provide a matching pslPrinter contribution to printPsl, or remove the block from the input AST.`,
+      `No pslBlocks contribution registered for pack-contributed block discriminator "${packBlock.kind}". Provide a matching pslBlocks contribution to printPsl, or remove the block from the input AST.`,
     );
   }
-  // The descriptor's `printer` field is declared with `Input extends
-  // PslPackBlock = never` so a pack literal's concrete printer type
-  // (`(node: SomeAst, …) => string`) assigns to the base shape across
-  // the contravariant function-parameter position. At dispatch time we
-  // hold the descriptor as the base shape, so its declared `Input` is
-  // `never` — but the runtime function is the pack's specific
-  // implementation, which expects the actual AST shape. The
-  // discriminator-keyed lookup pairs each `packBlock` with the
-  // descriptor whose pack contributed it (triple-bundle validation
-  // ensures the pairing exists), so the runtime contract holds even
-  // though TypeScript cannot prove the connection at the dispatch site.
-  const printerFn = blindCast<
-    (input: PslPackBlock, context: PslPackBlockPrinterContext) => string,
-    'discriminator-keyed dispatch pairs the descriptor with the AST node its pack produced; runtime contract holds while the static type narrows through `Input = never` for assignability'
-  >(descriptor.printer);
-  return printerFn(packBlock, printerContext);
+  // The descriptor is held as the base shape (`Node = PslPackBlock`), so
+  // its `printer` signature is `(node: PslPackBlock, ctx) => string` —
+  // the dispatched `packBlock` is a `PslPackBlock`, so the call is
+  // directly type-correct. The discriminator-keyed lookup pairs each
+  // `packBlock` with the descriptor whose parser produced it; the
+  // descriptor's own printer renders it.
+  return descriptor.printer(packBlock, printerContext);
 }
 
 function wrapNamespaceBlock(name: string, innerSections: readonly string[]): string {

@@ -211,7 +211,6 @@ describe('defineConfig', () => {
         type: {},
         entityTypes: {},
         pslBlocks: {},
-        pslPrinters: {},
       },
       codecLookup: {
         get: () => undefined,

@@ -6,7 +6,6 @@ import type {
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringPslBlockNamespace,
-  AuthoringPslPrinterNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 import {
@@ -14,7 +13,6 @@ import {
   isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringPslBlockDescriptor,
-  isAuthoringPslPrinterDescriptor,
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
@@ -38,7 +36,6 @@ export interface AssembledAuthoringContributions {
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
   readonly pslBlocks: AuthoringPslBlockNamespace;
-  readonly pslPrinters: AuthoringPslPrinterNamespace;
 }
 
 export interface ControlStack<
@@ -159,7 +156,6 @@ export function assembleAuthoringContributions(
   const type: Record<string, unknown> = {};
   const entityTypes: Record<string, unknown> = {};
   const pslBlocks: Record<string, unknown> = {};
-  const pslPrinters: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
@@ -198,15 +194,6 @@ export function assembleAuthoringContributions(
         'pslBlock',
       );
     }
-    if (descriptor.authoring?.pslPrinters) {
-      mergeAuthoringNamespaces(
-        pslPrinters,
-        descriptor.authoring.pslPrinters,
-        [],
-        isAuthoringPslPrinterDescriptor,
-        'pslPrinter',
-      );
-    }
   }
 
   const fieldNamespace = blindCast<
@@ -225,16 +212,11 @@ export function assembleAuthoringContributions(
     AuthoringPslBlockNamespace,
     'merge target accumulator narrows to typed namespace post-merge'
   >(pslBlocks);
-  const pslPrinterNamespace = blindCast<
-    AuthoringPslPrinterNamespace,
-    'merge target accumulator narrows to typed namespace post-merge'
-  >(pslPrinters);
   assertNoCrossRegistryCollisions(
     typeNamespace,
     fieldNamespace,
     entityTypeNamespace,
     pslBlockNamespace,
-    pslPrinterNamespace,
   );
 
   return {
@@ -242,7 +224,6 @@ export function assembleAuthoringContributions(
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
     pslBlocks: pslBlockNamespace,
-    pslPrinters: pslPrinterNamespace,
   };
 }
 

@@ -41,6 +41,8 @@ function makeTestKwBlocks(): AuthoringPslBlockNamespace {
           extra,
         };
       },
+      printer: (node: TestKeywordAst, ctx) =>
+        `testKw ${node.name} {\n${ctx.indent}extra = "${ctx.escapeStringLiteral(node.extra)}"\n}`,
     },
   };
 }
@@ -84,6 +86,7 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
               span: ctx.lineRangeSpan(ctx.bounds.startLine, ctx.bounds.endLine),
             };
           },
+          printer: (node) => `diagKw ${node.name} {\n}`,
         },
       };
       const result = parsePslDocument({
@@ -128,6 +131,7 @@ describe('parsePslDocument with pack-contributed pslBlocks', () => {
             name: ctx.name,
             span: ctx.lineRangeSpan(ctx.bounds.startLine, ctx.bounds.endLine),
           }),
+          printer: (node: OtherKeywordAst) => `otherKw ${node.name} {\n}`,
         },
       };
 

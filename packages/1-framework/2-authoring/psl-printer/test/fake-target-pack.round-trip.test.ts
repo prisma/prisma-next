@@ -1,8 +1,8 @@
 /**
  * End-to-end round-trip pin for the pack-contributed-PSL-blocks
- * substrate. A test-only fixture target pack registers all three
- * contributions (`pslBlocks` parser, `pslPrinters` printer,
- * `entityTypes` factory) for one made-up RLS-shaped keyword and
+ * substrate. A test-only fixture target pack registers a `pslBlocks`
+ * descriptor (carrying both parser + printer) and a matching
+ * `entityTypes` factory for one made-up RLS-shaped keyword and
  * exercises the path:
  *
  *   text → parse → AST.packBlocks → entityTypes factory → IR class
@@ -68,7 +68,7 @@ describe('fake-target-pack round-trip', () => {
       });
       expect(parsed1.diagnostics).toEqual([]);
 
-      const printed = printPslFromAst(parsed1.ast, { pslPrinters: assembled.pslPrinters });
+      const printed = printPslFromAst(parsed1.ast, { pslBlocks: assembled.pslBlocks });
       const parsed2 = parsePslDocument({
         schema: printed,
         sourceId: 'r2',
@@ -151,7 +151,7 @@ fake_policy AdminsOnly {
       });
       expect(parsed1.diagnostics).toEqual([]);
 
-      const printed = printPslFromAst(parsed1.ast, { pslPrinters: assembled.pslPrinters });
+      const printed = printPslFromAst(parsed1.ast, { pslBlocks: assembled.pslBlocks });
       const parsed2 = parsePslDocument({
         schema: printed,
         sourceId: 'r2',

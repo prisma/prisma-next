@@ -53,7 +53,7 @@ async function executeContractInferCommand(
     return inspectResult;
   }
 
-  const { config, target, meta, pslContractAst, pslPrintersNamespace } = inspectResult.value;
+  const { config, target, meta, pslContractAst, pslBlocksNamespace } = inspectResult.value;
 
   if (!pslContractAst) {
     return notOk(
@@ -65,7 +65,7 @@ async function executeContractInferCommand(
   }
 
   const outputPath = resolveContractInferOutputPath(options, config.contract?.output);
-  const pslContent = printPsl(pslContractAst, { pslPrinters: pslPrintersNamespace });
+  const pslContent = printPsl(pslContractAst, { pslBlocks: pslBlocksNamespace });
 
   if (existsSync(outputPath) && !flags.json && !flags.quiet) {
     ui.stderr(`\u26A0 Overwriting existing file: ${relative(process.cwd(), outputPath)}`);

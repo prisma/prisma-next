@@ -3,7 +3,6 @@ import type { PslDocumentAst, PslPackBlock } from '@prisma-next/framework-compon
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
-import type { PslPrintersNamespace } from '../src/print-psl';
 import { printPslFromAst } from '../src/print-psl';
 
 const ZERO_SPAN = {
@@ -18,22 +17,6 @@ interface TestKeywordAst extends PslPackBlock {
 
 interface OtherKeywordAst extends PslPackBlock {
   readonly kind: 'other-keyword';
-}
-
-function buildPslPrinters(): PslPrintersNamespace {
-  return {
-    testKw: {
-      kind: 'pslPrinter',
-      discriminator: 'test-keyword',
-      printer: (node: TestKeywordAst, ctx) =>
-        `testKw ${node.name} {\n${ctx.indent}predicate = "${ctx.escapeStringLiteral(node.predicate)}"\n}`,
-    },
-    otherKw: {
-      kind: 'pslPrinter',
-      discriminator: 'other-keyword',
-      printer: (node: OtherKeywordAst) => `otherKw ${node.name} {\n}`,
-    },
-  };
 }
 
 function buildPslBlocks(): AuthoringPslBlockNamespace {
@@ -61,6 +44,8 @@ function buildPslBlocks(): AuthoringPslBlockNamespace {
           predicate,
         };
       },
+      printer: (node: TestKeywordAst, ctx) =>
+        `testKw ${node.name} {\n${ctx.indent}predicate = "${ctx.escapeStringLiteral(node.predicate)}"\n}`,
     },
     otherKw: {
       kind: 'pslBlock',
@@ -70,6 +55,7 @@ function buildPslBlocks(): AuthoringPslBlockNamespace {
         name: ctx.name,
         span: ctx.lineRangeSpan(ctx.bounds.startLine, ctx.bounds.endLine),
       }),
+      printer: (node: OtherKeywordAst) => `otherKw ${node.name} {\n}`,
     },
   };
 }
@@ -93,7 +79,7 @@ function makeDocAst(packBlocks: readonly PslPackBlock[]): PslDocumentAst {
   };
 }
 
-describe('printPslFromAst with pack-contributed pslPrinters', () => {
+describe('printPslFromAst with pack-contributed pslBlocks', () => {
   describe('given a registered discriminator and a matching AST node', () => {
     it('renders the block via the registry into the namespace section', () => {
       const ast = makeDocAst([
@@ -105,7 +91,7 @@ describe('printPslFromAst with pack-contributed pslPrinters', () => {
         } as TestKeywordAst,
       ]);
 
-      const output = printPslFromAst(ast, { pslPrinters: buildPslPrinters() });
+      const output = printPslFromAst(ast, { pslBlocks: buildPslBlocks() });
       expect(output).toContain('testKw Foo {');
       expect(output).toContain('predicate = "allowed"');
     });
@@ -122,10 +108,9 @@ testKw Foo {
 }
 `;
       const pslBlocks = buildPslBlocks();
-      const pslPrinters = buildPslPrinters();
       const parsed1 = parsePslDocument({ schema: source, sourceId: 'r1', pslBlocks });
       expect(parsed1.diagnostics).toEqual([]);
-      const printed = printPslFromAst(parsed1.ast, { pslPrinters });
+      const printed = printPslFromAst(parsed1.ast, { pslBlocks });
       const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2', pslBlocks });
       expect(parsed2.diagnostics).toEqual([]);
 
@@ -150,7 +135,7 @@ testKw Foo {
         { kind: 'other-keyword', name: 'Second', span: ZERO_SPAN } as OtherKeywordAst,
       ]);
 
-      const output = printPslFromAst(ast, { pslPrinters: buildPslPrinters() });
+      const output = printPslFromAst(ast, { pslBlocks: buildPslBlocks() });
       const firstIndex = output.indexOf('testKw First');
       const secondIndex = output.indexOf('otherKw Second');
       expect(firstIndex).toBeGreaterThan(-1);
@@ -158,15 +143,15 @@ testKw Foo {
     });
   });
 
-  describe('given an AST with a pack-contributed block but no matching pslPrinters contribution', () => {
+  describe('given an AST with a pack-contributed block but no matching pslBlocks contribution', () => {
     it('throws naming the unknown discriminator', () => {
       const ast = makeDocAst([{ kind: 'unregistered-kind', name: 'Foo', span: ZERO_SPAN }]);
-      expect(() => printPslFromAst(ast, { pslPrinters: buildPslPrinters() })).toThrow(
+      expect(() => printPslFromAst(ast, { pslBlocks: buildPslBlocks() })).toThrow(
         /unregistered-kind/,
       );
     });
 
-    it('throws when no pslPrinters argument is supplied at all', () => {
+    it('throws when no pslBlocks argument is supplied at all', () => {
       const ast = makeDocAst([
         { kind: 'test-keyword', name: 'Foo', span: ZERO_SPAN, predicate: 'p' } as TestKeywordAst,
       ]);
@@ -200,7 +185,7 @@ testKw Foo {
         span: ZERO_SPAN,
       };
 
-      const output = printPslFromAst(ast, { pslPrinters: buildPslPrinters() });
+      const output = printPslFromAst(ast, { pslBlocks: buildPslBlocks() });
       expect(output).toContain('namespace public {');
       expect(output).toContain('  testKw Foo {');
       expect(output).toContain('    predicate = "p"');
