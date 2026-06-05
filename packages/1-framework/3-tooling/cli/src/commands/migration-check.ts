@@ -9,7 +9,10 @@ import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggrega
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
-import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
+import {
+  parseMigrationRef,
+  type RefResolutionError,
+} from '@prisma-next/migration-tools/ref-resolution';
 import type { Refs } from '@prisma-next/migration-tools/refs';
 import {
   isValidSpaceId,
@@ -28,6 +31,7 @@ import {
   errorAmbiguousMigrationRef,
   errorInvalidSpaceId,
   errorSpaceNotFound,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -454,9 +458,17 @@ async function checkSingleTarget(
   } else {
     // Ref resolution: try each in-scope space, collect all hits.
     const hits: Array<{ space: CheckSpace; pkg: OnDiskMigrationPackage }> = [];
+    let firstParseFailure: RefResolutionError | undefined;
     for (const space of scopedSpaces) {
       const migResult = parseMigrationRef(target, { graph: space.graph, refs: space.refs });
-      if (!migResult.ok) continue;
+      if (!migResult.ok) {
+        if (firstParseFailure === undefined) firstParseFailure = migResult.failure;
+        // wrong-grammar is space-independent — exit immediately with the shared envelope.
+        if (migResult.failure.kind === 'wrong-grammar') {
+          return { error: mapRefResolutionError(migResult.failure), exitCode: PRECONDITION };
+        }
+        continue;
+      }
       const pkg = space.packages.find(
         (p) => p.metadata.migrationHash === migResult.value.migrationHash,
       );
@@ -476,6 +488,12 @@ async function checkSingleTarget(
     if (hits.length === 1) {
       matchedSpace = hits[0]!.space;
       matchedPkg = hits[0]!.pkg;
+    } else if (firstParseFailure !== undefined) {
+      // The ref didn't resolve in any in-scope space — emit the shared
+      // ref-resolution envelope (PN-RUN-3000) the D2 contract asserts, rather
+      // than a bespoke string. (Ref-resolved-but-no-package falls through to the
+      // "not found on disk" result below.)
+      return { error: mapRefResolutionError(firstParseFailure), exitCode: PRECONDITION };
     }
   }
 
