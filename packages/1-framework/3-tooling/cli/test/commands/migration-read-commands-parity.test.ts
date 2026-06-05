@@ -11,14 +11,18 @@ import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { createSqlContract } from '@prisma-next/test-utils';
+import { type } from 'arktype';
 import { join } from 'pathe';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  type MigrationGraphJsonResult,
+  migrationGraphJsonResultSchema,
+} from '../../src/commands/json/schemas';
 import {
   createMigrationCheckCommand,
   enumerateCheckSpaces,
   runMigrationCheck,
 } from '../../src/commands/migration-check';
-import type { MigrationGraphJsonResult } from '../../src/commands/migration-graph';
 import {
   createMigrationGraphCommand,
   formatMigrationGraphHumanOutput,
@@ -307,6 +311,7 @@ describe('migration read commands pretty parity', () => {
       formatMigrationGraphHumanOutput({
         ok: true,
         graph: aggregate.app.graph(),
+        spaces: [],
         treeSections: listResult.value.spaces.map((spaceEntry) => {
           const member = aggregate.space(spaceEntry.space)!;
           const tree =
@@ -539,7 +544,7 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     expect(Array.isArray(envelope.spaces)).toBe(true);
   });
 
-  it('migration graph --json emits { ok: true, nodes: [...], edges: [...], summary }', async () => {
+  it('migration graph --json emits { ok: true, spaces: [{ contracts, migrations }], summary }', async () => {
     const { cwd } = await buildMultiSpaceFixture();
     const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
     loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
@@ -553,10 +558,19 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     }
 
     const envelope = parseJsonObjectFromCliCapture(consoleOutput) as MigrationGraphJsonResult;
+    expect(migrationGraphJsonResultSchema(envelope) instanceof type.errors).toBe(false);
     expect(envelope.ok).toBe(true);
-    expect(Array.isArray(envelope.nodes)).toBe(true);
-    expect(Array.isArray(envelope.edges)).toBe(true);
-    expect(typeof envelope.summary).toBe('string');
+    expect(envelope.spaces.length).toBeGreaterThan(1);
+    const appSpace = envelope.spaces.find((space) => space.space === 'app');
+    expect(appSpace).toBeDefined();
+    expect(Array.isArray(appSpace?.contracts)).toBe(true);
+    expect(Array.isArray(appSpace?.migrations)).toBe(true);
+    expect(appSpace?.migrations[0]).toMatchObject({
+      name: expect.any(String),
+      hash: expect.any(String),
+      fromContract: expect.any(String),
+      toContract: expect.any(String),
+    });
   });
 
   it('migration status --json (with --from) emits { ok: true, spaces: [...] }', async () => {

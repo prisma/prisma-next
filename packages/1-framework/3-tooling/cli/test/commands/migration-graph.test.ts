@@ -4,9 +4,13 @@ import type { MigrationPlanOperation } from '@prisma-next/framework-components/c
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { type } from 'arktype';
 import { join } from 'pathe';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
-import type { MigrationGraphJsonResult } from '../../src/commands/migration-graph';
+import {
+  type MigrationGraphJsonResult,
+  migrationGraphJsonResultSchema,
+} from '../../src/commands/json/schemas';
 import { createMigrationGraphCommand } from '../../src/commands/migration-graph';
 import { renderMigrationGraphLegend } from '../../src/utils/formatters/migration-graph-tree-render';
 import type { GlobalFlags } from '../../src/utils/global-flags';
@@ -107,7 +111,7 @@ describe('migration graph --json envelope', () => {
     vi.clearAllMocks();
   });
 
-  it('emits a { ok: true, nodes, edges, summary } object matching the exported type', async () => {
+  it('emits a { ok: true, spaces: [{ contracts, migrations }], summary } object matching the schema', async () => {
     const contractPath = await setupGraphFixture();
 
     const { consoleOutput, cleanup } = setupCommandMocks();
@@ -118,16 +122,23 @@ describe('migration graph --json envelope', () => {
     }
 
     const envelope = parseJsonObjectFromCliCapture(consoleOutput) as MigrationGraphJsonResult;
+    expect(migrationGraphJsonResultSchema(envelope) instanceof type.errors).toBe(false);
     expect(envelope.ok).toBe(true);
-    expect(Array.isArray(envelope.nodes)).toBe(true);
-    expect(Array.isArray(envelope.edges)).toBe(true);
     expect(typeof envelope.summary).toBe('string');
-    expect(envelope.edges.map((edge) => edge.dirName)).toContain('20260422T0720_initial');
-    expect(envelope.edges[0]).toMatchObject({
-      dirName: expect.any(String),
-      from: expect.any(String),
-      to: expect.any(String),
-      migrationHash: expect.any(String),
+    const appSpace = envelope.spaces.find((space) => space.space === 'app');
+    expect(appSpace).toBeDefined();
+    expect(appSpace?.migrations.map((migration) => migration.name)).toContain(
+      '20260422T0720_initial',
+    );
+    expect(appSpace?.migrations[0]).toMatchObject({
+      name: expect.any(String),
+      hash: expect.any(String),
+      fromContract: expect.any(String),
+      toContract: expect.any(String),
+    });
+    expect(appSpace?.contracts[0]).toMatchObject({
+      hash: expect.any(String),
+      refs: expect.any(Array),
     });
   });
 });
