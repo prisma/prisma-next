@@ -12,6 +12,11 @@ strings to `{ namespace, model }` objects. Extension authors only feel
 this if they hand-construct contract IR; the public framework
 factories (`createNamespaceTable`, `crossRef`, etc.) and the
 contract-builder produce the new shape directly. No codemod required.
+
+TML-2817: internal refactor of @prisma-next/extension-mongo's
+defineContract wrapper to eliminate bare casts via a shared bound
+contract builder. No extension API or behaviour change; incidental
+substrate diff only.
 -->
 
 # 0.12 → 0.13 — Extension-author upgrade instructions

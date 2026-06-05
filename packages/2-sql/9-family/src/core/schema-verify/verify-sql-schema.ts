@@ -43,8 +43,6 @@ import {
   verifyUniqueConstraints,
 } from './verify-helpers';
 
-export type ColumnsCompatible = (declared: string, live: string) => boolean;
-
 /**
  * Function type for normalizing raw database default expressions into ColumnDefault.
  * Target-specific implementations handle database dialect differences.
@@ -108,11 +106,6 @@ export interface VerifySqlSchemaOptions {
     enumType: PostgresEnumStorageEntry,
     namespaceId: string,
   ) => readonly string[] | null;
-  /**
-   * Target-supplied compatible-shape relation for `external` column type checks.
-   * Defaults to exact string equality when omitted.
-   */
-  readonly columnsCompatible?: ColumnsCompatible;
 }
 
 /**
@@ -135,7 +128,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     normalizeDefault,
     normalizeNativeType,
     resolveExistingEnumValues,
-    columnsCompatible,
   } = options;
   const startTime = Date.now();
 
@@ -175,7 +167,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
-    ...ifDefined('columnsCompatible', columnsCompatible),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -409,7 +400,6 @@ function verifySchemaTables(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
-  columnsCompatible?: ColumnsCompatible;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
   const {
     contract,
@@ -420,7 +410,6 @@ function verifySchemaTables(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
-    columnsCompatible,
   } = options;
   const contractDefaultControl = contract.defaultControlPolicy;
   const issues: SchemaIssue[] = [];
@@ -488,7 +477,6 @@ function verifySchemaTables(options: {
         storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
-        ...ifDefined('columnsCompatible', columnsCompatible),
       });
       rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
     }
@@ -545,7 +533,6 @@ function verifyTableChildren(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
-  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -561,7 +548,6 @@ function verifyTableChildren(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
-    columnsCompatible,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
@@ -578,7 +564,6 @@ function verifyTableChildren(options: {
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
-    ...ifDefined('columnsCompatible', columnsCompatible),
   });
   if (columnNodes.length > 0) {
     tableChildren.push(buildColumnsNode(tablePath, columnNodes));
@@ -741,7 +726,6 @@ function collectContractColumnNodes(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
-  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -757,7 +741,6 @@ function collectContractColumnNodes(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
-    columnsCompatible,
   } = options;
   const columnNodes: SchemaVerificationNode[] = [];
 
@@ -809,7 +792,6 @@ function collectContractColumnNodes(options: {
         storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
-        ...ifDefined('columnsCompatible', columnsCompatible),
       }),
     );
   }
@@ -882,7 +864,6 @@ function verifyColumn(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
-  columnsCompatible?: ColumnsCompatible;
 }): SchemaVerificationNode {
   const {
     tableName,
@@ -898,7 +879,6 @@ function verifyColumn(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
-    columnsCompatible,
   } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
@@ -914,11 +894,7 @@ function verifyColumn(options: {
   const schemaNativeType =
     normalizeNativeType?.(schemaColumn.nativeType) ?? schemaColumn.nativeType;
 
-  const typesMatch =
-    contractNativeType === schemaNativeType ||
-    (tableControlPolicy === 'external' &&
-      (columnsCompatible?.(contractNativeType, schemaNativeType) ??
-        contractNativeType === schemaNativeType));
+  const typesMatch = contractNativeType === schemaNativeType;
 
   if (!typesMatch) {
     const issue: SchemaIssue = {
