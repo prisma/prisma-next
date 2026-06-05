@@ -238,6 +238,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
+      # Exposed only to runs from prisma/prisma-next (not fork PRs). The
+      # `Require PPG service token` step below hard-fails own-repo runs that
+      # are missing the secret; the cloud-PPG integration test itself
+      # `describe.skipIf`s when the var is empty (fork PRs, local).
+      PRISMA_POSTGRES_SERVICE_TOKEN: ${{ secrets.PRISMA_POSTGRES_SERVICE_TOKEN }}
     services:
       postgres:
         image: postgres:15
@@ -263,6 +268,23 @@ jobs:
       - name: Build (restored from Turbo cache)
         if: needs.changes.outputs.inert != 'true'
         run: pnpm build
+      - name: Require PPG service token on own-repo PR runs
+        # Fork PRs can't access repo secrets — skip this gate there and let
+        # the integration test `describe.skipIf` handle it. On own-repo PR
+        # runs the secret MUST be configured, otherwise the cloud-PPG
+        # integration test would silently skip and AC-4 would go uncovered.
+        if: |
+          needs.changes.outputs.inert != 'true' &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          TOKEN: ${{ secrets.PRISMA_POSTGRES_SERVICE_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::PRISMA_POSTGRES_SERVICE_TOKEN is not configured in repo secrets — required for the cloud-PPG integration test on prisma/prisma-next PRs."
+            exit 1
+          fi
+          echo "PPG service token is configured."
       - name: Run Integration tests
         if: needs.changes.outputs.inert != 'true'
         run: pnpm test:integration

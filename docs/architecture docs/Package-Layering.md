@@ -132,7 +132,9 @@ The targets domain (`packages/3-targets/`) contains concrete target extension pa
 |-- 6-adapters/postgres (multi-plane: shared, migration, runtime)
 |   |-- → @prisma-next/adapter-postgres (adapter with control/runtime entrypoints)
 |-- 7-drivers/postgres (runtime plane)
-    |-- → @prisma-next/driver-postgres (driver implementation)
+|   |-- → @prisma-next/driver-postgres (TCP/pg driver implementation)
+|-- 7-drivers/ppg-serverless (multi-plane: runtime, migration)
+    |-- → @prisma-next/driver-ppg-serverless (PPG WebSocket driver; runtime entry, migration entry re-exports driver-postgres/control)
 ```
 
 ### Mongo Targets Domain
@@ -158,7 +160,11 @@ The extensions domain (`packages/3-extensions/`) contains ecosystem extensions a
 |-- sql-orm-client/ (runtime plane)
 |   |-- → @prisma-next/sql-orm-client
 |-- pgvector/ (multi-plane)
-    |-- → @prisma-next/extension-pgvector
+|   |-- → @prisma-next/extension-pgvector
+|-- postgres/ (multi-plane: shared, runtime, migration)
+|   |-- → @prisma-next/postgres (long-lived Node-process facade; TCP via @prisma-next/driver-postgres)
+|-- prisma-postgres-serverless/ (multi-plane: shared, runtime, migration)
+    |-- → @prisma-next/prisma-postgres-serverless (edge/serverless facade; WebSocket via @prisma-next/driver-ppg-serverless)
 ```
 
 ### Layer Structure
@@ -303,7 +309,8 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
   - `src/exports/runtime.ts` → runtime plane (runtime factory)
 
 **Drivers (Runtime Plane):**
-- `packages/3-targets/7-drivers/postgres/` → `@prisma-next/driver-postgres` - Postgres driver
+- `packages/3-targets/7-drivers/postgres/` → `@prisma-next/driver-postgres` - Postgres TCP driver via `pg`
+- `packages/3-targets/7-drivers/ppg-serverless/` → `@prisma-next/driver-ppg-serverless` - Prisma Postgres WebSocket driver via `@prisma/ppg`; ships `./runtime` (substantive) + `./control` (re-export of `@prisma-next/driver-postgres/control`)
 
 ## Naming Conventions
 
@@ -358,8 +365,11 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/3-targets/3-targets/postgres/` | `@prisma-next/target-postgres` |
 | `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |
 | `packages/3-targets/7-drivers/postgres/` | `@prisma-next/driver-postgres` |
+| `packages/3-targets/7-drivers/ppg-serverless/` | `@prisma-next/driver-ppg-serverless` |
 | `packages/3-extensions/sql-orm-client/` | `@prisma-next/sql-orm-client` |
 | `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` |
+| `packages/3-extensions/postgres/` | `@prisma-next/postgres` |
+| `packages/3-extensions/prisma-postgres-serverless/` | `@prisma-next/prisma-postgres-serverless` |
 
 ## Dependency Rules
 
