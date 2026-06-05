@@ -1,81 +1,64 @@
 # Slice `substrate` — Dispatch Plan
 
-**Slice spec:** Project spec at [`../../spec.md`](../../spec.md) — the substrate scope is captured in the project spec's "What this is" / "Cross-cutting design constraints" / "Project-DoD" sections, plus the project plan's Slice 1 entry.
+**Slice spec:** Project spec at [`../../spec.md`](../../spec.md) — substrate scope is in "What this is" / "Cross-cutting design constraints" / "Project-DoD".
 
 **Linear:** [TML-2804](https://linear.app/prisma-company/issue/TML-2804)
 
 ## At a glance
 
-Four dispatches, sequential. The substrate is built ground-up — types and validation first, then the parser side, then the printer side, finally the integration-test fixture that exercises the whole round-trip. Each prior dispatch's hand-off is a stable state the next dispatch builds on; the final dispatch closes the slice-DoD by demonstrating end-to-end round-trip with a real fixture target pack.
+The slice was first built across four dispatches (D1–D4, all reviewed SATISFIED), then opened as PR #718. Review surfaced a vocabulary problem ("pack"/"substrate"/"pack block") and an architectural one (parser + printer expressed as two descriptors when they're one inseparable unit), plus code-quality findings. Two restructure dispatches (R5, R6) bring the slice to the shape the amended spec describes. The branch is rebased onto current main (incorporating ADR 224 / #715); the final PR is force-pushed with a clean, coherent history.
 
-## Dispatch plan
+## As-built dispatches (D1–D4) — committed, then superseded by the restructure
 
-### Dispatch 1: substrate types + triple-bundle validation
+These landed and were each reviewed SATISFIED. They are the substrate's first cut; R5/R6 reshape them. Kept here as the record of how the slice was built.
 
-- **Outcome:** `AuthoringContributions.pslBlocks` and `AuthoringContributions.pslPrinters` namespaces exist, with descriptors and type guards structurally parallel to `entityTypes`. The descriptor-build-time validation extends to: (a) within-namespace duplicates throw via `mergeAuthoringNamespaces`; (b) cross-namespace collisions surface via `assertNoCrossRegistryCollisions`; (c) a new triple-bundle check rejects pack-load if any of `pslBlocks` / `pslPrinters` / `entityTypes` is missing its discriminator-matched siblings, naming the contributing pack and the offending discriminator. Type narrowing is end-to-end strong: a pack's contributed parser's return type narrows to the AST node shape its printer + factory consume.
-- **Builds on:** None. The chosen design is the spec's `pslBlocks` / `pslPrinters` namespace shape mirroring `entityTypes`.
-- **Hands to:** Working framework-components substrate that exposes the new namespaces with type narrowing and rejects malformed pack contributions at descriptor-build time. No parser or printer changes yet — pack-contributed parsers and printers cannot be invoked, but they can be declared and validated.
-- **Focus:** Pure framework-components changes. New code in `packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts` (descriptors, type guards, namespaces) and `packages/1-framework/1-core/framework-components/src/control/control-stack.ts` (merge extension, validation extension, new triple-bundle check). Out of scope here: AST changes, parser changes, printer changes, fixture pack.
+- **D1 — substrate types + (old) triple-bundle validation.** Two namespaces (`pslBlocks` + `pslPrinters`) + `entityTypes`, tied by discriminator, validated as a triple-bundle. *(R5 collapses the two namespaces into one descriptor.)*
+- **D2 — AST `packBlocks` slot + parser dispatch + parser SPI.** *(R6 renames the slot/types; R5 keeps the dispatch but consumes the merged descriptor.)*
+- **D3 — printer dispatch (two phases) + printer SPI + CLI `contract infer` threading.** *(R5 moves the printer onto the merged descriptor; R6 renames.)*
+- **D4 — integration-test fixture + end-to-end round-trip.** *(R5/R6 update the fixture to the merged, renamed shape.)*
+
+## Restructure dispatches
+
+### Dispatch 5 (R5): collapse the descriptor + fix validation
+
+- **Outcome:** Parser and printer live on a single `AuthoringPslBlockDescriptor` (fields `parser` + `printer`). `AuthoringPslPrinterDescriptor`, the `pslPrinters` namespace, and `isAuthoringPslPrinterDescriptor` are gone. The parser↔printer cross-check is gone (structurally impossible to violate with one descriptor). The block-descriptor↔`entityTypes`-factory check remains (a block requires a matching factory; a factory may still stand alone). Malformed descriptor objects (carry `kind`/`discriminator` but don't satisfy the descriptor shape) are rejected at load time rather than silently skipped (CodeRabbit finding). The optional `stack?.` in `ControlClient.getPslPrintersNamespace` (now `…PslBlocks…`) is audited — either `stack` is asserted-present post-`init()` and the `?.`/`?? {}` drop, or its optionality is justified in a comment.
+- **Builds on:** D1–D4 as committed (rebased onto current main).
+- **Hands to:** The settled descriptor shape — one namespace, one descriptor type carrying parser + printer, validated against a matching factory. R6 renames against this settled structure.
+- **Focus:** `framework-authoring.ts` (merge descriptors, drop the printer descriptor + guard + cross-check, fix malformed-descriptor validation), `control-stack.ts` (merge wiring), parser + printer dispatch sites (consume the merged descriptor's `parser` / `printer`), the CLI `getPsl*Namespace` method (audit `stack?.`), the fixture + tests (merged shape). Vocabulary stays "pack" for now — R6 sweeps it. This dispatch is design-judgment work, concentrated in the descriptor + validation.
 - **Completed when:**
-  - `pnpm typecheck` passes.
-  - `pnpm test:packages -- @prisma-next/framework-components` passes, including new tests asserting (a) within-namespace duplicate rejection; (b) cross-namespace collision rejection; (c) triple-bundle mismatch rejection (each direction: pslBlocks-without-pslPrinters, pslBlocks-without-entityTypes, etc.).
-  - End-to-end type narrowing demonstrated by a type-level test (vitest `expectTypeOf` or equivalent) showing parser-return → printer-input → factory-input narrows correctly.
+  - `pnpm typecheck` + `pnpm lint:deps` + `pnpm lint:casts` (no regression) pass.
+  - `pnpm test:packages -- @prisma-next/framework-components @prisma-next/psl-parser @prisma-next/psl-printer @prisma-next/cli` passes.
+  - A test pins malformed-descriptor rejection.
+  - No parser↔printer cross-check remains (`rg` confirms); the block↔factory check remains and is tested.
 
-### Dispatch 2: AST `packBlocks` slot + parser dispatch + parser SPI extraction
+### Dispatch 6 (R6): vocabulary sweep
 
-- **Outcome:** Framework AST types include a generic `packBlocks: readonly PslPackBlock[]` slot on `PslNamespace`, with the base shape `{ kind: string; name: string; span: PslSpan }`. The framework parser's top-level dispatch consults `AuthoringContributions.pslBlocks` for unknown identifiers before falling back to the existing "unknown top-level keyword" diagnostic; pack-contributed parsers populate the new slot with their typed AST nodes. A minimal parser SPI is extracted to `packages/1-framework/2-authoring/psl-parser/src/exports/` (or equivalent) — only the helpers a pack-contributed parser actually needs (token cursor + diagnostic sink + block-bounds finder + brace-delimited body walker; nothing speculative). The diagnostic for an unrecognised top-level keyword names the keyword and points at the offending span.
-- **Builds on:** Dispatch 1's substrate — `pslBlocks` registry exists and validation rejects malformed contributions. Tests for this dispatch construct fake `AuthoringContributions` objects that pass validation (i.e. include matching `pslPrinters` and `entityTypes` stubs) but only exercise the parser side.
-- **Hands to:** Pack-contributed parsers participate in framework parsing — given a registered `pslBlocks.<keyword>` contribution, source text containing that keyword parses into a typed AST node tagged with the contribution's discriminator and stored in the new `packBlocks` slot. The parser SPI is a stable framework export.
-- **Focus:** AST type changes (`packages/1-framework/1-core/framework-components/src/control/psl-ast.ts`), parser dispatch (`packages/1-framework/2-authoring/psl-parser/src/parser.ts`), and parser SPI extraction. Out of scope here: printer changes, fixture pack, end-to-end round-trip.
+- **Outcome:** "pack" is gone from this slice's surface — replaced by "extension" per the glossary. "substrate" is gone (the `psl-substrate.ts` file is renamed; no "substrate" prose remains in the slice's code/comments). `PslPackBlock` → `PslExtensionBlock`; `packBlocks` slot → `extensionBlocks`; `PslPackBlock{Parser,Printer}Context` → `PslExtensionBlock{Parser,Printer}Context`. The `Ref: TML-2804` breadcrumb in the (renamed) file header is dropped. Behaviour-preserving.
+- **Builds on:** R5's settled descriptor shape.
+- **Hands to:** The slice in its final shape, matching the amended spec's vocabulary and structure.
+- **Focus:** A mechanical rename/codemod across the slice's files + the PR description. No behaviour change. Reviewer confirms the diff is purely vocabulary + the `Ref:` drop.
 - **Completed when:**
-  - `pnpm typecheck` passes.
-  - `pnpm test:packages -- @prisma-next/psl-parser` passes, including new tests asserting (a) a registered `pslBlocks.<keyword>` parser is invoked on its keyword and produces the expected AST node in the namespace's `packBlocks` slot; (b) an unknown top-level keyword that no in-scope pack contributes surfaces the existing `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` diagnostic with the keyword named and span pointed at it; (c) the existing parser tests for built-in keywords (`model`, `enum`, `type`, `types`, `namespace`) continue to pass.
-  - The parser SPI is exported from `psl-parser`'s public surface and consumable by tests.
+  - `pnpm typecheck` + `pnpm lint:deps` pass; full `pnpm test:packages` for the four packages passes unchanged.
+  - `rg -i '\bpack\b|substrate|PslPackBlock|packBlocks'` over the slice's files returns only legitimate hits (e.g. unrelated pre-existing "pack" in untouched code), none in this slice's surface.
+  - No `Ref: TML-2804` (or other transient-ID breadcrumbs) in the renamed file.
 
-### Dispatch 3: printer dispatch (AST → PrintDocument and PrintDocument → string)
+## Slice-DoD coverage (final shape)
 
-- **Outcome:** The framework printer's two phases consult `AuthoringContributions.pslPrinters` for pack-contributed blocks. `astDocumentToPrintDocument` populates `PrintNamespaceSection`'s new generic packBlocks slot via the registered `pslPrinters.<keyword>` contribution; `serializePrintDocument` renders that slot's entries by consulting the same registry. The existing parser-printer round-trip test continues to pass for framework-parsed blocks (`model`, `enum`, `type`, `types`).
-- **Builds on:** Dispatch 1's substrate (registries exist with validation) + Dispatch 2's AST changes (`packBlocks` slot is populated by the parser). Tests for this dispatch construct AST documents containing `packBlocks` entries (either by parsing through Dispatch 2's machinery or by constructing AST objects directly) and verify both printer phases handle them via the registry.
-- **Hands to:** Pack-contributed blocks round-trip through parse → print, completing the printer half of the round-trip property. `contract infer` (which calls `printPsl` to render IR-to-PSL) works for pack-contributed block kinds — verified at the printer level here, end-to-end at Dispatch 4.
-- **Focus:** Printer changes: `packages/1-framework/2-authoring/psl-printer/src/ast-to-print-document.ts`, `serialize-print-document.ts`, `print-document.ts` (the `PrintNamespaceSection` shape extension). Out of scope here: fixture pack, end-to-end round-trip test, IR factories.
-- **Completed when:**
-  - `pnpm typecheck` passes.
-  - `pnpm test:packages -- @prisma-next/psl-printer` passes, including new tests asserting (a) a `PslDocumentAst` containing pack-contributed `packBlocks` is rendered correctly via the registered `pslPrinters.<keyword>` contribution; (b) the existing round-trip test (`parser → printer → parser` produces equivalent AST) continues to pass for framework-parsed blocks.
+| Project-DoD item | Delivered by | Reshaped by |
+|---|---|---|
+| `pslBlocks` namespace; descriptor carries parser + printer; end-to-end type narrowing | D1–D3 | R5 (collapse), R6 (rename) |
+| Load-time validation (within-namespace dup; block↔factory; malformed-descriptor reject) | D1 | R5 |
+| Parser dispatch consults `pslBlocks`; clean unknown-keyword diagnostic | D2 | R5/R6 |
+| Generic `extensionBlocks` slot on `PslNamespace` (2a — no `entries` migration) | D2 | R6 (rename from `packBlocks`) |
+| Printer's two phases dispatch via the descriptor's `printer` | D3 | R5/R6 |
+| Integration-test fixture round-trips end-to-end | D4 | R5/R6 |
+| Existing parser-printer round-trip preserved | D3 + D4 | — |
+| `contract infer` works for extension-contributed kinds | D3 + D4 | R5/R6 |
 
-### Dispatch 4: integration-test fixture target pack + end-to-end round-trip
+Project-DoD items 9 (ADR), 10 (`AGENTS.md` fix), 11 (project-dir deletion) belong to Slice 2 (TML-2806), out of scope here.
 
-- **Outcome:** A test-only fixture target pack ships all three contributions (`pslBlocks.<keyword>`, `pslPrinters.<keyword>`, `entityTypes.<keyword>`) for one RLS-shaped block keyword (block name + named-arg body + string-valued predicates) with the same discriminator across all three. An integration test runs the round-trip parse → lower → IR class instance → serialize → hydrate → IR class instance → print → re-parse and asserts the result is equal to the original. This is the regression test for the substrate going forward; future projects (RLS, roles) consume the substrate by following the fixture's pattern.
-- **Builds on:** Dispatch 1 + 2 + 3 — the entire substrate. The fixture pack's parser uses the SPI from Dispatch 2; its printer participates in the dispatch from Dispatch 3; its factory uses the existing `entityTypes` registry; all three contributions pass triple-bundle validation from Dispatch 1.
-- **Hands to:** Slice-DoD met. Substrate works end-to-end; the integration test pins the round-trip property going forward; no production-pack contribution ships from this slice (the fixture lives in test-only code).
-- **Focus:** New fixture pack code (test-only, lives somewhere like `packages/1-framework/2-authoring/psl-parser/test/fixtures/fake-target-pack/` or a similar test-adjacent location), the integration test, and possibly a small AGENTS.md / CLAUDE.md note about the fixture as the canonical example for downstream consumers. Out of scope here: real production-pack contributions (RLS lives in `projects/postgres-rls/`), the AGENTS.md `entities` → `entityTypes` doc-bug fix (that's Slice 2's scope).
-- **Completed when:**
-  - `pnpm typecheck` passes.
-  - The integration test asserts round-trip equality for a multi-block PSL document containing both built-in blocks (`model`) and the fixture's pack-contributed block.
-  - `pnpm test:packages` passes globally — no regressions in any existing test.
-  - `pnpm lint:deps` passes — no import-graph violations introduced.
-  - Spot-check: `contract infer` (or its programmatic equivalent in tests) renders a contract IR containing the fixture pack's IR class instances back to PSL source that re-parses to the equivalent IR.
+## Sequencing rationale
 
-## Hand-off chain
+R5 (judgment) before R6 (mechanical) follows the calibration rule: make the design decision in one place, then fan the resolved shape out mechanically — never bury a judgment site inside a rename's diff. R5 settles the descriptor structure; R6 sweeps vocabulary across the settled structure so its diff is reviewable as a pure rename.
 
-```
-D1 (substrate types + validation) → D2 (AST slot + parser) → D3 (printer) → D4 (fixture + round-trip)
-```
-
-Each dispatch's `Builds on` references the immediate prior dispatch's `Hands to`; no non-linear dependencies. The final dispatch's `Hands to` is the slice-DoD.
-
-## Slice-DoD coverage
-
-The project spec's Project-DoD items mapped to the dispatch sequence:
-
-| Project-DoD item | Delivered by |
-|---|---|
-| `pslBlocks` and `pslPrinters` namespaces with type narrowing | D1 |
-| Pack-load-time validation (within-namespace + cross-namespace + triple-bundle) | D1 |
-| Framework parser dispatch consults `pslBlocks` | D2 |
-| Framework printer's two phases consult `pslPrinters` | D3 |
-| Integration-test fixture round-trips end-to-end | D4 |
-| Existing parser-printer round-trip test continues to pass | D3 (preserved) + D4 (verified globally) |
-| Clean diagnostic for unknown top-level keyword | D2 |
-| `contract infer` works for pack-contributed kinds | D3 + D4 |
-
-The remaining Project-DoD items (three-layer ADR, `AGENTS.md` correction, project-dir deletion) belong to Slice 2 and are out of scope here.
+The branch is force-pushed with squashed/coherent history at slice close — the D1–D4 + R5 + R6 working commits collapse into commits that read against the final shape, not the path that produced it.
