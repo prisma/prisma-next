@@ -1,14 +1,14 @@
 import type {
   ContractField,
+  ContractManyToManyRelation,
   ContractModel,
-  ContractRelationThrough,
   ContractValueObject,
   CrossReference,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { type ImportRequirement, renderImports } from '@prisma-next/ts-render';
-import { blindCast } from '@prisma-next/utils/casts';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { isSafeTypeExpression } from './type-expression-safety';
 
 export function serializeValue(value: unknown): string {
@@ -128,11 +128,8 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
       );
     }
 
-    const through = blindCast<
-      ContractRelationThrough | undefined,
-      'contract JSON schema-validated before serialization; through is present iff cardinality is N:M'
-    >(relObj['through']);
-    if (through) {
+    if (relObj['cardinality'] === 'N:M') {
+      const { through } = castAs<ContractManyToManyRelation>(relObj);
       const table = serializeValue(through.table);
       const namespaceId = serializeValue(through.namespaceId);
       const parentColumns = through.parentColumns.map((c) => serializeValue(c)).join(', ');
