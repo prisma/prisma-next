@@ -680,7 +680,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:c257daebace9432c8af57900b51abba6630edb61b6481a7a0f807dba306a748e",
+    "storageHash": "sha256:7c31c2e1119a16c7cc438e6fd132c34f0872d70bfbc3d2a888a4d5d44730d07b",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

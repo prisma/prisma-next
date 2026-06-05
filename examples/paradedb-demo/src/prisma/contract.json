@@ -132,7 +132,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:fd7c3cfe9ecb591ac1f6c77f5da571d1313e7d5ccc1c93770336ebcdae840655"
+    "storageHash": "sha256:02d0dd40a88408e941bb73c7ee8f20ae299895a154be94990e34feadb042200f"
   },
   "capabilities": {
     "postgres": {
