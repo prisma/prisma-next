@@ -154,7 +154,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('Up to date');
-          expect(out).toContain('✓ applied');
+          expect(out).toContain('applied');
         },
         timeouts.spinUpPpgDev,
       );
@@ -417,8 +417,8 @@ withTempDir(({ createTempDir }) => {
 
           expect(json.ok).toBe(true);
           expect(json.summary).toBeTruthy();
-          expect(appSpace.spaceId).toBe('app');
-          expect(appSpace.targetHash).toBeTruthy();
+          expect(appSpace.space).toBe('app');
+          expect(appSpace.targetContract).toBeTruthy();
           expect(appSpace.migrations.length).toBeGreaterThan(0);
           expect(appSpace.migrations[0]?.status).toBe('applied');
 

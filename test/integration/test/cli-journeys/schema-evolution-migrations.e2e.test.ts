@@ -108,7 +108,7 @@ withTempDir(({ createTempDir }) => {
           ok: true,
           spaces: [
             {
-              spaceId: 'app',
+              space: 'app',
               migrations: expect.arrayContaining([
                 expect.objectContaining({
                   status: expect.stringMatching(/^(applied|pending)$/),

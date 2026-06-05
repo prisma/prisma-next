@@ -469,7 +469,10 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     const statusRef = await migrationStatus(ctx, ['--to', 'prod', '--json']);
     expect(statusRef.exitCode, 'Mongo-O.09: status --ref prod').toBe(0);
     const statusResult = parseMigrationStatusJson(statusRef);
-    expect(statusResult.missingInvariants, 'Mongo-O.09: missing empty').toBeUndefined();
+    expect(
+      statusResult.diagnostics?.some((d) => d.code === 'MIGRATION.MISSING_INVARIANTS'),
+      'Mongo-O.09: missing empty',
+    ).toBeFalsy();
     expect(statusResult.summary, 'Mongo-O.09: up to date').toMatch(/up to date/i);
     expect(
       migrationStatusAppSpace(statusResult).migrations.every((m) => m.status === 'applied'),
@@ -546,7 +549,9 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     const statusOffline = await migrationStatus(ctx, ['--json']);
     expect(statusOffline.exitCode, 'Mongo-P.05: status').toBe(0);
     const offlineState = migrationStatusAppSpace(parseMigrationStatusJson(statusOffline));
-    expect(offlineState.markerHash, 'Mongo-P.05: marker did not advance to C2').not.toBe(c2Hash);
+    expect(offlineState.currentContract, 'Mongo-P.05: marker did not advance to C2').not.toBe(
+      c2Hash,
+    );
 
     // Mongo-P.06: status --ref also fatal (parity with apply).
     const statusFail = await migrationStatus(ctx, ['--to', 'prod', '--json']);
