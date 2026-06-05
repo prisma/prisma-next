@@ -646,14 +646,23 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     expect(typeof envelope.summary).toBe('string');
   });
 
-  it('migration log --json emits { ok: true, entries: [...] } (type-shape lock)', () => {
+  it('migration log --json emits { ok: true, records: [...], summary } (type-shape lock)', () => {
     // The runtime JSON path is pinned by read-commands-json-golden.test.ts.
     // This assertion locks the exported type's shape so a type-level regression
-    // (removing `ok` or renaming `entries`) fails immediately at typecheck.
-    const sample: MigrationLogResult = { ok: true, entries: [] };
-    const parsed = JSON.parse(JSON.stringify(sample)) as { ok: boolean; entries: unknown[] };
+    // (removing `ok` or renaming `records`) fails immediately at typecheck.
+    const sample: MigrationLogResult = {
+      ok: true,
+      records: [],
+      summary: '0 migration(s) applied',
+    };
+    const parsed = JSON.parse(JSON.stringify(sample)) as {
+      ok: boolean;
+      records: unknown[];
+      summary: string;
+    };
     expect(parsed.ok).toBe(true);
-    expect(Array.isArray(parsed.entries)).toBe(true);
+    expect(Array.isArray(parsed.records)).toBe(true);
+    expect(typeof parsed.summary).toBe('string');
     // `ok` must be the discriminator field — no bare-array fallback.
     expect(Array.isArray(parsed)).toBe(false);
   });

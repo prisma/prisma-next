@@ -13,6 +13,7 @@ import { createDbSignCommand } from '../../src/commands/db-sign';
 import {
   type MigrationSpaceGraphEntry,
   migrationGraphJsonResultSchema,
+  migrationLogResultSchema,
 } from '../../src/commands/json/schemas';
 import { executeMigrationGraphCommand } from '../../src/commands/migration-graph';
 import { executeMigrationLogCommand } from '../../src/commands/migration-log';
@@ -159,17 +160,18 @@ function migrationGraphJson(result: {
 }
 
 function migrationLogJson(
-  entries: readonly {
+  records: readonly {
     space: string;
-    migrationName: string;
-    migrationHash: string;
-    from: string | null;
-    to: string;
+    name: string;
+    hash: string;
+    fromContract: string | null;
+    toContract: string;
     appliedAt: string;
     operationCount: number;
   }[],
+  summary: string,
 ): string {
-  return JSON.stringify({ ok: true, entries }, null, 2);
+  return JSON.stringify({ ok: true, records, summary }, null, 2);
 }
 
 describe('read commands --json golden', () => {
@@ -296,21 +298,29 @@ describe('read commands --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const json = migrationLogJson(
-      result.value.map(({ appliedAt, ...rest }) => ({
-        ...rest,
-        appliedAt: appliedAt.toISOString(),
-      })),
-    );
+    const serialized = result.value.map((entry) => ({
+      space: entry.space,
+      name: entry.migrationName,
+      hash: entry.migrationHash,
+      fromContract: entry.from,
+      toContract: entry.to,
+      appliedAt: entry.appliedAt.toISOString(),
+      operationCount: entry.operationCount,
+    }));
+    const summary = `${result.value.length} migration(s) applied`;
+    const json = migrationLogJson(serialized, summary);
     const parsed = JSON.parse(json) as {
       ok: boolean;
-      entries: Array<{ migrationName: string; appliedAt: string }>;
+      records: Array<{ name: string; appliedAt: string }>;
+      summary: string;
     };
     expect(parsed.ok).toBe(true);
-    expect(parsed.entries).toHaveLength(2);
-    expect(parsed.entries.map((entry) => entry.migrationName)).toEqual([dirInit, dirNext]);
-    expect(parsed.entries[0]!.appliedAt).toBe('2026-03-01T08:00:00.000Z');
+    expect(parsed.records).toHaveLength(2);
+    expect(parsed.records.map((r) => r.name)).toEqual([dirInit, dirNext]);
+    expect(parsed.records[0]!.appliedAt).toBe('2026-03-01T08:00:00.000Z');
+    expect(typeof parsed.summary).toBe('string');
     expect(json).not.toContain('markerHash');
+    expect(migrationLogResultSchema(parsed) instanceof type.errors).toBe(false);
   });
 
   it('pins ref set --json when resolving a migration dir name', async () => {

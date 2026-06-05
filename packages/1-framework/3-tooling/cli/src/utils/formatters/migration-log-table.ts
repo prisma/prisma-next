@@ -18,8 +18,8 @@ export interface RenderMigrationLogTableOptions {
 
 export interface SerializedLedgerEntryRecord {
   readonly space: string;
-  readonly migrationName: string;
-  readonly migrationHash: string;
+  readonly name: string;
+  readonly hash: string;
   readonly fromContract: string | null;
   readonly toContract: string;
   readonly appliedAt: string;
@@ -193,8 +193,8 @@ export function serializeLedgerEntriesForJson(
 ): SerializedLedgerEntryRecord[] {
   return sortLedgerEntries(entries).map((entry) => ({
     space: entry.space,
-    migrationName: entry.migrationName,
-    migrationHash: entry.migrationHash,
+    name: entry.migrationName,
+    hash: entry.migrationHash,
     fromContract: entry.from,
     toContract: entry.to,
     appliedAt: formatLedgerAppliedAt(entry.appliedAt, 'iso'),
