@@ -31,6 +31,7 @@ import {
   withTransaction,
 } from '@prisma-next/sql-runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
+import { castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 
@@ -277,7 +278,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
         // variable in `withTransaction`) remain wired to the original object.
         // Spreading would evaluate the getter once and freeze its value.
         const tx: SqliteTransactionContext<TContract> = Object.assign(
-          Object.create(txCtx) as TransactionContext,
+          castAs<TransactionContext>(Object.create(txCtx)),
           { sql: txSql, orm: txOrm },
         );
 
