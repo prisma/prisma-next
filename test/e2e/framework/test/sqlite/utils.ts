@@ -75,7 +75,7 @@ export async function withSqliteTestRuntime<TContract extends Contract<SqlStorag
   }
 }
 
-function createSchema<TContract extends Contract<SqlStorage>>(
+export function createSchema<TContract extends Contract<SqlStorage>>(
   db: DatabaseSync,
   contract: TContract,
 ): void {
@@ -146,7 +146,7 @@ function createSchema<TContract extends Contract<SqlStorage>>(
   `);
 }
 
-function seedData(db: DatabaseSync): void {
+export function seedData(db: DatabaseSync): void {
   db.exec(`
     INSERT INTO users (id, name, email, invited_by_id) VALUES
       (1, 'Alice', 'alice@example.com', NULL),
