@@ -17,6 +17,14 @@ TML-2817: internal refactor of @prisma-next/extension-mongo's
 defineContract wrapper to eliminate bare casts via a shared bound
 contract builder. No extension API or behaviour change; incidental
 substrate diff only.
+
+TML-2683: additive @prisma-next/sql-orm-client surface — polymorphic-
+target `.include()` support (variant-shaped rows, `.variant()`
+narrowing, variant-aware `where`/`first` predicates) plus a depth-2
+nested-include decode fix. Existing extension call sites compile
+unchanged: non-polymorphic include row types are unaffected by the
+variant-union default widening, and no public API was removed or
+renamed. No codemod required.
 -->
 
 # 0.12 → 0.13 — Extension-author upgrade instructions
