@@ -1876,13 +1876,10 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
-  const { modelNodes: linkedModelNodes, syntheticPkFieldsByVariant } =
+  const { modelNodes: mtiLinkedModelNodes, syntheticPkFieldsByVariant } =
     materializeMtiVariantStorageLinks(modelNodes, baseDeclarations, stiVariantNames);
-  const { modelNodes: polyModelNodes, stiBaseFieldsByBase } = materializeStiVariantStorageColumns(
-    linkedModelNodes,
-    baseDeclarations,
-    stiVariantNames,
-  );
+  const { modelNodes: stiColumnModelNodes, stiBaseFieldsByBase } =
+    materializeStiVariantStorageColumns(mtiLinkedModelNodes, baseDeclarations, stiVariantNames);
 
   const valueObjects = buildValueObjects({
     compositeTypes,
@@ -1919,7 +1916,7 @@ export function interpretPslDocumentToSqlContract(
       ? { namespaceTypes: namespaceEnumStorageTypes }
       : {}),
     ...ifDefined('createNamespace', input.createNamespace),
-    models: polyModelNodes.map((model) => ({
+    models: stiColumnModelNodes.map((model) => ({
       ...model,
       ...(modelRelations.has(model.modelName)
         ? {
