@@ -843,43 +843,45 @@ describe('M:N include correlated subquery', () => {
         namespaces: {
           public: {
             id: 'public',
-            tables: {
-              parents: {
-                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
-              children: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            entries: {
+              table: {
+                parents: {
+                  columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
-              grandchildren: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  child_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                children: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
-              parent_child: {
-                columns: {
-                  parent_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  child_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                grandchildren: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    child_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['parent_id', 'child_id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+                parent_child: {
+                  columns: {
+                    parent_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    child_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['parent_id', 'child_id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
               },
             },
           },
