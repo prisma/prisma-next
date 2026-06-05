@@ -769,10 +769,10 @@ export async function withTransaction<R>(
       throw transactionClosedError();
     }
     for await (const row of inner) {
+      yield row;
       if (invalidated) {
         throw transactionClosedError();
       }
-      yield row;
     }
   }
 
