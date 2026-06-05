@@ -1,22 +1,19 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import {
-  type ContractSpaceMember,
-  graphWalkStrategy,
-  requireHeadRef,
-} from '@prisma-next/migration-tools/aggregate';
+import { type ContractSpaceMember, requireHeadRef } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
-import type { RefEntry } from '@prisma-next/migration-tools/refs';
+import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
+import { planMemberPath } from '../control-api/operations/migrate';
 import type {
   MigrateFailure,
   MigratePathDecision,
@@ -125,9 +122,12 @@ export interface MigrateResult {
 /**
  * Read-only preview of the migration path `migrate` will take.
  *
- * Computes the path through the SAME seam as `migrate`:
- * - `readAllMarkers()` for the from-state (when no `--from` is given)
- * - `graphWalkStrategy()` for the path selection
+ * Computes the path through the SAME seam as `executeMigrate`:
+ * - `readAllMarkers()` for the from-state (when no `--from` is given), preserving
+ *   the full marker including `invariants` (not just `storageHash`).
+ * - `planMemberPath()` (shared with `executeMigrate`) for per-member path selection,
+ *   which feeds `graphWalkStrategy()` with the same target hash, target invariants,
+ *   and current marker as the real apply path uses.
  *
  * Returns BEFORE any write boundary (`runMigration` / marker / DDL). No
  * DB state is mutated.
@@ -161,7 +161,7 @@ async function executeMigrateShowCommand(
     }
   }
 
-  let allRefs = {};
+  let allRefs: Refs = {};
   try {
     allRefs = await readRefs(refsDir);
   } catch (error) {
@@ -179,7 +179,10 @@ async function executeMigrateShowCommand(
   const appGraph = aggregate.app.graph();
 
   // Resolve the --to target (defaults to the on-disk contract, same as migrate).
+  // Also capture the ref's invariants so planMemberPath feeds graphWalkStrategy the
+  // same target invariants that real migrate would use (refInvariants ?? headRef.invariants).
   let targetHash: string = contractHash;
+  let refInvariants: readonly string[] | undefined;
   if (options.to) {
     const toResult = parseContractRef(options.to, {
       graph: appGraph,
@@ -198,6 +201,10 @@ async function executeMigrateShowCommand(
       );
     }
     targetHash = toResult.value.hash;
+    if (toResult.value.provenance.kind === 'ref') {
+      const refEntry = allRefs[toResult.value.provenance.refName];
+      if (refEntry) refInvariants = refEntry.invariants;
+    }
   }
 
   if (!flags.json && !flags.quiet) {
@@ -226,7 +233,13 @@ async function executeMigrateShowCommand(
   // Resolve the from-state.
   // - Explicit --from: parse it offline (no connection).
   // - Omitted: read the live DB marker via readAllMarkers() — the same source migrate uses.
-  const fromHashBySpace = new Map<string, string>();
+  //
+  // Full marker records (storageHash + invariants) are preserved so planMemberPath
+  // can feed graphWalkStrategy the complete currentMarker — exactly as executeMigrate
+  // does via familyInstance.readAllMarkers(). A stripped { storageHash, invariants: [] }
+  // marker would produce a different `required` set and a different (incorrect) path.
+  type LiveMarker = { readonly storageHash: string; readonly invariants: readonly string[] };
+  const markerBySpace = new Map<string, LiveMarker | null>();
   const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
 
   if (hasExplicitFrom) {
@@ -262,9 +275,14 @@ async function executeMigrateShowCommand(
           return notOk(missingDb);
         }
       } else {
-        // Offline hypothetical: use the same from-hash for all spaces
+        // Offline hypothetical: the --from ref only carries a hash (no live invariants).
+        // Use null for spaces not explicitly identified (planMemberPath treats null as
+        // "no marker" / greenfield), and set a hash-only marker for all spaces.
+        const fromHash = fromResult.value.hash;
+        const offlineMarker: LiveMarker | null =
+          fromHash === EMPTY_CONTRACT_HASH ? null : { storageHash: fromHash, invariants: [] };
         for (const member of allMembers) {
-          fromHashBySpace.set(member.spaceId, fromResult.value.hash);
+          markerBySpace.set(member.spaceId, offlineMarker);
         }
       }
     }
@@ -291,9 +309,11 @@ async function executeMigrateShowCommand(
     try {
       await client.connect(dbConnection);
       const allMarkers = await client.readAllMarkers();
+      // Store the full marker record (storageHash + invariants) per space.
+      // This is the same data executeMigrate uses via familyInstance.readAllMarkers().
       for (const member of allMembers) {
         const marker = allMarkers.get(member.spaceId);
-        fromHashBySpace.set(member.spaceId, marker?.storageHash ?? EMPTY_CONTRACT_HASH);
+        markerBySpace.set(member.spaceId, marker ?? null);
       }
     } catch (error) {
       if (CliStructuredError.is(error)) {
@@ -312,52 +332,59 @@ async function executeMigrateShowCommand(
     }
   }
 
-  // Walk the path via graphWalkStrategy — the SAME seam migrate uses.
+  // Walk the path via planMemberPath — the same helper executeMigrate uses.
+  // planMemberPath feeds graphWalkStrategy identical inputs (targetHash, targetInvariants,
+  // currentMarker with full invariants), so the preview path is always the path migrate runs.
   const orderedMigrations: MigrateShowMigration[] = [];
   for (const member of allMembers) {
-    const fromHash = fromHashBySpace.get(member.spaceId) ?? EMPTY_CONTRACT_HASH;
+    const isAppMember = member.spaceId === aggregate.app.spaceId;
     const headRef = requireHeadRef(member);
-    const memberTargetHash = member.spaceId === aggregate.app.spaceId ? targetHash : headRef.hash;
+    const memberTargetHash = isAppMember ? targetHash : headRef.hash;
+    const memberRefInvariants = isAppMember ? refInvariants : undefined;
+    const liveMarker = markerBySpace.get(member.spaceId) ?? null;
 
-    if (member.graph().nodes.size === 0) {
-      // No migrations on disk for this space — nothing to walk.
-      continue;
-    }
-
-    const memberWithTarget: ContractSpaceMember =
-      memberTargetHash === headRef.hash
-        ? member
-        : { ...member, headRef: { hash: memberTargetHash, invariants: headRef.invariants } };
-
-    const currentMarker =
-      fromHash === EMPTY_CONTRACT_HASH ? null : { storageHash: fromHash, invariants: [] };
-
-    // graphWalkStrategy is the exact same function migrate uses to plan its path.
-    const walked = graphWalkStrategy({
-      aggregateTargetId: aggregate.targetId,
-      member: memberWithTarget,
-      currentMarker,
+    const outcome = planMemberPath({
+      member,
+      aggregate,
+      targetHash: memberTargetHash,
+      refInvariants: memberRefInvariants,
+      liveMarker,
     });
 
-    if (walked.kind === 'unreachable') {
+    if (outcome.kind === 'at-head') {
+      // Empty-graph member already at target — nothing to run for this space.
+      continue;
+    }
+    if (outcome.kind === 'never-planned') {
       return notOk(
         errorPathUnreachable({
           code: 'MIGRATION_PATH_NOT_FOUND',
-          summary: `No migration path from ${fromHash.slice(0, 14)} to ${memberTargetHash.slice(0, 14)} in space "${member.spaceId}".`,
-          why: `The migration graph has no path from the from-state to the target in space "${member.spaceId}".`,
-          meta: { spaceId: member.spaceId, from: fromHash, to: memberTargetHash },
+          summary: `No on-disk migrations for contract space "${outcome.spaceId}"`,
+          why: `migrate is replay-only: space "${outcome.spaceId}" has no on-disk migrations but its head ref targets "${outcome.targetHash}".`,
+          meta: { spaceId: outcome.spaceId, target: outcome.targetHash, kind: 'neverPlanned' },
         }),
       );
     }
-    if (walked.kind === 'unsatisfiable') {
+    if (outcome.kind === 'unreachable') {
+      const fromHash = outcome.liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
       return notOk(
-        errorRuntime(`Missing required invariants for space "${member.spaceId}"`, {
-          why: `The path requires invariants not available on disk: ${walked.missing.join(', ')}`,
+        errorPathUnreachable({
+          code: 'MIGRATION_PATH_NOT_FOUND',
+          summary: `No migration path from ${fromHash.slice(0, 14)} to ${outcome.targetHash.slice(0, 14)} in space "${outcome.spaceId}".`,
+          why: `The migration graph has no path from the from-state to the target in space "${outcome.spaceId}".`,
+          meta: { spaceId: outcome.spaceId, from: fromHash, to: outcome.targetHash },
+        }),
+      );
+    }
+    if (outcome.kind === 'unsatisfiable') {
+      return notOk(
+        errorRuntime(`Missing required invariants for space "${outcome.spaceId}"`, {
+          why: `The path requires invariants not available on disk: ${outcome.missing.join(', ')}`,
         }),
       );
     }
 
-    for (const edge of walked.result.migrationEdges) {
+    for (const edge of outcome.plan.migrationEdges) {
       orderedMigrations.push({
         spaceId: member.spaceId,
         dirName: edge.dirName,
@@ -400,10 +427,11 @@ async function executeMigrateShowCommand(
     const appGraph = aggregate.app.graph();
     const rowModel = buildMigrationGraphRows(appGraph, { contractHash: targetHash });
     const layout = buildMigrationGraphLayout(rowModel);
-    const fromHash = fromHashBySpace.get(aggregate.app.spaceId) ?? EMPTY_CONTRACT_HASH;
+    const appLiveMarker = markerBySpace.get(aggregate.app.spaceId) ?? null;
+    const appFromHash = appLiveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
     graphOutput = renderMigrationGraphTree(layout, {
       contractHash: targetHash,
-      ...(needsLiveMarker ? { dbHash: fromHash } : {}),
+      ...(needsLiveMarker ? { dbHash: appFromHash } : {}),
       refsByHash,
       edgeAnnotationsByHash,
       colorize: flags.color !== false,

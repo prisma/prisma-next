@@ -5,6 +5,7 @@ import type { MigrationPlanOperation } from '@prisma-next/framework-components/c
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { writeRef } from '@prisma-next/migration-tools/refs';
 import stripAnsi from 'strip-ansi';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
@@ -109,6 +110,42 @@ async function buildFixture(): Promise<{ cwd: string; appDir: string }> {
   return { cwd, appDir };
 }
 
+/**
+ * Build a fixture where the --to ref carries invariants. Used to verify that
+ * planMemberPath feeds graphWalkStrategy the ref's invariants as
+ * member.headRef.invariants, not the contract-derived head ref's empty invariants.
+ *
+ * Graph: EMPTY → C1 → C2 (linear, both migrations provide no invariants).
+ * Named ref `prod` = { hash: C2, invariants: ['inv-a'] }.
+ *
+ * With the old bug: member.headRef.invariants was always [], so required = [].
+ * With the fix: member.headRef.invariants is ['inv-a'], so required = ['inv-a'] \ markerInvariants.
+ * The graphWalkStrategy call argument differs between the two — this test detects it.
+ */
+async function buildInvariantFixture(): Promise<{ cwd: string; appDir: string }> {
+  const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-show-inv-'));
+  tempDirs.push(cwd);
+  const appDir = join(cwd, 'migrations', 'app');
+  const refsDir = join(appDir, 'refs');
+  await mkdir(appDir, { recursive: true });
+  await writePkg(appDir, {
+    from: EMPTY,
+    to: C1,
+    providedInvariants: ['inv-a'],
+    createdAt: '2026-01-01T10:00:00.000Z',
+  });
+  await writePkg(appDir, {
+    from: C1,
+    to: C2,
+    providedInvariants: [],
+    createdAt: '2026-01-01T10:01:00.000Z',
+  });
+  await writeFile(join(cwd, 'contract.json'), JSON.stringify(contractEnvelope(C2)));
+  // Named ref 'prod' targeting C2 with invariant 'inv-a'.
+  await writeRef(refsDir, 'prod', { hash: C2, invariants: ['inv-a'] });
+  return { cwd, appDir };
+}
+
 function setupConfigMock(): void {
   mocks.loadConfig.mockResolvedValue({
     family: {
@@ -169,7 +206,10 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(mocks.runMigration).not.toHaveBeenCalled();
   });
 
-  it('faithfulness: path is computed via graphWalkStrategy (same seam as migrate)', async () => {
+  it('faithfulness: graphWalkStrategy is called with the correct inputs (same as migrate apply)', async () => {
+    // Basic fixture: linear chain, no ref invariants.
+    // Asserts graphWalkStrategy is called with a correctly-assembled currentMarker
+    // (null for EMPTY from-state) and the contract-derived target hash.
     const { cwd } = await buildFixture();
     process.chdir(cwd);
 
@@ -187,6 +227,56 @@ describe('migrate --show (read-only + faithfulness)', () => {
     }
 
     expect(mocks.graphWalkStrategy).toHaveBeenCalled();
+    const [firstCall] = mocks.graphWalkStrategy.mock.calls;
+    expect(firstCall).toBeDefined();
+    const callArg = firstCall![0] as { currentMarker: unknown; member: { headRef: unknown } };
+    // From sha256:empty — marker should be null (planMemberPath treats EMPTY as no-marker).
+    expect(callArg.currentMarker).toBeNull();
+    // App member head ref invariants default to [] (synthesised from contract).
+    expect((callArg.member.headRef as { invariants: unknown }).invariants).toEqual([]);
+  });
+
+  it('faithfulness: --to ref invariants are passed to graphWalkStrategy (not silently dropped)', async () => {
+    // This test would have caught the original Bug #2: the show command was ignoring the
+    // --to ref's invariants and always using headRef.invariants = [] instead.
+    //
+    // Fixture: EMPTY → C1 (provides 'inv-a') → C2; named ref 'prod' = { hash: C2, invariants: ['inv-a'] }.
+    // With the old bug: member.headRef.invariants = [] (invariants dropped).
+    // With the fix:    member.headRef.invariants = ['inv-a'] (ref invariants propagated).
+    //
+    // On a graph where all paths from EMPTY satisfy 'inv-a' (EMPTY→C1 provides it), the
+    // walk still succeeds; what changes is the required set fed to findPathWithDecision.
+    // A graph with ONLY a path that does NOT provide 'inv-a' from the current position would
+    // return 'unsatisfiable' under the bug but succeed here — making the bug detectable via
+    // the call arguments without needing a branching graph topology.
+    const { cwd } = await buildInvariantFixture();
+    process.chdir(cwd);
+
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+
+    try {
+      await executeCommand(createMigrateCommand(), [
+        '--show',
+        '--from',
+        'sha256:empty',
+        '--to',
+        'prod',
+        '--no-color',
+      ]);
+    } catch {
+      // process.exit on success
+    }
+
+    expect(getExitCode()).toBe(0);
+    expect(mocks.graphWalkStrategy).toHaveBeenCalled();
+    const [firstCall] = mocks.graphWalkStrategy.mock.calls;
+    expect(firstCall).toBeDefined();
+    const callArg = firstCall![0] as { member: { headRef: { hash: string; invariants: unknown } } };
+    // The ref 'prod' has invariants: ['inv-a']. planMemberPath must propagate these
+    // as member.headRef.invariants. The old bug set headRef.invariants = [] here.
+    expect(callArg.member.headRef.invariants).toEqual(['inv-a']);
+    // And the target hash must be C2 (the ref's hash).
+    expect(callArg.member.headRef.hash).toBe(C2);
   });
 
   it('prints the ordered list of migrations that will run', async () => {
