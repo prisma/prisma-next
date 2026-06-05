@@ -47,7 +47,7 @@ Lives in `docs/` (canonical) or in the package's `README.md` (entry-point friend
 
 1. **At a glance.** The same canonical code sample from [`overview.md`](overview.md), so users see the surface immediately.
 2. **Setup.** `prisma-next init --supabase`; what env vars to populate; one paragraph on how the Supabase project's database connection URL maps to `DATABASE_URL`.
-3. **Your first model.** Walk through the scaffolded `Profile` model. Explain the cross-contract FK (model handle `AuthUser` value-imported from `@prisma-next/extension-supabase/contract`), `control` (implicit via Supabase contract; see [`projects/control-policy/spec.md`](../control-policy/spec.md)), and the `.rls([...])` policy stage.
+3. **Your first model.** Walk through the scaffolded `Profile` model. Explain the cross-contract FK (model handle `AuthUser` value-imported from `@prisma-next/extension-supabase/contract`), `control` (implicit via Supabase contract; see [ADR 224](../../docs/architecture%20docs/adrs/ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md)), and the `.rls([...])` policy stage.
 4. **Your first migration.** Run the planner; show the generated DDL; explain what's *not* in it (no `CREATE TABLE auth.users` because it's externally-managed).
 5. **Your first query.** Show `db.asUser(jwt).sql.from(Profile)...`. Show what RLS enforcement looks like (a query that would return another user's row returns empty).
 6. **What's next.** Link to ref docs (Postgres target, contract authoring, RLS, etc.).

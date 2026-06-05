@@ -1,3 +1,8 @@
+/**
+ * Shared runner tail (`runMigration` + `buildPerSpaceBreakdown`/`collectOrdered`).
+ * Backs no command directly; consumed by db-run and migrate.
+ */
+
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
@@ -11,32 +16,32 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import type { OnControlProgress, PerSpaceExecutionEntry } from '../types';
 
 /**
- * Span id emitted via `onProgress` for the apply phase. Stable
+ * Span id emitted via `onProgress` for the run phase. Stable
  * identifier consumed by the structured-output renderer and by tests.
  */
-const APPLY_SPAN_ID = 'apply' as const;
+const RUN_SPAN_ID = 'apply' as const;
 
 /**
- * Action that originated this apply call. Threaded into `OnControlProgress`
+ * Action that originated this run call. Threaded into `OnControlProgress`
  * events so the parent CLI command can attribute the span correctly,
  * and used to compose action-specific summary phrasing.
  */
-export type ApplyAction = 'dbInit' | 'dbUpdate' | 'migrationApply';
+export type RunAction = 'dbInit' | 'dbUpdate' | 'migrate';
 
 /**
- * Failure variant emitted by {@link applyMigration} when the runner
- * itself rejects the apply. Mirrors the failure shape callers
+ * Failure variant emitted by {@link runMigration} when the runner
+ * itself rejects the run. Mirrors the failure shape callers
  * already wrap into their own action-specific failure envelopes
- * (`DbInitFailure`, `DbUpdateFailure`, `MigrationApplyFailure`) so each
+ * (`DbInitFailure`, `DbUpdateFailure`, `MigrateFailure`) so each
  * caller keeps owning its own discriminated failure code.
  */
-export interface ApplyRunnerFailure {
+export interface RunnerFailure {
   readonly summary: string;
   readonly why?: string;
   readonly meta: Record<string, unknown>;
 }
 
-export interface ApplyMigrationInputs<TFamilyId extends string, TTargetId extends string> {
+export interface RunMigrationInputs<TFamilyId extends string, TTargetId extends string> {
   readonly aggregate: ContractSpaceAggregate;
   /**
    * Per-space plans, keyed by `spaceId`. Produced by either the full
@@ -62,22 +67,22 @@ export interface ApplyMigrationInputs<TFamilyId extends string, TTargetId extend
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly policy: MigrationOperationPolicy;
-  readonly action: ApplyAction;
+  readonly action: RunAction;
   readonly onProgress?: OnControlProgress;
 }
 
 /**
  * Resolved per-space plan in canonical schedule order. Surfaced from
- * {@link applyMigration} to callers so each one can build its own
+ * {@link runMigration} to callers so each one can build its own
  * action-specific success envelope (e.g. `DbInitSuccess` vs
- * `MigrationApplySuccess`) without re-deriving the ordering.
+ * `MigrateSuccess`) without re-deriving the ordering.
  */
 export interface OrderedResolution {
   readonly spaceId: string;
   readonly entry: PerSpacePlan;
 }
 
-export interface ApplyMigrationValue {
+export interface RunMigrationValue {
   readonly orderedResolutions: readonly OrderedResolution[];
   readonly totalOpsPlanned: number;
   readonly totalOpsExecuted: number;
@@ -89,10 +94,10 @@ export interface ApplyMigrationValue {
   readonly perSpace: readonly PerSpaceExecutionEntry[];
 }
 
-export type ApplyMigrationResult = Result<ApplyMigrationValue, ApplyRunnerFailure>;
+export type RunMigrationResult = Result<RunMigrationValue, RunnerFailure>;
 
 /**
- * Runner-driving tail shared by every apply caller — `db init`,
+ * Runner-driving tail shared by every run caller — `db init`,
  * `db update`, and `migrate`. Consumes already-resolved per-space
  * plans (the planner-vs-replay distinction is owned by the caller) and
  * dispatches them to the runner in canonical order.
@@ -107,9 +112,9 @@ export type ApplyMigrationResult = Result<ApplyMigrationValue, ApplyRunnerFailur
  * so callers don't have to duplicate it; the `action` field on each
  * progress event is taken from the caller's `action` argument.
  */
-export async function applyMigration<TFamilyId extends string, TTargetId extends string>(
-  inputs: ApplyMigrationInputs<TFamilyId, TTargetId>,
-): Promise<ApplyMigrationResult> {
+export async function runMigration<TFamilyId extends string, TTargetId extends string>(
+  inputs: RunMigrationInputs<TFamilyId, TTargetId>,
+): Promise<RunMigrationResult> {
   const {
     aggregate,
     perSpacePlans,
@@ -130,7 +135,7 @@ export async function applyMigration<TFamilyId extends string, TTargetId extends
   onProgress?.({
     action,
     kind: 'spanStart',
-    spanId: APPLY_SPAN_ID,
+    spanId: RUN_SPAN_ID,
     label: progressLabelForAction(action),
   });
 
@@ -152,7 +157,7 @@ export async function applyMigration<TFamilyId extends string, TTargetId extends
   const runnerResult = await runner.execute({ driver, perSpaceOptions });
 
   if (!runnerResult.ok) {
-    onProgress?.({ action, kind: 'spanEnd', spanId: APPLY_SPAN_ID, outcome: 'error' });
+    onProgress?.({ action, kind: 'spanEnd', spanId: RUN_SPAN_ID, outcome: 'error' });
     return notOk({
       summary: runnerResult.failure.summary,
       ...ifDefined('why', runnerResult.failure.why),
@@ -163,7 +168,7 @@ export async function applyMigration<TFamilyId extends string, TTargetId extends
       },
     });
   }
-  onProgress?.({ action, kind: 'spanEnd', spanId: APPLY_SPAN_ID, outcome: 'ok' });
+  onProgress?.({ action, kind: 'spanEnd', spanId: RUN_SPAN_ID, outcome: 'ok' });
 
   const totalOpsPlanned = runnerResult.value.perSpaceResults.reduce(
     (sum, r) => sum + r.value.operationsPlanned,
@@ -195,7 +200,7 @@ export async function applyMigration<TFamilyId extends string, TTargetId extends
  * advances as the last step of each space's transaction) and `false`
  * for plan-mode (no marker has been written yet).
  *
- * Exported alongside {@link applyMigration} so plan-mode callers can
+ * Exported alongside {@link runMigration} so plan-mode callers can
  * assemble the same per-space block without going through the runner.
  */
 export function buildPerSpaceBreakdown(
@@ -244,18 +249,18 @@ export function collectOrdered(
 }
 
 /**
- * Action-appropriate label for the `spanStart` event the apply
- * primitive emits. `applyMigration` is shared by `db init`, `db update`,
+ * Action-appropriate label for the `spanStart` event the run
+ * primitive emits. `runMigration` is shared by `db init`, `db update`,
  * and `migrate`; the span label tracks the user-visible action
  * so structured-progress output reads naturally for each surface.
  */
-export function progressLabelForAction(action: ApplyAction): string {
+export function progressLabelForAction(action: RunAction): string {
   switch (action) {
     case 'dbInit':
       return 'Initialising database across spaces';
     case 'dbUpdate':
       return 'Updating database across spaces';
-    case 'migrationApply':
-      return 'Applying migration plan across spaces';
+    case 'migrate':
+      return 'Running migration plan across spaces';
   }
 }

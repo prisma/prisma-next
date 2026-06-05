@@ -45,6 +45,75 @@ import { existsSync } from 'node:fs';
 import { argv, cwd, exit, stderr, stdout } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * Parse the `changes:` key from an `instructions.md` frontmatter block.
+ *
+ * Accepts two shapes emitted by the upgrade-skill authoring workflow:
+ *   - `changes: []`               — inline empty array (incidental diff no-op)
+ *   - `changes:\n  - id: …\n …`  — block sequence (one or more real entries)
+ *
+ * Returns `{ ok: true, changes: Array<{id: string}> }` on success, or
+ * `{ ok: false, reason: string }` when the frontmatter is absent or the
+ * `changes:` key cannot be resolved.
+ */
+export function parseChangesFrontmatter(src) {
+  const fmMatch = /^---\s*\n([\s\S]*?)\n---/.exec(src);
+  if (!fmMatch) {
+    return { ok: false, reason: 'missing frontmatter block' };
+  }
+  const fm = fmMatch[1];
+
+  // Inline empty array: `changes: []`
+  if (/^changes:\s*\[\s*\]/m.test(fm)) {
+    return { ok: true, changes: [] };
+  }
+
+  // Inline non-empty flow array: `changes: [foo]` or `changes: [a, b]`
+  // Must have at least one non-whitespace character inside the brackets.
+  if (/^changes:\s*\[.*\S.*\]/m.test(fm)) {
+    const flowMatch = /^changes:\s*\[(.+)\]/m.exec(fm);
+    const elements = flowMatch
+      ? flowMatch[1]
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    return { ok: true, changes: elements };
+  }
+
+  // Block sequence: `changes:` followed by indented `- ` bullet lines.
+  // Walk lines linearly to avoid ReDoS from nested quantifiers on multi-line
+  // patterns. Collect bullet lines after `changes:` until the first non-blank,
+  // non-indented line.
+  const lines = fm.split('\n');
+  const changesIdx = lines.findIndex((l) => /^changes:\s*$/.test(l));
+  if (changesIdx !== -1) {
+    const bulletLines = [];
+    for (let i = changesIdx + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line === '' || /^\s/.test(line)) {
+        if (/^\s+-\s/.test(line)) bulletLines.push(line);
+      } else {
+        break;
+      }
+    }
+    if (bulletLines.length > 0) {
+      const entries = bulletLines.map((line) => {
+        const idMatch = /^\s+-\s+id:\s+(.+)$/.exec(line);
+        return idMatch ? { id: idMatch[1].trim() } : {};
+      });
+      return { ok: true, changes: entries };
+    }
+  }
+
+  // `changes:` key present but with no recognisable value
+  if (/^changes:/m.test(fm)) {
+    return { ok: false, reason: 'changes key present but value is not an array' };
+  }
+
+  return { ok: false, reason: 'changes key absent' };
+}
+
 const USER_SKILL_PKG = 'skills/upgrade/prisma-next-upgrade';
 const EXT_SKILL_PKG = 'skills/extension-author/prisma-next-extension-upgrade';
 
@@ -177,6 +246,19 @@ function readPackageJsonAtRef(repoRoot, ref) {
   return JSON.parse(raw);
 }
 
+function tryReadFileAtRef(repoRoot, ref, path) {
+  try {
+    return git(repoRoot, 'show', `${ref}:${path}`);
+  } catch {
+    return null;
+  }
+}
+
+function diffAllChangedPaths(repoRoot, prev, head) {
+  const out = git(repoRoot, 'diff', '--name-only', `${prev}..${head}`);
+  return new Set(out.split('\n').filter(Boolean));
+}
+
 function diffPaths(repoRoot, prev, head, pathspecs) {
   const args = ['diff', '--name-only', `${prev}..${head}`, '--'];
   args.push(...pathspecs);
@@ -285,6 +367,10 @@ export function runCheck({ repoRoot, head, prev }) {
 
   const violations = [];
 
+  // Compute the full set of changed paths once; reused by the
+  // per-PR-declaration check below.
+  const changedPaths = diffAllChangedPaths(repoRoot, prev, head);
+
   // Coverage check fires whenever the substrate diff is non-empty.
   // No carve-out for patch ranges, no carve-out for "regenerated"
   // artefacts. A consumer-facing diff is a consumer-facing diff —
@@ -309,6 +395,34 @@ export function runCheck({ repoRoot, head, prev }) {
           rule: 'coverage',
           substrate,
           requiredDir,
+          sampleDiffPaths: substrateDiff.slice(0, 5),
+        });
+        continue;
+      }
+      // Per-PR correspondence check: the directory exists, but this PR
+      // must also have touched the instructions.md and that file must
+      // carry a valid `changes:` array (empty or non-empty) so that
+      // deliberate intent is recorded per PR, not just per transition
+      // directory creation.
+      const instructionsPath = `${skillPkg}/upgrades/${transition}/instructions.md`;
+      if (!changedPaths.has(instructionsPath)) {
+        violations.push({
+          rule: 'per-pr-declaration',
+          substrate,
+          instructionsPath,
+          sampleDiffPaths: substrateDiff.slice(0, 5),
+        });
+        continue;
+      }
+      const raw = tryReadFileAtRef(repoRoot, head, instructionsPath);
+      const parsed = raw ? parseChangesFrontmatter(raw) : { ok: false, reason: 'file unreadable' };
+      if (!parsed.ok) {
+        violations.push({
+          rule: 'per-pr-declaration',
+          substrate,
+          instructionsPath,
+          malformed: true,
+          reason: parsed.reason,
           sampleDiffPaths: substrateDiff.slice(0, 5),
         });
       }
@@ -373,6 +487,26 @@ function renderViolations(result, write) {
           '                skills/upgrade/prisma-next-upgrade/upgrades/<one-of-the-above>/instructions.md\n' +
           '                skills/extension-author/prisma-next-extension-upgrade/upgrades/<one-of-the-above>/instructions.md\n',
       );
+    } else if (v.rule === 'per-pr-declaration') {
+      if (v.malformed) {
+        write(
+          `  [per-pr-declaration] ${v.instructionsPath} was updated but its frontmatter\n` +
+            `              is missing or has a malformed changes: key (${v.reason});\n` +
+            '              add a changes[] entry or declare `changes: []` for an incidental diff\n',
+        );
+      } else {
+        write(
+          `  [per-pr-declaration] PR touches ${v.substrate} but did not record an upgrade\n` +
+            `              declaration in ${v.instructionsPath};\n` +
+            '              add a changes[] entry or declare `changes: []` for an incidental diff\n',
+        );
+      }
+      if (v.sampleDiffPaths.length > 0) {
+        write('              sample paths from the diff:\n');
+        for (const p of v.sampleDiffPaths) {
+          write(`                ${p}\n`);
+        }
+      }
     }
   }
   write(

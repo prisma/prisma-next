@@ -16,7 +16,7 @@ import {
 } from '@prisma-next/migration-tools/aggregate';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
-import { type ApplyAction, applyMigration } from '../../src/control-api/operations/apply';
+import { type RunAction, runMigration } from '../../src/control-api/operations/run-migration';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 
 const APP_HASH = `sha256:${'a'.repeat(64)}`;
@@ -94,12 +94,12 @@ function makeMigrations(): TargetMigrationsCapability<
   >;
 }
 
-async function runWithAction(action: ApplyAction): Promise<ControlProgressEvent[]> {
+async function runWithAction(action: RunAction): Promise<ControlProgressEvent[]> {
   const events: ControlProgressEvent[] = [];
   const aggregate = makeAggregate();
   const perSpacePlans = new Map([['app', makePerSpacePlan()]]);
 
-  await applyMigration<'sql', 'postgres'>({
+  await runMigration<'sql', 'postgres'>({
     aggregate,
     perSpacePlans,
     applyOrder: ['app'],
@@ -114,7 +114,7 @@ async function runWithAction(action: ApplyAction): Promise<ControlProgressEvent[
   return events;
 }
 
-describe('applyMigration apply span label', () => {
+describe('runMigration apply span label', () => {
   it('emits the `dbInit` label for action=dbInit', async () => {
     const events = await runWithAction('dbInit');
     const start = events.find((e) => e.kind === 'spanStart' && e.spanId === 'apply');
@@ -133,12 +133,12 @@ describe('applyMigration apply span label', () => {
     });
   });
 
-  it('emits the `migrationApply` label for action=migrationApply', async () => {
-    const events = await runWithAction('migrationApply');
+  it('emits the `migrate` label for action=migrate', async () => {
+    const events = await runWithAction('migrate');
     const start = events.find((e) => e.kind === 'spanStart' && e.spanId === 'apply');
     expect(start).toMatchObject({
-      action: 'migrationApply',
-      label: 'Applying migration plan across spaces',
+      action: 'migrate',
+      label: 'Running migration plan across spaces',
     });
   });
 });
