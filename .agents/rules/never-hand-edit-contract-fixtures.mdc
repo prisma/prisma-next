@@ -1,3 +1,7 @@
+---
+description: Forbid hand-editing emitted contract fixtures (contract.json, contract.d.ts, expected.contract.json) — always regenerate via `pnpm fixtures:emit`
+alwaysApply: true
+---
 # Never hand-edit emitted contract fixtures
 
 **CRITICAL**: Never hand-edit `contract.json`, `contract.d.ts`, `expected.contract.json`, or any other file emitted by the contract pipeline. These files are generated; their canonical form is whatever the emitter produces, byte-for-byte.
