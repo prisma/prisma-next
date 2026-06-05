@@ -1,0 +1,33 @@
+## Dispatch plan
+
+_Slice: `migrate-show-preview`. Four sequential dispatches, one PR (commit-per-dispatch). The `@`-vocabulary splits into two surfaces — render (D1) and reference grammar (D2) — because they're different code with different tests; the command then builds on both (D3 list, D4 graph). D4 has a non-linear hand-off: it builds on D3's on-path set **and** D1's relabelled overlay._
+
+### Dispatch 1: Render-vocabulary relabel — reserved markers draw as `@db`/`@contract`
+
+- **Outcome:** The shared Tier-3 overlay draws reserved markers as `@contract`/`@db` (sigil, no angle brackets); user refs keep parens. The `--legend` example markers + explanatory text use the `@`-form and note they're typeable `--from`/`--to` tokens. `graph`/`status`/`list` snapshots are regenerated and consistent. `tsc` + cli tests green.
+- **Builds on:** The spec's chosen design (D-MS7).
+- **Hands to:** A green tree where every command rendering the shared overlay/legend speaks `@db`/`@contract` — the visual vocabulary D4 will highlight on.
+- **Focus:** the marker-name styling in `migration-list-styler.ts` (the `<…>` branch, `:91-94`/`:19`) → `@`-prefix, drop brackets; `overlayNamesForContract` / styler in `migration-graph-tree-render.ts`; `formatLegendExampleMarkers` (`:744`) + the legend text in `renderMigrationGraphLegend` (`:765`). **Out:** the reference-grammar tokens (D2), `migrate --show` (D3/D4). **Gate:** `pnpm typecheck`; `pnpm --filter @prisma-next/cli test` green with `graph`/`status`/`list` snapshots updated; `rg "green\('<'\)|<\$\{names" packages/1-framework/3-tooling/cli/src/utils/formatters` shows no reserved-marker angle-bracket rendering remains.
+
+### Dispatch 2: `@db` + `@contract` reference-grammar tokens
+
+- **Outcome:** The contract-reference grammar accepts `@db` and `@contract` anywhere `--from`/`--to` are accepted. `@contract` resolves **offline** to the working/desired contract hash; `@db` resolves to the **live DB marker** (connection-required) — returned as a connection-requiring result the CLI layer resolves via `readAllMarkers()`, with a clear "needs a connection" error when offline. Unit tests cover both, plus the offline-`@db` error. `tsc` + cli tests green.
+- **Builds on:** Independent of D1 (different surface); the spec's D-MS5.
+- **Hands to:** `@db`/`@contract` are first-class reference inputs with a resolution helper any command can call — the explicit-`--from` path D3 wires.
+- **Focus:** `parseContractRef` (`migration-tools/src/refs/contract-ref.ts`) recognising the `@`-sigil tokens (implementer picks the seam — parse-level vs context-injected reserved refs); the offline `@contract` resolution; the `@db` connection-requiring result + a shared CLI resolver helper. **Out:** rendering (D1); the `migrate --show` command (D3). **Gate:** `pnpm typecheck`; new `parseContractRef`/resolver unit tests green (positive `@contract`, positive `@db`-with-marker, negative `@db`-no-connection); `pnpm --filter @prisma-next/cli test`.
+
+### Dispatch 3: `migrate --show` — read-only path compute + ordered execution list
+
+- **Outcome:** `migrate --show [--from <ref>] [--to <ref>]` works as a **read-only** preview: default from-state = the live marker (`readAllMarkers`, read-only), explicit `--from X` = offline hypothetical (incl. `@db`/`@contract` via D2); the path is computed by `graphWalkStrategy()` — the same seam `migrate` uses — and the command **returns before `runMigration()`** (no writes). It prints the **linear, ordered list** of migrations that will run. Edge cases handled: no path, already-at-target (empty), multi-space, `@db`-with-no-connection. `tsc` + cli tests green.
+- **Builds on:** Dispatch 2's `@db`/`@contract` resolver (for explicit `--from`); the planner seam confirmed by the spike (`graphWalkStrategy` / `runMigration` boundary).
+- **Hands to:** A working `migrate --show` that prints the read-only ordered list and exposes the **on-path migration-hash set** — the input D4 highlights.
+- **Focus:** `--show`/`--from` flags in `createMigrateCommand`; making the DB connection optional when `--from` is explicit; the read-only compute path (`readAllMarkers` → resolve from-state → `graphWalkStrategy` → stop before `runMigration`); the ordered-list formatter + `--json` parity if the family convention requires it; the four edge cases. **Out:** the graph visualization (D4). **Gate:** `pnpm typecheck`; `pnpm --filter @prisma-next/cli test`; new coverage proving (a) **read-only** — no path reaches `runMigration`/marker/ledger writes in `--show`, and (b) **faithfulness** — the path is computed via `graphWalkStrategy` (same seam as apply), asserted at the call site.
+
+### Dispatch 4: `migrate --show` graph visualization — green path + dimmed off-path
+
+- **Outcome:** `migrate --show` renders the Tier-3 graph with the chosen path (from-state → target) highlighted **bright green**, off-path nodes **dimmed and unlabelled**, and only path migrations named — alongside D3's ordered list. The graph shows the `@db`/`@contract` markers (D1's vocabulary). `tsc` + cli tests green; a snapshot/e2e fixture captures the highlighted output.
+- **Builds on:** Dispatch 3's on-path migration-hash set **and** Dispatch 1's relabelled overlay (non-linear: needs both, not just D3).
+- **Hands to:** The slice-DoD — `migrate --show` delivers the full two-part artifact (green-path graph + ordered list), faithfully and read-only, in the unified `@`-vocabulary. Ready for PR.
+- **Focus:** extend the renderer's annotation mechanism (`MigrationEdgeAnnotation` / `edgeAnnotationsByHash`, `migration-graph-tree-render.ts:46-53,452`) with an on-path **highlight** annotation (green) + an **off-path dim** mode; wire the command to pass the on-path set + dim the rest; a fixture exercising the worked example (DB one migration behind target). **Out:** any new path-finding (reuse D3's); behavioural change to `migrate`. **Gate:** `pnpm typecheck`; `pnpm --filter @prisma-next/cli test` with the `--show` graph snapshot green; reviewer confirms the render reuses the existing annotation plumbing (no parallel renderer).
+
+_Dispatch-INVEST: D1 is a mechanical relabel + snapshot regen (one outcome, binary grep/snapshot gates). D2 is a single grammar addition with unit-level gates. D3 is a single-package feature (the read-only preview + list) with read-only + faithfulness as named, testable gates. D4 is a bounded renderer extension reusing existing annotation plumbing. Each is Small (fits one session, references scoped to the named files) and Independent given the D1→D2→D3→D4 hand-offs (D4's dual dependency surfaced). Total 4 ≤ 10. Ships as one PR, four commits._
