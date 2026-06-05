@@ -6,9 +6,14 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { applicationDomainOf } from '@prisma-next/test-utils';
+import { type } from 'arktype';
 import { join } from 'pathe';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbSignCommand } from '../../src/commands/db-sign';
+import {
+  type MigrationSpaceGraphEntry,
+  migrationGraphJsonResultSchema,
+} from '../../src/commands/json/schemas';
 import { executeMigrationGraphCommand } from '../../src/commands/migration-graph';
 import { executeMigrationLogCommand } from '../../src/commands/migration-log';
 import { executeRefSetCommand } from '../../src/commands/ref';
@@ -147,23 +152,10 @@ async function writeEndContract(packageDir: string, storageHash: string): Promis
 }
 
 function migrationGraphJson(result: {
-  graph: {
-    nodes: ReadonlySet<string>;
-    migrationByHash: ReadonlyMap<
-      string,
-      { dirName: string; from: string; to: string; migrationHash: string }
-    >;
-  };
+  spaces: readonly MigrationSpaceGraphEntry[];
   summary: string;
 }): string {
-  const nodes = [...result.graph.nodes];
-  const edges = [...result.graph.migrationByHash.values()].map((e) => ({
-    dirName: e.dirName,
-    from: e.from,
-    to: e.to,
-    migrationHash: e.migrationHash,
-  }));
-  return JSON.stringify({ ok: true, nodes, edges, summary: result.summary }, null, 2);
+  return JSON.stringify({ ok: true, spaces: [...result.spaces], summary: result.summary }, null, 2);
 }
 
 function migrationLogJson(
@@ -221,31 +213,47 @@ describe('read commands --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    expect(migrationGraphJsonResultSchema(result.value) instanceof type.errors).toBe(false);
+
     const json = migrationGraphJson(result.value);
     expect(json).toBe(
       [
         '{',
         '  "ok": true,',
-        '  "nodes": [',
-        `    "${EMPTY_CONTRACT_HASH}",`,
-        `    "${HASH_A}",`,
-        `    "${HASH_B}"`,
-        '  ],',
-        '  "edges": [',
+        '  "spaces": [',
         '    {',
-        `      "dirName": "${dirInit}",`,
-        `      "from": "${EMPTY_CONTRACT_HASH}",`,
-        `      "to": "${HASH_A}",`,
-        '      "migrationHash": "sha256:d5c8739bfe8617fa82603875980b18d7dee1e02637499fd451ec7f1a7087e920"',
-        '    },',
-        '    {',
-        `      "dirName": "${dirNext}",`,
-        `      "from": "${HASH_A}",`,
-        `      "to": "${HASH_B}",`,
-        '      "migrationHash": "sha256:ca2593661d91c77720887ec8ff9ff6de7a7009df17757b7a5952fde8ceae9747"',
+        '      "space": "app",',
+        '      "contracts": [',
+        '        {',
+        `          "hash": "${EMPTY_CONTRACT_HASH}",`,
+        '          "refs": []',
+        '        },',
+        '        {',
+        `          "hash": "${HASH_A}",`,
+        '          "refs": []',
+        '        },',
+        '        {',
+        `          "hash": "${HASH_B}",`,
+        '          "refs": []',
+        '        }',
+        '      ],',
+        '      "migrations": [',
+        '        {',
+        `          "name": "${dirInit}",`,
+        '          "hash": "sha256:d5c8739bfe8617fa82603875980b18d7dee1e02637499fd451ec7f1a7087e920",',
+        `          "fromContract": "${EMPTY_CONTRACT_HASH}",`,
+        `          "toContract": "${HASH_A}"`,
+        '        },',
+        '        {',
+        `          "name": "${dirNext}",`,
+        '          "hash": "sha256:ca2593661d91c77720887ec8ff9ff6de7a7009df17757b7a5952fde8ceae9747",',
+        `          "fromContract": "${HASH_A}",`,
+        `          "toContract": "${HASH_B}"`,
+        '        }',
+        '      ]',
         '    }',
         '  ],',
-        '  "summary": "3 node(s), 2 edge(s)"',
+        '  "summary": "1 space(s), 3 contract(s), 2 migration(s)"',
         '}',
       ].join('\n'),
     );

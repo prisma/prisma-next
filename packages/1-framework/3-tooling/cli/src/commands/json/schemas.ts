@@ -41,3 +41,28 @@ export const migrationListResultSchema = successEnvelopeBaseSchema.and(
 );
 
 export type MigrationListResult = typeof migrationListResultSchema.infer;
+
+export const graphMigrationSchema = type({
+  name: 'string',
+  hash: 'string',
+  fromContract: 'string',
+  toContract: 'string',
+});
+
+export type GraphMigration = typeof graphMigrationSchema.infer;
+
+export const migrationSpaceGraphEntrySchema = type({
+  space: 'string',
+  contracts: contractRefSchema.array(),
+  migrations: graphMigrationSchema.array(),
+});
+
+export type MigrationSpaceGraphEntry = typeof migrationSpaceGraphEntrySchema.infer;
+
+export const migrationGraphJsonResultSchema = successEnvelopeBaseSchema.and(
+  type({
+    spaces: migrationSpaceGraphEntrySchema.array(),
+  }),
+);
+
+export type MigrationGraphJsonResult = typeof migrationGraphJsonResultSchema.infer;
