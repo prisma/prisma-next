@@ -159,12 +159,28 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
   };
 
   // The family-level driver type is `ControlDriverInstance<'mongo', string>`,
-  // but the SPI methods are typed against `<'mongo', 'mongo'>`. Today's only
-  // Mongo target is `'mongo'`, so the runtime values are identical; the cast
-  // satisfies the structural type-system mismatch on `targetId`.
-  const asMongoDriver = (
+  // but the SPI methods are typed against `<'mongo', 'mongo'>`. A type predicate
+  // narrows safely based on targetId rather than casting. The family layer cannot
+  // import the adapter's MongoControlDriverInstance (targets domain), so this
+  // predicate returns the framework type only. The adapter's isMongoControlDriver
+  // predicate handles transport-bearing narrowing (MongoControlDriverInstance with
+  // .db and .execute).
+  function isMongoTargetDriver(
     driver: ControlDriverInstance<'mongo', string>,
-  ): ControlDriverInstance<'mongo', 'mongo'> => driver as ControlDriverInstance<'mongo', 'mongo'>;
+  ): driver is ControlDriverInstance<'mongo', 'mongo'> {
+    return driver.targetId === 'mongo';
+  }
+
+  function asMongoDriver(
+    driver: ControlDriverInstance<'mongo', string>,
+  ): ControlDriverInstance<'mongo', 'mongo'> {
+    if (!isMongoTargetDriver(driver)) {
+      throw new Error(
+        `Expected Mongo control driver with targetId 'mongo', got '${driver.targetId}'`,
+      );
+    }
+    return driver;
+  }
 
   return {
     familyId: 'mongo' as const,

@@ -14,16 +14,16 @@ import type { Db } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
 import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';
 import { MongoControlAdapterImpl } from './mongo-control-adapter';
+import { isMongoControlDriver } from './mongo-control-driver';
 
 export function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
-  const mongoDriver = driver as ControlDriverInstance<'mongo', 'mongo'> & { db?: Db };
-  if (!mongoDriver.db) {
+  if (!isMongoControlDriver(driver)) {
     throw new Error(
       'Mongo control driver does not expose a db property. ' +
         'Use mongoControlDriver.create() from `@prisma-next/driver-mongo/control`.',
     );
   }
-  return mongoDriver.db;
+  return driver.db;
 }
 
 /**
