@@ -59,6 +59,13 @@ export interface RenderMigrationGraphTreeOptions {
   readonly edgeAnnotationsByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly dbHash?: string;
   readonly contractHash?: string;
+  /**
+   * Whether this render is for the app space. When false, the `@contract`
+   * marker is suppressed — `@contract` is an app-space concept and must not
+   * appear in extension spaces (e.g. `pgvector:`). Defaults to `true` so
+   * single-space callers that do not pass this option are unaffected.
+   */
+  readonly isAppSpace?: boolean;
   readonly activeRefName?: string;
   readonly hashLength?: number;
   readonly globalMaxEdgeTreePrefixWidth?: number;
@@ -417,7 +424,11 @@ function overlayNamesForContract(
   if (userRefs) {
     refs.push(...[...userRefs].sort((a, b) => a.localeCompare(b)));
   }
-  if (opts.contractHash === contractHash && contractHash !== EMPTY_CONTRACT_HASH) {
+  if (
+    opts.isAppSpace !== false &&
+    opts.contractHash === contractHash &&
+    contractHash !== EMPTY_CONTRACT_HASH
+  ) {
     markers.push(CONTRACT_MARKER_NAME);
   }
   if (opts.dbHash === contractHash) {

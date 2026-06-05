@@ -166,6 +166,7 @@ export async function executeMigrationGraphCommand(
       continue;
     }
     const graph = member.graph();
+    const isAppSpace = spaceEntry.spaceId === aggregate.app.spaceId;
     const tree =
       spaceEntry.migrations.length === 0
         ? ''
@@ -175,6 +176,7 @@ export async function executeMigrationGraphCommand(
             liveContractHash,
             glyphMode,
             colorize,
+            isAppSpace,
             refsByHash: listRefsByContractHash(member),
             ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
             ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),

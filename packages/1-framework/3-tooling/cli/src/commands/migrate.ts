@@ -428,18 +428,13 @@ async function executeMigrateShowCommand(
           pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
         });
       }
-      // BUG 1 fix: contractHash marks the app's working/desired contract.
-      // BUG 2 fix: only the app space gets @contract — extension spaces must not.
-      const spaceContractHash = isApp ? contractHash : undefined;
-      const rowModel = buildMigrationGraphRows(
-        memberGraph,
-        spaceContractHash !== undefined ? { contractHash: spaceContractHash } : {},
-      );
+      const rowModel = buildMigrationGraphRows(memberGraph, isApp ? { contractHash } : {});
       const layout = buildMigrationGraphLayout(rowModel);
       const liveMarker = markerBySpace.get(member.spaceId) ?? null;
       const liveMarkerHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
       return renderMigrationGraphTree(layout, {
-        ...(spaceContractHash !== undefined ? { contractHash: spaceContractHash } : {}),
+        contractHash,
+        isAppSpace: isApp,
         ...(needsLiveMarker ? { dbHash: liveMarkerHash } : {}),
         refsByHash: listRefsByContractHash(member),
         edgeAnnotationsByHash: edgeAnnotations,

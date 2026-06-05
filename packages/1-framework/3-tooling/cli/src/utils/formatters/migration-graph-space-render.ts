@@ -44,6 +44,14 @@ export interface RenderMigrationGraphSpaceTreeInput {
   readonly styler?: MigrationListStyler;
   readonly globalMaxEdgeTreePrefixWidth?: number;
   readonly globalMaxDirNameWidth?: number;
+  /**
+   * Whether this render is for the app space. When false, `contractHash` is
+   * not forwarded to `buildMigrationGraphRows` (suppressing the floating
+   * working-contract node) and `isAppSpace: false` is passed to
+   * `renderMigrationGraphTree` (suppressing the `@contract` marker).
+   * Defaults to `true` so single-space callers are unaffected.
+   */
+  readonly isAppSpace?: boolean;
 }
 
 export interface ComputeGlobalMaxEdgeTreePrefixWidthInput {
@@ -80,8 +88,9 @@ export function computeGlobalMaxDirNameWidth(
 }
 
 function renderMigrationGraphSpaceTreeInternal(input: RenderMigrationGraphSpaceTreeInput): string {
+  const appSpace = input.isAppSpace !== false;
   const rowModel = buildMigrationGraphRows(input.graph, {
-    contractHash: input.liveContractHash,
+    ...(appSpace ? { contractHash: input.liveContractHash } : {}),
   });
   const layout = buildMigrationGraphLayout(rowModel);
   const listOverlay = buildEdgeAnnotationsByHashFromListEntries(input.migrations);
@@ -92,6 +101,7 @@ function renderMigrationGraphSpaceTreeInternal(input: RenderMigrationGraphSpaceT
   return renderMigrationGraphTree(layout, {
     refsByHash: input.refsByHash ?? buildRefsByHashFromListEntries(input.migrations),
     contractHash: input.liveContractHash,
+    isAppSpace: appSpace,
     edgeAnnotationsByHash,
     colorize: input.colorize,
     glyphMode: input.glyphMode,

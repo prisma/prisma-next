@@ -1579,3 +1579,102 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     expect(output).toContain(onPathEdge.dirName);
   });
 });
+
+describe('renderMigrationGraphTree isAppSpace gate', () => {
+  // Helpers local to this suite so migSeq stays independent.
+  function makeGraph(edges: readonly MigrationEdge[]): MigrationGraph {
+    const nodes = new Set<string>();
+    const forwardChain = new Map<string, MigrationEdge[]>();
+    const reverseChain = new Map<string, MigrationEdge[]>();
+    const migrationByHash = new Map<string, MigrationEdge>();
+    for (const e of edges) {
+      nodes.add(e.from);
+      nodes.add(e.to);
+      migrationByHash.set(e.migrationHash, e);
+      const fwd = forwardChain.get(e.from);
+      if (fwd) fwd.push(e);
+      else forwardChain.set(e.from, [e]);
+      const rev = reverseChain.get(e.to);
+      if (rev) rev.push(e);
+      else reverseChain.set(e.to, [e]);
+    }
+    return { nodes, forwardChain, reverseChain, migrationByHash };
+  }
+
+  function renderSpace(
+    edges: readonly MigrationEdge[],
+    contractHash: string,
+    isAppSpace: boolean,
+  ): string {
+    const g = makeGraph(edges);
+    const rowModel = buildMigrationGraphRows(g, isAppSpace ? { contractHash } : {});
+    const layout = buildMigrationGraphLayout(rowModel);
+    return stripAnsi(
+      renderMigrationGraphTree(layout, {
+        contractHash,
+        isAppSpace,
+        colorize: false,
+      }),
+    );
+  }
+
+  const APP_CONTRACT = `sha256:${'a'.repeat(64)}`;
+  const EXT_CONTRACT = `sha256:${'e'.repeat(64)}`;
+
+  it('app space shows @contract on the node that matches contractHash', () => {
+    const initEdge = edge(EMPTY_CONTRACT_HASH, APP_CONTRACT.slice(7, 14), 'app_init');
+    const output = renderSpace([initEdge], APP_CONTRACT, true);
+    expect(output).toContain('@contract');
+  });
+
+  it('extension space does not show @contract even when contractHash matches a node', () => {
+    const initEdge = edge(EMPTY_CONTRACT_HASH, EXT_CONTRACT.slice(7, 14), 'ext_init');
+    const output = renderSpace([initEdge], EXT_CONTRACT, false);
+    expect(output).not.toContain('@contract');
+  });
+
+  it('extension space does not produce a floating working-contract node', () => {
+    // Use a contractHash that is NOT in the graph — would float as an extra node if app-gated.
+    const initEdge = edge(EMPTY_CONTRACT_HASH, 'aaa1111', 'ext_init');
+    const detachedHash = `sha256:${'f'.repeat(64)}`;
+    const g = makeGraph([initEdge]);
+    const appRows = buildMigrationGraphRows(g, { contractHash: detachedHash });
+    const extRows = buildMigrationGraphRows(g, {});
+    // App space: detached contract causes an extra floating node.
+    expect(appRows.nodes.length).toBeGreaterThan(extRows.nodes.length);
+    // Extension space: no floating node — row count equals graph-only row count.
+    expect(extRows.nodes).not.toContain(detachedHash);
+  });
+
+  it('@db marker still appears in extension spaces (per-space, not app-gated)', () => {
+    const initEdge = edge(EMPTY_CONTRACT_HASH, EXT_CONTRACT.slice(7, 14), 'ext_init');
+    const g = makeGraph([initEdge]);
+    const rowModel = buildMigrationGraphRows(g, {});
+    const layout = buildMigrationGraphLayout(rowModel);
+    const output = stripAnsi(
+      renderMigrationGraphTree(layout, {
+        contractHash: APP_CONTRACT,
+        dbHash: EXT_CONTRACT.slice(7, 14),
+        isAppSpace: false,
+        colorize: false,
+      }),
+    );
+    expect(output).not.toContain('@contract');
+    expect(output).toContain('@db');
+  });
+
+  it('default (isAppSpace omitted) behaves as app space — @contract renders', () => {
+    const initEdge = edge(EMPTY_CONTRACT_HASH, APP_CONTRACT.slice(7, 14), 'app_init');
+    const g = makeGraph([initEdge]);
+    const rowModel = buildMigrationGraphRows(g, { contractHash: APP_CONTRACT });
+    const layout = buildMigrationGraphLayout(rowModel);
+    const output = stripAnsi(
+      renderMigrationGraphTree(layout, {
+        contractHash: APP_CONTRACT,
+        colorize: false,
+        // isAppSpace omitted — must default to true
+      }),
+    );
+    expect(output).toContain('@contract');
+  });
+});
