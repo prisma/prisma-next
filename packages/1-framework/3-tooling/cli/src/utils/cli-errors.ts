@@ -374,6 +374,29 @@ export function requireLiveDatabase(args: {
  * Maps a `RefResolutionError` from the contract/migration reference
  * resolver into a CLI structured error envelope.
  */
+/**
+ * A migration ref (dirName or hash-prefix) resolves in more than one contract
+ * space. The user must qualify with `--space <id>` to disambiguate.
+ */
+export function errorAmbiguousMigrationRef(
+  ref: string,
+  spaceIds: readonly string[],
+): CliStructuredError {
+  const spaceList = spaceIds.join(', ');
+  return errorRuntime(
+    `Ambiguous migration reference: "${ref}" resolves in multiple spaces — qualify with --space <id>`,
+    {
+      why: `"${ref}" matches migrations in spaces: ${spaceList}.`,
+      fix: `Qualify with --space <id> to select one space. Available matching spaces: ${spaceList}.`,
+      meta: {
+        code: 'MIGRATION.AMBIGUOUS_MIGRATION_REF',
+        ref,
+        spaceIds: [...spaceIds],
+      },
+    },
+  );
+}
+
 export function mapRefResolutionError(error: RefResolutionError): CliStructuredError {
   switch (error.kind) {
     case 'not-found':

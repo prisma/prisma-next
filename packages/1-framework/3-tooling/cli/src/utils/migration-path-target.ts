@@ -30,6 +30,27 @@ export function resolveAppTargetPath(
   return ok(targetPath);
 }
 
+/**
+ * Resolve a filesystem-path target to the migration dir that contains it,
+ * searching each in-scope space's `migrationsDir`. A path is explicit, so
+ * it can belong to at most one space — returns the first match, or `null`
+ * when the path falls outside every space dir.
+ */
+export function resolveTargetPathAcrossSpaces(
+  target: string,
+  spaces: ReadonlyArray<{ readonly migrationsDir: string }>,
+): string | null {
+  const targetPath = resolve(target);
+  for (const space of spaces) {
+    const rel = relative(space.migrationsDir, targetPath);
+    const isOutside = rel === '' || rel === '.' || rel.startsWith('..') || isAbsolute(rel);
+    if (!isOutside) {
+      return targetPath;
+    }
+  }
+  return null;
+}
+
 export function findPackageByDirPath(
   packages: readonly OnDiskMigrationPackage[],
   resolvedDirPath: string,
