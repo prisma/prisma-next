@@ -1721,7 +1721,13 @@ export function buildBoundContract<
       rel,
       valueObject,
     } as unknown as ContractAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>;
-    return buildContractFromDefinition({ ...full, ...factory(helpers) });
+    const built = factory(helpers);
+    return buildContractFromDefinition({
+      ...full,
+      ...ifDefined('models', built.models),
+      ...ifDefined('valueObjects', built.valueObjects),
+      ...ifDefined('roots', built.roots),
+    });
   }
 
   return buildContractFromDefinition(full);
