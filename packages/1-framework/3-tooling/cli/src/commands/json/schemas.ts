@@ -45,7 +45,7 @@ export type MigrationListResult = typeof migrationListResultSchema.infer;
 export const graphMigrationSchema = type({
   name: 'string',
   hash: 'string',
-  fromContract: 'string',
+  fromContract: 'string | null',
   toContract: 'string',
 });
 

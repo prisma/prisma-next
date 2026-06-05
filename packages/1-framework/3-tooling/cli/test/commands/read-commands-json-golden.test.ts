@@ -243,7 +243,7 @@ describe('read commands --json golden', () => {
         '        {',
         `          "name": "${dirInit}",`,
         '          "hash": "sha256:d5c8739bfe8617fa82603875980b18d7dee1e02637499fd451ec7f1a7087e920",',
-        `          "fromContract": "${EMPTY_CONTRACT_HASH}",`,
+        `          "fromContract": null,`,
         `          "toContract": "${HASH_A}"`,
         '        },',
         '        {',

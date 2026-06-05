@@ -133,9 +133,12 @@ describe('migration graph --json envelope', () => {
     expect(appSpace?.migrations[0]).toMatchObject({
       name: expect.any(String),
       hash: expect.any(String),
-      fromContract: expect.any(String),
       toContract: expect.any(String),
     });
+    const firstMigrationFromContract = appSpace?.migrations[0]?.fromContract;
+    expect(
+      firstMigrationFromContract === null || typeof firstMigrationFromContract === 'string',
+    ).toBe(true);
     expect(appSpace?.contracts[0]).toMatchObject({
       hash: expect.any(String),
       refs: expect.any(Array),

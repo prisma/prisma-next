@@ -1,3 +1,4 @@
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok, type Result } from '@prisma-next/utils/result';
@@ -188,7 +189,7 @@ export async function executeMigrationGraphCommand(
       migrations: [...graph.migrationByHash.values()].map((edge) => ({
         name: edge.dirName,
         hash: edge.migrationHash,
-        fromContract: edge.from,
+        fromContract: edge.from === EMPTY_CONTRACT_HASH ? null : edge.from,
         toContract: edge.to,
       })),
     });
