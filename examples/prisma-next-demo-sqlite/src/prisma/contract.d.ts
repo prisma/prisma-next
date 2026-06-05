@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:194cf0bce4a19c7191f9e4ae8670de21707c48678d7b8998d38708a506488c88'>;
+  StorageHashBase<'sha256:664e11eed7f1d28dcf79412d71801ffa7c0a6369c717c38a0aa655b033e2213e'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:70c6ceb0ed79d5888519ec84bf32e31a056283fa8d5c7b5c1ba65b709f8595c8'>;
 export type ProfileHash =
@@ -87,157 +87,159 @@ type ContractBase = Omit<
       readonly namespaces: {
         readonly __unbound__: {
           readonly id: '__unbound__';
-          readonly kind: 'sql-namespace';
-          readonly tables: {
-            readonly post: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+          readonly kind: 'sqlite-namespace';
+          readonly entries: {
+            readonly table: {
+              readonly post: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                  readonly title: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly userId: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                  readonly createdAt: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/datetime@1';
+                    readonly nullable: false;
+                    readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  };
                 };
-                readonly title: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly userId: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
-                };
-                readonly createdAt: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/datetime@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [
+                  {
+                    readonly source: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'post';
+                      readonly columns: readonly ['userId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'user';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly name: 'post_userId_fkey';
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                ];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [
-                {
-                  readonly source: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'post';
-                    readonly columns: readonly ['userId'];
+              readonly post_tag: {
+                columns: {
+                  readonly postId: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
                   };
-                  readonly target: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'user';
-                    readonly columns: readonly ['id'];
+                  readonly tagId: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
                   };
-                  readonly name: 'post_userId_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
-                },
-              ];
-            };
-            readonly post_tag: {
-              columns: {
-                readonly postId: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
                 };
-                readonly tagId: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
+                primaryKey: {
+                  readonly columns: readonly ['postId', 'tagId'];
+                  readonly name: 'post_tag_pkey';
                 };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [
+                  {
+                    readonly source: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'post_tag';
+                      readonly columns: readonly ['postId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'post';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly name: 'post_tag_postId_fkey';
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                  {
+                    readonly source: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'post_tag';
+                      readonly columns: readonly ['tagId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: '__unbound__' & NamespaceId;
+                      readonly tableName: 'tag';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly name: 'post_tag_tagId_fkey';
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                ];
               };
-              primaryKey: {
-                readonly columns: readonly ['postId', 'tagId'];
-                readonly name: 'post_tag_pkey';
+              readonly tag: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                  readonly label: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
+                  };
+                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [
-                {
-                  readonly source: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'post_tag';
-                    readonly columns: readonly ['postId'];
+              readonly user: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
                   };
-                  readonly target: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'post';
-                    readonly columns: readonly ['id'];
+                  readonly email: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
                   };
-                  readonly name: 'post_tag_postId_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
-                },
-                {
-                  readonly source: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'post_tag';
-                    readonly columns: readonly ['tagId'];
+                  readonly displayName: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/text@1';
+                    readonly nullable: false;
                   };
-                  readonly target: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'tag';
-                    readonly columns: readonly ['id'];
+                  readonly createdAt: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'sqlite/datetime@1';
+                    readonly nullable: false;
+                    readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
                   };
-                  readonly name: 'post_tag_tagId_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
-                },
-              ];
-            };
-            readonly tag: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
                 };
-                readonly label: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
-            };
-            readonly user: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
-                };
-                readonly email: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly displayName: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly createdAt: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/datetime@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
-              };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
             };
           };
         };

@@ -303,207 +303,209 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "post": {
-            "columns": {
-              "createdAt": {
-                "codecId": "sqlite/datetime@1",
-                "default": {
-                  "expression": "now()",
-                  "kind": "function"
+        "entries": {
+          "table": {
+            "post": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "sqlite/datetime@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
                 },
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
-                }
-              },
-              "title": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "userId": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
-                }
-              }
-            },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "name": "post_userId_fkey",
-                "source": {
-                  "columns": [
-                    "userId"
-                  ],
-                  "namespaceId": "__unbound__",
-                  "tableName": "post"
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
-                "target": {
-                  "columns": [
-                    "id"
-                  ],
-                  "namespaceId": "__unbound__",
-                  "tableName": "user"
-                }
-              }
-            ],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
-          },
-          "post_tag": {
-            "columns": {
-              "postId": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
+                "title": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 }
               },
-              "tagId": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "name": "post_userId_fkey",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "post"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "user"
+                  }
                 }
-              }
-            },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "name": "post_tag_postId_fkey",
-                "source": {
-                  "columns": [
-                    "postId"
-                  ],
-                  "namespaceId": "__unbound__",
-                  "tableName": "post_tag"
-                },
-                "target": {
-                  "columns": [
-                    "id"
-                  ],
-                  "namespaceId": "__unbound__",
-                  "tableName": "post"
-                }
-              },
-              {
-                "constraint": true,
-                "index": true,
-                "name": "post_tag_tagId_fkey",
-                "source": {
-                  "columns": [
-                    "tagId"
-                  ],
-                  "namespaceId": "__unbound__",
-                  "tableName": "post_tag"
-                },
-                "target": {
-                  "columns": [
-                    "id"
-                  ],
-                  "namespaceId": "__unbound__",
-                  "tableName": "tag"
-                }
-              }
-            ],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "postId",
-                "tagId"
               ],
-              "name": "post_tag_pkey"
-            },
-            "uniques": []
-          },
-          "tag": {
-            "columns": {
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
-                }
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
               },
-              "label": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
+              "uniques": []
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
-          },
-          "user": {
-            "columns": {
-              "createdAt": {
-                "codecId": "sqlite/datetime@1",
-                "default": {
-                  "expression": "now()",
-                  "kind": "function"
+            "post_tag": {
+              "columns": {
+                "postId": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
-                "nativeType": "text",
-                "nullable": false
-              },
-              "displayName": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "email": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
+                "tagId": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 }
-              }
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "name": "post_tag_postId_fkey",
+                  "source": {
+                    "columns": [
+                      "postId"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "post_tag"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "post"
+                  }
+                },
+                {
+                  "constraint": true,
+                  "index": true,
+                  "name": "post_tag_tagId_fkey",
+                  "source": {
+                    "columns": [
+                      "tagId"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "post_tag"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "tag"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "postId",
+                  "tagId"
+                ],
+                "name": "post_tag_pkey"
+              },
+              "uniques": []
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "tag": {
+              "columns": {
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                },
+                "label": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             },
-            "uniques": []
+            "user": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "sqlite/datetime@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "displayName": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "email": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
           }
-        }
+        },
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:194cf0bce4a19c7191f9e4ae8670de21707c48678d7b8998d38708a506488c88"
+    "storageHash": "sha256:664e11eed7f1d28dcf79412d71801ffa7c0a6369c717c38a0aa655b033e2213e"
   },
   "execution": {
     "executionHash": "sha256:70c6ceb0ed79d5888519ec84bf32e31a056283fa8d5c7b5c1ba65b709f8595c8",
