@@ -1,9 +1,6 @@
-import {
-  createMongoControlDriver,
-  createMongoRunnerDeps,
-  introspectSchema,
-} from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, introspectSchema } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import { verifyMongoSchema } from '@prisma-next/family-mongo/schema-verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
@@ -172,7 +169,7 @@ function fakeFamily(): ControlFamilyInstance<'mongo', MongoSchemaIR> {
 function makeRunner() {
   return new MongoMigrationRunner(
     createMongoRunnerDeps(
-      createMongoControlDriver(db, client),
+      new MongoControlDriver(db, client),
       MongoDriverImpl.fromDb(db),
       fakeFamily(),
     ),
