@@ -224,6 +224,46 @@ describe('parseContractRef', () => {
     });
   });
 
+  describe('@contract reserved token', () => {
+    it('resolves @contract to the contractHash in context', () => {
+      const ctx = createContext();
+      const result = parseContractRef('@contract', { ...ctx, contractHash: HASH_B });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.hash).toBe(HASH_B);
+        expect(result.value.provenance).toEqual({ kind: 'reserved-contract' });
+      }
+    });
+
+    it('returns not-found when contractHash is absent from context', () => {
+      const ctx = createContext();
+      const result = parseContractRef('@contract', ctx);
+      expectError(result, 'not-found');
+    });
+  });
+
+  describe('@db reserved token', () => {
+    it('returns a reserved-db provenance that callers must resolve via readAllMarkers', () => {
+      const ctx = createContext();
+      const result = parseContractRef('@db', ctx);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.provenance).toEqual({ kind: 'reserved-db' });
+        // The hash is a placeholder — callers must NOT use it directly.
+        // They must check provenance.kind === 'reserved-db' and call readAllMarkers().
+      }
+    });
+
+    it('returns reserved-db even when contractHash is in context (no offline resolution)', () => {
+      const ctx = createContext();
+      const result = parseContractRef('@db', { ...ctx, contractHash: HASH_A });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.provenance.kind).toBe('reserved-db');
+      }
+    });
+  });
+
   describe('ambiguity between interpretation forms', () => {
     it('reports ambiguity when input matches both a ref and a dir name', () => {
       const ctx = createContext({

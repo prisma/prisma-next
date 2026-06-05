@@ -14,6 +14,11 @@ import { findEdgeByDirName, isFullHash, isHexPrefix, normalizeHashPrefix } from 
  * contract-reference grammar.
  *
  * Accepted forms:
+ * - `@contract` — the on-disk working contract hash (offline; requires
+ *   `ctx.contractHash` to be set)
+ * - `@db` — the live database marker (connection-required); callers MUST
+ *   check `result.value.provenance.kind === 'reserved-db'` and resolve the
+ *   actual hash via `readAllMarkers()` before using `result.value.hash`
  * - Full storage hash (`sha256:<64 hex>` or `sha256:empty`)
  * - Hex prefix (6+ hex chars, must uniquely identify one contract)
  * - Ref name (looked up in the refs index)
@@ -26,6 +31,26 @@ export function parseContractRef(
 ): Result<ContractRef, RefResolutionError> {
   if (!input) {
     return notOk({ kind: 'invalid-format', input, reason: 'Reference cannot be empty' });
+  }
+
+  if (input === '@contract') {
+    if (ctx.contractHash === undefined) {
+      return notOk({
+        kind: 'not-found',
+        input,
+        grammar: 'contract',
+      });
+    }
+    return ok({ hash: ctx.contractHash, provenance: { kind: 'reserved-contract' } });
+  }
+
+  if (input === '@db') {
+    // The live DB marker is not available offline. Return a sentinel result with
+    // a `reserved-db` provenance; callers must resolve the actual hash via
+    // `readAllMarkers()`. The `hash` placeholder is intentionally empty — it
+    // must NOT be used directly. This is enforced by convention; callers
+    // should check `provenance.kind` before using the hash.
+    return ok({ hash: '', provenance: { kind: 'reserved-db' } });
   }
 
   if (isFullHash(input)) {
