@@ -743,12 +743,10 @@ export interface RenderMigrationGraphLegendOptions {
 
 function formatLegendExampleMarkers(colorize: boolean): string {
   if (!colorize) {
-    return '<contract, db>';
+    return '@contract @db';
   }
-  const open = green('<');
-  const close = green('>');
-  const separator = green(', ');
-  return open + green('contract') + separator + green('db') + close;
+  const sigil = green('@');
+  return sigil + bold(green('contract')) + ' ' + sigil + green('db');
 }
 
 /**
@@ -779,7 +777,7 @@ export function renderMigrationGraphLegend(opts: RenderMigrationGraphLegendOptio
     `  ${style.kind(palette.edgeArrow.self)} ${style.summary('migration without schema change')}`,
     appliedPending,
     `  ${style.kind(palette.emptySource)} ${style.summary('empty database (baseline)')}`,
-    `  ${exampleMarkers} ${style.summary('live markers (contract on disk, database state)')}`,
+    `  ${exampleMarkers} ${style.summary('reserved markers — also typeable as --from/--to tokens')}`,
     `  ${exampleRefs} ${style.summary('user-defined refs')}`,
     `  ${sampleArrow}   ${style.summary('migration from contract aaaaaa to bbbbbb')}`,
   ];

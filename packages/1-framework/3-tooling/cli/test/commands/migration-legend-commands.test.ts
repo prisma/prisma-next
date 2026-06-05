@@ -127,9 +127,9 @@ describe('migration list --legend', () => {
       expect(exitCode).toBe(0);
       const stderr = commandMocks.consoleErrors.join('\n');
       expect(stderr).toContain('Legend:');
-      expect(stderr).toContain('<contract, db>');
+      expect(stderr).toContain('@contract @db');
       expect(stderr).toContain('(prod, staging)');
-      expect(stderr).toContain('live markers (contract on disk, database state)');
+      expect(stderr).toContain('reserved markers — also typeable as --from/--to tokens');
     } finally {
       process.chdir(originalCwd);
       commandMocks.cleanup();

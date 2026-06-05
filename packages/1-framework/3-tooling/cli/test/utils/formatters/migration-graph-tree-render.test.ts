@@ -171,8 +171,8 @@ describe('renderMigrationGraphTree (D23 padding rules)', () => {
       contractHash: 'a94b7b4',
     });
     const contractOnlyLine = stripAnsi(contractOnly.split('\n')[0] ?? '');
-    expect(contractOnlyLine).toBe('○   a94b7b4  <contract>');
-    expect(tokenStartOffset(contractOnlyLine, '<contract>')).toBe(
+    expect(contractOnlyLine).toBe('○   a94b7b4  @contract');
+    expect(tokenStartOffset(contractOnlyLine, '@contract')).toBe(
       tokenStartOffset(contractOnlyLine, 'a94b7b4') + MIGRATION_LIST_HASH_WIDTH + LABEL_GAP,
     );
 
@@ -183,8 +183,8 @@ describe('renderMigrationGraphTree (D23 padding rules)', () => {
       contractHash: 'a94b7b4',
     });
     const markersLine = stripAnsi(markersAndRefs.split('\n')[0] ?? '');
-    expect(markersLine).toBe('○   a94b7b4  <contract, db> (prod)');
-    expect(tokenStartOffset(markersLine, '<contract, db>')).toBe(
+    expect(markersLine).toBe('○   a94b7b4  @contract @db (prod)');
+    expect(tokenStartOffset(markersLine, '@contract')).toBe(
       tokenStartOffset(markersLine, 'a94b7b4') + MIGRATION_LIST_HASH_WIDTH + LABEL_GAP,
     );
 
@@ -237,9 +237,9 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   c0ffee0  <contract>',
+        '○   c0ffee0  @contract',
         '',
-        '○   a94b7b4  <db> (main)',
+        '○   a94b7b4  @db (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
         '│↑  init                       ∅ → ef9de27',
@@ -248,7 +248,7 @@ describe('renderMigrationGraphTree', () => {
     );
   });
 
-  it('renders only system markers in angle brackets', () => {
+  it('renders system markers with the @-sigil', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     expect(
       tree([init], {
@@ -256,7 +256,7 @@ describe('renderMigrationGraphTree', () => {
         dbHash: 'ef9de27',
         contractHash: 'ef9de27',
       }),
-    ).toContain('<contract, db>');
+    ).toContain('@contract @db');
   });
 
   it('renders only user refs in parentheses', () => {
@@ -279,7 +279,7 @@ describe('renderMigrationGraphTree', () => {
         dbHash: 'a94b7b4',
         contractHash: 'a94b7b4',
       }),
-    ).toContain('<contract, db> (prod)');
+    ).toContain('@contract @db (prod)');
   });
 
   it('renders colliding system db marker and user ref named db separately', () => {
@@ -290,7 +290,7 @@ describe('renderMigrationGraphTree', () => {
         refsByHash: refsMap([{ hash: 'ef9de27', names: ['db'] }]),
         dbHash: 'ef9de27',
       }),
-    ).toContain('<db> (db)');
+    ).toContain('@db (db)');
   });
 
   it('emphasizes the contract system marker in colorized output', () => {
@@ -299,7 +299,7 @@ describe('renderMigrationGraphTree', () => {
       colorize: true,
       contractHash: 'ef9de27',
     });
-    expect(colored).toContain(green('<') + bold(green('contract')) + green('>'));
+    expect(colored).toContain(green('@') + bold(green('contract')));
     expect(colored).not.toContain(bold(green('db')));
   });
 
@@ -318,9 +318,9 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   a94b7b4  <contract> (main)',
+        '○   a94b7b4  @contract (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
-        '○   ef9de27  <db> (prod)',
+        '○   ef9de27  @db (prod)',
         '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
@@ -336,7 +336,7 @@ describe('renderMigrationGraphTree', () => {
     const edges = [historical1, historical2, historical3, historical4, live];
     expect(tree(edges, { colorize: false, contractHash: '1375f13' })).toBe(
       [
-        '○   1375f13  <contract>',
+        '○   1375f13  @contract',
         '│↑    live_migration           ∅ → 1375f13',
         '│ ○   f7a8eb5',
         '│ │↑  historical_4       6cee614 → f7a8eb5',
@@ -604,7 +604,7 @@ describe('renderMigrationGraphTree', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "○   cd5c15b  <contract> (main)
+      "○   cd5c15b  @contract (main)
       ├─╮
       │↑│   merge_2a           0276f92 → cd5c15b
       │ │↑  merge_2b           a94b7b4 → cd5c15b
@@ -708,9 +708,9 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'c0ffee0',
       }),
     ).toMatchInlineSnapshot(`
-      "*   c0ffee0  <contract>
+      "*   c0ffee0  @contract
 
-      *   a94b7b4  <db> (main)
+      *   a94b7b4  @db (main)
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
       |^  init                       - -> ef9de27
@@ -732,9 +732,9 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'a94b7b4',
       }),
     ).toMatchInlineSnapshot(`
-      "*   a94b7b4  <contract> (main)
+      "*   a94b7b4  @contract (main)
       |^  add_posts            ef9de27 -> a94b7b4
-      *   ef9de27  <db> (prod)
+      *   ef9de27  @db (prod)
       |^  init                       - -> ef9de27
       -"
     `);
@@ -868,7 +868,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "*   cd5c15b  <contract> (main)
+      "*   cd5c15b  @contract (main)
       +-\\
       |^|   merge_2a           0276f92 -> cd5c15b
       | |^  merge_2b           a94b7b4 -> cd5c15b
@@ -1331,7 +1331,7 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        <contract, db> live markers (contract on disk, database state)
+        @contract @db reserved markers — also typeable as --from/--to tokens
         (prod, staging) user-defined refs
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
@@ -1346,7 +1346,7 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        <contract, db> live markers (contract on disk, database state)
+        @contract @db reserved markers — also typeable as --from/--to tokens
         (prod, staging) user-defined refs
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
@@ -1371,7 +1371,7 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        <contract, db> live markers (contract on disk, database state)
+        @contract @db reserved markers — also typeable as --from/--to tokens
         (prod, staging) user-defined refs
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
@@ -1386,7 +1386,7 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        <contract, db> live markers (contract on disk, database state)
+        @contract @db reserved markers — also typeable as --from/--to tokens
         (prod, staging) user-defined refs
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
@@ -1395,11 +1395,11 @@ describe('renderMigrationGraphLegend', () => {
   it('renders the marker/ref block as two lines in system-then-ref order', () => {
     const text = renderMigrationGraphLegend({ colorize: false });
     const lines = text.split('\n');
-    const markersIdx = lines.findIndex((line) => line.includes('live markers'));
+    const markersIdx = lines.findIndex((line) => line.includes('reserved markers'));
     const refsIdx = lines.findIndex((line) => line.includes('user-defined refs'));
     expect(markersIdx).toBeGreaterThan(-1);
     expect(refsIdx).toBeGreaterThan(markersIdx);
-    expect(lines[markersIdx]).toContain('<contract, db>');
+    expect(lines[markersIdx]).toContain('@contract @db');
     expect(lines[refsIdx]).toContain('(prod, staging)');
   });
 
@@ -1418,9 +1418,9 @@ describe('renderMigrationGraphLegend', () => {
       expect(text).not.toContain('data column');
       expect(text).not.toContain('node overlay');
       expect(text).not.toContain('db / contract markers');
-      expect(text).toContain('<contract, db>');
+      expect(text).toContain('@contract @db');
       expect(text).toContain('(prod, staging)');
-      expect(text).toContain('live markers (contract on disk, database state)');
+      expect(text).toContain('reserved markers — also typeable as --from/--to tokens');
       expect(text).toContain('user-defined refs');
       expect(text).toContain('migration from contract aaaaaa to bbbbbb');
     }

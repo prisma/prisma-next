@@ -104,10 +104,13 @@ describe('createAnsiMigrationListStyler', () => {
     );
   });
 
-  it('renders system markers in angle brackets and user refs in parentheses', () => {
+  it('renders system markers with @-sigil and user refs in parentheses', () => {
     const styler = createAnsiMigrationListStyler({ useColor: true });
-    expect(styler.markers(['contract'])).toBe(green('<') + bold(green('contract')) + green('>'));
-    expect(styler.markers(['db'])).toBe(green('<') + green('db') + green('>'));
+    expect(styler.markers(['contract'])).toBe(green('@') + bold(green('contract')));
+    expect(styler.markers(['db'])).toBe(green('@') + green('db'));
+    expect(styler.markers(['contract', 'db'])).toBe(
+      green('@') + bold(green('contract')) + ' ' + green('@') + green('db'),
+    );
     expect(styler.refs(['production'])).toBe(green('(') + green('production') + green(')'));
     expect(styler.refs(['production', 'staging'])).toBe(
       green('(') + [green('production'), green('staging')].join(green(', ')) + green(')'),
