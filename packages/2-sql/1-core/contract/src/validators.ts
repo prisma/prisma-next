@@ -375,17 +375,30 @@ const ContractRelationThroughSchema = type({
   targetColumns: type.string.array().readonly(),
 });
 
-const ContractReferenceRelationSchema = type({
+const ContractRelationOnSchema = type({
+  '+': 'reject',
+  localFields: type.string.array().readonly(),
+  targetFields: type.string.array().readonly(),
+});
+
+const ContractManyToManyRelationSchema = type({
   '+': 'reject',
   to: CrossReferenceSchema,
-  cardinality: "'1:1' | '1:N' | 'N:1' | 'N:M'",
-  on: type({
-    '+': 'reject',
-    localFields: type.string.array().readonly(),
-    targetFields: type.string.array().readonly(),
-  }),
-  'through?': ContractRelationThroughSchema,
+  cardinality: "'N:M'",
+  on: ContractRelationOnSchema,
+  through: ContractRelationThroughSchema,
 });
+
+const ContractNonJunctionRelationSchema = type({
+  '+': 'reject',
+  to: CrossReferenceSchema,
+  cardinality: "'1:1' | '1:N' | 'N:1'",
+  on: ContractRelationOnSchema,
+});
+
+const ContractReferenceRelationSchema = ContractManyToManyRelationSchema.or(
+  ContractNonJunctionRelationSchema,
+);
 
 const ContractEmbedRelationSchema = type({
   '+': 'reject',

@@ -1,6 +1,7 @@
 import type {
   ContractField,
   ContractModel,
+  ContractRelationThrough,
   ContractValueObject,
   CrossReference,
 } from '@prisma-next/contract/types';
@@ -127,22 +128,11 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
       );
     }
 
-    const through = relObj['through'] as
-      | {
-          table?: string;
-          namespaceId?: string;
-          parentColumns?: string[];
-          childColumns?: string[];
-          targetColumns?: string[];
-        }
-      | undefined;
-    if (
-      through?.table &&
-      through.namespaceId &&
-      through.parentColumns &&
-      through.childColumns &&
-      through.targetColumns
-    ) {
+    const through = blindCast<
+      ContractRelationThrough | undefined,
+      'contract JSON schema-validated before serialization; through is present iff cardinality is N:M'
+    >(relObj['through']);
+    if (through) {
       const table = serializeValue(through.table);
       const namespaceId = serializeValue(through.namespaceId);
       const parentColumns = through.parentColumns.map((c) => serializeValue(c)).join(', ');
