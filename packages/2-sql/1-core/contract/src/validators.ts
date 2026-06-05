@@ -13,6 +13,8 @@ import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
 import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 import {
+  type ForeignKeyInput,
+  type ForeignKeyReferenceInput,
   type PrimaryKeyInput,
   type ReferentialAction,
   type SqlModelStorage,
@@ -158,7 +160,7 @@ const SpaceForeignKeyReferenceSchema = type({
 
 export const ForeignKeyReferenceSchema = LocalForeignKeyReferenceSchema.or(
   SpaceForeignKeyReferenceSchema,
-);
+) satisfies Type<ForeignKeyReferenceInput>;
 
 export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
@@ -172,7 +174,7 @@ export const ForeignKeySchema = type({
   'onUpdate?': ReferentialActionSchema,
   constraint: 'boolean',
   index: 'boolean',
-});
+}) satisfies Type<ForeignKeyInput>;
 
 const StorageTableSchema = type({
   '+': 'reject',
