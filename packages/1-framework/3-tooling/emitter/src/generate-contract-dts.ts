@@ -95,22 +95,29 @@ export function generateContractDts(
   const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects, codecLookup);
   const valueObjectsDescriptor = generateValueObjectsDescriptorType(valueObjects);
 
-  // Per-namespace models types for the domain.namespaces section of ContractBase.
-  const perNamespaceModelsTypes: Array<readonly [string, string]> = namespaceEntries.map(
-    ([nsId, ns]) => {
+  // Per-namespace models and value objects types for the domain.namespaces section of ContractBase.
+  const perNamespaceTypes: Array<readonly [string, string, string | undefined]> =
+    namespaceEntries.map(([nsId, ns]) => {
       const nsModels = ns.models as Record<string, ContractModel>;
       const nsModelsType = generateModelsType(nsModels, (name, model) =>
         emitter.generateModelStorageType(name, model),
       );
-      return [nsId, nsModelsType] as const;
-    },
-  );
+      const nsValueObjects = ns.valueObjects as Record<string, ContractValueObject> | undefined;
+      const nsValueObjectsDescriptor =
+        nsValueObjects !== undefined && Object.keys(nsValueObjects).length > 0
+          ? generateValueObjectsDescriptorType(nsValueObjects)
+          : undefined;
+      return [nsId, nsModelsType, nsValueObjectsDescriptor] as const;
+    });
 
-  const domainNamespacesType = perNamespaceModelsTypes
-    .map(
-      ([nsId, nsModelsType]) =>
-        `      readonly ${nsId}: {\n        readonly models: ${nsModelsType};\n      }`,
-    )
+  const domainNamespacesType = perNamespaceTypes
+    .map(([nsId, nsModelsType, nsValueObjectsDescriptor]) => {
+      const voLine =
+        nsValueObjectsDescriptor !== undefined
+          ? `\n        readonly valueObjects: ${nsValueObjectsDescriptor};`
+          : '';
+      return `      readonly ${nsId}: {\n        readonly models: ${nsModelsType};${voLine}\n      }`;
+    })
     .join(';\n');
 
   const executionClause =
