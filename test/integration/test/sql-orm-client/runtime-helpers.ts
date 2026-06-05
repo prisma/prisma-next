@@ -237,6 +237,8 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
     create table user_tags (
       user_id integer not null,
       tag_id text not null,
+      note text,
+      created_at text not null default now(),
       primary key (user_id, tag_id)
     )
   `);
