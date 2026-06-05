@@ -13,3 +13,7 @@ this if they hand-construct contract IR; the public framework
 factories (`createNamespaceTable`, `crossRef`, etc.) and the
 contract-builder produce the new shape directly. No codemod required.
 -->
+
+# 0.12 → 0.13 — Extension-author upgrade instructions
+
+No extension-author action required for this transition. The `defineContract` wrappers in the `@prisma-next/postgres` and `@prisma-next/sqlite` packages were refactored to be cast-free via a shared `buildBoundContract` helper in `@prisma-next/sql-contract-ts`; the consumer-facing API and emitted contract shapes are unchanged.
