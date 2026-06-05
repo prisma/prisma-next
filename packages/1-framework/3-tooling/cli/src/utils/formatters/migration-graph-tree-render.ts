@@ -171,18 +171,14 @@ function arrowForEdgeKind(
  *
  * - `forcedBold`: branch-coloured migration names pair their lane hue with bold;
  *   both must emit so the name is deterministically bold + hue.
- * - `forcedDim` / `forcedGreenBright`: path-highlight overrides (migrate --show).
- *   The renderer gates these behind `opts.colorize`; the forced variant ensures
+ * - `forcedDim`: off-path path-highlight override (migrate --show).
+ *   The renderer gates this behind `opts.colorize`; the forced variant ensures
  *   ANSI is emitted in controlled environments (e.g. tests with `NO_COLOR=1`)
- *   when the caller explicitly requests colour. Without forcing, `dim()`/
- *   `greenBright()` from the ambient module-level import no-op under NO_COLOR,
- *   making the path-highlight unreachable in tests.
+ *   when the caller explicitly requests colour. Without forcing, `dim()` from
+ *   the ambient module-level import no-ops under NO_COLOR, making the
+ *   path-highlight unreachable in tests.
  */
-const {
-  bold: forcedBold,
-  dim: forcedDim,
-  greenBright: forcedGreenBright,
-} = createColors({ useColor: true });
+const { bold: forcedBold, dim: forcedDim } = createColors({ useColor: true });
 
 function laneStylerForColumn(
   colorColumn: number,
@@ -277,10 +273,10 @@ function renderCellPair(
   laneOverride?: (text: string) => string,
 ): string {
   const laneColumn = colors.lane[column] ?? column;
-  // When a path-highlight override is supplied (on-path → greenBright, off-path → dim),
-  // it replaces the rotating lane colour entirely so the rotation hue is never emitted.
-  // Without an override (every command except migrate --show), the existing rotation
-  // behaviour is unchanged.
+  // When an off-path dim override is supplied, it replaces the rotating lane colour
+  // entirely so the rotation hue is never emitted. On-path cells carry no override
+  // and render in ordinary colours. Without an override (every command except migrate
+  // --show), the existing rotation behaviour is unchanged.
   const lane = laneOverride ?? laneStylerForColumn(laneColumn, colorize, style);
   switch (cell.kind) {
     case 'node': {
@@ -358,10 +354,11 @@ function renderCellPair(
  *
  * `columnLaneOverride` is an optional per-column map populated when path-highlight
  * annotations are active (`migrate --show`). For each column in the connector's
- * lane range, the map supplies the override styler (greenBright or dim) that should
+ * lane range, the map supplies the override styler (dim for off-path) that should
  * replace the normal rotating-lane colour for that column. Columns absent from the
- * map use the standard `laneStylerForColumn` logic unchanged. This ensures off-path
- * branch connectors appear dim rather than in their rotation colour (e.g. magenta).
+ * map (on-path or unannotated) use the standard `laneStylerForColumn` logic unchanged.
+ * This ensures off-path branch connectors appear dim rather than in their rotation
+ * colour (e.g. magenta).
  */
 function renderConnectorRow(
   row: MigrationGraphGridRow,
@@ -572,12 +569,7 @@ function formatEdgeAnnotationSuffix(
   }
   if (annotation.pathHighlight === 'on-path') {
     const glyph = opts.glyphMode === 'ascii' ? '>' : '↑';
-    const label = 'will run';
-    if (!opts.colorize) {
-      segments.push(`${glyph} ${label}`);
-    } else {
-      segments.push(forcedGreenBright(`${glyph} ${label}`));
-    }
+    segments.push(`${glyph} will run`);
   }
   if (segments.length === 0) {
     return '';
@@ -589,11 +581,10 @@ function formatEdgeAnnotationSuffix(
 /**
  * Format the `from → to` hash data column for an edge row.
  *
- * When `hashOverride` is provided (on-path → `greenBright`, off-path → `dim`),
- * it replaces ALL sub-stylers (`sourceHash`, `destHash`, arrow `glyph`) so the
- * outer path-highlight colour reaches every character without inner ANSI codes
- * (e.g. the dim+cyan of `sourceHash`) overriding it. Without an override, the
- * normal `style` sub-stylers apply unchanged.
+ * When `hashOverride` is provided (off-path → `dim`), it replaces ALL sub-stylers
+ * (`sourceHash`, `destHash`, arrow `glyph`) so dim reaches every character without
+ * inner ANSI codes (e.g. the dim+cyan of `sourceHash`) overriding it. On-path edges
+ * carry no override. Without an override, the normal `style` sub-stylers apply.
  */
 function formatEdgeHashColumn(
   edge: ClassifiedEdge,
@@ -769,15 +760,16 @@ export function renderMigrationGraphTree(
 
   /**
    * Determine the lane-colour override for a row based on path-highlight annotations.
-   * Returns `dim` for off-path, `greenBright` for on-path, `undefined` for no override
-   * (which preserves the normal rotating-colour behaviour).
-   * Only returns a non-undefined value when `opts.colorize` is true.
+   * Returns `dim` for off-path, `undefined` for on-path or unknown (preserving the
+   * normal rotating-colour behaviour — on-path cells render in ordinary colours).
+   * Only returns a non-undefined value when `opts.colorize` is true and the
+   * migration is off-path.
    */
   function pathLaneOverride(
     highlight: 'on-path' | 'off-path' | undefined,
   ): ((text: string) => string) | undefined {
-    if (!opts.colorize || highlight === undefined) return undefined;
-    return highlight === 'on-path' ? forcedGreenBright : forcedDim;
+    if (!opts.colorize || highlight !== 'off-path') return undefined;
+    return forcedDim;
   }
 
   const lines: string[] = [];
@@ -793,11 +785,10 @@ export function renderMigrationGraphTree(
 
     if (row.kind === 'branch-connector' || row.kind === 'merge-connector') {
       // Build a per-column lane override for this connector row when path-highlight
-      // annotations are active. Off-path lane columns must render dim rather than their
-      // rotation colour (e.g. magenta for column 1). On-path columns stay neutral —
-      // connector rows use the normal dim lane style for the trunk (column 0) and the
-      // rotation colour for branch columns; an on-path branch connector is rare and
-      // the dim trunk default is already correct.
+      // annotations are active. Off-path lane columns render dim rather than their
+      // rotation colour (e.g. magenta for column 1). On-path and unannotated columns
+      // carry no override (pathLaneOverride returns undefined), so they render in their
+      // ordinary rotating-lane colour.
       let connectorColumnOverride: Map<number, (text: string) => string> | undefined;
       if (opts.colorize && columnHighlights.size > 0) {
         for (const [col, highlight] of columnHighlights) {
@@ -918,10 +909,9 @@ export function renderMigrationGraphTree(
         lines.push(trimTrailingWhitespace(`${emptyGutter}${' '.repeat(LABEL_GAP)}${overlay}`));
         continue;
       }
-      // Apply the row's path-highlight override to the hash text when present (on-path →
-      // greenBright, off-path → dim). Without an override, `style.sourceHash` applies the
-      // default dim+cyan styling. The override must replace `style.sourceHash` entirely —
-      // wrapping styled text in an outer colour leaves the inner ANSI codes intact,
+      // Apply dim override to off-path node hash text. Without an override, `style.sourceHash`
+      // applies the default dim+cyan styling. The override must replace `style.sourceHash`
+      // entirely — wrapping styled text in an outer colour leaves the inner ANSI codes intact,
       // which overrides the outer colour at the terminal level.
       const hashTextStyler = rowLaneOverride ?? style.sourceHash;
       const hashText = hashTextStyler(
@@ -942,13 +932,12 @@ export function renderMigrationGraphTree(
 
     const edgeAnnotation = opts.edgeAnnotationsByHash?.get(edge.migrationHash);
     const isOffPath = edgeAnnotation?.pathHighlight === 'off-path';
-    const isOnPath = edgeAnnotation?.pathHighlight === 'on-path';
 
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
     const laneIndex = row.laneIndex ?? 0;
 
     // The gutter is already coloured via the per-cell laneOverride threaded into
-    // renderCellPair above — no post-hoc dim/greenBright wrapper needed here.
+    // renderCellPair above — no post-hoc dim wrapper needed here.
     const edgeGutterPad = padVisible(gutter, labelColumn);
 
     let dirName: string;
@@ -957,12 +946,10 @@ export function renderMigrationGraphTree(
       dirName = opts.colorize
         ? `${forcedDim(edge.dirName)}${dirNamePadding}`
         : `${edge.dirName}${dirNamePadding}`;
-    } else if (isOnPath && opts.colorize) {
-      // On-path migrations: bright green name.
-      dirName = `${forcedGreenBright(bold(edge.dirName))}${dirNamePadding}`;
     } else {
-      // A branched name keeps its bold (via `style.dirName`) and adds the lane
-      // hue, so it reads as one with its lane/arrow; column-0 names stay bold-only.
+      // On-path and unannotated migrations: ordinary name — lane hue for branched lanes,
+      // bold-only for column 0. On-path rows are not specially highlighted; they read in
+      // the same colour as any other ordinary migration.
       const dirNameStyler =
         opts.colorize && laneIndex > NEUTRAL_LANE_COLUMN
           ? (text: string) => forcedBold(laneColorForColumn(laneIndex)(text))
@@ -970,19 +957,13 @@ export function renderMigrationGraphTree(
       dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
     }
 
-    // When a path-highlight override is active, pass it directly to formatEdgeHashColumn
+    // When an off-path override is active, pass forcedDim to formatEdgeHashColumn
     // so it replaces ALL sub-stylers (sourceHash, destHash, arrow glyph). Wrapping an
     // already-styled string in an outer colour does not work: the inner ANSI codes (e.g.
     // dim+cyan from sourceHash, or brightCyan from destHash) override the outer wrapper
-    // at the terminal level, leaving source hashes dim and destination hashes brightCyan
-    // instead of the intended uniform green or grey.
-    const hashColumnOverride = opts.colorize
-      ? isOffPath
-        ? forcedDim
-        : isOnPath
-          ? forcedGreenBright
-          : undefined
-      : undefined;
+    // at the terminal level, leaving source hashes dim+cyan instead of uniform dim grey.
+    // On-path edges carry no override — they render in ordinary colours.
+    const hashColumnOverride = opts.colorize && isOffPath ? forcedDim : undefined;
     const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette, hashColumnOverride);
     const styledHashColumn = hashColumn;
     const annotationSuffix = formatEdgeAnnotationSuffix(edge.migrationHash, opts, style);

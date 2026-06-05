@@ -1669,12 +1669,13 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     expect(noColorOutput).not.toContain('\x1b[');
   });
 
-  it('ANSI colour codes: on-path rows carry greenBright, off-path rows carry dim, no rotation colour on any highlighted row', () => {
+  it('ANSI colour codes: off-path rows carry dim, on-path rows are ordinary (no green highlight), no rotation colour on off-path rows', () => {
     // This test verifies the actual ANSI escape codes emitted by the renderer.
     //
-    // The renderer uses forcedGreenBright and forcedDim from createColors({ useColor: true }),
-    // which always emit ANSI regardless of the ambient NO_COLOR environment. This makes the
-    // color assertions testable directly in vitest without subprocess gymnastics.
+    // The renderer uses forcedDim from createColors({ useColor: true }), which always
+    // emits ANSI regardless of the ambient NO_COLOR environment. On-path rows carry NO
+    // special override — they render in ordinary colours (the lane glyph column 0 may be
+    // dim via style.lane, but the migration name and hash are not forced-dim).
     //
     // Topology: branching graph at ∅ — off-path branch forks at column 1 (which would
     // receive magenta in the rotation), on-path chain continues on column 0.
@@ -1682,11 +1683,11 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     //   ∅ → onPathDest   (on-path, column 0)
     //
     // Assertions:
-    //   - on-path edge row contains \x1b[92m (greenBright)
-    //   - on-path node row (onPathDest hash) contains \x1b[92m
+    //   - on-path edge row does NOT contain \x1b[92m (greenBright) — no green highlight
+    //   - on-path edge/node row: 'will run' suffix is present (plain text, no colour wrapper)
     //   - off-path edge row contains \x1b[2m (dim)
     //   - off-path node row (offPathDest hash) contains \x1b[2m
-    //   - NO \x1b[31m (red) or \x1b[35m (magenta) on any highlighted row — rotation must not bleed through
+    //   - NO \x1b[31m (red) or \x1b[35m (magenta) on any off-path row
     //
     // The GREEN_BRIGHT code is \x1b[92m; DIM is \x1b[2m; RED is \x1b[31m; MAGENTA is \x1b[35m.
     const GREEN_BRIGHT = '\x1b[92m';
@@ -1707,26 +1708,27 @@ describe('renderMigrationGraphTree path highlight colors', () => {
 
     const lines = rendered.split('\n');
 
-    // On-path edge line: must have greenBright, must not have dim or rotation colours.
+    // On-path edge line: ordinary — must NOT have greenBright (no green highlight).
+    // The 'will run' suffix confirms the on-path annotation was routed correctly.
+    // Rotation lane colours (magenta, etc.) are expected for branched lanes — on-path
+    // renders in its ordinary lane hue, not a forced colour.
     const onPathEdgeLine = lines.find((l) => l.includes(onPathEdge.dirName));
     expect(onPathEdgeLine, 'on-path edge line must exist').toBeDefined();
-    expect(onPathEdgeLine).toContain(GREEN_BRIGHT);
-    expect(onPathEdgeLine).not.toContain(RED);
-    expect(onPathEdgeLine).not.toContain(MAGENTA);
+    expect(onPathEdgeLine).not.toContain(GREEN_BRIGHT);
+    expect(onPathEdgeLine).toContain('will run');
 
-    // On-path node line (the 'on22222' hash): must have greenBright.
+    // On-path node line (the 'on22222' hash): must NOT have greenBright.
     const onPathNodeLine = lines.find(
       (l) => l.includes('on22222') && !l.includes(onPathEdge.dirName),
     );
     expect(onPathNodeLine, 'on-path node line must exist').toBeDefined();
-    expect(onPathNodeLine).toContain(GREEN_BRIGHT);
-    expect(onPathNodeLine).not.toContain(RED);
-    expect(onPathNodeLine).not.toContain(MAGENTA);
+    expect(onPathNodeLine).not.toContain(GREEN_BRIGHT);
 
     // Off-path edge line: must have dim, must not have greenBright or rotation colours.
     const offPathEdgeLine = lines.find((l) => l.includes(offPathEdge.dirName));
     expect(offPathEdgeLine, 'off-path edge line must exist').toBeDefined();
     expect(offPathEdgeLine).toContain(DIM);
+    expect(offPathEdgeLine).not.toContain(GREEN_BRIGHT);
     expect(offPathEdgeLine).not.toContain(RED);
     expect(offPathEdgeLine).not.toContain(MAGENTA);
 
@@ -1736,15 +1738,18 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     );
     expect(offPathNodeLine, 'off-path node line must exist').toBeDefined();
     expect(offPathNodeLine).toContain(DIM);
+    expect(offPathNodeLine).not.toContain(GREEN_BRIGHT);
     expect(offPathNodeLine).not.toContain(RED);
     expect(offPathNodeLine).not.toContain(MAGENTA);
 
-    // Connector row between off-path branch and trunk: must not contain magenta.
-    // The connector's branch lane (column 1) is off-path and must render dim, not magenta.
+    // Connector row: off-path columns render dim, on-path columns render in their ordinary
+    // rotation colour. In this topology off_branch is column 0 (off-path → dim) and
+    // on_branch is column 1 (on-path → ordinary magenta). The connector must contain dim
+    // (for the off-path trunk) and must NOT contain GREEN_BRIGHT.
     const connectorLine = lines.find((l) => l.includes('╯') || l.includes('/'));
     if (connectorLine !== undefined) {
-      expect(connectorLine).not.toContain(RED);
-      expect(connectorLine).not.toContain(MAGENTA);
+      expect(connectorLine).not.toContain(GREEN_BRIGHT);
+      expect(connectorLine).toContain(DIM);
     }
   });
 });
