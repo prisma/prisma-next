@@ -9,7 +9,7 @@ import type {
   ContractInput,
   ModelLike,
 } from '@prisma-next/sql-contract-ts/contract-builder';
-import { defineContract as baseDefineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { buildBoundContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 
@@ -23,13 +23,13 @@ type PostgresResult<
   Types extends TypesConstraint,
   Models extends ModelsConstraint,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-> = Omit<
-  ReturnType<typeof baseDefineContract<SqlFamily, PostgresPack, Types, Models, ExtensionPacks>>,
-  'target' | 'targetFamily'
-> & {
-  readonly target: PostgresPack['targetId'];
-  readonly targetFamily: SqlFamily['familyId'];
-};
+> = ReturnType<
+  typeof buildBoundContract<
+    SqlFamily,
+    PostgresPack,
+    { readonly types?: Types; readonly models?: Models; readonly extensionPacks?: ExtensionPacks }
+  >
+>;
 
 type PostgresBaseScaffold<
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
@@ -81,29 +81,18 @@ export function defineContract<
   },
 ): PostgresResult<Types, Models, ExtensionPacks>;
 
+// Implementation — delegates to buildBoundContract which pre-binds family/target,
+// carrying zero casts at this layer.
 export function defineContract(
-  scaffold: Omit<ContractInput, 'family' | 'target'>,
+  definition: PostgresDefinition<TypesConstraint, ModelsConstraint, undefined>,
   factory?: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, undefined>) => {
     readonly types?: TypesConstraint;
     readonly models?: ModelsConstraint;
   },
 ): PostgresResult<TypesConstraint, ModelsConstraint, undefined> {
-  const full = {
-    ...scaffold,
-    family: sqlFamilyPack,
-    target: postgresPack,
-    createNamespace: postgresCreateNamespace,
-  } as ContractInput;
+  const bound = { ...definition, createNamespace: postgresCreateNamespace };
   if (factory !== undefined) {
-    const { types: _t, models: _m, ...scaffoldOnly } = full;
-    return baseDefineContract(
-      scaffoldOnly,
-      factory as Parameters<typeof baseDefineContract>[1],
-    ) as unknown as PostgresResult<TypesConstraint, ModelsConstraint, undefined>;
+    return buildBoundContract(sqlFamilyPack, postgresPack, bound, factory);
   }
-  return baseDefineContract(full) as unknown as PostgresResult<
-    TypesConstraint,
-    ModelsConstraint,
-    undefined
-  >;
+  return buildBoundContract(sqlFamilyPack, postgresPack, bound);
 }

@@ -6,6 +6,7 @@ export type {
   ScalarFieldBuilder,
 } from '../contract-builder';
 export {
+  buildBoundContract,
   buildSqlContractFromDefinition,
   defineContract,
   field,
