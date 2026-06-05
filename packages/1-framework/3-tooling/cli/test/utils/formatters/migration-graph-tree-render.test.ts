@@ -1668,6 +1668,85 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     });
     expect(noColorOutput).not.toContain('\x1b[');
   });
+
+  it('ANSI colour codes: on-path rows carry greenBright, off-path rows carry dim, no rotation colour on any highlighted row', () => {
+    // This test verifies the actual ANSI escape codes emitted by the renderer.
+    //
+    // The renderer uses forcedGreenBright and forcedDim from createColors({ useColor: true }),
+    // which always emit ANSI regardless of the ambient NO_COLOR environment. This makes the
+    // color assertions testable directly in vitest without subprocess gymnastics.
+    //
+    // Topology: branching graph at ∅ — off-path branch forks at column 1 (which would
+    // receive magenta in the rotation), on-path chain continues on column 0.
+    //   ∅ → offPathDest  (off-path, column 1 = normally magenta in LANE_COLOR_CYCLE)
+    //   ∅ → onPathDest   (on-path, column 0)
+    //
+    // Assertions:
+    //   - on-path edge row contains \x1b[92m (greenBright)
+    //   - on-path node row (onPathDest hash) contains \x1b[92m
+    //   - off-path edge row contains \x1b[2m (dim)
+    //   - off-path node row (offPathDest hash) contains \x1b[2m
+    //   - NO \x1b[31m (red) or \x1b[35m (magenta) on any highlighted row — rotation must not bleed through
+    //
+    // The GREEN_BRIGHT code is \x1b[92m; DIM is \x1b[2m; RED is \x1b[31m; MAGENTA is \x1b[35m.
+    const GREEN_BRIGHT = '\x1b[92m';
+    const DIM = '\x1b[2m';
+    const RED = '\x1b[31m';
+    const MAGENTA = '\x1b[35m';
+
+    const offPathEdge = edge(EMPTY_CONTRACT_HASH, 'off1111', 'off_branch');
+    const onPathEdge = edge(EMPTY_CONTRACT_HASH, 'on22222', 'on_branch');
+    const annotations = new Map([
+      [offPathEdge.migrationHash, { pathHighlight: 'off-path' as const }],
+      [onPathEdge.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+    const rendered = tree([offPathEdge, onPathEdge], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+
+    const lines = rendered.split('\n');
+
+    // On-path edge line: must have greenBright, must not have dim or rotation colours.
+    const onPathEdgeLine = lines.find((l) => l.includes(onPathEdge.dirName));
+    expect(onPathEdgeLine, 'on-path edge line must exist').toBeDefined();
+    expect(onPathEdgeLine).toContain(GREEN_BRIGHT);
+    expect(onPathEdgeLine).not.toContain(RED);
+    expect(onPathEdgeLine).not.toContain(MAGENTA);
+
+    // On-path node line (the 'on22222' hash): must have greenBright.
+    const onPathNodeLine = lines.find(
+      (l) => l.includes('on22222') && !l.includes(onPathEdge.dirName),
+    );
+    expect(onPathNodeLine, 'on-path node line must exist').toBeDefined();
+    expect(onPathNodeLine).toContain(GREEN_BRIGHT);
+    expect(onPathNodeLine).not.toContain(RED);
+    expect(onPathNodeLine).not.toContain(MAGENTA);
+
+    // Off-path edge line: must have dim, must not have greenBright or rotation colours.
+    const offPathEdgeLine = lines.find((l) => l.includes(offPathEdge.dirName));
+    expect(offPathEdgeLine, 'off-path edge line must exist').toBeDefined();
+    expect(offPathEdgeLine).toContain(DIM);
+    expect(offPathEdgeLine).not.toContain(RED);
+    expect(offPathEdgeLine).not.toContain(MAGENTA);
+
+    // Off-path node line (the 'off1111' hash): must have dim.
+    const offPathNodeLine = lines.find(
+      (l) => l.includes('off1111') && !l.includes(offPathEdge.dirName),
+    );
+    expect(offPathNodeLine, 'off-path node line must exist').toBeDefined();
+    expect(offPathNodeLine).toContain(DIM);
+    expect(offPathNodeLine).not.toContain(RED);
+    expect(offPathNodeLine).not.toContain(MAGENTA);
+
+    // Connector row between off-path branch and trunk: must not contain magenta.
+    // The connector's branch lane (column 1) is off-path and must render dim, not magenta.
+    const connectorLine = lines.find((l) => l.includes('╯') || l.includes('/'));
+    if (connectorLine !== undefined) {
+      expect(connectorLine).not.toContain(RED);
+      expect(connectorLine).not.toContain(MAGENTA);
+    }
+  });
 });
 
 describe('renderMigrationGraphTree isAppSpace gate', () => {

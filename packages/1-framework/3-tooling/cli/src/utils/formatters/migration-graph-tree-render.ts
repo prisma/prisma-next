@@ -1,5 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { bold, createColors, dim, green, greenBright, yellow } from 'colorette';
+import { bold, createColors, green, yellow } from 'colorette';
 import stringWidth from 'string-width';
 import type { GlyphMode } from '../glyph-mode';
 import {
@@ -166,12 +166,23 @@ function arrowForEdgeKind(
 }
 
 /**
- * Forced bold for branch-coloured names. A branched name pairs its lane hue
- * (also forced, via {@link laneColorForColumn}) with bold; both must emit even
- * when colorette's ambient TTY detection is off, so the colorized branch name
- * is deterministically bold + hue rather than hue-only.
+ * Forced-color functions that always emit ANSI regardless of the ambient TTY
+ * environment (NO_COLOR, piped output). Used for:
+ *
+ * - `forcedBold`: branch-coloured migration names pair their lane hue with bold;
+ *   both must emit so the name is deterministically bold + hue.
+ * - `forcedDim` / `forcedGreenBright`: path-highlight overrides (migrate --show).
+ *   The renderer gates these behind `opts.colorize`; the forced variant ensures
+ *   ANSI is emitted in controlled environments (e.g. tests with `NO_COLOR=1`)
+ *   when the caller explicitly requests colour. Without forcing, `dim()`/
+ *   `greenBright()` from the ambient module-level import no-op under NO_COLOR,
+ *   making the path-highlight unreachable in tests.
  */
-const { bold: forcedBold } = createColors({ useColor: true });
+const {
+  bold: forcedBold,
+  dim: forcedDim,
+  greenBright: forcedGreenBright,
+} = createColors({ useColor: true });
 
 function laneStylerForColumn(
   colorColumn: number,
@@ -342,13 +353,27 @@ function renderCellPair(
   }
 }
 
+/**
+ * Render a branch-connector or merge-connector row.
+ *
+ * `columnLaneOverride` is an optional per-column map populated when path-highlight
+ * annotations are active (`migrate --show`). For each column in the connector's
+ * lane range, the map supplies the override styler (greenBright or dim) that should
+ * replace the normal rotating-lane colour for that column. Columns absent from the
+ * map use the standard `laneStylerForColumn` logic unchanged. This ensures off-path
+ * branch connectors appear dim rather than in their rotation colour (e.g. magenta).
+ */
 function renderConnectorRow(
   row: MigrationGraphGridRow,
   gridWidth: number,
   colorize: boolean,
   style: MigrationListStyler,
   palette: MigrationGraphTreeGlyphPalette,
+  columnLaneOverride?: ReadonlyMap<number, (text: string) => string>,
 ): string {
+  const resolvedLane = (column: number): ((text: string) => string) =>
+    columnLaneOverride?.get(column) ?? laneStylerForColumn(column, colorize, style);
+
   const isMerge = row.kind === 'merge-connector';
   if (row.cells.length > 0) {
     const colors = resolveConnectorLaneColors(row.cells, row.startLane ?? 0);
@@ -359,6 +384,36 @@ function renderConnectorRow(
       if (cell === undefined) continue;
       const glyphColumn = colors.glyph[column] ?? column;
       const dashColumn = colors.dash[column] ?? glyphColumn;
+      const override = columnLaneOverride?.get(glyphColumn);
+      if (override !== undefined) {
+        // When an override is active for this column, render the whole cell pair with
+        // the override so neither the glyph nor the dash emits the rotation colour.
+        switch (cell.kind) {
+          case 'branch-tee':
+          case 'merge-tee':
+            out += override(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
+            seenTee = true;
+            break;
+          case 'branch-corner':
+            out += override(palette.branchCorner);
+            break;
+          case 'merge-corner':
+            out += override(palette.mergeCorner);
+            break;
+          case 'vertical-pass':
+            out += override(palette.verticalPass);
+            break;
+          case 'horizontal-pass':
+            out += override(palette.horizontalPass);
+            break;
+          case 'arc-crossing':
+            out += override(palette.arcCrossing);
+            break;
+          default:
+            out += '  ';
+        }
+        continue;
+      }
       const lane = laneStylerForColumn(glyphColumn, colorize, style);
       switch (cell.kind) {
         case 'branch-tee':
@@ -413,7 +468,7 @@ function renderConnectorRow(
   const end = row.endLane ?? start;
   // The whole fork/merge run reads as one line in the served lane's hue (the
   // corner it reaches); pass-through columns outside the run keep their own.
-  const runLane = laneStylerForColumn(end, colorize, style);
+  const runLane = resolvedLane(end);
   let out = '';
   for (let column = 0; column < gridWidth; column++) {
     if (column < start || column > end) out += '  ';
@@ -521,36 +576,49 @@ function formatEdgeAnnotationSuffix(
     if (!opts.colorize) {
       segments.push(`${glyph} ${label}`);
     } else {
-      segments.push(greenBright(`${glyph} ${label}`));
+      segments.push(forcedGreenBright(`${glyph} ${label}`));
     }
   }
   if (segments.length === 0) {
     return '';
   }
   const suffix = `  ${segments.join('  ')}`;
-  return opts.colorize && isOffPath ? dim(suffix) : suffix;
+  return opts.colorize && isOffPath ? forcedDim(suffix) : suffix;
 }
 
+/**
+ * Format the `from → to` hash data column for an edge row.
+ *
+ * When `hashOverride` is provided (on-path → `greenBright`, off-path → `dim`),
+ * it replaces ALL sub-stylers (`sourceHash`, `destHash`, arrow `glyph`) so the
+ * outer path-highlight colour reaches every character without inner ANSI codes
+ * (e.g. the dim+cyan of `sourceHash`) overriding it. Without an override, the
+ * normal `style` sub-stylers apply unchanged.
+ */
 function formatEdgeHashColumn(
   edge: ClassifiedEdge,
   style: MigrationListStyler,
   hashLength: number,
   palette: MigrationGraphTreeGlyphPalette,
+  hashOverride?: (text: string) => string,
 ): string {
+  const src = hashOverride ?? style.sourceHash;
+  const dst = hashOverride ?? style.destHash;
+  const glyph = hashOverride ?? style.glyph;
   if (edge.kind === 'self') {
     const hash = abbreviateHash(edge.from, hashLength, palette.emptySource);
-    const source = padFromHashColumn(style.sourceHash(hash), hashLength);
-    return `${source} ${style.glyph(palette.forwardArrow)} ${style.destHash(hash)}`;
+    const source = padFromHashColumn(src(hash), hashLength);
+    return `${source} ${glyph(palette.forwardArrow)} ${dst(hash)}`;
   }
   const source =
     edge.from === EMPTY_CONTRACT_HASH
-      ? padFromHashColumn(style.glyph(palette.emptySource), hashLength)
+      ? padFromHashColumn(glyph(palette.emptySource), hashLength)
       : padFromHashColumn(
-          style.sourceHash(abbreviateHash(edge.from, hashLength, palette.emptySource)),
+          src(abbreviateHash(edge.from, hashLength, palette.emptySource)),
           hashLength,
         );
-  const arrow = style.glyph(palette.forwardArrow);
-  const dest = style.destHash(abbreviateHash(edge.to, hashLength, palette.emptySource));
+  const arrow = glyph(palette.forwardArrow);
+  const dest = dst(abbreviateHash(edge.to, hashLength, palette.emptySource));
   return `${source} ${arrow} ${dest}`;
 }
 
@@ -669,6 +737,11 @@ export function renderMigrationGraphTree(
   // This map is only populated when edgeAnnotationsByHash is provided (migrate --show);
   // for every other command (graph/status/list) it is empty and the code below is a no-op.
   const contractHighlights = new Map<string, 'on-path' | 'off-path'>();
+  // column → path-highlight for connector-row per-column override (migrate --show only).
+  // Maps each lane column to its dominant highlight so connector rows (branch/merge)
+  // emit dim for off-path lanes rather than the rotating lane colour.
+  // On-path wins when a column hosts both (it hosts the edge arriving at the branch point).
+  const columnHighlights = new Map<number, 'on-path' | 'off-path'>();
   if (opts.edgeAnnotationsByHash) {
     for (const row of model.rows) {
       if (row.kind !== 'edge' || row.edge === undefined) continue;
@@ -681,6 +754,14 @@ export function renderMigrationGraphTree(
         // On-path wins over off-path when a contract hash appears in both.
         if (existing !== 'on-path') {
           contractHighlights.set(hash, highlight);
+        }
+      }
+      // Track the highlight per lane column so connector rows know which columns are off-path.
+      const col = model.edgeColumn.get(row.edge.migrationHash);
+      if (col !== undefined) {
+        const existingCol = columnHighlights.get(col);
+        if (existingCol !== 'on-path') {
+          columnHighlights.set(col, highlight);
         }
       }
     }
@@ -696,7 +777,7 @@ export function renderMigrationGraphTree(
     highlight: 'on-path' | 'off-path' | undefined,
   ): ((text: string) => string) | undefined {
     if (!opts.colorize || highlight === undefined) return undefined;
-    return highlight === 'on-path' ? greenBright : dim;
+    return highlight === 'on-path' ? forcedGreenBright : forcedDim;
   }
 
   const lines: string[] = [];
@@ -711,8 +792,33 @@ export function renderMigrationGraphTree(
     }
 
     if (row.kind === 'branch-connector' || row.kind === 'merge-connector') {
+      // Build a per-column lane override for this connector row when path-highlight
+      // annotations are active. Off-path lane columns must render dim rather than their
+      // rotation colour (e.g. magenta for column 1). On-path columns stay neutral —
+      // connector rows use the normal dim lane style for the trunk (column 0) and the
+      // rotation colour for branch columns; an on-path branch connector is rare and
+      // the dim trunk default is already correct.
+      let connectorColumnOverride: Map<number, (text: string) => string> | undefined;
+      if (opts.colorize && columnHighlights.size > 0) {
+        for (const [col, highlight] of columnHighlights) {
+          const override = pathLaneOverride(highlight);
+          if (override !== undefined) {
+            connectorColumnOverride ??= new Map();
+            connectorColumnOverride.set(col, override);
+          }
+        }
+      }
       lines.push(
-        trimTrailingWhitespace(renderConnectorRow(row, gridWidth, opts.colorize, style, palette)),
+        trimTrailingWhitespace(
+          renderConnectorRow(
+            row,
+            gridWidth,
+            opts.colorize,
+            style,
+            palette,
+            connectorColumnOverride,
+          ),
+        ),
       );
       continue;
     }
@@ -812,7 +918,13 @@ export function renderMigrationGraphTree(
         lines.push(trimTrailingWhitespace(`${emptyGutter}${' '.repeat(LABEL_GAP)}${overlay}`));
         continue;
       }
-      const hashText = style.sourceHash(
+      // Apply the row's path-highlight override to the hash text when present (on-path →
+      // greenBright, off-path → dim). Without an override, `style.sourceHash` applies the
+      // default dim+cyan styling. The override must replace `style.sourceHash` entirely —
+      // wrapping styled text in an outer colour leaves the inner ANSI codes intact,
+      // which overrides the outer colour at the terminal level.
+      const hashTextStyler = rowLaneOverride ?? style.sourceHash;
+      const hashText = hashTextStyler(
         abbreviateHash(contractHash, hashLength, palette.emptySource),
       );
       const overlays = overlayNamesForContract(contractHash, opts);
@@ -843,11 +955,11 @@ export function renderMigrationGraphTree(
     if (isOffPath) {
       // Off-path migrations: fully drawn but in uniform dim grey — name, hash, and lanes.
       dirName = opts.colorize
-        ? `${dim(edge.dirName)}${dirNamePadding}`
+        ? `${forcedDim(edge.dirName)}${dirNamePadding}`
         : `${edge.dirName}${dirNamePadding}`;
     } else if (isOnPath && opts.colorize) {
       // On-path migrations: bright green name.
-      dirName = `${greenBright(bold(edge.dirName))}${dirNamePadding}`;
+      dirName = `${forcedGreenBright(bold(edge.dirName))}${dirNamePadding}`;
     } else {
       // A branched name keeps its bold (via `style.dirName`) and adds the lane
       // hue, so it reads as one with its lane/arrow; column-0 names stay bold-only.
@@ -858,13 +970,21 @@ export function renderMigrationGraphTree(
       dirName = `${dirNameStyler(edge.dirName)}${dirNamePadding}`;
     }
 
-    const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
-    const styledHashColumn =
-      opts.colorize && isOffPath
-        ? dim(hashColumn)
-        : opts.colorize && isOnPath
-          ? greenBright(hashColumn)
-          : hashColumn;
+    // When a path-highlight override is active, pass it directly to formatEdgeHashColumn
+    // so it replaces ALL sub-stylers (sourceHash, destHash, arrow glyph). Wrapping an
+    // already-styled string in an outer colour does not work: the inner ANSI codes (e.g.
+    // dim+cyan from sourceHash, or brightCyan from destHash) override the outer wrapper
+    // at the terminal level, leaving source hashes dim and destination hashes brightCyan
+    // instead of the intended uniform green or grey.
+    const hashColumnOverride = opts.colorize
+      ? isOffPath
+        ? forcedDim
+        : isOnPath
+          ? forcedGreenBright
+          : undefined
+      : undefined;
+    const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette, hashColumnOverride);
+    const styledHashColumn = hashColumn;
     const annotationSuffix = formatEdgeAnnotationSuffix(edge.migrationHash, opts, style);
     lines.push(
       trimTrailingWhitespace(`${edgeGutterPad}${dirName}${styledHashColumn}${annotationSuffix}`),
