@@ -43,7 +43,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
   readonly #adapter: MongoAdapter = createMongoAdapter();
   readonly #markerLedgerCollection = collection<MarkerLedgerDocShape>(MARKER_LEDGER_COLLECTION);
 
-  async #executeControl(
+  async #execute(
     driver: ControlDriverInstance<'mongo', 'mongo'>,
     command: AnyMongoCommand,
   ): Promise<Document[]> {
@@ -97,7 +97,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
     const markerContext = { space, markerLocation: MONGO_MARKER_COLLECTION };
     const docs = await withMarkerReadErrorHandling(
       () =>
-        this.#executeControl(
+        this.#execute(
           driver,
           this.#markerLedgerCollection
             .aggregate()
@@ -119,7 +119,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
     const markerContext = { space: 'app', markerLocation: MONGO_MARKER_COLLECTION };
     const docs = await withMarkerReadErrorHandling(
       () =>
-        this.#executeControl(
+        this.#execute(
           driver,
           this.#markerLedgerCollection
             .aggregate()
@@ -161,7 +161,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       meta: {},
       invariants: [...(destination.invariants ?? [])],
     };
-    await this.#executeControl(driver, this.#markerLedgerCollection.insertOne(document));
+    await this.#execute(driver, this.#markerLedgerCollection.insertOne(document));
   }
 
   async updateMarker(
@@ -175,7 +175,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
     },
   ): Promise<boolean> {
     const { invariants } = destination;
-    const docs = await this.#executeControl(
+    const docs = await this.#execute(
       driver,
       this.#markerLedgerCollection
         .match((f) => f._id.eq(space))
@@ -229,7 +229,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       ),
       appliedAt: new Date(),
     };
-    await this.#executeControl(driver, this.#markerLedgerCollection.insertOne(document));
+    await this.#execute(driver, this.#markerLedgerCollection.insertOne(document));
   }
 
   async readLedger(
@@ -246,7 +246,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
             .sort({ _id: 1 })
             .build();
     const docs = await withMarkerReadErrorHandling(
-      () => this.#executeControl(driver, command),
+      () => this.#execute(driver, command),
       ledgerContext,
     );
 
