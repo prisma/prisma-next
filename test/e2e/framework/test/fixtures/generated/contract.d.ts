@@ -43,7 +43,7 @@ export type ExecutionHash =
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
-export type CodecTypes = PgTypes & PgVectorTypes & ArktypeJsonTypes;
+export type CodecTypes = PgTypes & ArktypeJsonTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
   PgVectorQueryOperationTypes<CodecTypes>;
