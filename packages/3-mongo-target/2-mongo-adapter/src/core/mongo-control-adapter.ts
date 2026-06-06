@@ -55,8 +55,8 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
     const wireCommand = await this.#adapter.lower(plan, {});
     if (!isMongoControlDriver(driver)) {
       throw new Error(
-        'Mongo control adapter requires a Mongo control driver with wire transport. ' +
-          'Use createMongoControlDriver() from `@prisma-next/adapter-mongo/control`.',
+        'Mongo control adapter requires a Mongo control driver with an execute() transport. ' +
+          'Provide a MongoControlDriver from `@prisma-next/driver-mongo/control`.',
       );
     }
     const rows: Document[] = [];
