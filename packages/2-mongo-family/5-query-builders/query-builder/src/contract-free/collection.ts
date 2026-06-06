@@ -123,16 +123,16 @@ export class FilteredBuilder<Shape extends DocShape> {
  * `new MongoMatchStage(...)`, `MongoAndExpr.of([...])`, or `new AggregateCommand(...)`.
  *
  * ```ts
- * const control = collection<ControlDocShape>('_prisma_migrations');
+ * const markerLedger = collection<MarkerLedgerDocShape>('_prisma_migrations');
  *
  * // aggregate
- * control.aggregate().match(f => f._id.eq(space)).limit(1).build();
+ * markerLedger.aggregate().match(f => f._id.eq(space)).limit(1).build();
  *
  * // insertOne
- * control.insertOne({ _id: space, space, storageHash });
+ * markerLedger.insertOne({ _id: space, space, storageHash });
  *
  * // findOneAndUpdate (CAS)
- * control.match(f => f._id.eq(space)).match(f => f.storageHash.eq(expectedFrom))
+ * markerLedger.match(f => f._id.eq(space)).match(f => f.storageHash.eq(expectedFrom))
  *   .findOneAndUpdate(f => [f.stage.set({ storageHash: newHash })], { upsert: false });
  * ```
  */

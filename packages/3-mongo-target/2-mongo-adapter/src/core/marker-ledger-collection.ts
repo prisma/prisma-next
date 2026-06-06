@@ -1,12 +1,12 @@
 /**
- * Document shape of the `_prisma_migrations` control collection, declared
- * once so the contract-free field accessor is typed without threading a
- * contract, codecs, or paths at the call sites. Both the marker
- * documents (`space` / `storageHash` / … / `invariants`) and the ledger
- * documents (`type` / `edgeId` / … / `appliedAt`) live in this one
- * collection, so the shape is their union.
+ * Document shape of the `_prisma_migrations` collection, which stores both the
+ * per-space contract **markers** (`space` / `storageHash` / … / `invariants`)
+ * and the migration **ledger** entries (`type` / `edgeId` / … / `appliedAt`) —
+ * so the shape is their union. Declared once so the contract-free field
+ * accessor is typed without threading a contract, codecs, or paths at the call
+ * sites.
  */
-export type ControlDocShape = {
+export type MarkerLedgerDocShape = {
   readonly _id: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
   // Marker fields
   readonly space: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
@@ -29,4 +29,4 @@ export type ControlDocShape = {
   readonly appliedAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
 };
 
-export const CONTROL_COLLECTION = '_prisma_migrations';
+export const MARKER_LEDGER_COLLECTION = '_prisma_migrations';

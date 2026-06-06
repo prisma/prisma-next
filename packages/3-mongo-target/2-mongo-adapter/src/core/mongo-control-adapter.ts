@@ -19,13 +19,13 @@ import type { MongoValue } from '@prisma-next/mongo-value';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import type { Db, Document } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
-import { CONTROL_COLLECTION, type ControlDocShape } from './control-construction';
 import { introspectSchema } from './introspect-schema';
 import {
   MONGO_LEDGER_COLLECTION,
   MONGO_MARKER_COLLECTION,
   parseMongoMarkerDocSafely,
 } from './marker-ledger';
+import { MARKER_LEDGER_COLLECTION, type MarkerLedgerDocShape } from './marker-ledger-collection';
 import { extractDb } from './runner-deps';
 
 /**
@@ -59,14 +59,14 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
   readonly familyId = 'mongo' as const;
   readonly targetId = 'mongo' as const;
   readonly #adapter: MongoAdapter = createMongoAdapter();
-  readonly #control = collection<ControlDocShape>(CONTROL_COLLECTION);
+  readonly #markerLedgerCollection = collection<MarkerLedgerDocShape>(MARKER_LEDGER_COLLECTION);
 
   async #executeControl(
     driver: ControlDriverInstance<'mongo', 'mongo'>,
     command: AnyMongoCommand,
   ): Promise<Document[]> {
     const plan: MongoQueryPlan = {
-      collection: CONTROL_COLLECTION,
+      collection: MARKER_LEDGER_COLLECTION,
       command,
       meta: { target: 'mongo', targetFamily: 'mongo', storageHash: '', lane: 'control' },
     };
@@ -113,7 +113,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       () =>
         this.#executeControl(
           driver,
-          this.#control
+          this.#markerLedgerCollection
             .aggregate()
             .match((f) => f._id.eq(space))
             .match((f) => f.space.eq(space))
@@ -135,7 +135,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       () =>
         this.#executeControl(
           driver,
-          this.#control
+          this.#markerLedgerCollection
             .aggregate()
             .match((f) => f._id.type('string'))
             .match((f) => f.space.type('string'))
@@ -175,7 +175,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       meta: {},
       invariants: [...(destination.invariants ?? [])],
     };
-    await this.#executeControl(driver, this.#control.insertOne(document));
+    await this.#executeControl(driver, this.#markerLedgerCollection.insertOne(document));
   }
 
   async updateMarker(
@@ -191,7 +191,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
     const { invariants } = destination;
     const docs = await this.#executeControl(
       driver,
-      this.#control
+      this.#markerLedgerCollection
         .match((f) => f._id.eq(space))
         .match((f) => f.space.eq(space))
         .match((f) => f.storageHash.eq(expectedFrom))
@@ -243,7 +243,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       ),
       appliedAt: new Date(),
     };
-    await this.#executeControl(driver, this.#control.insertOne(document));
+    await this.#executeControl(driver, this.#markerLedgerCollection.insertOne(document));
   }
 
   async readLedger(
@@ -251,7 +251,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
     space?: string,
   ): Promise<readonly LedgerEntryRecord[]> {
     const ledgerContext = { space: space ?? '*', markerLocation: MONGO_LEDGER_COLLECTION };
-    const chain = this.#control.aggregate().match((f) => f.type.eq('ledger'));
+    const chain = this.#markerLedgerCollection.aggregate().match((f) => f.type.eq('ledger'));
     const command =
       space === undefined
         ? chain.sort({ _id: 1 }).build()
