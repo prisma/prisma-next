@@ -17,10 +17,8 @@ describe('extractDb', () => {
     expect(extractDb(driver)).toBe(fakeDb);
   });
 
-  it("throws when the mongo control driver doesn't expose a db property", () => {
+  it('throws when the value is not a Mongo control driver', () => {
     const driver = {} as unknown as ControlDriverInstance<'mongo', 'mongo'>;
-    expect(() => extractDb(driver)).toThrowError(
-      /Mongo control driver does not expose a db property/,
-    );
+    expect(() => extractDb(driver)).toThrowError(/Expected a Mongo control driver/);
   });
 });
