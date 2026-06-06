@@ -149,12 +149,19 @@ export const ForeignKeyReferenceSchema = type({
   'spaceId?': 'string',
 }) satisfies Type<ForeignKeyReferenceInput>;
 
+export const ForeignKeySourceSchema = type({
+  '+': 'reject',
+  namespaceId: 'string',
+  tableName: 'string',
+  columns: type.string.array().readonly(),
+}) satisfies Type<ForeignKeyReferenceInput>;
+
 export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
   .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
 
 export const ForeignKeySchema = type({
-  source: ForeignKeyReferenceSchema,
+  source: ForeignKeySourceSchema,
   target: ForeignKeyReferenceSchema,
   'name?': 'string',
   'onDelete?': ReferentialActionSchema,
