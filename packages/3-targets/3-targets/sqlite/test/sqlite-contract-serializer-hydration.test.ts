@@ -12,15 +12,17 @@ function makeContractWithTablesJson() {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'INTEGER', codecId: 'sqlite/integer@1', nullable: false },
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  id: { nativeType: 'INTEGER', codecId: 'sqlite/integer@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -39,7 +41,7 @@ describe('SqliteContractSerializer namespace hydration', () => {
       return;
     }
     expect(namespace.qualifyTable('user')).toBe('"user"');
-    const userTable = namespace.tables['user'];
+    const userTable = namespace.entries.table['user'];
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
   });

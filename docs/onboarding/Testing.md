@@ -8,11 +8,13 @@
 
 ```bash
 pnpm test:packages      # Unit tests for packages only
-pnpm test:integration   # Integration tests
+pnpm test:integration   # Integration tests (pretest builds first)
 pnpm test:e2e           # End-to-end tests
 pnpm test:all           # All tests (packages + examples + integration + e2e)
 pnpm coverage:packages  # Coverage for packages only
 ```
+
+> Integration tests (`test/integration`) run against each package's built `dist`, not its source. After changing a package's source, rebuild it (e.g. `pnpm --filter <pkg> build`) before running a bare `vitest` filter, or the test will exercise stale output. The full `pnpm test:integration` pretest builds automatically, so this only bites targeted runs.
 
 ## CI
 

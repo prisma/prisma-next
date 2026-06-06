@@ -200,16 +200,9 @@ The extension declares the following capabilities:
 
 ## Authoring (maintainers)
 
-The extension's contract + baseline migration are emitted on-disk inside this package using the same pipeline application authors use:
+After changing the contract source, run `pnpm migrations:regen` from the repo root to keep migration metadata, `refs/head.json`, and `end-contract.*` consistent with the freshly-built `src/contract.json`; it is also wired into `pnpm fixtures:emit` automatically.
 
-- `pnpm build:contract-space` — runs `prisma-next contract emit` to produce `src/contract.{json,d.ts}` from the TS source at `src/contract.ts`.
-- `pnpm exec prisma-next migration plan --name <slug>` (run from this package directory) — scaffolds a new migration directory under `migrations/<dirName>/` for schema changes that touch tables / models. **Not chained into `pnpm build`**: `migration plan` is non-idempotent (each invocation generates a new timestamped directory), so it runs manually when the contract source changes. Note: pgvector's contract declares only the parameterised `vector` native type under `storage.types` (no tables / models), so the planner currently refuses to scaffold the baseline migration with `PN-CLI-4020 Contract changed but planner produced no operations` (this is **Path B** authoring per [ADR 212](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md#contract-space-package-layout)). That directory was hand-authored once (Migration subclass + seed `migration.json` preserving the full `toContract`) and `pnpm tsx migrations/<dirName>/migration.ts` re-emits `ops.json` + `migration.json` deterministically. Future migrations that add tables / models can use `migration plan` directly (Path A).
-- `pnpm tsx migrations/<dirName>/migration.ts` (run from this package directory) — re-emits `ops.json` + `migration.json` from the hand-edited subclass. Use `tsx`, not bare `node`, because the Migration subclass imports relative TypeScript siblings which Node's native loader can't resolve without a TS-aware loader.
-- `migrations/refs/head.json` is hand-pinned with the latest migration's `to` hash + `providedInvariants`.
-
-The descriptor at `src/exports/control.ts` then JSON-imports those artefacts and synthesises the framework's `MigrationPackage` shape.
-
-See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) ("Contract-space package layout") for the canonical layout and rationale.
+See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) ("Contract-space package layout") for the layout and rationale.
 
 ## References
 

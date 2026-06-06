@@ -217,10 +217,10 @@ describe('value objects: end-to-end SQL pipeline', () => {
     const storage = contract.storage as unknown as {
       namespaces: Record<
         string,
-        { tables: Record<string, { columns: Record<string, { nativeType: string }> }> }
+        { entries: { table: Record<string, { columns: Record<string, { nativeType: string }> }> } }
       >;
     };
-    const userTable = storage.namespaces['public']!.tables['user'];
+    const userTable = storage.namespaces['public']!.entries.table['user'];
     expect(userTable).toBeDefined();
     expect(userTable!.columns['homeAddress']).toBeDefined();
     expect(userTable!.columns['homeAddress']!.nativeType).toBe('jsonb');

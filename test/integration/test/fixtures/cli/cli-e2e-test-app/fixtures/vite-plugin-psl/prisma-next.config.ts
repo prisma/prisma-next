@@ -4,6 +4,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 
 export default defineConfig({
   family: sql,
@@ -14,5 +15,6 @@ export default defineConfig({
   contract: prismaContract('./contract.prisma', {
     output: 'output/contract.json',
     target: postgres,
+    createNamespace: postgresCreateNamespace,
   }),
 });

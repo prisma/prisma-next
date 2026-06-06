@@ -28,7 +28,8 @@ import {
 import { errorRuntime } from '@prisma-next/errors/execution';
 import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { RefResolutionError } from '@prisma-next/migration-tools/ref-resolution';
-import type { MigrationApplyFailure } from '../control-api/types';
+import { ifDefined } from '@prisma-next/utils/defined';
+import type { MigrateFailure } from '../control-api/types';
 
 export {
   ERROR_CODE_DESTRUCTIVE_CHANGES,
@@ -267,7 +268,7 @@ export function errorMarkerMismatch(
   });
 }
 
-export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructuredError {
+export function errorPathUnreachable(failure: MigrateFailure): CliStructuredError {
   const meta = failure.meta ?? {};
   const fromHashMeta = typeof meta['fromHash'] === 'string' ? meta['fromHash'] : null;
   // `buildPathNotFoundFailure` uses this sentinel in meta when the live marker is null.
@@ -343,9 +344,59 @@ export function mapMigrationToolsError(error: MigrationToolsError): CliStructure
 }
 
 /**
+ * Shared "needs a live database" precondition for read verbs that consult the
+ * marker/ledger (`migration log`, `migration status`). A command needs both a
+ * connection string and a control-plane driver; either missing yields the same
+ * `PN-CLI-4005` envelope with `meta.missingFlags` (canonical long-form flags
+ * per CLI Style Guide §Errors) so callers can react programmatically. Returns
+ * `null` when both are present.
+ */
+export function requireLiveDatabase(args: {
+  readonly dbConnection: unknown;
+  readonly hasDriver: boolean;
+  readonly why: string;
+  readonly commandName?: string;
+  readonly retryCommand?: string;
+}): CliStructuredError | null {
+  if (args.dbConnection && args.hasDriver) {
+    return null;
+  }
+  const missingFlags = args.dbConnection ? [] : ['--db'];
+  return errorDatabaseConnectionRequired({
+    why: args.why,
+    missingFlags,
+    ...ifDefined('commandName', args.commandName),
+    ...ifDefined('retryCommand', args.retryCommand),
+  });
+}
+
+/**
  * Maps a `RefResolutionError` from the contract/migration reference
  * resolver into a CLI structured error envelope.
  */
+/**
+ * A migration ref (dirName or hash-prefix) resolves in more than one contract
+ * space. The user must qualify with `--space <id>` to disambiguate.
+ */
+export function errorAmbiguousMigrationRef(
+  ref: string,
+  spaceIds: readonly string[],
+): CliStructuredError {
+  const spaceList = spaceIds.join(', ');
+  return errorRuntime(
+    `Ambiguous migration reference: "${ref}" resolves in multiple spaces — qualify with --space <id>`,
+    {
+      why: `"${ref}" matches migrations in spaces: ${spaceList}.`,
+      fix: `Qualify with --space <id> to select one space. Available matching spaces: ${spaceList}.`,
+      meta: {
+        code: 'MIGRATION.AMBIGUOUS_MIGRATION_REF',
+        ref,
+        spaceIds: [...spaceIds],
+      },
+    },
+  );
+}
+
 export function mapRefResolutionError(error: RefResolutionError): CliStructuredError {
   switch (error.kind) {
     case 'not-found':

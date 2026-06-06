@@ -5,10 +5,9 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { blindCast, castAs } from '@prisma-next/utils/casts';
-import type { PostgresEnumStorageEntry } from './postgres-enum-storage-entry';
 import type { SqlNamespace, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
-import { StorageTable } from './storage-table';
+import { StorageTable, type StorageTableInput } from './storage-table';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
 
@@ -25,15 +24,15 @@ function isMaterializedSqlNamespace(ns: Namespace | SqlNamespaceTablesInput): ns
 
 class SqlBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
-  declare readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
 
   readonly id: string;
-  readonly tables: Readonly<Record<string, StorageTable>>;
+  readonly entries: Readonly<{
+    readonly table: Readonly<Record<string, StorageTable>>;
+  }>;
 
   static fromTablesInput(input: SqlNamespaceTablesInput): SqlNamespace {
-    const tableCount = Object.keys(input.tables ?? {}).length;
-    const enumCount = Object.keys(input.enum ?? {}).length;
-    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0 && enumCount === 0) {
+    const tableCount = Object.keys(input.entries.table).length;
+    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0) {
       return castAs<SqlNamespace>(SqlUnboundNamespace.instance);
     }
     return castAs<SqlNamespace>(new SqlBoundNamespace(input));
@@ -42,22 +41,16 @@ class SqlBoundNamespace extends NamespaceBase {
   private constructor(input: SqlNamespaceTablesInput) {
     super();
     this.id = input.id;
-    this.tables = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.tables ?? {}).map(([name, t]) => [
-          name,
-          t instanceof StorageTable ? t : new StorageTable(t),
-        ]),
+    this.entries = Object.freeze({
+      table: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.table).map(([k, v]) => [
+            k,
+            v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
+          ]),
+        ),
       ),
-    );
-    if (input.enum !== undefined && Object.keys(input.enum).length > 0) {
-      Object.defineProperty(this, 'enum', {
-        value: Object.freeze({ ...input.enum }),
-        writable: false,
-        enumerable: true,
-        configurable: false,
-      });
-    }
+    });
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,
@@ -90,7 +83,12 @@ export function buildSqlNamespaceMap(
             SqlNamespace,
             'a materialised SQL-family namespace entry in a namespace map is a SqlNamespace'
           >(ns)
-        : SqlBoundNamespace.fromTablesInput(ns),
+        : SqlBoundNamespace.fromTablesInput(
+            blindCast<
+              SqlNamespaceTablesInput,
+              'non-materialized SQL namespace map entry is a SqlNamespaceTablesInput'
+            >(ns),
+          ),
     ]),
   );
 }

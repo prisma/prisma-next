@@ -199,7 +199,7 @@ Handles the translation between JavaScript values and database values. When you 
 
 ### Marker
 
-A small record stored in the database that tracks which contract is currently applied. Before running queries or migrations, Prisma Next checks that the marker matches the contract the application is carrying. This catches situations where the database and application have drifted out of sync — for example, if a migration was applied but the application wasn't redeployed.
+A small record stored in the database that tracks which contract the database is currently migrated to. Before running queries or migrations, Prisma Next checks that the marker matches the contract the application is carrying. This catches situations where the database and application have drifted out of sync — for example, if a migration was run but the application wasn't redeployed.
 
 ### Namespace
 
@@ -312,4 +312,5 @@ Planned refactors to bring internal naming in line with user-facing terminology:
 | extension / `extensions`  | extension pack / `extensionPacks`   | Config property, types, docs, CLI output, error messages          | Pending |
 | middleware / `middleware` | plugin / `plugins`                  | Runtime options, types, docs                                      | **Done** |
 | query builder             | query lane / lane                   | Architecture docs, package names, internal naming                 | Pending |
+| `migrate` (advance DB) / `run` (execute a migration) | `apply` (verb) / `migrationApply` | Control-api method + types, internal naming, docs | **In progress** |
 

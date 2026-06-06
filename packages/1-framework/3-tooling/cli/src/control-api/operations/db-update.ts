@@ -9,7 +9,7 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk } from '@prisma-next/utils/result';
 import type { DbUpdateResult, OnControlProgress } from '../types';
-import { executeApply } from './db-apply';
+import { executeRun } from './db-run';
 
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -71,7 +71,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     const gate = await guardDestructiveChanges<TFamilyId, TTargetId>(sharedInputs);
     if (gate !== null) return gate;
   }
-  return (await executeApply<TFamilyId, TTargetId>({
+  return (await executeRun<TFamilyId, TTargetId>({
     ...sharedInputs,
     mode: options.mode,
   })) as DbUpdateResult;
@@ -85,9 +85,9 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
  * run.
  */
 async function guardDestructiveChanges<TFamilyId extends string, TTargetId extends string>(
-  sharedInputs: Omit<Parameters<typeof executeApply<TFamilyId, TTargetId>>[0], 'mode'>,
+  sharedInputs: Omit<Parameters<typeof executeRun<TFamilyId, TTargetId>>[0], 'mode'>,
 ): Promise<DbUpdateResult | null> {
-  const planResult = (await executeApply<TFamilyId, TTargetId>({
+  const planResult = (await executeRun<TFamilyId, TTargetId>({
     ...sharedInputs,
     mode: 'plan',
   })) as DbUpdateResult;

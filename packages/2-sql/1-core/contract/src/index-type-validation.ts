@@ -9,7 +9,7 @@ export function validateIndexTypes(
   indexTypeRegistry: IndexTypeRegistry,
 ): void {
   for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
-    for (const [tableName, rawTable] of Object.entries(ns.tables)) {
+    for (const [tableName, rawTable] of Object.entries(ns.entries.table)) {
       const table = rawTable as StorageTable;
       for (const index of table.indexes) {
         if (index.type === undefined && index.options !== undefined) {

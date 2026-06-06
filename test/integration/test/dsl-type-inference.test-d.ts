@@ -50,13 +50,13 @@ const singleModelContract = defineContract({
 
 test('table name literals survive in storage.tables (single model)', () => {
   expectTypeOf<
-    keyof (typeof singleModelContract.storage.namespaces)['public']['tables']
+    keyof (typeof singleModelContract.storage.namespaces)['public']['entries']['table']
   >().toEqualTypeOf<'user'>();
 });
 
 test('column name literals survive in storage.tables[name].columns', () => {
   type UserColumns =
-    (typeof singleModelContract.storage.namespaces)['public']['tables']['user']['columns'];
+    (typeof singleModelContract.storage.namespaces)['public']['entries']['table']['user']['columns'];
   expectTypeOf<keyof UserColumns>().toEqualTypeOf<'id' | 'email'>();
 });
 
@@ -78,7 +78,7 @@ test('deserializeContract preserves table name literals', () => {
     singleModelContract,
   ) as typeof singleModelContract;
   expectTypeOf<
-    keyof (typeof validated.storage.namespaces)['public']['tables']
+    keyof (typeof validated.storage.namespaces)['public']['entries']['table']
   >().toEqualTypeOf<'user'>();
 });
 
@@ -125,7 +125,7 @@ const multiModelContract = defineContract({
 
 test('multi-model contract preserves table name literals', () => {
   expectTypeOf<
-    keyof (typeof multiModelContract.storage.namespaces)['public']['tables']
+    keyof (typeof multiModelContract.storage.namespaces)['public']['entries']['table']
   >().toEqualTypeOf<'user' | 'post'>();
 });
 
@@ -137,7 +137,7 @@ test('multi-model contract preserves model name literals', () => {
 
 test('multi-model contract preserves column literals per table', () => {
   type PostColumns =
-    (typeof multiModelContract.storage.namespaces)['public']['tables']['post']['columns'];
+    (typeof multiModelContract.storage.namespaces)['public']['entries']['table']['post']['columns'];
   expectTypeOf<keyof PostColumns>().toEqualTypeOf<'id' | 'userId' | 'title'>();
 });
 

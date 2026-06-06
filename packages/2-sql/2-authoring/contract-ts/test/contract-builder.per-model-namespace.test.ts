@@ -38,12 +38,12 @@ const sqliteTargetPack: TargetPackRef<'sql', 'sqlite'> = {
 class StubNamespace extends NamespaceBase {
   readonly kind = 'schema' as const;
   readonly id: string;
-  readonly tables: Readonly<Record<string, IRNode>>;
+  readonly entries: Readonly<{ readonly table: Readonly<Record<string, IRNode>> }>;
 
   constructor(id: string, tables: Readonly<Record<string, IRNode>> = {}) {
     super();
     this.id = id;
-    this.tables = Object.freeze({ ...tables });
+    this.entries = Object.freeze({ table: Object.freeze({ ...tables }) });
     freezeNode(this);
   }
 
@@ -57,7 +57,10 @@ class StubNamespace extends NamespaceBase {
 }
 
 function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
-  return new StubNamespace(input.id, input.tables as Readonly<Record<string, IRNode>> | undefined);
+  return new StubNamespace(
+    input.id,
+    input.entries.table as Readonly<Record<string, IRNode>> | undefined,
+  );
 }
 
 const int4Column = columnDescriptor('pg/int4@1');
@@ -84,8 +87,12 @@ describe('per-model `namespace` field (TS builder)', () => {
     // `keyof` as `never` (preventing `Db<C>` from collapsing to a string
     // index signature). The runtime value is correct; cast to verify it.
     expect(
-      (contract.storage.namespaces as Record<string, { tables: Record<string, unknown> }>)['auth']
-        ?.tables['User'],
+      (
+        contract.storage.namespaces as Record<
+          string,
+          { entries: { table: Record<string, unknown> } }
+        >
+      )['auth']?.entries.table['User'],
     ).toBeDefined();
   });
 
@@ -101,7 +108,7 @@ describe('per-model `namespace` field (TS builder)', () => {
     });
 
     expect(
-      (contract.storage.namespaces['public']?.tables as Record<string, unknown>)['User'],
+      (contract.storage.namespaces['public']?.entries.table as Record<string, unknown>)['User'],
     ).toBeDefined();
   });
 

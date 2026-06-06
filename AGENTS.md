@@ -54,6 +54,7 @@ The repo keeps a single canonical home for each kind of agent surface, with pres
 - Don't reexport from one file in another, except in `exports/` folders.
 - Don't branch on target; use adapters: `.agents/rules/no-target-branches.mdc`.
 - Keep tests concise; omit "should": `.agents/rules/omit-should-in-tests.mdc`.
+- In sql-orm-client tests, assert the whole result shape (`toEqual`/snapshot) with explicit `select`: `.agents/rules/sql-orm-client-whole-shape-assertions.mdc`.
 - Keep docs current (READMEs, rules, links): `.agents/rules/doc-maintenance.mdc`.
 - Prefer links to canonical docs over long comments.
 

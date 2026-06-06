@@ -1,23 +1,31 @@
 import { Collection } from '@prisma-next/sql-orm-client';
-import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
-import { withReturningCapability } from './collection-fixtures';
-import { buildMixedPolyContract, getTestContext, type TestContract } from './helpers';
+import { getPolyTestContext } from './helpers';
 import { timeouts, withCollectionRuntime } from './integration-helpers';
 import type { PgIntegrationRuntime } from './runtime-helpers';
 
-function polyContract() {
-  return withReturningCapability(buildMixedPolyContract()) as TestContract;
-}
+const polyContext = getPolyTestContext();
+
+// These tests run against the REAL emitted poly fixture
+// (`fixtures/polymorphism/generated/contract.json`): the Task hierarchy — base
+// `Task` (discriminator `type`), `Bug` (single-table inheritance, own field
+// `severity`), `Feature` (multi-table inheritance, table `features`, field
+// `priority`) — is part of the static contract type, so `.variant(...)`,
+// `.orderBy(...)`, `.create(...)` and the decoded row shapes are driven by the
+// real `Collection` types, not a hand-written cast interface.
+//
+// The fixture's `Task` carries the relationship FK columns (`project_id`,
+// `reporter_id`) that the sibling include tests need; they are nullable and
+// surface in the default (no-`select`) projection here as `projectId` /
+// `reporterId`.
 
 function createTaskCollection(runtime: PgIntegrationRuntime) {
-  const contract = polyContract();
-  const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'Task');
+  return new Collection({ runtime, context: polyContext }, 'Task');
 }
 
 async function setupPolySchema(runtime: PgIntegrationRuntime): Promise<void> {
   await runtime.query('drop table if exists features');
+  await runtime.query('drop table if exists epics');
   await runtime.query('drop table if exists tasks');
 
   await runtime.query(`
@@ -25,7 +33,9 @@ async function setupPolySchema(runtime: PgIntegrationRuntime): Promise<void> {
       id serial primary key,
       title text not null,
       type text not null,
-      severity text
+      severity text,
+      project_id integer,
+      reporter_id integer
     )
   `);
 
@@ -33,6 +43,16 @@ async function setupPolySchema(runtime: PgIntegrationRuntime): Promise<void> {
     create table features (
       id integer primary key references tasks(id),
       priority integer not null
+    )
+  `);
+
+  // The shared fixture's Task hierarchy includes a second MTI variant (Epic →
+  // `epics`). A base `Task` query LEFT JOINs every MTI variant table, so the
+  // table must exist even though these scenarios seed no epics.
+  await runtime.query(`
+    create table epics (
+      id integer primary key references tasks(id),
+      scope text not null
     )
   `);
 }
@@ -52,70 +72,138 @@ async function seedPolyData(runtime: PgIntegrationRuntime): Promise<void> {
 
 describe('integration/polymorphism', () => {
   it(
-    'base query returns all variants with discriminator-aware mapping',
+    'base query with no select returns the full default shape per variant of the union',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await setupPolySchema(runtime);
         await seedPolyData(runtime);
 
         const tasks = createTaskCollection(runtime);
-        const rows = await tasks.all().toArray();
+        // No `.select(...)` on purpose: this pins the default projection of a
+        // base poly query — each row carries the base fields plus only its own
+        // variant's field (Bug rows carry `severity`, Feature rows carry
+        // `priority`; no sibling-variant field leaks).
+        const rows = await tasks
+          .orderBy((task) => task.id.asc())
+          .all()
+          .toArray();
 
-        expect(rows).toHaveLength(4);
-
-        const bug = rows.find((r) => r['title'] === 'Crash on login');
-        expect(bug).toMatchObject({
-          id: 1,
-          title: 'Crash on login',
-          type: 'bug',
-          severity: 'critical',
-        });
-        expect(bug).not.toHaveProperty('priority');
-
-        const feature = rows.find((r) => r['title'] === 'Dark mode');
-        expect(feature).toMatchObject({ id: 3, title: 'Dark mode', type: 'feature', priority: 1 });
-        expect(feature).not.toHaveProperty('severity');
-      });
+        expect(rows).toEqual([
+          {
+            id: 1,
+            title: 'Crash on login',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'critical',
+          },
+          {
+            id: 2,
+            title: 'Null ref in parser',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'low',
+          },
+          {
+            id: 3,
+            title: 'Dark mode',
+            type: 'feature',
+            projectId: null,
+            reporterId: null,
+            priority: 1,
+          },
+          {
+            id: 4,
+            title: 'Export to PDF',
+            type: 'feature',
+            projectId: null,
+            reporterId: null,
+            priority: 3,
+          },
+        ]);
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
 
   it(
-    'variant(Bug) query returns only STI Bug rows',
+    'variant(Bug) query with no select returns the full default STI variant shape',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await setupPolySchema(runtime);
         await seedPolyData(runtime);
 
         const tasks = createTaskCollection(runtime);
-        const bugs = await (tasks.variant('Bug' as never) as typeof tasks).all().toArray();
+        // STI variant (`severity` is a base-table column). No `.select(...)`:
+        // pins the default projection of an STI-variant-narrowed query — base
+        // fields plus the Bug variant's `severity`, and only the Bug rows.
+        const bugs = await tasks
+          .variant('Bug')
+          .orderBy((task) => task.id.asc())
+          .all()
+          .toArray();
 
-        expect(bugs).toHaveLength(2);
-        for (const bug of bugs) {
-          expect(bug['type']).toBe('bug');
-          expect(bug).toHaveProperty('severity');
-        }
-      });
+        expect(bugs).toEqual([
+          {
+            id: 1,
+            title: 'Crash on login',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'critical',
+          },
+          {
+            id: 2,
+            title: 'Null ref in parser',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'low',
+          },
+        ]);
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
 
   it(
-    'variant(Feature) query INNER JOINs and returns only MTI Feature rows',
+    'variant(Feature) query with no select INNER JOINs and returns the full default MTI variant shape',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await setupPolySchema(runtime);
         await seedPolyData(runtime);
 
         const tasks = createTaskCollection(runtime);
-        const features = await (tasks.variant('Feature' as never) as typeof tasks).all().toArray();
+        // MTI variant (`priority` lives on the joined `features` table). No
+        // `.select(...)`: pins the default projection of an MTI-variant-narrowed
+        // query — base fields plus the joined `priority`, and only the Feature
+        // rows (the INNER JOIN drops non-Feature rows).
+        const features = await tasks
+          .variant('Feature')
+          .orderBy((task) => task.id.asc())
+          .all()
+          .toArray();
 
-        expect(features).toHaveLength(2);
-        for (const feature of features) {
-          expect(feature['type']).toBe('feature');
-          expect(feature).toHaveProperty('priority');
-        }
-      });
+        expect(features).toEqual([
+          {
+            id: 3,
+            title: 'Dark mode',
+            type: 'feature',
+            projectId: null,
+            reporterId: null,
+            priority: 1,
+          },
+          {
+            id: 4,
+            title: 'Export to PDF',
+            type: 'feature',
+            projectId: null,
+            reporterId: null,
+            priority: 3,
+          },
+        ]);
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -127,17 +215,38 @@ describe('integration/polymorphism', () => {
         await setupPolySchema(runtime);
 
         const tasks = createTaskCollection(runtime);
-        const bugs = tasks.variant('Bug' as never) as typeof tasks;
-        const created = await bugs.create({ title: 'New bug', severity: 'high' } as never);
+        const bugs = tasks.variant('Bug');
+        const created = await bugs.create({ title: 'New bug', severity: 'high' });
 
-        expect(created).toMatchObject({ title: 'New bug', type: 'bug', severity: 'high' });
-        expect(created['id']).toBeDefined();
+        const id = created.id;
+        expect(created).toEqual({
+          id,
+          title: 'New bug',
+          type: 'bug',
+          projectId: null,
+          reporterId: null,
+          severity: 'high',
+        });
 
-        const rows = await runtime.query<{ type: string }>('select type from tasks where id = $1', [
-          created['id'],
+        // Read the row back through the ORM (no select → default variant shape)
+        // rather than re-reading the discriminator column raw: the discriminator
+        // round-trips through the mapped variant shape, which is what callers see.
+        const readBack = await tasks
+          .variant('Bug')
+          .orderBy((task) => task.id.asc())
+          .all()
+          .toArray();
+        expect(readBack).toEqual([
+          {
+            id,
+            title: 'New bug',
+            type: 'bug',
+            projectId: null,
+            reporterId: null,
+            severity: 'high',
+          },
         ]);
-        expect(rows[0]!.type).toBe('bug');
-      });
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );
@@ -149,29 +258,39 @@ describe('integration/polymorphism', () => {
         await setupPolySchema(runtime);
 
         const tasks = createTaskCollection(runtime);
-        const features = tasks.variant('Feature' as never) as typeof tasks;
+        const features = tasks.variant('Feature');
         const created = await features.create({
           title: 'New feature',
           priority: 5,
-        } as never);
+        });
 
-        expect(created).toMatchObject({ title: 'New feature', type: 'feature', priority: 5 });
-        expect(created['id']).toBeDefined();
+        const id = created.id;
+        expect(created).toEqual({
+          id,
+          title: 'New feature',
+          type: 'feature',
+          projectId: null,
+          reporterId: null,
+          priority: 5,
+        });
 
+        // Storage-level invariant the ORM intentionally hides: an MTI create is a
+        // two-table transactional write — the base row lands in `tasks` and the
+        // variant row in `features`. The mapped ORM result above presents a single
+        // merged row, so only a raw read can prove both physical tables were
+        // written. This is the deliberate exception to "read back through the ORM".
         const baseRows = await runtime.query<{ title: string; type: string }>(
           'select title, type from tasks where id = $1',
-          [created['id']],
+          [id],
         );
-        expect(baseRows).toHaveLength(1);
-        expect(baseRows[0]).toMatchObject({ title: 'New feature', type: 'feature' });
+        expect(baseRows).toEqual([{ title: 'New feature', type: 'feature' }]);
 
         const variantRows = await runtime.query<{ priority: number }>(
           'select priority from features where id = $1',
-          [created['id']],
+          [id],
         );
-        expect(variantRows).toHaveLength(1);
-        expect(variantRows[0]!.priority).toBe(5);
-      });
+        expect(variantRows).toEqual([{ priority: 5 }]);
+      }, polyContext.contract);
     },
     timeouts.spinUpPpgDev,
   );

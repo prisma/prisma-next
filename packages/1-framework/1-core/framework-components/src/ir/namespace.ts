@@ -41,28 +41,30 @@ export const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
  *
  * The framework promises only the coordinate (`id`) — the named storage
  * entities a namespace contains are family-typed (SQL contributes
- * `tables`, Mongo contributes `collections`, future families pick their
- * own native idiom). Generic consumers walking "all named entries" go
- * through a family-typed namespace, not the framework `Namespace`.
+ * `table` / `type`, Mongo contributes `collection`, future families pick
+ * their own native idiom under `entries`). Generic consumers walking "all
+ * named entries" go through a family-typed namespace, not the framework
+ * `Namespace`.
  *
  * Every namespace concretion (e.g. family-built SQL namespaces,
  * `MongoUnboundNamespace`, target-promoted namespaces like
- * `PostgresSchema`) carries exactly: `id` (enumerable string), `kind`
- * (non-enumerable string discriminator set via `Object.defineProperty`),
- * and one or more entity-kind slot maps — each an own-enumerable property
- * whose key is the entity kind (`tables`, `types`, `collections`,
- * target-pack-contributed slot names) and whose value is a
- * `Record<entityName, EntityIRClass>`. No other own-enumerable data lives
- * on a namespace; non-entity computed data lives on the surrounding storage
- * or contract IR. The framework's `elementCoordinates(storage)` walk relies
- * on this invariant to enumerate entities structurally without
- * family-specific knowledge.
+ * `PostgresSchema`) carries exactly: `id` (enumerable string),
+ * `entries` (frozen object holding entity-kind slot maps), and `kind`
+ * (non-enumerable string discriminator set via `Object.defineProperty`).
+ * Each slot map under `entries` uses a singular essence key (`table`,
+ * `type`, `collection`, …) mapping entity names to IR classes. No other
+ * own-enumerable data lives on a namespace; non-entity computed data lives
+ * on the surrounding storage or contract IR. The framework's
+ * `elementCoordinates(storage)` walk relies on this invariant to enumerate
+ * entities structurally without family-specific knowledge.
  */
 export interface Namespace extends IRNode, StorageNamespace {
   readonly kind: string;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 export abstract class NamespaceBase extends IRNodeBase implements Namespace {
   abstract readonly id: string;
+  abstract readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   abstract override readonly kind: string;
 }

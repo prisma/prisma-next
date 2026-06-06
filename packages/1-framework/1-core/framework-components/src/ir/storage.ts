@@ -30,18 +30,19 @@ export interface EntityCoordinate {
  * value, yielded as {@link EntityCoordinate} tuples with
  * `plane: 'storage'` (the parameter type binds the plane).
  *
- * Iterates each namespace's own-enumerable properties structurally.
- * Skips `id` (known scalar); `kind` is non-enumerable on namespace
- * concretions and does not appear in `Object.entries`. For every other
- * property whose value is a non-null object, yields one coordinate per
- * entry key in that map. No family-specific slot vocabulary is required.
+ * Iterates each namespace's `entries` slot maps structurally. Skips
+ * non-object `entries`; `id` and `kind` are not walked (`kind` is
+ * non-enumerable on concretions). For every entity-kind key under
+ * `entries` whose value is a non-null object, yields one coordinate per
+ * entity name in that map. No family-specific slot vocabulary is required.
  */
 export function* elementCoordinates(
   storage: Pick<StorageBase, 'namespaces'>,
 ): Generator<EntityCoordinate> {
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    for (const [entityKind, slot] of Object.entries(ns)) {
-      if (entityKind === 'id') continue;
+    const entries = ns.entries;
+    if (entries === null || typeof entries !== 'object') continue;
+    for (const [entityKind, slot] of Object.entries(entries)) {
       if (slot === null || typeof slot !== 'object') continue;
       for (const entityName of Object.keys(slot)) {
         yield { plane: 'storage', namespaceId, entityKind, entityName };

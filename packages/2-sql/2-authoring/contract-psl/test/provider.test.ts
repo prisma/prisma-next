@@ -153,8 +153,10 @@ describe('prismaContract provider helper', () => {
         storage: {
           namespaces: {
             public: {
-              tables: {
-                user: expect.any(Object),
+              entries: {
+                table: {
+                  user: expect.any(Object),
+                },
               },
             },
           },
@@ -190,8 +192,10 @@ describe('prismaContract provider helper', () => {
         storage: {
           namespaces: {
             public: {
-              tables: {
-                user: expect.any(Object),
+              entries: {
+                table: {
+                  user: expect.any(Object),
+                },
               },
             },
           },
@@ -519,13 +523,15 @@ model Document {
       expect(result.value.storage).toMatchObject({
         namespaces: {
           public: {
-            tables: {
-              user: {
-                columns: {
-                  dbExpr: {
-                    default: {
-                      kind: 'function',
-                      expression: 'gen_random_uuid()',
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    dbExpr: {
+                      default: {
+                        kind: 'function',
+                        expression: 'gen_random_uuid()',
+                      },
                     },
                   },
                 },

@@ -49,20 +49,22 @@ describe('cross-reference shape round-trip', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: {
-                  kind: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    kind: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
-              post: {
-                columns: {},
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+                post: {
+                  columns: {},
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
               },
             },
           },

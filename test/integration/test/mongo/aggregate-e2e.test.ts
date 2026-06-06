@@ -1,10 +1,7 @@
-import mongoAdapterDescriptor, {
-  createMongoControlDriver,
-  readAllMarkers,
-} from '@prisma-next/adapter-mongo/control';
+import mongoAdapterDescriptor, { readAllMarkers } from '@prisma-next/adapter-mongo/control';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 
-import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import mongoControlDriver, { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import {
   contractToMongoSchemaIR,
   createMongoFamilyInstance,
@@ -90,16 +87,18 @@ function buildAppContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
-            users: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'email', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
+          entries: {
+            collection: {
+              users: {
+                kind: 'mongo-collection' as const,
+                indexes: [
+                  {
+                    kind: 'mongo-index' as const,
+                    keys: [{ field: 'email', direction: 1 as const }],
+                    unique: true,
+                  },
+                ],
+              },
             },
           },
         },
@@ -356,6 +355,6 @@ describe('Mongo contract-space aggregate e2e', {
     // live database. (The two driver shapes converge on the same
     // underlying connection, so there is no schema divergence to
     // worry about.)
-    return createMongoControlDriver(db, client);
+    return new MongoControlDriver(db, client);
   }
 });

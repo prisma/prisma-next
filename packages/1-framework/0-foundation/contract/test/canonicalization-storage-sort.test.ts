@@ -6,7 +6,7 @@ import {
 } from '../src/canonicalization-storage-sort';
 
 const sqlSortTargets = [
-  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+  { path: ['namespaces', '*', 'entries', 'table', '*'], arrayKeys: ['indexes', 'uniques'] },
 ] as const satisfies readonly NamedArraySortTarget[];
 
 describe('createStorageSort', () => {
@@ -17,11 +17,13 @@ describe('createStorageSort', () => {
       namespaces: {
         __unbound__: {
           id: '__unbound__',
-          tables: {
-            users: {
-              columns: {},
-              indexes: [{ name: 'idx_z' }, { name: 'idx_a' }],
-              uniques: [{ name: 'uq_z' }, { name: 'uq_a' }],
+          entries: {
+            table: {
+              users: {
+                columns: {},
+                indexes: [{ name: 'idx_z' }, { name: 'idx_a' }],
+                uniques: [{ name: 'uq_z' }, { name: 'uq_a' }],
+              },
             },
           },
         },
@@ -29,7 +31,7 @@ describe('createStorageSort', () => {
     };
 
     const sorted = sortStorage(storage) as typeof storage;
-    const table = sorted.namespaces.__unbound__.tables.users;
+    const table = sorted.namespaces.__unbound__.entries.table.users;
     expect(table.indexes.map((i) => i.name)).toEqual(['idx_a', 'idx_z']);
     expect(table.uniques.map((u) => u.name)).toEqual(['uq_a', 'uq_z']);
   });
@@ -39,12 +41,12 @@ describe('createStorageSort', () => {
     expect(sortStorage('x')).toBe('x');
   });
 
-  it('passes through namespaces without tables', () => {
+  it('passes through namespaces without a table slot', () => {
     const storage = {
       namespaces: {
         __unbound__: {
           id: '__unbound__',
-          collections: { posts: { columns: {} } },
+          entries: { collection: { posts: { columns: {} } } },
         },
       },
     };
@@ -57,13 +59,13 @@ describe('createStorageSort', () => {
         broken: null,
         __unbound__: {
           id: '__unbound__',
-          tables: { bad: null },
+          entries: { table: { bad: null } },
         },
       },
     };
     const sorted = sortStorage(storage) as typeof storage;
     expect(sorted.namespaces.broken).toBeNull();
-    expect(sorted.namespaces.__unbound__.tables.bad).toBeNull();
+    expect(sorted.namespaces.__unbound__.entries.table.bad).toBeNull();
   });
 
   it('sorts entries without name using empty-string fallback', () => {
@@ -71,17 +73,19 @@ describe('createStorageSort', () => {
       namespaces: {
         __unbound__: {
           id: '__unbound__',
-          tables: {
-            users: {
-              columns: {},
-              indexes: [{ columns: ['b'] }, { name: 'idx_a', columns: ['a'] }],
+          entries: {
+            table: {
+              users: {
+                columns: {},
+                indexes: [{ columns: ['b'] }, { name: 'idx_a', columns: ['a'] }],
+              },
             },
           },
         },
       },
     };
     const sorted = sortStorage(storage) as typeof storage;
-    const indexes = sorted.namespaces.__unbound__.tables.users.indexes;
+    const indexes = sorted.namespaces.__unbound__.entries.table.users.indexes;
     expect(indexes[0]).toEqual({ columns: ['b'] });
     expect(indexes[1]).toEqual({ name: 'idx_a', columns: ['a'] });
   });
@@ -95,5 +99,9 @@ describe('compareByNameProperty', () => {
 
   it('treats missing name as empty string', () => {
     expect(compareByNameProperty({}, { name: 'a' })).toBeLessThan(0);
+  });
+
+  it('uses code-unit order, not locale collation (Z < a)', () => {
+    expect(compareByNameProperty({ name: 'Z' }, { name: 'a' })).toBeLessThan(0);
   });
 });

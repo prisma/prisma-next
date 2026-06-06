@@ -109,7 +109,7 @@ withTempDir(({ createTempDir }) => {
         const status = await runMigrationStatus(ctx, ['--json']);
         expect(status.exitCode, 'status after rollback').toBe(0);
         const statusJson = migrationStatusAppSpace(parseMigrationStatusJson(status));
-        expect(statusJson.markerHash, 'status marker = C1').toBe(c1Hash);
+        expect(statusJson.currentContract, 'status marker = C1').toBe(c1Hash);
       },
       timeouts.spinUpPpgDev,
     );

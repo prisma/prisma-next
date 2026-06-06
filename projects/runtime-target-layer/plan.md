@@ -75,6 +75,12 @@ The three PRs below correspond to the three milestones (M1, M2, M3). Each milest
 
 **Validation:** AC9 verified. Docs reviewed by the team.
 
+## Walking-skeleton integration (cross-cutting DoD)
+
+Per the umbrella's walking-skeleton strategy (decisions [C13/C14](../supabase-integration/decisions.md); [README](../supabase-integration/README.md) §"Walking skeleton"), this project's definition of done includes wiring its feature into the running `examples/supabase` app:
+
+- [ ] Switch the `examples/supabase` `db.ts` onto the exported `PostgresRuntime` (the skeleton ran on the stock `@prisma-next/postgres/runtime` factory until now). This proves `PostgresRuntime` is the substrate `SupabaseRuntime` will extend in `extension-supabase` M2; no behaviour change expected, since the initial `PostgresRuntime` is identity-like.
+
 ## Risks and mitigations
 
 - **Risk:** the rename in M1 inadvertently changes hot-path behaviour because of a missed `extends SqlRuntimeImpl` reference or a stale type cast somewhere in the workspace.

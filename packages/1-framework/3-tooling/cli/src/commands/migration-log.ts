@@ -1,15 +1,15 @@
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
   CliStructuredError,
-  errorDatabaseConnectionRequired,
-  errorDriverRequired,
   errorUnexpected,
   mapMigrationToolsError,
+  requireLiveDatabase,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -31,11 +31,15 @@ import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import type { MigrationLogResult } from './json/schemas';
+
+export type { MigrationLogResult };
 
 interface MigrationLogOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly utc?: boolean;
+  readonly ascii?: boolean;
 }
 
 export async function executeMigrationLogCommand(
@@ -47,16 +51,14 @@ export async function executeMigrationLogCommand(
   const { configPath } = resolveMigrationPaths(options.config, config);
 
   const dbConnection = options.db ?? config.db?.connection;
-  if (!dbConnection) {
-    return notOk(
-      errorDatabaseConnectionRequired({
-        why: `Database connection is required for migration log (set db.connection in ${configPath}, or pass --db <url>)`,
-        commandName: 'migration log',
-      }),
-    );
-  }
-  if (!config.driver) {
-    return notOk(errorDriverRequired({ why: 'Config.driver is required for migration log' }));
+  const missingDb = requireLiveDatabase({
+    dbConnection,
+    hasDriver: !!config.driver,
+    why: `migration log needs a database connection and driver to read the ledger (set db.connection in ${configPath}, or pass --db <url>)`,
+    commandName: 'migration log',
+  });
+  if (missingDb) {
+    return notOk(missingDb);
   }
   if (!targetSupportsMigrations(config.target)) {
     return notOk(errorUnexpected('Target does not support migrations'));
@@ -81,7 +83,7 @@ export async function executeMigrationLogCommand(
     family: config.family,
     target: config.target,
     adapter: config.adapter,
-    driver: config.driver,
+    ...ifDefined('driver', config.driver),
     extensionPacks: config.extensionPacks ?? [],
   });
 
@@ -108,7 +110,8 @@ export function createMigrationLogCommand(): Command {
     command,
     'Show executed migration history',
     'Reads the database ledger and displays every applied migration edge\n' +
-      'in chronological order, including rollbacks and re-applies.',
+      'in chronological order, including rollbacks and re-applies, merged\n' +
+      'across all contract spaces. Requires a database connection.',
   );
   setCommandExamples(command, [
     'prisma-next migration log --db $DATABASE_URL',
@@ -125,19 +128,32 @@ export function createMigrationLogCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--utc', 'Render human timestamps in UTC instead of local time')
+    .option('--ascii', 'Use ASCII glyphs (pipe-friendly)')
     .action(async (options: MigrationLogOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
       const result = await executeMigrationLogCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, (entries) => {
         if (flags.json) {
-          ui.output(JSON.stringify(serializeLedgerEntriesForJson(entries), null, 2));
+          const records = serializeLedgerEntriesForJson(entries);
+          const result: MigrationLogResult = {
+            ok: true,
+            records,
+            summary: `${records.length} migration(s) applied`,
+          };
+          ui.output(JSON.stringify(result, null, 2));
         } else if (!flags.quiet) {
           if (entries.length === 0) {
             ui.output(MIGRATION_LOG_EMPTY_MESSAGE);
           } else {
             const styler = createAnsiMigrationListStyler({ useColor: ui.useColor });
-            ui.output(renderMigrationLogTable(entries, { utc: options.utc === true, styler }));
+            ui.output(
+              renderMigrationLogTable(entries, {
+                utc: options.utc === true,
+                styler,
+                glyphMode: ui.resolveGlyphMode(options.ascii === true),
+              }),
+            );
           }
         }
       });

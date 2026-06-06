@@ -90,7 +90,7 @@ type ContractWithVO = MongoContractWithTypeMaps<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly collections: { readonly users: MongoCollection };
+          readonly entries: { readonly collection: { readonly users: MongoCollection } };
         };
       };
       readonly storageHash: StorageHashBase<'sha256:test-storage'>;
@@ -152,7 +152,7 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
       readonly storage: {
         readonly namespaces: Record<
           string,
-          { readonly id: string; readonly collections: Record<string, never> }
+          { readonly id: string; readonly entries: { readonly collection: Record<string, never> } }
         >;
         readonly storageHash: StorageHashBase<'sha256:s'>;
       };
@@ -189,7 +189,7 @@ test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () =>
       readonly storage: {
         readonly namespaces: Record<
           string,
-          { readonly id: string; readonly collections: Record<string, never> }
+          { readonly id: string; readonly entries: { readonly collection: Record<string, never> } }
         >;
         readonly storageHash: StorageHashBase<'sha256:s'>;
       };

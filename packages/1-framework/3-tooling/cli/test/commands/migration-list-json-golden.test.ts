@@ -5,8 +5,10 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
+import { type } from 'arktype';
 import { join } from 'pathe';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { migrationListResultSchema } from '../../src/commands/json/schemas';
 import { executeMigrationListCommand } from '../../src/commands/migration-list';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
@@ -142,18 +144,21 @@ describe('migration list --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    const schemaResult = migrationListResultSchema(result.value.list);
+    expect(schemaResult instanceof type.errors).toBe(false);
+
     const json = JSON.stringify(result.value.list, null, 2);
     expect(json).toContain('"ok": true');
     expect(json).toContain('"summary": "5 migration(s) on disk"');
-    expect(json).toContain('"spaceId": "app"');
-    expect(json).toContain('"dirName": "20260601T1200_backfill_emails"');
+    expect(json).toContain('"space": "app"');
+    expect(json).toContain('"name": "20260601T1200_backfill_emails"');
     expect(json).toContain('"backfill_emails_v1"');
     expect(json).toContain('"production"');
-    expect(json).toContain('"dirName": "20260422T0720_initial"');
+    expect(json).toContain('"name": "20260422T0720_initial"');
     const parsed = JSON.parse(json) as {
-      spaces: Array<{ migrations: Array<{ dirName: string }> }>;
+      spaces: Array<{ migrations: Array<{ name: string }> }>;
     };
-    expect(parsed.spaces[0]?.migrations.map((m) => m.dirName)).toEqual([
+    expect(parsed.spaces[0]?.migrations.map((m) => m.name)).toEqual([
       '20260601T1200_backfill_emails',
       '20260518T1701_namespaces_bookend',
       '20260422T0748_migration',
@@ -203,7 +208,7 @@ describe('migration list --json golden', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const postgisSpace = result.value.list.spaces.find((s) => s.spaceId === 'postgis');
+    const postgisSpace = result.value.list.spaces.find((s) => s.space === 'postgis');
     expect(postgisSpace?.migrations[0]?.refs).toEqual(['head']);
   });
 });

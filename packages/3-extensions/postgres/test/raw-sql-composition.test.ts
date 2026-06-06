@@ -27,26 +27,28 @@ function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
         namespaces: {
           __unbound__: {
             id: '__unbound__',
-            tables: {
-              users: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nullable: false },
-                  name: { codecId: 'pg/text@1', nullable: false },
-                  score: { codecId: 'pg/int4@1', nullable: true },
+            entries: {
+              table: {
+                users: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nullable: false },
+                    name: { codecId: 'pg/text@1', nullable: false },
+                    score: { codecId: 'pg/int4@1', nullable: true },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-              },
-              events: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nullable: false },
-                  createdAt: { codecId: 'pg/timestamptz@1', nullable: false },
-                  score: { codecId: 'pg/int4@1', nullable: true },
+                events: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nullable: false },
+                    createdAt: { codecId: 'pg/timestamptz@1', nullable: false },
+                    score: { codecId: 'pg/int4@1', nullable: true },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
             },
           },

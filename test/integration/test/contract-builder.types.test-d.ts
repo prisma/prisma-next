@@ -50,10 +50,10 @@ test('builder contract types match fixture contract types', () => {
   ) as Contract;
 
   type BuilderUserTable = NonNullable<
-    (typeof _validatedBuilderContract.storage.namespaces)['public']['tables']['user']
+    (typeof _validatedBuilderContract.storage.namespaces)['public']['entries']['table']['user']
   >;
   type FixtureUserTable = NonNullable<
-    (typeof _fixtureContract.storage.namespaces)['public']['tables']['user']
+    (typeof _fixtureContract.storage.namespaces)['public']['entries']['table']['user']
   >;
 
   expectTypeOf<BuilderUserTable>().toHaveProperty('columns');
@@ -144,10 +144,12 @@ test('refined object contract preserves downstream model token inference', () =>
 
   const validated = new SqlContractSerializer().deserializeContract(contract) as typeof contract;
   type RefinedUserColumns = NonNullable<
-    NonNullable<(typeof validated.storage.namespaces)['public']['tables']['user']>['columns']
+    NonNullable<
+      (typeof validated.storage.namespaces)['public']['entries']['table']['user']
+    >['columns']
   >;
 
-  expectTypeOf<(typeof validated.storage.namespaces)['public']['tables']>().toExtend<
+  expectTypeOf<(typeof validated.storage.namespaces)['public']['entries']['table']>().toExtend<
     Record<string, unknown>
   >();
   expectTypeOf<RefinedUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
@@ -232,31 +234,31 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
 
   expectTypeOf<CallbackStorageTypes['Embedding']['codecId']>().toEqualTypeOf<'pg/vector@1'>();
   expectTypeOf(
-    contract.storage.namespaces['public'].tables.user.columns.id.codecId,
+    contract.storage.namespaces['public'].entries.table.user.columns.id.codecId,
   ).toEqualTypeOf<'pg/int4@1'>();
   expectTypeOf(
-    contract.storage.namespaces['public'].tables.user.columns.email.codecId,
+    contract.storage.namespaces['public'].entries.table.user.columns.email.codecId,
   ).toEqualTypeOf<'pg/text@1'>();
   expectTypeOf(
-    contract.storage.namespaces['public'].tables.user.columns.age.codecId,
+    contract.storage.namespaces['public'].entries.table.user.columns.age.codecId,
   ).toEqualTypeOf<'pg/int4@1'>();
   expectTypeOf(
-    contract.storage.namespaces['public'].tables.user.columns.isActive.codecId,
+    contract.storage.namespaces['public'].entries.table.user.columns.isActive.codecId,
   ).toEqualTypeOf<'pg/bool@1'>();
   expectTypeOf(
-    contract.storage.namespaces['public'].tables.user.columns.score.codecId,
+    contract.storage.namespaces['public'].entries.table.user.columns.score.codecId,
   ).toEqualTypeOf<'pg/float8@1'>();
   expectTypeOf(
-    contract.storage.namespaces['public'].tables.user.columns.profile.codecId,
+    contract.storage.namespaces['public'].entries.table.user.columns.profile.codecId,
   ).toEqualTypeOf<'pg/jsonb@1'>();
   expectTypeOf(
-    contract.storage.namespaces['public'].tables.user.columns.createdAt.codecId,
+    contract.storage.namespaces['public'].entries.table.user.columns.createdAt.codecId,
   ).toEqualTypeOf<'pg/timestamptz@1'>();
   // `role.typeRef` and `embedding.typeRef` capture is gated on the
   // descriptor-level generic forwarding noted above; the contract
   // still carries the correct typeRef strings at runtime.
   expectTypeOf(
-    contract.storage.namespaces['public'].tables.user.columns.embedding.typeRef,
+    contract.storage.namespaces['public'].entries.table.user.columns.embedding.typeRef,
   ).toEqualTypeOf<'Embedding'>();
 });
 

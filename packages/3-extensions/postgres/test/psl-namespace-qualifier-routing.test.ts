@@ -66,7 +66,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['tenant']).toBeDefined();
+    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries.table['tenant']).toBeDefined();
 
     // The storage map carries the Postgres target concretion (not the
     // SQL family placeholder) at the unbound slot.
@@ -104,7 +104,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    expect(storage.namespaces['auth']?.tables['user']).toBeDefined();
+    expect(storage.namespaces['auth']?.entries.table['user']).toBeDefined();
 
     const namespace = storage.namespaces['auth'];
     expect(namespace).toBeInstanceOf(PostgresSchema);
@@ -135,7 +135,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    expect(storage.namespaces['public']?.tables['post']).toBeDefined();
+    expect(storage.namespaces['public']?.entries.table['post']).toBeDefined();
 
     const namespace = storage.namespaces['public'];
     expect(namespace).toBeInstanceOf(PostgresSchema);

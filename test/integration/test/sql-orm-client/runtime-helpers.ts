@@ -1,8 +1,10 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import {
@@ -12,7 +14,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
-import { getTestContract, type TestContract } from './helpers';
+import { getTestContract } from './helpers';
 
 interface SeedUser {
   id: number;
@@ -53,6 +55,11 @@ export interface PgIntegrationRuntime extends RuntimeQueryable {
 
 export async function createPgIntegrationRuntime(
   connectionString: string,
+  // The runtime validates each plan's storageHash against this contract, so
+  // tests driving a non-base fixture (e.g. the emitted polymorphism contract)
+  // must build the runtime against that same contract. Defaults to the base
+  // sql-orm-client fixture.
+  contractOverride?: Contract<SqlStorage>,
 ): Promise<PgIntegrationRuntime> {
   const pool = new Pool({ connectionString });
   // Wrap stack/runtime construction so any failure between pool creation and
@@ -63,7 +70,7 @@ export async function createPgIntegrationRuntime(
     try {
       await pool.query('select 1');
 
-      const contract = getTestContract();
+      const contract = contractOverride ?? getTestContract();
 
       const stack = createSqlExecutionStack({
         target: postgresTarget,
@@ -72,7 +79,7 @@ export async function createPgIntegrationRuntime(
         extensionPacks: [pgvectorRuntime],
       });
 
-      const context = createExecutionContext<TestContract>({ contract, stack });
+      const context = createExecutionContext<Contract<SqlStorage>>({ contract, stack });
       const stackInstance = instantiateExecutionStack(stack);
       // Use the stack-composed adapter (carries `pg/vector@1` via the pgvector
       // extension pack) for both lowering-for-assertion and execution. A bare

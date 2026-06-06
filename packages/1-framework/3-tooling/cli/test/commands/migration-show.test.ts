@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,12 +10,14 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { type } from 'arktype';
 import stripAnsi from 'strip-ansi';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { migrationShowResultSchema } from '../../src/commands/json/schemas';
 import type { MigrationShowPresent } from '../../src/commands/migration-show';
-import { resolveAppTargetPath } from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
+import { resolveAppTargetPath } from '../../src/utils/migration-path-target';
 import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
 
 const mocks = vi.hoisted(() => ({
@@ -25,6 +28,13 @@ vi.mock('../../src/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 
+afterAll(() => {
+  // Repo-wide vitest runs with `isolate: false`, so the `vi.mock` leaks
+  // into the next file in the same worker; unmock to restore it.
+  vi.doUnmock('../../src/config-loader');
+  vi.resetModules();
+});
+
 const createdTempDirs: string[] = [];
 
 async function createTempDir(prefix: string): Promise<string> {
@@ -34,7 +44,7 @@ async function createTempDir(prefix: string): Promise<string> {
   );
   await mkdir(dir, { recursive: true });
   createdTempDirs.push(dir);
-  return dir;
+  return realpathSync(dir);
 }
 
 afterEach(async () => {
@@ -104,18 +114,16 @@ function setupConfigMock(): void {
 
 function samplePresent(overrides: Partial<MigrationShowPresent> = {}): MigrationShowPresent {
   return {
-    spaceId: 'app',
-    dirName: '20260101_100000_add_user',
-    dirPath: 'migrations/app/20260101_100000_add_user',
-    from: null,
-    to: 'sha256:hash-a',
-    migrationHash: 'sha256:edge-abc',
+    space: 'app',
+    name: '20260101_100000_add_user',
+    fromContract: null,
+    toContract: 'sha256:hash-a',
+    hash: 'sha256:edge-abc',
     createdAt: '2026-01-01T10:00:00.000Z',
     operations: [{ id: 'table.user', label: 'Create table "user"', operationClass: 'additive' }],
     preview: {
       statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
     },
-    summary: '1 operation(s)',
     ...overrides,
   };
 }
@@ -195,7 +203,6 @@ describe('formatMigrationShowOutput', () => {
               operationClass: 'destructive',
             },
           ],
-          summary: '2 operation(s)',
           preview: { statements: [] },
         }),
       },
@@ -211,7 +218,7 @@ describe('formatMigrationShowOutput', () => {
   it('returns empty string in quiet mode', () => {
     const flags = parseGlobalFlags({ quiet: true });
     const output = formatMigrationShowOutput(
-      { migration: samplePresent({ operations: [], summary: '0 operation(s)' }) },
+      { migration: samplePresent({ operations: [] }) },
       flags,
     );
 
@@ -275,6 +282,51 @@ describe('migration show command', () => {
     expect(jsonLine).toBeDefined();
     const envelope = JSON.parse(jsonLine!) as { code?: string };
     expect(envelope.code).toBe('PN-CLI-4004');
+  });
+
+  it('resolves a migration directory path argument', async () => {
+    const cwd = await createTempDir('path-target');
+    const appDir = join(cwd, 'migrations', 'app');
+    await mkdir(appDir, { recursive: true });
+    const dirName = await setupMigrationDir(
+      appDir,
+      'init',
+      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:abc'),
+      [createOp('table.user', 'Create table user', 'additive')],
+    );
+
+    const contractDir = join(cwd, 'src', 'prisma');
+    await mkdir(contractDir, { recursive: true });
+    await writeFile(
+      join(contractDir, 'contract.json'),
+      JSON.stringify({ storage: { storageHash: 'sha256:abc', namespaces: {} } }),
+    );
+
+    process.chdir(cwd);
+
+    const { createMigrationShowCommand } = await import('../../src/commands/migration-show');
+
+    const dirPath = join(appDir, dirName);
+    try {
+      await executeCommand(createMigrationShowCommand(), [dirPath, '--json']);
+    } catch {
+      // process.exit on success/failure
+    }
+
+    expect(getExitCode()).toBe(0);
+    const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+    expect(jsonLine).toBeDefined();
+    const parsed = JSON.parse(jsonLine!);
+    expect(migrationShowResultSchema(parsed) instanceof type.errors).toBe(false);
+    const result = parsed as {
+      ok?: boolean;
+      migration?: { name?: string; space?: string };
+      summary?: string;
+    };
+    expect(result.ok).toBe(true);
+    expect(result.migration?.name).toBe(dirName);
+    expect(result.migration?.space).toBe('app');
+    expect(typeof result.summary).toBe('string');
   });
 
   it('errors with contract validation when contract JSON is invalid', async () => {

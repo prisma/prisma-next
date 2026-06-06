@@ -37,17 +37,20 @@ import type {
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
+  type SqlModelStorage,
   type SqlNamespaceTablesInput,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import {
   buildSqlContractFromDefinition,
+  type FieldNode,
   type ForeignKeyNode,
   type IndexNode,
   type ModelNode,
   type PrimaryKeyNode,
   type UniqueConstraintNode,
 } from '@prisma-next/sql-contract-ts/contract-builder';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
@@ -1332,10 +1335,25 @@ function resolvePolymorphism(
   modelMappings: ReadonlyMap<string, ModelNameMapping>,
   modelNamespaceIds: ReadonlyMap<string, string>,
   defaultNamespaceId: string,
+  syntheticPkFieldsByVariant: ReadonlyMap<string, readonly string[]>,
+  stiBaseFieldsByBase: ReadonlyMap<string, readonly string[]>,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): Record<string, ContractModel> {
   let patched = models;
+
+  // STI variant columns were materialised onto the base storage table so the
+  // variants' `storage.fields` resolve. They are storage-only on the base — the
+  // domain field belongs to the variant — so strip them from the base model's
+  // domain + storage field maps (the table column, built upstream, stays).
+  for (const [baseName, fieldNames] of stiBaseFieldsByBase) {
+    const baseModel = patched[baseName];
+    if (!baseModel || fieldNames.length === 0) continue;
+    patched = {
+      ...patched,
+      [baseName]: stripStorageOnlyDomainFields(baseModel, fieldNames),
+    };
+  }
 
   for (const [modelName, decl] of discriminatorDeclarations) {
     if (baseDeclarations.has(modelName)) {
@@ -1431,20 +1449,209 @@ function resolvePolymorphism(
       variantMapping?.model.attributes.some((attr) => attr.name === 'map') ?? false;
     const resolvedTable = hasExplicitMap ? variantMapping?.tableName : baseMapping?.tableName;
 
+    const patchedVariant: ContractModel = {
+      ...variantModel,
+      base: crossRef(
+        baseDecl.baseName,
+        modelNamespaceIds.get(baseDecl.baseName) ?? defaultNamespaceId,
+      ),
+      ...(resolvedTable ? { storage: { ...variantModel.storage, table: resolvedTable } } : {}),
+    };
+
     patched = {
       ...patched,
-      [variantName]: {
-        ...variantModel,
-        base: crossRef(
-          baseDecl.baseName,
-          modelNamespaceIds.get(baseDecl.baseName) ?? defaultNamespaceId,
-        ),
-        ...(resolvedTable ? { storage: { ...variantModel.storage, table: resolvedTable } } : {}),
-      },
+      [variantName]: stripStorageOnlyDomainFields(
+        patchedVariant,
+        syntheticPkFieldsByVariant.get(variantName) ?? [],
+      ),
     };
   }
 
   return patched;
+}
+
+/**
+ * Multi-table-inheritance variants (`@@base` + their own `@@map`) live in a
+ * separate table from their base. The ORM joins that table to the base on the
+ * shared primary key (`base.id = variant.id`), so the variant storage table
+ * must carry the base PK column even though the variant domain model declares
+ * only its own fields. This enriches each MTI variant's `ModelNode` with that
+ * link column, a primary key on it, and a FK back to the base table.
+ *
+ * The link column is reported back per variant in `syntheticPkFieldsByVariant`
+ * so the domain-model patch can drop it again — keeping the variant's domain
+ * surface thin (its create/read inputs don't gain a redundant `id`) while the
+ * storage table stays joinable. Single-table-inheritance variants (no own
+ * table) are left untouched.
+ */
+function materializeMtiVariantStorageLinks(
+  modelNodes: readonly ModelNode[],
+  baseDeclarations: ReadonlyMap<string, BaseDeclaration>,
+  stiVariantNames: ReadonlySet<string>,
+): { modelNodes: ModelNode[]; syntheticPkFieldsByVariant: Map<string, readonly string[]> } {
+  const nodeByModel = new Map(modelNodes.map((node) => [node.modelName, node]));
+  const syntheticPkFieldsByVariant = new Map<string, readonly string[]>();
+
+  const enriched = modelNodes.map((node): ModelNode => {
+    const baseDecl = baseDeclarations.get(node.modelName);
+    if (!baseDecl) return node;
+    const baseNode = nodeByModel.get(baseDecl.baseName);
+    if (!baseNode) return node;
+    // Single-table inheritance (no own `@@map`) shares the base table; it gets
+    // its columns materialised onto the base instead (see
+    // {@link materializeStiVariantStorageColumns}), never a link column.
+    if (stiVariantNames.has(node.modelName)) return node;
+    const basePrimaryKey = baseNode.id;
+    if (!basePrimaryKey || basePrimaryKey.columns.length === 0) return node;
+
+    const existingColumns = new Set(node.fields.map((field) => field.columnName));
+    const linkFields: FieldNode[] = [];
+    for (const pkColumn of basePrimaryKey.columns) {
+      if (existingColumns.has(pkColumn)) continue;
+      const baseField = baseNode.fields.find(
+        (field): field is FieldNode => 'descriptor' in field && field.columnName === pkColumn,
+      );
+      if (!baseField) continue;
+      linkFields.push({
+        fieldName: baseField.fieldName,
+        columnName: pkColumn,
+        descriptor: baseField.descriptor,
+        nullable: false,
+      });
+    }
+    if (linkFields.length === 0) return node;
+
+    syntheticPkFieldsByVariant.set(
+      node.modelName,
+      linkFields.map((field) => field.fieldName),
+    );
+
+    const foreignKey: ForeignKeyNode = {
+      columns: basePrimaryKey.columns,
+      references: {
+        model: baseNode.modelName,
+        table: baseNode.tableName,
+        columns: basePrimaryKey.columns,
+        ...ifDefined('namespaceId', baseNode.namespaceId),
+      },
+      constraint: true,
+      // The link columns are the variant's own primary key, which already
+      // carries a unique index — a separate FK backing index would be redundant.
+      index: false,
+      // Deleting a base row must delete its variant extension row — classic
+      // multi-table-inheritance semantics.
+      onDelete: 'cascade',
+    };
+
+    return {
+      ...node,
+      fields: [...linkFields, ...node.fields],
+      id: { columns: basePrimaryKey.columns },
+      foreignKeys: [...(node.foreignKeys ?? []), foreignKey],
+    };
+  });
+
+  return { modelNodes: enriched, syntheticPkFieldsByVariant };
+}
+
+/**
+ * Single-table-inheritance variants (`@@base` with no own `@@map`) share the
+ * base table: `resolvePolymorphism` points the variant's `storage.table` at the
+ * base, and the ORM reads variant-declared fields straight off the base table.
+ * For that to validate and round-trip, the base storage table must physically
+ * carry every STI variant's declared columns. This enriches the base
+ * `ModelNode` with those columns.
+ *
+ * The materialised columns are always nullable in storage: the base table hosts
+ * every variant's rows, so a column a variant declares as required is still
+ * NULL on sibling-variant rows. The variant's domain field keeps its declared
+ * nullability — required-in-domain / nullable-in-storage is the intended STI
+ * shape.
+ *
+ * Collisions (two variants declaring the same column, or a variant column name
+ * clashing with a base column) are resolved skip-if-exists here, mirroring the
+ * MTI link guard; surfacing them as diagnostics is tracked separately
+ * (TML-2827).
+ */
+function materializeStiVariantStorageColumns(
+  modelNodes: readonly ModelNode[],
+  baseDeclarations: ReadonlyMap<string, BaseDeclaration>,
+  stiVariantNames: ReadonlySet<string>,
+): { modelNodes: ModelNode[]; stiBaseFieldsByBase: Map<string, readonly string[]> } {
+  if (stiVariantNames.size === 0) {
+    return { modelNodes: [...modelNodes], stiBaseFieldsByBase: new Map() };
+  }
+
+  const nodeByModel = new Map(modelNodes.map((node) => [node.modelName, node]));
+  type StiColumn = ModelNode['fields'][number];
+  const stiColumnsByBase = new Map<string, StiColumn[]>();
+
+  for (const variantName of stiVariantNames) {
+    const variantNode = nodeByModel.get(variantName);
+    const baseDecl = baseDeclarations.get(variantName);
+    if (!variantNode || !baseDecl) continue;
+    const baseNode = nodeByModel.get(baseDecl.baseName);
+    if (!baseNode) continue;
+
+    const baseColumns = new Set(baseNode.fields.map((field) => field.columnName));
+    const claimed = stiColumnsByBase.get(baseDecl.baseName) ?? [];
+    const claimedColumns = new Set(claimed.map((field) => field.columnName));
+
+    for (const field of variantNode.fields) {
+      if (baseColumns.has(field.columnName) || claimedColumns.has(field.columnName)) {
+        continue;
+      }
+      claimedColumns.add(field.columnName);
+      claimed.push({ ...field, nullable: true });
+    }
+    stiColumnsByBase.set(baseDecl.baseName, claimed);
+  }
+
+  // The materialised columns exist on the base STORAGE table so the variants'
+  // `storage.fields` resolve, but they are NOT base DOMAIN fields — `severity`
+  // belongs to `Bug`, not to `Task`. Report the materialised field names per
+  // base so the domain patch can strip them from the base model (the table
+  // column stays); this is the STI analogue of `syntheticPkFieldsByVariant`.
+  const stiBaseFieldsByBase = new Map<string, readonly string[]>();
+  for (const [baseName, columns] of stiColumnsByBase) {
+    stiBaseFieldsByBase.set(
+      baseName,
+      columns.map((field) => field.fieldName),
+    );
+  }
+
+  const enriched = modelNodes.map((node): ModelNode => {
+    // STI variant: contributes a domain model but no storage table of its own.
+    if (stiVariantNames.has(node.modelName)) {
+      return { ...node, sharesBaseTable: true };
+    }
+    const stiColumns = stiColumnsByBase.get(node.modelName);
+    if (!stiColumns || stiColumns.length === 0) return node;
+    return { ...node, fields: [...node.fields, ...stiColumns] };
+  });
+
+  return { modelNodes: enriched, stiBaseFieldsByBase };
+}
+
+/**
+ * Drop the storage-only link fields (added by
+ * {@link materializeMtiVariantStorageLinks}) from a variant's domain model, so
+ * the domain surface stays thin while the storage table keeps the link column.
+ */
+function stripStorageOnlyDomainFields(
+  model: ContractModel,
+  fieldNames: readonly string[],
+): ContractModel {
+  if (fieldNames.length === 0) return model;
+  const fields = { ...model.fields };
+  for (const name of fieldNames) delete fields[name];
+  const storage = blindCast<
+    SqlModelStorage,
+    'SQL interpreter domain models always carry SqlModelStorage'
+  >(model.storage);
+  const storageFields = { ...storage.fields };
+  for (const name of fieldNames) delete storageFields[name];
+  return { ...model, fields, storage: { ...storage, fields: storageFields } };
 }
 
 export function interpretPslDocumentToSqlContract(
@@ -1653,6 +1860,27 @@ export function interpretPslDocumentToSqlContract(
     diagnostics,
   );
 
+  // A variant with `@@base` but no own `@@map` is single-table inheritance:
+  // it shares the base table. (`@@map` ⇒ multi-table inheritance.) This is the
+  // authoritative STI/MTI signal — the variant's resolved table name is not,
+  // because a no-`@@map` STI variant still gets a `lowerFirst(name)` default
+  // table name that differs from the base before `resolvePolymorphism` rewrites
+  // it onto the base table.
+  const stiVariantNames = new Set<string>();
+  for (const variantName of baseDeclarations.keys()) {
+    const variantMapping = modelMappings.get(variantName);
+    const hasExplicitMap =
+      variantMapping?.model.attributes.some((attr) => attr.name === 'map') ?? false;
+    if (!hasExplicitMap) {
+      stiVariantNames.add(variantName);
+    }
+  }
+
+  const { modelNodes: mtiLinkedModelNodes, syntheticPkFieldsByVariant } =
+    materializeMtiVariantStorageLinks(modelNodes, baseDeclarations, stiVariantNames);
+  const { modelNodes: stiColumnModelNodes, stiBaseFieldsByBase } =
+    materializeStiVariantStorageColumns(mtiLinkedModelNodes, baseDeclarations, stiVariantNames);
+
   const valueObjects = buildValueObjects({
     compositeTypes,
     enumTypeDescriptors: allEnumTypeDescriptors,
@@ -1688,7 +1916,7 @@ export function interpretPslDocumentToSqlContract(
       ? { namespaceTypes: namespaceEnumStorageTypes }
       : {}),
     ...ifDefined('createNamespace', input.createNamespace),
-    models: modelNodes.map((model) => ({
+    models: stiColumnModelNodes.map((model) => ({
       ...model,
       ...(modelRelations.has(model.modelName)
         ? {
@@ -1708,7 +1936,7 @@ export function interpretPslDocumentToSqlContract(
           `duplicate model name "${modelName}" across domain namespaces during PSL interpretation`,
         );
       }
-      modelsForPatch[modelName] = model as ContractModel;
+      modelsForPatch[modelName] = model;
     }
   }
   let patchedModels = patchModelDomainFields(modelsForPatch, modelResolvedFields);
@@ -1722,6 +1950,8 @@ export function interpretPslDocumentToSqlContract(
     modelMappings,
     modelNamespaceIds,
     input.target.defaultNamespaceId,
+    syntheticPkFieldsByVariant,
+    stiBaseFieldsByBase,
     sourceId,
     polyDiagnostics,
   );

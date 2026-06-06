@@ -7,7 +7,7 @@
  *
  * The clean-graph and PRECONDITION tests use the in-process helper
  * (exit 0 and exit 2 are captured reliably). Adversarial tests that
- * expect exit 4 assert on the JSON output's `failures[].pnCode`
+ * expect exit 4 assert on the JSON output's `failures[].code`
  * without asserting the exit code, since the in-process test mock
  * captures commander's re-thrown exit rather than the command's own.
  */
@@ -77,7 +77,7 @@ withTempDir(({ createTempDir }) => {
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(failures.length).toBeGreaterThan(0);
-        expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-001')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-001')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
@@ -100,7 +100,7 @@ withTempDir(({ createTempDir }) => {
         const json = parseJsonOutput(check);
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
-        expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-002')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-002')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
@@ -140,7 +140,7 @@ withTempDir(({ createTempDir }) => {
         const json = parseJsonOutput(check);
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
-        expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-003')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-003')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
@@ -167,7 +167,7 @@ withTempDir(({ createTempDir }) => {
         const json = parseJsonOutput(check);
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
-        expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-004')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-004')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
@@ -201,7 +201,7 @@ withTempDir(({ createTempDir }) => {
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(failures.length).toBeGreaterThan(0);
-        expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-005')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-005')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
@@ -242,7 +242,7 @@ withTempDir(({ createTempDir }) => {
         expect(json?.['ok'], 'per-migration check reports failure').toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(
-          failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-005'),
+          failures.some((f) => f['code'] === 'PN-MIG-CHECK-005'),
           'per-migration check carries PN-MIG-CHECK-005',
         ).toBe(true);
       },

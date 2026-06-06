@@ -12,6 +12,7 @@ import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
+import { createOrmClient } from '../src/orm-client/client';
 import { ormClientCreateUser } from '../src/orm-client/create-user';
 import { ormClientCreateUserWithAddress } from '../src/orm-client/create-user-with-address';
 import { ormClientDeleteUser } from '../src/orm-client/delete-user';
@@ -21,11 +22,14 @@ import { ormClientFindUserById } from '../src/orm-client/find-user-by-id';
 import { ormClientFindUserByIdCached } from '../src/orm-client/find-user-by-id-cached';
 import { ormClientGetAdminUsers } from '../src/orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from '../src/orm-client/get-dashboard-users';
+import { ormClientGetFeatureRoadmap } from '../src/orm-client/get-feature-roadmap';
 import { ormClientGetLatestUserPerKind } from '../src/orm-client/get-latest-user-per-kind';
 import { ormClientGetPostFeed } from '../src/orm-client/get-post-feed';
+import { ormClientGetUserBugTriage } from '../src/orm-client/get-user-bug-triage';
 import { ormClientGetUserInsights } from '../src/orm-client/get-user-insights';
 import { ormClientGetUserKindBreakdown } from '../src/orm-client/get-user-kind-breakdown';
 import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
+import { ormClientGetUserTaskBoard } from '../src/orm-client/get-user-task-board';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from '../src/orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
@@ -107,6 +111,13 @@ const embeddingPostIds = {
   similar2: '20000000-0000-0000-0000-000000000003',
   dissimilar: '20000000-0000-0000-0000-000000000004',
 } as const;
+
+interface SeededTaskIds {
+  readonly adminBug: string;
+  readonly adminFeature: string;
+  readonly memberBug: string;
+  readonly memberFeature: string;
+}
 
 function makeVector(leadingValues: number[]): number[] {
   const vec = new Array<number>(1536).fill(0);
@@ -228,6 +239,52 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
   for (const post of posts) {
     await runtime.execute(db.post.insert([post]).build());
   }
+}
+
+// Seeds polymorphic `Task` rows (Bug / Feature variants) for the admin and
+// member users via the ORM client's variant scopes, which auto-inject the
+// discriminator and transactionally write the base + variant tables. The
+// other seeded users own no tasks, so their included `tasks` come back empty.
+// Ids are client-generated (`@default(uuid())`); the created rows are returned
+// so the assertions can key on the same ids.
+async function seedOrmClientTasks(runtime: Runtime): Promise<SeededTaskIds> {
+  const orm = createOrmClient(runtime);
+
+  const adminBug = await orm.Task.bugs().create({
+    userId: seededUserIds.admin,
+    title: 'Login crashes on Safari',
+    severity: 'critical',
+    stepsToRepro: 'Open Safari → click "Sign in" → blank white screen',
+    createdAt: new Date('2024-03-01T00:00:00.000Z'),
+  });
+  const adminFeature = await orm.Task.features().create({
+    userId: seededUserIds.admin,
+    title: 'Dark mode',
+    priority: 'P1',
+    targetRelease: 'v2.0',
+    createdAt: new Date('2024-03-02T00:00:00.000Z'),
+  });
+  const memberBug = await orm.Task.bugs().create({
+    userId: seededUserIds.member,
+    title: 'Typo on pricing page',
+    severity: 'low',
+    stepsToRepro: 'Visit /pricing → "recieve" should be "receive"',
+    createdAt: new Date('2024-03-03T00:00:00.000Z'),
+  });
+  const memberFeature = await orm.Task.features().create({
+    userId: seededUserIds.member,
+    title: 'Slack integration',
+    priority: 'P0',
+    targetRelease: 'v2.0',
+    createdAt: new Date('2024-03-04T00:00:00.000Z'),
+  });
+
+  return {
+    adminBug: adminBug.id,
+    adminFeature: adminFeature.id,
+    memberBug: memberBug.id,
+    memberFeature: memberFeature.id,
+  };
 }
 
 describe('ORM client integration examples', () => {
@@ -511,6 +568,203 @@ describe('ORM client integration examples', () => {
             seededUserIds.adminTwo,
             seededUserIds.adminTwo,
             seededUserIds.admin,
+          ]);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetUserTaskBoard includes the polymorphic tasks relation in its full default per-variant shape',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const taskIds = await seedOrmClientTasks(runtime);
+          const board = await ormClientGetUserTaskBoard(10, runtime);
+
+          // newestFirst() orders users by createdAt desc: reader, adminTwo,
+          // member, admin. Only admin and member own tasks. The include takes
+          // the default projection, so each task row carries its full default
+          // shape — the shared Task columns plus the columns of whichever
+          // variant the discriminator selects (Bug: severity/stepsToRepro,
+          // Feature: priority/targetRelease) — all from one include.
+          expect(board).toEqual([
+            { id: seededUserIds.reader, displayName: 'Reader', kind: 'user', tasks: [] },
+            { id: seededUserIds.adminTwo, displayName: 'Admin Two', kind: 'admin', tasks: [] },
+            {
+              id: seededUserIds.member,
+              displayName: 'Member',
+              kind: 'user',
+              tasks: [
+                {
+                  id: taskIds.memberBug,
+                  title: 'Typo on pricing page',
+                  description: null,
+                  status: 'open',
+                  type: 'bug',
+                  userId: seededUserIds.member,
+                  createdAt: '2024-03-03T00:00:00+00:00',
+                  severity: 'low',
+                  stepsToRepro: 'Visit /pricing → "recieve" should be "receive"',
+                },
+                {
+                  id: taskIds.memberFeature,
+                  title: 'Slack integration',
+                  description: null,
+                  status: 'open',
+                  type: 'feature',
+                  userId: seededUserIds.member,
+                  createdAt: '2024-03-04T00:00:00+00:00',
+                  priority: 'P0',
+                  targetRelease: 'v2.0',
+                },
+              ],
+            },
+            {
+              id: seededUserIds.admin,
+              displayName: 'Admin',
+              kind: 'admin',
+              tasks: [
+                {
+                  id: taskIds.adminBug,
+                  title: 'Login crashes on Safari',
+                  description: null,
+                  status: 'open',
+                  type: 'bug',
+                  userId: seededUserIds.admin,
+                  createdAt: '2024-03-01T00:00:00+00:00',
+                  severity: 'critical',
+                  stepsToRepro: 'Open Safari → click "Sign in" → blank white screen',
+                },
+                {
+                  id: taskIds.adminFeature,
+                  title: 'Dark mode',
+                  description: null,
+                  status: 'open',
+                  type: 'feature',
+                  userId: seededUserIds.admin,
+                  createdAt: '2024-03-02T00:00:00+00:00',
+                  priority: 'P1',
+                  targetRelease: 'v2.0',
+                },
+              ],
+            },
+          ]);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetUserBugTriage narrows the include to Bug, filters by severity, and returns the full default Bug shape',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const taskIds = await seedOrmClientTasks(runtime);
+          const triage = await ormClientGetUserBugTriage('critical', 10, runtime);
+
+          // Users ordered by displayName asc; only admin owns a critical bug,
+          // and only Bug variant rows survive the variant narrowing. The
+          // include takes the default projection, so the surviving row carries
+          // its full default Bug shape (shared Task columns + Bug columns).
+          expect(triage).toEqual([
+            {
+              id: seededUserIds.admin,
+              displayName: 'Admin',
+              tasks: [
+                {
+                  id: taskIds.adminBug,
+                  title: 'Login crashes on Safari',
+                  description: null,
+                  status: 'open',
+                  type: 'bug',
+                  userId: seededUserIds.admin,
+                  createdAt: '2024-03-01T00:00:00+00:00',
+                  severity: 'critical',
+                  stepsToRepro: 'Open Safari → click "Sign in" → blank white screen',
+                },
+              ],
+            },
+            { id: seededUserIds.adminTwo, displayName: 'Admin Two', tasks: [] },
+            { id: seededUserIds.member, displayName: 'Member', tasks: [] },
+            { id: seededUserIds.reader, displayName: 'Reader', tasks: [] },
+          ]);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetFeatureRoadmap narrows the include to Feature, filters by targetRelease, and returns the full default Feature shape',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const taskIds = await seedOrmClientTasks(runtime);
+          const roadmap = await ormClientGetFeatureRoadmap('v2.0', 10, runtime);
+
+          // Both admin and member have a Feature targeting v2.0; the
+          // targetRelease filter reaches a column in the joined `feature`
+          // table. The include takes the default projection, so each surviving
+          // row carries its full default Feature shape (shared Task columns +
+          // Feature columns).
+          expect(roadmap).toEqual([
+            {
+              id: seededUserIds.admin,
+              displayName: 'Admin',
+              tasks: [
+                {
+                  id: taskIds.adminFeature,
+                  title: 'Dark mode',
+                  description: null,
+                  status: 'open',
+                  type: 'feature',
+                  userId: seededUserIds.admin,
+                  createdAt: '2024-03-02T00:00:00+00:00',
+                  priority: 'P1',
+                  targetRelease: 'v2.0',
+                },
+              ],
+            },
+            { id: seededUserIds.adminTwo, displayName: 'Admin Two', tasks: [] },
+            {
+              id: seededUserIds.member,
+              displayName: 'Member',
+              tasks: [
+                {
+                  id: taskIds.memberFeature,
+                  title: 'Slack integration',
+                  description: null,
+                  status: 'open',
+                  type: 'feature',
+                  userId: seededUserIds.member,
+                  createdAt: '2024-03-04T00:00:00+00:00',
+                  priority: 'P0',
+                  targetRelease: 'v2.0',
+                },
+              ],
+            },
+            { id: seededUserIds.reader, displayName: 'Reader', tasks: [] },
           ]);
         } finally {
           await runtime.close();

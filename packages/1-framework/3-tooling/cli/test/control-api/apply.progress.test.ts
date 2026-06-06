@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { progressLabelForAction } from '../../src/control-api/operations/apply';
+import { progressLabelForAction } from '../../src/control-api/operations/run-migration';
 
 describe('progressLabelForAction', () => {
   it('returns an init-specific label for dbInit', () => {
@@ -10,7 +10,7 @@ describe('progressLabelForAction', () => {
     expect(progressLabelForAction('dbUpdate')).toBe('Updating database across spaces');
   });
 
-  it('returns the migration-apply label for migrationApply', () => {
-    expect(progressLabelForAction('migrationApply')).toBe('Applying migration plan across spaces');
+  it('returns the migrate label for migrate', () => {
+    expect(progressLabelForAction('migrate')).toBe('Running migration plan across spaces');
   });
 });

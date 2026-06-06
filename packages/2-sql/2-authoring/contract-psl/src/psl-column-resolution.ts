@@ -25,6 +25,7 @@ import type {
   PslSpan,
   PslTypeConstructorCall,
 } from '@prisma-next/psl-parser';
+import { blindCast } from '@prisma-next/utils/casts';
 import {
   lowerDefaultFunctionWithRegistry,
   parseDefaultFunctionCall,
@@ -67,7 +68,9 @@ export function getAuthoringTypeConstructor(
     if (typeof current !== 'object' || current === null || Array.isArray(current)) {
       return undefined;
     }
-    current = (current as Record<string, unknown>)[segment];
+    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
+      current,
+    )[segment];
   }
 
   return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
@@ -94,7 +97,9 @@ export function getAuthoringEntity(
     if (typeof current !== 'object' || current === null || Array.isArray(current)) {
       return undefined;
     }
-    current = (current as Record<string, unknown>)[segment];
+    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
+      current,
+    )[segment];
   }
 
   return isAuthoringEntityTypeDescriptor(current) ? current : undefined;
@@ -115,7 +120,9 @@ export function getAuthoringFieldPreset(
     if (typeof current !== 'object' || current === null || Array.isArray(current)) {
       return undefined;
     }
-    current = (current as Record<string, unknown>)[segment];
+    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
+      current,
+    )[segment];
   }
 
   return isAuthoringFieldPresetDescriptor(current) ? current : undefined;

@@ -4,7 +4,6 @@ import {
   APP_SPACE_ID,
   createControlStack,
   type MigrationPlanOperation,
-  type OperationPreview,
 } from '@prisma-next/framework-components/control';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
@@ -13,7 +12,7 @@ import { castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { isAbsolute, relative, resolve } from 'pathe';
+import { relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
@@ -36,61 +35,33 @@ import { formatMigrationShowOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import {
+  findPackageByDirPath,
+  looksLikePath,
+  resolveAppTargetPath,
+} from '../utils/migration-path-target';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import type { MigrationShowResult } from './json/schemas';
 
 interface MigrationShowOptions extends CommonCommandOptions {
   readonly config?: string;
 }
 
 export interface MigrationShowPresent {
-  readonly spaceId: string;
-  readonly dirName: string;
-  readonly dirPath: string;
-  readonly from: string | null;
-  readonly to: string;
-  readonly migrationHash: string;
+  readonly space: string;
+  readonly name: string;
+  readonly fromContract: string | null;
+  readonly toContract: string;
+  readonly hash: string;
   readonly createdAt: string;
-  readonly operations: readonly {
-    readonly id: string;
-    readonly label: string;
-    readonly operationClass: string;
-  }[];
-  readonly preview: OperationPreview;
-  readonly summary: string;
+  readonly operations: { id: string; label: string; operationClass: string }[];
+  readonly preview: {
+    statements: { text: string; language: string }[];
+  };
 }
 
-export interface MigrationShowResult {
-  readonly ok: true;
-  readonly migration: MigrationShowPresent;
-}
-
-function looksLikePath(target: string): boolean {
-  return target.includes('/') || target.includes('\\');
-}
-
-export function resolveAppTargetPath(
-  target: string,
-  appMigrationsDir: string,
-  appMigrationsRelative: string,
-): Result<string, CliStructuredError> {
-  const targetPath = resolve(target);
-  const relativeToApp = relative(appMigrationsDir, targetPath);
-  const isOutsideAppDir =
-    relativeToApp === '' ||
-    relativeToApp === '.' ||
-    relativeToApp.startsWith('..') ||
-    isAbsolute(relativeToApp);
-  if (isOutsideAppDir) {
-    return notOk(
-      errorRuntime('Target must point to an app-space migration', {
-        why: `Expected a path under ${appMigrationsRelative}, got ${target}`,
-        fix: 'Pass an app-space migration directory or use a hash prefix.',
-      }),
-    );
-  }
-  return ok(targetPath);
-}
+export type { MigrationShowResult };
 
 function pkgToPresent(
   spaceId: string,
@@ -98,31 +69,21 @@ function pkgToPresent(
   client: ReturnType<typeof createControlClient>,
 ): MigrationShowPresent {
   const ops = castAs<readonly MigrationPlanOperation[]>(pkg.ops);
-  const preview: OperationPreview = client.toOperationPreview(ops) ?? { statements: [] };
+  const rawPreview = client.toOperationPreview(ops) ?? { statements: [] };
   return {
-    spaceId,
-    dirName: pkg.dirName,
-    dirPath: relative(process.cwd(), pkg.dirPath),
-    from: pkg.metadata.from,
-    to: pkg.metadata.to,
-    migrationHash: pkg.metadata.migrationHash,
+    space: spaceId,
+    name: pkg.dirName,
+    fromContract: pkg.metadata.from,
+    toContract: pkg.metadata.to,
+    hash: pkg.metadata.migrationHash,
     createdAt: pkg.metadata.createdAt,
     operations: ops.map((op) => ({
       id: op.id,
       label: op.label,
       operationClass: op.operationClass,
     })),
-    preview,
-    summary: `${ops.length} operation(s)`,
+    preview: { statements: [...rawPreview.statements] },
   };
-}
-
-function findPackageByDirPath(
-  packages: readonly OnDiskMigrationPackage[],
-  resolvedDirPath: string,
-): OnDiskMigrationPackage | undefined {
-  const normalized = resolve(resolvedDirPath);
-  return packages.find((p) => resolve(p.dirPath) === normalized);
 }
 
 async function executeMigrationShowCommand(
@@ -248,9 +209,11 @@ async function executeMigrationShowCommand(
     appPkg = matchedPkg;
   }
 
+  const migration = pkgToPresent(APP_SPACE_ID, appPkg, client);
   return ok({
     ok: true,
-    migration: pkgToPresent(APP_SPACE_ID, appPkg, client),
+    summary: `Migration ${migration.name} in ${migration.space}: ${migration.operations.length} operation(s)`,
+    migration,
   });
 }
 
@@ -260,11 +223,13 @@ export function createMigrationShowCommand(): Command {
     command,
     'Display migration package contents',
     'Shows the operations, statement preview, and metadata for one app-space migration.\n' +
-      'Accepts a directory path, directory name, or hash prefix.',
+      'Accepts a directory path, directory name, or hash prefix.\n' +
+      'Offline — does not consult the database.',
   );
   setCommandExamples(command, [
     'prisma-next migration show 20260101_100000_add_user',
     'prisma-next migration show sha256:a1b2c3',
+    'prisma-next migration show 20260101_100000_add_user --json',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
@@ -273,7 +238,7 @@ export function createMigrationShowCommand(): Command {
     { verb: 'migration graph', oneLiner: 'Show the migration graph topology' },
   ]);
   addGlobalOptions(command)
-    .argument('<target>', 'Migration reference: directory name, hash/prefix, or path')
+    .argument('<target>', 'Migration reference: directory name, hash/prefix, ref, or path')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string, options: MigrationShowOptions) => {
       const flags = parseGlobalFlagsOrExit(options);

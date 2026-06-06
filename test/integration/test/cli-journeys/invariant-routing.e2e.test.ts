@@ -18,7 +18,6 @@
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
@@ -202,7 +201,10 @@ withTempDir(({ createTempDir }) => {
         const statusRef = await runMigrationStatus(ctx, ['--to', 'prod', '--json']);
         expect(statusRef.exitCode, 'O.09: status --ref prod').toBe(0);
         const statusResult = parseMigrationStatusJson(statusRef);
-        expect(statusResult.missingInvariants, 'O.09: status missing is empty').toBeUndefined();
+        expect(
+          statusResult.diagnostics?.some((d) => d.code === 'MIGRATION.MISSING_INVARIANTS'),
+          'O.09: status missing is empty',
+        ).toBeFalsy();
         expect(statusResult.summary, 'O.09: status up to date').toMatch(/up to date/i);
         expect(
           migrationStatusAppSpace(statusResult).migrations.every((m) => m.status === 'applied'),
@@ -299,7 +301,7 @@ withTempDir(({ createTempDir }) => {
         const statusOffline = await runMigrationStatus(ctx, ['--json']);
         expect(statusOffline.exitCode, 'P.05: status exit').toBe(0);
         const offlineState = migrationStatusAppSpace(parseMigrationStatusJson(statusOffline));
-        expect(offlineState.markerHash, 'P.05: marker did not advance to C2').not.toBe(c2Hash);
+        expect(offlineState.currentContract, 'P.05: marker did not advance to C2').not.toBe(c2Hash);
 
         // P.06: status --ref prod is fatal too (parity with apply).
         const statusFail = await runMigrationStatus(ctx, ['--to', 'prod', '--json']);
@@ -805,9 +807,11 @@ MigrationCLI.run(import.meta.url, M);
         const statusResult = await runMigrationStatus(ctx, ['--to', 'prod', '--json']);
         expect(statusResult.exitCode, 'T.05: status exits 0').toBe(0);
         const envelope = parseMigrationStatusJson(statusResult);
-        const missingLine =
-          envelope.missingInvariants ?? stripAnsi(statusResult.stdout + statusResult.stderr);
-        expect(missingLine, 'T.05: missing invariant surfaced').toMatch(
+        const missingDiagnostic = envelope.diagnostics?.find(
+          (d) => d.code === 'MIGRATION.MISSING_INVARIANTS',
+        );
+        expect(missingDiagnostic, 'T.05: MISSING_INVARIANTS diagnostic present').toBeDefined();
+        expect(missingDiagnostic?.message, 'T.05: missing invariant surfaced').toMatch(
           /missing invariant\(s\): normalize-user-email/i,
         );
       },

@@ -35,6 +35,7 @@ import {
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
 import {
@@ -93,7 +94,7 @@ export function tableAt(
 ): StorageTable | undefined {
   // Namespace.tables is typed as Record<string, IRNode> at the interface level;
   // SQL family namespaces always hold StorageTable instances.
-  return storage.namespaces[namespaceId]?.tables[tableName] as StorageTable | undefined;
+  return storage.namespaces[namespaceId]?.entries.table[tableName] as StorageTable | undefined;
 }
 
 /**
@@ -134,8 +135,8 @@ const DEFAULT_ENUM_NAMESPACE_ID = 'public';
 
 function namespaceHasEnum(storage: SqlStorage, namespaceId: string, typeName: string): boolean {
   const ns = storage.namespaces[namespaceId];
-  if (!ns || !('enum' in ns) || ns.enum == null) return false;
-  return (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName] !== undefined;
+  if (!isPostgresSchema(ns)) return false;
+  return ns.entries.type[typeName] !== undefined;
 }
 
 /**
@@ -166,7 +167,7 @@ function resolveColumnEnumNamespace(
 
 /**
  * Finds a type entry by explicit namespace coordinate. Namespace types (e.g.
- * Postgres enums) live under `storage.namespaces[nsId].enum`. Returns the
+ * Postgres enums) live under `storage.namespaces[nsId].entries.type`. Returns the
  * entry from the named namespace only — never scans other namespaces, so two
  * namespaces that hold an enum with the same name resolve independently.
  */
@@ -176,8 +177,12 @@ function locateNamespaceType(
   typeName: string,
 ): PostgresEnumStorageEntry | undefined {
   const ns = storage.namespaces[namespaceId];
-  if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
-  return (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName];
+  const raw = ns?.entries['type']?.[typeName];
+  if (raw === undefined) return undefined;
+  return blindCast<
+    PostgresEnumStorageEntry,
+    'postgres type slot carries PostgresEnumStorageEntry at the postgres target layer'
+  >(raw);
 }
 
 // ============================================================================
@@ -436,7 +441,7 @@ function enumRebuildCallRecipe(
   // same-named enums in distinct namespaces keep their columns disjoint.
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
   for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-    for (const [tableName, tableNode] of Object.entries(ns.tables)) {
+    for (const [tableName, tableNode] of Object.entries(ns.entries.table)) {
       const table = tableNode as StorageTable;
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (
@@ -639,9 +644,10 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
 function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
   for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-    if (!('enum' in ns) || ns.enum == null) continue;
-    const nsEnums = ns.enum as Record<string, unknown>;
-    for (const [name, instance] of Object.entries(nsEnums).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!isPostgresSchema(ns)) continue;
+    for (const [name, instance] of Object.entries(ns.entries.type).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       if (instance instanceof PostgresEnumType) {
         result.set(enumCompoundKey(nsId, name), instance);
       }

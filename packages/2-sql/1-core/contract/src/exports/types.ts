@@ -21,6 +21,7 @@ export type {
   QueryOperationTypesOf,
   ReferentialAction,
   ResolveCodecTypes,
+  SqlControlDriverInstance,
   SqlModelFieldStorage,
   SqlModelStorage,
   SqlNamespaceTablesInput,

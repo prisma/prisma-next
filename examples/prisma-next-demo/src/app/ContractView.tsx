@@ -142,7 +142,7 @@ export function ContractView({ contract }: { contract: Contract }) {
 
       <Section title="Tables">
         {Object.values(contract.storage.namespaces).flatMap((ns) =>
-          Object.entries(ns.tables).map(([tableName, table]) => (
+          Object.entries(ns.entries.table).map(([tableName, table]) => (
             <TableCard key={`${ns.id}.${tableName}`} tableName={tableName} table={table} />
           )),
         )}

@@ -8,7 +8,6 @@ import type {
   TargetDescriptor,
 } from '@prisma-next/framework-components/components';
 import type {
-  ControlDriverInstance,
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
@@ -32,7 +31,7 @@ import type { TypesImportSpec } from '@prisma-next/framework-components/emission
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   DdlNode,
@@ -69,10 +68,10 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
   ) {
     const namespaces = contract.storage.namespaces as Record<
       string,
-      { readonly tables?: Readonly<Record<string, unknown>> }
+      { readonly entries: { readonly table: Readonly<Record<string, unknown>> } }
     >;
     for (const ns of Object.values(namespaces)) {
-      const tbls = ns.tables;
+      const tbls = ns.entries.table;
       if (typeof tbls !== 'object' || tbls === null) continue;
       for (const table of Object.values(tbls)) {
         if (
@@ -203,7 +202,7 @@ export interface SqlControlFamilyInstance
   deserializeContract(contractJson: unknown): Contract;
 
   verify(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly contract: unknown;
     readonly expectedTargetId: string;
     readonly contractPath: string;
@@ -228,14 +227,14 @@ export interface SqlControlFamilyInstance
   }): VerifyDatabaseSchemaResult;
 
   sign(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly contract: unknown;
     readonly contractPath: string;
     readonly configPath?: string;
   }): Promise<SignDatabaseResult>;
 
   introspect(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly contract?: unknown;
   }): Promise<SqlSchemaIR>;
 
@@ -249,7 +248,7 @@ export interface SqlControlFamilyInstance
    * `SqlControlAdapter.initMarker`.
    */
   initMarker(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly space: string;
     readonly destination: {
       readonly storageHash: string;
@@ -263,7 +262,7 @@ export interface SqlControlFamilyInstance
    * when the swap matched a row; see `SqlControlAdapter.updateMarker`.
    */
   updateMarker(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly space: string;
     readonly expectedFrom: string;
     readonly destination: {
@@ -278,7 +277,7 @@ export interface SqlControlFamilyInstance
    * `SqlControlAdapter.writeLedgerEntry`.
    */
   writeLedgerEntry(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly space: string;
     readonly entry: {
       readonly edgeId: string;
@@ -395,7 +394,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
-  // Family-instance methods accept `ControlDriverInstance<'sql', string>` — the
+  // Family-instance methods accept `SqlControlDriverInstance<string>` — the
   // family API isn't generic on the target id. The adapter descriptor's `create`
   // returns the concrete `SqlControlAdapter<TTargetId>`; widening the target id to
   // `string` here matches the family-level driver type without a per-method probe.
@@ -422,7 +421,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     async verify(verifyOptions: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
       readonly contract: unknown;
       readonly expectedTargetId: string;
       readonly contractPath: string;
@@ -566,12 +565,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
-        ...ifDefined('columnsCompatible', controlAdapter.columnsCompatible),
         ...ifDefined('resolveExistingEnumValues', resolveExistingEnumValues),
       });
     },
     async sign(options: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
       readonly contract: unknown;
       readonly contractPath: string;
       readonly configPath?: string;
@@ -672,24 +670,24 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     },
     async readMarker(options: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
       readonly space: string;
     }): Promise<ContractMarkerRecord | null> {
       return getControlAdapter().readMarker(options.driver, options.space);
     },
     async readAllMarkers(options: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
     }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
       return getControlAdapter().readAllMarkers(options.driver);
     },
     async readLedger(options: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
       readonly space?: string;
     }): Promise<readonly LedgerEntryRecord[]> {
       return getControlAdapter().readLedger(options.driver, options.space);
     },
     async initMarker(options: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
       readonly space: string;
       readonly destination: {
         readonly storageHash: string;
@@ -700,7 +698,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return getControlAdapter().initMarker(options.driver, options.space, options.destination);
     },
     async updateMarker(options: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
       readonly space: string;
       readonly expectedFrom: string;
       readonly destination: {
@@ -717,7 +715,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       );
     },
     async writeLedgerEntry(options: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
       readonly space: string;
       readonly entry: {
         readonly edgeId: string;
@@ -731,7 +729,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return getControlAdapter().writeLedgerEntry(options.driver, options.space, options.entry);
     },
     async introspect(options: {
-      readonly driver: ControlDriverInstance<'sql', string>;
+      readonly driver: SqlControlDriverInstance<string>;
       readonly contract?: unknown;
     }): Promise<SqlSchemaIR> {
       return getControlAdapter().introspect(options.driver, options.contract);

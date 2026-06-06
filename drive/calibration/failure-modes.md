@@ -440,6 +440,26 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-06-03, slice `sql-marker-ops-through-adapter` (TML-2753), D8 R1 review. Reviewer (`claude-opus-4-7-thinking-high`) hit a stale-`dist` typecheck red post-`origin/main`-merge, ran `git stash` (no-op — tree was clean) then `git stash pop`, which popped `stash@{0}` from the unrelated `tml-2812-render-polish-and-ledger-tests` worktree (message: `d5-wip-2`). The pop applied cleanly because changes were textually conflict-free; reviewer reverted what they saw in the D8 tree (`git checkout --` + `rm -rf` on new untracked dirs), but the original `d5-wip-2` stash entry was permanently removed from the operator's `git stash list`. Recovery path: `git fsck --no-reflogs --unreachable | rg 'dangling commit'` in the `tml-2812-…` worktree. Subsequent reviewer (D9 R1) honored the new rule via `git worktree add ../tmp-d9-verify <merge-base>` for the pre-existing-flake verification; no incident.
 
+### F23. Close-out doc authored from the project spec inherits pre-implementation API names
+
+**Symptom.** A close-out ADR (or any doc authored at project close from `spec.md`) describes the shipped system using names lifted from the spec — but the spec predates implementation, and type / field / function / diagnostic names drifted via renames during the slices. The doc ships symbols, diagnostic codes, and code-example shapes that no longer exist in the merged code. By close-out the spec is the *oldest, least-accurate* naming source in the project.
+
+**Detection signal.**
+
+- Symbols, file paths, or diagnostic codes cited in the doc don't grep in `packages/`.
+- Field names in the doc match `spec.md` but not the merged code (e.g. spec `defaultControl` vs shipped `defaultControlPolicy`).
+- A code-example block uses a constructor / DSL shape that doesn't match the real signature.
+- Relative links resolve from the wrong directory depth (doc moved deeper than the spec it was drawn from).
+
+**Mitigation.**
+
+- Doc-authoring briefs at close-out must say: **verify every API reference (type, function, field, diagnostic code, file path) against shipped source; treat the spec as *intent only*, never as the API surface.** Don't seed the brief with *predicted* names from the spec either — those carry the same drift.
+- Require the dispatch to return a "verified-against-source" list (symbol → file where confirmed) and an explicit flag of any place shipped code diverged from the brief's expectation.
+- Orchestrator review pass spot-checks every cited symbol / path with grep and resolves every relative link before merge. The `adr-examples-must-match-code` rule covers code *examples*; this failure mode extends the discipline to *all* API references in the prose.
+- Generalises to any Drive project that writes close-out docs from a spec; landed project-context here on first occurrence. If it recurs, promote to canonical (`drive-close-project` / `drive-pr-description` brief discipline) per the team's "after one or two repetitions" rule.
+
+**Reference incident.** 2026-06-04, control-policy close-out ADR (ADR 224, TML-2831). First draft (drawn from `spec.md`) used `effectiveControl` (shipped `effectiveControlPolicy`), `defaultControl` (shipped `defaultControlPolicy`, renamed under TML-2800), and a predicted diagnostic `control_managed_in_external_space` (shipped `controlPolicySuppressedCall`); it also shipped a structurally-wrong `defineContract` TS example and a relative link off by one `../`. All caught in the orchestrator's source-verification review before merge. The implementer's brief *had* asked it to verify against source — which surfaced the divergences in its return — but the brief's own predicted names were themselves from the stale spec, so the verification was doing double duty.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

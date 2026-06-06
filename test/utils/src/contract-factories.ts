@@ -48,7 +48,7 @@ const DEFAULT_SQL_STORAGE = {
   namespaces: {
     [UNBOUND_NAMESPACE_ID]: {
       id: UNBOUND_NAMESPACE_ID,
-      tables: {},
+      entries: { table: {} },
     },
   },
 } as const;
@@ -115,7 +115,13 @@ export function createContract<
 
 type SqlStorageLike = StorageBase & {
   readonly namespaces: Readonly<
-    Record<string, { readonly id: string; readonly tables: Readonly<Record<string, unknown>> }>
+    Record<
+      string,
+      {
+        readonly id: string;
+        readonly entries: Readonly<{ readonly table?: Readonly<Record<string, unknown>> }>;
+      }
+    >
   >;
   readonly types?: Record<string, unknown>;
 };

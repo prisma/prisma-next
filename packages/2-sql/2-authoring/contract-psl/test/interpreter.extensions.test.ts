@@ -360,18 +360,20 @@ model Document {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          tables: {
-            document: {
-              columns: {
-                shortName: {
-                  codecId: 'custom/varchar@1',
-                  nativeType: 'character varying',
-                  nullable: false,
-                },
-                embedding: {
-                  codecId: 'custom/vector@1',
-                  nativeType: 'vector',
-                  nullable: true,
+          entries: {
+            table: {
+              document: {
+                columns: {
+                  shortName: {
+                    codecId: 'custom/varchar@1',
+                    nativeType: 'character varying',
+                    nullable: false,
+                  },
+                  embedding: {
+                    codecId: 'custom/vector@1',
+                    nativeType: 'vector',
+                    nullable: true,
+                  },
                 },
               },
             },

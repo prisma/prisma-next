@@ -151,10 +151,12 @@ type TestStorage = {
     readonly __unbound__: {
       readonly id: '__unbound__';
       readonly kind: 'mongo-namespace';
-      readonly collections: {
-        readonly orders: { readonly kind: 'mongo-collection' };
-        readonly users: { readonly kind: 'mongo-collection' };
-        readonly customers: { readonly kind: 'mongo-collection' };
+      readonly entries: {
+        readonly collection: {
+          readonly orders: { readonly kind: 'mongo-collection' };
+          readonly users: { readonly kind: 'mongo-collection' };
+          readonly customers: { readonly kind: 'mongo-collection' };
+        };
       };
     };
   };

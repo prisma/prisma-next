@@ -6,11 +6,11 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { StorageType } from '@prisma-next/framework-components/ir';
 import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type {
   ContractWithTypeMaps,
   Index,
-  PostgresEnumStorageEntry,
   ReferentialAction,
   StorageTypeInstance,
   TypeMaps,
@@ -144,10 +144,7 @@ type DefinitionNamespaces<Definition> = Definition extends {
 type DefinitionTypes<Definition> = Definition extends {
   readonly types?: unknown;
 }
-  ? Present<Definition['types']> extends Record<
-      string,
-      StorageTypeInstance | PostgresEnumStorageEntry
-    >
+  ? Present<Definition['types']> extends Record<string, StorageType>
     ? Present<Definition['types']>
     : Record<never, never>
   : Record<never, never>;
@@ -311,10 +308,7 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
   ? TypeRef
   : undefined;
 
-type LookupNamedStorageTypeKeyByValue<
-  Definition,
-  TypeRef extends StorageTypeInstance | PostgresEnumStorageEntry,
-> = {
+type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageType> = {
   [TypeName in keyof DefinitionTypes<Definition> & string]: [TypeRef] extends [
     DefinitionTypes<Definition>[TypeName],
   ]
@@ -326,7 +320,7 @@ type LookupNamedStorageTypeKeyByValue<
 
 type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
   ? TypeRef
-  : TypeRef extends StorageTypeInstance | PostgresEnumStorageEntry
+  : TypeRef extends StorageType
     ? [LookupNamedStorageTypeKeyByValue<Definition, TypeRef>] extends [never]
       ? string
       : LookupNamedStorageTypeKeyByValue<Definition, TypeRef>
@@ -564,9 +558,9 @@ type BuiltStorageTables<Definition> = {
 };
 
 type BuiltDocumentScopedTypes<Definition> = {
-  readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends PostgresEnumStorageEntry
-    ? never
-    : K]: DefinitionTypes<Definition>[K];
+  readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends StorageTypeInstance
+    ? K
+    : never]: DefinitionTypes<Definition>[K];
 };
 
 type BuiltDomain<Definition> =
@@ -586,19 +580,20 @@ type BuiltStorage<Definition> = {
   readonly types?: BuiltDocumentScopedTypes<Definition>;
   // The primary namespace key is target-specific: Postgres uses `public` (the
   // default schema), all other SQL targets use `__unbound__`. The namespace
-  // carries the narrowed tables shape so downstream DSL surfaces keep
+  // carries the narrowed `entries.table` shape so downstream DSL surfaces keep
   // literal-keyed access without an optional-narrowing dance. The shape is
   // described inline (rather than intersecting with `SqlStorage['namespaces']`)
   // so its `Readonly<Record<string, Namespace>>` index signature doesn't
-  // collapse `keyof tables` to `string`. The literal object is still
-  // structurally assignable to `SqlStorage['namespaces']` because every value
-  // satisfies the framework `Namespace` interface.
+  // collapse slot keys to `string`. The literal object is still structurally
+  // assignable to `SqlStorage['namespaces']` because every value satisfies the
+  // framework `Namespace` interface.
   readonly namespaces: {
     readonly [K in DefaultStorageNamespaceId<Definition>]: {
       readonly id: K;
       readonly kind: string;
-      readonly tables: BuiltStorageTables<Definition>;
-      readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+      readonly entries: {
+        readonly table: BuiltStorageTables<Definition>;
+      };
     };
   } & {
     readonly [Ns in Exclude<
@@ -607,8 +602,9 @@ type BuiltStorage<Definition> = {
     >]: {
       readonly id: Ns;
       readonly kind: string;
-      readonly tables: Record<never, never>;
-      readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+      readonly entries: {
+        readonly table: Record<never, never>;
+      };
     };
   };
 };

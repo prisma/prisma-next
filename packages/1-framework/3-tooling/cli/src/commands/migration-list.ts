@@ -52,8 +52,8 @@ function compareSpaceIds(a: string, b: string): number {
 }
 
 function compareDirNamesDescending(a: MigrationListEntry, b: MigrationListEntry): number {
-  if (a.dirName < b.dirName) return 1;
-  if (a.dirName > b.dirName) return -1;
+  if (a.name < b.name) return 1;
+  if (a.name > b.name) return -1;
   return 0;
 }
 
@@ -110,18 +110,18 @@ export async function migrationSpaceListEntriesFromAggregate(
     const refsByHash = listRefsByContractHash(member);
     const migrations: MigrationListEntry[] = member.packages
       .map((pkg) => ({
-        dirName: pkg.dirName,
-        from: pkg.metadata.from,
-        to: pkg.metadata.to,
-        migrationHash: pkg.metadata.migrationHash,
+        name: pkg.dirName,
+        hash: pkg.metadata.migrationHash,
+        fromContract: pkg.metadata.from,
+        toContract: pkg.metadata.to,
         operationCount: pkg.ops.length,
         createdAt: pkg.metadata.createdAt,
-        refs: refsByHash.get(pkg.metadata.to) ?? [],
-        providedInvariants: pkg.metadata.providedInvariants,
+        refs: [...(refsByHash.get(pkg.metadata.to) ?? [])],
+        providedInvariants: [...pkg.metadata.providedInvariants],
       }))
       .sort(compareDirNamesDescending);
 
-    spaces.push({ spaceId, migrations });
+    spaces.push({ space: spaceId, migrations });
   }
 
   return spaces;
@@ -198,19 +198,19 @@ export function runMigrationList(
     return notOk(errorInvalidSpaceId(spaceFilter));
   }
 
-  if (spaceFilter !== undefined && !spaces.some((s) => s.spaceId === spaceFilter)) {
-    return notOk(errorSpaceNotFound(spaceFilter, spaces.map((s) => s.spaceId).sort()));
+  if (spaceFilter !== undefined && !spaces.some((s) => s.space === spaceFilter)) {
+    return notOk(errorSpaceNotFound(spaceFilter, spaces.map((s) => s.space).sort()));
   }
 
   const scopedSpaces =
-    spaceFilter !== undefined ? spaces.filter((s) => s.spaceId === spaceFilter) : spaces;
+    spaceFilter !== undefined ? spaces.filter((s) => s.space === spaceFilter) : spaces;
 
   const resultSpaces: readonly MigrationSpaceListEntry[] =
-    scopedSpaces.length === 0 ? [{ spaceId: APP_SPACE_ID, migrations: [] }] : scopedSpaces;
+    scopedSpaces.length === 0 ? [{ space: APP_SPACE_ID, migrations: [] }] : scopedSpaces;
 
   return ok({
     ok: true,
-    spaces: resultSpaces,
+    spaces: [...resultSpaces],
     summary: computeSummary(resultSpaces),
   });
 }

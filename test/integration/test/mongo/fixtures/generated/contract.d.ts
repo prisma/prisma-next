@@ -90,23 +90,25 @@ type ContractBase = Omit<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly collections: {
-            readonly tasks: MongoCollection;
-            readonly users: {
-              readonly kind: 'mongo-collection';
-              readonly indexes: readonly [
-                {
-                  readonly kind: 'mongo-index';
-                  readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
-                  readonly unique: true;
-                },
-              ];
-              readonly options: {
-                readonly kind: 'mongo-collection-options';
-                readonly collation: {
-                  readonly kind: 'mongo-collation-options';
-                  readonly locale: 'en';
-                  readonly strength: 2;
+          readonly entries: {
+            readonly collection: {
+              readonly tasks: MongoCollection;
+              readonly users: {
+                readonly kind: 'mongo-collection';
+                readonly indexes: readonly [
+                  {
+                    readonly kind: 'mongo-index';
+                    readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
+                    readonly unique: true;
+                  },
+                ];
+                readonly options: {
+                  readonly kind: 'mongo-collection-options';
+                  readonly collation: {
+                    readonly kind: 'mongo-collation-options';
+                    readonly locale: 'en';
+                    readonly strength: 2;
+                  };
                 };
               };
             };

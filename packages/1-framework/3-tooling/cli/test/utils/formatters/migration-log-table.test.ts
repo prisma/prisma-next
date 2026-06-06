@@ -161,6 +161,24 @@ describe('renderMigrationLogTable', () => {
     expect(renderMigrationLogTable([])).toBe('');
   });
 
+  it('uses ASCII glyphs when glyph mode is ascii', () => {
+    const table = renderMigrationLogTable(
+      [
+        entry({
+          migrationName: '20260301_init',
+          from: null,
+          to: 'sha256:ef9de27abc',
+          appliedAt: new Date('2026-06-01T08:00:00.000Z'),
+        }),
+      ],
+      { utc: true, glyphMode: 'ascii' },
+    );
+    expect(table).toContain('- -> ef9de27');
+    expect(table).not.toContain(MIGRATION_LIST_FORWARD_EDGE_GLYPH);
+    expect(table).not.toContain(MIGRATION_LIST_EMPTY_SOURCE);
+    expect(table).not.toContain('─');
+  });
+
   it('uses UTC timestamps when utc is true', () => {
     const table = renderMigrationLogTable(
       [entry({ migrationName: '20260301_init', appliedAt: new Date('2026-06-01T08:00:00.000Z') })],
@@ -323,8 +341,18 @@ describe('serializeLedgerEntriesForJson', () => {
       }),
     ]);
     expect(json).toHaveLength(2);
-    expect(json[0]!.migrationName).toBe('001_first');
+    expect(json[0]!.name).toBe('001_first');
     expect(json[0]!.appliedAt).toBe('2026-06-01T08:00:00.000Z');
     expect(json[1]!.appliedAt).toBe('2026-06-02T08:00:00.000Z');
+  });
+
+  it('uses name and hash field names (not migrationName/migrationHash)', () => {
+    const json = serializeLedgerEntriesForJson([
+      entry({ migrationName: '001_init', migrationHash: 'sha256:deadbeef' }),
+    ]);
+    expect(json[0]).toHaveProperty('name', '001_init');
+    expect(json[0]).toHaveProperty('hash', 'sha256:deadbeef');
+    expect(json[0]).not.toHaveProperty('migrationName');
+    expect(json[0]).not.toHaveProperty('migrationHash');
   });
 });

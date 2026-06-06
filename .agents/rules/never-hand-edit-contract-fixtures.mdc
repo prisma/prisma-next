@@ -1,0 +1,39 @@
+---
+description: Forbid hand-editing emitted contract fixtures (contract.json, contract.d.ts, expected.contract.json) — always regenerate via `pnpm fixtures:emit`
+alwaysApply: true
+---
+# Never hand-edit emitted contract fixtures
+
+**CRITICAL**: Never hand-edit `contract.json`, `contract.d.ts`, `expected.contract.json`, or any other file emitted by the contract pipeline (including migration `start-contract.json` / `end-contract.json` snapshots). These files are generated; their canonical form is whatever the emitter produces, byte-for-byte.
+
+To bring fixtures back in sync:
+
+```bash
+pnpm fixtures:emit   # regenerate everything
+pnpm fixtures:check  # re-emit + git diff --exit-code; fails if stale
+```
+
+`fixtures:emit` knows which packages contribute fixtures (examples, apps, `sql-builder`, `sql-orm-client`, extension `build:contract-space`, migration regen). Don't second-guess it by emitting only one package.
+
+## What's forbidden
+
+For any `contract.json`, `contract.d.ts`, `expected.contract.json`, or migration `{start,end}-contract.json`:
+
+- Writing via `Write`, `StrReplace`, `sed`, `awk`, or manual JSON-stringify-then-write.
+- "Reformatting" the JSON — the canonicalizer owns whitespace and key order.
+- Adding/removing fields by hand, even ones a substrate change clearly necessitates.
+
+If `pnpm fixtures:emit` fails or doesn't cover the file, **fix the emit chain** (substrate / serializer / canonicalizer / regen script), not the fixture. Hand-edited fixtures drift silently from the canonical shape, fail `fixtures:check`, and re-introduce delta on the next emit run.
+
+## Pattern
+
+```bash
+pnpm fixtures:emit
+git status -- ':(glob)**/contract.*' ':(glob)**/expected.contract.json'
+git add <the specific fixture files>
+git commit -s -m 'chore(fixtures): re-emit after <reason>'
+```
+
+## Escape hatch (rare)
+
+Hand-crafted JSON in a `*.test.ts` file is acceptable only when the test's point is to pin a specific byte sequence the emitter would never produce. Never applies to `contract.json` / `contract.d.ts` / `expected.contract.json` / migration `{start,end}-contract.json` — those are always emitter-owned.

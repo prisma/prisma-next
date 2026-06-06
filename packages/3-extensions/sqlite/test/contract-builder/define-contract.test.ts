@@ -1,4 +1,6 @@
 import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqliteUnboundDatabase } from '@prisma-next/target-sqlite/control';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../../src/exports/contract-builder';
 
@@ -38,5 +40,12 @@ describe('sqlite defineContract wrap', () => {
       },
     });
     expect(domainModelsAtDefaultNamespace(result.domain)['Bar']).toBeDefined();
+  });
+
+  it('materialises storage namespaces as SqliteUnboundDatabase class instances', () => {
+    const result = defineContract({});
+    const namespace = result.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(namespace).toBe(SqliteUnboundDatabase.instance);
+    expect(namespace?.kind).toBe('sqlite-namespace');
   });
 });

@@ -28,10 +28,12 @@ class MongoBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;
-  readonly collections: Readonly<Record<string, MongoCollection>>;
+  readonly entries: Readonly<{
+    readonly collection: Readonly<Record<string, MongoCollection>>;
+  }>;
 
   static fromCollectionsInput(input: MongoNamespaceCollectionsInput): MongoNamespace {
-    const collectionCount = Object.keys(input.collections ?? {}).length;
+    const collectionCount = Object.keys(input.entries.collection).length;
     if (input.id === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
       return castAs<MongoNamespace>(MongoUnboundNamespace.instance);
     }
@@ -41,14 +43,16 @@ class MongoBoundNamespace extends NamespaceBase {
   private constructor(input: MongoNamespaceCollectionsInput) {
     super();
     this.id = input.id;
-    this.collections = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.collections ?? {}).map(([name, c]) => [
-          name,
-          c instanceof MongoCollection ? c : new MongoCollection(c),
-        ]),
+    this.entries = Object.freeze({
+      collection: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.collection).map(([name, c]) => [
+            name,
+            c instanceof MongoCollection ? c : new MongoCollection(c),
+          ]),
+        ),
       ),
-    );
+    });
     Object.defineProperty(this, 'kind', {
       value: MONGO_NAMESPACE_KIND,
       writable: false,
@@ -74,7 +78,12 @@ export function buildMongoNamespaceMap(
             MongoNamespace,
             'a materialised Mongo-family namespace entry in a namespace map is a MongoNamespace'
           >(ns)
-        : MongoBoundNamespace.fromCollectionsInput(ns),
+        : MongoBoundNamespace.fromCollectionsInput(
+            blindCast<
+              MongoNamespaceCollectionsInput,
+              'non-materialized Mongo namespace map entry is a MongoNamespaceCollectionsInput'
+            >(ns),
+          ),
     ]),
   );
 }

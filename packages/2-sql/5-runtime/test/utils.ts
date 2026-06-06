@@ -420,7 +420,7 @@ export function createStubAdapter(): StubAdapter {
 export function unboundNamespaceWithTables(
   tables: Record<string, StorageTableInput>,
 ): ReturnType<typeof buildSqlNamespace> {
-  return buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables });
+  return buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
 }
 
 export function emptySqlTestDomain() {

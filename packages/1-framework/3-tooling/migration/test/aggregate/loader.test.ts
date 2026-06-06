@@ -19,7 +19,9 @@ function sqlContractWithTables(args: { target?: string; tables: readonly string[
   return createSqlContract({
     target: args.target ?? 'postgres',
     storage: {
-      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: tables } },
+      },
     },
   });
 }

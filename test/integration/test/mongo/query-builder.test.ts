@@ -125,9 +125,11 @@ const contractJson = {
       __unbound__: {
         id: '__unbound__',
         kind: 'mongo-namespace',
-        collections: {
-          products: { kind: 'mongo-collection' },
-          orders: { kind: 'mongo-collection' },
+        entries: {
+          collection: {
+            products: { kind: 'mongo-collection' },
+            orders: { kind: 'mongo-collection' },
+          },
         },
       },
     },

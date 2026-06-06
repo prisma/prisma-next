@@ -6,7 +6,7 @@ import { createEmitterTestContract as createContract } from './create-emitter-te
 
 function installNamespacedTableDeletionRace(ir: Contract, tableName: string): void {
   const originalStorage = ir.storage as {
-    namespaces: Record<string, { tables: Record<string, unknown> }>;
+    namespaces: Record<string, { entries: { table: Record<string, unknown> } }>;
   };
   let tableDeleted = false;
   const proxiedStorage = new Proxy(originalStorage, {
@@ -17,24 +17,33 @@ function installNamespacedTableDeletionRace(ir: Contract, tableName: string): vo
             if (nsKey !== UNBOUND_NAMESPACE_ID) {
               return Reflect.get(nsTarget, nsKey, nsTarget);
             }
-            const inner = Reflect.get(nsTarget, nsKey) as { tables: Record<string, unknown> };
+            const inner = Reflect.get(nsTarget, nsKey) as {
+              entries: { table: Record<string, unknown> };
+            };
             return new Proxy(inner, {
               get(innerTarget, innerProp) {
-                if (innerProp !== 'tables') {
+                if (innerProp !== 'entries') {
                   return Reflect.get(innerTarget, innerProp, innerTarget);
                 }
-                return new Proxy(innerTarget.tables, {
-                  get(tableTarget, tableProp) {
-                    if (tableProp === tableName && tableDeleted) {
-                      return undefined;
+                return new Proxy(innerTarget.entries, {
+                  get(entriesTarget, entriesProp) {
+                    if (entriesProp !== 'table') {
+                      return Reflect.get(entriesTarget, entriesProp, entriesTarget);
                     }
-                    return Reflect.get(tableTarget, tableProp, tableTarget);
-                  },
-                  has(tableTarget, tableProp) {
-                    return Reflect.has(tableTarget, tableProp);
-                  },
-                  ownKeys(tableTarget) {
-                    return Reflect.ownKeys(tableTarget);
+                    return new Proxy(entriesTarget.table, {
+                      get(tableTarget, tableProp) {
+                        if (tableProp === tableName && tableDeleted) {
+                          return undefined;
+                        }
+                        return Reflect.get(tableTarget, tableProp, tableTarget);
+                      },
+                      has(tableTarget, tableProp) {
+                        return Reflect.has(tableTarget, tableProp);
+                      },
+                      ownKeys(tableTarget) {
+                        return Reflect.ownKeys(tableTarget);
+                      },
+                    });
                   },
                 });
               },
@@ -46,7 +55,7 @@ function installNamespacedTableDeletionRace(ir: Contract, tableName: string): vo
     },
   });
 
-  delete originalStorage.namespaces[UNBOUND_NAMESPACE_ID].tables[tableName];
+  delete originalStorage.namespaces[UNBOUND_NAMESPACE_ID].entries.table[tableName];
   tableDeleted = true;
   (ir as { storage: unknown }).storage = proxiedStorage;
 }

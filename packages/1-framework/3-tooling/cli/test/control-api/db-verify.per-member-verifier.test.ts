@@ -14,7 +14,12 @@ describe('createPerMemberVerifier', () => {
     const contract = createSqlContract({
       target: 'postgres',
       storage: {
-        namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { user: {} } } },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: { table: { user: {} } },
+          },
+        },
       },
     });
     const member = createContractSpaceMember({

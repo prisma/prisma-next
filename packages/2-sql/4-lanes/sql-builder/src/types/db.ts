@@ -12,7 +12,10 @@ export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 export type TableProxyContract = {
   readonly storage: {
     readonly namespaces: Readonly<
-      Record<string, { readonly tables: Readonly<Record<string, StorageTable>> }>
+      Record<
+        string,
+        { readonly entries: { readonly table: Readonly<Record<string, StorageTable>> } }
+      >
     >;
   };
   readonly capabilities: CapabilitiesBase;
@@ -25,13 +28,13 @@ export type UnboundTables<C extends TableProxyContract> = {
 };
 
 export type TableNamesAcrossNamespaces<C extends TableProxyContract> = {
-  [NSId in keyof C['storage']['namespaces']]: keyof C['storage']['namespaces'][NSId]['tables'] &
+  [NSId in keyof C['storage']['namespaces']]: keyof C['storage']['namespaces'][NSId]['entries']['table'] &
     string;
 }[keyof C['storage']['namespaces']];
 
 export type TableInAnyNamespace<C extends TableProxyContract, Name extends string> = {
-  [NSId in keyof C['storage']['namespaces']]: Name extends keyof C['storage']['namespaces'][NSId]['tables']
-    ? C['storage']['namespaces'][NSId]['tables'][Name]
+  [NSId in keyof C['storage']['namespaces']]: Name extends keyof C['storage']['namespaces'][NSId]['entries']['table']
+    ? C['storage']['namespaces'][NSId]['entries']['table'][Name]
     : never;
 }[keyof C['storage']['namespaces']];
 

@@ -73,7 +73,10 @@ function unboundStorage(
   return new SqlStorage({
     storageHash,
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        entries: { table: tables },
+      }),
     },
   });
 }
@@ -100,14 +103,16 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            User: table({
-              columns: {
-                id: col({ nativeType: 'text' }),
-                email: col({ nativeType: 'text', nullable: false }),
-                name: col({ nativeType: 'text', nullable: true }),
-              },
-            }),
+          entries: {
+            table: {
+              User: table({
+                columns: {
+                  id: col({ nativeType: 'text' }),
+                  email: col({ nativeType: 'text', nullable: false }),
+                  name: col({ nativeType: 'text', nullable: true }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -130,21 +135,23 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                a: col({
-                  nativeType: 'vector',
-                  codecId: 'pgvector/vector@1',
-                  typeParams: { dimensions: 1536 },
-                }),
-                b: col({
-                  nativeType: 'vector',
-                  codecId: 'pgvector/vector@1',
-                  typeRef: 'MyVector',
-                }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  a: col({
+                    nativeType: 'vector',
+                    codecId: 'pgvector/vector@1',
+                    typeParams: { dimensions: 1536 },
+                  }),
+                  b: col({
+                    nativeType: 'vector',
+                    codecId: 'pgvector/vector@1',
+                    typeRef: 'MyVector',
+                  }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -178,17 +185,19 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                id: col({
-                  nativeType: 'character',
-                  codecId: 'sql/char@1',
-                  typeParams: { length: 36 },
-                }),
-                name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  id: col({
+                    nativeType: 'character',
+                    codecId: 'sql/char@1',
+                    typeParams: { length: 36 },
+                  }),
+                  name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -227,17 +236,19 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            Post: table({
-              columns: {
-                embedding: col({
-                  nativeType: 'vector',
-                  codecId: 'pg/vector@1',
-                  nullable: true,
-                  typeRef: 'Embedding1536',
-                }),
-              },
-            }),
+          entries: {
+            table: {
+              Post: table({
+                columns: {
+                  embedding: col({
+                    nativeType: 'vector',
+                    codecId: 'pg/vector@1',
+                    nullable: true,
+                    typeRef: 'Embedding1536',
+                  }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -276,16 +287,18 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                id: col({
-                  nativeType: 'character',
-                  codecId: 'sql/char@1',
-                  typeParams: { length: 36 },
-                }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  id: col({
+                    nativeType: 'character',
+                    codecId: 'sql/char@1',
+                    typeParams: { length: 36 },
+                  }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -301,15 +314,17 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                status: col({
-                  nativeType: 'text',
-                  default: { kind: 'literal', value: 'active' },
-                }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  status: col({
+                    nativeType: 'text',
+                    default: { kind: 'literal', value: 'active' },
+                  }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -325,15 +340,17 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                author: col({
-                  nativeType: 'text',
-                  default: { kind: 'literal', value: "O'Reilly" },
-                }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  author: col({
+                    nativeType: 'text',
+                    default: { kind: 'literal', value: "O'Reilly" },
+                  }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -349,15 +366,17 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                textValue: col({
-                  nativeType: 'text',
-                  default: { kind: 'literal', value: "a'b''c" },
-                }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  textValue: col({
+                    nativeType: 'text',
+                    default: { kind: 'literal', value: "a'b''c" },
+                  }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -373,15 +392,17 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                createdAt: col({
-                  nativeType: 'timestamptz',
-                  default: { kind: 'function', expression: 'now()' },
-                }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  createdAt: col({
+                    nativeType: 'timestamptz',
+                    default: { kind: 'function', expression: 'now()' },
+                  }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -397,12 +418,14 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                name: col({ nativeType: 'text' }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  name: col({ nativeType: 'text' }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -419,13 +442,15 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                id: col({ nativeType: 'text' }),
-              },
-              primaryKey: { columns: ['id'], name: 'T_pkey' },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  id: col({ nativeType: 'text' }),
+                },
+                primaryKey: { columns: ['id'], name: 'T_pkey' },
+              }),
+            },
           },
         }),
       },
@@ -441,13 +466,15 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                email: col({ nativeType: 'text' }),
-              },
-              uniques: [{ columns: ['email'], name: 'T_email_key' }],
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  email: col({ nativeType: 'text' }),
+                },
+                uniques: [{ columns: ['email'], name: 'T_email_key' }],
+              }),
+            },
           },
         }),
       },
@@ -463,13 +490,15 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                email: col({ nativeType: 'text' }),
-              },
-              indexes: [{ columns: ['email'], name: 'T_email_idx' }],
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  email: col({ nativeType: 'text' }),
+                },
+                indexes: [{ columns: ['email'], name: 'T_email_idx' }],
+              }),
+            },
           },
         }),
       },
@@ -487,31 +516,33 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            Post: table({
-              columns: {
-                authorId: col({ nativeType: 'text' }),
-              },
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'Post',
-                    columns: ['authorId'],
-                  },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'User',
-                    columns: ['id'],
-                  },
-                  name: 'Post_authorId_fkey',
-                  onDelete: 'cascade',
-                  onUpdate: 'restrict',
-                  constraint: true,
-                  index: true,
+          entries: {
+            table: {
+              Post: table({
+                columns: {
+                  authorId: col({ nativeType: 'text' }),
                 },
-              ],
-            }),
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Post',
+                      columns: ['authorId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'User',
+                      columns: ['id'],
+                    },
+                    name: 'Post_authorId_fkey',
+                    onDelete: 'cascade',
+                    onUpdate: 'restrict',
+                    constraint: true,
+                    index: true,
+                  },
+                ],
+              }),
+            },
           },
         }),
       },
@@ -537,13 +568,15 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            User: table({
-              columns: { id: col({ nativeType: 'text' }) },
-            }),
-            Post: table({
-              columns: { id: col({ nativeType: 'text' }) },
-            }),
+          entries: {
+            table: {
+              User: table({
+                columns: { id: col({ nativeType: 'text' }) },
+              }),
+              Post: table({
+                columns: { id: col({ nativeType: 'text' }) },
+              }),
+            },
           },
         }),
       },
@@ -560,12 +593,14 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -598,12 +633,14 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
-              },
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
+                },
+              }),
+            },
           },
         }),
       },
@@ -638,14 +675,16 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                a: col({ nativeType: 'text' }),
-                b: col({ nativeType: 'text' }),
-              },
-              uniques: [{ columns: ['a', 'b'] }],
-            }),
+          entries: {
+            table: {
+              T: table({
+                columns: {
+                  a: col({ nativeType: 'text' }),
+                  b: col({ nativeType: 'text' }),
+                },
+                uniques: [{ columns: ['a', 'b'] }],
+              }),
+            },
           },
         }),
       },
@@ -661,26 +700,28 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            Post: table({
-              columns: { authorId: col({ nativeType: 'text' }) },
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'Post',
-                    columns: ['authorId'],
+          entries: {
+            table: {
+              Post: table({
+                columns: { authorId: col({ nativeType: 'text' }) },
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Post',
+                      columns: ['authorId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'User',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: true,
                   },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'User',
-                    columns: ['id'],
-                  },
-                  constraint: true,
-                  index: true,
-                },
-              ],
-            }),
+                ],
+              }),
+            },
           },
         }),
       },
@@ -701,31 +742,33 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            User: table({
-              columns: { id: col({ nativeType: 'text' }) },
-              primaryKey: { columns: ['id'] },
-            }),
-            Post: table({
-              columns: { userId: col({ nativeType: 'text' }) },
-              primaryKey: { columns: ['userId'] },
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'Post',
-                    columns: ['userId'],
+          entries: {
+            table: {
+              User: table({
+                columns: { id: col({ nativeType: 'text' }) },
+                primaryKey: { columns: ['id'] },
+              }),
+              Post: table({
+                columns: { userId: col({ nativeType: 'text' }) },
+                primaryKey: { columns: ['userId'] },
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Post',
+                      columns: ['userId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'User',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: true,
                   },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'User',
-                    columns: ['id'],
-                  },
-                  constraint: true,
-                  index: true,
-                },
-              ],
-            }),
+                ],
+              }),
+            },
           },
         }),
       },
@@ -741,31 +784,33 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            User: table({
-              columns: { id: col({ nativeType: 'text' }) },
-              primaryKey: { columns: ['id'] },
-            }),
-            Post: table({
-              columns: { userId: col({ nativeType: 'text' }) },
-              uniques: [{ columns: ['userId'] }],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'Post',
-                    columns: ['userId'],
+          entries: {
+            table: {
+              User: table({
+                columns: { id: col({ nativeType: 'text' }) },
+                primaryKey: { columns: ['id'] },
+              }),
+              Post: table({
+                columns: { userId: col({ nativeType: 'text' }) },
+                uniques: [{ columns: ['userId'] }],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Post',
+                      columns: ['userId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'User',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: true,
                   },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'User',
-                    columns: ['id'],
-                  },
-                  constraint: true,
-                  index: true,
-                },
-              ],
-            }),
+                ],
+              }),
+            },
           },
         }),
       },
@@ -781,44 +826,46 @@ describe('contractToSchemaIR', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            User: table({
-              columns: { id: col({ nativeType: 'text' }) },
-              primaryKey: { columns: ['id'] },
-            }),
-            Post: table({
-              columns: { userId: col({ nativeType: 'text' }) },
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'Post',
-                    columns: ['userId'],
+          entries: {
+            table: {
+              User: table({
+                columns: { id: col({ nativeType: 'text' }) },
+                primaryKey: { columns: ['id'] },
+              }),
+              Post: table({
+                columns: { userId: col({ nativeType: 'text' }) },
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Post',
+                      columns: ['userId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'User',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: true,
                   },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'User',
-                    columns: ['id'],
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Post',
+                      columns: ['userId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'User',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: true,
                   },
-                  constraint: true,
-                  index: true,
-                },
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'Post',
-                    columns: ['userId'],
-                  },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'User',
-                    columns: ['id'],
-                  },
-                  constraint: true,
-                  index: true,
-                },
-              ],
-            }),
+                ],
+              }),
+            },
           },
         }),
       },
@@ -845,8 +892,10 @@ describe('detectDestructiveChanges', () => {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({ columns: { a: col({ nativeType: 'text' }) } }),
+          entries: {
+            table: {
+              T: table({ columns: { a: col({ nativeType: 'text' }) } }),
+            },
           },
         }),
       },

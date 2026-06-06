@@ -12,11 +12,11 @@ import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 
 function makeContract(
-  overrides: { tables?: Record<string, StorageTableInput> } = {},
+  overrides: { entries: { table: Record<string, StorageTableInput> } } = { entries: { table: {} } },
 ): Contract<SqlStorage> {
   const unboundNs = buildSqlNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    tables: overrides.tables ?? {},
+    entries: { table: overrides.entries.table },
   });
   return {
     target: 'sqlite',
@@ -46,16 +46,18 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
   describe('missing_table', () => {
     it('emits CreateTableCall + per-index CreateIndexCall', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [{ columns: ['email'] }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['email'] }],
-            foreignKeys: [],
           },
         },
       });
@@ -88,31 +90,33 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
 
     it('appends a CreateIndexCall for an FK with index=true (no explicit index covering the columns)', () => {
       const toContract = makeContract({
-        tables: {
-          post: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: {
-                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                  tableName: 'post',
-                  columns: ['userId'],
-                },
-                target: {
-                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                  tableName: 'user',
-                  columns: ['id'],
-                },
-                index: true,
-                constraint: true,
+        entries: {
+          table: {
+            post: {
+              columns: {
+                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                    tableName: 'post',
+                    columns: ['userId'],
+                  },
+                  target: {
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                    tableName: 'user',
+                    columns: ['id'],
+                  },
+                  index: true,
+                  constraint: true,
+                },
+              ],
+            },
           },
         },
       });
@@ -140,31 +144,33 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
 
     it('skips the FK-derived index when an explicit index already covers the column set', () => {
       const toContract = makeContract({
-        tables: {
-          post: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['userId'], name: 'idx_explicit' }],
-            foreignKeys: [
-              {
-                source: {
-                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                  tableName: 'post',
-                  columns: ['userId'],
-                },
-                target: {
-                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                  tableName: 'user',
-                  columns: ['id'],
-                },
-                index: true,
-                constraint: true,
+        entries: {
+          table: {
+            post: {
+              columns: {
+                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [{ columns: ['userId'], name: 'idx_explicit' }],
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                    tableName: 'post',
+                    columns: ['userId'],
+                  },
+                  target: {
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                    tableName: 'user',
+                    columns: ['id'],
+                  },
+                  index: true,
+                  constraint: true,
+                },
+              ],
+            },
           },
         },
       });
@@ -230,16 +236,18 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
   describe('missing_column', () => {
     it('emits AddColumnCall', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              bio: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                bio: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -274,15 +282,17 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
   describe('index_mismatch (missing)', () => {
     it('emits CreateIndexCall with explicit name when contract declares one', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [{ columns: ['id'], name: 'idx_explicit' }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['id'], name: 'idx_explicit' }],
-            foreignKeys: [],
           },
         },
       });
@@ -313,29 +323,31 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
 
     it('emits a CreateIndexCall with the default name when no explicit index but a contract FK matches', () => {
       const toContract = makeContract({
-        tables: {
-          post: {
-            columns: {
-              userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: {
-                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                  tableName: 'post',
-                  columns: ['userId'],
-                },
-                target: {
-                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                  tableName: 'user',
-                  columns: ['id'],
-                },
-                index: true,
-                constraint: true,
+        entries: {
+          table: {
+            post: {
+              columns: {
+                userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
               },
-            ],
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                    tableName: 'post',
+                    columns: ['userId'],
+                  },
+                  target: {
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                    tableName: 'user',
+                    columns: ['id'],
+                  },
+                  index: true,
+                  constraint: true,
+                },
+              ],
+            },
           },
         },
       });
@@ -526,26 +538,28 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
 describe('planIssues — emission order and bucketing', () => {
   it('orders calls: create-table → add-column → create-index → drop-column → drop-index → drop-table', () => {
     const toContract = makeContract({
-      tables: {
-        a: {
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+      entries: {
+        table: {
+          a: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [{ columns: ['email'] }],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [{ columns: ['email'] }],
-          foreignKeys: [],
-        },
-        b: {
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            new_col: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+          b: {
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              new_col: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     });

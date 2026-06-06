@@ -124,7 +124,7 @@ describe('verifySqlSchema control policy', () => {
     expect(result.schema.issues.some((i) => i.kind === 'extra_index')).toBe(false);
   });
 
-  it('fails incompatible declared types under external without a listed pair', () => {
+  it('fails a native-type mismatch under external (exact equality)', () => {
     const contract = createTestContract({
       user: createContractTable(
         { email: { nativeType: 'character varying(255)', nullable: true } },
@@ -267,42 +267,5 @@ describe('verifySqlSchema enum dispatch on control policy', () => {
     });
     expect(result.ok).toBe(true);
     expect(enumNodeStatus(result.schema.root)).toBe('warn');
-  });
-});
-
-describe('verifySqlSchema external columnsCompatible threading', () => {
-  const contract = createTestContract({
-    user: createContractTable(
-      { email: { nativeType: 'character varying(255)', nullable: true } },
-      { control: 'external' },
-    ),
-  });
-  const schema = createTestSchemaIR({
-    user: createSchemaTable('user', { email: { nativeType: 'text', nullable: true } }),
-  });
-
-  it('accepts a relation-compatible type pair', () => {
-    const result = verifySqlSchema({
-      contract,
-      schema,
-      ...verifyOpts,
-      columnsCompatible: (declared, live) =>
-        declared === live || (declared === 'character varying(255)' && live === 'text'),
-    });
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues.some((i) => i.kind === 'type_mismatch')).toBe(false);
-  });
-
-  it('fails when the relation rejects the type pair', () => {
-    const result = verifySqlSchema({
-      contract,
-      schema,
-      ...verifyOpts,
-      columnsCompatible: (declared, live) => declared === live,
-    });
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
-      expect.objectContaining({ kind: 'type_mismatch', column: 'email' }),
-    );
   });
 });

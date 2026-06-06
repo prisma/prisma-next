@@ -128,6 +128,48 @@ export function resolveFieldToColumn(
   return getFieldToColumnMap(contract, modelName)[fieldName] ?? fieldName;
 }
 
+export interface VariantColumnRef {
+  // Bare storage-table name (namespace-flat, like every table name in this
+  // module). The namespace is bound separately when the name becomes a
+  // `TableSource` via `tableSourceForContract`/`requireStorageTableForContract`.
+  readonly table: string;
+  readonly column: string;
+}
+
+/**
+ * Map the fields that an MTI variant contributes to `{ table, column }` refs
+ * qualified against the variant's own table — the table the read path joins
+ * into the correlated child SELECT. STI variants contribute nothing here:
+ * their columns live on the base table and resolve through the ordinary
+ * base-table field map. Base fields are intentionally absent so callers can
+ * gate variant qualification strictly to variant-owned fields.
+ *
+ * `baseModelName` is a default-namespace model name, consistent with the rest
+ * of this module; namespace context is bound downstream at table resolution.
+ *
+ * Uncached on purpose: `resolvePolymorphismInfo` already memoizes the variant
+ * lookup, and the remaining work is one pass over the variant's field→column
+ * map, so a second cache layer would buy nothing.
+ */
+export function resolveVariantFieldColumns(
+  contract: Contract<SqlStorage>,
+  baseModelName: string,
+  variantName: string,
+): Record<string, VariantColumnRef> {
+  const polyInfo = resolvePolymorphismInfo(contract, baseModelName);
+  const variant = polyInfo?.variants.get(variantName);
+  const result: Record<string, VariantColumnRef> = {};
+
+  if (variant && variant.strategy === 'mti') {
+    const variantFieldToColumn = getFieldToColumnMap(contract, variant.modelName);
+    for (const [field, column] of Object.entries(variantFieldToColumn)) {
+      result[field] = { table: variant.table, column };
+    }
+  }
+
+  return result;
+}
+
 export function getFieldToColumnMap(
   contract: Contract<SqlStorage>,
   modelName: string,
