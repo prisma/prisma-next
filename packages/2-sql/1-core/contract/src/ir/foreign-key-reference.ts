@@ -11,7 +11,7 @@ import { SqlNode } from './sql-node';
  * identified by `spaceId`.
  *
  * Presence-based discrimination keeps local FK JSON byte-identical to
- * contracts authored before cross-space support was added (NFR2).
+ * contracts authored before cross-space support was added.
  */
 export interface ForeignKeyReferenceInput {
   readonly namespaceId: string;

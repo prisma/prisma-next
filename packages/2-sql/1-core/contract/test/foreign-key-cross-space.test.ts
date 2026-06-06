@@ -133,10 +133,10 @@ describe('ForeignKeyReference', () => {
 });
 
 // ---------------------------------------------------------------------------
-// NFR2: local FK JSON shape must be byte-identical to pre-discriminator shape
+// local FK JSON must be byte-identical to pre-discriminator shape
 // ---------------------------------------------------------------------------
 
-describe('local FK backward-compatibility (NFR2)', () => {
+describe('local FK backward-compatibility', () => {
   it('local FK serializes to the same JSON shape as before the discriminator was added', () => {
     const localFk = makeLocalFk();
     const serialized = JSON.parse(JSON.stringify(localFk)) as Record<string, unknown>;
@@ -177,10 +177,10 @@ describe('local FK backward-compatibility (NFR2)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC8: round-trip with mixed local + cross-space FK carriers
+// round-trip with mixed local + cross-space FK carriers
 // ---------------------------------------------------------------------------
 
-describe('AC8: round-trip – mixed local and cross-space FK carriers', () => {
+describe('round-trips mixed local and cross-space FK carriers', () => {
   it('serialize → JSON → deserialize preserves both local and cross-space FKs', () => {
     const localRef = new ForeignKeyReference({
       namespaceId: UNBOUND_NAMESPACE_ID,

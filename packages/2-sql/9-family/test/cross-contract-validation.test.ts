@@ -184,7 +184,7 @@ function makeStack(
 }
 
 // ---------------------------------------------------------------------------
-// (B) Reverse-reference rejection (FR14, AC6)
+// (B) Reverse-reference rejection
 // ---------------------------------------------------------------------------
 
 describe('cross-space FK reverse-reference rejection', () => {
