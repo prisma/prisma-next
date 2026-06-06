@@ -532,16 +532,33 @@ function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags):
     // `formatOnPathMigrationRow` uses PATH_HIGHLIGHT_STYLES.onPath so the list and
     // graph-tree rows are styled identically — changing the on-path colour in future
     // is a one-line edit in PATH_HIGHLIGHT_STYLES.
-    // Use the globally computed name column width so this list aligns with the
-    // graph-tree sections above it when multiple spaces are rendered.
-    const dirNameWidth =
+    //
+    // Alignment anchor: the `→` arrow (source-hash onward) must land at the SAME
+    // absolute column as in graph edge rows, across every graph section and this list.
+    //
+    // Multi-space output layout (space headings + 2-space indented tree sections):
+    //   Graph edge row:  [2 heading][G gutter][D dirName][7 source] [→] [dest]
+    //   List row:        [2 spaces][L dirName][  ][7 source] [→] [dest]
+    //   Alignment:  2 + G + D + 9 = 2 + L + 2 + 9   =>   L = G + D - 2
+    //
+    // Single-space output layout (flat tree, no heading indent):
+    //   Graph edge row:  [G gutter][D dirName][7 source] [→] [dest]
+    //   List row:        [2 spaces][L dirName][  ][7 source] [→] [dest]
+    //   Alignment:  G + D + 9 = 2 + L + 2 + 9   =>   L = G + D - 4
+    //
+    // D (edgeDirNameWidth) = max(rawDirNameWidth + LABEL_GAP, MIN_HASH_DATA_COLUMN - G)
+    // where LABEL_GAP = 2 and MIN_HASH_DATA_COLUMN = 25 (same constants as the renderer).
+    //
+    // runListLeftPad is set only for multi-space; undefined means single-space.
+    const isMultiSpace = result.runListLeftPad !== undefined;
+    const gutter = result.runListLeftPad ?? 0;
+    const rawDirNameWidth =
       result.runListDirNameWidth ?? Math.max(...result.migrations.map((m) => m.dirName.length));
-    // Left-pad each list row by the graph's data-column offset so the list's
-    // dirName starts at the same column as graph rows, aligning every `→`.
-    const leftPad = ' '.repeat(result.runListLeftPad ?? 2);
+    const edgeDirNameWidth = Math.max(rawDirNameWidth + 2, 25 - gutter);
+    const listDirNameWidth = gutter + edgeDirNameWidth - (isMultiSpace ? 2 : 4);
     for (const m of result.migrations) {
       lines.push(
-        `${leftPad}${formatOnPathMigrationRow(m.dirName, m.from, m.to, dirNameWidth, colorize, 'unicode')}`,
+        `  ${formatOnPathMigrationRow(m.dirName, m.from, m.to, listDirNameWidth, colorize, 'unicode')}`,
       );
     }
   } else {

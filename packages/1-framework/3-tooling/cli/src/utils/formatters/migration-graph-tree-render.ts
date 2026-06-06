@@ -442,14 +442,20 @@ function renderConnectorRow(
       const dashColumn = colors.dash[column] ?? glyphColumn;
       const override = columnLaneOverride?.get(glyphColumn);
       if (override !== undefined) {
-        // When an override is active for this column, render the whole cell pair with
-        // the override so neither the glyph nor the dash emits the rotation colour.
+        // When an override is active for this column, apply the glyph column's override
+        // to the junction glyph (├/┬/┴), and the DASH column's override to the trailing dash.
+        // This matters for merge/branch connectors: the on-path trunk's tee (├) is green
+        // while the dash (─) and corner (╯) bridging to an OFF-path column are dim.
+        // For non-tee cells (corner, pass, crossing), the single-column override is fine.
         switch (cell.kind) {
           case 'branch-tee':
-          case 'merge-tee':
-            out += override(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
+          case 'merge-tee': {
+            const pair = seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee;
+            const dashOverride = columnLaneOverride?.get(dashColumn) ?? override;
+            out += override(pair.slice(0, 1)) + dashOverride(pair.slice(1));
             seenTee = true;
             break;
+          }
           case 'branch-corner':
             out += override(palette.branchCorner);
             break;
