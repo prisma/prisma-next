@@ -6,6 +6,7 @@ import type {
   GenerateContractTypesOptions,
   TypesImportSpec,
 } from '@prisma-next/framework-components/emission';
+import { blindCast } from '@prisma-next/utils/casts';
 import {
   deduplicateImports,
   generateBothFieldTypesMaps,
@@ -68,7 +69,12 @@ export function generateContractDts(
   // is explicit-namespace-dsl's job (not this interim unblock).
   const modelsRecord: Record<string, ContractModel> = {};
   for (const [, ns] of namespaceEntries) {
-    for (const [modelName, model] of Object.entries(ns.models as Record<string, ContractModel>)) {
+    for (const [modelName, model] of Object.entries(
+      blindCast<
+        Record<string, ContractModel>,
+        'ns.models is a ContractModel record in the emitted IR'
+      >(ns.models),
+    )) {
       if (!(modelName in modelsRecord)) {
         modelsRecord[modelName] = model;
       }
@@ -84,7 +90,10 @@ export function generateContractDts(
   const flatValueObjects: Record<string, ContractValueObject> = {};
   for (const [, ns] of namespaceEntries) {
     for (const [voName, vo] of Object.entries(
-      (ns.valueObjects ?? {}) as Record<string, ContractValueObject>,
+      blindCast<
+        Record<string, ContractValueObject>,
+        'ns.valueObjects is a ContractValueObject record in the emitted IR (default to {} when absent)'
+      >(ns.valueObjects ?? {}),
     )) {
       if (!(voName in flatValueObjects)) {
         flatValueObjects[voName] = vo;
@@ -98,11 +107,17 @@ export function generateContractDts(
   // Per-namespace models and value objects types for the domain.namespaces section of ContractBase.
   const perNamespaceTypes: Array<readonly [string, string, string | undefined]> =
     namespaceEntries.map(([nsId, ns]) => {
-      const nsModels = ns.models as Record<string, ContractModel>;
+      const nsModels = blindCast<
+        Record<string, ContractModel>,
+        'ns.models is a ContractModel record in the emitted IR'
+      >(ns.models);
       const nsModelsType = generateModelsType(nsModels, (name, model) =>
         emitter.generateModelStorageType(name, model),
       );
-      const nsValueObjects = ns.valueObjects as Record<string, ContractValueObject> | undefined;
+      const nsValueObjects = blindCast<
+        Record<string, ContractValueObject> | undefined,
+        'ns.valueObjects is an optional ContractValueObject record in the emitted IR'
+      >(ns.valueObjects);
       const nsValueObjectsDescriptor =
         nsValueObjects !== undefined && Object.keys(nsValueObjects).length > 0
           ? generateValueObjectsDescriptorType(nsValueObjects)

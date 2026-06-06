@@ -242,6 +242,9 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         expect(result.rows[0]?.table_name).toBe('users');
       });
     },
-    timeouts.spinUpPpgDev,
+    // The test does seed + materialise + dbInit (plan + apply) + dbVerify + connect
+    // runtime + insert + read — substantially more than just spinning up the DB.
+    // 4× the spin-up budget gives cold CI workers headroom.
+    timeouts.spinUpPpgDev * 4,
   );
 });
