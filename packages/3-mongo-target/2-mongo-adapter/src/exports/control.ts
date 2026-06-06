@@ -1,9 +1,6 @@
-import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import type { MongoControlAdapterDescriptor } from '@prisma-next/family-mongo/control-adapter';
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
-import type { Db } from 'mongodb';
+import type { MongoControlDriverInstance } from '@prisma-next/mongo-lowering';
 
-export type { MongoControlDriverInstance } from '@prisma-next/mongo-lowering';
 export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
 export { introspectSchema } from '../core/introspect-schema';
 export { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
@@ -15,77 +12,10 @@ export {
   type MongoRunnerDependencies,
 } from '../core/runner-deps';
 export { createMongoAdapter } from '../mongo-adapter';
+export type { MongoControlDriverInstance };
 
 import { mongoCodecDescriptors } from '../core/codecs';
 import { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
-
-const defaultControlAdapter = new MongoControlAdapterImpl();
-
-function controlDriverFromDb(db: Db): ControlDriverInstance<'mongo', 'mongo'> & { db: Db } {
-  return {
-    familyId: 'mongo',
-    targetId: 'mongo',
-    db,
-    close: async () => {},
-  };
-}
-
-export async function readMarker(db: Db, space: string): Promise<ContractMarkerRecord | null> {
-  return defaultControlAdapter.readMarker(controlDriverFromDb(db), space);
-}
-
-export async function readAllMarkers(db: Db): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-  return defaultControlAdapter.readAllMarkers(controlDriverFromDb(db));
-}
-
-export async function initMarker(
-  db: Db,
-  space: string,
-  destination: {
-    readonly storageHash: string;
-    readonly profileHash: string;
-    readonly invariants?: readonly string[];
-  },
-): Promise<void> {
-  await defaultControlAdapter.initMarker(controlDriverFromDb(db), space, destination);
-}
-
-export async function updateMarker(
-  db: Db,
-  space: string,
-  expectedFrom: string,
-  destination: {
-    readonly storageHash: string;
-    readonly profileHash: string;
-    readonly invariants?: readonly string[];
-  },
-): Promise<boolean> {
-  return defaultControlAdapter.updateMarker(
-    controlDriverFromDb(db),
-    space,
-    expectedFrom,
-    destination,
-  );
-}
-
-export async function readLedger(db: Db, space?: string): Promise<readonly LedgerEntryRecord[]> {
-  return defaultControlAdapter.readLedger(controlDriverFromDb(db), space);
-}
-
-export async function writeLedgerEntry(
-  db: Db,
-  space: string,
-  entry: {
-    readonly edgeId: string;
-    readonly from: string;
-    readonly to: string;
-    readonly migrationName: string;
-    readonly migrationHash: string;
-    readonly operations: readonly unknown[];
-  },
-): Promise<void> {
-  await defaultControlAdapter.writeLedgerEntry(controlDriverFromDb(db), space, entry);
-}
 
 export const mongoAdapterDescriptor: MongoControlAdapterDescriptor<'mongo'> = {
   kind: 'adapter',

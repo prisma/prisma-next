@@ -7,6 +7,7 @@ import {
   MongoAddFieldsStage,
   MongoAggFieldRef,
   MongoExistsExpr,
+  MongoExprFilter,
   MongoFieldFilter,
   MongoProjectStage,
   MongoReplaceRootStage,
@@ -57,6 +58,14 @@ export interface LeafExpression<F extends DocField> extends TypedAggExpr<F> {
   in(values: ReadonlyArray<MongoValue>): MongoFilterExpr;
   nin(values: ReadonlyArray<MongoValue>): MongoFilterExpr;
   exists(flag?: boolean): MongoFilterExpr;
+
+  /**
+   * `$type` filter: `{ field: { $type: bsonType } }`. Rides
+   * `MongoFieldFilter`'s generic `op` string — no dedicated AST node. The
+   * BSON type is expressed as Mongo's alias string (e.g. `'string'`) or
+   * numeric type code; an array selects any of several types.
+   */
+  type(bsonType: MongoValue): MongoFilterExpr;
 
   // Update operators ($set family)
   set(value: MongoValue): TypedUpdateOp;
@@ -203,6 +212,17 @@ export type FieldAccessor<S extends DocShape, N extends NestedDocShape = Record<
     rawPath<F extends DocField = DocField>(path: string): LeafExpression<F>;
   };
 
+/**
+ * Wrap a boolean aggregation expression as an `$expr` filter
+ * (`MongoExprFilter`). Lets a `$match` express an aggregation-expression
+ * predicate — e.g. comparing two field references via `fn.eq(a, b)` — in
+ * the typed AST rather than via a raw escape hatch. Pairs with `.type()`
+ * to express filters like `{ _id: { $type: 'string' }, $expr: { $eq: ['$_id', '$space'] } }`.
+ */
+export function expr(predicate: TypedAggExpr<DocField>): MongoFilterExpr {
+  return MongoExprFilter.of(predicate.node);
+}
+
 function buildExpression<F extends DocField>(path: string): Expression<F> {
   // The runtime object carries the full operator surface unconditionally;
   // `ObjectExpression` is a strict subset of `LeafExpression`, so a single
@@ -223,6 +243,7 @@ function buildExpression<F extends DocField>(path: string): Expression<F> {
     nin: (values: ReadonlyArray<MongoValue>) => MongoFieldFilter.nin(path, values),
     exists: (flag?: boolean) =>
       flag === false ? MongoExistsExpr.notExists(path) : MongoExistsExpr.exists(path),
+    type: (bsonType: MongoValue) => MongoFieldFilter.of(path, '$type', bsonType),
 
     set: (value: MongoValue) => setOp(path, value),
     unset: () => unsetOp(path),

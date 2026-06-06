@@ -13,7 +13,7 @@ export type {
   LeafExpression,
   ObjectExpression,
 } from '../field-accessor';
-export { createFieldAccessor } from '../field-accessor';
+export { createFieldAccessor, expr } from '../field-accessor';
 export type {
   LookupBuilder,
   LookupBuilderWithKey,

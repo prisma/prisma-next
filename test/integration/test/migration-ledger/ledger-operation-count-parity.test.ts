@@ -1,7 +1,4 @@
-import {
-  createMongoRunnerDeps,
-  readLedger as readMongoLedger,
-} from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, MongoControlAdapterImpl } from '@prisma-next/adapter-mongo/control';
 import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
@@ -47,6 +44,8 @@ import {
   frameworkComponents as sqliteFrameworkComponents,
   sqliteTargetDescriptor,
 } from '../../../../packages/3-targets/6-adapters/sqlite/test/migrations/fixtures/runner-fixtures';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 function makeMongoFamily(): ReturnType<typeof createMongoFamilyInstance> {
   return createMongoFamilyInstance(
@@ -290,7 +289,10 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       migrationEdges: mongoEdges,
     });
     if (!mongoResult.ok) throw new Error(formatRunnerFailure(mongoResult.failure));
-    const mongoLedger = await readMongoLedger(mongoDb, LEDGER_TEST_SPACE_ID);
+    const mongoLedger = await controlAdapter.readLedger(
+      new MongoControlDriver(mongoDb, mongoClient),
+      LEDGER_TEST_SPACE_ID,
+    );
 
     const countsByBackend = {
       postgres: ledgerOperationCounts(pgLedger),
@@ -455,7 +457,10 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       migrationEdges: mongoEdges,
     });
     if (!mongoResult.ok) throw new Error(formatRunnerFailure(mongoResult.failure));
-    const mongoLedger = await readMongoLedger(mongoDb, LEDGER_TEST_SPACE_ID);
+    const mongoLedger = await controlAdapter.readLedger(
+      new MongoControlDriver(mongoDb, mongoClient),
+      LEDGER_TEST_SPACE_ID,
+    );
 
     const countsByBackend = {
       postgres: ledgerOperationCounts(pgLedger),
@@ -594,7 +599,10 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       migrationEdges: mongoSynthEdges,
     });
     if (!mongoResult.ok) throw new Error(formatRunnerFailure(mongoResult.failure));
-    const mongoLedger = await readMongoLedger(mongoDb, LEDGER_TEST_SPACE_ID);
+    const mongoLedger = await controlAdapter.readLedger(
+      new MongoControlDriver(mongoDb, mongoClient),
+      LEDGER_TEST_SPACE_ID,
+    );
 
     const countsByBackend = {
       postgres: ledgerOperationCounts(pgLedger),

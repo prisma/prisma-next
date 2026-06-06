@@ -3,46 +3,108 @@ import { withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
+import type { MongoAdapter } from '@prisma-next/mongo-lowering';
 import {
-  RawAggregateCommand,
-  RawFindOneAndUpdateCommand,
-  RawInsertOneCommand,
+  type AnyMongoCommand,
+  MongoAggFieldRef,
+  MongoAggLiteral,
+  MongoAggOperator,
+  type MongoQueryPlan,
 } from '@prisma-next/mongo-query-ast/execution';
+import { expr, fn } from '@prisma-next/mongo-query-builder';
+import { collection } from '@prisma-next/mongo-query-builder/contract-free';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import type { MongoValue } from '@prisma-next/mongo-value';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { Document } from 'mongodb';
+import { createMongoAdapter } from '../mongo-adapter';
 import { introspectSchema } from './introspect-schema';
 import {
-  COLLECTION,
-  executeAggregate,
-  executeFindOneAndUpdate,
-  executeInsertOne,
   MONGO_LEDGER_COLLECTION,
   MONGO_MARKER_COLLECTION,
   parseMongoMarkerDocSafely,
 } from './marker-ledger';
+import { MARKER_LEDGER_COLLECTION, type MarkerLedgerDocShape } from './marker-ledger-collection';
+import { isMongoControlDriver } from './mongo-control-driver';
 import { extractDb } from './runner-deps';
 
 /**
  * Mongo control adapter for control-plane operations like introspection
  * and marker-ledger CAS. Implements the family-level `MongoControlAdapter`
- * SPI by extracting the underlying `Db` from the framework-shaped driver
- * per call.
+ * SPI. Every marker/ledger operation builds a canonical command inline via
+ * the contract-free fluent builder and dispatches it through the family
+ * adapter's lowering path (`createMongoAdapter().lower(plan, {})`) onto the
+ * Mongo wire transport (`driver.execute(wireCommand)`) — the same route SQL
+ * marker/ledger ops take through `adapter.lower()` → `driver.query()`.
  */
 export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
   readonly familyId = 'mongo' as const;
   readonly targetId = 'mongo' as const;
+  readonly #adapter: MongoAdapter = createMongoAdapter();
+  readonly #markerLedgerCollection = collection<MarkerLedgerDocShape>(MARKER_LEDGER_COLLECTION);
+
+  async #execute(
+    driver: ControlDriverInstance<'mongo', 'mongo'>,
+    command: AnyMongoCommand,
+  ): Promise<Document[]> {
+    const plan: MongoQueryPlan = {
+      collection: MARKER_LEDGER_COLLECTION,
+      command,
+      meta: { target: 'mongo', targetFamily: 'mongo', storageHash: '', lane: 'control' },
+    };
+    const wireCommand = await this.#adapter.lower(plan, {});
+    if (!isMongoControlDriver(driver)) {
+      throw new Error(
+        'Mongo control adapter requires a Mongo control driver with an execute() transport. ' +
+          'Provide a MongoControlDriver from `@prisma-next/driver-mongo/control`.',
+      );
+    }
+    const rows: Document[] = [];
+    for await (const row of driver.execute<Document>(wireCommand)) {
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  /**
+   * Server-side invariant-merge aggregation expression:
+   * `$sortArray({ input: $setUnion([$ifNull('$invariants', []), incoming]), sortBy: 1 })`.
+   *
+   * Built through the typed agg-expr layer — `fn.setUnion` plus the generic
+   * `MongoAggOperator` for `$ifNull` / `$sortArray` (neither has a named `fn`
+   * helper). Returns a `MongoAggOperator` that is passed directly to
+   * `f.stage.set({ invariants: ... })` in the update pipeline.
+   */
+  #invariantMergeExpr(incoming: readonly string[]): MongoAggOperator {
+    const existingOrEmpty = MongoAggOperator.of('$ifNull', [
+      MongoAggFieldRef.of('invariants'),
+      MongoAggLiteral.of([]),
+    ]);
+    const merged = fn.setUnion(
+      { _field: { codecId: 'mongo/array@1', nullable: false }, node: existingOrEmpty },
+      {
+        _field: { codecId: 'mongo/array@1', nullable: false },
+        node: MongoAggLiteral.of([...incoming]),
+      },
+    );
+    return MongoAggOperator.of('$sortArray', { input: merged.node, sortBy: MongoAggLiteral.of(1) });
+  }
 
   async readMarker(
     driver: ControlDriverInstance<'mongo', 'mongo'>,
     space: string,
   ): Promise<ContractMarkerRecord | null> {
-    const db = extractDb(driver);
     const markerContext = { space, markerLocation: MONGO_MARKER_COLLECTION };
     const docs = await withMarkerReadErrorHandling(
       () =>
-        executeAggregate(
-          db,
-          new RawAggregateCommand(COLLECTION, [{ $match: { _id: space, space } }, { $limit: 1 }]),
+        this.#execute(
+          driver,
+          this.#markerLedgerCollection
+            .aggregate()
+            .match((f) => f._id.eq(space))
+            .match((f) => f.space.eq(space))
+            .limit(1)
+            .build(),
         ),
       markerContext,
     );
@@ -54,21 +116,17 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
   async readAllMarkers(
     driver: ControlDriverInstance<'mongo', 'mongo'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-    const db = extractDb(driver);
     const markerContext = { space: 'app', markerLocation: MONGO_MARKER_COLLECTION };
     const docs = await withMarkerReadErrorHandling(
       () =>
-        executeAggregate(
-          db,
-          new RawAggregateCommand(COLLECTION, [
-            {
-              $match: {
-                _id: { $type: 'string' },
-                space: { $type: 'string' },
-                $expr: { $eq: ['$_id', '$space'] },
-              },
-            },
-          ]),
+        this.#execute(
+          driver,
+          this.#markerLedgerCollection
+            .aggregate()
+            .match((f) => f._id.type('string'))
+            .match((f) => f.space.type('string'))
+            .match((f) => expr(fn.eq(f._id, f.space)))
+            .build(),
         ),
       markerContext,
     );
@@ -91,8 +149,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<void> {
-    const db = extractDb(driver);
-    const cmd = new RawInsertOneCommand(COLLECTION, {
+    const document: Record<string, MongoValue> = {
       _id: space,
       space,
       storageHash: destination.storageHash,
@@ -102,9 +159,9 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       updatedAt: new Date(),
       appTag: null,
       meta: {},
-      invariants: destination.invariants ?? [],
-    });
-    await executeInsertOne(db, cmd);
+      invariants: [...(destination.invariants ?? [])],
+    };
+    await this.#execute(driver, this.#markerLedgerCollection.insertOne(document));
   }
 
   async updateMarker(
@@ -117,38 +174,34 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       readonly invariants?: readonly string[];
     },
   ): Promise<boolean> {
-    const db = extractDb(driver);
-    const setBase: Record<string, unknown> = {
-      storageHash: destination.storageHash,
-      profileHash: destination.profileHash,
-      updatedAt: new Date(),
-    };
-    const update: Document | Document[] =
-      destination.invariants === undefined
-        ? { $set: setBase }
-        : [
-            {
-              $set: {
-                ...setBase,
-                invariants: {
-                  $sortArray: {
-                    input: {
-                      $setUnion: [{ $ifNull: ['$invariants', []] }, destination.invariants],
-                    },
-                    sortBy: 1,
+    const { invariants } = destination;
+    const docs = await this.#execute(
+      driver,
+      this.#markerLedgerCollection
+        .match((f) => f._id.eq(space))
+        .match((f) => f.space.eq(space))
+        .match((f) => f.storageHash.eq(expectedFrom))
+        .findOneAndUpdate(
+          (f) => [
+            f.stage.set(
+              invariants === undefined
+                ? {
+                    storageHash: MongoAggLiteral.of(destination.storageHash),
+                    profileHash: MongoAggLiteral.of(destination.profileHash),
+                    updatedAt: MongoAggLiteral.of(new Date()),
+                  }
+                : {
+                    storageHash: MongoAggLiteral.of(destination.storageHash),
+                    profileHash: MongoAggLiteral.of(destination.profileHash),
+                    updatedAt: MongoAggLiteral.of(new Date()),
+                    invariants: this.#invariantMergeExpr(invariants),
                   },
-                },
-              },
-            },
-          ];
-    const cmd = new RawFindOneAndUpdateCommand(
-      COLLECTION,
-      { _id: space, space, storageHash: expectedFrom },
-      update,
-      false,
+            ),
+          ],
+          { upsert: false },
+        ),
     );
-    const result = await executeFindOneAndUpdate(db, cmd);
-    return result !== null;
+    return docs.length > 0;
   }
 
   async writeLedgerEntry(
@@ -163,8 +216,7 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       readonly operations: readonly unknown[];
     },
   ): Promise<void> {
-    const db = extractDb(driver);
-    const cmd = new RawInsertOneCommand(COLLECTION, {
+    const document: Record<string, MongoValue> = {
       type: 'ledger',
       space,
       edgeId: entry.edgeId,
@@ -172,28 +224,29 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       to: entry.to,
       migrationName: entry.migrationName,
       migrationHash: entry.migrationHash,
-      operations: entry.operations,
+      operations: blindCast<ReadonlyArray<MongoValue>, 'ledger operation docs are BSON values'>(
+        entry.operations,
+      ),
       appliedAt: new Date(),
-    });
-    await executeInsertOne(db, cmd);
+    };
+    await this.#execute(driver, this.#markerLedgerCollection.insertOne(document));
   }
 
   async readLedger(
     driver: ControlDriverInstance<'mongo', 'mongo'>,
     space?: string,
   ): Promise<readonly LedgerEntryRecord[]> {
-    const db = extractDb(driver);
     const ledgerContext = { space: space ?? '*', markerLocation: MONGO_LEDGER_COLLECTION };
-    const matchStage: Record<string, unknown> = { type: 'ledger' };
-    if (space !== undefined) {
-      matchStage['space'] = space;
-    }
+    const chain = this.#markerLedgerCollection.aggregate().match((f) => f.type.eq('ledger'));
+    const command =
+      space === undefined
+        ? chain.sort({ _id: 1 }).build()
+        : chain
+            .match((f) => f.space.eq(space))
+            .sort({ _id: 1 })
+            .build();
     const docs = await withMarkerReadErrorHandling(
-      () =>
-        executeAggregate(
-          db,
-          new RawAggregateCommand(COLLECTION, [{ $match: matchStage }, { $sort: { _id: 1 } }]),
-        ),
+      () => this.#execute(driver, command),
       ledgerContext,
     );
 

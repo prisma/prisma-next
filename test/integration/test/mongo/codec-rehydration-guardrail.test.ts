@@ -1,6 +1,6 @@
-import { readAllMarkers } from '@prisma-next/adapter-mongo/control';
+import { MongoControlAdapterImpl } from '@prisma-next/adapter-mongo/control';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
-import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import mongoControlDriver, { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import {
   contractToMongoSchemaIR,
   createMongoFamilyInstance,
@@ -22,6 +22,8 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { synthMigrationEdges } from './synth-migration-edges';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 /**
  * Codec-rehydration guardrail.
@@ -250,7 +252,7 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('unreachable');
 
-      const markers = await readAllMarkers(db);
+      const markers = await controlAdapter.readAllMarkers(new MongoControlDriver(db, client));
       expect(markers.size).toBe(2);
       expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(app.storage.storageHash);
       expect(markers.get(EXT_SPACE)?.storageHash).toBe(ext.storage.storageHash);
