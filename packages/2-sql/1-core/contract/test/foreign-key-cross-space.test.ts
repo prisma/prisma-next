@@ -57,7 +57,6 @@ function makeSpaceFk(): ForeignKey {
       namespaceId: UNBOUND_NAMESPACE_ID,
       tableName: 'user',
       columns: ['id'],
-      origin: 'space',
       spaceId: 'auth-service',
     },
     constraint: false,
@@ -70,8 +69,8 @@ function makeSpaceFk(): ForeignKey {
 // ---------------------------------------------------------------------------
 
 describe('ForeignKeyReference', () => {
-  describe('local reference (origin absent or "local")', () => {
-    it('constructs with no origin field', () => {
+  describe('local reference (spaceId absent)', () => {
+    it('constructs with no spaceId field', () => {
       const ref = new ForeignKeyReference({
         namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'user',
@@ -80,22 +79,10 @@ describe('ForeignKeyReference', () => {
       expect(ref.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
       expect(ref.tableName).toBe('user');
       expect(ref.columns).toEqual(['id']);
-      expect(ref.origin).toBeUndefined();
       expect(ref.spaceId).toBeUndefined();
     });
 
-    it('constructs with explicit origin: "local"', () => {
-      const ref = new ForeignKeyReference({
-        namespaceId: UNBOUND_NAMESPACE_ID,
-        tableName: 'user',
-        columns: ['id'],
-        origin: 'local',
-      });
-      expect(ref.origin).toBe('local');
-      expect(ref.spaceId).toBeUndefined();
-    });
-
-    it('serializes without origin or spaceId fields (JSON-clean local)', () => {
+    it('serializes without spaceId field (JSON-clean local)', () => {
       const ref = new ForeignKeyReference({
         namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'user',
@@ -103,7 +90,6 @@ describe('ForeignKeyReference', () => {
       });
       const json = JSON.stringify(ref);
       const parsed: Record<string, unknown> = JSON.parse(json);
-      expect(parsed).not.toHaveProperty('origin');
       expect(parsed).not.toHaveProperty('spaceId');
       expect(parsed).toEqual({
         namespaceId: UNBOUND_NAMESPACE_ID,
@@ -113,26 +99,23 @@ describe('ForeignKeyReference', () => {
     });
   });
 
-  describe('cross-space reference (origin: "space")', () => {
-    it('constructs with origin: "space" and spaceId', () => {
+  describe('cross-space reference (spaceId present)', () => {
+    it('constructs with spaceId', () => {
       const ref = new ForeignKeyReference({
         namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'user',
         columns: ['id'],
-        origin: 'space',
         spaceId: 'auth-service',
       });
-      expect(ref.origin).toBe('space');
       expect(ref.spaceId).toBe('auth-service');
       expect(ref.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
     });
 
-    it('serializes origin and spaceId into JSON', () => {
+    it('serializes spaceId into JSON but not origin', () => {
       const ref = new ForeignKeyReference({
         namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'user',
         columns: ['id'],
-        origin: 'space',
         spaceId: 'auth-service',
       });
       const json = JSON.stringify(ref);
@@ -141,9 +124,9 @@ describe('ForeignKeyReference', () => {
         namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'user',
         columns: ['id'],
-        origin: 'space',
         spaceId: 'auth-service',
       });
+      expect(parsed).not.toHaveProperty('origin');
     });
   });
 });
@@ -207,7 +190,6 @@ describe('AC8: round-trip – mixed local and cross-space FK carriers', () => {
       namespaceId: UNBOUND_NAMESPACE_ID,
       tableName: 'user',
       columns: ['id'],
-      origin: 'space',
       spaceId: 'auth-service',
     });
 
@@ -226,11 +208,9 @@ describe('AC8: round-trip – mixed local and cross-space FK carriers', () => {
       spaceJson as Parameters<typeof ForeignKeyReference>[0],
     );
 
-    expect(localRoundTripped.origin).toBeUndefined();
     expect(localRoundTripped.spaceId).toBeUndefined();
     expect(localRoundTripped.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
 
-    expect(spaceRoundTripped.origin).toBe('space');
     expect(spaceRoundTripped.spaceId).toBe('auth-service');
     expect(spaceRoundTripped.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
 
@@ -241,9 +221,7 @@ describe('AC8: round-trip – mixed local and cross-space FK carriers', () => {
     const localFkRoundTripped = new ForeignKey(localFkJson as Parameters<typeof ForeignKey>[0]);
     const spaceFkRoundTripped = new ForeignKey(spaceFkJson as Parameters<typeof ForeignKey>[0]);
 
-    expect(localFkRoundTripped.target.origin).toBeUndefined();
     expect(localFkRoundTripped.target.spaceId).toBeUndefined();
-    expect(spaceFkRoundTripped.target.origin).toBe('space');
     expect(spaceFkRoundTripped.target.spaceId).toBe('auth-service');
   });
 
@@ -264,9 +242,7 @@ describe('AC8: round-trip – mixed local and cross-space FK carriers', () => {
 
     expect(reconstructed.foreignKeys).toHaveLength(2);
     const [localFk, spaceFk] = reconstructed.foreignKeys;
-    expect(localFk?.target.origin).toBeUndefined();
     expect(localFk?.target.spaceId).toBeUndefined();
-    expect(spaceFk?.target.origin).toBe('space');
     expect(spaceFk?.target.spaceId).toBe('auth-service');
   });
 });
@@ -276,7 +252,7 @@ describe('AC8: round-trip – mixed local and cross-space FK carriers', () => {
 // ---------------------------------------------------------------------------
 
 describe('ForeignKeyReferenceSchema', () => {
-  it('accepts a well-formed local reference (no origin)', () => {
+  it('accepts a well-formed local reference (no spaceId)', () => {
     const input = {
       namespaceId: UNBOUND_NAMESPACE_ID,
       tableName: 'user',
@@ -286,7 +262,18 @@ describe('ForeignKeyReferenceSchema', () => {
     expect(result).not.toBeInstanceOf(type.errors);
   });
 
-  it('accepts a cross-space reference with origin: "space" and spaceId', () => {
+  it('accepts a cross-space reference with spaceId', () => {
+    const input = {
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      tableName: 'user',
+      columns: ['id'],
+      spaceId: 'auth-service',
+    };
+    const result = ForeignKeyReferenceSchema(input);
+    expect(result).not.toBeInstanceOf(type.errors);
+  });
+
+  it('rejects an unknown origin key (stale input)', () => {
     const input = {
       namespaceId: UNBOUND_NAMESPACE_ID,
       tableName: 'user',
@@ -295,37 +282,15 @@ describe('ForeignKeyReferenceSchema', () => {
       spaceId: 'auth-service',
     };
     const result = ForeignKeyReferenceSchema(input);
-    expect(result).not.toBeInstanceOf(type.errors);
+    expect(result).toBeInstanceOf(type.errors);
   });
 
-  it('accepts origin: "local" explicitly', () => {
+  it('rejects any origin key since origin is no longer part of the schema', () => {
     const input = {
       namespaceId: UNBOUND_NAMESPACE_ID,
       tableName: 'user',
       columns: ['id'],
       origin: 'local',
-    };
-    const result = ForeignKeyReferenceSchema(input);
-    expect(result).not.toBeInstanceOf(type.errors);
-  });
-
-  it('rejects a cross-space reference with origin: "space" but missing spaceId', () => {
-    const input = {
-      namespaceId: UNBOUND_NAMESPACE_ID,
-      tableName: 'user',
-      columns: ['id'],
-      origin: 'space',
-    };
-    const result = ForeignKeyReferenceSchema(input);
-    expect(result).toBeInstanceOf(type.errors);
-  });
-
-  it('rejects an unrecognized origin value', () => {
-    const input = {
-      namespaceId: UNBOUND_NAMESPACE_ID,
-      tableName: 'user',
-      columns: ['id'],
-      origin: 'remote',
     };
     const result = ForeignKeyReferenceSchema(input);
     expect(result).toBeInstanceOf(type.errors);
@@ -344,7 +309,6 @@ describe('ForeignKeySchema', () => {
         namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'user',
         columns: ['id'],
-        origin: 'space',
         spaceId: 'auth-service',
       },
       constraint: false,
@@ -392,7 +356,6 @@ describe('validateSqlContractFully with cross-space FKs', () => {
                         namespaceId: UNBOUND_NAMESPACE_ID,
                         tableName: 'user',
                         columns: ['id'],
-                        origin: 'space',
                         spaceId: 'auth-service',
                       },
                       constraint: false,
@@ -410,7 +373,7 @@ describe('validateSqlContractFully with cross-space FKs', () => {
   });
 
   it('still rejects a local FK whose target table is missing', () => {
-    // A local FK (no origin) pointing at a non-existent table must still fail.
+    // A local FK (no spaceId) pointing at a non-existent table must still fail.
     const rawContract = createContract({
       storage: {
         storageHash: 'sha256:missing-local',
