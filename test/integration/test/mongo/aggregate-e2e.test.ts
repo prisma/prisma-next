@@ -1,4 +1,6 @@
-import mongoAdapterDescriptor, { readAllMarkers } from '@prisma-next/adapter-mongo/control';
+import mongoAdapterDescriptor, {
+  MongoControlAdapterImpl,
+} from '@prisma-next/adapter-mongo/control';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 
 import mongoControlDriver, { MongoControlDriver } from '@prisma-next/driver-mongo/control';
@@ -30,6 +32,8 @@ import {
 } from '../contract-space-fixture-mongo/constants';
 import mongoTestContractSpaceExtensionDescriptor from '../contract-space-fixture-mongo/control';
 import { synthMigrationEdges } from './synth-migration-edges';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 /**
  * Aggregate-level end-to-end test for the Mongo contract-space
@@ -228,7 +232,7 @@ describe('Mongo contract-space aggregate e2e', {
 
       // Both markers advanced — per-space marker-level atomicity gated on
       // post-apply strict verify (option C, recorded in spec § Atomicity).
-      const markers = await readAllMarkers(db);
+      const markers = await controlAdapter.readAllMarkers(new MongoControlDriver(db, client));
       expect(markers.size).toBe(2);
       expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContract.storage.storageHash);
       expect(markers.get(MONGO_TEST_SPACE_ID)?.storageHash).toBe(extContract.storage.storageHash);

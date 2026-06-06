@@ -36,6 +36,7 @@
   },
   "devDependencies": {
     "mongodb": "catalog:",
+    "@prisma-next/driver-mongo": "workspace:0.12.0",
     "@prisma-next/errors": "workspace:0.12.0",
     "@prisma-next/mongo-contract-psl": "workspace:0.12.0",
     "@prisma-next/psl-parser": "workspace:0.12.0",

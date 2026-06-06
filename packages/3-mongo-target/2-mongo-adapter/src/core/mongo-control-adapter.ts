@@ -1,5 +1,4 @@
 import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
-import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
@@ -16,8 +15,8 @@ import { expr, fn } from '@prisma-next/mongo-query-builder';
 import { collection } from '@prisma-next/mongo-query-builder/contract-free';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { MongoValue } from '@prisma-next/mongo-value';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
-import type { Db, Document } from 'mongodb';
+import { blindCast } from '@prisma-next/utils/casts';
+import type { Document } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
 import { introspectSchema } from './introspect-schema';
 import {
@@ -26,24 +25,8 @@ import {
   parseMongoMarkerDocSafely,
 } from './marker-ledger';
 import { MARKER_LEDGER_COLLECTION, type MarkerLedgerDocShape } from './marker-ledger-collection';
+import { isMongoControlDriver } from './mongo-control-driver';
 import { extractDb } from './runner-deps';
-
-/**
- * Mongo control drivers expose the underlying `Db` so the wire transport
- * can be reached without a side channel. The SPI types the driver as the
- * abstract {@link ControlDriverInstance} (which carries only `query` /
- * `close`), so the marker-op path resolves the `Db` once through this typed
- * view — `db` is structurally optional, so reading it needs no bare cast —
- * inside {@link MongoControlAdapterImpl} rather than at each call site.
- */
-function controlDriverDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
-  const { db } = castAs<ControlDriverInstance<'mongo', 'mongo'> & { readonly db?: Db }>(driver);
-  if (db) return db;
-  throw new Error(
-    'Mongo control driver does not expose a db property. ' +
-      'Use createMongoControlDriver() from `@prisma-next/adapter-mongo/control`.',
-  );
-}
 
 /**
  * Mongo control adapter for control-plane operations like introspection
@@ -51,9 +34,8 @@ function controlDriverDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
  * SPI. Every marker/ledger operation builds a canonical command inline via
  * the contract-free fluent builder and dispatches it through the family
  * adapter's lowering path (`createMongoAdapter().lower(plan, {})`) onto the
- * Mongo wire transport (`MongoDriverImpl.fromDb(db).execute(wireCommand)`) —
- * the same route SQL marker/ledger ops take through `adapter.lower()` →
- * `driver.query()`.
+ * Mongo wire transport (`driver.execute(wireCommand)`) — the same route SQL
+ * marker/ledger ops take through `adapter.lower()` → `driver.query()`.
  */
 export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
   readonly familyId = 'mongo' as const;
@@ -71,10 +53,14 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
       meta: { target: 'mongo', targetFamily: 'mongo', storageHash: '', lane: 'control' },
     };
     const wireCommand = await this.#adapter.lower(plan, {});
+    if (!isMongoControlDriver(driver)) {
+      throw new Error(
+        'Mongo control adapter requires a Mongo control driver with wire transport. ' +
+          'Use createMongoControlDriver() from `@prisma-next/adapter-mongo/control`.',
+      );
+    }
     const rows: Document[] = [];
-    for await (const row of MongoDriverImpl.fromDb(controlDriverDb(driver)).execute<Document>(
-      wireCommand,
-    )) {
+    for await (const row of driver.execute<Document>(wireCommand)) {
       rows.push(row);
     }
     return rows;

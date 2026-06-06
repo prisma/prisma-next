@@ -1,8 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readMarker } from '@prisma-next/adapter-mongo/control';
+import { MongoControlAdapterImpl } from '@prisma-next/adapter-mongo/control';
 import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
@@ -16,6 +17,8 @@ import {
   setupTestDirectoryFromFixtures,
   withTempDir,
 } from './utils/cli-test-helpers';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 const testContract: MongoContract = {
   target: 'mongo',
@@ -155,7 +158,7 @@ describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpMongoMemorySer
         marker: { created: true, updated: false },
       });
 
-      const marker = await readMarker(db, 'app');
+      const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
       expect(marker).not.toBeNull();
       expect(marker!.storageHash).toBe(testContract.storage.storageHash);
     });
@@ -251,7 +254,7 @@ describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpMongoMemorySer
         marker: { created: false, updated: true },
       });
 
-      const marker = await readMarker(db, 'app');
+      const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
       expect(marker!.storageHash).toBe(updatedContract.storage.storageHash);
     });
   });
