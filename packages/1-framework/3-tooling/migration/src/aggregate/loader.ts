@@ -97,7 +97,6 @@ async function loadAppSpace(
     problems,
     refProblems,
     headRefProblem: null,
-    hasSynthesizedHead: true,
     isApp: true,
   };
 }
@@ -128,41 +127,9 @@ async function loadExtensionSpace(
   const spaceDir = spaceMigrationDirectory(migrationsDir, spaceId);
   const { packages, problems } = await readMigrationsDir(spaceDir);
   const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
-
-  // A space with zero packages and zero load problems is migration-less by design —
-  // it declares only external schema (e.g. auth.* / storage.* managed by Supabase)
-  // and will never ship DDL migrations. Treat it like the app space: synthesize the
-  // head ref from the on-disk contract's storage hash, and skip graph-reachability
-  // checks. The planner falls through to synth strategy (zero ops) for these spaces.
-  const isMigrationless = packages.length === 0 && problems.length === 0;
+  const { headRef, problem: headRefProblem } = await readHeadRefTolerant(migrationsDir, spaceId);
 
   const rawContract = await readRawContractDeferred(migrationsDir, spaceId);
-
-  if (isMigrationless) {
-    const storageHash = extractStorageHashFromRaw(safeCallRaw(rawContract));
-    const member = createContractSpaceMember({
-      spaceId,
-      packages,
-      refs,
-      headRef: storageHash !== null ? { hash: storageHash, invariants: [] } : null,
-      refsDir: spaceRefsDirectory(spaceDir),
-      resolveContract: () => deserializeContract(rawContract()),
-      deserializeContract,
-    });
-    // Head ref is synthesised from the contract hash — no on-disk head.json is
-    // read, so headRefProblem is always null. hasSynthesizedHead suppresses the
-    // headRefMissing / headRefNotInGraph integrity checks for this space.
-    return {
-      member,
-      problems,
-      refProblems,
-      headRefProblem: null,
-      hasSynthesizedHead: true,
-      isApp: false,
-    };
-  }
-
-  const { headRef, problem: headRefProblem } = await readHeadRefTolerant(migrationsDir, spaceId);
 
   const member = createContractSpaceMember({
     spaceId,
@@ -174,41 +141,7 @@ async function loadExtensionSpace(
     deserializeContract,
   });
 
-  return { member, problems, refProblems, headRefProblem, hasSynthesizedHead: false, isApp: false };
-}
-
-/**
- * Extract `storage.storageHash` from a raw (already-parsed) contract value
- * without full deserialization. Returns `null` when the value does not
- * structurally carry the field (missing contract, wrong shape, etc.).
- */
-function extractStorageHashFromRaw(raw: unknown): string | null {
-  if (
-    typeof raw === 'object' &&
-    raw !== null &&
-    'storage' in raw &&
-    typeof (raw as { storage: unknown }).storage === 'object' &&
-    (raw as { storage: unknown }).storage !== null &&
-    'storageHash' in (raw as { storage: object }).storage &&
-    typeof (raw as { storage: { storageHash: unknown } }).storage.storageHash === 'string'
-  ) {
-    return (raw as { storage: { storageHash: string } }).storage.storageHash;
-  }
-  return null;
-}
-
-/**
- * Call the deferred raw-contract thunk without propagating errors. Returns
- * the raw value on success, or `null` on any throw (missing / unreadable
- * contract — the deferred error will re-surface when `contract()` is called
- * and caught by the `contractUnreadable` integrity check).
- */
-function safeCallRaw(rawFn: () => unknown): unknown {
-  try {
-    return rawFn();
-  } catch {
-    return null;
-  }
+  return { member, problems, refProblems, headRefProblem, isApp: false };
 }
 
 /**

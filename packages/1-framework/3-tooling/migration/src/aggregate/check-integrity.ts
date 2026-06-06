@@ -28,27 +28,11 @@ export interface IntegritySpaceState {
    * the absent case is judged `headRefMissing`, the corrupt case here is
    * judged `refUnreadable` (and suppresses `headRefMissing`).
    *
-   * Always `null` for spaces whose head ref is synthesised (app space and
-   * migration-less extension spaces) — there is no on-disk `head.json` to
-   * read or fail on.
+   * Always `null` for the app space — the app head ref is synthesised from
+   * the live contract, so there is no on-disk `head.json` to read or fail on.
    */
   readonly headRefProblem: RefLoadProblem | null;
   readonly isApp: boolean;
-  /**
-   * `true` for spaces whose head ref is synthesised from the contract's
-   * `storage.storageHash` rather than read from an on-disk `refs/head.json`.
-   *
-   * The app space always has a synthesised head ref. Extension spaces that
-   * declare **zero migration packages** (all-external spaces like Supabase
-   * that manage no DDL) also get a synthesised head ref — the graph is empty
-   * by design, so graph-reachability checks would always fail. The planner
-   * handles these spaces the same way it handles the app space: synth
-   * strategy, zero ops.
-   *
-   * When `hasSynthesizedHead` is `true`, the `headRefMissing` and
-   * `headRefNotInGraph` violations are never emitted for the space.
-   */
-  readonly hasSynthesizedHead: boolean;
 }
 
 export interface IntegrityComputationInput {
@@ -69,14 +53,7 @@ export function computeIntegrityViolations(
 ): readonly IntegrityViolation[] {
   const violations: IntegrityViolation[] = [];
 
-  for (const {
-    member,
-    problems,
-    refProblems,
-    headRefProblem,
-    isApp,
-    hasSynthesizedHead,
-  } of input.spaces) {
+  for (const { member, problems, refProblems, headRefProblem, isApp } of input.spaces) {
     const { spaceId } = member;
 
     for (const problem of problems) {
@@ -111,17 +88,20 @@ export function computeIntegrityViolations(
 
     violations.push(...duplicateMigrationHashViolations(spaceId, member.packages));
 
-    // Skip graph-reachability checks for spaces whose head ref is synthesised
-    // from the contract hash (app space, and migration-less extension spaces).
-    // Those spaces have an empty graph by design; requiring the head hash to
-    // appear in an empty graph would always fail. The planner's synth strategy
-    // handles them correctly: zero ops when the DB is already up to date.
-    // Extension spaces with non-empty graphs (migration-backed packs like
-    // pgvector) still go through the full head-ref check as before.
-    if (!isApp && !hasSynthesizedHead && headRefProblem === null) {
+    // For non-app spaces: a missing head.json is always an authoring error
+    // (headRefMissing). The graph-reachability check (headRefNotInGraph) only
+    // applies when the space actually has a migration graph — an extension that
+    // ships no packages (e.g. all-external auth/storage spaces) has an empty
+    // graph by design, and requiring the head hash to appear in that empty graph
+    // would always fail. The planner handles empty-graph spaces via synth
+    // strategy (zero ops).
+    if (!isApp && headRefProblem === null) {
       if (member.headRef === null) {
         violations.push({ kind: 'headRefMissing', spaceId });
-      } else if (!headRefPresentInGraph(member, member.headRef.hash)) {
+      } else if (
+        member.packages.length > 0 &&
+        !headRefPresentInGraph(member, member.headRef.hash)
+      ) {
         violations.push({ kind: 'headRefNotInGraph', spaceId, hash: member.headRef.hash });
       }
     }
