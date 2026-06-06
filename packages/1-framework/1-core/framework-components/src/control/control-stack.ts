@@ -523,9 +523,13 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
 ): ControlStack<TFamilyId, TTargetId> {
   const { family, target, adapter, driver, extensionPacks = [] } = input;
 
-  buildExtensionLoadOrder(extensionPacks);
+  const orderedIds = buildExtensionLoadOrder(extensionPacks);
+  const extensionById = new Map(extensionPacks.map((ext) => [ext.id, ext]));
+  const orderedExtensionPacks = orderedIds
+    .map((id) => extensionById.get(id))
+    .filter((ext): ext is ControlExtensionDescriptor<TFamilyId, TTargetId> => ext !== undefined);
 
-  const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
+  const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...orderedExtensionPacks];
 
   const codecLookup = extractCodecLookup(allDescriptors);
   const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
@@ -535,11 +539,11 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     target,
     adapter,
     driver,
-    extensionPacks: extensionPacks as readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[],
+    extensionPacks: orderedExtensionPacks,
 
     codecTypeImports: extractCodecTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
-    extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
+    extensionIds: extractComponentIds(family, target, adapter, orderedExtensionPacks),
     codecLookup,
     authoringContributions: assembleAuthoringContributions(allDescriptors),
     scalarTypeDescriptors,
