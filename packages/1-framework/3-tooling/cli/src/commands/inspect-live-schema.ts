@@ -41,7 +41,7 @@ export interface InspectLiveSchemaResult {
    */
   readonly pslContractAst: PslDocumentAst | undefined;
   /**
-   * Assembled `pslBlocks` namespace from the control stack. Pack-contributed
+   * Assembled `pslBlocks` namespace from the control stack. Extension-contributed
    * PSL block descriptors (parser + printer) register here; downstream
    * commands pass this through to `printPsl` so contributed-block AST nodes
    * round-trip back to source.

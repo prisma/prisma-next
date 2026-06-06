@@ -9,11 +9,9 @@
  *        → JSON.stringify → JSON.parse → IR class (hydrated)
  *        → print → text → parse → AST.extensionBlocks (equivalent)
  *
- * The fixture lives at `./fixtures/fake-target-pack.ts`. Downstream
+ * The fixture lives at `./fixtures/fake-extension.ts`. Downstream
  * projects (RLS, roles, custom Postgres types) follow this shape as
  * the canonical example of an extension-contributed top-level block.
- *
- * Ref: TML-2804.
  */
 
 import { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
@@ -23,14 +21,14 @@ import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
 import {
   FakePolicyIr,
-  fakeTargetPackContributions,
+  fakeExtensionContributions,
   hydrateFakePolicyIrFromJson,
   isFakePolicyAst,
-} from './fixtures/fake-target-pack';
+} from './fixtures/fake-extension';
 
-const assembled = assembleAuthoringContributions([{ authoring: fakeTargetPackContributions }]);
+const assembled = assembleAuthoringContributions([{ authoring: fakeExtensionContributions }]);
 
-describe('fake-target-pack round-trip', () => {
+describe('fake-extension round-trip', () => {
   describe('given a PSL document with a single fake_policy block at the top level', () => {
     const source = `fake_policy ProfilesSelect {
   target = Profile

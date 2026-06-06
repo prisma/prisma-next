@@ -324,7 +324,7 @@ describe('assembleAuthoringContributions', () => {
             pslBlocks: {
               foo: {
                 kind: 'pslBlock',
-                discriminator: 'pack-foo',
+                discriminator: 'fake-foo',
                 parser: stubExtensionBlockParser,
                 printer: stubExtensionBlockPrinter,
               },
@@ -337,7 +337,7 @@ describe('assembleAuthoringContributions', () => {
             pslBlocks: {
               foo: {
                 kind: 'pslBlock',
-                discriminator: 'pack-foo',
+                discriminator: 'fake-foo',
                 parser: stubExtensionBlockParser,
                 printer: stubExtensionBlockPrinter,
               },
@@ -382,7 +382,7 @@ describe('assembleAuthoringContributions', () => {
             pslBlocks: {
               fooBlock: {
                 kind: 'pslBlock',
-                discriminator: 'pack-foo',
+                discriminator: 'fake-foo',
                 parser: stubExtensionBlockParser,
                 printer: stubExtensionBlockPrinter,
               },
@@ -390,7 +390,7 @@ describe('assembleAuthoringContributions', () => {
           },
         }),
       ]),
-    ).toThrow(/pslBlock.*"pack-foo".*entityType/);
+    ).toThrow(/pslBlock.*"fake-foo".*entityType/);
   });
 
   it('rejects a malformed pslBlocks descriptor that carries kind but no parser/printer', () => {
@@ -402,7 +402,7 @@ describe('assembleAuthoringContributions', () => {
               // Descriptor-shaped (has kind + discriminator) but missing
               // parser/printer — must be rejected at load time, not
               // silently treated as a sub-namespace.
-              broken: { kind: 'pslBlock', discriminator: 'pack-foo' } as unknown as never,
+              broken: { kind: 'pslBlock', discriminator: 'fake-foo' } as unknown as never,
             },
           },
         }),

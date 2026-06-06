@@ -935,9 +935,9 @@ export interface ControlClient {
 
   /**
    * Returns the assembled `pslBlocks` namespace from the control stack.
-   * Pack-contributed PSL block descriptors (parser + printer) register
+   * Extension-contributed PSL block descriptors (parser + printer) register
    * here; the CLI's `contract infer` command threads this through to
-   * `printPsl` so pack-contributed blocks in the inferred AST round-trip
+   * `printPsl` so extension-contributed blocks in the inferred AST round-trip
    * back to PSL source. Forces `init()` so the stack is built before
    * access.
    */

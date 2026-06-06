@@ -17,9 +17,7 @@
  * Future projects (RLS, roles, custom Postgres types) follow this
  * fixture's shape as the canonical example of an extension-contributed
  * top-level block. The slice's round-trip regression test
- * (`../fake-target-pack.round-trip.test.ts`) consumes this fixture.
- *
- * Ref: TML-2804.
+ * (`../fake-extension.round-trip.test.ts`) consumes this fixture.
  */
 
 import type {
@@ -156,7 +154,7 @@ function decodePslEscapes(value: string): string {
   return result;
 }
 
-export const fakeTargetPackContributions = {
+export const fakeExtensionContributions = {
   entityTypes: {
     fake_policy: {
       kind: 'entity',

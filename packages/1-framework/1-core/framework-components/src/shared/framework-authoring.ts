@@ -123,14 +123,14 @@ export interface AuthoringEntityTypeTemplateOutput {
 }
 
 /**
- * Default `Input = never` is load-bearing for pack-bag-driven type
- * narrowing. Factory parameter positions are contravariant, so a pack
+ * Default `Input = never` is required for extension-driven type
+ * narrowing. Factory parameter positions are contravariant, so an extension
  * literal declaring `factory: (input: DemoEntityInput) => DemoEntity`
  * is only assignable to the base descriptor's factory shape if the
  * base's input is `never` (the bottom of the contravariant position).
  * The concrete input/output types are recovered at the helper-derivation
  * site via `EntityHelperFunction<Descriptor>`'s conditional inference,
- * which reads them from the pack's `as const` literal factory signature
+ * which reads them from the extension's `as const` literal factory signature
  * — the base widening does not erase the literal because `satisfies`
  * does not widen the declared type.
  */
@@ -200,6 +200,18 @@ export type AuthoringEntityTypeNamespace = {
  */
 export interface AuthoringPslBlockDescriptor<Node extends PslExtensionBlock = PslExtensionBlock> {
   readonly kind: 'pslBlock';
+  /**
+   * The routing discriminator string for this block kind. The framework
+   * parser verifies `node.kind === descriptor.discriminator` immediately
+   * after the contributed parser returns and emits
+   * `PSL_EXTENSION_BLOCK_PARSE_FAILED` if they differ. The printer
+   * dispatch map is keyed by this value and looks up blocks via
+   * `extensionBlock.kind` — so the invariant `node.kind ===
+   * descriptor.discriminator` is a hard requirement for routing
+   * to work. The load-time `assertPslBlocksHaveFactories` check also
+   * matches this discriminator against the corresponding `entityTypes`
+   * factory.
+   */
   readonly discriminator: string;
   parser(context: PslExtensionBlockParserContext): Node;
   printer(node: Node, context: PslExtensionBlockPrinterContext): string;

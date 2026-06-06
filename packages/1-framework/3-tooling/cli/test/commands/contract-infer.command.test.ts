@@ -310,4 +310,70 @@ describe('createContractInferCommand', () => {
     // Capability-based wording — must not name the familyId string directly.
     expect(stderr).not.toContain('family "mongo"');
   });
+
+  it('renders an extension-contributed fake_policy block in the written PSL (AC8)', async () => {
+    process.chdir(testDir);
+
+    // A minimal fake_policy pslBlocks namespace — structurally identical to
+    // fakeExtensionContributions.pslBlocks in psl-printer/test/fixtures/fake-extension.ts.
+    const fakePolicyPslBlocks = {
+      fake_policy: {
+        kind: 'pslBlock' as const,
+        discriminator: 'fake-policy',
+        parser: () => {
+          throw new Error('parser not used in this test');
+        },
+        printer: (node: {
+          readonly kind: string;
+          readonly name: string;
+          readonly target?: string;
+          readonly using?: string;
+        }) =>
+          `fake_policy ${node.name} {\n  target = ${node.target ?? ''}\n  using = "${node.using ?? ''}"\n}`,
+      },
+    };
+
+    mocks.getPslBlocksNamespaceMock.mockReturnValue(fakePolicyPslBlocks);
+
+    // The extensionBlocks entry carries extra fields (target, using) that the
+    // printer reads. PslExtensionBlock is the base shape; the concrete node
+    // is structurally wider — cast to satisfy the AST slot type.
+    const fakePolicyNode = {
+      kind: 'fake-policy' as const,
+      name: 'ReadOnlyUser',
+      target: 'User',
+      using: 'auth.uid = user_id',
+      span: SYNTHETIC_SPAN,
+    };
+    const astWithFakePolicy: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 'test',
+      namespaces: [
+        {
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [],
+          enums: [],
+          compositeTypes: [],
+          extensionBlocks: [
+            fakePolicyNode as unknown as PslDocumentAst['namespaces'][number]['extensionBlocks'][number],
+          ],
+          span: SYNTHETIC_SPAN,
+        },
+      ],
+      span: SYNTHETIC_SPAN,
+    };
+    mocks.inferPslContractMock.mockReturnValue(astWithFakePolicy);
+
+    await executeCommand(createContractInferCommand(), [
+      '--config',
+      'prisma-next.config.ts',
+      '--no-color',
+    ]);
+
+    const outputPath = join(testDir, 'output/contract.prisma');
+    expect(existsSync(outputPath)).toBe(true);
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain('fake_policy ReadOnlyUser');
+  });
 });

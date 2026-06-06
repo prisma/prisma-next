@@ -98,7 +98,7 @@ describe('printPslFromAst with extension-contributed pslBlocks', () => {
   });
 
   describe('given a built-in model and an extension-contributed block in the same namespace', () => {
-    it('round-trips both through parse → print → parse with the pack registries in scope', () => {
+    it('round-trips both through parse → print → parse with the extension registries in scope', () => {
       const source = `model User {
   id Int @id
 }

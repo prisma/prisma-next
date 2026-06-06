@@ -36,7 +36,8 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_DEFAULT_VALUE'
   | 'PSL_INVALID_ENUM_MEMBER'
   | 'PSL_INVALID_TYPES_MEMBER'
-  | 'PSL_INVALID_QUALIFIED_TYPE';
+  | 'PSL_INVALID_QUALIFIED_TYPE'
+  | 'PSL_EXTENSION_BLOCK_PARSE_FAILED';
 
 /**
  * Base shape for an extension-contributed top-level PSL block. The
@@ -48,6 +49,17 @@ export type PslDiagnosticCode =
  * by name without per-contribution machinery.
  */
 export interface PslExtensionBlock {
+  /**
+   * Discriminator for this block kind. This field serves as the routing
+   * key in the printer dispatch map: `serializeExtensionBlock` looks up
+   * the block's descriptor by `extensionBlock.kind` against a map keyed
+   * by `descriptor.discriminator`. The framework parser enforces the
+   * invariant `node.kind === descriptor.discriminator` immediately after
+   * the contributed parser returns — a mismatch produces a
+   * `PSL_EXTENSION_BLOCK_PARSE_FAILED` diagnostic at parse time so the
+   * error surfaces close to its cause rather than at `contract infer`
+   * print time.
+   */
   readonly kind: string;
   readonly name: string;
   readonly span: PslSpan;

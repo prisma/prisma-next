@@ -187,4 +187,98 @@ describe('parsePslDocument with extension-contributed pslBlocks', () => {
       ]);
     });
   });
+
+  describe('contributed-parser failure isolation', () => {
+    it('converts a throwing contributed parser into a diagnostic and continues parsing', () => {
+      const blocks: AuthoringPslBlockNamespace = {
+        throwingKw: {
+          kind: 'pslBlock',
+          discriminator: 'throwing-keyword',
+          parser: (_ctx): PslExtensionBlock => {
+            throw new Error('parser explosion');
+          },
+          printer: (node) => `throwingKw ${node.name} {\n}`,
+        },
+        ...makeTestKwBlocks(),
+      };
+
+      const result = parsePslDocument({
+        schema: 'throwingKw Bad {\n}\ntestKw Good {\n  extra = "ok"\n}\n',
+        sourceId: 'schema.prisma',
+        pslBlocks: blocks,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]).toMatchObject({
+        code: 'PSL_EXTENSION_BLOCK_PARSE_FAILED',
+        sourceId: 'schema.prisma',
+        message: expect.stringContaining('parser explosion'),
+      });
+      const namespace = result.ast.namespaces[0];
+      expect(namespace?.extensionBlocks).toHaveLength(1);
+      expect(namespace?.extensionBlocks[0]).toMatchObject({ kind: 'test-keyword', name: 'Good' });
+    });
+
+    it('converts an undefined-returning contributed parser into a diagnostic', () => {
+      const blocks: AuthoringPslBlockNamespace = {
+        undefinedKw: {
+          kind: 'pslBlock',
+          discriminator: 'undefined-keyword',
+          // Cast needed to simulate a misbehaving JS contributor that ignores the return type
+          parser: (_ctx): PslExtensionBlock => undefined as unknown as PslExtensionBlock,
+          printer: (node) => `undefinedKw ${node.name} {\n}`,
+        },
+      };
+
+      const result = parsePslDocument({
+        schema: 'undefinedKw Oops {\n}\n',
+        sourceId: 'schema.prisma',
+        pslBlocks: blocks,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics[0]).toMatchObject({
+        code: 'PSL_EXTENSION_BLOCK_PARSE_FAILED',
+        sourceId: 'schema.prisma',
+        message: expect.stringContaining('returned no node'),
+      });
+      // The failed block produces no node, so the unspecified namespace stays
+      // empty and is dropped from the output — no namespace appears.
+      expect(result.ast.namespaces).toHaveLength(0);
+    });
+
+    it('emits a diagnostic at parse time when node.kind does not match descriptor.discriminator', () => {
+      const blocks: AuthoringPslBlockNamespace = {
+        mismatchKw: {
+          kind: 'pslBlock',
+          discriminator: 'correct-discriminator',
+          // Cast needed to simulate a contributed parser with a discriminator typo
+          parser: (ctx): PslExtensionBlock => ({
+            kind: 'wrong-kind' as 'correct-discriminator',
+            name: ctx.name,
+            span: ctx.lineRangeSpan(ctx.bounds.startLine, ctx.bounds.endLine),
+          }),
+          printer: (node) => `mismatchKw ${node.name} {\n}`,
+        },
+      };
+
+      const result = parsePslDocument({
+        schema: 'mismatchKw Typo {\n}\n',
+        sourceId: 'schema.prisma',
+        pslBlocks: blocks,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics[0]).toMatchObject({
+        code: 'PSL_EXTENSION_BLOCK_PARSE_FAILED',
+        sourceId: 'schema.prisma',
+        message: expect.stringContaining('correct-discriminator'),
+      });
+      expect(result.diagnostics[0]?.message).toContain('wrong-kind');
+      // The mismatched node is rejected, so the unspecified namespace stays
+      // empty and is dropped from the output — no namespace appears.
+      expect(result.ast.namespaces).toHaveLength(0);
+    });
+  });
 });

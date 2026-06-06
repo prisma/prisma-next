@@ -1530,7 +1530,40 @@ function invokeExtensionBlockParser(
     keywordLineIndex,
     bounds,
   );
-  return descriptor.parser(handle);
+  const blockSpan = createTrimmedLineSpan(context, keywordLineIndex);
+
+  let node: PslExtensionBlock;
+  try {
+    const result = descriptor.parser(handle);
+    if (result === undefined || result === null) {
+      pushDiagnostic(context, {
+        code: 'PSL_EXTENSION_BLOCK_PARSE_FAILED',
+        message: `Extension-contributed parser for "${keyword}" (discriminator "${descriptor.discriminator}") returned no node`,
+        span: blockSpan,
+      });
+      return undefined;
+    }
+    node = result;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    pushDiagnostic(context, {
+      code: 'PSL_EXTENSION_BLOCK_PARSE_FAILED',
+      message: `Extension-contributed parser for "${keyword}" (discriminator "${descriptor.discriminator}") threw: ${reason}`,
+      span: blockSpan,
+    });
+    return undefined;
+  }
+
+  if (node.kind !== descriptor.discriminator) {
+    pushDiagnostic(context, {
+      code: 'PSL_EXTENSION_BLOCK_PARSE_FAILED',
+      message: `Extension-contributed parser for "${keyword}" (discriminator "${descriptor.discriminator}") returned a node with kind "${node.kind}"; node.kind must equal the descriptor's discriminator`,
+      span: blockSpan,
+    });
+    return undefined;
+  }
+
+  return node;
 }
 
 function createExtensionBlockParserContext(
