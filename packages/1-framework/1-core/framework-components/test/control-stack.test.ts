@@ -705,7 +705,7 @@ describe('buildExtensionLoadOrder', () => {
 });
 
 // ---------------------------------------------------------------------------
-// findNamespaceOwnershipCollisions (FR15/FR16, AC6 collision half)
+// findNamespaceOwnershipCollisions
 // ---------------------------------------------------------------------------
 
 function makeCollisionEntry(
