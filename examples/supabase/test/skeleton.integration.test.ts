@@ -92,11 +92,12 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       // `db init` discovers extension spaces by scanning `migrations/<space>/`.
       // The supabase pack is migration-less: it declares only external schema
       // (auth.* / storage.* are Supabase-managed tables) and ships zero DDL
-      // migrations. We write only the space artefacts (contract.json,
-      // refs/head.json) so the aggregate loader discovers the space and
-      // synthesizes its head ref from the contract's storage hash. No migration
-      // packages are written — the loader treats a zero-package space as
-      // all-external and falls through to synth strategy (zero ops).
+      // migrations. We write the space artefacts (contract.json + refs/head.json)
+      // so the aggregate loader picks the space up via the uniform read path —
+      // head.json carries the pack's declared `{ hash, invariants }` on disk.
+      // With no migration packages, the planner falls through to the synth
+      // strategy (zero ops), and the integrity check skips `headRefNotInGraph`
+      // because an empty graph has nothing to check the head ref against.
       const space = supabasePack.contractSpace;
       if (!space) {
         throw new Error('supabasePack must declare a contractSpace');
