@@ -10,6 +10,7 @@ import type { SqlStorage } from '../src/types';
 import {
   ForeignKeyReferenceSchema,
   ForeignKeySchema,
+  ForeignKeySourceSchema,
   validateSqlContractFully,
   validateStorage,
 } from '../src/validators';
@@ -297,6 +298,27 @@ describe('ForeignKeyReferenceSchema', () => {
   });
 });
 
+describe('ForeignKeySourceSchema', () => {
+  it('accepts a well-formed local source (no spaceId)', () => {
+    const result = ForeignKeySourceSchema({
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      tableName: 'post',
+      columns: ['author_id'],
+    });
+    expect(result).not.toBeInstanceOf(type.errors);
+  });
+
+  it('rejects a source carrying spaceId', () => {
+    const result = ForeignKeySourceSchema({
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      tableName: 'post',
+      columns: ['author_id'],
+      spaceId: 'auth-service',
+    });
+    expect(result).toBeInstanceOf(type.errors);
+  });
+});
+
 describe('ForeignKeySchema', () => {
   it('accepts an FK with a cross-space target', () => {
     const input = {
@@ -315,6 +337,43 @@ describe('ForeignKeySchema', () => {
       index: true,
     };
     const result = ForeignKeySchema(input);
+    expect(result).not.toBeInstanceOf(type.errors);
+  });
+
+  it('rejects an FK whose source carries spaceId', () => {
+    const result = ForeignKeySchema({
+      source: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        tableName: 'post',
+        columns: ['author_id'],
+        spaceId: 'auth-service',
+      },
+      target: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        tableName: 'user',
+        columns: ['id'],
+      },
+      constraint: true,
+      index: true,
+    });
+    expect(result).toBeInstanceOf(type.errors);
+  });
+
+  it('accepts an FK with a local source and local target', () => {
+    const result = ForeignKeySchema({
+      source: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        tableName: 'post',
+        columns: ['author_id'],
+      },
+      target: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        tableName: 'user',
+        columns: ['id'],
+      },
+      constraint: true,
+      index: true,
+    });
     expect(result).not.toBeInstanceOf(type.errors);
   });
 });
