@@ -1,11 +1,10 @@
 import {
-  createMongoControlDriver,
   createMongoRunnerDeps,
-  initMarker,
   introspectSchema,
-  readMarker,
+  MongoControlAdapterImpl,
 } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import type {
   ControlFamilyInstance,
   MigrationPlan,
@@ -24,6 +23,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
 import { MongoMigrationRunner } from '../src/core/mongo-runner';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -105,7 +106,7 @@ function fakeFamily(): ControlFamilyInstance<'mongo', MongoSchemaIR> {
 function makeRunner() {
   return new MongoMigrationRunner(
     createMongoRunnerDeps(
-      createMongoControlDriver(db, client),
+      new MongoControlDriver(db, client),
       MongoDriverImpl.fromDb(db),
       fakeFamily(),
     ),
@@ -198,7 +199,10 @@ describe('MongoMigrationRunner - closed validators', () => {
       validationLevel: 'strict',
       validationAction: 'error',
     });
-    await initMarker(db, 'app', { storageHash: 'sha256:origin', profileHash: 'sha256:p1' });
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
+      storageHash: 'sha256:origin',
+      profileHash: 'sha256:p1',
+    });
 
     const originIR = new MongoSchemaIR([
       new MongoSchemaCollection({
@@ -263,7 +267,7 @@ describe('MongoMigrationRunner - closed validators', () => {
       db.collection('users').insertOne({ email: 'junk@example.com', undeclared: 'nope' }),
     ).rejects.toThrow();
 
-    const marker = await readMarker(db, 'app');
+    const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
     expect(marker?.storageHash).toBe('sha256:dest');
   });
 

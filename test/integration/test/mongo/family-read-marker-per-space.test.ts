@@ -1,5 +1,7 @@
-import mongoAdapterDescriptor, { initMarker } from '@prisma-next/adapter-mongo/control';
-import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import mongoAdapterDescriptor, {
+  MongoControlAdapterImpl,
+} from '@prisma-next/adapter-mongo/control';
+import mongoControlDriver, { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
@@ -10,6 +12,8 @@ import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 const EXT_SPACE = 'cipherstash';
 
@@ -57,7 +61,7 @@ describe('MongoFamilyInstance per-space readMarker', {
   }
 
   it('returns the marker doc for an extension space', async () => {
-    await initMarker(db, EXT_SPACE, {
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), EXT_SPACE, {
       storageHash: 'sha256:ext-storage',
       profileHash: 'sha256:ext-profile',
     });
@@ -86,11 +90,11 @@ describe('MongoFamilyInstance per-space readMarker', {
   });
 
   it('readAllMarkers returns one entry per space', async () => {
-    await initMarker(db, APP_SPACE_ID, {
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), APP_SPACE_ID, {
       storageHash: 'sha256:app-storage',
       profileHash: 'sha256:app-profile',
     });
-    await initMarker(db, EXT_SPACE, {
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), EXT_SPACE, {
       storageHash: 'sha256:ext-storage',
       profileHash: 'sha256:ext-profile',
     });

@@ -119,10 +119,6 @@ export interface ControlAdapterInstance<TFamilyId extends string, TTargetId exte
 
 export interface ControlDriverInstance<TFamilyId extends string, TTargetId extends string>
   extends DriverInstance<TFamilyId, TTargetId> {
-  query<Row = Record<string, unknown>>(
-    sql: string,
-    params?: readonly unknown[],
-  ): Promise<{ readonly rows: Row[] }>;
   close(): Promise<void>;
 }
 

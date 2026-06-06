@@ -1,11 +1,8 @@
-import {
-  createMongoControlDriver,
-  createMongoRunnerDeps,
-  readLedger as readMongoLedger,
-} from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, MongoControlAdapterImpl } from '@prisma-next/adapter-mongo/control';
 import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import {
@@ -47,6 +44,8 @@ import {
   frameworkComponents as sqliteFrameworkComponents,
   sqliteTargetDescriptor,
 } from '../../../../packages/3-targets/6-adapters/sqlite/test/migrations/fixtures/runner-fixtures';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 function makeMongoFamily(): ReturnType<typeof createMongoFamilyInstance> {
   return createMongoFamilyInstance(
@@ -275,7 +274,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     };
     const mongoRunner = new MongoMigrationRunner(
       createMongoRunnerDeps(
-        createMongoControlDriver(mongoDb, mongoClient),
+        new MongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
         makeMongoFamily(),
       ),
@@ -290,7 +289,10 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       migrationEdges: mongoEdges,
     });
     if (!mongoResult.ok) throw new Error(formatRunnerFailure(mongoResult.failure));
-    const mongoLedger = await readMongoLedger(mongoDb, LEDGER_TEST_SPACE_ID);
+    const mongoLedger = await controlAdapter.readLedger(
+      new MongoControlDriver(mongoDb, mongoClient),
+      LEDGER_TEST_SPACE_ID,
+    );
 
     const countsByBackend = {
       postgres: ledgerOperationCounts(pgLedger),
@@ -441,7 +443,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     };
     const mongoRunner = new MongoMigrationRunner(
       createMongoRunnerDeps(
-        createMongoControlDriver(mongoDb, mongoClient),
+        new MongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
         makeMongoFamily(),
       ),
@@ -455,7 +457,10 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       migrationEdges: mongoEdges,
     });
     if (!mongoResult.ok) throw new Error(formatRunnerFailure(mongoResult.failure));
-    const mongoLedger = await readMongoLedger(mongoDb, LEDGER_TEST_SPACE_ID);
+    const mongoLedger = await controlAdapter.readLedger(
+      new MongoControlDriver(mongoDb, mongoClient),
+      LEDGER_TEST_SPACE_ID,
+    );
 
     const countsByBackend = {
       postgres: ledgerOperationCounts(pgLedger),
@@ -580,7 +585,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     ];
     const mongoRunner = new MongoMigrationRunner(
       createMongoRunnerDeps(
-        createMongoControlDriver(mongoDb, mongoClient),
+        new MongoControlDriver(mongoDb, mongoClient),
         MongoDriverImpl.fromDb(mongoDb),
         makeMongoFamily(),
       ),
@@ -594,7 +599,10 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       migrationEdges: mongoSynthEdges,
     });
     if (!mongoResult.ok) throw new Error(formatRunnerFailure(mongoResult.failure));
-    const mongoLedger = await readMongoLedger(mongoDb, LEDGER_TEST_SPACE_ID);
+    const mongoLedger = await controlAdapter.readLedger(
+      new MongoControlDriver(mongoDb, mongoClient),
+      LEDGER_TEST_SPACE_ID,
+    );
 
     const countsByBackend = {
       postgres: ledgerOperationCounts(pgLedger),

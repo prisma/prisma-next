@@ -44,6 +44,7 @@
   "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
+    "./contract-free": "./dist/exports/contract-free.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

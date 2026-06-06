@@ -1,11 +1,10 @@
 import {
-  createMongoControlDriver,
   createMongoRunnerDeps,
-  initMarker,
   introspectSchema,
-  readMarker,
+  MongoControlAdapterImpl,
 } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import type {
   ControlFamilyInstance,
   MigrationPlan,
@@ -27,6 +26,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
 import { MongoMigrationRunner } from '../src/core/mongo-runner';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -118,7 +119,7 @@ function fakeFamily(): ControlFamilyInstance<'mongo', MongoSchemaIR> {
 function makeRunner() {
   return new MongoMigrationRunner(
     createMongoRunnerDeps(
-      createMongoControlDriver(db, client),
+      new MongoControlDriver(db, client),
       MongoDriverImpl.fromDb(db),
       fakeFamily(),
     ),
@@ -151,7 +152,10 @@ describe('MongoMigrationRunner - validator widen', () => {
       validationAction: 'error',
     });
 
-    await initMarker(db, 'app', { storageHash: 'sha256:origin', profileHash: 'sha256:p1' });
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
+      storageHash: 'sha256:origin',
+      profileHash: 'sha256:p1',
+    });
 
     const originIR = new MongoSchemaIR([
       new MongoSchemaCollection({
@@ -209,7 +213,7 @@ describe('MongoMigrationRunner - validator widen', () => {
     expect(liveProperties).toHaveProperty('avatarUrl');
 
     // Marker must have advanced to the destination hash.
-    const marker = await readMarker(db, 'app');
+    const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
     expect(marker?.storageHash).toBe('sha256:dest');
   });
 
@@ -257,7 +261,10 @@ describe('MongoMigrationRunner - validator widen', () => {
       validationAction: 'error',
     });
 
-    await initMarker(db, 'app', { storageHash: 'sha256:origin', profileHash: 'sha256:p1' });
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
+      storageHash: 'sha256:origin',
+      profileHash: 'sha256:p1',
+    });
 
     // Build a plan that STILL contains the widening collMod by feeding the planner
     // a stale (narrower) origin IR — this simulates a re-apply where the planner's
@@ -316,7 +323,7 @@ describe('MongoMigrationRunner - validator widen', () => {
 
     // The apply still succeeds: live schema already satisfies the contract, so verify
     // passes and the marker advances to the destination hash.
-    const marker = await readMarker(db, 'app');
+    const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
     expect(marker?.storageHash).toBe('sha256:dest');
   });
 });
