@@ -301,7 +301,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     // Should show both migrations in order (EMPTY → C1 → C2)
     expect(output).toContain('20260101_100000_111111');
     expect(output).toContain('20260101_100000_222222');
-    expect(output).toContain('Will run, in order:');
+    expect(output).toContain('The following');
   });
 
   it('shows "nothing to run" when already at target', async () => {
@@ -420,9 +420,9 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(output).toContain('20260101_100000_222222');
     // The off-path migration (EMPTY→C1) dirName IS shown — fully drawn in grey (not omitted).
     expect(output).toContain('20260101_100000_111111');
-    // The ordered list should appear without a Clack │ gutter (it goes to stdout).
-    expect(output).toContain('Will run, in order:');
-    expect(output).toContain('1 migration will run');
+    // The consolidated header must appear (no separate "N migrations will run" + "Will run, in order:").
+    expect(output).toContain('The following 1 migration will run:');
+    expect(output).not.toContain('Will run, in order:');
     // The ordered list uses graph row format (from → to hash columns), not "1. name (from → to)".
     expect(output).toContain(`${C1.slice(7, 14)} → ${C2.slice(7, 14)}`);
     // No Clack │ prefix on any list line.
@@ -458,7 +458,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const output = stripAnsi(consoleOutput.join('\n'));
 
     // @contract must appear exactly once and be on the C2 node (the working contract).
-    const graphSection = output.split('Will run, in order:')[0] ?? output;
+    const graphSection = output.split('The following')[0] ?? output;
     const contractMarkerCount = (graphSection.match(/@contract/g) ?? []).length;
     expect(contractMarkerCount).toBe(1);
     const contractLine = graphSection.split('\n').find((l) => l.includes('@contract'));
@@ -694,7 +694,8 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(output).toContain(extDirName);
 
     // Split output into graph section and ordered-list section.
-    const orderedListSection = output.split('Will run, in order:')[1] ?? '';
+    // The consolidated header is "The following N migration(s) will run:" — split after it.
+    const orderedListSection = output.split(/The following \d+ migrations? will run:/)[1] ?? '';
 
     // The app migration C1 → C2 must appear in the ordered list.
     expect(orderedListSection).toContain('20260101_100000_222222');
@@ -705,9 +706,9 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(orderedListSection).not.toContain(appMig1.dirName);
   });
 
-  it('canonical schedule order: extension migrations appear before app migrations in "Will run, in order:"', async () => {
+  it('canonical schedule order: extension migrations appear before app migrations in the ordered run list', async () => {
     // Regression guard for the ordering bug: the runner applies extensions first
-    // (alphabetically by spaceId), then the app. The "Will run, in order:" list must
+    // (alphabetically by spaceId), then the app. The ordered run list must
     // reflect that same sequence — not app-first.
     //
     // Fixture: two spaces.
@@ -806,7 +807,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(getExitCode()).toBe(0);
 
     const output = stripAnsi(consoleOutput.join('\n'));
-    const orderedListSection = output.split('Will run, in order:')[1] ?? '';
+    const orderedListSection = output.split(/The following \d+ migrations? will run:/)[1] ?? '';
 
     // Extension migration and both app migrations must appear.
     expect(orderedListSection).toContain(extDirName);

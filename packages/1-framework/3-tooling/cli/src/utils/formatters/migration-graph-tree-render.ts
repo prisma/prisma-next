@@ -178,7 +178,11 @@ function arrowForEdgeKind(
  *   the ambient module-level import no-ops under NO_COLOR, making the
  *   path-highlight unreachable in tests.
  */
-const { bold: forcedBold, dim: forcedDim } = createColors({ useColor: true });
+const {
+  bold: forcedBold,
+  dim: forcedDim,
+  greenBright: forcedGreen,
+} = createColors({ useColor: true });
 
 /**
  * The two styles used in `migrate --show` path-highlight mode.
@@ -201,17 +205,20 @@ export const PATH_HIGHLIGHT_STYLES = {
   /**
    * Lane/glyph/arrow stylers for on-path cells.
    *
-   * Mirrors the neutral column-0 style exactly as a linear (no-branch) section renders:
-   * - lane: `style.lane` (ambient dim — respects NO_COLOR, NOT forcedDim, NOT rotation hue)
+   * - lane: `forcedGreen` when colour is on — bright green so the on-path
+   *   branch glyphs (`│ ├ ╯ ↑`) and node markers (`○`/`∅`) are visually
+   *   distinct from off-path (dim grey). Uses forced ANSI so it survives
+   *   NO_COLOR in tests. Identity when `colorize` is false.
    * - arrow: identity (plain, no colouring)
-   * - dirName: `bold` (ambient bold)
-   * - hashOverride: undefined — `style.sourceHash`/`style.destHash` apply normally (purple)
+   * - dirName: `bold` (ambient bold — name stays white/bold, not green)
+   * - hashOverride: undefined — `style.sourceHash`/`style.destHash` apply
+   *   normally (cyan) so hashes keep their existing neutral colour.
    *
    * `style` is the same `MigrationListStyler` the tree renderer uses.
    * Rotation (`LANE_COLOR_CYCLE`) is never applied to on-path cells.
    */
-  onPath: (style: MigrationListStyler) => ({
-    lane: style.lane,
+  onPath: (_style: MigrationListStyler, colorize: boolean) => ({
+    lane: colorize ? forcedGreen : (text: string) => text,
     arrow: (text: string) => text,
     dirName: (text: string) => bold(text),
     hashOverride: undefined as undefined,
@@ -838,8 +845,8 @@ export function renderMigrationGraphTree(
       const s = PATH_HIGHLIGHT_STYLES.offPath(opts.colorize);
       return { lane: s.lane, arrow: s.arrow, dirName: s.dirName, hashOverride: s.hashOverride };
     }
-    // on-path → neutral single-path style (style.lane, no rotation hue)
-    const s = PATH_HIGHLIGHT_STYLES.onPath(style);
+    // on-path → green lane glyphs, bold name, neutral hashes
+    const s = PATH_HIGHLIGHT_STYLES.onPath(style, opts.colorize);
     return { lane: s.lane, arrow: s.arrow, dirName: s.dirName, hashOverride: s.hashOverride };
   }
 
@@ -1136,8 +1143,8 @@ export function formatOnPathMigrationRow(
   const palette = paletteFor(glyphMode);
   const style = createAnsiMigrationListStyler({ useColor: colorize });
   // Use PATH_HIGHLIGHT_STYLES.onPath as the single seam for on-path colour.
-  // Pass `style` so the lane styler matches the tree renderer's neutral column-0 style exactly.
-  const s = PATH_HIGHLIGHT_STYLES.onPath(style);
+  // Pass `style` and `colorize` so the lane/glyph stylers respect the colour gate.
+  const s = PATH_HIGHLIGHT_STYLES.onPath(style, colorize);
   const styledDirName = `${s.dirName(dirName)}${' '.repeat(Math.max(0, dirNameWidth - dirName.length))}`;
   const hashLength = MIGRATION_LIST_HASH_WIDTH;
   const emptySource = palette.emptySource;

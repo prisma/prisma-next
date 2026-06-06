@@ -107,6 +107,13 @@ export interface MigrateShowResult {
    * every graph-tree section. Only present in human (non-JSON) mode.
    */
   readonly runListDirNameWidth?: number;
+  /**
+   * Left-pad offset (number of blank spaces) matching the graph's data-column
+   * offset (`globalMaxEdgeTreePrefixWidth`). Used to align list rows with graph
+   * rows so every `→` in the output (graph + list) lands at the same column.
+   * Only present in human (non-JSON) mode when multiple spaces are rendered.
+   */
+  readonly runListLeftPad?: number;
 }
 
 export interface MigrateResult {
@@ -424,6 +431,7 @@ async function executeMigrateShowCommand(
   // Reuses the existing annotation hook — no parallel renderer.
   let graphOutput: string | undefined;
   let runListDirNameWidth: number | undefined;
+  let runListLeftPad: number | undefined;
   if (!flags.json) {
     const onPathHashes = new Set(orderedMigrations.map((m) => m.migrationHash));
     const colorize = flags.color !== false;
@@ -462,6 +470,7 @@ async function executeMigrateShowCommand(
         ? Math.max(globalMaxDirNameWidthFromLayouts, runListMaxFromMigrations)
         : undefined;
     runListDirNameWidth = globalMaxDirNameWidth ?? runListMaxFromMigrations;
+    runListLeftPad = globalMaxEdgeTreePrefixWidth;
 
     // Render each space section with globally computed widths.
     const showSpaceHeadings = allMembers.length > 1;
@@ -501,6 +510,7 @@ async function executeMigrateShowCommand(
     summary,
     ...(graphOutput !== undefined ? { graphOutput } : {}),
     ...(runListDirNameWidth !== undefined ? { runListDirNameWidth } : {}),
+    ...(runListLeftPad !== undefined ? { runListLeftPad } : {}),
   });
 }
 
@@ -513,8 +523,11 @@ function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags):
     lines.push(result.graphOutput);
     lines.push('');
   }
-  lines.push(result.summary);
-  if (result.migrations.length > 0) {
+  const n = result.migrations.length;
+  if (n > 0) {
+    // Consolidated header: one line replaces the old separate summary + blank +
+    // "Will run, in order:" header.
+    lines.push(`The following ${n} migration${n === 1 ? '' : 's'} will run:`);
     // Ordered list rendered through the SAME on-path row renderer as the tree.
     // `formatOnPathMigrationRow` uses PATH_HIGHLIGHT_STYLES.onPath so the list and
     // graph-tree rows are styled identically — changing the on-path colour in future
@@ -523,13 +536,16 @@ function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags):
     // graph-tree sections above it when multiple spaces are rendered.
     const dirNameWidth =
       result.runListDirNameWidth ?? Math.max(...result.migrations.map((m) => m.dirName.length));
-    lines.push('');
-    lines.push('Will run, in order:');
+    // Left-pad each list row by the graph's data-column offset so the list's
+    // dirName starts at the same column as graph rows, aligning every `→`.
+    const leftPad = ' '.repeat(result.runListLeftPad ?? 2);
     for (const m of result.migrations) {
       lines.push(
-        `  ${formatOnPathMigrationRow(m.dirName, m.from, m.to, dirNameWidth, colorize, 'unicode')}`,
+        `${leftPad}${formatOnPathMigrationRow(m.dirName, m.from, m.to, dirNameWidth, colorize, 'unicode')}`,
       );
     }
+  } else {
+    lines.push(result.summary);
   }
   return lines.join('\n');
 }

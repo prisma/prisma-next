@@ -1672,27 +1672,29 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     expect(noColorOutput).not.toContain('\x1b[');
   });
 
-  it('ANSI colour codes: off-path rows carry dim, on-path rows are ordinary (no green highlight), no rotation colour on off-path rows', () => {
+  it('ANSI colour codes: on-path lane glyphs carry green, on-path name bold, off-path rows carry dim, no rotation colour on off-path rows', () => {
     // This test verifies the actual ANSI escape codes emitted by the renderer.
     //
-    // The renderer uses forcedDim from createColors({ useColor: true }), which always
-    // emits ANSI regardless of the ambient NO_COLOR environment. On-path rows carry NO
-    // special override — they render in ordinary colours (the lane glyph column 0 may be
-    // dim via style.lane, but the migration name and hash are not forced-dim).
+    // PATH_HIGHLIGHT_STYLES.onPath uses forcedGreen (createColors({useColor:true}).greenBright)
+    // for lane/glyph/marker styling, so the branch glyphs trace the path in green.
+    // The name is bold-only (not green); hashes use their normal colours (cyan).
+    // PATH_HIGHLIGHT_STYLES.offPath uses forcedDim for every cell.
+    // Both are forced-ANSI, so they emit \x1b codes regardless of NO_COLOR in the environment.
     //
-    // Topology: branching graph at ∅ — off-path branch forks at column 1 (which would
-    // receive magenta in the rotation), on-path chain continues on column 0.
-    //   ∅ → offPathDest  (off-path, column 1 = normally magenta in LANE_COLOR_CYCLE)
-    //   ∅ → onPathDest   (on-path, column 0)
+    // Topology: branching graph at ∅ — off-path branch listed first (column 0),
+    // on-path branch listed second (column 1).
+    //   ∅ → off1111  (off-path, column 0)
+    //   ∅ → on22222  (on-path,  column 1)
     //
     // Assertions:
-    //   - on-path edge row does NOT contain \x1b[92m (greenBright) — no green highlight
-    //   - on-path edge/node row: 'will run' suffix is present (plain text, no colour wrapper)
+    //   - on-path edge row contains \x1b[92m (greenBright) — lane glyph is green
+    //   - on-path edge row: 'will run' suffix is present
+    //   - on-path node row contains \x1b[92m — node marker is green
     //   - off-path edge row contains \x1b[2m (dim)
-    //   - off-path node row (offPathDest hash) contains \x1b[2m
+    //   - off-path node row contains \x1b[2m
     //   - NO \x1b[31m (red) or \x1b[35m (magenta) on any off-path row
     //
-    // The GREEN_BRIGHT code is \x1b[92m; DIM is \x1b[2m; RED is \x1b[31m; MAGENTA is \x1b[35m.
+    // GREEN_BRIGHT = \x1b[92m; DIM = \x1b[2m; RED = \x1b[31m; MAGENTA = \x1b[35m.
     const GREEN_BRIGHT = '\x1b[92m';
     const DIM = '\x1b[2m';
     const RED = '\x1b[31m';
@@ -1711,21 +1713,19 @@ describe('renderMigrationGraphTree path highlight colors', () => {
 
     const lines = rendered.split('\n');
 
-    // On-path edge line: ordinary — must NOT have greenBright (no green highlight).
+    // On-path edge line: lane glyph must carry greenBright.
     // The 'will run' suffix confirms the on-path annotation was routed correctly.
-    // Rotation lane colours (magenta, etc.) are expected for branched lanes — on-path
-    // renders in its ordinary lane hue, not a forced colour.
     const onPathEdgeLine = lines.find((l) => l.includes(onPathEdge.dirName));
     expect(onPathEdgeLine, 'on-path edge line must exist').toBeDefined();
-    expect(onPathEdgeLine).not.toContain(GREEN_BRIGHT);
+    expect(onPathEdgeLine).toContain(GREEN_BRIGHT);
     expect(onPathEdgeLine).toContain('will run');
 
-    // On-path node line (the 'on22222' hash): must NOT have greenBright.
+    // On-path node line (the 'on22222' hash): node marker must carry greenBright.
     const onPathNodeLine = lines.find(
       (l) => l.includes('on22222') && !l.includes(onPathEdge.dirName),
     );
     expect(onPathNodeLine, 'on-path node line must exist').toBeDefined();
-    expect(onPathNodeLine).not.toContain(GREEN_BRIGHT);
+    expect(onPathNodeLine).toContain(GREEN_BRIGHT);
 
     // Off-path edge line: must have dim, must not have greenBright or rotation colours.
     const offPathEdgeLine = lines.find((l) => l.includes(offPathEdge.dirName));
@@ -1735,7 +1735,7 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     expect(offPathEdgeLine).not.toContain(RED);
     expect(offPathEdgeLine).not.toContain(MAGENTA);
 
-    // Off-path node line (the 'off1111' hash): must have dim.
+    // Off-path node line (the 'off1111' hash): must have dim, not greenBright.
     const offPathNodeLine = lines.find(
       (l) => l.includes('off1111') && !l.includes(offPathEdge.dirName),
     );
@@ -1745,13 +1745,13 @@ describe('renderMigrationGraphTree path highlight colors', () => {
     expect(offPathNodeLine).not.toContain(RED);
     expect(offPathNodeLine).not.toContain(MAGENTA);
 
-    // Connector row: off-path columns render dim, on-path columns render in their ordinary
-    // rotation colour. In this topology off_branch is column 0 (off-path → dim) and
-    // on_branch is column 1 (on-path → ordinary magenta). The connector must contain dim
-    // (for the off-path trunk) and must NOT contain GREEN_BRIGHT.
+    // Connector row: off-path columns render dim; on-path column renders green.
+    // In this topology off_branch is column 0 (off-path → dim) and
+    // on_branch is column 1 (on-path → green). The connector must contain green
+    // (for the on-path arc) and dim (for the off-path column).
     const connectorLine = lines.find((l) => l.includes('╯') || l.includes('/'));
     if (connectorLine !== undefined) {
-      expect(connectorLine).not.toContain(GREEN_BRIGHT);
+      expect(connectorLine).toContain(GREEN_BRIGHT);
       expect(connectorLine).toContain(DIM);
     }
   });
@@ -1972,18 +1972,19 @@ describe('renderMigrationGraphTree global column alignment', () => {
 
 describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
   // Tests verify the path-highlight colour model:
-  //   - app on-path rows and pgvector on-path rows use the same neutral style
-  //   - no rotation codes on any on-path cell (RED/MAGENTA/GREEN_BRIGHT suppressed)
+  //   - app on-path rows and pgvector on-path rows both carry GREEN_BRIGHT (\x1b[92m) on
+  //     their lane glyphs (forced-ANSI from PATH_HIGHLIGHT_STYLES.onPath)
+  //   - no rotation codes on on-path cells (RED/MAGENTA suppressed)
   //   - off-path rows carry forcedDim (\x1b[2m) — emitted via createColors({ useColor: true })
   //     even under NO_COLOR=1
-  //   - formatOnPathMigrationRow (run-list) and tree on-path rows share the same plain-text
-  //     dirName (identical under NO_COLOR=1 where ambient bold is identity)
+  //   - formatOnPathMigrationRow (run-list) and tree on-path rows share the same dirName text
   //   - normal graph/status/list rotation (laneColorForColumn) applies when no pathHighlight
   //     annotations are present, even when edgeAnnotationsByHash is provided
   //
   // Note: the on-path style uses ambient `bold()` which is identity under NO_COLOR=1.
-  // Bold is NOT asserted via \x1b[1m; instead we verify absence of rotation/dim codes.
-  // forcedDim (\x1b[2m) IS verifiable because it bypasses NO_COLOR.
+  // Bold is NOT asserted via \x1b[1m; instead we verify presence of GREEN_BRIGHT and
+  // absence of rotation/dim codes.
+  // forcedGreen (\x1b[92m) and forcedDim (\x1b[2m) both bypass NO_COLOR.
 
   const EMPTY = EMPTY_CONTRACT_HASH;
   const RED = '\x1b[31m';
@@ -2020,12 +2021,10 @@ describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
     });
   }
 
-  it('app on-path row and pgvector on-path row carry the same neutral style (no rotation codes)', () => {
-    // Both are single-path (column 0, no branching) — the canonical "neutral single-path style".
-    // Rotation is suppressed; both rows have the same structural codes: no RED, MAGENTA, GREEN_BRIGHT.
-    // Under NO_COLOR=1, ambient bold/dim are identity, so no ANSI codes except forcedDim appear
-    // on off-path. On-path rows render plain except for the `style.sourceHash` (dim+cyan) and
-    // `style.destHash` (cyanBright) which are ambient and therefore identity too.
+  it('app on-path row and pgvector on-path row both carry green on their lane glyphs (no rotation codes)', () => {
+    // Both are single-path (column 0, no branching).
+    // PATH_HIGHLIGHT_STYLES.onPath uses forcedGreen for lane glyphs — both rows must
+    // carry GREEN_BRIGHT (\x1b[92m). Rotation is suppressed (no RED/MAGENTA).
     const appEdge = edge(EMPTY, 'aaa1111', 'app_init');
     const pgEdge = edge(EMPTY, 'bbb2222', 'pgvector_init');
 
@@ -2042,13 +2041,13 @@ describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
     expect(appLine, 'app on-path edge line must exist').toBeDefined();
     expect(pgLine, 'pgvector on-path edge line must exist').toBeDefined();
 
-    // Neither on-path row must have rotation or green-highlight codes.
+    // On-path rows carry green on lane glyphs — no rotation colours.
+    expect(appLine).toContain(GREEN_BRIGHT);
     expect(appLine).not.toContain(RED);
     expect(appLine).not.toContain(MAGENTA);
-    expect(appLine).not.toContain(GREEN_BRIGHT);
+    expect(pgLine).toContain(GREEN_BRIGHT);
     expect(pgLine).not.toContain(RED);
     expect(pgLine).not.toContain(MAGENTA);
-    expect(pgLine).not.toContain(GREEN_BRIGHT);
 
     // Plain dirName text is present in both (ambient bold is identity under NO_COLOR=1).
     expect(appLine).toContain(appEdge.dirName);
@@ -2059,9 +2058,10 @@ describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
     expect(pgLine).not.toContain(DIM);
   });
 
-  it('on-path cells: no rotation codes even when the edge occupies a branched lane', () => {
+  it('on-path cells: green lane glyph, no rotation codes even when the edge occupies a branched lane', () => {
     // Branching topology: one on-path edge, one off-path. In normal mode the branched lane
     // gets a rotation colour (e.g. magenta). Path-highlight suppresses rotation for ALL cells.
+    // On-path rows carry GREEN_BRIGHT on lane glyphs instead of any rotation colour.
     const trunk = edge(EMPTY, 'trunk11', 'on_trunk'); // on-path
     const branch = edge(EMPTY, 'branch2', 'off_branch'); // off-path
 
@@ -2075,14 +2075,19 @@ describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
 
     const trunkLine = lines.find((l) => l.includes(trunk.dirName));
     expect(trunkLine, 'on-path trunk line must exist').toBeDefined();
+    // Lane glyph carries green; no rotation colours.
+    expect(trunkLine).toContain(GREEN_BRIGHT);
     expect(trunkLine).not.toContain(RED);
     expect(trunkLine).not.toContain(MAGENTA);
-    expect(trunkLine).not.toContain(GREEN_BRIGHT);
     // On-path rows are NOT force-dimmed.
     expect(trunkLine).not.toContain(DIM);
   });
 
-  it('off-path cells: every cell is forcedDim (\x1b[2m), no rotation or green', () => {
+  it('off-path cells: every off-path cell is forcedDim (\x1b[2m), no rotation codes', () => {
+    // The off-path edge row (column 1) may contain GREEN_BRIGHT from an on-path
+    // pass-through glyph at column 0 — that is expected and correct.
+    // The off-path cells themselves (the directed arc glyph + name + hash) carry DIM.
+    // The off-path node row (off2222) must carry DIM and no rotation codes.
     const onPath = edge(EMPTY, 'on11111', 'on_mig');
     const offPath = edge(EMPTY, 'off2222', 'off_mig');
 
@@ -2096,23 +2101,29 @@ describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
 
     const offEdgeLine = lines.find((l) => l.includes(offPath.dirName));
     expect(offEdgeLine, 'off-path edge line must exist').toBeDefined();
+    // The off-path arc glyph and name are wrapped in forcedDim.
     expect(offEdgeLine).toContain(DIM);
     expect(offEdgeLine).not.toContain(RED);
     expect(offEdgeLine).not.toContain(MAGENTA);
-    expect(offEdgeLine).not.toContain(GREEN_BRIGHT);
 
-    // Off-path node row (off2222 hash) must also be dim.
+    // Off-path node row (off2222 hash) must be dim and not carry rotation codes.
     const offNodeLine = lines.find((l) => l.includes('off2222') && !l.includes(offPath.dirName));
     expect(offNodeLine, 'off-path node line must exist').toBeDefined();
-    expect(offNodeLine).toContain(DIM);
     expect(offNodeLine).not.toContain(RED);
     expect(offNodeLine).not.toContain(MAGENTA);
+    // The off-path node marker (○) and its hash text are dim — the cell's own content is dimmed.
+    // A green on-path trunk pass-through │ in another column is allowed.
+    // Assert by checking the raw ANSI sequences: DIM wraps the node marker and hash.
+    expect(offNodeLine).toContain(`${DIM}○`); // node marker is dim
+    expect(offNodeLine).toContain(`${DIM}off2222`); // hash is dim
+    // The on-path trunk column passes through as a green │ — that green is expected and correct.
+    // It is NOT on the off-path cell's own node marker or hash.
   });
 
-  it('formatOnPathMigrationRow shares the same dirName text and no-rotation-code invariant as the tree on-path row', () => {
+  it('formatOnPathMigrationRow shares the same dirName text and green-lane invariant as the tree on-path row', () => {
     // The run-list and tree on-path rows use the same styling seam (PATH_HIGHLIGHT_STYLES.onPath).
-    // Under NO_COLOR=1, ambient bold is identity so the dirName appears as plain text in both.
-    // No rotation codes appear on either. The list row omits the gutter; the dirName text matches.
+    // Both carry GREEN_BRIGHT on lane/node glyphs. No rotation codes appear on either.
+    // The list row omits the gutter; the dirName text matches.
     const e = edge(EMPTY, 'dest123', 'run_list_mig');
     const annotations = new Map([[e.migrationHash, { pathHighlight: 'on-path' as const }]]);
 
@@ -2130,14 +2141,13 @@ describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
       'unicode',
     );
 
-    // Both contain the plain dirName (no dim or rotation wrapper).
+    // Both contain the plain dirName.
     expect(treeLine).toContain(e.dirName);
     expect(listRow).toContain(e.dirName);
 
     // Neither has rotation codes.
     expect(listRow).not.toContain(RED);
     expect(listRow).not.toContain(MAGENTA);
-    expect(listRow).not.toContain(GREEN_BRIGHT);
 
     // List row is not force-dimmed.
     expect(listRow).not.toContain(DIM);
