@@ -31,7 +31,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
@@ -163,9 +162,12 @@ describe('supabase external-schema classification (db init + db verify)', () => 
 
       // 2. Materialise the supabase extension contract space on disk.
       //
-      // The supabase pack carries `contractSpace` (contract + headRef +
-      // zero-ops baseline migration). We emit those artefacts so `db init`
-      // can discover the extension space and walk its migration graph.
+      // The supabase pack is migration-less: it declares only external schema
+      // (auth.* / storage.* are Supabase-managed tables). We emit the space
+      // artefacts (contract.json, refs/head.json) so `db init` discovers the
+      // extension space. No migration packages are written — the loader treats a
+      // zero-package space as all-external and the planner falls through to synth
+      // strategy (zero ops).
       const space = supabasePack.contractSpace;
       if (!space) throw new Error('supabasePack must carry a contractSpace');
 
@@ -174,10 +176,6 @@ describe('supabase external-schema classification (db init + db verify)', () => 
         contractDts: '// supabase extension contract space\n',
         headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
       });
-      const supabaseSpaceDir = join(migrationsDir, 'supabase');
-      for (const pkg of space.migrations) {
-        await materialiseMigrationPackage(supabaseSpaceDir, pkg);
-      }
 
       // 3. db init — plan mode.
       //
