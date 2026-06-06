@@ -3,13 +3,11 @@ import type { MongoControlAdapterDescriptor } from '@prisma-next/family-mongo/co
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type { Db } from 'mongodb';
 
+export type { MongoControlDriverInstance } from '@prisma-next/mongo-lowering';
 export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
 export { introspectSchema } from '../core/introspect-schema';
 export { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
-export {
-  createMongoControlDriver,
-  type MongoControlDriverInstance,
-} from '../core/mongo-control-driver';
+export { isMongoControlDriver } from '../core/mongo-control-driver';
 export {
   createMongoRunnerDeps,
   extractDb,
@@ -28,7 +26,6 @@ function controlDriverFromDb(db: Db): ControlDriverInstance<'mongo', 'mongo'> & 
     familyId: 'mongo',
     targetId: 'mongo',
     db,
-    query: () => Promise.reject(new Error('MongoDB control driver does not support SQL queries')),
     close: async () => {},
   };
 }

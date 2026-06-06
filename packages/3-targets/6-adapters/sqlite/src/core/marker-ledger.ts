@@ -1,4 +1,4 @@
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import {
   type AnyQueryAst,
   type LoweredStatement,
@@ -121,4 +121,4 @@ export function decodeSqliteMarkerRow(row: unknown): unknown {
   return { ...record, invariants: parsed };
 }
 
-export type SqliteMarkerWriteDriver = ControlDriverInstance<'sql', 'sqlite'>;
+export type SqliteMarkerWriteDriver = SqlControlDriverInstance<'sqlite'>;

@@ -49,19 +49,6 @@ describe('mongoControlDriver descriptor', () => {
     }
   });
 
-  it('query() throws since MongoDB does not support SQL', async () => {
-    const url = replSet.getUri('control_driver_query');
-    const driver = await mongoControlDriver.create(url);
-
-    try {
-      expect(() => driver.query('SELECT 1')).toThrow(
-        'MongoDB control driver does not support SQL queries',
-      );
-    } finally {
-      await driver.close();
-    }
-  });
-
   it('close() disconnects the client', async () => {
     const url = replSet.getUri('control_driver_close');
     const driver = await mongoControlDriver.create(url);

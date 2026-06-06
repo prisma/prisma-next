@@ -1,5 +1,14 @@
 import type { CodecTrait } from '@prisma-next/framework-components/codec';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type { ReferentialAction } from './ir/foreign-key';
+
+export interface SqlControlDriverInstance<T extends string = string>
+  extends ControlDriverInstance<'sql', T> {
+  query<Row = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[],
+  ): Promise<{ readonly rows: Row[] }>;
+}
 
 export { buildSqlNamespace, buildSqlNamespaceMap } from './ir/build-sql-namespace';
 export {

@@ -1,5 +1,4 @@
 import {
-  createMongoControlDriver,
   createMongoRunnerDeps,
   initMarker,
   introspectSchema,
@@ -7,6 +6,7 @@ import {
   readMarker,
 } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import type { MongoControlFamilyInstance } from '@prisma-next/family-mongo/control';
 import type {
   ControlFamilyInstance,
@@ -170,7 +170,7 @@ function fakeFamily(): ControlFamilyInstance<'mongo', MongoSchemaIR> {
 function makeRunner() {
   return new MongoMigrationRunner(
     createMongoRunnerDeps(
-      createMongoControlDriver(db, client),
+      new MongoControlDriver(db, client),
       MongoDriverImpl.fromDb(db),
       fakeFamily(),
     ),
@@ -924,7 +924,7 @@ describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', ()
     const runner = mongoTargetDescriptor.migrations.createRunner(
       fakeFamily() as MongoControlFamilyInstance,
     );
-    const driver = createMongoControlDriver(db, client);
+    const driver = new MongoControlDriver(db, client);
     const space = 'ledger-wrapper-test';
     const destHash = 'sha256:wrapper-dest';
     const midHash = 'sha256:wrapper-mid';
@@ -981,18 +981,11 @@ describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', ()
 });
 
 describe('MongoControlDriver', () => {
-  it('query() throws because MongoDB does not support SQL', () => {
-    const driver = createMongoControlDriver(db, client);
-    expect(() => driver.query('SELECT 1')).toThrow(
-      'MongoDB control driver does not support SQL queries',
-    );
-  });
-
   it('close() delegates to the underlying MongoClient', async () => {
     const closeClient = new MongoClient(replSet.getUri());
     await closeClient.connect();
     const closeDb = closeClient.db('close_test');
-    const driver = createMongoControlDriver(closeDb, closeClient);
+    const driver = new MongoControlDriver(closeDb, closeClient);
 
     await driver.close();
 

@@ -1,4 +1,4 @@
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { introspectPostgresEnumTypes, parsePostgresArray } from '../src/core/enum-control-hooks';
 import { ENUM_CODEC_ID } from './test-utils';
@@ -66,7 +66,7 @@ describe('parsePostgresArray', () => {
 describe('introspectPostgresEnumTypes', () => {
   function createMockDriver(
     rows: Array<{ schema_name: string; type_name: string; values: unknown }>,
-  ): ControlDriverInstance<'sql', 'postgres'> {
+  ): SqlControlDriverInstance<'postgres'> {
     return {
       familyId: 'sql',
       targetId: 'postgres',
@@ -129,7 +129,7 @@ describe('introspectPostgresEnumTypes', () => {
 
   it('defaults schema name to public when undefined', async () => {
     const expectedRows = [{ schema_name: 'public', type_name: 'role', values: ['USER'] }];
-    const driver: ControlDriverInstance<'sql', 'postgres'> = {
+    const driver: SqlControlDriverInstance<'postgres'> = {
       familyId: 'sql',
       targetId: 'postgres',
       query: async <Row>(_sql: string, params?: unknown[]) => {

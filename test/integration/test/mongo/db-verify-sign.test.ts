@@ -1,8 +1,6 @@
-import mongoAdapterDescriptor, {
-  createMongoControlDriver,
-  initMarker,
-} from '@prisma-next/adapter-mongo/control';
+import mongoAdapterDescriptor, { initMarker } from '@prisma-next/adapter-mongo/control';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 
 import {
   createMongoFamilyInstance,
@@ -95,7 +93,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
   }, timeouts.databaseOperation);
 
   function makeDriver() {
-    return createMongoControlDriver(db, client);
+    return new MongoControlDriver(db, client);
   }
 
   describe('verify (marker-only)', () => {

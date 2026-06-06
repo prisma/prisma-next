@@ -13,13 +13,10 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type {
-  ControlDriverInstance,
-  MigrationRunnerResult,
-} from '@prisma-next/framework-components/control';
+import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -171,7 +168,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   }
 
   async execute(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly perSpaceOptions: ReadonlyArray<
       SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>
     >;
