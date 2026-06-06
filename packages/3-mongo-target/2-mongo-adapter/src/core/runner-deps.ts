@@ -19,8 +19,8 @@ import { isMongoControlDriver } from './mongo-control-driver';
 export function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
   if (!isMongoControlDriver(driver)) {
     throw new Error(
-      'Mongo control driver does not expose a db property. ' +
-        'Use mongoControlDriver.create() from `@prisma-next/driver-mongo/control`.',
+      'Expected a Mongo control driver created by ' +
+        'mongoControlDriver.create() from `@prisma-next/driver-mongo/control`.',
     );
   }
   return driver.db;
