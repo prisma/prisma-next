@@ -137,7 +137,8 @@ export function integrityViolationToCheckFailure(
       };
     case 'namespaceOwnershipCollision':
       return {
-        pnCode: 'PN-MIG-CHECK-017',
+        space: 'app',
+        code: 'PN-MIG-CHECK-017',
         where: migrationPathRelative(migrationsDir),
         why: `Namespace primitive "${violation.name}" (kind "${violation.primitiveKind}") in namespace "${violation.namespace}" is claimed by multiple contract spaces: ${violation.contributorSpaceIds.join(', ')}.`,
         fix: 'Update the contracts so each namespace primitive is owned by exactly one contract space.',
