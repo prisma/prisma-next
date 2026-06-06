@@ -7,8 +7,8 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
-  type ContractSpaceAggregate,
   type ContractSpaceMember,
+  collectAggregateNamespaces,
   requireHeadRef,
   type VerifierOutput,
   verifyMigration,
@@ -106,7 +106,7 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
         driver,
         familyInstance,
         onProgress,
-        contract: buildAggregateIntrospectContract(aggregate),
+        contract: collectAggregateNamespaces(aggregate),
       });
 
   emitVerifySpan(onProgress, 'spanStart');
@@ -136,7 +136,7 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
   driver: ControlDriverInstance<TFamilyId, TTargetId>;
   familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   onProgress: OnControlProgress | undefined;
-  contract: Record<string, unknown>;
+  contract: unknown;
 }): Promise<unknown> {
   const { driver, familyInstance, onProgress, contract } = args;
   onProgress?.({
@@ -350,40 +350,4 @@ function mapMarkerCheckFailures(
     docsUrl: 'https://pris.ly/contract-spaces',
     meta: { violations },
   });
-}
-
-/**
- * Builds a synthetic contract-like object whose `storage.namespaces` key set
- * is the union of every namespace declared across all members of the aggregate
- * (app + extensions). Passed to `familyInstance.introspect` so the Postgres
- * adapter walks every declared schema rather than falling back to `public`
- * only — the fallback is correct for single-namespace contracts but wrong for
- * composed contracts that declare tables in additional schemas (e.g. the
- * Supabase extension's `auth` and `storage`).
- *
- * The object is structurally minimal: `extractContractNamespaceIds` in the
- * Postgres adapter only reads `contract.storage.namespaces` as a plain record
- * and returns `Object.keys(namespaces)`. No other fields are required.
- */
-function buildAggregateIntrospectContract(
-  aggregate: ContractSpaceAggregate,
-): Record<string, unknown> {
-  const allNamespaces: Record<string, unknown> = {};
-  for (const member of aggregate.spaces()) {
-    try {
-      const contract = member.contract();
-      const namespaces = (contract.storage as { namespaces?: Record<string, unknown> }).namespaces;
-      if (namespaces !== null && typeof namespaces === 'object') {
-        for (const key of Object.keys(namespaces)) {
-          allNamespaces[key] = namespaces[key];
-        }
-      }
-    } catch {
-      // If a member's contract is unreadable at this point, skip it.
-      // Integrity checks elsewhere surface the unreadable contract as a
-      // structured violation; swallowing here keeps introspection from
-      // failing before the planner has a chance to surface the error.
-    }
-  }
-  return { storage: { namespaces: allNamespaces } };
 }
