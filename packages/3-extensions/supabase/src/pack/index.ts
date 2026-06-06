@@ -1,5 +1,6 @@
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import { blindCast } from '@prisma-next/utils/casts';
+import packageJson from '../../package.json' with { type: 'json' };
 import type { Contract } from '../contract/contract.d';
 import contractJson from '../contract/contract.json' with { type: 'json' };
 
@@ -24,7 +25,7 @@ const supabasePackBase = {
   id: SUPABASE_SPACE_ID,
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
-  version: '0.12.0',
+  version: packageJson.version,
   contractSpace: supabaseContractSpace,
   create: () => ({
     familyId: 'sql' as const,

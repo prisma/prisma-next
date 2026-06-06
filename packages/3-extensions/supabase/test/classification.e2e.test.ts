@@ -17,9 +17,9 @@
  * verify` via the control client and asserts the per-space plan operations
  * and per-space verify results.
  *
- * Shim strategy: the external table seed SQL is inlined here so this test
- * is self-contained. The walking skeleton in `examples/supabase/test/`
- * uses the same SQL via `bootstrapSupabaseShim` from that package.
+ * Shim strategy: the external table seed SQL lives in `./supabase-bootstrap`
+ * and is shared with the walking skeleton in `examples/supabase/test/`
+ * via the `@prisma-next/extension-supabase/test/utils` subpath export.
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -35,14 +35,10 @@ import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces'
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
-import {
-  applicationDomainOf,
-  createDevDatabase,
-  timeouts,
-  withClient,
-} from '@prisma-next/test-utils';
+import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
+import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
 /**
  * Minimal app contract: a single `public` schema with a `profile` table.
@@ -83,56 +79,6 @@ function buildAppContract(): Contract<SqlStorage> {
   };
 }
 
-/**
- * Seeds a Postgres database with the external Supabase schemas and tables.
- * Mirrors the shape declared in the supabase extension's contract.json so the
- * verifier's external-policy check (`declaredMissing` → fail) is satisfied.
- */
-async function seedExternalSupabaseTables(connectionString: string): Promise<void> {
-  await withClient(connectionString, async (client) => {
-    await client.query('CREATE SCHEMA IF NOT EXISTS auth');
-    await client.query('CREATE SCHEMA IF NOT EXISTS storage');
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS auth.users (
-        id          uuid        NOT NULL,
-        email       text        NOT NULL,
-        created_at  timestamptz NOT NULL,
-        updated_at  timestamptz NOT NULL,
-        PRIMARY KEY (id)
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS auth.identities (
-        id          uuid        NOT NULL,
-        user_id     uuid        NOT NULL,
-        provider    text        NOT NULL,
-        created_at  timestamptz NOT NULL,
-        updated_at  timestamptz NOT NULL,
-        PRIMARY KEY (id)
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS storage.buckets (
-        id          text        NOT NULL,
-        name        text        NOT NULL,
-        created_at  timestamptz NOT NULL,
-        updated_at  timestamptz NOT NULL,
-        PRIMARY KEY (id)
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS storage.objects (
-        id          uuid        NOT NULL,
-        bucket_id   text        NOT NULL,
-        name        text        NOT NULL,
-        created_at  timestamptz NOT NULL,
-        updated_at  timestamptz NOT NULL,
-        PRIMARY KEY (id)
-      )
-    `);
-  });
-}
-
 describe('supabase external-schema classification (db init + db verify)', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let migrationsDir: string;
@@ -158,7 +104,7 @@ describe('supabase external-schema classification (db init + db verify)', () => 
       // The verifier's `external` policy confirms declared tables exist.
       // Without this seed, `db verify` would fail with `declaredMissing`
       // for every auth.*/storage.* table.
-      await seedExternalSupabaseTables(connectionString);
+      await bootstrapSupabaseShim(connectionString);
 
       // 2. Materialise the supabase extension contract space on disk.
       //
