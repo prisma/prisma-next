@@ -448,15 +448,14 @@ export function findNamespaceOwnershipCollisions(
     }
   }
 
-  return [...collisions.keys()].sort().map((key) => {
-    const c = collisions.get(key)!;
-    return {
+  return [...collisions.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([, c]) => ({
       namespaceId: c.namespaceId,
       entityKind: c.entityKind,
       name: c.name,
       contributorSpaceIds: [...c.contributors].sort(),
-    };
-  });
+    }));
 }
 
 export function buildExtensionLoadOrder(
@@ -494,7 +493,8 @@ export function buildExtensionLoadOrder(
 
   const result: string[] = [];
   while (queue.length > 0) {
-    const id = queue.shift()!;
+    const id = queue.shift();
+    if (id === undefined) break;
     result.push(id);
     const children = dependents.get(id) ?? [];
     children.sort();
