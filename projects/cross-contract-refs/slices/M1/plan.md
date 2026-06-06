@@ -36,6 +36,13 @@ ACs owned by M1: **AC6** (collision + cycle rejection), **AC8** (round-trip prop
   - **Namespace-ownership collision (A)** — must include the **app contract**, which is NOT present at `createSqlFamilyInstance` (the `ControlStack` carries extension descriptors only). App + extensions first meet at the migration-tools **aggregate** (`packages/1-framework/3-tooling/migration/src/aggregate/loader.ts` `loadContractSpaceAggregate`), whose integrity gate `computeIntegrityViolations` (`check-integrity.ts`) already hosts cross-space checks. Wire `assertNoNamespaceOwnershipCollisions` there as a new `IntegrityViolation` kind, over `[app, ...extensions]`. This matches the plan's original "on the loaded aggregate" wording; the round-1 placement in `control-stack.ts`/SQL-family was wrong. Layering: the check *logic* stays in `framework-components` (1-core); 3-tooling calling it is allowed (no new layering, NFR4 holds).
 - **dispatch-INVEST:** Small, Testable, Valuable (the ownership guarantees AC6 + FR14 require).
 
+## Dispatch M1.4 — simplify FK carrier (operator decision A)
+
+- **Outcome:** drop the redundant `origin: 'local' | 'space'` discriminator from `ForeignKeyReference`; discriminate cross-space purely on **`spaceId` presence** (absent → local, present → cross-space). `origin` carried no information `spaceId`'s presence didn't already carry, and forced a `spaceId?: never` + discriminated-union just to keep the two fields in sync.
+- **Decision (2026-06-05, operator-approved):** **A** — keep `spaceId` optional (absent = local), preserving **NFR2** (local FKs still serialize byte-identically; dropping `origin` doesn't change local JSON, since local never carried it). The non-optional/uniform alternative (B) was rejected because it would re-hash every existing local-FK contract and churn fixtures.
+- **Touches:** `foreign-key-reference.ts` (remove `origin`, collapse the local/space input union to a single `{ namespaceId, tableName, columns, spaceId?: string }` shape), `validators.ts` (collapse the two ref schemas into one with `'spaceId?': 'string'`, keep the `satisfies Type<…>` guards), and **every reader of `origin`** — at least `validateSqlStorageConsistency`'s target-existence skip and the SQL-family `assertNoCrossSpaceFkReverseReferences` check, both of which switch from `origin === 'space'` to `spaceId !== undefined`. Plus the affected tests.
+- **Why now:** M1 is in review (PR #745), before M2's authoring surface produces these carriers — the right moment to fix the shape.
+
 ## Slice DoD
 
 - AC6 + AC8 demonstrated by tests; AC10 (`lint:deps`) green; AC9 regression (existing local-FK tests pass).
