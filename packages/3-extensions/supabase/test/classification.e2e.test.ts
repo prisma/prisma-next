@@ -59,16 +59,18 @@ function buildAppContract(): Contract<SqlStorage> {
       namespaces: {
         public: buildSqlNamespace({
           id: 'public',
-          tables: {
-            profile: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/text@1', nullable: false },
-                username: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          entries: {
+            table: {
+              profile: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/text@1', nullable: false },
+                  username: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         }),
