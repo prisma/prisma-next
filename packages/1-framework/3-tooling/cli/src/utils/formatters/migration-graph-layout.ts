@@ -1093,7 +1093,10 @@ function layoutComponent(
   ): void {
     ensureGridWidth(endLane + 1);
     const activeLanes = new Set(activeLaneIndices());
-    const trunkEdgeHash = laneEdgeByIndex.get(startLane);
+    // Prefer the fanEdgeHashByLane entry for startLane (the downward fanout edge
+    // leaving this node) over laneEdgeByIndex, which may still hold the hash of
+    // the last skip-rollback emitted into that lane before the branch-connector.
+    const trunkEdgeHash = fanEdgeHashByLane.get(startLane) ?? laneEdgeByIndex.get(startLane);
     rows.push({
       kind: 'branch-connector',
       contractHash,
@@ -1219,6 +1222,20 @@ function layoutComponent(
         if (firstEdge !== undefined) fanEdgeHashByLane.set(lane, firstEdge.migrationHash);
       }
       emitBranchConnector(node, column, endLane, groups.length, laneForGroup, fanEdgeHashByLane);
+
+      // Pre-populate laneEdgeByIndex for every fan lane (including lane 0 / trunk) with the
+      // representative edge hash BEFORE emitting any edge rows. Without this, when groupIndex=0's
+      // edge rows are emitted first, the pass-through cells for groupIndex≥1 lanes carry no hash
+      // (laneEdgeByIndex has no entry yet for those lanes) and fall through to whatever annotation
+      // the row's default override is — often the wrong colour.
+      for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+        const fanLane = laneForGroup[groupIndex];
+        if (fanLane === undefined) continue;
+        const fanHash = fanEdgeHashByLane.get(fanLane);
+        if (fanHash !== undefined) {
+          laneEdgeByIndex.set(fanLane, fanHash);
+        }
+      }
     }
 
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {

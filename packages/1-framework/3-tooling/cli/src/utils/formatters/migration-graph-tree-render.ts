@@ -304,8 +304,10 @@ function renderConnectorTee(
  * the connector follows the arc it belongs to (its owning back-lane hue).
  * Direction arrows are handled elsewhere — they take their edge's lane hue too.
  *
- * When `laneOverride` is provided (for path-highlight rows), it replaces both
- * the marker and connector stylers so no rotation hue bleeds through.
+ * When `laneOverride` is provided (for path-highlight rows), it replaces the
+ * marker styler. `arcLaneOverride` (if provided) replaces the connector styler
+ * independently — this matters when the node is on-path but the arc belongs to
+ * an off-path rollback edge, which must render dim rather than green.
  */
 function renderNodeMarkerPair(
   pair: string,
@@ -314,9 +316,11 @@ function renderNodeMarkerPair(
   colorize: boolean,
   style: MigrationListStyler,
   laneOverride?: (text: string) => string,
+  arcLaneOverride?: (text: string) => string,
 ): string {
   const marker = laneOverride ?? laneStylerForColumn(nodeColumn, colorize, style);
-  const connector = laneOverride ?? laneStylerForColumn(arcColumn, colorize, style);
+  const connector =
+    arcLaneOverride ?? laneOverride ?? laneStylerForColumn(arcColumn, colorize, style);
   return marker(pair.slice(0, 1)) + connector(pair.slice(1));
 }
 
@@ -329,6 +333,7 @@ function renderCellPair(
   palette: MigrationGraphTreeGlyphPalette,
   laneOverride?: (text: string) => string,
   arrowOverride?: (text: string) => string,
+  arcLaneOverride?: (text: string) => string,
 ): string {
   const laneColumn = colors.lane[column] ?? column;
   // In path-highlight mode (`laneOverride` present), the rotating lane colour is
@@ -351,6 +356,7 @@ function renderCellPair(
           colorize,
           style,
           laneOverride,
+          arcLaneOverride,
         );
       }
       if (cell.arcTee === true) {
@@ -361,6 +367,7 @@ function renderCellPair(
           colorize,
           style,
           laneOverride,
+          arcLaneOverride,
         );
       }
       return lane(palette.node);
@@ -482,9 +489,18 @@ function renderConnectorRow(
           case 'horizontal-pass':
             out += effectiveOverride(palette.horizontalPass);
             break;
-          case 'arc-crossing':
-            out += effectiveOverride(palette.arcCrossing);
+          case 'arc-crossing': {
+            // The junction glyph (┼) belongs to the vertical lane (effectiveOverride).
+            // The trailing dash (─) runs horizontally into the next column — it belongs
+            // to that column's owner (dashColumn). Use the dash column's override so an
+            // off-path horizontal continuation is dim even when the crossing is on-path.
+            const arcCrossingDashOverride =
+              columnLaneOverride?.get(dashColumn) ?? effectiveOverride;
+            out +=
+              effectiveOverride(palette.arcCrossing.slice(0, 1)) +
+              arcCrossingDashOverride(palette.arcCrossing.slice(1));
             break;
+          }
           default:
             out += '  ';
         }
@@ -969,6 +985,7 @@ export function renderMigrationGraphTree(
       .map((cell, column) => {
         let laneOverride = rowLaneOverride;
         let arrowOverride = rowArrowOverride;
+        let arcLaneOverride: ((text: string) => string) | undefined;
         if (pathHighlightActive) {
           if (cell.kind === 'edge-lane') {
             // Own cell: colour comes from this cell's own edge annotation.
@@ -977,6 +994,22 @@ export function renderMigrationGraphTree(
             )?.pathHighlight;
             laneOverride = pathLaneFor(cellHighlight);
             arrowOverride = pathArrowFor(cellHighlight);
+          } else if (cell.kind === 'node' && (cell.arcTee === true || cell.arcLand === true)) {
+            // Node with arc decoration: the node marker takes the node's own row highlight
+            // (rowLaneOverride), but the arc connector belongs to the back-arc edge which may
+            // have a different annotation. Look up the arc cell's migrationHash to derive the
+            // arc connector's colour independently.
+            const arcColumn = cellColors.connector[column] ?? NEUTRAL_LANE_COLUMN;
+            const arcCell = row.cells[arcColumn];
+            const arcHash =
+              arcCell !== undefined && 'migrationHash' in arcCell
+                ? arcCell.migrationHash
+                : undefined;
+            if (arcHash !== undefined) {
+              const arcHighlight = opts.edgeAnnotationsByHash?.get(arcHash)?.pathHighlight;
+              arcLaneOverride = pathLaneFor(arcHighlight);
+            }
+            // laneOverride stays as rowLaneOverride (the node marker colour)
           } else if (cell.kind !== 'node' && cell.kind !== 'empty') {
             // Routing cells (vertical-pass, branch-tee, merge-corner, arc-*, horizontal-pass):
             // each carries a migrationHash for the edge it belongs to. Classify by that hash.
@@ -991,7 +1024,7 @@ export function renderMigrationGraphTree(
               arrowOverride = pathArrowFor(cellHighlight);
             }
           }
-          // node cells fall through to rowLaneOverride (derived from contractHighlights)
+          // plain node cells (no arcTee/arcLand) fall through to rowLaneOverride
         }
         return renderCellPair(
           cell,
@@ -1002,6 +1035,7 @@ export function renderMigrationGraphTree(
           palette,
           laneOverride,
           arrowOverride,
+          arcLaneOverride,
         );
       })
       .join('');

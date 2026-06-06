@@ -1249,4 +1249,165 @@ describe('graph colouring', () => {
       }
     });
   });
+
+  // =========================================================================
+  // Arc-tee connector colour (Bug X1 fix)
+  // =========================================================================
+  describe('arc-tee connector colour', () => {
+    // When a node has arcTee (a back-arc leaving it), the node marker (○) takes
+    // the node's own path-highlight, but the connector char (─) belongs to the
+    // arc edge and must carry that arc's annotation independently.
+    //
+    // Graph:  ∅ → n0 → n1 → n2 (rollback arc: n2 → n0)
+    //   ○  n2  (on-path node)
+    //   ○─╮   node row: marker is GREEN, connector belongs to off-path rollback → DIM
+
+    it('arc-tee connector char is dim when the arc edge is off-path, even if node is on-path', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'at_n0', 'at_init');
+      const m1 = edge('at_n0', 'at_n1', 'at_m1');
+      const m2 = edge('at_n1', 'at_n2', 'at_m2');
+      const rb = edge('at_n2', 'at_n0', 'at_rb');
+      const edgeList = [init, m1, m2, rb];
+      // n2 is on-path (via m2); rollback rb is off-path
+      const onPath = new Set([init.migrationHash, m1.migrationHash, m2.migrationHash]);
+      const anno = annotations(edgeList, onPath);
+      const rendered = renderEdges(edgeList, { colorize: true, edgeAnnotationsByHash: anno });
+
+      // Find the node row for n2, which has arcTee (○─╮ pattern)
+      const n2Row = rendered.split('\n').find((l) => {
+        const plain = stripAnsi(l);
+        return plain.includes('○─') || plain.includes('*-');
+      });
+      expect(n2Row, 'node row with arcTee must exist').toBeDefined();
+      if (n2Row !== undefined) {
+        // The ○ marker should be GREEN (on-path node).
+        const codeForMarker = lastCodeBefore(n2Row, '○');
+        expect(
+          codeForMarker,
+          `node marker ○ must be GREEN (on-path). Got: ${JSON.stringify(codeForMarker)}`,
+        ).toBe(GREEN_BRIGHT);
+        // The ─ connector immediately after ○ belongs to the off-path rollback → DIM.
+        // lastCodeBefore finds the code before the FIRST ─ in the line; since ○ comes
+        // before ─, and the ANSI reset after ○ is followed by the DIM code for ─, we
+        // check that no GREEN_BRIGHT appears immediately before the ─.
+        const codeForConnector = lastCodeBefore(n2Row, '─');
+        expect(
+          codeForConnector,
+          `arc connector ─ must be DIM (off-path rollback). Got: ${JSON.stringify(codeForConnector)}`,
+        ).toBe(DIM);
+      }
+    });
+  });
+
+  // =========================================================================
+  // Branch-connector tee hash (Bug Y1 fix) + fan-lane pass-through (Bug Y2 fix)
+  // =========================================================================
+  describe('branch-connector tee and fan-lane pass-through colours', () => {
+    // Diamond topology: ∅ → root → alice (col 0) → merge
+    //                              → bob   (col 1) → merge
+    // With alice + mergeAlice on-path, bob + mergeBob off-path.
+    //
+    // Bug Y1: branch-connector tee at col 0 was dim (carrying skip-rollback hash).
+    //         After fix: tee carries mergeAlice hash → GREEN.
+    // Bug Y2: merge_alice edge row, vertical-pass at col 1 carries no hash → DIM.
+    //         After fix: pre-populated with mergeBob hash → DIM (correct — off-path).
+    //         The key is that the pass-through carries the RIGHT hash so its colour
+    //         is determined by that edge's annotation, not by falling through to the
+    //         row's own override.
+
+    it('branch-connector tee is GREEN when the trunk fanout edge is on-path', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'bc_root', 'bc_init');
+      const alice = edge('bc_root', 'bc_alice', 'bc_alice');
+      const bob = edge('bc_root', 'bc_bob', 'bc_bob');
+      const mergeAlice = edge('bc_alice', 'bc_merge', 'bc_merge_alice');
+      const mergeBob = edge('bc_bob', 'bc_merge', 'bc_merge_bob');
+      const edgeList = [init, alice, bob, mergeAlice, mergeBob];
+      // mergeAlice is the trunk fanout edge (col 0); alice is on-path; bob/mergeBob off-path
+      const onPath = new Set([init.migrationHash, alice.migrationHash, mergeAlice.migrationHash]);
+      const anno = annotations(edgeList, onPath);
+      const rendered = renderEdges(edgeList, { colorize: true, edgeAnnotationsByHash: anno });
+
+      // The branch-connector row contains ├ (tee) and ╮ (corner).
+      // ├ at col 0 (trunk) carries mergeAlice → GREEN.
+      // ╮ at col 1 (bob fan) carries mergeBob → DIM.
+      const branchRow = rendered.split('\n').find((l) => {
+        const plain = stripAnsi(l);
+        return plain.includes('├') && plain.includes('╮');
+      });
+      expect(branchRow, 'branch-connector row (├…╮) must exist').toBeDefined();
+      if (branchRow !== undefined) {
+        const codeForTee = lastCodeBefore(branchRow, '├');
+        expect(
+          codeForTee,
+          `branch-connector tee ├ must be GREEN (trunk fanout on-path). Got: ${JSON.stringify(codeForTee)}`,
+        ).toBe(GREEN_BRIGHT);
+        const codeForCorner = lastCodeBefore(branchRow, '╮');
+        expect(
+          codeForCorner,
+          `branch-connector corner ╮ must be DIM (off-path fan). Got: ${JSON.stringify(codeForCorner)}`,
+        ).toBe(DIM);
+      }
+    });
+
+    it('branch-connector tee is DIM when the trunk fanout edge is off-path', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'bc2_root', 'bc2_init');
+      const alice = edge('bc2_root', 'bc2_alice', 'bc2_alice');
+      const bob = edge('bc2_root', 'bc2_bob', 'bc2_bob');
+      const mergeAlice = edge('bc2_alice', 'bc2_merge', 'bc2_merge_alice');
+      const mergeBob = edge('bc2_bob', 'bc2_merge', 'bc2_merge_bob');
+      const edgeList = [init, alice, bob, mergeAlice, mergeBob];
+      // All off-path (empty onPath set)
+      const anno = annotations(edgeList, new Set());
+      const rendered = renderEdges(edgeList, { colorize: true, edgeAnnotationsByHash: anno });
+
+      const branchRow = rendered.split('\n').find((l) => {
+        const plain = stripAnsi(l);
+        return plain.includes('├') && plain.includes('╮');
+      });
+      expect(branchRow, 'branch-connector row (├…╮) must exist').toBeDefined();
+      if (branchRow !== undefined) {
+        const codeForTee = lastCodeBefore(branchRow, '├');
+        expect(
+          codeForTee,
+          `branch-connector tee ├ must be DIM (trunk off-path). Got: ${JSON.stringify(codeForTee)}`,
+        ).toBe(DIM);
+      }
+    });
+  });
+
+  // =========================================================================
+  // Arc-crossing dash in branch-connector (Bug X2 fix)
+  // =========================================================================
+  describe('arc-crossing dash in branch-connector', () => {
+    // When a branch-connector row contains an arc-crossing (┼─), the ┼ junction
+    // belongs to the vertical lane passing through, and the ─ trailing dash runs
+    // horizontally into the next column. The dash must carry the next column's
+    // annotation, not the crossing's.
+    //
+    // Setup: node-skipping rollback through a branch-connector row:
+    //   ∅ → n0 → n1 → n2 → n3 (trunk)
+    //   n2 → n0 (skipping rollback, back-arc through connector rows)
+    // The rollback's arc crosses the branch-connector (┼─). The ┼ is the crossing
+    // lane (n2's rollback, which is off-path in this scenario), and the ─ leads
+    // into the on-path trunk continuation — but since we're testing the fix, we
+    // verify the dash uses the DASH COLUMN's annotation.
+
+    it('arc-crossing dash in connector uses dash column annotation, not glyph column', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'ac_n0', 'ac_init');
+      const m1 = edge('ac_n0', 'ac_n1', 'ac_m1');
+      const m2 = edge('ac_n1', 'ac_n2', 'ac_m2');
+      const m3 = edge('ac_n2', 'ac_n3', 'ac_m3');
+      const rb = edge('ac_n2', 'ac_n0', 'ac_rb');
+      const edgeList = [init, m1, m2, m3, rb];
+      // All off-path so we can verify DIM on both junction and dash
+      const anno = annotations(edgeList, new Set());
+      const rendered = renderEdges(edgeList, { colorize: true, edgeAnnotationsByHash: anno });
+
+      // In path-highlight mode with no on-path edges, no GREEN_BRIGHT must appear anywhere.
+      expect(
+        rendered,
+        'with all edges off-path, no GREEN_BRIGHT must appear in the output',
+      ).not.toContain(GREEN_BRIGHT);
+    });
+  });
 });

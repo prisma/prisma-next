@@ -101,15 +101,17 @@ describe('per-cell edge identity — fork+merge diamond', () => {
     expect(cellHash(cornerCell)).toBe(mergeBob.migrationHash);
   });
 
-  it('branch-connector tee (trunk lane) has no hash when emitted before any edge row', () => {
-    // The branch-connector is emitted before its child edge rows, so the
-    // trunk lane has not yet been populated in laneEdgeByIndex.
+  it('branch-connector tee (trunk lane) carries the trunk fanout edge hash', () => {
+    // The branch-connector uses fanEdgeHashByLane for the trunk lane so the tee
+    // carries the representative edge hash for the downward fanout (mergeAlice),
+    // not undefined (which it would be if laneEdgeByIndex were consulted before
+    // any edge row was emitted into that lane).
     const model = layout([init, alice, bob, mergeAlice, mergeBob]);
     const branchRow = model.rows.find((r) => r.kind === 'branch-connector');
     expect(branchRow).toBeDefined();
     const teeCell = branchRow?.cells[0];
     expect(teeCell?.kind).toBe('branch-tee');
-    expect(cellHash(teeCell)).toBeUndefined();
+    expect(cellHash(teeCell)).toBe(mergeAlice.migrationHash);
   });
 
   it('merge-connector tee carries the incoming alice edge hash', () => {
@@ -257,5 +259,50 @@ describe('per-cell edge identity — node-skipping rollback', () => {
       expect(cell?.kind).toBe('vertical-pass');
       expect(cellHash(cell)).toBe(rb.migrationHash);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fan-lane pass-through identity.
+//
+// When a node fans out into multiple groups, the branch-connector is emitted
+// before any of the fan's edge rows. Without pre-populating laneEdgeByIndex
+// for every fan lane, vertical-pass cells in peer group edge rows carry no
+// hash (laneEdgeByIndex has no entry for lanes not yet written). Fix 4
+// pre-populates every fan lane so pass-through cells carry the right hash.
+//
+// Layout (tips at top):
+//   ○     tip
+//   ├─╮   branch-connector (startLane=0, endLane=1)
+//   │↑│   merge_alice / merge_bob (peer edge rows)
+//   ○ │   alice
+//   │↑│   alice_add_phone / (lane-1 pass-through)
+//   │ ○   bob
+//   │↑    bob_add_avatar
+//   ├─╯   merge-connector
+//   ○     root
+//   │↑    init
+//   ○     ∅
+// ---------------------------------------------------------------------------
+
+describe('per-cell edge identity — fan-lane pass-through', () => {
+  const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
+  const alice = edge('root', 'alice', 'alice_add_phone');
+  const bob = edge('root', 'bob', 'bob_add_avatar');
+  const mergeAlice = edge('alice', 'tip', 'merge_alice');
+  const mergeBob = edge('bob', 'tip', 'merge_bob');
+
+  it('vertical-pass at fan lane 1 on merge_alice edge row carries merge_bob hash', () => {
+    // merge_alice (lane 0) is emitted first. At that point, lane 1 has been
+    // pre-populated with merge_bob.migrationHash via Fix 4, so the vertical-pass
+    // at lane 1 on the merge_alice row carries merge_bob.migrationHash.
+    const model = layout([init, alice, bob, mergeAlice, mergeBob]);
+    const mergeAliceRow = model.rows.find(
+      (r) => r.kind === 'edge' && r.edge?.migrationHash === mergeAlice.migrationHash,
+    );
+    expect(mergeAliceRow).toBeDefined();
+    const passCell = mergeAliceRow?.cells[1];
+    expect(passCell?.kind).toBe('vertical-pass');
+    expect(cellHash(passCell)).toBe(mergeBob.migrationHash);
   });
 });
