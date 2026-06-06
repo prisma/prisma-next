@@ -1,5 +1,11 @@
 import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
-  entry: ['src/exports/pack.ts', 'src/exports/runtime.ts'],
+  entry: {
+    pack: 'src/exports/pack.ts',
+    runtime: 'src/exports/runtime.ts',
+    'test/utils': 'test/supabase-bootstrap.ts',
+  },
+  // Keep manual exports to preserve stable root/subpath mapping.
+  exports: { enabled: false },
 });

@@ -3648,6 +3648,12 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:0.12.0
         version: link:../../0-config/tsdown
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.20.0
+      pg:
+        specifier: 'catalog:'
+        version: 8.20.0
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(tsx@4.22.3)(typescript@5.9.3)
