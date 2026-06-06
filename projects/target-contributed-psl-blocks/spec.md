@@ -53,9 +53,13 @@ The lowering factory (`entityTypes`) is *not* folded into the PSL-block descript
 
 So this project keeps the link as a validated reference: a PSL-block descriptor **requires** a matching `entityTypes` factory (same discriminator); an `entityTypes` factory does **not** require a PSL-block descriptor. Revisiting this asymmetry is explicitly TML-2815's domain.
 
-### The `entries` pattern is an IR-layer concept, not a PSL-AST one
+### The PSL AST converges on the IR's `entries` coordinate shape
 
-ADR 224 (merged) addresses contract-IR namespace concretions by coordinate: `storage.namespaces[id].entries[kind][name]`. That `entries` shape lives on the *lowered* IR objects (`PostgresSchema`, `MongoBoundNamespace`). It does **not** apply to the PSL AST's `PslNamespace`, which ADR 224 deliberately left on its per-kind slots (`models` / `enums` / `compositeTypes`). This project's AST slot lives at the PSL-AST layer, so it follows the per-kind-slot shape of that layer, not the IR's `entries` shape. (Migrating the whole PSL AST to an `entries` shape is a separate framework-wide change — out of scope here; see non-goals.)
+ADR 224 (merged) addresses contract-IR namespace concretions by coordinate: `storage.namespaces[id].entries[kind][name]`. That `entries` shape lives on the *lowered* IR objects (`PostgresSchema`, `MongoBoundNamespace`), and ADR 224 scoped itself to the IR layer — it left the PSL AST's `PslNamespace` on its per-kind slots (`models` / `enums` / `compositeTypes`).
+
+The PSL AST should carry the same coordinate system. We have two near-identical IR trees and only one has a uniform entity coordinate; there is no principled reason the PSL AST can't address entities the same way, and a generic coordinate system is exactly what would let PSL consumers stop special-casing kinds. So the destination is explicit: `PslNamespace` migrates onto the `entries[kind][name]` shape, with built-in and extension-contributed kinds addressed uniformly.
+
+That migration is framework-wide — it touches the parser, both printer phases, `sqlSchemaIrToPslAst`, and every PSL-AST consumer and test — so it does not ride in the substrate slice. The substrate ships the minimal generic `extensionBlocks` slot as a deliberate **interim** shape; the full migration is this project's closing slice, [TML-2849](https://linear.app/prisma-company/issue/TML-2849). The interim is safe to defer because the slot is framework-internal: extensions contribute AST *nodes* through the descriptor SPI and never touch `PslNamespace` directly, so the later migration changes the framework's storage shape without forcing changes on extension contributions.
 
 ### Why the printer is in scope, not just the parser
 
@@ -74,6 +78,8 @@ When an extension contributes a parser for a new block keyword, the AST node it 
 `name` is mandatory because every block kind we've shipped or planned has one (`enum Status`, `policy ProfilesSelectAnon`, `role admin`, `model Article`). The mandatory name keeps the base type narrow and the lowering registry's index simple. If a future extension-contributed kind genuinely needs to be anonymous, the base shape can loosen then.
 
 The alternative to a generic slot — a typed slot per contributed kind (the way `enums: readonly PslEnum[]` works today) — would force every new extension-contributed kind to ship a framework PR. That defeats the point. The generic slot keeps the framework AST stable as extensions add kinds. This is a structural break from how `enum` is modelled (`PslEnum` has its own typed slot); `enum` is unchanged by this project (see non-goals), so the generic slot is purely additive.
+
+The generic slot is the interim shape, not the destination. A flat `extensionBlocks` array next to the built-in typed slots leaves `PslNamespace` two-tier — built-in kinds typed-and-named, contributed kinds in a generic array — which is a less-general second answer to the coordinate problem ADR 224 already solved one layer down. This project's closing slice ([TML-2849](https://linear.app/prisma-company/issue/TML-2849)) resolves that by folding the generic slot *and* the built-in per-kind slots into the IR's `entries[kind][name]` coordinate shape.
 
 ### Minimal-by-default parser/printer SPI
 
@@ -103,7 +109,7 @@ The reasoning: silent precedence is a maintenance trap, and a missing factory or
 
 **Fold `entityTypes` into the PSL-block descriptor.** Kept as a separate registry for the reasons in "Place in the world." The "should every PSL-representable entity contribute its own parser/printer" question is TML-2815's domain.
 
-**Migrate the PSL AST to an `entries` shape.** ADR 224's `entries` pattern is an IR-layer concept; the PSL AST stays on per-kind slots (the shape ADR 224 itself left it on). A framework-wide PSL-AST `entries` migration would be its own project.
+**Migrate the PSL AST to an `entries` shape *in the substrate slice*.** The substrate ships the generic `extensionBlocks` slot as an interim. Converging `PslNamespace` onto ADR 224's `entries[kind][name]` coordinate shape — built-in and contributed kinds alike — is this project's closing slice ([TML-2849](https://linear.app/prisma-company/issue/TML-2849)), sequenced before the ADR + close-out so the ADR records the converged shape.
 
 **Custom attribute parsers** (`@policy(…)`, `@auth(…)`). Attributes live inside other blocks and have a different SPI shape — they consume tokens within a parent parse rather than driving one. Separate concern.
 
@@ -140,4 +146,6 @@ This project is done when:
 10. **`AGENTS.md` references `AuthoringContributions.entityTypes` correctly.** The current doc-bug (`AuthoringContributions.entities`) is fixed.
 
 11. **Project directory deleted.** `projects/target-contributed-psl-blocks/` removed; in-tree references scrubbed per `.cursor/rules/doc-maintenance.mdc`.
+
+12. **PSL AST namespace migrated to `entries` coordinate addressing.** `PslNamespace` converges on ADR 224's `entries[kind][name]` shape; the interim `extensionBlocks` slot and the built-in per-kind slots (`models` / `enums` / `compositeTypes`) fold into one coordinate container, so built-in and extension-contributed kinds are addressed uniformly and PSL consumers stop special-casing kinds. Tracked as [TML-2849](https://linear.app/prisma-company/issue/TML-2849); sequenced before item 9 (the ADR records the converged shape) and item 11 (close-out deletes the project dir last).
 </content>
