@@ -1,42 +1,19 @@
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import { blindCast } from '@prisma-next/utils/casts';
-import baselineMigrationJson from '../../migrations/20260605T0000_establish_external_supabase_tables/migration.json' with {
-  type: 'json',
-};
-import baselineOpsJson from '../../migrations/20260605T0000_establish_external_supabase_tables/ops.json' with {
-  type: 'json',
-};
-import headRefJson from '../../migrations/refs/head.json' with { type: 'json' };
 import type { Contract } from '../contract/contract.d';
 import contractJson from '../contract/contract.json' with { type: 'json' };
 
 const SUPABASE_SPACE_ID = 'supabase' as const;
-const SUPABASE_DIR_NAME = '20260605T0000_establish_external_supabase_tables' as const;
-
-/**
- * The baseline migration for the supabase extension contract space.
- *
- * The supabase extension ships one zero-ops baseline migration: its graph
- * transitions from `EMPTY_CONTRACT_HASH` (null) to the supabase storage hash,
- * establishing the head ref without emitting any DDL. The `auth.*` and
- * `storage.*` tables are managed by Supabase; this migration records that the
- * supabase contract space has been "installed" (i.e. those tables are expected
- * to exist) but takes no action to create them.
- */
-const supabaseBaselineMigration = {
-  dirName: SUPABASE_DIR_NAME,
-  metadata: baselineMigrationJson,
-  ops: baselineOpsJson,
-} as const;
 
 function buildContractSpace(contractOverride?: unknown) {
+  const contract = blindCast<
+    Contract,
+    'JSON import narrowed to emitted Contract type; assertDescriptorSelfConsistency verifies the storageHash at load time'
+  >(contractOverride ?? contractJson);
   return {
-    contractJson: blindCast<
-      Contract,
-      'JSON import narrowed to emitted Contract type; assertDescriptorSelfConsistency verifies the storageHash at load time'
-    >(contractOverride ?? contractJson),
-    migrations: [supabaseBaselineMigration] as const,
-    headRef: headRefJson,
+    contractJson: contract,
+    migrations: [] as const,
+    headRef: { hash: contract.storage.storageHash, invariants: [] as const },
   };
 }
 

@@ -119,6 +119,67 @@ describe('loadContractSpaceAggregate', () => {
     });
   });
 
+  describe('migration-less extension spaces', () => {
+    it('synthesises head ref from contract storageHash when space has no packages', async () => {
+      const extContract = sqlContractWithTables({ tables: ['ext_table'] });
+      // Write only the space artefacts — no migration packages.
+      await writeContractJson('supabase', extContract);
+
+      const aggregate = await load();
+      const member = aggregate.space('supabase');
+      expect(member).toBeDefined();
+      expect(member?.packages).toHaveLength(0);
+      expect(member?.headRef).toEqual({
+        hash: extContract.storage.storageHash,
+        invariants: [],
+      });
+    });
+
+    it('produces no headRefMissing or headRefNotInGraph violations for a migration-less space', async () => {
+      const extContract = sqlContractWithTables({ tables: ['ext_table'] });
+      await writeContractJson('supabase', extContract);
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+      expect(violationsOfKind(violations, 'headRefMissing').map((v) => v.spaceId)).not.toContain(
+        'supabase',
+      );
+      expect(violationsOfKind(violations, 'headRefNotInGraph').map((v) => v.spaceId)).not.toContain(
+        'supabase',
+      );
+    });
+
+    it('still reports headRefMissing for a migration-backed space with no head.json', async () => {
+      // A space with a migration package but no head.json is NOT migration-less.
+      await writePackage('backed', '20260101T0000_init', { from: null, to: 'sha256:b1' });
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+      expect(violationsOfKind(violations, 'headRefMissing').map((v) => v.spaceId)).toContain(
+        'backed',
+      );
+    });
+
+    it('still reports headRefNotInGraph for a space with unloadable packages (not migration-less)', async () => {
+      // An unloadable package makes problems.length > 0 → NOT treated as migration-less.
+      await mkdir(join(migrationsDir, 'broken', '20260101T0000_bad'), { recursive: true });
+      await writeFile(
+        join(migrationsDir, 'broken', '20260101T0000_bad', 'migration.json'),
+        'not json',
+      );
+      await writeFile(join(migrationsDir, 'broken', '20260101T0000_bad', 'ops.json'), '[]');
+      await writeHeadRef('broken', { hash: 'sha256:non-empty-hash', invariants: [] });
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+      // Graph is empty (unloadable package omitted) but space is not migration-less,
+      // so headRefNotInGraph fires.
+      expect(violationsOfKind(violations, 'headRefNotInGraph').map((v) => v.spaceId)).toContain(
+        'broken',
+      );
+    });
+  });
+
   describe('app member', () => {
     it('synthesises the app head ref from the live contract storage hash', async () => {
       const aggregate = await load();

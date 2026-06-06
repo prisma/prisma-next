@@ -35,6 +35,7 @@ describe('computeIntegrityViolations', () => {
       problems: [],
       refProblems: [],
       headRefProblem: null,
+      hasSynthesizedHead: true,
       isApp: true,
     };
 
@@ -72,6 +73,7 @@ describe('computeIntegrityViolations', () => {
       problems: [],
       refProblems: [],
       headRefProblem: null,
+      hasSynthesizedHead: false,
       isApp: false,
     };
 

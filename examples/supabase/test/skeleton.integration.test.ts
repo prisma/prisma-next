@@ -20,13 +20,13 @@
  *      stock `@prisma-next/postgres/runtime`.
  *
  * How the supabase extension space participates:
- *   The supabase pack declares `contractSpace` (contract + headRef, baseline
- *   migration). The test materialises `migrations/supabase/` on disk (via
- *   `emitContractSpaceArtefacts` + `materialiseMigrationPackage`) so `db init`
- *   discovers the extension space and processes its `auth.*` / `storage.*` tables
- *   through the aggregate planner. The planner emits zero ops for that space
- *   (zero-ops baseline migration); the verifier then confirms the declared
- *   external tables are present in the DB.
+ *   The supabase pack declares `contractSpace` (contract + headRef, no migrations).
+ *   The test materialises `migrations/supabase/` on disk (via
+ *   `emitContractSpaceArtefacts`) so `db init` discovers the extension space and
+ *   processes its `auth.*` / `storage.*` tables through the aggregate planner.
+ *   Because the pack ships zero migration packages, the loader synthesizes the head
+ *   ref from the contract hash and the planner falls through to synth strategy (zero
+ *   ops); the verifier then confirms the declared external tables are present in the DB.
  *
  * Framework fix landed (2026-06-05):
  *   `executeRun` and `executeDbVerify` now pass a merged aggregate contract to
@@ -46,7 +46,6 @@ import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
-import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -93,12 +92,13 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       // Step 2 — Materialise the supabase extension space on disk.
       //
       // `db init` discovers extension spaces by scanning `migrations/<space>/`.
-      // The supabase pack carries `contractSpace` (contract + headRef + baseline
-      // migration). We write the space artefacts (contract.json, refs/head.json)
-      // and the baseline migration package so the aggregate loader can build the
-      // migration graph for the supabase space. The baseline migration is
-      // zero-ops — it only establishes the head ref without running any DDL —
-      // because `auth.*`/`storage.*` are external (Supabase-managed) tables.
+      // The supabase pack is migration-less: it declares only external schema
+      // (auth.* / storage.* are Supabase-managed tables) and ships zero DDL
+      // migrations. We write only the space artefacts (contract.json,
+      // refs/head.json) so the aggregate loader discovers the space and
+      // synthesizes its head ref from the contract's storage hash. No migration
+      // packages are written — the loader treats a zero-package space as
+      // all-external and falls through to synth strategy (zero ops).
       const space = supabasePack.contractSpace;
       if (!space) {
         throw new Error('supabasePack must declare a contractSpace');
@@ -108,16 +108,6 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         contractDts: '// supabase extension contract space\n',
         headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
       });
-
-      // Write the baseline migration package so the aggregate loader can walk
-      // the migration graph for the supabase space. Without this, the loader
-      // reports `headRefNotInGraph` because the graph is empty and the head ref
-      // hash does not equal EMPTY_CONTRACT_HASH.
-      const { join: pathJoin } = await import('node:path');
-      const supabaseSpaceDir = pathJoin(migrationsDir, 'supabase');
-      for (const pkg of space.migrations) {
-        await materialiseMigrationPackage(supabaseSpaceDir, pkg);
-      }
 
       // Step 3 — Run `db init` (plan mode first, then apply).
       //
