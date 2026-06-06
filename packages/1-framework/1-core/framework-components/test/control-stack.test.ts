@@ -681,6 +681,27 @@ describe('buildExtensionLoadOrder', () => {
       ),
     ).toThrow(/cycle/i);
   });
+
+  it('assembles extensionPacks in dependency order even when input lists dependent before dependency', () => {
+    const dep = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'dep' }),
+      contractSpace: { contractJson: {} },
+    };
+    const consumer = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'consumer' }),
+      contractSpace: { contractJson: { extensionPacks: { dep: {} } } },
+    };
+    // Input order: consumer first (would fail ordering if not reordered)
+    const stack = createControlStack(
+      stubInput({
+        family: createDescriptor({ kind: 'family', id: 'sql' }),
+        target: createDescriptor({ kind: 'target', id: 'postgres' }),
+        extensionPacks: [consumer, dep],
+      }),
+    );
+    const extIds = stack.extensionPacks.map((e: { id: string }) => e.id);
+    expect(extIds.indexOf('dep')).toBeLessThan(extIds.indexOf('consumer'));
+  });
 });
 
 // ---------------------------------------------------------------------------
