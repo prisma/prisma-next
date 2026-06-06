@@ -12,18 +12,24 @@ export type StructuralCell =
       readonly arcTee?: boolean;
       readonly arcLand?: boolean;
     }
-  | { readonly kind: 'vertical-pass' }
-  | { readonly kind: 'horizontal-pass' }
-  | { readonly kind: 'branch-tee' }
-  | { readonly kind: 'branch-corner' }
-  | { readonly kind: 'merge-tee' }
-  | { readonly kind: 'merge-corner' }
-  | { readonly kind: 'arc-branch-corner' }
-  | { readonly kind: 'arc-branch-tee' }
-  | { readonly kind: 'arc-land-corner' }
-  | { readonly kind: 'arc-land-tee' }
-  | { readonly kind: 'arc-crossing' }
-  | { readonly kind: 'arc-land-bridge' }
+  | { readonly kind: 'vertical-pass'; readonly migrationHash?: string }
+  | { readonly kind: 'horizontal-pass'; readonly migrationHash?: string }
+  | { readonly kind: 'branch-tee'; readonly migrationHash?: string }
+  | { readonly kind: 'branch-corner'; readonly migrationHash?: string }
+  | { readonly kind: 'merge-tee'; readonly migrationHash?: string }
+  | { readonly kind: 'merge-corner'; readonly migrationHash?: string }
+  | { readonly kind: 'arc-branch-corner'; readonly migrationHash?: string }
+  | { readonly kind: 'arc-branch-tee'; readonly migrationHash?: string }
+  | { readonly kind: 'arc-land-corner'; readonly migrationHash?: string }
+  | { readonly kind: 'arc-land-tee'; readonly migrationHash?: string }
+  | {
+      readonly kind: 'arc-crossing';
+      /** Hash of the edge whose vertical lane passes through this cell. */
+      readonly migrationHash?: string;
+      /** Hash of the arc edge that crosses over the vertical lane. */
+      readonly arcMigrationHash?: string;
+    }
+  | { readonly kind: 'arc-land-bridge'; readonly migrationHash?: string }
   | {
       readonly kind: 'edge-lane';
       readonly migrationHash: string;
@@ -337,6 +343,15 @@ function refineAdjacency(
             row.convergenceProducer ?? false,
             divergenceBranchEdge,
           );
+    // Reconstruct lane owners from the existing cells so the refined row
+    // preserves per-cell identity on its pass-through vertical-pass cells.
+    const existingLaneEdge = new Map<number, string>();
+    for (const lane of row.passThroughLanes ?? []) {
+      const cell = row.cells[lane];
+      if (cell !== undefined && 'migrationHash' in cell && cell.migrationHash !== undefined) {
+        existingLaneEdge.set(lane, cell.migrationHash);
+      }
+    }
     return {
       ...row,
       cells: buildEdgeCells(
@@ -345,6 +360,7 @@ function refineAdjacency(
         row.passThroughLanes ?? [],
         adjacency,
         row.cells.length,
+        existingLaneEdge,
       ),
     };
   });
@@ -377,30 +393,50 @@ function emptyCells(width: number): StructuralCell[] {
   return Array.from({ length: width }, () => ({ kind: 'empty' as const }));
 }
 
+/** Returns `{ migrationHash: hash }` when hash is defined, otherwise `{}`. */
+function hashProp(hash: string | undefined): { readonly migrationHash: string } | object {
+  return hash !== undefined ? { migrationHash: hash } : {};
+}
+
+/** Returns `{ arcMigrationHash: hash }` when hash is defined, otherwise `{}`. */
+function arcHashProp(hash: string | undefined): { readonly arcMigrationHash: string } | object {
+  return hash !== undefined ? { arcMigrationHash: hash } : {};
+}
+
 function buildBranchConnectorCells(
   startLane: number,
   endLane: number,
   fanTargetLanes: ReadonlySet<number>,
   activeLanes: ReadonlySet<number>,
   gridWidth: number,
+  /** Hash of the edge whose lane is at startLane (the source/trunk edge). */
+  trunkEdgeHash: string | undefined,
+  /** Hash of the fan edge for each fan-target lane. */
+  fanEdgeHashByLane: ReadonlyMap<number, string>,
+  /** Hash of the edge occupying each active pass-through lane. */
+  laneEdgeByIndex: ReadonlyMap<number, string>,
 ): StructuralCell[] {
   const cells = emptyCells(gridWidth);
   for (let lane = 0; lane < gridWidth; lane++) {
     if (activeLanes.has(lane) && (lane < startLane || lane > endLane)) {
-      cells[lane] = { kind: 'vertical-pass' };
+      cells[lane] = { kind: 'vertical-pass', ...hashProp(laneEdgeByIndex.get(lane)) };
       continue;
     }
     if (lane === startLane) {
-      cells[lane] = { kind: 'branch-tee' };
+      cells[lane] = { kind: 'branch-tee', ...hashProp(trunkEdgeHash) };
     } else if (lane === endLane) {
-      cells[lane] = { kind: 'branch-corner' };
+      cells[lane] = { kind: 'branch-corner', ...hashProp(fanEdgeHashByLane.get(lane)) };
     } else if (lane > startLane && lane < endLane) {
       if (fanTargetLanes.has(lane)) {
-        cells[lane] = { kind: 'branch-tee' };
+        cells[lane] = { kind: 'branch-tee', ...hashProp(fanEdgeHashByLane.get(lane)) };
       } else if (activeLanes.has(lane)) {
-        cells[lane] = { kind: 'arc-crossing' };
+        cells[lane] = {
+          kind: 'arc-crossing',
+          ...hashProp(laneEdgeByIndex.get(lane)),
+          ...arcHashProp(fanEdgeHashByLane.get(endLane)),
+        };
       } else {
-        cells[lane] = { kind: 'branch-tee' };
+        cells[lane] = { kind: 'branch-tee', ...hashProp(fanEdgeHashByLane.get(lane)) };
       }
     }
   }
@@ -413,24 +449,30 @@ function buildMergeConnectorCells(
   fanTargetLanes: ReadonlySet<number>,
   activeLanes: ReadonlySet<number>,
   gridWidth: number,
+  /** Hash of the edge occupying each active lane (fan lanes + pass-throughs). */
+  laneEdgeByIndex: ReadonlyMap<number, string>,
 ): StructuralCell[] {
   const cells = emptyCells(gridWidth);
   for (let lane = 0; lane < gridWidth; lane++) {
     if (activeLanes.has(lane) && (lane < startLane || lane > endLane)) {
-      cells[lane] = { kind: 'vertical-pass' };
+      cells[lane] = { kind: 'vertical-pass', ...hashProp(laneEdgeByIndex.get(lane)) };
       continue;
     }
     if (lane === startLane) {
-      cells[lane] = { kind: 'merge-tee' };
+      cells[lane] = { kind: 'merge-tee', ...hashProp(laneEdgeByIndex.get(lane)) };
     } else if (lane === endLane) {
-      cells[lane] = { kind: 'merge-corner' };
+      cells[lane] = { kind: 'merge-corner', ...hashProp(laneEdgeByIndex.get(lane)) };
     } else if (lane > startLane && lane < endLane) {
       if (fanTargetLanes.has(lane)) {
-        cells[lane] = { kind: 'merge-tee' };
+        cells[lane] = { kind: 'merge-tee', ...hashProp(laneEdgeByIndex.get(lane)) };
       } else if (activeLanes.has(lane)) {
-        cells[lane] = { kind: 'arc-crossing' };
+        cells[lane] = {
+          kind: 'arc-crossing',
+          ...hashProp(laneEdgeByIndex.get(lane)),
+          ...arcHashProp(laneEdgeByIndex.get(endLane)),
+        };
       } else {
-        cells[lane] = { kind: 'horizontal-pass' };
+        cells[lane] = { kind: 'horizontal-pass', ...hashProp(laneEdgeByIndex.get(startLane)) };
       }
     }
   }
@@ -442,11 +484,13 @@ function buildNodeCells(
   nodeColumn: number,
   activeLanes: readonly number[],
   gridWidth: number,
+  /** Hash of the edge occupying each active pass-through lane. */
+  laneEdgeByIndex: ReadonlyMap<number, string>,
 ): StructuralCell[] {
   const cells = emptyCells(gridWidth);
   for (const lane of activeLanes) {
     if (lane !== nodeColumn && lane < gridWidth) {
-      cells[lane] = { kind: 'vertical-pass' };
+      cells[lane] = { kind: 'vertical-pass', ...hashProp(laneEdgeByIndex.get(lane)) };
     }
   }
   if (nodeColumn < gridWidth) {
@@ -461,10 +505,14 @@ function buildEdgeCells(
   passThroughLanes: readonly number[],
   adjacency: EdgeAdjacency,
   gridWidth: number,
+  /** Hash of the edge occupying each active pass-through lane. */
+  laneEdgeByIndex: ReadonlyMap<number, string>,
 ): StructuralCell[] {
   const cells = emptyCells(gridWidth);
   for (const lane of passThroughLanes) {
-    if (lane < gridWidth) cells[lane] = { kind: 'vertical-pass' };
+    if (lane < gridWidth) {
+      cells[lane] = { kind: 'vertical-pass', ...hashProp(laneEdgeByIndex.get(lane)) };
+    }
   }
   if (laneIndex < gridWidth) {
     cells[laneIndex] = {
@@ -713,6 +761,8 @@ function applySkipRollbackRouting(
       .map((other) => other.backLane);
     const maxCoLandingLane = Math.max(...coLandingLanes);
 
+    const { migrationHash: arcHash } = edge;
+
     const sourceRow = result[sourceRowIndex];
     if (sourceRow !== undefined) {
       const cells = sourceRow.cells;
@@ -721,7 +771,12 @@ function applySkipRollbackRouting(
       cells[nodeCol] = { kind: 'node', contractHash, arcTee: true };
       for (let lane = nodeCol + 1; lane < backLane; lane += 1) {
         if (coSourcedLanes.includes(lane)) {
-          cells[lane] = { kind: 'arc-branch-tee' };
+          // A co-sourced arc tees off at this lane; tag it with that arc's hash.
+          const coSourcedArc = routes.find((r) => r.backLane === lane && r.edge.from === edge.from);
+          cells[lane] = {
+            kind: 'arc-branch-tee',
+            ...hashProp(coSourcedArc?.edge.migrationHash),
+          };
           continue;
         }
         const existing = cells[lane];
@@ -734,14 +789,30 @@ function applySkipRollbackRouting(
           occupied ||
           routes.some(
             (other) =>
-              other.edge.migrationHash !== edge.migrationHash &&
+              other.edge.migrationHash !== arcHash &&
               other.backLane === lane &&
               routeCrossesRow(other, sourceRowIndex, result),
           );
-        cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'horizontal-pass' };
+        if (crossed) {
+          // The vertical lane was already occupied; tag the crossing with the
+          // existing vertical owner's hash and the arc that crosses over it.
+          const verticalHash =
+            existing !== undefined && 'migrationHash' in existing
+              ? existing.migrationHash
+              : undefined;
+          cells[lane] = {
+            kind: 'arc-crossing',
+            ...hashProp(verticalHash),
+            arcMigrationHash: arcHash,
+          };
+        } else {
+          cells[lane] = { kind: 'horizontal-pass', migrationHash: arcHash };
+        }
       }
       cells[backLane] =
-        backLane < maxCoSourcedLane ? { kind: 'arc-branch-tee' } : { kind: 'arc-branch-corner' };
+        backLane < maxCoSourcedLane
+          ? { kind: 'arc-branch-tee', migrationHash: arcHash }
+          : { kind: 'arc-branch-corner', migrationHash: arcHash };
     }
 
     const edgeRow = result[edgeRowIndex];
@@ -750,10 +821,17 @@ function applySkipRollbackRouting(
       // lane may already cross this row, and rebuilding would clobber it.
       const cells = edgeRow.cells;
       ensureCellWidth(cells, backLane + 1);
-      cells[nodeCol] = { kind: 'vertical-pass' };
+      // The forward lane at nodeCol is now interrupted by this rollback; tag the
+      // vertical-pass with the edge that owns that forward lane.
+      const forwardLaneCell = cells[nodeCol];
+      const forwardLaneHash =
+        forwardLaneCell !== undefined && 'migrationHash' in forwardLaneCell
+          ? forwardLaneCell.migrationHash
+          : undefined;
+      cells[nodeCol] = { kind: 'vertical-pass', ...hashProp(forwardLaneHash) };
       cells[backLane] = {
         kind: 'edge-lane',
-        migrationHash: edge.migrationHash,
+        migrationHash: arcHash,
         edgeKind: edge.kind,
         ownsLabel: true,
         adjacency: 'node-skipping-rollback',
@@ -780,7 +858,7 @@ function applySkipRollbackRouting(
         existing?.kind !== 'arc-branch-tee' &&
         existing?.kind !== 'arc-crossing'
       ) {
-        cells[backLane] = { kind: 'vertical-pass' };
+        cells[backLane] = { kind: 'vertical-pass', migrationHash: arcHash };
       }
     }
 
@@ -794,7 +872,9 @@ function applySkipRollbackRouting(
         // An inner converging arc's own landing junction: the outer arcs' bridge
         // passes through it (`┴`) while its own vertical run closes here.
         if (coLandingLanes.includes(lane)) {
-          cells[lane] = { kind: 'arc-land-tee' };
+          // Tag the landing tee with the inner arc that closes here.
+          const innerArc = routes.find((r) => r.backLane === lane && r.edge.to === edge.to);
+          cells[lane] = { kind: 'arc-land-tee', ...hashProp(innerArc?.edge.migrationHash) };
           continue;
         }
         // A bridged lane that carries another arc OR a forward vertical still
@@ -811,16 +891,30 @@ function applySkipRollbackRouting(
           occupied ||
           routes.some(
             (other) =>
-              other.edge.migrationHash !== edge.migrationHash &&
+              other.edge.migrationHash !== arcHash &&
               other.backLane === lane &&
               routeCrossesRow(other, targetRowIndex, result),
           );
-        cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'arc-land-bridge' };
+        if (crossed) {
+          const verticalHash =
+            existing !== undefined && 'migrationHash' in existing
+              ? existing.migrationHash
+              : undefined;
+          cells[lane] = {
+            kind: 'arc-crossing',
+            ...hashProp(verticalHash),
+            arcMigrationHash: arcHash,
+          };
+        } else {
+          cells[lane] = { kind: 'arc-land-bridge', migrationHash: arcHash };
+        }
       }
       // Inner converging arcs close as a landing tee so the outermost arc's
       // bridge reads through to the node; only the outermost arc draws `╯`.
       cells[backLane] =
-        backLane < maxCoLandingLane ? { kind: 'arc-land-tee' } : { kind: 'arc-land-corner' };
+        backLane < maxCoLandingLane
+          ? { kind: 'arc-land-tee', migrationHash: arcHash }
+          : { kind: 'arc-land-corner', migrationHash: arcHash };
       for (const other of routes) {
         if (other.backLane <= backLane) continue;
         if (!routeCrossesRow(other, targetRowIndex, result)) continue;
@@ -832,7 +926,12 @@ function applySkipRollbackRouting(
           existing?.kind !== 'arc-land-bridge' &&
           existing?.kind !== 'node'
         ) {
-          cells[other.backLane] = { kind: 'vertical-pass' };
+          // This is a pass-through from another arc still in flight; tag with
+          // that arc's hash.
+          cells[other.backLane] = {
+            kind: 'vertical-pass',
+            migrationHash: other.edge.migrationHash,
+          };
         }
       }
     }
@@ -914,6 +1013,9 @@ function layoutComponent(
   const nodeColumn = new Map<string, number>();
   const edgeColumn = new Map<string, number>();
   const producerLaneByHash = new Map<string, number>();
+  // Tracks which edge's migrationHash last occupied each lane, so pass-through
+  // cells on node/edge/connector rows can carry per-cell identity.
+  const laneEdgeByIndex = new Map<number, string>();
   let gridWidth = 1;
 
   function ensureGridWidth(minWidth: number): void {
@@ -965,7 +1067,14 @@ function layoutComponent(
       startLane,
       endLane,
       branchCount: laneIndices.length,
-      cells: buildMergeConnectorCells(startLane, endLane, fanTargetLanes, activeLanes, gridWidth),
+      cells: buildMergeConnectorCells(
+        startLane,
+        endLane,
+        fanTargetLanes,
+        activeLanes,
+        gridWidth,
+        laneEdgeByIndex,
+      ),
     });
     for (const index of laneIndices) {
       if (index !== startLane) setLane(index, null);
@@ -979,9 +1088,12 @@ function layoutComponent(
     endLane: number,
     branchCount: number,
     fanTargetLanes: readonly number[],
+    /** Hash of the first/representative edge for each fan lane (keyed by lane index). */
+    fanEdgeHashByLane: ReadonlyMap<number, string>,
   ): void {
     ensureGridWidth(endLane + 1);
     const activeLanes = new Set(activeLaneIndices());
+    const trunkEdgeHash = laneEdgeByIndex.get(startLane);
     rows.push({
       kind: 'branch-connector',
       contractHash,
@@ -994,6 +1106,9 @@ function layoutComponent(
         new Set(fanTargetLanes),
         activeLanes,
         gridWidth,
+        trunkEdgeHash,
+        fanEdgeHashByLane,
+        laneEdgeByIndex,
       ),
     });
   }
@@ -1007,11 +1122,14 @@ function layoutComponent(
       edge,
       laneIndex: lane,
       passThroughLanes: passThrough,
-      cells: buildEdgeCells(edge, lane, passThrough, adjacency, gridWidth),
+      cells: buildEdgeCells(edge, lane, passThrough, adjacency, gridWidth, laneEdgeByIndex),
     };
     rows.push(convergenceProducer ? { ...row, convergenceProducer: true } : row);
     edgeColumn.set(edge.migrationHash, lane);
     if (convergenceProducer) producerLaneByHash.set(edge.migrationHash, lane);
+    // Record this edge as the current occupant of its lane so subsequent rows
+    // can tag their pass-through cells with the correct owner.
+    laneEdgeByIndex.set(lane, edge.migrationHash);
   }
 
   function emitNodeRow(contractHash: string, column: number): void {
@@ -1020,7 +1138,7 @@ function layoutComponent(
     rows.push({
       kind: 'node',
       contractHash,
-      cells: buildNodeCells(contractHash, column, passThrough, gridWidth),
+      cells: buildNodeCells(contractHash, column, passThrough, gridWidth, laneEdgeByIndex),
     });
     nodeColumn.set(contractHash, column);
   }
@@ -1090,7 +1208,17 @@ function layoutComponent(
 
     if (groups.length >= 2) {
       const endLane = Math.max(...laneForGroup);
-      emitBranchConnector(node, column, endLane, groups.length, laneForGroup);
+      // Map each fan lane to the representative edge (first in the group) so
+      // the branch-connector cells can carry per-cell identity.
+      const fanEdgeHashByLane = new Map<number, string>();
+      for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+        const group = groups[groupIndex];
+        const lane = laneForGroup[groupIndex];
+        if (group === undefined || lane === undefined) continue;
+        const firstEdge = group.edges[0];
+        if (firstEdge !== undefined) fanEdgeHashByLane.set(lane, firstEdge.migrationHash);
+      }
+      emitBranchConnector(node, column, endLane, groups.length, laneForGroup, fanEdgeHashByLane);
     }
 
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
