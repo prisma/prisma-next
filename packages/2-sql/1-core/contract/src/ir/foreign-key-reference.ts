@@ -3,49 +3,35 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 
 /**
- * A local reference: the referenced table lives in the same contract-space.
- * `origin` is omitted from JSON when absent, preserving backward-compatible
- * serialization for all existing local FK contracts.
+ * Input for a foreign-key reference (one side of a foreign-key declaration).
+ *
+ * When `spaceId` is absent the reference is local — the referenced table lives
+ * in the same contract-space. When `spaceId` is present the reference is
+ * cross-space — the referenced table lives in a different contract-space
+ * identified by `spaceId`.
+ *
+ * Presence-based discrimination keeps local FK JSON byte-identical to
+ * contracts authored before cross-space support was added (NFR2).
  */
-export interface LocalForeignKeyReferenceInput {
+export interface ForeignKeyReferenceInput {
   readonly namespaceId: string;
   readonly tableName: string;
   readonly columns: readonly string[];
-  readonly origin?: 'local';
-  readonly spaceId?: never;
+  readonly spaceId?: string;
 }
-
-/**
- * A cross-space reference: the referenced table lives in a different
- * contract-space identified by `spaceId`. The full coordinate
- * (`namespaceId`, `tableName`, `columns`) remains present so the reference
- * resolves without lexical context.
- */
-export interface SpaceForeignKeyReferenceInput {
-  readonly namespaceId: string;
-  readonly tableName: string;
-  readonly columns: readonly string[];
-  readonly origin: 'space';
-  readonly spaceId: string;
-}
-
-export type ForeignKeyReferenceInput =
-  | LocalForeignKeyReferenceInput
-  | SpaceForeignKeyReferenceInput;
 
 /**
  * SQL Contract IR node for one side (source or target) of a foreign-key
  * declaration. Carries the full coordinate: namespace, table, and columns.
  *
- * The optional `origin` discriminator distinguishes between a local reference
- * (same contract-space, `origin` absent or `'local'`) and a cross-space
- * reference (`origin: 'space'`) that additionally carries a `spaceId`
- * identifying the foreign contract-space.
+ * Cross-space discrimination is based on `spaceId` presence: absent means
+ * local (same contract-space); present means cross-space (the referenced
+ * table lives in the contract-space identified by `spaceId`).
  *
- * For local references `origin` and `spaceId` are absent from JSON, keeping
- * the serialized shape byte-identical to contracts authored before this
- * discriminator was added. For cross-space references both `origin: 'space'`
- * and `spaceId` appear in JSON so round-trips are lossless.
+ * For local references `spaceId` is absent from JSON, keeping the serialized
+ * shape byte-identical to contracts authored before cross-space support was
+ * added. For cross-space references `spaceId` appears in JSON so round-trips
+ * are lossless.
  *
  * Use `UNBOUND_NAMESPACE_ID` from `@prisma-next/framework-components/ir`
  * as the sentinel `namespaceId` for single-namespace (unbound) references.
@@ -54,7 +40,6 @@ export class ForeignKeyReference extends SqlNode {
   readonly namespaceId: NamespaceId;
   readonly tableName: string;
   readonly columns: readonly string[];
-  declare readonly origin?: 'local' | 'space';
   declare readonly spaceId?: string;
 
   constructor(input: ForeignKeyReferenceInput) {
@@ -62,8 +47,7 @@ export class ForeignKeyReference extends SqlNode {
     this.namespaceId = asNamespaceId(input.namespaceId);
     this.tableName = input.tableName;
     this.columns = input.columns;
-    if (input.origin !== undefined) this.origin = input.origin;
-    if (input.origin === 'space') this.spaceId = input.spaceId;
+    if (input.spaceId !== undefined) this.spaceId = input.spaceId;
     freezeNode(this);
   }
 }

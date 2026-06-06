@@ -141,26 +141,13 @@ export const IndexSchema = type({
   'options?': 'Record<string, unknown>',
 });
 
-const LocalForeignKeyReferenceSchema = type({
+export const ForeignKeyReferenceSchema = type({
   '+': 'reject',
   namespaceId: 'string',
   tableName: 'string',
   columns: type.string.array().readonly(),
-  'origin?': "'local'",
-});
-
-const SpaceForeignKeyReferenceSchema = type({
-  '+': 'reject',
-  namespaceId: 'string',
-  tableName: 'string',
-  columns: type.string.array().readonly(),
-  origin: "'space'",
-  spaceId: 'string',
-});
-
-export const ForeignKeyReferenceSchema = LocalForeignKeyReferenceSchema.or(
-  SpaceForeignKeyReferenceSchema,
-) satisfies Type<ForeignKeyReferenceInput>;
+  'spaceId?': 'string',
+}) satisfies Type<ForeignKeyReferenceInput>;
 
 export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
@@ -824,7 +811,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         }
       }
 
-      if (fk.target.origin !== 'space') {
+      if (fk.target.spaceId === undefined) {
         const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
         const referencedRaw = targetNamespace?.entries.table[fk.target.tableName];
         if (referencedRaw === undefined) {

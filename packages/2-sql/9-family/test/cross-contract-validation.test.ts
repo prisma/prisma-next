@@ -129,7 +129,6 @@ function buildExtensionWithCrossSpaceFK(opts: {
         namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'remote_table',
         columns: ['id'],
-        origin: 'space',
         spaceId: opts.targetSpaceId,
       },
       constraint: false,
@@ -252,7 +251,7 @@ describe('cross-space FK reverse-reference rejection', () => {
     expect(msg).toMatch(/reverse|direction|dependency/i);
   });
 
-  it('accepts an extension with a local FK (no cross-space origin)', () => {
+  it('accepts an extension with a local FK (no spaceId)', () => {
     const extA = buildExtension({
       id: 'ext-a',
       tables: {

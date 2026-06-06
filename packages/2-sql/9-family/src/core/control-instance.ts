@@ -403,7 +403,7 @@ function buildTransitiveDependsOnMap(
  * Asserts that no cross-space FK in any extension points against the
  * dependency direction.
  *
- * A cross-space FK (target.origin === 'space') from extension A pointing at
+ * A cross-space FK (target.spaceId present) from extension A pointing at
  * space B is a violation when B depends on A (directly or transitively),
  * because that means A is pointing "upward" against the dependency arrows
  * established by the extension load order.
@@ -437,7 +437,7 @@ export function assertNoCrossSpaceFkReverseReferences(
             if (!isObjectRecord(fk)) continue;
             const target = fk['target'];
             if (!isObjectRecord(target)) continue;
-            if (target['origin'] !== 'space') continue;
+            if (target['spaceId'] === undefined) continue;
             const targetSpaceId = target['spaceId'];
             if (typeof targetSpaceId !== 'string') continue;
             // Check if targetSpaceId depends on ext.id (directly or transitively)
