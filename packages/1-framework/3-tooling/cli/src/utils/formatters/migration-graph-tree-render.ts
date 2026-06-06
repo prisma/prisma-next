@@ -441,35 +441,49 @@ function renderConnectorRow(
       const glyphColumn = colors.glyph[column] ?? column;
       const dashColumn = colors.dash[column] ?? glyphColumn;
       const override = columnLaneOverride?.get(glyphColumn);
-      if (override !== undefined) {
-        // When an override is active for this column, apply the glyph column's override
-        // to the junction glyph (├/┬/┴), and the DASH column's override to the trailing dash.
+      // In path-highlight mode, the dash column's override is used for the trailing dash
+      // even when the glyph column has no override. This handles branch-tee cells whose
+      // migrationHash is undefined (no previous edge occupied that lane) — the tee's dash
+      // belongs to the connector run and should follow the corner's annotation.
+      const dashOverrideForPathHighlight = columnLaneOverride?.get(dashColumn) ?? override;
+      if (
+        override !== undefined ||
+        (columnLaneOverride !== undefined && dashOverrideForPathHighlight !== undefined)
+      ) {
+        // When an override is active for this column (or when a dash override is available
+        // via the connected corner), apply the glyph column's override to the junction glyph
+        // (├/┬/┴), and the dash column's override to the trailing dash.
         // This matters for merge/branch connectors: the on-path trunk's tee (├) is green
         // while the dash (─) and corner (╯) bridging to an OFF-path column are dim.
         // For non-tee cells (corner, pass, crossing), the single-column override is fine.
+        const effectiveOverride = override ?? dashOverrideForPathHighlight;
+        if (effectiveOverride === undefined) {
+          out += '  ';
+          continue;
+        }
         switch (cell.kind) {
           case 'branch-tee':
           case 'merge-tee': {
             const pair = seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee;
-            const dashOverride = columnLaneOverride?.get(dashColumn) ?? override;
-            out += override(pair.slice(0, 1)) + dashOverride(pair.slice(1));
+            const dashOverride = columnLaneOverride?.get(dashColumn) ?? effectiveOverride;
+            out += effectiveOverride(pair.slice(0, 1)) + dashOverride(pair.slice(1));
             seenTee = true;
             break;
           }
           case 'branch-corner':
-            out += override(palette.branchCorner);
+            out += effectiveOverride(palette.branchCorner);
             break;
           case 'merge-corner':
-            out += override(palette.mergeCorner);
+            out += effectiveOverride(palette.mergeCorner);
             break;
           case 'vertical-pass':
-            out += override(palette.verticalPass);
+            out += effectiveOverride(palette.verticalPass);
             break;
           case 'horizontal-pass':
-            out += override(palette.horizontalPass);
+            out += effectiveOverride(palette.horizontalPass);
             break;
           case 'arc-crossing':
-            out += override(palette.arcCrossing);
+            out += effectiveOverride(palette.arcCrossing);
             break;
           default:
             out += '  ';
@@ -792,12 +806,10 @@ export function renderMigrationGraphTree(
   // edge (or vice-versa), it is treated as on-path.
   // This map is only populated when edgeAnnotationsByHash is provided (migrate --show);
   // for every other command (graph/status/list) it is empty and the code below is a no-op.
+  // NOTE: this is ONLY used for node-marker (○/∅) classification. Connector rows and
+  // structural cells (tees, corners, arcs) use their per-cell migrationHash directly —
+  // not this map and not any column-level aggregate.
   const contractHighlights = new Map<string, 'on-path' | 'off-path'>();
-  // column → path-highlight for connector-row per-column override (migrate --show only).
-  // Maps each lane column to its dominant highlight so connector rows (branch/merge)
-  // emit dim for off-path lanes rather than the rotating lane colour.
-  // On-path wins when a column hosts both (it hosts the edge arriving at the branch point).
-  const columnHighlights = new Map<number, 'on-path' | 'off-path'>();
   if (opts.edgeAnnotationsByHash) {
     for (const row of model.rows) {
       if (row.kind !== 'edge' || row.edge === undefined) continue;
@@ -810,14 +822,6 @@ export function renderMigrationGraphTree(
         // On-path wins over off-path when a contract hash appears in both.
         if (existing !== 'on-path') {
           contractHighlights.set(hash, highlight);
-        }
-      }
-      // Track the highlight per lane column so connector rows know which columns are off-path.
-      const col = model.edgeColumn.get(row.edge.migrationHash);
-      if (col !== undefined) {
-        const existingCol = columnHighlights.get(col);
-        if (existingCol !== 'on-path') {
-          columnHighlights.set(col, highlight);
         }
       }
     }
@@ -888,13 +892,24 @@ export function renderMigrationGraphTree(
     }
 
     if (row.kind === 'branch-connector' || row.kind === 'merge-connector') {
-      // In path-highlight mode, build a per-column lane override for this connector row.
-      // On-path columns get the neutral lane override (style.lane); off-path get forcedDim.
-      // Columns with no highlight entry keep normal rotation (pathLaneFor returns undefined).
+      // In path-highlight mode, build a per-column lane override from each cell's own
+      // migrationHash. Each structural cell (branch-tee, branch-corner, merge-tee,
+      // merge-corner, vertical-pass, arc-crossing) carries the migrationHash of the
+      // edge it visually belongs to (set by Stage 2). We look up that edge's annotation
+      // directly — no column-level aggregate, no "on-path wins" across columns.
       let connectorColumnOverride: Map<number, (text: string) => string> | undefined;
-      if (pathHighlightActive && opts.colorize && columnHighlights.size > 0) {
+      if (pathHighlightActive && opts.colorize) {
         connectorColumnOverride = new Map();
-        for (const [col, highlight] of columnHighlights) {
+        for (let col = 0; col < row.cells.length; col++) {
+          const cell = row.cells[col];
+          if (cell === undefined || cell.kind === 'empty') continue;
+          // arc-crossing: colour by the vertical lane's owner (migrationHash), not the arc.
+          const hashForCell =
+            'migrationHash' in cell && cell.migrationHash !== undefined
+              ? cell.migrationHash
+              : undefined;
+          if (hashForCell === undefined) continue;
+          const highlight = opts.edgeAnnotationsByHash?.get(hashForCell)?.pathHighlight;
           const override = pathLaneFor(highlight);
           if (override !== undefined) {
             connectorColumnOverride.set(col, override);
@@ -934,34 +949,49 @@ export function renderMigrationGraphTree(
     const rowLaneOverride = rowStyle?.lane;
     const rowArrowOverride = rowStyle?.arrow;
 
-    // For vertical-pass cells and edge-lane cells, classify per-cell rather than
-    // using the row-level override. A vertical-pass at column c represents a
-    // DIFFERENT edge passing through, so its dim/ordinary classification comes from
-    // that column's dominant edge annotation (columnHighlights), not from the
-    // current row's edge. An edge-lane cell carries its own migrationHash and can
-    // be classified directly. For all other structural cells (node marker, branch-tee,
-    // etc.), the row-level override applies.
+    // Classify every cell by its own edge's annotation (migrationHash → edgeAnnotationsByHash).
+    // Each structural cell (vertical-pass, branch-tee, arc-land-corner, etc.) carries the
+    // migrationHash of the edge it visually belongs to (set by the layout builder, Stage 2).
+    // We read that hash directly — no column-level aggregate, no "on-path wins" across columns.
     //
-    // This prevents off-path edge rows from dimming on-path pass-through lanes and
-    // vice-versa.
+    // - vertical-pass: classifies by cell.migrationHash (the edge passing through), NOT by column.
+    // - edge-lane:     classifies by cell.migrationHash (the edge's own row).
+    // - branch-tee/corner, merge-tee/corner, arc-*: classifies by cell.migrationHash.
+    // - arc-crossing:  classifies by cell.migrationHash (the vertical lane's owner), so the
+    //                  crossing reads as the lane passing THROUGH, not the arc skipping over.
+    // - node (○/∅):   classifies by rowPathHighlight derived from contractHighlights (the
+    //                  node's incident edges); falls through to rowLaneOverride.
+    //
+    // When pathHighlightActive is false (normal graph/status/list mode), all overrides are
+    // undefined and the normal rotating-colour lane styler applies unchanged.
     const cellColors = resolveRowArcLaneColors(row.cells);
     let gutter = row.cells
       .map((cell, column) => {
         let laneOverride = rowLaneOverride;
         let arrowOverride = rowArrowOverride;
         if (pathHighlightActive) {
-          if (cell.kind === 'vertical-pass') {
-            // Pass-through: colour comes from the column's dominant edge annotation.
-            laneOverride = pathLaneFor(columnHighlights.get(column));
-            arrowOverride = pathArrowFor(columnHighlights.get(column));
-          } else if (cell.kind === 'edge-lane') {
+          if (cell.kind === 'edge-lane') {
             // Own cell: colour comes from this cell's own edge annotation.
             const cellHighlight = opts.edgeAnnotationsByHash?.get(
               cell.migrationHash,
             )?.pathHighlight;
             laneOverride = pathLaneFor(cellHighlight);
             arrowOverride = pathArrowFor(cellHighlight);
+          } else if (cell.kind !== 'node' && cell.kind !== 'empty') {
+            // Routing cells (vertical-pass, branch-tee, merge-corner, arc-*, horizontal-pass):
+            // each carries a migrationHash for the edge it belongs to. Classify by that hash.
+            // arc-crossing uses migrationHash (vertical lane owner), not arcMigrationHash.
+            const hashForCell =
+              'migrationHash' in cell && cell.migrationHash !== undefined
+                ? cell.migrationHash
+                : undefined;
+            if (hashForCell !== undefined) {
+              const cellHighlight = opts.edgeAnnotationsByHash?.get(hashForCell)?.pathHighlight;
+              laneOverride = pathLaneFor(cellHighlight);
+              arrowOverride = pathArrowFor(cellHighlight);
+            }
           }
+          // node cells fall through to rowLaneOverride (derived from contractHighlights)
         }
         return renderCellPair(
           cell,
@@ -1003,6 +1033,8 @@ export function renderMigrationGraphTree(
       row.edge?.from === EMPTY_CONTRACT_HASH &&
       (row.laneIndex ?? 0) === 0
     ) {
+      // Init edge (∅ → first): only the first cell is rendered (the edge-lane cell).
+      // rowLaneOverride is correct here — it comes from the edge's own annotation.
       gutter = row.cells
         .slice(0, 1)
         .map((cell, column) =>
@@ -1019,20 +1051,36 @@ export function renderMigrationGraphTree(
         )
         .join('');
     } else if (row.kind === 'node' && laneSpan < row.cells.length && !nodeHasArcDecoration(row)) {
+      // Node gutter slice: may contain vertical-pass cells belonging to other edges.
+      // Classify each cell by its own migrationHash so pass-through lanes carry the
+      // correct colour, not the node's highlight.
       gutter = row.cells
         .slice(0, laneSpan)
-        .map((cell, column) =>
-          renderCellPair(
+        .map((cell, column) => {
+          let cellLaneOverride = rowLaneOverride;
+          let cellArrowOverride = rowArrowOverride;
+          if (pathHighlightActive && cell.kind !== 'node' && cell.kind !== 'empty') {
+            const hashForCell =
+              'migrationHash' in cell && cell.migrationHash !== undefined
+                ? cell.migrationHash
+                : undefined;
+            if (hashForCell !== undefined) {
+              const cellHighlight = opts.edgeAnnotationsByHash?.get(hashForCell)?.pathHighlight;
+              cellLaneOverride = pathLaneFor(cellHighlight);
+              cellArrowOverride = pathArrowFor(cellHighlight);
+            }
+          }
+          return renderCellPair(
             cell,
             column,
             cellColors,
             opts.colorize,
             style,
             palette,
-            rowLaneOverride,
-            rowArrowOverride,
-          ),
-        )
+            cellLaneOverride,
+            cellArrowOverride,
+          );
+        })
         .join('');
     } else if (gutter.length < laneSpan * 2) {
       gutter = gutter.padEnd(laneSpan * 2, ' ');
@@ -1046,20 +1094,36 @@ export function renderMigrationGraphTree(
     if (row.kind === 'node') {
       const contractHash = row.contractHash ?? EMPTY_CONTRACT_HASH;
       if (contractHash === EMPTY_CONTRACT_HASH) {
+        // The ∅ node row's trailing cells are vertical-pass lanes belonging to arc edges.
+        // Classify each by its own migrationHash so they carry the correct path-highlight
+        // colour rather than the rotation code that falls out of the ambient lane styler.
         const trailingLanes = row.cells
           .slice(1)
-          .map((cell, offset) =>
-            renderCellPair(
+          .map((cell, offset) => {
+            let cellLaneOverride = rowLaneOverride;
+            let cellArrowOverride = rowArrowOverride;
+            if (pathHighlightActive && cell.kind !== 'node' && cell.kind !== 'empty') {
+              const hashForCell =
+                'migrationHash' in cell && cell.migrationHash !== undefined
+                  ? cell.migrationHash
+                  : undefined;
+              if (hashForCell !== undefined) {
+                const cellHighlight = opts.edgeAnnotationsByHash?.get(hashForCell)?.pathHighlight;
+                cellLaneOverride = pathLaneFor(cellHighlight);
+                cellArrowOverride = pathArrowFor(cellHighlight);
+              }
+            }
+            return renderCellPair(
               cell,
               offset + 1,
               cellColors,
               opts.colorize,
               style,
               palette,
-              rowLaneOverride,
-              rowArrowOverride,
-            ),
-          )
+              cellLaneOverride,
+              cellArrowOverride,
+            );
+          })
           .join('');
         const emptyGutter = palette.emptySource.padEnd(2, ' ') + trailingLanes;
         const overlays = overlayNamesForContract(contractHash, opts);

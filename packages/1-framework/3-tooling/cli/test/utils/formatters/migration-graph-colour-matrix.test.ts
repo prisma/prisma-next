@@ -1045,6 +1045,115 @@ describe('graph colouring', () => {
         expect(line, `${name} carries dim`).toContain(DIM);
       }
     });
+
+    it('@db→prod path-highlight (init+addName+bobAvatar+promoteBob on-path): off-path lane and arc cells carry DIM, not green', () => {
+      // Acceptance test for Stage-3 per-cell classification.
+      //
+      // The @db→prod path goes: ∅ --init--> 3bfce91 --addName--> 419c099
+      //   --bobAvatar--> 935a023 --promoteBob--> f660984
+      //
+      // Off-path rollback cells that MUST be DIM (not green):
+      //   - rollbackAlice lane glyphs (│↓│ rows) — rollback spine in arc lane
+      //   - rollbackLocale lane glyphs (│↓│ rows)
+      //   - rollbackUsers lane glyphs (│↓│ rows)
+      //   - rollback arc landing corners (╯ in arc-land rows at rollback targets)
+      //
+      // On-path cells that MUST carry GREEN_BRIGHT:
+      //   - init, addName, bobAvatar, promoteBob edge rows (their own lane glyph │)
+      const edges = showcaseEdges();
+      const initEdge = edges.find((e) => e.dirName === '20260601T0719_init')!;
+      const addNameEdge = edges.find((e) => e.dirName === '20260601T0725_add_name')!;
+      const bobAvatarEdge = edges.find((e) => e.dirName === '20260601T0725_bob_avatar')!;
+      const promoteBobEdge = edges.find((e) => e.dirName === '20260601T0728_promote_bob')!;
+      const onPath = new Set([
+        initEdge.migrationHash,
+        addNameEdge.migrationHash,
+        bobAvatarEdge.migrationHash,
+        promoteBobEdge.migrationHash,
+      ]);
+      const anno = annotations(edges, onPath);
+      const rendered = renderEdges(edges, { colorize: true, edgeAnnotationsByHash: anno });
+
+      // No rotation codes at all in path-highlight mode.
+      assertNoRotationCodes(rendered, 'showcase @db→prod path-highlight');
+
+      // On-path edges must carry green on their own lane glyphs.
+      for (const e of [initEdge, addNameEdge, bobAvatarEdge, promoteBobEdge]) {
+        const line = rendered.split('\n').find((l) => l.includes(e.dirName));
+        expect(line, `${e.dirName} must exist`).toBeDefined();
+        expect(line, `${e.dirName} must carry green`).toContain(GREEN_BRIGHT);
+        expect(line, `${e.dirName} must have will run`).toContain('will run');
+      }
+
+      // Off-path rollback edges must carry DIM on their own direction arrow (↓).
+      // These are the edges that form rollback arcs to earlier contracts.
+      const offPathRollbackNames = [
+        '20260601T0727_rollback_alice',
+        '20260601T0727_rollback_locale',
+        '20260601T0727_rollback_users',
+      ];
+      for (const name of offPathRollbackNames) {
+        const line = rendered.split('\n').find((l) => l.includes(name));
+        expect(line, `${name} must exist`).toBeDefined();
+        if (line !== undefined) {
+          const codeForArrow = lastCodeBefore(line, '↓');
+          expect(
+            codeForArrow,
+            `${name}: rollback ↓ arrow must be preceded by DIM, not green. Line: ${JSON.stringify(line)}`,
+          ).toBe(DIM);
+        }
+      }
+
+      // Off-path arc landing cells (╯ in arc-landing node rows for rollback edges) must carry DIM.
+      //
+      // Arc-landing NODE rows are distinguished from merge-connector rows by the ◂ glyph: the
+      // node marker ○◂ appears only when an arc lands at that node (arcLand decoration). Merge-
+      // connector rows (├─╯) also contain ╯ with no direction arrow, but their ╯ is a merge-corner
+      // that belongs to the edge whose lane converges there — which may be ON-PATH (e.g. bob_avatar
+      // is on-path and its merge-corner ╯ correctly renders green). Filtering by ◂ ensures only
+      // true arc-landing node rows are checked.
+      //
+      // In this specific @db→prod path (init+addName+bobAvatar+promoteBob), none of the on-path
+      // edges are rollbacks, so every arc-land-corner ╯ in an ○◂ row belongs to an off-path
+      // rollback edge and must be DIM.
+      //
+      // This is the key bleed guard: before Stage-3, these arc cells incorrectly rendered
+      // green because columnHighlights used "on-path wins" at the column level. With per-cell
+      // classification, each arc cell is coloured by its own edge's annotation.
+      const arcLandingRows = rendered.split('\n').filter((l) => {
+        const plain = stripAnsi(l);
+        // ◂ only appears in the ○◂ arc-landing node marker — this reliably identifies arc-landing
+        // node rows while excluding merge-connector rows (which also contain ╯ but no ◂).
+        return plain.includes('◂') && plain.includes('╯');
+      });
+      // There should be at least one arc-landing row (rollback arcs land with ╯).
+      expect(arcLandingRows.length, 'at least one arc-landing ╯ row must exist').toBeGreaterThan(0);
+      // Every arc-landing ╯ in this path (all off-path rollbacks) must be DIM.
+      for (const arcRow of arcLandingRows) {
+        const codeForCorner = lastCodeBefore(arcRow, '╯');
+        expect(
+          codeForCorner,
+          'Off-path rollback arc-landing ╯ must be preceded by DIM. ' +
+            `Line: ${JSON.stringify(arcRow)}. Full output:\n${stripAnsi(rendered)}`,
+        ).toBe(DIM);
+      }
+
+      // Glyph-level colour map for a sample off-path lane row (rollbackAlice ↓).
+      // G=GREEN_BRIGHT D=DIM in column order (left to right):
+      //   Before: some columns G (bleed), the ↓ arrow G (bleed)
+      //   After:  the rollbackAlice lane glyph D, ↓ arrow D
+      const rollbackAliceLine = rendered
+        .split('\n')
+        .find((l) => l.includes('20260601T0727_rollback_alice'));
+      expect(rollbackAliceLine, 'rollbackAlice line must exist').toBeDefined();
+      if (rollbackAliceLine !== undefined) {
+        // Assert no GREEN_BRIGHT on the rollbackAlice row itself
+        // (on-path pass-through from other lanes is allowed in other columns).
+        // The rollbackAlice's OWN ↓ arrow must be DIM.
+        const codeForDownArrow = lastCodeBefore(rollbackAliceLine, '↓');
+        expect(codeForDownArrow, 'rollbackAlice ↓ arrow must be DIM (off-path)').toBe(DIM);
+      }
+    });
   });
 
   // =========================================================================
@@ -1058,13 +1167,11 @@ describe('graph colouring', () => {
       { name: 'rollbackOnPath', edges: rollbackOnPathEdges() },
       { name: 'loopViaInvariant', edges: loopViaInvariantEdges() },
       { name: 'showcase', edges: showcaseEdges() },
+      // branchPlusRollback is included here after Stage-3 fixed the arc landing at ∅.
+      // The `∅ ╯` arc-land-corner cell now carries its migrationHash and is classified
+      // per-cell, so the rotation code from the old column-level fallback is gone.
+      { name: 'branchPlusRollback', edges: branchPlusRollbackEdges() },
     ];
-
-    // NOTE: branchPlusRollback is excluded from this cross-cutting suite because it
-    // has a known rotation-code bug in the arc landing at ∅ (`∅ ╯` uses magenta even
-    // in path-highlight mode). That specific bug is asserted in the branchPlusRollback
-    // describe block's dedicated 'arc body' test. Including it here would make the
-    // cross-cutting suite ambiguous — the failure message would point to the wrong thing.
 
     for (const { name, edges: fixtureEdges } of fixtures) {
       it(`${name}: no rotation codes when all edges on-path`, () => {
@@ -1092,17 +1199,15 @@ describe('graph colouring', () => {
   // ARC LANDING AT ∅: rotation-code bug in branchPlusRollback
   // =========================================================================
   describe('branchPlusRollback arc landing at ∅', () => {
-    // The `∅ ╯` row at the bottom of a node-skipping rollback to ∅ renders the ╯
-    // corner with the normal laneColorForColumn rotation even in path-highlight mode.
-    // This is because ∅ (EMPTY_CONTRACT_HASH) is excluded from contractHighlights, so
-    // the renderer has no per-column override for the arc landing column. The corner
-    // falls through to the ambient `laneStylerForColumn` → rotation code.
-    //
-    // Both all-on-path and all-off-path cases fail this invariant.
+    // The `∅ ╯` row at the bottom of a node-skipping rollback to ∅ is an empty-source
+    // node row. The ╯ corner is a trailing arc-land-corner cell whose migrationHash
+    // identifies the rollback edge. The Stage-3 per-cell classification reads that hash
+    // directly and applies the correct path-highlight colour (green for on-path, dim for
+    // off-path), suppressing the rotation code that the old column-level fallback emitted.
 
     const edges = branchPlusRollbackEdges();
 
-    it('all edges on-path: ∅ landing row must not carry a rotation code (CURRENTLY FAILS)', () => {
+    it('all edges on-path: ∅ landing row must not carry a rotation code', () => {
       const onPath = new Set(edges.map((e) => e.migrationHash));
       const anno = annotations(edges, onPath);
       const rendered = renderEdges(edges, { colorize: true, edgeAnnotationsByHash: anno });
@@ -1124,7 +1229,7 @@ describe('graph colouring', () => {
       }
     });
 
-    it('all edges off-path: ∅ landing row must not carry a rotation code (CURRENTLY FAILS)', () => {
+    it('all edges off-path: ∅ landing row must not carry a rotation code', () => {
       const anno = annotations(edges, new Set());
       const rendered = renderEdges(edges, { colorize: true, edgeAnnotationsByHash: anno });
 
