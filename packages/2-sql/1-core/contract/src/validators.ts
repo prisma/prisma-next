@@ -160,7 +160,7 @@ export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
   .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
 
-export const ForeignKeySchema = type({
+export const ForeignKeySchema = type.declare<ForeignKeyInput>().type({
   source: ForeignKeySourceSchema,
   target: ForeignKeyReferenceSchema,
   'name?': 'string',
@@ -168,7 +168,7 @@ export const ForeignKeySchema = type({
   'onUpdate?': ReferentialActionSchema,
   constraint: 'boolean',
   index: 'boolean',
-}) satisfies Type<ForeignKeyInput>;
+});
 
 const StorageTableSchema = type({
   '+': 'reject',
