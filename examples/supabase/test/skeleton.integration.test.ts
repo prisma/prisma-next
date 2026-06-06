@@ -34,7 +34,8 @@
  *   namespace (not just `public`). The full proof was confirmed green with this fix
  *   in place. See `feat(cli): introspect all declared namespaces for db init/verify`.
  *
- * TODO: Remove the `describe.skip` when the example is green end-to-end (M3).
+ * Active in CI as of M1 (the external-contract + public.* proof is green); later
+ * constituents extend the assertions in place.
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -56,10 +57,12 @@ import { insertAndReadProfile } from '../src/handlers';
 import { db } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
-// Full proof confirmed green as of 2026-06-05 with the multi-namespace introspect fix
-// (feat(cli): introspect all declared namespaces for db init/verify). Kept .skip because
-// the example is still WIP (grown by later constituents) and is not yet part of CI.
-describe.skip('supabase walking skeleton — external-contract migrate/verify + public round-trip', () => {
+// Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
+// external-contract migrate/verify + the public.profile round-trip — which is green and
+// stable. Later constituents (cross-contract-refs, postgres-rls, explicit-namespace-dsl)
+// EXTEND this suite with their own assertions; they do not invalidate the M1 ones. The
+// point of the skeleton is to be a continuous CI surface, so it runs rather than skips.
+describe('supabase walking skeleton — external-contract migrate/verify + public round-trip', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let migrationsDir: string;
 

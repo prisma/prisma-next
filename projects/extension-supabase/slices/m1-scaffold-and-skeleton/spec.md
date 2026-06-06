@@ -68,7 +68,7 @@ examples/supabase/
 │   ├── contract.json / .d.ts   # emitted
 │   ├── prisma/db.ts        # client on the STOCK @prisma-next/postgres/runtime
 │   └── handlers.ts         # one handler: write + read public.profile
-└── test/                   # one hermetic PGlite integration test (committed .skip)
+└── test/                   # one hermetic PGlite integration test (active in CI)
 ```
 
 **App contract (PSL):**
@@ -95,7 +95,7 @@ namespace public {
 3. Run the handler's `public.profile` insert + read; assert the row.
 4. *(Optional bonus)* a raw read of the seeded `auth.users` to prove the external table is reachable. The ergonomic typed path (`db.sql.auth.users`) waits for `explicit-namespace-dsl` — do not depend on it.
 
-The suite is committed `describe.skip`-ped with a `TODO` noting it ungates when the example is green end-to-end (M3); this keeps the intentionally-WIP example from redding CI. The implementer demonstrates it green locally (temporarily un-skipped) in the dispatch summary.
+The suite **runs in CI** (`test:examples` covers `examples/**`, and the example has a `test` script). It asserts the M1 walking-skeleton behaviour only (external-contract migrate/verify + the `public.profile` round-trip), which is green and stable; later constituents extend its assertions in place. _(Originally drafted as committed `.skip` "until green at M3"; once the proof was green the skip was removed — a skipped green test guards nothing, which defeats the walking skeleton's reason to exist as a continuous CI surface.)_
 
 **What grows here later (context, not M1 work).** `cross-contract-refs` adds `Profile.userId` + a FK to `auth.users` (and seeds `auth.users` in the test); `postgres-rls` adds RLS policies + roles + `auth.uid()`; `explicit-namespace-dsl` adds a handler that queries `auth.users`; `extension-supabase` M2 swaps `db.ts` to the Supabase `/runtime` with `asUser()`/`asAnon()`.
 
@@ -107,7 +107,7 @@ The suite is committed `describe.skip`-ped with a `TODO` noting it ungates when 
 | PSL `contract.prisma` + emit | `contract.json` emits carrying `defaultControl: 'external'`; `contract.d.ts` validates |
 | Minimal `bootstrapSupabaseShim` + the migrate/verify assertions | the framework treats `auth.*`/`storage.*` as `external` — no DDL emitted, verifier confirms them present |
 | Example app contract + client + handler | `examples/supabase` migrates its `public` schema and runs a `public.profile` round-trip |
-| Committed `.skip` on the integration test | the example is gated out of the default CI run |
+| The integration test runs in CI (`test:examples`) | the walking skeleton is a live regression surface for downstream constituents |
 | Tree-shaking discipline + bundle measurement | `/pack` < 5 KB gzip; `/pack` imports no runtime code |
 
 ## Scope
@@ -135,7 +135,7 @@ A **new, package-local** contract authored in PSL, emitted to `contract.json` + 
 - [ ] `/pack` resolves and typechecks when imported from an app contract declaring `extensionPacks: [supabasePack]`.
 - [ ] `contract.prisma` emits a `contract.json` + `contract.d.ts`; `defaultControl: 'external'` is carried; `validateContract<Contract>` typechecks; no `roles` block.
 - [ ] Against a `bootstrapSupabaseShim`-seeded PGlite DB, the migrate of the composed example contract emits **no DDL** for `auth.*`/`storage.*` (suppressed-subject warnings only) and the verifier **passes**; `public.profile` is created and the handler's round-trip returns its row.
-- [ ] The integration test is committed `.skip`-ped (gated out of default CI), demonstrated green locally.
+- [ ] The integration test **runs in CI** (`test:examples`) and is green (the M1 external-contract + `public.*` proof).
 - [ ] `pnpm lint:deps` green; `/pack` < 5 KB gzip; `pnpm fixtures:check` green.
 
 ## Pre-investigated edge cases
@@ -143,7 +143,7 @@ A **new, package-local** contract authored in PSL, emitted to `contract.json` + 
 | Edge case | Disposition |
 |---|---|
 | `cipherstash` (referenced by older drafts) no longer exists | Model on `pgvector`. |
-| An intentionally-WIP example redding CI | Commit the integration test `describe.skip`-ped; demonstrate green locally. |
+| An intentionally-WIP example redding CI | The M1 assertions are green, so the suite runs in CI. A future constituent that adds not-yet-green assertions gates *its own* additions, not the whole suite — so the M1 regression surface stays live. |
 | `/pack` accidentally pulling in runtime code | Keep `src/exports/pack.ts`'s import graph clean; verify with `lint:deps` + the < 5 KB budget. |
 
 ## To confirm at dispatch
