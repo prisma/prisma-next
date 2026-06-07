@@ -304,7 +304,7 @@ export function makePslNamespace(init: {
       entries: { value: init.entries, enumerable: true, writable: false, configurable: false },
       span: { value: init.span, enumerable: true, writable: false, configurable: false },
       models: {
-        enumerable: true,
+        enumerable: false,
         configurable: false,
         get(): readonly PslModel[] {
           return blindCast<
@@ -314,7 +314,7 @@ export function makePslNamespace(init: {
         },
       },
       enums: {
-        enumerable: true,
+        enumerable: false,
         configurable: false,
         get(): readonly PslEnum[] {
           return blindCast<
@@ -324,7 +324,7 @@ export function makePslNamespace(init: {
         },
       },
       compositeTypes: {
-        enumerable: true,
+        enumerable: false,
         configurable: false,
         get(): readonly PslCompositeType[] {
           return blindCast<
