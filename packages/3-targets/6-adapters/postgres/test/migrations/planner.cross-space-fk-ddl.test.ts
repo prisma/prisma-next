@@ -1,10 +1,9 @@
 /**
  * Planner emits correct REFERENCES DDL for cross-space FKs.
  *
- * `buildForeignKeySql` (planner-ddl-builders.ts) is dead on the hot path —
- * it is exported but has no production caller. The live path is
- * issue-planner → AddForeignKeyCall → addForeignKey() → renderForeignKeySql()
- * which reads fk.references.schema (the target namespace) and is correct.
+ * The live path is issue-planner → AddForeignKeyCall → addForeignKey() →
+ * renderForeignKeySql() which reads fk.references.schema (the target
+ * namespace) and is correct.
  *
  * These tests pin the correct path's output for both qualified (named target
  * namespace) and unqualified (__unbound__ target namespace) cross-space FKs,
