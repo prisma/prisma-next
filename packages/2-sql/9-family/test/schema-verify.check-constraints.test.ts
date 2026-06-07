@@ -160,8 +160,8 @@ describe('classifySqlVerifierIssueKind — check constraint kinds', () => {
     expect(classifySqlVerifierIssueKind('check_missing')).toBe('declaredMissing');
   });
 
-  it('classifies check_mismatch as declaredIncompatible', () => {
-    expect(classifySqlVerifierIssueKind('check_mismatch')).toBe('declaredIncompatible');
+  it('classifies check_mismatch as valueDrift (symmetric with enum_values_changed)', () => {
+    expect(classifySqlVerifierIssueKind('check_mismatch')).toBe('valueDrift');
   });
 
   it('classifies check_removed as extraAuxiliary', () => {

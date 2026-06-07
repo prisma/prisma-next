@@ -40,6 +40,32 @@ describe('parseCheckConstraintDef', () => {
     const result = parseCheckConstraintDef('CHECK ((col IS NOT NULL))');
     expect(result).toBeUndefined();
   });
+
+  // F1: doubled single-quote un-escaping
+  it("un-escapes doubled single-quotes in ARRAY values (O''Brien → O'Brien)", () => {
+    const result = parseCheckConstraintDef(
+      "CHECK ((last_name = ANY (ARRAY['O''Brien'::text, 'Smith'::text])))",
+    );
+    expect(result).toEqual({ column: 'last_name', permittedValues: ["O'Brien", 'Smith'] });
+  });
+
+  it('un-escapes doubled single-quotes in IN list values', () => {
+    const result = parseCheckConstraintDef("CHECK ((last_name IN ('O''Brien', 'Smith')))");
+    expect(result).toEqual({ column: 'last_name', permittedValues: ["O'Brien", 'Smith'] });
+  });
+
+  // F2: double-quoted (non-identifier) column names
+  it('parses a double-quoted column name in ARRAY shape', () => {
+    const result = parseCheckConstraintDef(
+      "CHECK ((\"my-col\" = ANY (ARRAY['a'::text, 'b'::text])))",
+    );
+    expect(result).toEqual({ column: 'my-col', permittedValues: ['a', 'b'] });
+  });
+
+  it('parses a double-quoted column name in IN shape', () => {
+    const result = parseCheckConstraintDef("CHECK ((\"my-col\" IN ('a', 'b')))");
+    expect(result).toEqual({ column: 'my-col', permittedValues: ['a', 'b'] });
+  });
 });
 
 // ---------------------------------------------------------------------------

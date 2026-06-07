@@ -92,4 +92,15 @@ describe('verifierDisposition', () => {
     expect(verifierDisposition('external', 'type_missing')).toBe('fail');
     expect(verifierDisposition('observed', 'type_missing')).toBe('warn');
   });
+
+  it('suppresses check_mismatch under external policy, symmetric with enum_values_changed', () => {
+    // check_mismatch (value-set drift on a check constraint) is graded the same
+    // as enum_values_changed — both are valueDrift so external suppresses them
+    // identically. An external owner controls the allowed values; a drift should
+    // not block the app.
+    expect(verifierDisposition('external', 'check_mismatch')).toBe('suppress');
+    expect(verifierDisposition('managed', 'check_mismatch')).toBe('fail');
+    expect(verifierDisposition('tolerated', 'check_mismatch')).toBe('fail');
+    expect(verifierDisposition('observed', 'check_mismatch')).toBe('warn');
+  });
 });

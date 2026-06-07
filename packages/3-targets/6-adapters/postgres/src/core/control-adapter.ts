@@ -1285,6 +1285,13 @@ function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<T[K], T
  * 2. `IN (...)` — stays as-is when written directly:
  *    `CHECK ((col IN ('a', 'b')))`
  *
+ * Column names may be plain identifiers (`status`) or double-quoted identifiers
+ * (`"my-col"`). Double-quoted identifiers with embedded `""` are un-escaped to a
+ * single `"`.
+ *
+ * String literal values may contain Postgres-style doubled single-quotes (`''`),
+ * which are un-escaped to a single `'` (e.g. `O''Brien` → `O'Brien`).
+ *
  * Returns `{ column, permittedValues }` when the predicate matches one of
  * the two recognised shapes. Returns `undefined` for anything else (e.g.
  * a free-form SQL predicate that wasn't emitted by this slice).
@@ -1307,21 +1314,25 @@ export function parseCheckConstraintDef(
       : afterCheck;
 
   // Shape 1: col = ANY (ARRAY['a'::text, 'b'::text])
-  // The column name may be quoted; the cast (::text, ::character varying, etc.) is optional.
-  const anyArrayMatch = inner.match(/^"?(\w+)"?\s*=\s*ANY\s*\(\s*ARRAY\s*\[(.+)\]\s*\)/i);
+  // Accepts both plain identifiers and double-quoted identifiers for the column.
+  const anyArrayMatch = inner.match(
+    /^(?:"((?:[^"]|"")*)"|(\w+))\s*=\s*ANY\s*\(\s*ARRAY\s*\[(.+)\]\s*\)/i,
+  );
   if (anyArrayMatch) {
-    const column = anyArrayMatch[1];
-    const arrayBody = anyArrayMatch[2];
+    const column =
+      anyArrayMatch[1] !== undefined ? anyArrayMatch[1].replace(/""/g, '"') : anyArrayMatch[2];
+    const arrayBody = anyArrayMatch[3];
     if (!column || !arrayBody) return undefined;
     const permittedValues = extractArrayLiterals(arrayBody);
     return permittedValues ? { column, permittedValues } : undefined;
   }
 
   // Shape 2: col IN ('a', 'b')
-  const inMatch = inner.match(/^"?(\w+)"?\s+IN\s*\((.+)\)/i);
+  // Accepts both plain identifiers and double-quoted identifiers for the column.
+  const inMatch = inner.match(/^(?:"((?:[^"]|"")*)"|(\w+))\s+IN\s*\((.+)\)/i);
   if (inMatch) {
-    const column = inMatch[1];
-    const listBody = inMatch[2];
+    const column = inMatch[1] !== undefined ? inMatch[1].replace(/""/g, '"') : inMatch[2];
+    const listBody = inMatch[3];
     if (!column || !listBody) return undefined;
     const permittedValues = extractQuotedLiterals(listBody);
     return permittedValues ? { column, permittedValues } : undefined;
@@ -1333,20 +1344,24 @@ export function parseCheckConstraintDef(
 /**
  * Extracts string literals from an `ARRAY[...]` body.
  * Handles `'value'::type` casts by stripping the cast part.
+ * Postgres stores single quotes inside values as doubled single-quotes (`''`);
+ * each extracted value is un-escaped so `O''Brien` becomes `O'Brien`.
  */
 function extractArrayLiterals(arrayBody: string): readonly string[] | undefined {
   // Match 'value'::cast or 'value' (with possible spaces)
   const pattern = /'((?:[^'\\]|\\.|'')*)'\s*(?:::[^\s,\]]+)?/g;
-  const values = [...arrayBody.matchAll(pattern)].map((m) => m[1] ?? '');
+  const values = [...arrayBody.matchAll(pattern)].map((m) => (m[1] ?? '').replace(/''/g, "'"));
   return values.length > 0 ? values : undefined;
 }
 
 /**
  * Extracts string literals from an `IN (...)` list.
  * Handles single-quoted literals with possible escaped quotes.
+ * Postgres stores single quotes inside values as doubled single-quotes (`''`);
+ * each extracted value is un-escaped so `O''Brien` becomes `O'Brien`.
  */
 function extractQuotedLiterals(listBody: string): readonly string[] | undefined {
   const pattern = /'((?:[^'\\]|\\.|'')*)'/g;
-  const values = [...listBody.matchAll(pattern)].map((m) => m[1] ?? '');
+  const values = [...listBody.matchAll(pattern)].map((m) => (m[1] ?? '').replace(/''/g, "'"));
   return values.length > 0 ? values : undefined;
 }
