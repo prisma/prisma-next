@@ -1,6 +1,16 @@
 # Project Plan
 
-## Status / next-up (2026-06-07) — resume here
+## Status / next-up (2026-06-07 — M2 merged) — resume here
+
+- **M1: ✅ MERGED (PR #745).** Storage IR carrier + aggregate-load checks.
+- **M2: ✅ MERGED (PR #752).** TS brands + PSL grammar + non-navigable cross-space relation + supabase `/contract` handles + CodeRabbit hardening.
+- **NEXT — M3 split into TWO PRs (operator decision, 2026-06-07).**
+  - **M3a (this branch `tml-2500-m3-planner-verifier`, framework substrate):** planner DDL + verifier
+    + PSL aggregate resolution + PGlite AC7 integration test.
+  - **M3b (next branch, user-visible glue, opens after M3a merges):** `examples/supabase` cross-space
+    FK wiring + cascade-delete hermetic test + `BuiltStorageTables.spaceId` type-surface cleanup.
+- The two-PR shape de-risks the slice: the live-DB integration is reviewable in isolation, and a
+  surprise in M3a doesn't drag the skeleton change with it.
 
 - **M1 — Foundation: ✅ MERGED (PR #745).** FK carrier (`ForeignKeyReference.spaceId`, presence =
   cross-space discriminator); cross-space dependency graph + cycle rejection; reverse-reference
