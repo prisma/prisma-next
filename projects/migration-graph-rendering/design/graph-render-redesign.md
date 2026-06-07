@@ -47,41 +47,66 @@ live. It owns:
 - **Overlap** — a cell holds an **ordered (z) set of lines present**, each with its
   **local directions** (which of up/down/left/right it occupies in that cell).
 - **Planes (z-order)** — see below; the layout assigns them.
-- **The single-glyph invariant** — the layout guarantees no cell ever needs to express
-  more than one glyph can (a junction and a crossing never collide in one cell).
+- **The single-owner invariant** — the layout guarantees **every cell is owned by
+  exactly one line** (see § Planes: no tees + 2-col lanes). So a cell never needs more
+  than one glyph can express, and never holds two differently-coloured lines.
 
 **Render** is a **dumb projection** — no topology knowledge. Per cell:
 
-1. Take the **topmost plane's** line(s).
-2. **Glyph** = box-drawing character looked up from the union of *that plane's*
-   directions (the 16 up/down/left/right combinations), with `○`/`∅` node markers and
-   `↑ ↓ ⟲` arrows as overlays.
+1. Take the **topmost** line.
+2. **Glyph** = box-drawing character from that line's directions (verticals + corners),
+   with `○`/`∅` node markers and `↑ ↓ ⟲` arrows as overlays.
 3. **Colour** = that line's colour (on-path / off-path; or the by-branch rotation in
-   normal mode). Among same-plane lines that connect at a junction, pick by priority
-   (on-path wins).
-4. Lower planes are **occluded** (clipped) — not drawn at this cell.
+   normal mode). Read straight off the owning line — never arbitrated.
+4. Lower lines are **occluded** (clipped) — not drawn at this cell.
 
 This makes the giant `switch` collapse to a direction→glyph lookup, and makes colour
 **correct-by-construction**: exactly one owning line per cell, so a cell's colour is
 never a compromise between two branches.
 
-### Planes (the load-bearing decision)
+### Planes + z-order (the load-bearing decision)
 
-A cell is a z-ordered stack of lines. **Same-plane lines that meet _connect_** (a
-junction — their directions combine into `├ ┬ ╮ ┴ ┼`). **Different-plane lines _do
-not_ connect** — the topmost is drawn and the others are occluded (a crossing). This
-single rule replaces the `merge-*` vs `arc-*` cell-kind distinction.
+A cell is a z-ordered stack of lines. **The topmost line in a cell is drawn; the rest
+are occluded.** One rule governs **everything that overlaps**:
 
-**Policy:**
+- **Crossings** — two lines pass through a cell: the top is drawn, the lower clips.
+- **Merges / forks** — several lines meet at a node: the **top branch is drawn
+  continuous; the others _yield_ beneath it** (each corners into its own connector
+  cell). A merge is *not* a special junction — it is "one continuous line + N yielding
+  corners", which scales to any number of parents/children.
+- **Back-arcs** — see policy below.
 
-- **Forward DAG lines = base plane.** They interconnect via real junctions.
-- **Back-arcs (rollbacks) = upper plane, drawn continuous.** They are rare
-  out-of-plane exceptions; where a back-arc crosses a forward vertical, the **forward
-  line clips** (a small break) and the back-arc runs through. Colour stays orthogonal —
-  a back-arc is a continuous line in *its own* colour (grey when off-path).
-- **Back-arc convergence:** back-arcs that land on the **same target node share one
-  back-lane** (sources tee in, one landing). Narrower output, truer topology, and fewer
-  crossings — so the clip-vs-continuous choice bites less often.
+**The single-owner invariant — this is what dissolves the colour problem: no cell is
+ever owned by two lines.** Achieved by:
+
+- **No tees.** The glyph alphabet is **verticals + corners + arrows + node markers** —
+  never `├ ┬ ┼`. A tee is the *only* glyph that bundles a through-line with a branch in
+  one cell; drop it and the bundling is gone. A fork/merge is the top line's continuous
+  `│`/corner plus each other line's own corner.
+- **2 columns per lane** — a **lane column** (a single-owner vertical) and a
+  **connector column** (corners/horizontals, single-owner). Turns happen in the
+  connector column, never crammed into the trunk's column. (Columns-per-lane is a
+  configurable constant — see § Geometry.)
+
+Because every cell has exactly one owner, **colour is read straight off that line** —
+there is never a colour to arbitrate between two branches.
+
+**Z-order assignment is mode-dependent — the only thing that differs between modes:**
+
+- **Normal (multi-colour) mode → trunk on top.** The main lane stays an unbroken `│`;
+  later parents corner in beneath it (`│─╮─╮…`). Compact, git-log-style.
+- **Highlighted (`migrate --show`) mode → the on-path branch on top.** The chosen path
+  is lifted above everything and drawn as one continuous prominent line sweeping the
+  merge (`╰───╮`) — literally "the route the runner takes" — while off-path branches
+  yield beneath it, each owning its own (grey) corner cells.
+
+**Back-arc policy:**
+
+- **Forward DAG lines = base plane; back-arcs (rollbacks) = upper plane, drawn
+  continuous.** Where a back-arc crosses a forward vertical the **forward line clips**
+  and the back-arc runs through; colour is orthogonal (grey when off-path).
+- **Back-arc convergence:** back-arcs landing on the **same target node share one
+  back-lane** — narrower, truer, fewer crossings.
 
 ### Geometry is configurable
 
@@ -142,9 +167,12 @@ Render per cell: pick `max plane`; `glyph = boxChar(union of that plane's direct
 
 ## Open questions (settle at spec time)
 
-- **Within-plane junction colour** when a branch splits on-path/off-path: a `├` whose
-  spine is on-path and whose branch is off-path is one same-plane junction — confirm
-  the priority (on-path wins the cell's colour) and that this reads correctly.
+- ~~Within-plane junction colour when a branch splits on-path/off-path.~~ **Resolved
+  by the design itself:** the no-tee / 2-col-lane / single-owner rule means a junction
+  is never one shared cell — the top branch is a continuous line, each other branch owns
+  its own corner cell, so there is no colour to arbitrate. The choice of *which* branch
+  is on top is the mode-dependent z-order (trunk-on-top normal / on-path-on-top
+  highlighted), not a colour rule.
 - **Default columns-per-lane** value and the full set of geometry parameters to expose.
 
 ## Relationship to the current code

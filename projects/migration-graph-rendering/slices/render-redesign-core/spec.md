@@ -15,6 +15,7 @@ Per the design doc. In scope for this slice:
 - Layout produces the new grid + **plane assignment** (forward DAG = base plane; each back-arc = upper plane, drawn continuous; forward verticals clip at crossings). **No convergence yet** — keep today's per-arc lanes (that's slice 2).
 - Renderer = occlusion projection: topmost plane → `boxChar(union of its directions)` + colour from the winning line (on-path > off-path priority at same-plane junctions; by-branch rotation in normal mode); node/arrow overlays; lower planes clipped.
 - Retire the 14 `StructuralCell` kinds, the render `switch`, and the per-cell `migrationHash?` bolt-on.
+- **Single-owner glyph discipline (the core invariant):** the glyph alphabet is **verticals + corners + arrows + node markers — no tees (`├ ┬ ┼`)**; with 2 columns per lane, every cell is owned by exactly one line, so colour is read straight off it (never arbitrated). Merges/forks render as the **top branch continuous + the others yielding into their own corner cells**; **z-order is mode-dependent** — trunk-on-top in normal mode (`│─╮─╮`), on-path-branch-on-top in highlighted mode (`╰───╮`, the path sweeps over as one continuous line).
 - **Out:** back-arc convergence; extracting geometry constants to parameters (both → `render-redesign-geometry`). Keep current geometry/spacing as-is.
 
 ## Coherence rationale
@@ -38,7 +39,7 @@ Author tests **before** the implementation, in this order, and **prove they go r
 
 ## Open Questions
 
-1. Within-plane junction colour when a branch splits on-path/off-path (design doc § Open questions). Working position: on-path wins the junction cell's colour; verify it reads correctly on a fixture.
+None. (The within-plane junction-colour question is dissolved by the no-tee / single-owner discipline — see § Chosen design and the design doc. Default columns-per-lane is settled in the `render-redesign-geometry` slice.)
 
 ## References
 
