@@ -221,7 +221,7 @@ export const PATH_HIGHLIGHT_STYLES = {
     lane: colorize ? forcedGreen : (text: string) => text,
     arrow: (text: string) => text,
     dirName: (text: string) => bold(text),
-    hashOverride: undefined as undefined,
+    hashOverride: undefined,
   }),
   /**
    * Lane/glyph/arrow/hash stylers for off-path cells.
