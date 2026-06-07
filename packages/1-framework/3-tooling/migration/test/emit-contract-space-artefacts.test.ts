@@ -160,10 +160,9 @@ describe('emitContractSpaceArtefacts', () => {
     expect(invariants).toEqual(snapshot);
   });
 
-  it('accepts the app space and writes under migrations/<APP_SPACE_ID>/ (M2.5b AC6)', async () => {
-    // Pre-M2.5b the helper rejected the app space; the layout is now
-    // uniform — every space, including the app, gets the same on-disk
-    // shape under `migrations/<spaceId>/`.
+  it('accepts the app space and writes under migrations/<APP_SPACE_ID>/', async () => {
+    // The layout is uniform — every space, including the app, gets the same
+    // on-disk shape under `migrations/<spaceId>/`.
     await emitContractSpaceArtefacts(migrationsDir, APP_SPACE_ID, {
       contract: { kind: 'app' },
       contractDts: 'export type AppContract = unknown;\n',

@@ -1,5 +1,5 @@
 /**
- * M2.3 — Supabase extension `/contract` branded handles
+ * Supabase extension `/contract` branded handles
  *
  * Tests for the branded model handles exported from
  * `@prisma-next/extension-supabase/contract`:

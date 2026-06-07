@@ -1,7 +1,6 @@
 /**
- * AC7 integration test — cross-contract FK from `public.profile.user_id → auth.users.id`.
- *
- * Proves the M3a end-to-end story on a live PGlite database:
+ * Integration test — cross-contract FK from `public.profile.user_id → auth.users.id`
+ * on a live PGlite database.
  *
  *   1. A synthetic app contract built in-test with the TS builder declares
  *      `Profile.userId → auth.users.id` (via `belongsTo(AuthUser, …)` +
@@ -17,10 +16,6 @@
  *      - `confdeltype = 'c'` (cascade DDL declaration) is asserted.
  *      - The target column resolves to `id` on `auth.users`.
  *   6. `dbVerify` returns zero issues across both spaces.
- *
- * Hard out-of-scope (per M3a.4 brief):
- *   - Runtime cascade-delete behaviour (no `DELETE FROM auth.users` test — that is M3b).
- *   - Any modification to `examples/supabase/` (M3b).
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -145,10 +140,9 @@ describe('AC7 — cross-contract FK: public.profile.user_id → auth.users.id', 
 
       // Step 4 — Run `db init` (apply mode).
       //
-      // This exercises the full aggregate planner pipeline:
-      // - M3a.1 resolver patches cross-space FK tableName → 'users'
-      // - M3a.2 planner emits `REFERENCES "auth"."users"("id")`
-      // - The FK constraint is created in the live DB.
+      // This exercises the full aggregate planner pipeline — the planner
+      // emits `REFERENCES "auth"."users"("id")` and the FK constraint is
+      // created in the live DB.
       const client = createControlClient({
         family: sql,
         target: postgres,
@@ -240,9 +234,8 @@ describe('AC7 — cross-contract FK: public.profile.user_id → auth.users.id', 
 
         // Step 6 — Run `db verify` and assert zero issues.
         //
-        // M3a.3 proved verifyForeignKeys handles cross-space FKs without trying to
-        // own the target table. With the shim in place, all `external` tables are
-        // present and the verifier should return ok with zero schema issues.
+        // With the shim in place, all `external` tables are present and the
+        // verifier should return ok with zero schema issues.
         const deserializedContract = serializer.deserializeContract(appContractJson);
         const verifyResult = await client.dbVerify({
           contract: deserializedContract,

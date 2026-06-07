@@ -1,9 +1,9 @@
 /**
- * AC3 — planner emits correct REFERENCES DDL for cross-space FKs (M3a.2).
+ * Planner emits correct REFERENCES DDL for cross-space FKs.
  *
- * Audit result: `buildForeignKeySql` (planner-ddl-builders.ts) is **dead on
- * the hot path** — it is exported but has no production caller. The live path
- * is issue-planner → AddForeignKeyCall → addForeignKey() → renderForeignKeySql()
+ * `buildForeignKeySql` (planner-ddl-builders.ts) is dead on the hot path —
+ * it is exported but has no production caller. The live path is
+ * issue-planner → AddForeignKeyCall → addForeignKey() → renderForeignKeySql()
  * which reads fk.references.schema (the target namespace) and is correct.
  *
  * These tests pin the correct path's output for both qualified (named target
@@ -24,9 +24,7 @@ const emptySchema: SqlSchemaIR = { tables: {} };
 
 /**
  * Build a contract with a Profile table in the unbound (public) namespace
- * that has a FK to a target in the given namespace and table. This simulates
- * the post-M3a.1 world where the aggregate loader has already resolved
- * the cross-space FK's tableName to the real value ('users').
+ * that has a FK to a target in the given namespace and table.
  */
 function buildCrossSpaceFkContract(targetNamespaceId: string): Contract<SqlStorage> {
   return {
@@ -81,7 +79,7 @@ function buildCrossSpaceFkContract(targetNamespaceId: string): Contract<SqlStora
 
 /**
  * Build a contract with a local (same-namespace) FK from post.user_id → user.id.
- * Used as a regression guard — local-FK DDL must be unchanged after M3a.2.
+ * Used as a regression guard — local-FK DDL must be unchanged.
  */
 function buildLocalFkContract(): Contract<SqlStorage> {
   return {

@@ -226,8 +226,8 @@ const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
 };
 
 /**
- * Dead on the production hot path (M3a.2 audit, 2026-06-07): no production
- * code calls this. The live FK-add path goes through `AddForeignKeyCall` →
+ * Dead on the production hot path: no production code calls this. The live
+ * FK-add path goes through `AddForeignKeyCall` →
  * `addForeignKey()` → `renderForeignKeySql()` in operations/constraints.ts,
  * which reads `fk.references.schema` (the target namespace) and is correct.
  *
