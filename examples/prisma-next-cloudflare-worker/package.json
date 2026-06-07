@@ -36,8 +36,8 @@
     "pg": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.16.6",
-    "@cloudflare/workers-types": "4.20260515.1",
+    "@cloudflare/vitest-pool-workers": "0.16.11",
+    "@cloudflare/workers-types": "4.20260528.1",
     "@prisma-next/cli": "workspace:0.12.0",
     "@prisma-next/sql-contract-psl": "workspace:0.12.0",
     "@prisma-next/test-utils": "workspace:0.12.0",
@@ -47,7 +47,7 @@
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "^4.1.7",
-    "wrangler": "4.91.0"
+    "wrangler": "4.95.0"
   },
   "version": "0.12.0"
 }
