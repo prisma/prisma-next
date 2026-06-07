@@ -35,6 +35,7 @@ import {
   emitTypedCrossModelFallbackWarnings,
   emitTypedNamedTypeFallbackWarnings,
 } from './contract-warnings';
+import { isEnumTypeHandle } from './enum-type';
 
 type RuntimeModel = ContractModelBuilder<
   string | undefined,
@@ -84,6 +85,13 @@ function resolveFieldDescriptor(
   }
 
   if ('typeRef' in fieldState && fieldState.typeRef) {
+    if (isEnumTypeHandle(fieldState.typeRef)) {
+      return {
+        codecId: fieldState.typeRef.codecId,
+        nativeType: fieldState.typeRef.nativeType,
+      };
+    }
+
     const typeRef =
       typeof fieldState.typeRef === 'string'
         ? fieldState.typeRef
@@ -567,6 +575,11 @@ function resolveModelNode(
       throw new Error(`Column name resolution failed for "${spec.modelName}.${fieldName}"`);
     }
 
+    const enumHandle =
+      'typeRef' in fieldState && isEnumTypeHandle(fieldState.typeRef)
+        ? fieldState.typeRef
+        : undefined;
+
     fields.push({
       fieldName,
       columnName,
@@ -574,6 +587,7 @@ function resolveModelNode(
       nullable: fieldState.nullable,
       ...(fieldState.default ? { default: fieldState.default } : {}),
       ...(fieldState.executionDefaults ? { executionDefaults: fieldState.executionDefaults } : {}),
+      ...(enumHandle !== undefined ? { enumTypeHandle: enumHandle } : {}),
     });
   }
 
@@ -717,6 +731,9 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
       : {}),
     ...(definition.namespaces ? { namespaces: definition.namespaces } : {}),
     ...(definition.createNamespace ? { createNamespace: definition.createNamespace } : {}),
+    ...(definition.enums && Object.keys(definition.enums).length > 0
+      ? { enums: definition.enums }
+      : {}),
     models,
   };
 }

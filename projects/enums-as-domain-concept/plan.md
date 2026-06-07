@@ -9,44 +9,57 @@ Four slices in a substrate-then-parallel-realization-then-cleanup shape: a contr
 substrate slice lands the two-plane enum shape; two independent realization slices then
 run in parallel — one delivering the Postgres server-side realization (checks +
 defaults + verification), the other the application read surface (typing + `db.enums` +
-ordering); a final cleanup slice deletes the native enum machinery. One stack thread
-(substrate → cleanup) with a parallel pair in the middle.
+ordering); a final cutover slice flips PSL `enum` + authoring to the new shape and
+deletes the native machinery. The substrate slice is purely **additive** (the new
+representation lands *dark*; native stays the default), so every intermediate merge stays
+green. One stack thread (additive substrate → cutover) with a parallel pair in the
+middle.
 
 ## Composition
 
 ### Stack (deliver in order)
 
 1. **Slice `enum-contract-substrate`** — Linear: [TML-2850](https://linear.app/prisma-company/issue/TML-2850)
-   - **Outcome:** An enum declared in PSL or the TS DSL emits a `domain…enum` entity
-     (explicit codec + ordered name→value members) and a `storage…valueSet` entity
-     (ordered permitted values), with the using field and column each keeping their
-     always-present `codecId` and additionally carrying a `valueSet` restriction
-     reference in the space-aware coordinate shape. The contract round-trips through the
-     serializer and passes validation.
+   - **Outcome:** The new enum representation exists and round-trips, added **additively
+     (dark)**. The `enumType` / `member` API produces a `domain…enum` entity (explicit
+     codec + ordered name→value members) and a `storage…valueSet` entity (ordered
+     permitted values); the using field and column each keep their always-present
+     `codecId` and additionally carry a `valueSet` restriction reference in the
+     space-aware coordinate shape; the contract round-trips through the serializer and
+     passes validation. PSL `enum` and the existing default authoring keep emitting the
+     native enum unchanged — no fixture changes, no behavior change. The new shape is not
+     yet migration-capable (slice 2); it is exercised by the new API + direct-IR
+     round-trip tests, not end-to-end migration.
    - **Builds on:** None. (Soft external: the `valueSet` reference shape tracks the
      TML-2500 / PR #745 carrier — see § Dependencies. Local refs carry no `spaceId`, so
      this is not blocking.)
    - **Hands to:** The two-plane contract shape — `domain…enum`, `storage…valueSet`, and
      the `valueSet` property + reference coordinate — that slices 2 and 3 consume.
    - **Focus:** the `enumType` / `member` authoring API; the two new IR entity kinds and
-     the `valueSet` property on domain field + storage column; PSL and TS-DSL lowering
-     into both planes; serializer, validator, round-trip. The new path uses the ordinary
-     scalar codec — no bespoke enum codec. Deliberately out of scope: server-side
-     enforcement (slice 2), client typing / defaults (slice 3), and removing the existing
-     native enum path (slice 4), which stays untouched alongside.
+     the `valueSet` property on domain field + storage column; the new API's TS-DSL
+     lowering into both planes; serializer, validator, round-trip. The new path uses the
+     ordinary scalar codec — no bespoke enum codec. Deliberately out of scope: server-side
+     enforcement (slice 2), client typing / defaults (slice 3), and the cutover that makes
+     the new shape the meaning of `enum` and deletes native (slice 4). The native path
+     stays the default and is untouched; **PSL `enum` is not repointed in this slice** (it
+     keeps lowering to native — repoint is the slice-4 cutover).
 
 2. **Slice `delete-native-enum-machinery`** — Linear: [TML-2853](https://linear.app/prisma-company/issue/TML-2853)
-   - **Outcome:** The native Postgres enum machinery (spec § What this replaces) is
-     gone; enums are realized only as `valueSet` + check; build, type-checks, and
-     `fixtures:check` pass; no `postgres-enum` discriminator or `PostgresEnumType`
-     remains; the no-bare-cast ratchet is clean.
-   - **Builds on:** Slice `check-constraint-realization`'s value-set + check realization
-     (which makes the native emission/migration/verification path redundant). Sequenced
-     after the parallel pair so fixtures regenerate once, not twice.
+   - **Outcome (cutover + delete):** PSL `enum` and the default authoring switch to
+     producing the new domain-enum + value-set shape; canonical fixtures regenerate to the
+     `valueSet` + check form; the native Postgres enum machinery (spec § What this
+     replaces) is deleted. Build, type-checks, and `fixtures:check` pass; no
+     `postgres-enum` discriminator or `PostgresEnumType` remains; the no-bare-cast ratchet
+     is clean.
+   - **Builds on:** Slice `check-constraint-realization` (TML-2851) — the flip requires
+     migrations/verification to understand the new shape the instant authoring emits it.
+     Sequenced after slice 3 (TML-2852) too, so reads are typed when the shape goes live
+     and fixtures regenerate exactly once.
    - **Hands to:** A single enum path — the project's end state.
-   - **Focus:** delete the enumerated native machinery; migrate canonical fixtures to the
-     `valueSet` + check form; confirm `fixtures:check` and the cast ratchet. Pure
-     subtraction + fixture regeneration; no new behavior.
+   - **Focus:** flip the PSL `enum` lowering + default authoring from native to the new
+     shape; regenerate canonical fixtures to the `valueSet` + check form; delete the
+     enumerated native machinery; confirm `fixtures:check` and the cast ratchet. The single
+     atomic cutover — native and new coexist only up to this PR.
 
 ### Parallel group A — Postgres realization (independent of group B; builds on slice 1)
 
@@ -103,7 +116,12 @@ ordering); a final cleanup slice deletes the native enum machinery. One stack th
   migration DDL path and the query/typing path do not collide, so the
   "different-surface slices parallelise; same-adapter slices serialise" heuristic applies
   in favour of parallel.
-- **Slice 4 last (build-before-delete)** because removing the native emission, migration,
-  verification, and codec only becomes safe once slice 2's realization covers those cases
-  in the new shape. It is sequenced after the parallel pair so the canonical fixtures are
-  regenerated a single time rather than churned by both realization slices.
+- **Slice 4 is the atomic cutover (transitional-shape constraint).** `enum` is one
+  keyword; it cannot mean both native and the new shape at once. So the new representation
+  lands *dark* in slice 1 (additive — native stays the default and the only thing PSL
+  `enum` lowers to), realization (slice 2) and typing (slice 3) build against it, and only
+  slice 4 flips PSL `enum`/authoring to the new shape **and** deletes native in a single
+  PR. The flip requires slice 2 (so migrations understand the new shape the instant
+  authoring emits it) and follows slice 3 (so reads are typed when the shape goes live).
+  Sequencing the flip last also regenerates the canonical fixtures exactly once. This is
+  the project's only non-additive merge; every prior slice leaves `main` green.

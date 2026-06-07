@@ -7,6 +7,7 @@ import {
   type StorageTypeInstance,
   type StorageTypeInstanceInput,
 } from './storage-type-instance';
+import type { StorageValueSet, StorageValueSetInput } from './storage-value-set';
 
 /**
  * Polymorphic value type for document-scoped `SqlStorage.types` entries
@@ -21,6 +22,7 @@ export interface SqlNamespaceTablesInput {
   readonly id: string;
   readonly entries: {
     readonly table: Record<string, StorageTable | StorageTableInput>;
+    readonly valueSet?: Record<string, StorageValueSet | StorageValueSetInput>;
   };
 }
 
@@ -60,6 +62,7 @@ export interface SqlStorageInput<THash extends string = string> {
 export type SqlNamespace = Namespace & {
   readonly entries: Readonly<{
     readonly table: Readonly<Record<string, StorageTable>>;
+    readonly valueSet?: Readonly<Record<string, StorageValueSet>>;
   }>;
   /**
    * Render a dialect-qualified table reference for runtime SQL emission.

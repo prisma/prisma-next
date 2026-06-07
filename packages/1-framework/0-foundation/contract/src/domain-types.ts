@@ -1,4 +1,5 @@
 import type { CrossReference } from './cross-reference';
+import type { ValueSetRef } from './value-set-ref';
 
 export type ScalarFieldType = {
   readonly kind: 'scalar';
@@ -23,6 +24,17 @@ export type ContractField = {
   readonly type: ContractFieldType;
   readonly many?: true;
   readonly dict?: true;
+  readonly valueSet?: ValueSetRef;
+};
+
+/**
+ * A domain enum: an ordered set of named members, each with a codec-encoded
+ * value. The `codecId` identifies the codec used to encode member values in
+ * storage. The `members` array is ordered (declaration order is preserved).
+ */
+export type ContractEnum = {
+  readonly codecId: string;
+  readonly members: readonly { readonly name: string; readonly value: string }[];
 };
 
 export type ContractRelationOn = {

@@ -13,6 +13,7 @@ import type {
   SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import type { EnumTypeHandle } from './enum-type';
 
 export type { ExecutionMutationDefaultPhases };
 
@@ -24,6 +25,8 @@ export interface FieldNode {
   readonly default?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly many?: boolean;
+  /** Present when the field was authored with `field.namedType(enumHandle)`. */
+  readonly enumTypeHandle?: EnumTypeHandle;
 }
 
 export interface PrimaryKeyNode {
@@ -163,4 +166,10 @@ export interface ContractDefinition {
   ) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
+  /**
+   * Domain enum handles authored via `enumType()`. Each entry lowers to a
+   * domain `enum` entry and a storage `valueSet` entry in the contract's
+   * default namespace.
+   */
+  readonly enums?: Record<string, EnumTypeHandle>;
 }

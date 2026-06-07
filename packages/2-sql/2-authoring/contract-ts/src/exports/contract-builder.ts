@@ -23,3 +23,5 @@ export type {
   RelationNode,
   UniqueConstraintNode,
 } from '../contract-definition';
+export type { EnumMember, EnumTypeHandle } from '../enum-type';
+export { enumType, member } from '../enum-type';
