@@ -225,6 +225,18 @@ const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
   setDefault: 'SET DEFAULT',
 };
 
+/**
+ * Dead on the production hot path (M3a.2 audit, 2026-06-07): no production
+ * code calls this. The live FK-add path goes through `AddForeignKeyCall` →
+ * `addForeignKey()` → `renderForeignKeySql()` in operations/constraints.ts,
+ * which reads `fk.references.schema` (the target namespace) and is correct.
+ *
+ * This function uses `schemaName` (the *source* table's schema) for the
+ * REFERENCES target — so for a cross-schema FK from public.profile to
+ * auth.users it would emit `REFERENCES "public"."users"` instead of
+ * `REFERENCES "auth"."users"`. It is exported for external consumers;
+ * removal is tracked separately.
+ */
 export function buildForeignKeySql(
   schemaName: string,
   tableName: string,
