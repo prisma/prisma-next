@@ -377,13 +377,26 @@ export function buildSqlContractFromDefinition(
       }
 
       const enumHandle = !isValueObjectField(field) ? field.enumTypeHandle : undefined;
+      // Authored enums are always registered under the contract's defaultNamespaceId
+      // (see the enum registration loop below), so refs must point there regardless
+      // of which namespace the consuming model lives in.
       const storageValueSetRef: ValueSetRef | undefined =
         enumHandle !== undefined
-          ? { plane: 'storage', entityKind: 'value-set', namespaceId, name: enumHandle.enumName }
+          ? {
+              plane: 'storage',
+              entityKind: 'value-set',
+              namespaceId: defaultNamespaceId,
+              name: enumHandle.enumName,
+            }
           : undefined;
       const domainValueSetRef: ValueSetRef | undefined =
         enumHandle !== undefined
-          ? { plane: 'domain', entityKind: 'enum', namespaceId, name: enumHandle.enumName }
+          ? {
+              plane: 'domain',
+              entityKind: 'enum',
+              namespaceId: defaultNamespaceId,
+              name: enumHandle.enumName,
+            }
           : undefined;
 
       const column = buildStorageColumn(field, storageValueSetRef, codecLookup);
@@ -608,6 +621,11 @@ export function buildSqlContractFromDefinition(
   const domainEnumsByNs: Record<string, Record<string, ContractEnum>> = {};
   const storageValueSetsByNs: Record<string, Record<string, StorageValueSetInput>> = {};
   for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
+    if (enumName !== handle.enumName) {
+      throw new Error(
+        `enum declaration key "${enumName}" must match enumType name "${handle.enumName}". Aliases are not supported.`,
+      );
+    }
     const nsId = defaultNamespaceId;
     let domainSlot = domainEnumsByNs[nsId];
     if (domainSlot === undefined) {
