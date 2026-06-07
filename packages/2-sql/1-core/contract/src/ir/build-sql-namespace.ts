@@ -49,7 +49,14 @@ class SqlBoundNamespace extends NamespaceBase {
       Object.fromEntries(
         Object.entries(input.entries.table).map(([k, v]) => [
           k,
-          v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
+          v instanceof StorageTable
+            ? v
+            : new StorageTable(
+                blindCast<
+                  StorageTableInput,
+                  'non-instance entry in entries.table is a StorageTableInput'
+                >(v),
+              ),
         ]),
       ),
     );
@@ -58,7 +65,14 @@ class SqlBoundNamespace extends NamespaceBase {
         Object.fromEntries(
           Object.entries(input.entries.valueSet).map(([k, v]) => [
             k,
-            v instanceof StorageValueSet ? v : new StorageValueSet(v as StorageValueSetInput),
+            v instanceof StorageValueSet
+              ? v
+              : new StorageValueSet(
+                  blindCast<
+                    StorageValueSetInput,
+                    'non-instance entry in entries.valueSet is a StorageValueSetInput'
+                  >(v),
+                ),
           ]),
         ),
       );

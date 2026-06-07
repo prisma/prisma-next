@@ -1,4 +1,5 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
+import { blindCast } from '@prisma-next/utils/casts';
 
 // ---------------------------------------------------------------------------
 // EnumMember — a single member declaration with literal type preservation
@@ -23,7 +24,13 @@ export function member<const Name extends string, const Value extends string = N
   name: Name,
   value?: Value,
 ): EnumMember<Name, Value> {
-  return { name, value: (value ?? name) as Value };
+  return {
+    name,
+    value: blindCast<
+      Value,
+      'overload signatures enforce Value=Name when value is omitted; default generic Value=Name makes this safe'
+    >(value ?? name),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -201,9 +208,9 @@ export function enumType(
     codecId: codec.codecId,
     nativeType: codec.nativeType,
     enumMembers,
-    values: values as never,
-    names: names as never,
-    members: membersAccessor as never,
+    values,
+    names,
+    members: membersAccessor,
     has: (v: string) => valueSet.has(v),
     nameOf: (v: string) => valueToName.get(v),
     ordinalOf: (v: string) => valueToOrdinal.get(v) ?? -1,
@@ -219,6 +226,6 @@ export function isEnumTypeHandle(value: unknown): value is EnumTypeHandle {
   return (
     typeof value === 'object' &&
     value !== null &&
-    (value as Record<symbol, unknown>)[ENUM_TYPE_HANDLE_BRAND] === true
+    Reflect.get(value, ENUM_TYPE_HANDLE_BRAND) === true
   );
 }

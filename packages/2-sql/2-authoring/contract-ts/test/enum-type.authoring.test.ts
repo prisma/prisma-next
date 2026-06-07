@@ -248,6 +248,26 @@ describe('enumType() authoring → contract structure', () => {
       name: 'Role',
     });
   });
+
+  it('field.namedType(handle) does not set typeRef on storage column', () => {
+    const contract = defineContract({
+      family: sqlFamilyPack,
+      target: postgresTargetPack,
+      enums: { Role },
+      models: {
+        User: model('User', {
+          fields: {
+            role: field.namedType(Role),
+          },
+        }),
+      },
+    }) as Contract<SqlStorage>;
+
+    const storageNs = contract.storage.namespaces['public'];
+    const userTable = storageNs?.entries.table?.['User'];
+    const roleColumn = userTable?.columns?.['role'];
+    expect(roleColumn?.typeRef).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
