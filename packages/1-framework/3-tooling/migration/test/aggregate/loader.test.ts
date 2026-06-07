@@ -363,7 +363,9 @@ describe('loadContractSpaceAggregate', () => {
       expect(violationsOfKind(gated, 'targetMismatch').map((v) => v.spaceId)).toContain(
         'wrongtarget',
       );
-      expect(violationsOfKind(gated, 'disjointness').map((v) => v.element)).toContain('user');
+      expect(violationsOfKind(gated, 'disjointness').map((v) => v.element)).toContain(
+        `${UNBOUND_NAMESPACE_ID}.user`,
+      );
       expect(violationsOfKind(gated, 'contractUnreadable').map((v) => v.spaceId)).toContain(
         'broken',
       );

@@ -378,12 +378,7 @@ async function executeMigrationCheckCommand(
   const scopedViolations =
     options.space === undefined
       ? allViolations
-      : allViolations.filter(
-          (v) =>
-            v.kind !== 'disjointness' &&
-            v.kind !== 'namespaceOwnershipCollision' &&
-            v.spaceId === options.space,
-        );
+      : allViolations.filter((v) => v.kind !== 'disjointness' && v.spaceId === options.space);
   for (const violation of scopedViolations) {
     failures.push(integrityViolationToCheckFailure(violation, migrationsDir));
   }

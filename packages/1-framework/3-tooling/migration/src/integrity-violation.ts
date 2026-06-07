@@ -64,13 +64,6 @@ export type IntegrityViolation =
       readonly element: string;
       readonly claimedBy: readonly string[];
     }
-  | {
-      readonly kind: 'namespaceOwnershipCollision';
-      readonly namespace: string;
-      readonly primitiveKind: string;
-      readonly name: string;
-      readonly contributorSpaceIds: readonly string[];
-    }
   | { readonly kind: 'contractUnreadable'; readonly spaceId: string; readonly detail: string }
   // genuinely unloadable — package omitted from member.packages
   | {
@@ -114,9 +107,8 @@ export interface IntegrityQueryOptions {
    */
   readonly declaredExtensions?: readonly DeclaredExtensionEntry[];
   /**
-   * When true, enables contract/disjointness/target/collision checks:
-   * `contractUnreadable`, `targetMismatch`, `disjointness`,
-   * `namespaceOwnershipCollision`.
+   * When true, enables contract/disjointness/target checks:
+   * `contractUnreadable`, `targetMismatch`, `disjointness`.
    */
   readonly checkContracts?: boolean;
 }
