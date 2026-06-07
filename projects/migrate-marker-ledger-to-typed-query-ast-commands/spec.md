@@ -32,6 +32,7 @@ Marker/ledger operations are the **first consumer** (proving the surface against
 - **No change to marker/ledger storage shape or wire semantics.** Table layouts (`prisma_contract.marker`/`.ledger`, `_prisma_marker`/`_prisma_ledger`, `_prisma_migrations`), the CAS/advisory-lock strategies (ADR 190/043), and the per-space marker model (ADR 212) are preserved. The one deliberate exception is the invariant-merge convergence (see DoD).
 - **No user-facing runtime DDL authoring surface.** DDL becomes a valid, lowerable query-AST kind, but giving application authors a builder to emit it is deferred. (Modelling DDL as valid now avoids foreclosing it later.)
 - **No runtime query-path changes.** User-facing lanes, codecs, and runtime DML execution are untouched.
+- **Not a control-plane stack-lifecycle refactor.** This project routes marker/ledger/DDL operations through `adapter.lower()`, but it does not fix *who constructs and owns* the control adapter/driver instances. Today the SQL family retains a live adapter (and `PostgresMigration` builds a second one), instead of the orchestrator — the CLI control client — constructing the control stack once and threading the instances, the way `createExecutionStack` already does in the runtime plane. That cleanup is tracked separately as **TML-2856** (detailed in the plan's parallel-group-B follow-ups).
 
 ## Place in the larger world
 
