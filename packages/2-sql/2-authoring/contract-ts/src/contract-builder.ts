@@ -21,7 +21,7 @@ import {
 } from './composed-authoring-helpers';
 import {
   type ContractInput,
-  type ContractModelBuilder,
+  ContractModelBuilder,
   field,
   isContractInput,
   type ModelAttributesSpec,
@@ -518,11 +518,5 @@ export function defineContract(
   return buildBoundContract(definition.family, definition.target, definition);
 }
 
-export type {
-  ComposedAuthoringHelpers,
-  ContractInput,
-  ContractModelBuilder,
-  ModelLike,
-  ScalarFieldBuilder,
-};
-export { field, model, rel };
+export type { ComposedAuthoringHelpers, ContractInput, ModelLike, ScalarFieldBuilder };
+export { ContractModelBuilder, field, model, rel };

@@ -1,13 +1,13 @@
 export type {
   ComposedAuthoringHelpers,
   ContractInput,
-  ContractModelBuilder,
   ModelLike,
   ScalarFieldBuilder,
 } from '../contract-builder';
 export {
   buildBoundContract,
   buildSqlContractFromDefinition,
+  ContractModelBuilder,
   defineContract,
   field,
   model,
@@ -23,3 +23,4 @@ export type {
   RelationNode,
   UniqueConstraintNode,
 } from '../contract-definition';
+export type { TargetFieldRef } from '../contract-dsl';
