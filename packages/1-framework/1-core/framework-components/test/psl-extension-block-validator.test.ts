@@ -23,7 +23,11 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { describe, expect, it } from 'vitest';
 import { extractCodecLookup } from '../src/control/control-stack';
-import type { PslNamespace } from '../src/control/psl-ast';
+import {
+  makePslNamespace,
+  makePslNamespaceEntries,
+  type PslNamespace,
+} from '../src/control/psl-ast';
 import {
   type ExtensionBlockRefResolutionContext,
   validateExtensionBlock,
@@ -126,33 +130,28 @@ function validNode(): PslExtensionBlock {
 
 /** A minimal PslNamespace with a single model named `Post`. */
 function namespaceWithModel(nsName: string, modelName: string): PslNamespace {
-  return {
+  const model = {
+    kind: 'model' as const,
+    name: modelName,
+    fields: [],
+    attributes: [],
+    span: stubSpan(),
+  };
+  return makePslNamespace({
     kind: 'namespace',
     name: nsName,
     span: stubSpan(),
-    models: [
-      {
-        kind: 'model',
-        name: modelName,
-        fields: [],
-        attributes: [],
-        span: stubSpan(),
-      },
-    ],
-    enums: [],
-    compositeTypes: [],
-  };
+    entries: makePslNamespaceEntries([model], [], [], []),
+  });
 }
 
 function emptyNamespace(nsName: string): PslNamespace {
-  return {
+  return makePslNamespace({
     kind: 'namespace',
     name: nsName,
     span: stubSpan(),
-    models: [],
-    enums: [],
-    compositeTypes: [],
-  };
+    entries: makePslNamespaceEntries([], [], [], []),
+  });
 }
 
 // ---------------------------------------------------------------------------

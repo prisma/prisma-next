@@ -27,13 +27,19 @@ import {
   extractCodecLookup,
 } from '@prisma-next/framework-components/control';
 import type {
+  PslEnum,
   PslExtensionBlock,
   PslExtensionBlockParamList,
   PslExtensionBlockParamOption,
   PslExtensionBlockParamRef,
   PslExtensionBlockParamScalarValue,
+  PslModel,
 } from '@prisma-next/framework-components/psl-ast';
-import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import {
+  makePslNamespace,
+  makePslNamespaceEntries,
+  UNSPECIFIED_PSL_NAMESPACE_ID,
+} from '@prisma-next/framework-components/psl-ast';
 import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
 import {
@@ -97,6 +103,15 @@ const STUB_SPAN = {
   end: { offset: 1, line: 1, column: 2 },
 } as const;
 
+function makeNs(models: PslModel[], enums: PslEnum[], extensionBlocks: PslExtensionBlock[]) {
+  return makePslNamespace({
+    kind: 'namespace',
+    name: UNSPECIFIED_PSL_NAMESPACE_ID,
+    entries: makePslNamespaceEntries(models, enums, [], extensionBlocks),
+    span: STUB_SPAN,
+  });
+}
+
 function refParam(identifier: string): PslExtensionBlockParamRef {
   return { kind: 'ref', identifier, span: STUB_SPAN };
 }
@@ -135,17 +150,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [],
-            enums: [],
-            compositeTypes: [],
-            extensionBlocks: [block],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs([], [], [block])],
         span: STUB_SPAN,
       };
 
@@ -176,17 +181,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [],
-            enums: [],
-            compositeTypes: [],
-            extensionBlocks: [block],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs([], [], [block])],
         span: STUB_SPAN,
       };
 
@@ -468,17 +463,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [],
-            enums: [],
-            compositeTypes: [],
-            extensionBlocks: [block],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs([], [], [block])],
         span: STUB_SPAN,
       };
 
@@ -493,47 +478,38 @@ describe('generic extension-block printer (P2)', () => {
 
   describe('built-in print round-trip', () => {
     it('prints a model with @id field unchanged', () => {
+      const models: PslModel[] = [
+        {
+          kind: 'model',
+          name: 'Post',
+          fields: [
+            {
+              kind: 'field',
+              name: 'id',
+              typeName: 'Int',
+              optional: false,
+              list: false,
+              attributes: [
+                {
+                  kind: 'attribute',
+                  target: 'field',
+                  name: 'id',
+                  args: [],
+                  span: STUB_SPAN,
+                },
+              ],
+              span: STUB_SPAN,
+            },
+          ],
+          attributes: [],
+          span: STUB_SPAN,
+          comment: undefined,
+        },
+      ];
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [
-              {
-                kind: 'model' as const,
-                name: 'Post',
-                fields: [
-                  {
-                    kind: 'field' as const,
-                    name: 'id',
-                    typeName: 'Int',
-                    optional: false,
-                    list: false,
-                    attributes: [
-                      {
-                        kind: 'attribute' as const,
-                        target: 'field' as const,
-                        name: 'id',
-                        args: [],
-                        span: STUB_SPAN,
-                      },
-                    ],
-                    span: STUB_SPAN,
-                  },
-                ],
-                attributes: [],
-                span: STUB_SPAN,
-                comment: undefined,
-              },
-            ],
-            enums: [],
-            compositeTypes: [],
-            extensionBlocks: [],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs(models, [], [])],
         span: STUB_SPAN,
       };
 
@@ -543,43 +519,34 @@ describe('generic extension-block printer (P2)', () => {
     });
 
     it('prints an enum with values unchanged', () => {
+      const enums: PslEnum[] = [
+        {
+          kind: 'enum',
+          name: 'Role',
+          values: [
+            {
+              kind: 'enumValue',
+              name: 'ADMIN',
+              span: STUB_SPAN,
+              attributes: [],
+              mapName: undefined,
+            },
+            {
+              kind: 'enumValue',
+              name: 'USER',
+              span: STUB_SPAN,
+              attributes: [],
+              mapName: undefined,
+            },
+          ],
+          attributes: [],
+          span: STUB_SPAN,
+        },
+      ];
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [],
-            enums: [
-              {
-                kind: 'enum' as const,
-                name: 'Role',
-                values: [
-                  {
-                    kind: 'enumValue' as const,
-                    name: 'ADMIN',
-                    span: STUB_SPAN,
-                    attributes: [],
-                    mapName: undefined,
-                  },
-                  {
-                    kind: 'enumValue' as const,
-                    name: 'USER',
-                    span: STUB_SPAN,
-                    attributes: [],
-                    mapName: undefined,
-                  },
-                ],
-                attributes: [],
-                span: STUB_SPAN,
-              },
-            ],
-            compositeTypes: [],
-            extensionBlocks: [],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs([], enums, [])],
         span: STUB_SPAN,
       };
 

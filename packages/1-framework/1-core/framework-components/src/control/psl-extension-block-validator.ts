@@ -310,13 +310,11 @@ function validateRef(
  * Returns true when an entity named `name` of kind `refKind` exists in at
  * least one of the given namespaces.
  *
- * Built-in PSL entity kinds are mapped to their `PslNamespace` collection:
- * - `'model'`         → `ns.models`
- * - `'enum'`          → `ns.enums`
- * - `'compositeType'` → `ns.compositeTypes`
+ * Resolution reads from `ns.entries` (the canonical ADR 224 container):
+ * - `'model'`, `'enum'`, `'compositeType'` → look up in the matching kind map.
+ * - Any other `refKind` → look up in the extension-contributed kind map for
+ *   that discriminator (e.g. `'policy_select'`, `'rls_role'`).
  *
- * Any other `refKind` is resolved against the namespace's `extensionBlocks`
- * array (matching by `block.kind === refKind` and `block.name === name`).
  * This covers extension-contributed entity kinds that reference other
  * extension-contributed blocks (e.g. a policy referencing a role block).
  */
@@ -326,15 +324,8 @@ function resolveEntityInNamespaces(
   namespaces: readonly PslNamespace[],
 ): boolean {
   for (const ns of namespaces) {
-    if (refKind === 'model') {
-      if (ns.models.some((m) => m.name === name)) return true;
-    } else if (refKind === 'enum') {
-      if (ns.enums.some((e) => e.name === name)) return true;
-    } else if (refKind === 'compositeType') {
-      if (ns.compositeTypes.some((ct) => ct.name === name)) return true;
-    } else {
-      if (ns.extensionBlocks?.some((b) => b.kind === refKind && b.name === name)) return true;
-    }
+    const kindMap = ns.entries[refKind];
+    if (kindMap !== undefined && Object.hasOwn(kindMap, name)) return true;
   }
   return false;
 }

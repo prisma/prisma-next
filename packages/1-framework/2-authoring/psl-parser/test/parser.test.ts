@@ -4,6 +4,7 @@ import {
   flatPslCompositeTypes,
   flatPslEnums,
   flatPslModels,
+  namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
 import { describe, expect, it } from 'vitest';
 import { parsePslDocument } from '../src/parser';
@@ -1238,9 +1239,10 @@ policy_select ReadPosts {
 
       const ns = result.ast.namespaces[0];
       expect(ns).toBeDefined();
-      expect(ns?.extensionBlocks).toHaveLength(1);
+      const nsExtBlocks = namespacePslExtensionBlocks(ns!);
+      expect(nsExtBlocks).toHaveLength(1);
 
-      const block = ns?.extensionBlocks?.[0];
+      const block = nsExtBlocks[0];
       expect(block?.kind).toBe('test-policy-select');
       expect(block?.name).toBe('ReadPosts');
       expect(block?.span).toBeDefined();
@@ -1330,9 +1332,10 @@ policy_select ReadPosts {
       expect(flatPslModels(result.ast)).toHaveLength(1);
       expect(flatPslModels(result.ast)[0]?.name).toBe('Post');
 
-      expect(ns?.extensionBlocks).toHaveLength(1);
-      expect(ns?.extensionBlocks?.[0]?.kind).toBe('test-policy-select');
-      expect(ns?.extensionBlocks?.[0]?.name).toBe('ReadPosts');
+      const nsExtBlocks2 = namespacePslExtensionBlocks(ns!);
+      expect(nsExtBlocks2).toHaveLength(1);
+      expect(nsExtBlocks2[0]?.kind).toBe('test-policy-select');
+      expect(nsExtBlocks2[0]?.name).toBe('ReadPosts');
     });
 
     it('built-in block parsing is unchanged when pslBlockDescriptors is provided', () => {
@@ -1357,7 +1360,7 @@ enum Role {
       expect(result.diagnostics).toEqual([]);
       expect(flatPslModels(result.ast)).toHaveLength(1);
       expect(flatPslEnums(result.ast)).toHaveLength(1);
-      expect(result.ast.namespaces[0]?.extensionBlocks).toBeUndefined();
+      expect(namespacePslExtensionBlocks(result.ast.namespaces[0]!)).toHaveLength(0);
     });
 
     it('lands extension blocks in the namespace extensionBlocks slot in source order', () => {
@@ -1389,9 +1392,10 @@ policy_select Beta {
 
       expect(result.ok).toBe(true);
       const ns = result.ast.namespaces[0];
-      expect(ns?.extensionBlocks).toHaveLength(2);
-      expect(ns?.extensionBlocks?.[0]?.name).toBe('Alpha');
-      expect(ns?.extensionBlocks?.[1]?.name).toBe('Beta');
+      const extBlocks = namespacePslExtensionBlocks(ns!);
+      expect(extBlocks).toHaveLength(2);
+      expect(extBlocks[0]?.name).toBe('Alpha');
+      expect(extBlocks[1]?.name).toBe('Beta');
     });
 
     it('captures unknown parameters as raw values and validation flags them', () => {
@@ -1419,7 +1423,7 @@ policy_select ReadPosts {
       expect(result.ok).toBe(false);
       expect(result.diagnostics).toMatchObject([{ code: 'PSL_EXTENSION_UNKNOWN_PARAMETER' }]);
       // The parameter is still captured in the AST node.
-      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      const block = namespacePslExtensionBlocks(result.ast.namespaces[0]!)[0];
       expect(block?.parameters['unrecognized_param']).toMatchObject({
         kind: 'value',
         raw: 'some_value',
@@ -1480,8 +1484,9 @@ namespace auth {
 
       const authNs = result.ast.namespaces.find((ns) => ns.name === 'auth');
       expect(authNs).toBeDefined();
-      expect(authNs?.extensionBlocks).toHaveLength(1);
-      expect(authNs?.extensionBlocks?.[0]?.name).toBe('ReadPosts');
+      const authExtBlocks = namespacePslExtensionBlocks(authNs!);
+      expect(authExtBlocks).toHaveLength(1);
+      expect(authExtBlocks[0]?.name).toBe('ReadPosts');
     });
 
     it('parses an empty list parameter correctly', () => {
@@ -1505,7 +1510,7 @@ policy_select ReadPosts {
       });
 
       expect(result.ok).toBe(true);
-      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      const block = namespacePslExtensionBlocks(result.ast.namespaces[0]!)[0];
       expect(block?.parameters['roles']).toMatchObject({
         kind: 'list',
         items: [],

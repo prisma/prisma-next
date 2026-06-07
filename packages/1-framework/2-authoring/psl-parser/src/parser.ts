@@ -30,6 +30,9 @@ import type {
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import {
+  makePslNamespace,
+  makePslNamespaceEntries,
+  namespacePslExtensionBlocks,
   UNSPECIFIED_PSL_NAMESPACE_ID,
   validateExtensionBlock,
 } from '@prisma-next/framework-components/psl-ast';
@@ -357,18 +360,19 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         };
       }),
     }));
-    namespaces.push({
-      kind: 'namespace',
-      name,
-      models: normalizedModels,
-      enums: acc.enums,
-      compositeTypes: acc.compositeTypes,
-      ...ifDefined(
-        'extensionBlocks',
-        acc.extensionBlocks.length > 0 ? acc.extensionBlocks : undefined,
-      ),
-      span: acc.span ?? documentSpan,
-    });
+    namespaces.push(
+      makePslNamespace({
+        kind: 'namespace',
+        name,
+        entries: makePslNamespaceEntries(
+          normalizedModels,
+          acc.enums,
+          acc.compositeTypes,
+          acc.extensionBlocks,
+        ),
+        span: acc.span ?? documentSpan,
+      }),
+    );
   }
 
   // Validate extension blocks with the generic validator after the full
@@ -389,7 +393,9 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       }
     }
     for (const ns of namespaces) {
-      for (const block of ns.extensionBlocks ?? []) {
+      // Collect extension blocks from entries using the canonical helper, then
+      // filter to only those whose discriminator is registered in the namespace.
+      for (const block of namespacePslExtensionBlocks(ns)) {
         const descriptor = descriptorByDiscriminator.get(block.kind);
         if (descriptor === undefined) {
           continue;

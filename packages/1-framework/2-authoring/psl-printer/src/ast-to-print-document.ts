@@ -10,6 +10,7 @@ import type {
 } from '@prisma-next/framework-components/psl-ast';
 import {
   flatPslModels,
+  namespacePslExtensionBlocks,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
 import type { PrintDocument, PrintNamespaceSection } from './print-document';
@@ -59,7 +60,7 @@ export function astDocumentToPrintDocument(ast: PslDocumentAst): PrintDocument {
         values: e.values,
       })),
       models: printerModels,
-      extensionBlocks: namespace.extensionBlocks ?? [],
+      extensionBlocks: namespacePslExtensionBlocks(namespace),
     };
   });
 
