@@ -9,6 +9,7 @@ import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  controlAdapter,
   createDriver,
   createTestDatabase,
   emptySchema,
@@ -94,7 +95,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
 
   describe('enum types', () => {
     it('creates enum type and table with enum column', { timeout: testTimeout }, async () => {
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
       const runner = postgresTargetDescriptor.createRunner(familyInstance);
 
       const planResult = planner.plan({
@@ -171,7 +172,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
       // Pre-create the enum type
       await driver!.query(`CREATE TYPE "public"."role" AS ENUM ('USER', 'ADMIN')`);
 
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
       const schema = await familyInstance.introspect({
         driver: driver!,
         contract: contractWithEnum,
@@ -200,7 +201,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
       // Pre-create enum with only USER value
       await driver!.query(`CREATE TYPE "public"."role" AS ENUM ('USER')`);
 
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
       const schema = await familyInstance.introspect({
         driver: driver!,
         contract: contractWithEnum,

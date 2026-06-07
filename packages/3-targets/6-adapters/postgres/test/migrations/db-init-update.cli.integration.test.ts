@@ -14,6 +14,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   contract as appContract,
+  controlAdapter,
   createDriver,
   createTestDatabase,
   familyInstance,
@@ -268,6 +269,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
 
       const result = await executeDbInit({
         driver: drv,
+        adapter: controlAdapter,
         familyInstance,
         contract: appContract,
         mode: 'apply',
@@ -321,6 +323,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
 
       const initResult = await executeDbInit({
         driver: drv,
+        adapter: controlAdapter,
         familyInstance,
         contract: appContract,
         mode: 'apply',
@@ -362,6 +365,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
 
       const updateResult = await executeDbUpdate({
         driver: drv,
+        adapter: controlAdapter,
         familyInstance,
         contract: appContract,
         mode: 'apply',
@@ -411,6 +415,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
 
       const initResult = await executeDbInit({
         driver: drv,
+        adapter: controlAdapter,
         familyInstance,
         contract: appContract,
         mode: 'apply',
@@ -456,6 +461,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
 
       const updateResult = await executeDbUpdate({
         driver: drv,
+        adapter: controlAdapter,
         familyInstance,
         contract: appContract,
         mode: 'apply',

@@ -4,6 +4,7 @@ import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/pla
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   contract,
+  controlAdapter,
   createDriver,
   createMigrationPlan,
   createTestDatabase,
@@ -251,7 +252,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
     it('on a true no-op self-edge (no ops executed, no new invariants), skips both marker and ledger writes', {
       timeout: testTimeout,
     }, async () => {
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
       const runner = postgresTargetDescriptor.createRunner(familyInstance);
       const initialPlan = planner.plan({
         contract,
@@ -339,7 +340,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
       timeout: testTimeout,
     }, async () => {
       // Apply the schema first so the marker sits at the contract hash.
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
       const runner = postgresTargetDescriptor.createRunner(familyInstance);
       const initialPlan = planner.plan({
         contract,

@@ -25,9 +25,9 @@ describe('@prisma-next/postgres/migration re-export parity', () => {
     expect(facadeMigration.dataTransform).toBeDefined();
   });
 
-  it('re-exports createTable', () => {
-    expect(facadeMigration.createTable).toBeDefined();
-  });
+  // `createTable` / `createSchema` are no longer free exports — they are
+  // `Migration` methods (`this.createTable({ ... })`) that lower a typed DDL
+  // node through the adapter, so there is nothing to re-export here.
 
   it('re-exports addColumn', () => {
     expect(facadeMigration.addColumn).toBeDefined();

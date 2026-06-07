@@ -61,15 +61,21 @@ export const emptySchema: SqlSchemaIR = {
   tables: {},
 };
 
-export const familyInstance = sqlFamilyDescriptor.create(
-  createControlStack({
-    family: sqlFamilyDescriptor,
-    target: postgresTargetDescriptor,
-    adapter: postgresAdapterDescriptor,
-    driver: postgresDriverDescriptor,
-    extensionPacks: [],
-  }),
-);
+const controlStack = createControlStack({
+  family: sqlFamilyDescriptor,
+  target: postgresTargetDescriptor,
+  adapter: postgresAdapterDescriptor,
+  driver: postgresDriverDescriptor,
+  extensionPacks: [],
+});
+export const familyInstance = sqlFamilyDescriptor.create(controlStack);
+
+/**
+ * The control adapter instance, constructed once from the control stack — the
+ * `Lowerer` the migration planner takes. `postgresTargetDescriptor.createPlanner`
+ * accepts the adapter directly (not the family).
+ */
+export const controlAdapter = postgresAdapterDescriptor.create(controlStack);
 
 export const frameworkComponents = [
   postgresTargetDescriptor,

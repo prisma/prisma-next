@@ -4,6 +4,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   contract,
+  controlAdapter,
   createDriver,
   createTestDatabase,
   emptySchema,
@@ -44,7 +45,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
   });
 
   it('returns an empty plan for superset schemas', { timeout: testTimeout }, async () => {
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
 
     const initialPlan = planner.plan({
@@ -98,7 +99,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
     // Create user table with just id - missing email column, unique, and index
     await driver!.query('create table "user" (id uuid primary key)');
     const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
 
     const subsetResult = planner.plan({
       contract,
@@ -130,7 +131,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
         ('00000000-0000-0000-0000-000000000002')`);
 
     const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
 
     const planResult = planner.plan({
       contract,
@@ -166,7 +167,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
   it('fails with conflicts for incompatible schemas', { timeout: testTimeout }, async () => {
     await driver!.query('create table "user" (id uuid primary key, email uuid not null)');
     const schema = await introspectSchema(driver!);
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
 
     const conflictResult = planner.plan({
       contract,

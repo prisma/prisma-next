@@ -11,6 +11,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 import {
   contract,
+  controlAdapter,
   createDriver,
   createLedgerTestPlan,
   createTestDatabase,
@@ -395,7 +396,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
   it('writes one synthesised ledger row with space for synth apply with a single synth edge', {
     timeout: testTimeout,
   }, async () => {
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
 
     const planResult = planner.plan({

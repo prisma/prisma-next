@@ -9,10 +9,10 @@ import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  controlAdapter,
   createDriver,
   createTestDatabase,
   emptySchema,
-  familyInstance,
   frameworkComponents,
   type PostgresControlDriver,
   postgresTargetDescriptor,
@@ -121,7 +121,7 @@ describe.sequential('`namespace unbound` multi-tenancy via search_path', () => {
     'plans unqualified DDL for an unbound contract, applies it independently per tenant, and round-trips inserts in isolation',
     async () => {
       const contract = buildUnboundContract();
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
       const planResult = planner.plan({
         contract,
         schema: emptySchema,

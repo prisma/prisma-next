@@ -6,6 +6,7 @@ import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  controlAdapter,
   createDriver,
   createTestDatabase,
   emptySchema,
@@ -109,7 +110,7 @@ describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
       const contract = buildCrossNamespaceFkContract();
 
       // Plan: schema is empty, contract has cross-namespace FK
-      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
       const planResult = planner.plan({
         contract,
         schema: emptySchema,

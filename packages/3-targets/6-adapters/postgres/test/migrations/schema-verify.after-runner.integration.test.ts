@@ -8,6 +8,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   contract,
+  controlAdapter,
   createDriver,
   createTestDatabase,
   emptySchema,
@@ -68,7 +69,7 @@ describe.sequential('Schema verification after runner - integration', () => {
     d: PostgresControlDriver,
     contractInput: Contract<SqlStorage>,
   ): Promise<void> {
-    const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
 
     const result = planner.plan({

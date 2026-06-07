@@ -11,6 +11,7 @@ import { PostgresEnumType, PostgresSchema } from '@prisma-next/target-postgres/t
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  controlAdapter,
   createDriver,
   createTestDatabase,
   emptySchema,
@@ -67,7 +68,7 @@ async function applyBaseline(
   driver: PostgresControlDriver,
   contract: Contract<SqlStorage>,
 ): Promise<void> {
-  const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+  const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
   const runner = postgresTargetDescriptor.createRunner(familyInstance);
   const result = planner.plan({
     contract,
@@ -108,7 +109,7 @@ async function planAndExecute(
   contract: Contract<SqlStorage>,
 ): Promise<void> {
   const schema = await introspectSchema(driver);
-  const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+  const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
   const planResult = planner.plan({
     contract,
     schema,
