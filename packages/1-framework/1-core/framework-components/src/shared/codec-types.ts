@@ -1,6 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
+import type { PslLiteralParseResult } from './codec-descriptor';
 
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
@@ -40,12 +41,14 @@ export interface CodecCallContext {
  * - `targetTypesFor(id)` exposes the codec-id-keyed `targetTypes` metadata the runtime instance no longer carries (TML-2357). Returns the same array `CodecDescriptor.targetTypes` would; for Mongo (whose registration doesn't yet resolve through the unified descriptor map — TML-2324) the family-side assembly populates this directly from the contributor's codec metadata.
  * - `metaFor(id)` exposes the codec-id-keyed `meta` (e.g. SQL-side `db.sql.postgres.nativeType`) the runtime instance no longer carries.
  * - `renderOutputTypeFor(id, params)` exposes the codec-id-keyed `renderOutputType` renderer the runtime instance no longer carries. Returns `undefined` when the codec doesn't render a custom type or when the codec id is unknown.
+ * - `parsePslLiteralFor(id, raw)` delegates to the codec descriptor's {@link import('./codec-descriptor').CodecDescriptor.parsePslLiteral} hook. Used by the generic block validator (D4) to validate `value`-kind parameters. Returns a not-found rejection when the codec id is unknown.
  */
 export interface CodecLookup {
   get(id: string): Codec | undefined;
   targetTypesFor(id: string): readonly string[] | undefined;
   metaFor(id: string): CodecMeta | undefined;
   renderOutputTypeFor(id: string, params: Record<string, unknown>): string | undefined;
+  parsePslLiteralFor(id: string, raw: string): PslLiteralParseResult;
 }
 
 export const emptyCodecLookup: CodecLookup = {
@@ -53,6 +56,7 @@ export const emptyCodecLookup: CodecLookup = {
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
+  parsePslLiteralFor: (id) => ({ ok: false, error: `codec "${id}" is not registered` }),
 };
 
 /**

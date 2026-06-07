@@ -240,6 +240,7 @@ export const postgresCodecLookup: CodecLookup = {
   targetTypesFor: (id: string) => targetTypesByCodecId[id],
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
+  parsePslLiteralFor: (id) => ({ ok: false as const, error: `codec "${id}" is not registered` }),
 };
 
 export function createPostgresTestContext(

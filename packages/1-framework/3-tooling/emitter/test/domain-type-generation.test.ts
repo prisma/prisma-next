@@ -817,6 +817,7 @@ function stubCodecLookup(codecs: Record<string, CodecStub>): CodecLookup {
     targetTypesFor: (id) => codecs[id]?.targetTypes,
     metaFor: () => undefined,
     renderOutputTypeFor: (id, params) => codecs[id]?.renderOutputType?.(params),
+    parsePslLiteralFor: (id) => ({ ok: false as const, error: `codec "${id}" is not registered` }),
   };
 }
 

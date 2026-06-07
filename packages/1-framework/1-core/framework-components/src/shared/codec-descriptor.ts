@@ -8,6 +8,7 @@
  * The factory's method-level generic is the load-bearing piece for literal preservation: per-codec column helpers invoke `descriptor.factory(...)` *directly*, and the direct call binds the generic at its call site. Type extraction (`ReturnType<D['factory']>`, structural matching) widens method generics to their constraint — that's why the column-helper surface is per-codec, not polymorphic.
  */
 
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
 import {
@@ -16,6 +17,19 @@ import {
   type CodecTrait,
   voidParamsSchema,
 } from './codec-types';
+
+/**
+ * Result of parsing a raw PSL literal string through a codec's
+ * {@link CodecDescriptor.parsePslLiteral} hook.
+ *
+ * - `ok: true` — the raw literal was accepted; `value` is the parsed, codec-typed
+ *   value in its JSON-serializable form (the same shape `encodeJson` produces).
+ * - `ok: false` — the raw literal was rejected; `error` is a human-readable reason
+ *   suitable for inclusion in a validation diagnostic message.
+ */
+export type PslLiteralParseResult =
+  | { readonly ok: true; readonly value: JsonValue }
+  | { readonly ok: false; readonly error: string };
 
 /**
  * Unified codec descriptor. Every codec in the framework registers through this shape — non-parameterized codecs use `P = void` and a constant factory that returns the same shared codec instance for every column; parameterized codecs use a non-empty `P` and a curried higher-order factory that returns a per-instance codec.
@@ -45,6 +59,23 @@ export interface CodecDescriptor<P = void> {
   readonly renderOutputType?: (params: P) => string | undefined;
   /** The curried higher-order codec. For non-parameterized codecs, the factory is constant — every call returns the same shared codec instance. For parameterized codecs, the factory is called once per `storage.types` instance (or once per inline-`typeParams` column), with `ctx` carrying the column set the resulting codec serves. */
   readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
+  /**
+   * Parse and validate a raw PSL literal string for a `value`-kind block parameter
+   * whose `codecId` names this codec.
+   *
+   * The `raw` argument is the literal text captured by the parser — a double-quoted
+   * string (e.g. `"auth.uid() = user_id"`), a decimal integer or float (e.g. `42`),
+   * or a bareword boolean (`true` / `false`). The codec decides what forms it accepts.
+   *
+   * Returns `{ ok: true, value }` where `value` is the parsed typed value in its
+   * JSON-serializable form (matching the shape `encodeJson` produces), or
+   * `{ ok: false, error }` with a human-readable rejection reason.
+   *
+   * Optional — codecs that do not need to handle `value` block parameters may omit
+   * this method; the default implementation on {@link CodecDescriptorImpl} rejects
+   * every input with a "not supported" message.
+   */
+  parsePslLiteral?(raw: string): PslLiteralParseResult;
 }
 
 /**
@@ -84,4 +115,12 @@ export abstract class CodecDescriptorImpl<TParams = void> implements CodecDescri
   abstract factory(
     params: TParams,
   ): (ctx: CodecInstanceContext) => Codec<string, readonly CodecTrait[], unknown, unknown>;
+
+  /**
+   * Default implementation: rejects every input. Codec authors that need to support
+   * `value`-kind block parameters override this method on their descriptor subclass.
+   */
+  parsePslLiteral(_raw: string): PslLiteralParseResult {
+    return { ok: false, error: `codec "${this.codecId}" does not support PSL literal values` };
+  }
 }
