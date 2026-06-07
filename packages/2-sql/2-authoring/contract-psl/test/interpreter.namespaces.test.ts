@@ -1,5 +1,8 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -7,6 +10,48 @@ import {
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
+
+function makeSupabaseExtensionContract(): Contract {
+  return blindCast<
+    Contract,
+    'synthetic supabase extension contract for interpreter FK resolution tests'
+  >({
+    target: 'postgres',
+    targetFamily: 'sql',
+    roots: {},
+    domain: {
+      namespaces: {
+        auth: {
+          models: {
+            User: { fields: {}, relations: {}, storage: { table: 'users' } },
+          },
+        },
+      },
+    },
+    storage: {
+      storageHash: coreHash('sha256:' + 'a'.repeat(64)),
+      namespaces: {
+        auth: {
+          id: 'auth',
+          entries: {
+            table: {
+              users: {
+                columns: { id: { type: 'int4', nullable: false } },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      },
+    },
+    capabilities: {},
+    extensionPacks: {},
+    profileHash: profileHash('sha256:' + 'b'.repeat(64)),
+    meta: {},
+  });
+}
 
 const baseInput = {
   target: postgresTarget,
@@ -282,5 +327,73 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       target: { spaceId: 'supabase' },
       onDelete: 'cascade',
     });
+  });
+
+  it('resolves FK target.tableName from the extension contract when composedExtensionContracts is provided', () => {
+    const document = parsePslDocument({
+      schema: `model Profile {
+  id Int @id
+  userId Int
+  user supabase:auth.User @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: ['supabase'],
+      composedExtensionContracts: new Map([['supabase', makeSupabaseExtensionContract()]]),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as SqlStorage;
+    const profileTable = Object.values(storage.namespaces)
+      .flatMap((ns) => Object.values(ns.entries.table ?? {}))
+      .find((t) => t !== undefined);
+    const fks: readonly ForeignKey[] = profileTable?.foreignKeys ?? [];
+    expect(fks.length).toBe(1);
+    expect(fks[0]).toMatchObject({
+      target: {
+        spaceId: 'supabase',
+        namespaceId: 'auth',
+        tableName: 'users',
+        columns: ['id'],
+      },
+    });
+  });
+
+  it('emits PSL_UNKNOWN_CROSS_SPACE_TARGET when the extension contract is provided but the model is not found', () => {
+    const document = parsePslDocument({
+      schema: `model Profile {
+  id Int @id
+  userId Int
+  user supabase:auth.NonExistentModel @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: ['supabase'],
+      composedExtensionContracts: new Map([['supabase', makeSupabaseExtensionContract()]]),
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNKNOWN_CROSS_SPACE_TARGET',
+          message: expect.stringContaining('NonExistentModel'),
+        }),
+      ]),
+    );
   });
 });

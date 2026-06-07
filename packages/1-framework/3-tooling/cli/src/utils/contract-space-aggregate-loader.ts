@@ -5,15 +5,11 @@ import type { ControlExtensionDescriptor } from '@prisma-next/framework-componen
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type {
   ContractSpaceAggregate,
-  ContractSpaceMember,
   DeclaredExtensionEntry,
   IntegrityQueryOptions,
   IntegrityViolation,
 } from '@prisma-next/migration-tools/aggregate';
-import {
-  loadContractSpaceAggregate,
-  resolveCrossSpaceFkTableName,
-} from '@prisma-next/migration-tools/aggregate';
+import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -264,119 +260,6 @@ export function refusePackageCorruptionOnAggregate(
 }
 
 /**
- * Patch the app contract's cross-space FK `tableName`s with the real table
- * names from the corresponding extension contracts, then return a new
- * aggregate with the patched app member.
- *
- * The PSL interpreter stores a symbolic `tableName` (the model name
- * lowercased, e.g. `'user'` for `supabase:auth.User`) because it has no
- * access to the extension contract at interpretation time. The TS builder
- * carries the real table name directly. Both are resolved here using
- * `resolveCrossSpaceFkTableName` from `@prisma-next/migration-tools`, which
- * handles both the exact-match (TS) and model-name-lowercase (PSL) paths.
- *
- * Only FKs with `target.spaceId !== undefined` are patched. Local FKs are
- * left unchanged.
- *
- * Patching is done via JSON round-trip: the app contract is serialized to a
- * plain object, the `tableName`s are mutated in-place on the copy, and the
- * result is re-deserialized via `deserializeContract` to produce proper IR
- * class instances (required by `instanceof StorageTable` checks downstream).
- */
-/** Narrow `v` to a mutable `Record<string, unknown>` when it is a non-null object. */
-function asRecord(v: unknown): Record<string, unknown> | undefined {
-  return typeof v === 'object' && v !== null
-    ? blindCast<Record<string, unknown>, 'runtime object check above confirms shape'>(v)
-    : undefined;
-}
-
-function resolveAppContractCrossSpaceFks(
-  aggregate: ContractSpaceAggregate,
-  deserializeContract: (json: unknown) => Contract,
-): ContractSpaceAggregate {
-  const extensionBySpaceId = new Map<string, ContractSpaceMember>(
-    aggregate.extensions.map((ext) => [ext.spaceId, ext]),
-  );
-
-  const appContractJson = blindCast<
-    Record<string, unknown>,
-    'JSON round-trip of Contract produces a plain object — safe to walk as Record<string, unknown>'
-  >(JSON.parse(JSON.stringify(aggregate.app.contract())));
-
-  let patched = false;
-
-  const storage = asRecord(appContractJson['storage']);
-  const namespaces = asRecord(storage?.['namespaces']);
-  if (namespaces !== undefined) {
-    for (const ns of Object.values(namespaces)) {
-      const nsRec = asRecord(ns);
-      if (nsRec === undefined) continue;
-      const entries = asRecord(nsRec['entries']);
-      const tableSlot = asRecord(entries?.['table']);
-      if (tableSlot === undefined) continue;
-      for (const tableEntry of Object.values(tableSlot)) {
-        const tableRec = asRecord(tableEntry);
-        if (tableRec === undefined) continue;
-        const foreignKeysRaw = tableRec['foreignKeys'];
-        if (!Array.isArray(foreignKeysRaw)) continue;
-        for (const fkRaw of foreignKeysRaw) {
-          const fk = asRecord(fkRaw);
-          if (fk === undefined) continue;
-          const target = asRecord(fk['target']);
-          if (target === undefined) continue;
-          const spaceId = target['spaceId'];
-          if (typeof spaceId !== 'string') continue;
-
-          const extensionMember = extensionBySpaceId.get(spaceId);
-          if (extensionMember === undefined) continue;
-
-          const namespaceId = target['namespaceId'];
-          const tableName = target['tableName'];
-          if (typeof namespaceId !== 'string' || typeof tableName !== 'string') continue;
-
-          const columnsRaw = target['columns'];
-          const columns: readonly string[] = Array.isArray(columnsRaw)
-            ? blindCast<unknown[], 'Array.isArray check above confirms this is an array'>(
-                columnsRaw,
-              ).filter((c): c is string => typeof c === 'string')
-            : [];
-
-          const resolvedTableName = resolveCrossSpaceFkTableName(
-            extensionMember.contract(),
-            spaceId,
-            namespaceId,
-            tableName,
-            columns,
-          );
-
-          if (resolvedTableName !== tableName) {
-            target['tableName'] = resolvedTableName;
-            patched = true;
-          }
-        }
-      }
-    }
-  }
-
-  if (!patched) {
-    return aggregate;
-  }
-
-  const patchedContract = deserializeContract(appContractJson);
-  const patchedAppMember: ContractSpaceMember = {
-    ...aggregate.app,
-    contract: () => patchedContract,
-  };
-
-  return {
-    ...aggregate,
-    app: patchedAppMember,
-    space: (id) => (id === 'app' ? patchedAppMember : aggregate.space(id)),
-    spaces: () => [patchedAppMember, ...aggregate.extensions],
-  };
-}
-
-/**
  * Construct the tolerant {@link ContractSpaceAggregate} at the CLI
  * surface and apply the explicit integrity refusal.
  *
@@ -401,8 +284,7 @@ export async function buildContractSpaceAggregate<
   if (failure) {
     return notOk(failure);
   }
-  const resolved = resolveAppContractCrossSpaceFks(loaded.value, inputs.deserializeContract);
-  return ok(resolved);
+  return ok(loaded.value);
 }
 
 /**

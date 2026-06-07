@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { resolveCrossSpaceFkTableName } from '@prisma-next/migration-tools/aggregate';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
@@ -128,11 +127,34 @@ namespace public {
     expect(tsFks).toEqual(pslFks);
   });
 
-  it('PSL colon-prefix produces the same spaceId/namespaceId/columns as the TS builder for a cross-contract-space FK', () => {
+  it('PSL colon-prefix produces byte-identical FK carriers to the TS builder for a cross-contract-space FK', () => {
+    // Synthetic supabase extension contract with auth.User → table 'users'.
+    const syntheticExtensionContract = blindCast<
+      Contract,
+      'synthetic extension contract — only domain.namespaces needed for FK table resolution'
+    >({
+      target: 'postgres',
+      targetFamily: 'sql',
+      roots: {},
+      domain: {
+        namespaces: {
+          auth: {
+            models: {
+              User: { fields: {}, relations: {}, storage: { table: 'users' } },
+            },
+          },
+        },
+      },
+      storage: { storageHash: coreHash('sha256:test'), namespaces: {} },
+      capabilities: {},
+      extensionPacks: {},
+      profileHash: profileHash('sha256:test-profile'),
+      meta: {},
+    });
+
     // PSL: supabase:auth.User cross-space reference.
-    // The PSL field type 'supabase:auth.User' has fieldTypeName = 'User', so the interpreter
-    // stores the symbolic tableName 'user' (fieldTypeName.toLowerCase()). The TS builder matches
-    // the same model reference by using extensionModel('User', ...) with the real table 'users'.
+    // With composedExtensionContracts provided, the interpreter resolves tableName = 'users'
+    // directly from the extension contract — the same value the TS builder produces.
     const pslDocument = parsePslDocument({
       schema: `model Profile {
   id    Int @id
@@ -149,13 +171,13 @@ namespace public {
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       composedExtensionPacks: ['supabase'],
+      composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
     });
 
     expect(pslResult.ok).toBe(true);
     if (!pslResult.ok) return;
 
     // TS builder: User handle branded with spaceId:'supabase', namespace:'auth', table:'users'.
-    // Uses 'User' as the model name to match the PSL field type 'supabase:auth.User'.
     const User = extensionModel(
       'User',
       {
@@ -187,79 +209,16 @@ namespace public {
     const pslStorage = pslResult.value.storage as SqlStorage;
     const tsStorage = tsContract.storage as unknown as SqlStorage;
 
-    // PSL: postgres target with no explicit namespace block routes top-level models to 'public'
     const pslProfileTable = pslStorage.namespaces['public']?.entries.table?.['profile'];
     const pslFks: readonly ForeignKey[] = pslProfileTable?.foreignKeys ?? [];
 
-    // TS: postgres target, Profile model has no explicit namespace so it routes to 'public'
     const tsProfileTable = tsStorage.namespaces['public']?.entries.table?.['profile'];
     const tsFks: readonly ForeignKey[] = tsProfileTable?.foreignKeys ?? [];
 
     expect(pslFks.length).toBe(1);
     expect(tsFks.length).toBe(1);
 
-    // spaceId, namespaceId, and columns must agree between PSL and TS paths
-    expect(pslFks[0]).toMatchObject({
-      target: {
-        spaceId: 'supabase',
-        namespaceId: 'auth',
-        columns: ['id'],
-      },
-    });
-    expect(tsFks[0]).toMatchObject({
-      target: {
-        spaceId: 'supabase',
-        namespaceId: 'auth',
-        columns: ['id'],
-      },
-    });
-
-    // M3a.1: after resolution through the aggregate loader's resolver, both PSL and TS produce
-    // the real table name 'users'. The resolver is called here directly with a synthetic extension
-    // contract to verify the resolution logic; the aggregate loader applies it end-to-end.
-    //
-    // PSL path: raw tableName = 'user' (symbolic: fieldTypeName.toLowerCase()), resolved to
-    //   'users' via model-name-lowercase match ('User'.toLowerCase() === 'user').
-    // TS path: raw tableName = 'users' (real table name from extensionModel), resolved to
-    //   'users' via exact storage.table match.
-    const syntheticExtensionContract = blindCast<
-      Contract,
-      'synthetic extension contract for resolver unit test — only domain.namespaces needed'
-    >({
-      target: 'postgres',
-      targetFamily: 'sql',
-      roots: {},
-      domain: {
-        namespaces: {
-          auth: {
-            models: {
-              User: { fields: {}, relations: {}, storage: { table: 'users' } },
-            },
-          },
-        },
-      },
-      storage: { storageHash: coreHash('sha256:test'), namespaces: {} },
-      capabilities: {},
-      extensionPacks: {},
-      profileHash: profileHash('sha256:test-profile'),
-      meta: {},
-    });
-
-    const resolvedPslTableName = resolveCrossSpaceFkTableName(
-      syntheticExtensionContract,
-      'supabase',
-      pslFks[0]!.target.namespaceId,
-      pslFks[0]!.target.tableName,
-    );
-    const resolvedTsTableName = resolveCrossSpaceFkTableName(
-      syntheticExtensionContract,
-      'supabase',
-      tsFks[0]!.target.namespaceId,
-      tsFks[0]!.target.tableName,
-    );
-
-    expect(resolvedPslTableName).toBe('users');
-    expect(resolvedTsTableName).toBe('users');
-    expect(resolvedPslTableName).toEqual(resolvedTsTableName);
+    // Both authoring paths produce identical FK carriers including tableName = 'users'.
+    expect(tsFks).toEqual(pslFks);
   });
 });

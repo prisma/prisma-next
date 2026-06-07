@@ -103,6 +103,17 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
   /**
+   * Extension contracts keyed by space ID. When provided for a space,
+   * the interpreter resolves cross-space FK `target.tableName` directly
+   * from the contract instead of using the symbolic `modelName.toLowerCase()`
+   * placeholder. If a space's contract is in this map but the referenced
+   * model or namespace is not found in that contract, the interpreter emits
+   * `PSL_UNKNOWN_CROSS_SPACE_TARGET`. When a space's contract is absent from
+   * the map (or the map is not provided), the interpreter falls back to
+   * `fieldTypeName.toLowerCase()` as the table name.
+   */
+  readonly composedExtensionContracts?: ReadonlyMap<string, Contract>;
+  /**
    * Target-supplied `Namespace` factory threaded into
    * `buildSqlContractFromDefinition` for the contract's
    * `SqlStorage.namespaces` population. Required when the document
@@ -589,6 +600,8 @@ interface BuildModelNodeInput {
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly composedExtensions: Set<string>;
+  /** Extension contracts keyed by space ID for cross-space FK table-name resolution. */
+  readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
   readonly familyId: string;
   readonly targetId: string;
   readonly authoringContributions: AuthoringContributions | undefined;
@@ -1076,13 +1089,39 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       // no-namespace form is used (e.g. `supabase:User` → AC3).
       const crossTargetNamespaceId = fieldTypeNamespaceId ?? '__unbound__';
 
-      // Target table name: the interpreter cannot resolve `User → users` because it has no
-      // access to the extension contract (only a Set<string> of space names is available).
-      // Use `fieldTypeName.toLowerCase()` as a symbolic fallback — the same convention the TS
-      // builder uses (`targetModelName.toLowerCase()`) when `targetTableName` is absent.
-      // Physical table resolution against the extension contract is deferred to the aggregate
-      // stage (M3), which has access to the full extension contract.
-      const crossTargetTableName = fieldTypeName.toLowerCase();
+      // Target table name: look up the real table name from the extension contract when
+      // available. If the contract is in the map but the model or namespace is not found,
+      // emit PSL_UNKNOWN_CROSS_SPACE_TARGET (user typo). When no contract is available for
+      // the space, fall back to fieldTypeName.toLowerCase() as a symbolic placeholder.
+      const extContract = input.composedExtensionContracts.get(fieldTypeContractSpaceId);
+      let crossTargetTableName: string;
+      if (extContract !== undefined) {
+        const resolvedTable =
+          extContract.domain.namespaces[crossTargetNamespaceId]?.models[fieldTypeName]?.storage[
+            'table'
+          ];
+        if (typeof resolvedTable !== 'string') {
+          const availableModels =
+            Object.keys(extContract.domain.namespaces[crossTargetNamespaceId]?.models ?? {}).join(
+              ', ',
+            ) || '(none)';
+          diagnostics.push({
+            code: 'PSL_UNKNOWN_CROSS_SPACE_TARGET',
+            message: `Relation field "${model.name}.${relationAttribute.field.name}" references model "${fieldTypeName}" in namespace "${crossTargetNamespaceId}" of space "${fieldTypeContractSpaceId}", but that model was not found in the extension contract. Available models: ${availableModels}`,
+            sourceId,
+            span: relationAttribute.field.span,
+            data: {
+              space: fieldTypeContractSpaceId,
+              namespace: crossTargetNamespaceId,
+              model: fieldTypeName,
+            },
+          });
+          continue;
+        }
+        crossTargetTableName = resolvedTable;
+      } else {
+        crossTargetTableName = fieldTypeName.toLowerCase();
+      }
 
       foreignKeyNodes.push({
         columns: localColumns,
@@ -1895,6 +1934,8 @@ export function interpretPslDocumentToSqlContract(
   const modelNames = new Set(models.map((model) => model.name));
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
+  const composedExtensionContracts: ReadonlyMap<string, Contract> =
+    input.composedExtensionContracts ?? new Map();
   const defaultFunctionRegistry: ControlMutationDefaultRegistry =
     input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map();
   const generatorDescriptors = input.controlMutationDefaults?.generatorDescriptors ?? [];
@@ -1980,6 +2021,7 @@ export function interpretPslDocumentToSqlContract(
       enumTypeDescriptors: allEnumTypeDescriptors,
       namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
       composedExtensions,
+      composedExtensionContracts,
       familyId: input.target.familyId,
       targetId: input.target.targetId,
       authoringContributions: input.authoringContributions,

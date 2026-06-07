@@ -24,7 +24,6 @@ export {
   planMigration,
 } from '../aggregate/planner';
 export { projectSchemaToSpace } from '../aggregate/project-schema-to-space';
-export { resolveCrossSpaceFkTableName } from '../aggregate/resolve-cross-space-fk';
 export {
   type GraphWalkOutcome,
   type GraphWalkStrategyInputs,
