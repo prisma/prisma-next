@@ -309,17 +309,12 @@ function lowerBelongsToRelation(
   relation: Extract<RelationState, { kind: 'belongsTo' }>,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): RelationNode {
   const targetModelName = resolveRelationModelName(relation.toModel);
-  const targetSpec = allSpecs.get(targetModelName);
-  if (!targetSpec) {
-    throw new Error(
-      `Relation "${currentSpec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
-    );
-  }
-
   const fromFields = normalizeRelationFieldNames(relation.from);
   const toFields = normalizeRelationFieldNames(relation.to);
+
   assertRelationFieldArity({
     modelName: currentSpec.modelName,
     relationName,
@@ -328,6 +323,48 @@ function lowerBelongsToRelation(
     rightLabel: 'target',
     rightFields: toFields,
   });
+
+  // Cross-space path: the target lives in a different contract space.
+  // Resolve from the brand carried on the BelongsToRelation instead of
+  // requiring a local model spec — matching how the FK lowering works.
+  if (relation.spaceId !== undefined) {
+    assertKnownExtensionPack(
+      extensionPacks,
+      relation.spaceId,
+      `Relation "${currentSpec.modelName}.${relationName}"`,
+    );
+    const targetTable = relation.tableName ?? targetModelName.toLowerCase();
+    const parentColumns = mapFieldNamesToColumnNames(
+      currentSpec.modelName,
+      fromFields,
+      currentSpec.fieldToColumn,
+    );
+    // For cross-space relations, the `to` field names map directly to column
+    // names because we have no fieldToColumn map for the remote model.
+    // (The brand carries the table name; field→column resolution on the remote
+    // side is deferred to the planner which has access to the remote contract.)
+    return {
+      fieldName: relationName,
+      toModel: targetModelName,
+      toTable: targetTable,
+      cardinality: 'N:1',
+      spaceId: relation.spaceId,
+      ...(relation.namespaceId !== undefined ? { namespaceId: relation.namespaceId } : {}),
+      on: {
+        parentTable: currentSpec.tableName,
+        parentColumns,
+        childTable: targetTable,
+        childColumns: toFields,
+      },
+    };
+  }
+
+  const targetSpec = allSpecs.get(targetModelName);
+  if (!targetSpec) {
+    throw new Error(
+      `Relation "${currentSpec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
+    );
+  }
 
   return {
     fieldName: relationName,
@@ -473,9 +510,10 @@ function resolveRelationNode(
   relation: RelationState,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): RelationNode {
   if (relation.kind === 'belongsTo') {
-    return lowerBelongsToRelation(relationName, relation, currentSpec, allSpecs);
+    return lowerBelongsToRelation(relationName, relation, currentSpec, allSpecs, extensionPacks);
   }
 
   if (relation.kind === 'hasMany' || relation.kind === 'hasOne') {
@@ -653,7 +691,7 @@ function resolveModelNode(
   })) satisfies readonly IndexNode[];
   const foreignKeys = resolveForeignKeyNodes(spec, allSpecs, extensionPacks);
   const relations = Object.entries(spec.relations).map(([relationName, relationBuilder]) =>
-    resolveRelationNode(relationName, relationBuilder.build(), spec, allSpecs),
+    resolveRelationNode(relationName, relationBuilder.build(), spec, allSpecs, extensionPacks),
   );
 
   return {

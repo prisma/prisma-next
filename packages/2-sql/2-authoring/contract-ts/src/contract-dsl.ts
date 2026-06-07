@@ -21,6 +21,7 @@ import type {
   SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { NamedConstraintSpec } from './authoring-type-utils';
 
@@ -430,6 +431,22 @@ type BelongsToRelation<
   readonly from: FromField;
   readonly to: ToField;
   readonly sql?: SqlSpec;
+  /**
+   * Contract-space identity of the target model. Populated when
+   * `belongsTo` receives a cross-space branded handle. Absent for
+   * local (same-space) relations.
+   */
+  readonly spaceId?: string;
+  /**
+   * Physical table name of the cross-space target model. Only set
+   * when `spaceId` is present; read from the handle's `tableName`.
+   */
+  readonly tableName?: string;
+  /**
+   * Namespace coordinate of the cross-space target model.
+   * Only set when `spaceId` is present.
+   */
+  readonly namespaceId?: string;
 };
 
 type HasManyRelation<
@@ -1464,6 +1481,32 @@ export function model<
   });
 }
 
+/**
+ * Narrow shape for detecting a cross-space branded model handle at runtime.
+ * `ContractModelBuilder` exposes these fields but `AnyNamedModelToken` does
+ * not declare them; this guard bridges the gap without a bare cast.
+ */
+type CrossSpaceHandle = {
+  readonly spaceId: string;
+  readonly tableName?: string;
+  readonly stageOne: { readonly namespace?: string };
+};
+
+function isCrossSpaceHandle(value: unknown): value is CrossSpaceHandle {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const rec = blindCast<
+    Record<PropertyKey, unknown>,
+    'object null-check above; property access needed for runtime shape detection'
+  >(value);
+  return (
+    typeof rec['spaceId'] === 'string' &&
+    typeof rec['stageOne'] === 'object' &&
+    rec['stageOne'] !== null
+  );
+}
+
 function belongsTo<
   Token extends AnyNamedModelToken,
   FromField extends string | readonly string[],
@@ -1487,11 +1530,25 @@ function belongsTo(
     readonly to: string | readonly string[];
   },
 ): RelationBuilder<BelongsToRelation> {
+  // Extract cross-space brand from the handle when it carries a spaceId.
+  // ContractModelBuilder exposes spaceId/tableName at runtime even though
+  // the AnyNamedModelToken interface does not declare them.
+  const crossSpaceCoordinate = isCrossSpaceHandle(toModel)
+    ? {
+        spaceId: toModel.spaceId,
+        ...(toModel.tableName !== undefined ? { tableName: toModel.tableName } : {}),
+        ...(toModel.stageOne.namespace !== undefined
+          ? { namespaceId: toModel.stageOne.namespace }
+          : {}),
+      }
+    : undefined;
+
   return new RelationBuilder({
     kind: 'belongsTo',
     toModel: normalizeRelationModelSource(toModel),
     from: options.from,
     to: options.to,
+    ...(crossSpaceCoordinate !== undefined ? crossSpaceCoordinate : {}),
   });
 }
 

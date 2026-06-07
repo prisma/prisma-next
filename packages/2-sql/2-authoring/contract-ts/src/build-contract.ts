@@ -518,6 +518,24 @@ export function buildSqlContractFromDefinition(
     );
     const modelRelations: Record<string, ContractRelation> = {};
     for (const relation of semanticModel.relations ?? []) {
+      // Cross-space relations have `spaceId` set — the target model lives in
+      // a different contract space, so skip local model lookup and validation.
+      if (relation.spaceId !== undefined) {
+        const targetNamespaceId = relation.namespaceId ?? defaultNamespaceId;
+        modelRelations[relation.fieldName] = {
+          to: crossRef(relation.toModel, targetNamespaceId, relation.spaceId),
+          // Cross-space belongsTo relations are always N:1 (the FK-owning side).
+          cardinality: 'N:1',
+          on: {
+            localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
+            // For cross-space targets the lowering carries field names directly
+            // (no fieldToColumn map available for the remote model).
+            targetFields: relation.on.childColumns,
+          },
+        };
+        continue;
+      }
+
       const targetModel = assertKnownTargetModel(
         modelsByName,
         semanticModel.modelName,

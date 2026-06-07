@@ -75,6 +75,17 @@ export interface RelationNode {
   readonly toModel: string;
   readonly toTable: string;
   readonly cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
+  /**
+   * Contract-space identity of the related model. When present, the
+   * related model lives in a different contract space. Absent for local
+   * (same-space) relations.
+   */
+  readonly spaceId?: string;
+  /**
+   * Namespace coordinate of the related model in the foreign space.
+   * Only set when `spaceId` is present.
+   */
+  readonly namespaceId?: string;
   readonly on: {
     readonly parentTable: string;
     readonly parentColumns: readonly string[];
