@@ -15,6 +15,7 @@ const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
+  composedExtensionContracts: new Map(),
 } as const;
 
 describe('interpretPslDocumentToSqlContract types', () => {

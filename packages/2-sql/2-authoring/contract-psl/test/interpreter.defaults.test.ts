@@ -17,11 +17,16 @@ import { unboundTables } from './unbound-tables';
 describe('interpretPslDocumentToSqlContract default lowering', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
   const interpretPslDocumentToSqlContract = (
-    input: Omit<InterpretPslDocumentToSqlContractInput, 'target' | 'scalarTypeDescriptors'>,
+    input: Omit<
+      InterpretPslDocumentToSqlContractInput,
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts'
+    > &
+      Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
       ...input,
     });
   it('lowers supported default functions into execution and storage contract shapes', () => {
@@ -340,6 +345,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       document,
       target: sqliteTarget,
       scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: sqliteTemporalContributions,
     });

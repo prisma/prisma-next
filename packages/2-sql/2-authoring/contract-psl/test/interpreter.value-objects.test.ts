@@ -15,11 +15,16 @@ import {
 describe('interpretPslDocumentToSqlContract value objects and list fields', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
   const interpretPslDocumentToSqlContract = (
-    input: Omit<InterpretPslDocumentToSqlContractInput, 'target' | 'scalarTypeDescriptors'>,
+    input: Omit<
+      InterpretPslDocumentToSqlContractInput,
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts'
+    > &
+      Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
       ...input,
     });
 

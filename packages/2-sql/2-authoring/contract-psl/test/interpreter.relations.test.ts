@@ -14,6 +14,7 @@ import { unboundTables } from './unbound-tables';
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  composedExtensionContracts: new Map(),
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();

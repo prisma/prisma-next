@@ -247,6 +247,7 @@ export function createPostgresTestContext(
 ): ContractSourceContext {
   return {
     composedExtensionPacks: [],
+    composedExtensionContracts: new Map(),
     scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
     authoringContributions: { field: {}, type: {}, entityTypes: {} },
     codecLookup: postgresCodecLookup,

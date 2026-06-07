@@ -17,6 +17,7 @@ const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
 function createMongoTestContext(overrides?: Partial<ContractSourceContext>): ContractSourceContext {
   return {
     composedExtensionPacks: [],
+    composedExtensionContracts: new Map(),
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     authoringContributions: { field: {}, type: {}, entityTypes: {} },
     codecLookup: emptyCodecLookup,

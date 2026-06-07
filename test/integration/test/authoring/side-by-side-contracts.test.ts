@@ -44,6 +44,7 @@ const mongoStack = createControlStack({
 
 const sqlSourceContext: ContractSourceContext = {
   composedExtensionPacks: [],
+  composedExtensionContracts: new Map(),
   scalarTypeDescriptors: sqlStack.scalarTypeDescriptors,
   authoringContributions: sqlStack.authoringContributions,
   codecLookup: sqlStack.codecLookup,
@@ -53,6 +54,7 @@ const sqlSourceContext: ContractSourceContext = {
 
 const mongoSourceContext: ContractSourceContext = {
   composedExtensionPacks: [],
+  composedExtensionContracts: new Map(),
   scalarTypeDescriptors: mongoStack.scalarTypeDescriptors,
   authoringContributions: mongoStack.authoringContributions,
   codecLookup: mongoStack.codecLookup,

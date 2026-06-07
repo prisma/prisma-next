@@ -411,6 +411,7 @@ describe('TS and PSL authoring parity', () => {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
       composedExtensionPacks: ['pgvector'],
+      composedExtensionContracts: new Map(),
       composedExtensionPackRefs: [pgvectorExtensionPack],
     });
 
@@ -451,6 +452,7 @@ describe('TS and PSL authoring parity', () => {
       document: pslDocument,
       target: target.targetPack,
       scalarTypeDescriptors: target.scalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions: target.authoringContributions,
     });
@@ -500,6 +502,7 @@ model Post {
       document: pslDocument,
       target: portablePostgresTargetPack,
       scalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
     });

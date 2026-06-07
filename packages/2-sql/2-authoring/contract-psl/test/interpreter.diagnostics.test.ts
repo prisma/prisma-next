@@ -18,6 +18,7 @@ import {
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  composedExtensionContracts: new Map(),
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -1100,6 +1101,7 @@ model User {
       const result = interpretPslDocumentToSqlContract({
         target: sqliteTarget,
         scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+        composedExtensionContracts: new Map(),
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
@@ -1134,6 +1136,7 @@ model User {
       const result = interpretPslDocumentToSqlContract({
         target: sqliteTarget,
         scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+        composedExtensionContracts: new Map(),
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
       });
