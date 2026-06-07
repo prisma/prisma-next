@@ -461,12 +461,21 @@ function collectAuthoringLeafDiscriminators(
         'walker inspects a non-leaf value for descriptor-shaped keys before recursing'
       >(value);
       // A value carrying descriptor-shaped keys (`kind`/`discriminator`)
-      // that failed the leaf guard is a malformed descriptor — e.g.
-      // `{ kind: 'pslBlock' }` with no `parser`/`printer`. Descending into
-      // it as a sub-namespace would silently skip it, so a half-built
-      // contribution would pass validation. Reject it at load time
-      // instead, naming the path and what's wrong.
-      if (record['kind'] !== undefined || record['discriminator'] !== undefined) {
+      // but lacking the required descriptor body (no `parser`/`printer`) is
+      // a malformed descriptor — e.g. `{ kind: 'pslBlock', discriminator }` with
+      // no `parser`/`printer`. Descending into it as a sub-namespace would
+      // silently skip it, so a half-built contribution would pass validation.
+      // Reject it at load time instead, naming the path and what's wrong.
+      //
+      // A valid sub-namespace whose key happens to be named `kind` or
+      // `discriminator` (with no `parser`/`printer` of its own) must still
+      // descend normally — the check requires both: descriptor-shaped keys
+      // present AND the descriptor body absent.
+      if (
+        (record['kind'] !== undefined || record['discriminator'] !== undefined) &&
+        record['parser'] === undefined &&
+        record['printer'] === undefined
+      ) {
         throw new Error(
           `Malformed authoring ${label} contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/discriminator) but does not satisfy the ${label} descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
         );
@@ -528,6 +537,26 @@ export function assertNoCrossRegistryCollisions(
 }
 
 /**
+ * Throws when two or more entries in the same namespace share a discriminator.
+ * Duplicate discriminators within a namespace (e.g. two `pslBlocks` entries
+ * both using `"fake-policy"`) make dispatch ambiguous — the parser, printer,
+ * and entity factory all dispatch by discriminator, so one would silently
+ * shadow the other. Catch duplicates before building any dispatch map.
+ */
+function assertUniqueDiscriminators(entries: readonly AuthoringLeafEntry[], label: string): void {
+  const seen = new Map<string, string>();
+  for (const { path, discriminator } of entries) {
+    const existing = seen.get(discriminator);
+    if (existing !== undefined) {
+      throw new Error(
+        `Duplicate ${label} discriminator "${discriminator}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique discriminator.`,
+      );
+    }
+    seen.set(discriminator, path);
+  }
+}
+
+/**
  * Every `pslBlocks` descriptor needs a matching `entityTypes` factory
  * (same discriminator): the parser would otherwise produce an AST node
  * nothing can lower to an IR class instance. The link is one-directional
@@ -549,6 +578,9 @@ function assertPslBlocksHaveFactories(
     isAuthoringEntityTypeDescriptor,
     'entityType',
   );
+
+  assertUniqueDiscriminators(blockEntries, 'pslBlock');
+  assertUniqueDiscriminators(entityEntries, 'entityType');
 
   const entityDiscriminators = new Set(entityEntries.map((entry) => entry.discriminator));
 

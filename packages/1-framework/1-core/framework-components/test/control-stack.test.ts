@@ -410,6 +410,97 @@ describe('assembleAuthoringContributions', () => {
     ).toThrow(/Malformed authoring pslBlock contribution at "broken"/);
   });
 
+  it('descends into a pslBlocks sub-namespace whose key is literally "kind" or "discriminator"', () => {
+    // A valid sub-namespace keyed "kind" or "discriminator" (with no
+    // parser/printer at that level) must not trigger the malformed-descriptor
+    // check — only the combination of descriptor-shaped keys + absent body
+    // is a malformed descriptor.
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              kind: {
+                nested: {
+                  kind: 'entity',
+                  discriminator: 'test-entity-in-kind-ns',
+                  output: { factory: () => ({}) },
+                },
+              },
+              discriminator: {
+                nested: {
+                  kind: 'entity',
+                  discriminator: 'test-entity-in-discriminator-ns',
+                  output: { factory: () => ({}) },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    ).not.toThrow();
+  });
+
+  it('rejects two pslBlocks contributions sharing a discriminator', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              policyA: {
+                kind: 'entity',
+                discriminator: 'shared-disc',
+                output: { factory: () => ({}) },
+              },
+              policyB: {
+                kind: 'entity',
+                discriminator: 'shared-disc',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslBlocks: {
+              policyA: {
+                kind: 'pslBlock',
+                discriminator: 'shared-disc',
+                parser: stubExtensionBlockParser,
+                printer: stubExtensionBlockPrinter,
+              },
+              policyB: {
+                kind: 'pslBlock',
+                discriminator: 'shared-disc',
+                parser: stubExtensionBlockParser,
+                printer: stubExtensionBlockPrinter,
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate pslBlock discriminator "shared-disc".*"policyA".*"policyB"/);
+  });
+
+  it('rejects two entityTypes contributions sharing a discriminator', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              enumA: {
+                kind: 'entity',
+                discriminator: 'shared-entity-disc',
+                output: { factory: () => ({}) },
+              },
+              enumB: {
+                kind: 'entity',
+                discriminator: 'shared-entity-disc',
+                output: { factory: () => ({}) },
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate entityType discriminator "shared-entity-disc".*"enumA".*"enumB"/);
+  });
+
   it('accepts entityTypes-only contributions without a pslBlocks descriptor', () => {
     expect(() =>
       assembleAuthoringContributions([
