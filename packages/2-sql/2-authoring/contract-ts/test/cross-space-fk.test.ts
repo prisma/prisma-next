@@ -320,3 +320,124 @@ describe('local FK regression (NFR2 / AC9)', () => {
     expect(fks![0]!.target.columns).toEqual(['id']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// F-col — cross-space FK target columns use physical column name, not logical
+// ---------------------------------------------------------------------------
+
+describe('F-col: cross-space FK target columns prefer physical column name', () => {
+  it('when the cross-space handle field uses .column("physical_id"), the FK target column is "physical_id" not "userId"', () => {
+    // Extension model with a field whose physical column name differs from the logical field name.
+    const ExtUser = new ContractModelBuilder(
+      {
+        modelName: 'User' as const,
+        namespace: 'auth',
+        fields: {
+          // logical name: userId, physical column: physical_id
+          userId: field.column(int4Column).column('physical_id').id(),
+        },
+        relations: {},
+      },
+      undefined,
+      undefined,
+      'supabase' as const,
+    ).sql({ table: 'users' });
+
+    const Profile = model('Profile', {
+      fields: {
+        id: field.column(int4Column).id(),
+        fkCol: field.column(int4Column),
+      },
+    }).sql(({ cols, constraints }) => ({
+      table: 'profile',
+      // Reference the 'userId' field (logical name) on ExtUser — but FK should carry 'physical_id'
+      foreignKeys: [constraints.foreignKey(cols.fkCol, ExtUser.refs.userId)],
+    }));
+
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      extensionPacks: { supabase: supabasePack },
+      models: { Profile },
+    });
+
+    const fks = unboundTables(contract.storage)['profile']?.foreignKeys;
+    expect(fks).toHaveLength(1);
+    // Target column must be the physical column name, not the logical field name
+    expect(fks![0]!.target.columns).toEqual(['physical_id']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-compound — compound FK refs must all share the same cross-space coordinate
+// ---------------------------------------------------------------------------
+
+describe('F-compound: normalizeTargetFieldRefInput rejects mixed-space compound FK refs', () => {
+  it('throws when compound FK refs mix different spaceId values', () => {
+    // Two handles that have the same modelName but different spaceIds
+    const ExtUserSpace1 = new ContractModelBuilder(
+      {
+        modelName: 'User' as const,
+        namespace: 'auth',
+        fields: {
+          id: field.column(int4Column).id(),
+          tenantId: field.column(int4Column),
+        },
+        relations: {},
+      },
+      undefined,
+      undefined,
+      'supabase' as const,
+    ).sql({ table: 'users' });
+
+    const ExtUserSpace2 = new ContractModelBuilder(
+      {
+        modelName: 'User' as const,
+        namespace: 'auth',
+        fields: {
+          id: field.column(int4Column).id(),
+          tenantId: field.column(int4Column),
+        },
+        relations: {},
+      },
+      undefined,
+      undefined,
+      // Different spaceId — same modelName as above
+      'other_space' as const,
+    ).sql({ table: 'users' });
+
+    const otherPack: ExtensionPackRef<'sql', 'postgres'> = {
+      kind: 'extension',
+      id: 'other_space',
+      familyId: 'sql',
+      targetId: 'postgres',
+      version: '0.0.1',
+    };
+
+    const Profile = model('Profile', {
+      fields: {
+        id: field.column(int4Column).id(),
+        fkId: field.column(int4Column),
+        fkTenant: field.column(int4Column),
+      },
+    }).sql(({ cols, constraints }) => ({
+      table: 'profile',
+      // Compound FK mixing refs from two different spaces — same modelName but different spaceId
+      foreignKeys: [
+        constraints.foreignKey(
+          [cols.fkId, cols.fkTenant],
+          [ExtUserSpace1.refs.id, ExtUserSpace2.refs.tenantId],
+        ),
+      ],
+    }));
+
+    expect(() =>
+      defineContract({
+        family: bareFamilyPack,
+        target: postgresTargetPack,
+        extensionPacks: { supabase: supabasePack, other_space: otherPack },
+        models: { Profile },
+      }),
+    ).toThrow(/spaceId/i);
+  });
+});

@@ -156,6 +156,16 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
 
   constructor(private readonly state: State) {}
 
+  /**
+   * Returns the physical column name when `.column(name)` was called, or
+   * `undefined` when the field uses the default (logical field name) mapping.
+   * Used by cross-space FK lowering to stamp the physical column name onto
+   * `TargetFieldRef.columnName` so FK target columns are resolved correctly.
+   */
+  get physicalColumnName(): string | undefined {
+    return this.state.columnName;
+  }
+
   optional(): ScalarFieldBuilder<
     State extends ScalarFieldState<
       infer CodecId,
@@ -585,6 +595,14 @@ export type TargetFieldRef<
    * registry.
    */
   readonly tableName?: string;
+  /**
+   * Physical column name of the target field. Populated for cross-space refs
+   * when the extension handle's field used `.column(name)` to rename the
+   * physical column. When absent the logical `fieldName` is used as the column
+   * name. Only relevant for cross-space FK lowering — local FKs resolve column
+   * names via the local `fieldToColumn` map.
+   */
+  readonly columnName?: string;
 };
 
 export type ModelTokenRefs<
@@ -707,9 +725,29 @@ function normalizeTargetFieldRefInput(input: TargetFieldRef | readonly TargetFie
   if (refs.some((ref) => ref.modelName !== first.modelName)) {
     throw new Error('All target refs in a foreign key must point to the same model');
   }
+  // F-compound: all refs in a compound FK must share the same cross-space coordinate.
+  // A mismatch in spaceId, namespaceId, or tableName means the refs come from
+  // different spaces despite having the same modelName — an impossible FK.
+  if (refs.some((ref) => ref.spaceId !== first.spaceId)) {
+    throw new Error(
+      `All target refs in a compound foreign key must share the same spaceId (found mismatch: "${first.spaceId ?? '<local>'}" vs "${refs.find((r) => r.spaceId !== first.spaceId)?.spaceId ?? '<local>'}")`,
+    );
+  }
+  if (refs.some((ref) => ref.namespaceId !== first.namespaceId)) {
+    throw new Error(
+      'All target refs in a compound foreign key must share the same namespaceId (found mismatch)',
+    );
+  }
+  if (refs.some((ref) => ref.tableName !== first.tableName)) {
+    throw new Error(
+      'All target refs in a compound foreign key must share the same tableName (found mismatch)',
+    );
+  }
   return {
     modelName: first.modelName,
-    fieldNames: refs.map((ref) => ref.fieldName),
+    // F-col: for cross-space refs, prefer the physical column name (columnName) over
+    // the logical field name. Local refs have no columnName and use fieldName directly.
+    fieldNames: refs.map((ref) => ref.columnName ?? ref.fieldName),
     source: refs.some((ref) => ref.source === 'string') ? 'string' : 'token',
     spaceId: first.spaceId,
     namespaceId: first.namespaceId,
@@ -928,7 +966,9 @@ function createModelTokenRefs<
   },
 ): ModelTokenRefs<ModelName, Fields, TSpaceId> {
   const refs = {} as Record<string, TargetFieldRef>;
-  for (const fieldName of Object.keys(fields)) {
+  for (const [fieldName, fieldBuilder] of Object.entries(fields)) {
+    const physicalColumn =
+      crossSpaceCoordinate !== undefined ? fieldBuilder.physicalColumnName : undefined;
     refs[fieldName] = {
       kind: 'targetFieldRef',
       source: 'token',
@@ -943,6 +983,7 @@ function createModelTokenRefs<
             ...(crossSpaceCoordinate.tableName !== undefined
               ? { tableName: crossSpaceCoordinate.tableName }
               : {}),
+            ...(physicalColumn !== undefined ? { columnName: physicalColumn } : {}),
           }
         : {}),
     };
@@ -1123,11 +1164,14 @@ export class ContractModelBuilder<
             ...(tableName !== undefined ? { tableName } : {}),
           }
         : undefined;
-    this.refs = (
+    this.refs = blindCast<
+      ModelName extends string ? ModelTokenRefs<ModelName, Fields, TSpaceId> : never,
+      'conditional generic: stageOne.modelName presence matches ModelName extends string'
+    >(
       stageOne.modelName
         ? createModelTokenRefs(stageOne.modelName, stageOne.fields, crossSpaceCoordinate)
-        : undefined
-    ) as ModelName extends string ? ModelTokenRefs<ModelName, Fields, TSpaceId> : never;
+        : undefined,
+    );
   }
 
   ref<FieldName extends keyof Fields & string>(
@@ -1230,13 +1274,18 @@ export class ContractModelBuilder<
     // When specOrFactory is a static object (not a function), extract tableName for the cross-space coordinate.
     const nextTableName =
       typeof specOrFactory !== 'function' ? specOrFactory.table : this.tableName;
-    return new ContractModelBuilder(
-      this.stageOne,
-      this.attributesFactory,
-      specOrFactory,
-      this.spaceId,
-      nextTableName,
-    ) as never;
+    return blindCast<
+      never,
+      'conditional return type; runtime value is always a valid ContractModelBuilder'
+    >(
+      new ContractModelBuilder(
+        this.stageOne,
+        this.attributesFactory,
+        specOrFactory,
+        this.spaceId,
+        nextTableName,
+      ),
+    );
   }
 
   buildAttributesSpec(): AttributesSpec {
@@ -1584,15 +1633,21 @@ function belongsTo(
     readonly to: string | readonly string[];
   },
 ): RelationBuilder<BelongsToRelation> {
+  // F-lazy: when the model is a lazy thunk (() => handle), resolve it before
+  // the brand check so cross-space handles passed as lazy tokens are detected.
+  // normalizeRelationModelSource still receives the original toModel (which
+  // handles both lazy and non-lazy forms correctly for model-name resolution).
+  const resolvedModel = typeof toModel === 'function' ? toModel() : toModel;
+
   // Extract cross-space brand from the handle when it carries a spaceId.
   // ContractModelBuilder exposes spaceId/tableName at runtime even though
   // the AnyNamedModelToken interface does not declare them.
-  const crossSpaceCoordinate = isCrossSpaceHandle(toModel)
+  const crossSpaceCoordinate = isCrossSpaceHandle(resolvedModel)
     ? {
-        spaceId: toModel.spaceId,
-        ...(toModel.tableName !== undefined ? { tableName: toModel.tableName } : {}),
-        ...(toModel.stageOne.namespace !== undefined
-          ? { namespaceId: toModel.stageOne.namespace }
+        spaceId: resolvedModel.spaceId,
+        ...(resolvedModel.tableName !== undefined ? { tableName: resolvedModel.tableName } : {}),
+        ...(resolvedModel.stageOne.namespace !== undefined
+          ? { namespaceId: resolvedModel.stageOne.namespace }
           : {}),
       }
     : undefined;

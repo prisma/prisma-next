@@ -229,6 +229,84 @@ describe('cross-space belongsTo relation — missing-pack fail-fast', () => {
 });
 
 // ---------------------------------------------------------------------------
+// F-lazy — lazy cross-space handle (thunk form) carries the cross-space brand
+// ---------------------------------------------------------------------------
+
+describe('F-lazy: lazy cross-space belongsTo handle carries the brand', () => {
+  it('rel.belongsTo(() => ExtUser, …) sees the cross-space brand and emits to.space', () => {
+    const ExtUser = buildSyntheticSupabaseAuthUser();
+
+    const Profile = model('Profile', {
+      fields: {
+        id: field.column(int4Column).id(),
+        userId: field.column(int4Column),
+      },
+    }).relations({
+      // Lazy form — wraps ExtUser in a thunk
+      user: rel.belongsTo(() => ExtUser, { from: 'userId', to: 'id' }),
+    });
+
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      extensionPacks: { supabase: supabasePack },
+      models: { Profile },
+    });
+
+    const profileModel = modelsOf(contract)['Profile'];
+    const userRelation = profileModel?.relations?.['user'] as Record<string, unknown> | undefined;
+    expect(userRelation).toBeDefined();
+    const to = userRelation?.['to'] as Record<string, unknown> | undefined;
+    // The lazy thunk must be resolved before the brand check
+    expect(to?.['space']).toBe('supabase');
+    expect(to?.['namespace']).toBe('auth');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-relfk — cross-space belongsTo with .sql({ fk }) lowers to cross-space FK
+// ---------------------------------------------------------------------------
+
+describe('F-relfk: cross-space belongsTo().sql({ fk }) produces a cross-space FK in storage', () => {
+  it('relation-derived FK carries spaceId when the belongsTo target is cross-space', () => {
+    const ExtUser = buildSyntheticSupabaseAuthUser();
+
+    const Profile = model('Profile', {
+      fields: {
+        id: field.column(int4Column).id(),
+        userId: field.column(int4Column),
+      },
+    }).relations({
+      user: rel.belongsTo(ExtUser, { from: 'userId', to: 'id' }).sql({
+        fk: { onDelete: 'cascade' },
+      }),
+    });
+
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: postgresTargetPack,
+      extensionPacks: { supabase: supabasePack },
+      models: { Profile },
+    });
+
+    const storage = contract.storage;
+    const profileTable = Object.values(storage.namespaces)
+      .flatMap((ns) => Object.values(ns.entries.table ?? {}))
+      .find((t) => t !== undefined);
+
+    const fks = profileTable?.foreignKeys ?? [];
+    expect(fks).toHaveLength(1);
+    // The relation-derived FK must carry the cross-space spaceId.
+    // Cast to Record<string, unknown> for access to the optional `spaceId` field
+    // (the ForeignKeyReference class uses a `declare` field which some TS paths
+    // narrow away — runtime access is safe, the field is present when cross-space).
+    const fkTarget = fks[0]!.target as unknown as Record<string, unknown>;
+    expect(fkTarget['spaceId']).toBe('supabase');
+    expect(fks[0]!.onDelete).toBe('cascade');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Local relation regression (AC9) — local belongsTo stays unchanged
 // ---------------------------------------------------------------------------
 

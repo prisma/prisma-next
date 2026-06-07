@@ -254,6 +254,41 @@ function resolveRelationForeignKeys(
     }
 
     const targetModelName = resolveRelationModelName(relation.toModel);
+
+    // F-relfk: cross-space relations carry a spaceId; skip the local spec lookup
+    // and include cross-space coordinates so resolveForeignKeyNodes routes the FK
+    // through the cross-space path.
+    if (relation.spaceId !== undefined) {
+      const fields = normalizeRelationFieldNames(relation.from);
+      const targetFields = normalizeRelationFieldNames(relation.to);
+      assertRelationFieldArity({
+        modelName: spec.modelName,
+        relationName,
+        leftLabel: 'source',
+        leftFields: fields,
+        rightLabel: 'target',
+        rightFields: targetFields,
+      });
+
+      foreignKeys.push({
+        kind: 'fk',
+        fields,
+        targetModel: targetModelName,
+        targetFields,
+        targetSpaceId: relation.spaceId,
+        ...(relation.namespaceId !== undefined ? { targetNamespaceId: relation.namespaceId } : {}),
+        ...(relation.tableName !== undefined ? { targetTableName: relation.tableName } : {}),
+        ...(relation.sql.fk.name ? { name: relation.sql.fk.name } : {}),
+        ...(relation.sql.fk.onDelete ? { onDelete: relation.sql.fk.onDelete } : {}),
+        ...(relation.sql.fk.onUpdate ? { onUpdate: relation.sql.fk.onUpdate } : {}),
+        ...(relation.sql.fk.constraint !== undefined
+          ? { constraint: relation.sql.fk.constraint }
+          : {}),
+        ...(relation.sql.fk.index !== undefined ? { index: relation.sql.fk.index } : {}),
+      });
+      continue;
+    }
+
     if (!allSpecs.has(targetModelName)) {
       throw new Error(
         `Relation "${spec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
@@ -609,6 +644,20 @@ function resolveForeignKeyNodes(
   extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): readonly ForeignKeyNode[] {
   const relationForeignKeys = resolveRelationForeignKeys(spec, allSpecs).map((foreignKey) => {
+    // F-relfk: relation-derived FKs for cross-space targets carry targetSpaceId;
+    // route them through the cross-space path, just like explicit sql() FKs.
+    if (foreignKey.targetSpaceId !== undefined) {
+      assertKnownExtensionPack(
+        extensionPacks,
+        foreignKey.targetSpaceId,
+        `Relation-derived foreign key on "${spec.modelName}"`,
+      );
+      return lowerCrossSpaceForeignKeyNode(spec, {
+        ...foreignKey,
+        targetSpaceId: foreignKey.targetSpaceId,
+      });
+    }
+
     const targetSpec = allSpecs.get(foreignKey.targetModel);
     if (!targetSpec) {
       throw new Error(

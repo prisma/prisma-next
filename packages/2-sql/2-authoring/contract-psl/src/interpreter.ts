@@ -965,15 +965,26 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   const resultFkRelationMetadata: FkRelationMetadata[] = [];
   const resultCrossSpaceRelations: RelationNode[] = [];
   for (const relationAttribute of relationAttributes) {
-    if (relationAttribute.field.list) {
-      continue;
-    }
-
     const {
       typeName: fieldTypeName,
       typeNamespaceId: fieldTypeNamespaceId,
       typeContractSpaceId: fieldTypeContractSpaceId,
     } = relationAttribute.field;
+
+    if (relationAttribute.field.list) {
+      // F-list: cross-space list relations are explicitly unsupported (Option B does not
+      // navigate, so a list target makes no sense to carry). Emit a diagnostic instead of
+      // silently dropping the field — the author needs to know the field was ignored.
+      if (fieldTypeContractSpaceId !== undefined) {
+        diagnostics.push({
+          code: 'PSL_UNSUPPORTED_CROSS_SPACE_LIST',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" is a cross-space list relation (type "${fieldTypeContractSpaceId}:${fieldTypeNamespaceId !== undefined ? `${fieldTypeNamespaceId}.` : ''}${fieldTypeName}[]"). Cross-space relations must be singular in v0.1 — list cross-space relations are not supported.`,
+          sourceId,
+          span: relationAttribute.field.span,
+        });
+      }
+      continue;
+    }
 
     // Cross-contract-space relation: the target model lives in a different contract space
     // identified by `typeContractSpaceId` (e.g. `supabase:auth.User`).

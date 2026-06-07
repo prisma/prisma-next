@@ -221,6 +221,37 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     );
   });
 
+  it('F-list: cross-space list relation emits PSL_UNSUPPORTED_CROSS_SPACE_LIST diagnostic instead of silently dropping it', () => {
+    const document = parsePslDocument({
+      schema: `model Profile {
+  id Int @id
+  userId Int
+  posts supabase:auth.Post[] @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      composedExtensionPacks: ['supabase'],
+    });
+
+    // The result should fail with a diagnostic (not silently succeed with 0 FKs)
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_CROSS_SPACE_LIST',
+          message: expect.stringContaining('posts'),
+        }),
+      ]),
+    );
+  });
+
   it('cross-space FK with onDelete:cascade emits no diagnostic (AC4)', () => {
     const document = parsePslDocument({
       schema: `model Profile {
