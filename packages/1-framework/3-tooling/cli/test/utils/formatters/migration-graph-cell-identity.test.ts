@@ -68,13 +68,13 @@ function cellHash(cell: StructuralCell | undefined): string | undefined {
 //
 // Layout (tips at top):
 //   ○  tip
-//   ├─╮           branch-connector
-//   │↑│  merge_alice / merge_bob
-//   ○ │  alice
-//   │↑│  alice_add_phone / (merge_bob pass)
-//   │ ○  bob
-//   │↑   bob_add_avatar
-//   ├─╯           merge-connector
+//   │─╮           branch-connector
+//   │↑│    merge_alice / merge_bob
+//   ○ │    alice
+//   │↑│    alice_add_phone / (merge_bob pass)
+//   │ ○    bob
+//   │ | ↑  bob_add_avatar
+//   |─╯           merge-connector
 //   ○  root
 //   │↑  init
 //   ○  ∅

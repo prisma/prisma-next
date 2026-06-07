@@ -1410,4 +1410,203 @@ describe('graph colouring', () => {
       ).not.toContain(GREEN_BRIGHT);
     });
   });
+
+  // =========================================================================
+  // Branch-tee trailing dash uses the tee cell's own annotation (BUG 2 fix)
+  // =========================================================================
+  describe('branch-tee trailing dash colour', () => {
+    // The ─ dash immediately after a branch-tee ├ in a connector row must carry
+    // the same annotation as the tee cell itself (i.e., the edge that owns that
+    // tee cell), NOT the annotation of the adjacent column (dashColumn).
+    //
+    // Before the fix, renderConnectorRow used columnLaneOverride?.get(dashColumn)
+    // for the trailing dash, so an off-path tee's ─ would bleed green when the
+    // next column happened to be on-path.
+    //
+    // Topology: two separate fan-outs into the same node — one off-path, one on-path.
+    //   ∅ → root → A (col 0, off-path) → tip
+    //             → B (col 1, on-path)  → tip
+    //
+    // In the branch-connector row, col 0 holds a branch-tee for A (off-path).
+    // Col 1 holds the on-path branch corner for B.
+    // The ─ after the ├ must be DIM (A off-path), not GREEN (B on-path).
+
+    it('off-path branch-tee trailing dash is DIM even when adjacent column is on-path', () => {
+      const root = edge(EMPTY_CONTRACT_HASH, 'bt_root', 'bt_root');
+      const a = edge('bt_root', 'bt_a_node', 'bt_a');
+      const b = edge('bt_root', 'bt_b_node', 'bt_b');
+      const mergeA = edge('bt_a_node', 'bt_merge', 'bt_merge_a');
+      const mergeB = edge('bt_b_node', 'bt_merge', 'bt_merge_b');
+      const edgeList = [root, a, b, mergeA, mergeB];
+      // b and mergeB are on-path; root, a, mergeA are off-path
+      const onPath = new Set([b.migrationHash, mergeB.migrationHash]);
+      const anno = annotations(edgeList, onPath);
+      const rendered = renderEdges(edgeList, { colorize: true, edgeAnnotationsByHash: anno });
+
+      // Find the branch-connector row (contains ├ and ╮, no direction arrows).
+      const branchRow = rendered.split('\n').find((l) => {
+        const plain = stripAnsi(l);
+        return (
+          plain.includes('├') && plain.includes('╮') && !plain.includes('↑') && !plain.includes('↓')
+        );
+      });
+      expect(branchRow, 'branch-connector row (├…╮) must exist').toBeDefined();
+      if (branchRow !== undefined) {
+        // ├ at col 0 belongs to edge a (off-path) → DIM.
+        const codeForTee = lastCodeBefore(branchRow, '├');
+        expect(
+          codeForTee,
+          `branch-tee ├ must be DIM (off-path edge a). Got: ${JSON.stringify(codeForTee)}. Line: ${JSON.stringify(branchRow)}`,
+        ).toBe(DIM);
+
+        // ─ immediately after ├ also belongs to edge a (off-path tee cell) → DIM,
+        // not GREEN from the adjacent on-path column b.
+        const codeForDash = lastCodeBefore(branchRow, '─');
+        expect(
+          codeForDash,
+          `branch-tee trailing ─ must be DIM (off-path tee cell), not green from adjacent on-path column. Got: ${JSON.stringify(codeForDash)}. Line: ${JSON.stringify(branchRow)}`,
+        ).toBe(DIM);
+
+        // ╮ at col 1 belongs to edge b (on-path) → GREEN.
+        const codeForCorner = lastCodeBefore(branchRow, '╮');
+        expect(
+          codeForCorner,
+          `branch-corner ╮ must be GREEN (on-path edge b). Got: ${JSON.stringify(codeForCorner)}. Line: ${JSON.stringify(branchRow)}`,
+        ).toBe(GREEN_BRIGHT);
+      }
+    });
+
+    it('on-path branch-tee trailing dash is GREEN', () => {
+      const root = edge(EMPTY_CONTRACT_HASH, 'bt2_root', 'bt2_root');
+      const a = edge('bt2_root', 'bt2_a_node', 'bt2_a');
+      const b = edge('bt2_root', 'bt2_b_node', 'bt2_b');
+      const mergeA = edge('bt2_a_node', 'bt2_merge', 'bt2_merge_a');
+      const mergeB = edge('bt2_b_node', 'bt2_merge', 'bt2_merge_b');
+      const edgeList = [root, a, b, mergeA, mergeB];
+      // a and mergeA are on-path; root, b, mergeB are off-path
+      const onPath = new Set([a.migrationHash, mergeA.migrationHash]);
+      const anno = annotations(edgeList, onPath);
+      const rendered = renderEdges(edgeList, { colorize: true, edgeAnnotationsByHash: anno });
+
+      const branchRow = rendered.split('\n').find((l) => {
+        const plain = stripAnsi(l);
+        return (
+          plain.includes('├') && plain.includes('╮') && !plain.includes('↑') && !plain.includes('↓')
+        );
+      });
+      expect(branchRow, 'branch-connector row (├…╮) must exist').toBeDefined();
+      if (branchRow !== undefined) {
+        // ├ at col 0 belongs to edge a (on-path) → GREEN.
+        const codeForTee = lastCodeBefore(branchRow, '├');
+        expect(
+          codeForTee,
+          `branch-tee ├ must be GREEN (on-path edge a). Got: ${JSON.stringify(codeForTee)}. Line: ${JSON.stringify(branchRow)}`,
+        ).toBe(GREEN_BRIGHT);
+
+        // ─ trailing dash also belongs to the on-path tee cell → GREEN.
+        const codeForDash = lastCodeBefore(branchRow, '─');
+        expect(
+          codeForDash,
+          `branch-tee trailing ─ must be GREEN (on-path tee cell). Got: ${JSON.stringify(codeForDash)}. Line: ${JSON.stringify(branchRow)}`,
+        ).toBe(GREEN_BRIGHT);
+      }
+    });
+  });
+
+  // =========================================================================
+  // arc-crossing bridge in node rows uses arcMigrationHash (BUG 1 fix)
+  // =========================================================================
+  describe('arc-crossing bridge colour in node rows', () => {
+    // In a node row, an arc-crossing cell renders as ── (the horizontal bridge).
+    // The bridge belongs to the arc (arcMigrationHash), NOT the vertical lane
+    // owner (migrationHash) that passes through the same position.
+    //
+    // Before the fix, the renderer used migrationHash for both. When the vertical
+    // lane was on-path (GREEN) and the arc was off-path, the bridge ── rendered
+    // green instead of dim.
+    //
+    // Topology: three-lane graph where an off-path arc crosses through a node row
+    // that also has an on-path vertical lane.
+    //
+    //   ∅ → n0 → n1 → n2 → n3 (col 0, on-path trunk)
+    //             n1 → n4      (col 1, off-path branch)
+    //   n2 → n0               (col 2, off-path rollback arc — crosses n1 node row)
+    //
+    // In the n1 node row: col 0 = vertical-pass (n2→n3, on-path), col 2 = arc-crossing
+    // (rollback arc, off-path). The ── at col 2 must be DIM.
+
+    it('arc-crossing bridge ── in a node row is DIM when the arc edge is off-path, even when the vertical lane is on-path', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'xb_n0', 'xb_init');
+      const m1 = edge('xb_n0', 'xb_n1', 'xb_m1');
+      const m2 = edge('xb_n1', 'xb_n2', 'xb_m2');
+      const m3 = edge('xb_n2', 'xb_n3', 'xb_m3');
+      const branch = edge('xb_n1', 'xb_n4', 'xb_branch');
+      const rb = edge('xb_n2', 'xb_n0', 'xb_rb');
+      const edgeList = [init, m1, m2, m3, branch, rb];
+      // Trunk (init, m1, m2, m3) on-path; branch and rollback off-path
+      const onPath = new Set([
+        init.migrationHash,
+        m1.migrationHash,
+        m2.migrationHash,
+        m3.migrationHash,
+      ]);
+      const anno = annotations(edgeList, onPath);
+      const rendered = renderEdges(edgeList, { colorize: true, edgeAnnotationsByHash: anno });
+
+      assertNoRotationCodes(rendered, 'arc-crossing bridge in node rows');
+
+      // The on-path trunk edge rows must carry green.
+      for (const e of [init, m1, m2, m3]) {
+        const line = rendered.split('\n').find((l) => l.includes(e.dirName));
+        expect(line, `${e.dirName} must exist`).toBeDefined();
+        expect(line, `${e.dirName} must carry green`).toContain(GREEN_BRIGHT);
+      }
+
+      // The off-path rollback edge row must carry dim.
+      const rbLine = rendered.split('\n').find((l) => l.includes(rb.dirName));
+      expect(rbLine, 'rollback edge line must exist').toBeDefined();
+      expect(rbLine, 'rollback edge line must carry dim').toContain(DIM);
+
+      // The arc-crossing bridge ── appears in node rows (○ rows for nodes that
+      // the rollback arc crosses over). These rows contain ○ (node marker) and
+      // also ── (the bridge), with no direction arrows.
+      // All arc-crossing bridge cells belong to the off-path rollback, so they
+      // must be DIM even though the on-path vertical lane passes through the same row.
+      //
+      // The simplest invariant: no GREEN_BRIGHT must appear in any node row that
+      // also contains the arc bridge pattern ──. The on-path vertical lane (│) in
+      // the same row IS green, but the arc bridge ── characters must be DIM.
+      //
+      // We check this by asserting that the code immediately before ── is DIM.
+      const nodeRowsWithArcBridge = rendered.split('\n').filter((l) => {
+        const plain = stripAnsi(l);
+        return (
+          plain.includes('○') &&
+          plain.includes('──') &&
+          !plain.includes('↑') &&
+          !plain.includes('↓')
+        );
+      });
+      expect(
+        nodeRowsWithArcBridge.length,
+        'at least one node row with arc-crossing bridge (──) must exist',
+      ).toBeGreaterThan(0);
+
+      for (const nodeRow of nodeRowsWithArcBridge) {
+        // Find the first ── in the plain text and check the code before it.
+        const plainRow = stripAnsi(nodeRow);
+        const bridgeIdx = plainRow.indexOf('──');
+        if (bridgeIdx >= 0) {
+          // The ─ at bridgeIdx is the first dash of the bridge. Find code before it.
+          // We use the first ─ character — the bridge pair starts with it.
+          const firstDashInLine = nodeRow.indexOf('─');
+          const codeForBridge = lastCodeBefore(nodeRow, '─');
+          expect(
+            codeForBridge,
+            `Arc-crossing bridge ─ (off-path rollback arc) must be DIM, not GREEN. bridgeIdx=${bridgeIdx}, firstDashInLine=${firstDashInLine}. Row: ${JSON.stringify(nodeRow)}`,
+          ).toBe(DIM);
+        }
+      }
+    });
+  });
 });

@@ -472,8 +472,10 @@ function renderConnectorRow(
           case 'branch-tee':
           case 'merge-tee': {
             const pair = seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee;
-            const dashOverride = columnLaneOverride?.get(dashColumn) ?? effectiveOverride;
-            out += effectiveOverride(pair.slice(0, 1)) + dashOverride(pair.slice(1));
+            // Both the junction glyph and its trailing dash belong to this tee cell's
+            // own edge — use effectiveOverride for both so an off-path tee's dash is dim
+            // even when the next column (dashColumn) belongs to an on-path edge.
+            out += effectiveOverride(pair.slice(0, 1)) + effectiveOverride(pair.slice(1));
             seenTee = true;
             break;
           }
@@ -1013,11 +1015,20 @@ export function renderMigrationGraphTree(
           } else if (cell.kind !== 'node' && cell.kind !== 'empty') {
             // Routing cells (vertical-pass, branch-tee, merge-corner, arc-*, horizontal-pass):
             // each carries a migrationHash for the edge it belongs to. Classify by that hash.
-            // arc-crossing uses migrationHash (vertical lane owner), not arcMigrationHash.
+            //
+            // arc-crossing in node/edge rows renders as '──' (the arc bridge over the crossing),
+            // not '┼─'. Colour by the arc edge (arcMigrationHash) so an off-path arc bridge is
+            // dim even when the crossed vertical lane (migrationHash) is on-path.
+            // In connector rows, arc-crossing renders '┼─' where the junction belongs to the
+            // vertical lane — handled separately in renderConnectorRow.
             const hashForCell =
-              'migrationHash' in cell && cell.migrationHash !== undefined
-                ? cell.migrationHash
-                : undefined;
+              cell.kind === 'arc-crossing' &&
+              'arcMigrationHash' in cell &&
+              cell.arcMigrationHash !== undefined
+                ? cell.arcMigrationHash
+                : 'migrationHash' in cell && cell.migrationHash !== undefined
+                  ? cell.migrationHash
+                  : undefined;
             if (hashForCell !== undefined) {
               const cellHighlight = opts.edgeAnnotationsByHash?.get(hashForCell)?.pathHighlight;
               laneOverride = pathLaneFor(cellHighlight);
@@ -1095,9 +1106,13 @@ export function renderMigrationGraphTree(
           let cellArrowOverride = rowArrowOverride;
           if (pathHighlightActive && cell.kind !== 'node' && cell.kind !== 'empty') {
             const hashForCell =
-              'migrationHash' in cell && cell.migrationHash !== undefined
-                ? cell.migrationHash
-                : undefined;
+              cell.kind === 'arc-crossing' &&
+              'arcMigrationHash' in cell &&
+              cell.arcMigrationHash !== undefined
+                ? cell.arcMigrationHash
+                : 'migrationHash' in cell && cell.migrationHash !== undefined
+                  ? cell.migrationHash
+                  : undefined;
             if (hashForCell !== undefined) {
               const cellHighlight = opts.edgeAnnotationsByHash?.get(hashForCell)?.pathHighlight;
               cellLaneOverride = pathLaneFor(cellHighlight);
@@ -1138,9 +1153,13 @@ export function renderMigrationGraphTree(
             let cellArrowOverride = rowArrowOverride;
             if (pathHighlightActive && cell.kind !== 'node' && cell.kind !== 'empty') {
               const hashForCell =
-                'migrationHash' in cell && cell.migrationHash !== undefined
-                  ? cell.migrationHash
-                  : undefined;
+                cell.kind === 'arc-crossing' &&
+                'arcMigrationHash' in cell &&
+                cell.arcMigrationHash !== undefined
+                  ? cell.arcMigrationHash
+                  : 'migrationHash' in cell && cell.migrationHash !== undefined
+                    ? cell.migrationHash
+                    : undefined;
               if (hashForCell !== undefined) {
                 const cellHighlight = opts.edgeAnnotationsByHash?.get(hashForCell)?.pathHighlight;
                 cellLaneOverride = pathLaneFor(cellHighlight);
