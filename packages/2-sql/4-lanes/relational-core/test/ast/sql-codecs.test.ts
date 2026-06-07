@@ -42,39 +42,6 @@ describe('sql-codecs', () => {
       expect(codec.encodeJson('hello')).toBe('hello');
       expect(codec.decodeJson('hello')).toBe('hello');
     });
-
-    describe('parsePslLiteral', () => {
-      it('accepts a double-quoted string and strips the quotes', () => {
-        const result = sqlTextDescriptor.parsePslLiteral('"auth.uid() = user_id"');
-        expect(result).toEqual({ ok: true, value: 'auth.uid() = user_id' });
-      });
-
-      it('accepts an empty double-quoted string', () => {
-        const result = sqlTextDescriptor.parsePslLiteral('""');
-        expect(result).toEqual({ ok: true, value: '' });
-      });
-
-      it('rejects a bare word (no quotes)', () => {
-        const result = sqlTextDescriptor.parsePslLiteral('permissive');
-        expect(result.ok).toBe(false);
-        expect((result as { ok: false; error: string }).error).toMatch(/double-quoted/);
-      });
-
-      it('rejects a number literal', () => {
-        const result = sqlTextDescriptor.parsePslLiteral('42');
-        expect(result.ok).toBe(false);
-      });
-
-      it('rejects a single-quoted string', () => {
-        const result = sqlTextDescriptor.parsePslLiteral("'hello'");
-        expect(result.ok).toBe(false);
-      });
-
-      it('rejects a string with mismatched quotes', () => {
-        const result = sqlTextDescriptor.parsePslLiteral('"unclosed');
-        expect(result.ok).toBe(false);
-      });
-    });
   });
 
   describe('sql/int@1', () => {
@@ -141,18 +108,6 @@ describe('sql-codecs', () => {
     it('renderOutputType returns undefined when length absent', () => {
       expect(sqlCharDescriptor.renderOutputType?.({})).toBeUndefined();
     });
-
-    describe('parsePslLiteral', () => {
-      it('accepts a double-quoted string', () => {
-        const result = sqlCharDescriptor.parsePslLiteral('"ABC"');
-        expect(result).toEqual({ ok: true, value: 'ABC' });
-      });
-
-      it('rejects a bare word', () => {
-        const result = sqlCharDescriptor.parsePslLiteral('ABC');
-        expect(result.ok).toBe(false);
-      });
-    });
   });
 
   describe('sql/varchar@1', () => {
@@ -178,18 +133,6 @@ describe('sql-codecs', () => {
 
     it('renderOutputType returns undefined when length absent', () => {
       expect(sqlVarcharDescriptor.renderOutputType?.({})).toBeUndefined();
-    });
-
-    describe('parsePslLiteral', () => {
-      it('accepts a double-quoted string', () => {
-        const result = sqlVarcharDescriptor.parsePslLiteral('"hello world"');
-        expect(result).toEqual({ ok: true, value: 'hello world' });
-      });
-
-      it('rejects a bare word', () => {
-        const result = sqlVarcharDescriptor.parsePslLiteral('hello');
-        expect(result.ok).toBe(false);
-      });
     });
   });
 

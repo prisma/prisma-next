@@ -20,8 +20,13 @@
  * 3. **`option` value outside its set** — the captured `token` is not in
  *    `descriptor.values`.
  *
- * 4. **`value` rejected by its codec** — `codecLookup.parsePslLiteralFor`
- *    returns `{ ok: false }`.
+ * 4. **`value` rejected by its codec** — the raw string is first parsed as
+ *    JSON (`JSON.parse(raw)`). If `JSON.parse` throws, the literal is not valid
+ *    JSON and a `PSL_EXTENSION_INVALID_VALUE` diagnostic is emitted. If parsing
+ *    succeeds but `codec.decodeJson(jsonValue)` throws, the JSON value is not
+ *    acceptable to the codec and a `PSL_EXTENSION_INVALID_VALUE` diagnostic is
+ *    emitted. If `codecLookup.get(codecId)` returns `undefined` (unknown codec
+ *    id), a `PSL_EXTENSION_INVALID_VALUE` diagnostic is also emitted.
  *
  * 5. **`ref` that does not resolve within its scope** — the captured
  *    `identifier` is looked up in the PSL document's `PslNamespace` objects
@@ -47,6 +52,8 @@
  * entityKind, entityName)` coordinate model from PR #745 / TML-2500.
  */
 
+import type { JsonValue } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { CodecLookup } from '../shared/codec-types';
 import type { AuthoringPslBlockDescriptor } from '../shared/framework-authoring';
 import type {
@@ -82,7 +89,8 @@ export interface ExtensionBlockRefResolutionContext {
  * @param node - The parsed block node produced by the generic D3 parser.
  * @param descriptor - The descriptor that claims this block's keyword.
  * @param sourceId - The PSL source file identifier (threaded into diagnostics).
- * @param codecLookup - Used to validate `value`-kind parameter literals.
+ * @param codecLookup - Used to validate `value`-kind parameter literals via
+ *   `codecLookup.get(codecId)?.decodeJson(JSON.parse(raw))`.
  * @param refCtx - Namespace context for `ref`-kind scope resolution. Required
  *   when any descriptor parameter is `kind: 'ref'`; may be omitted if none are.
  */
@@ -176,11 +184,37 @@ function validateParam(
       if (captured.kind !== 'value') {
         return;
       }
-      const result = codecLookup.parsePslLiteralFor(param.codecId, captured.raw);
-      if (!result.ok) {
+      const codec = codecLookup.get(param.codecId);
+      if (codec === undefined) {
         diagnostics.push({
           code: 'PSL_EXTENSION_INVALID_VALUE',
-          message: `Parameter "${key}" in "${descriptor.keyword}" block "${node.name}" was rejected by codec "${param.codecId}": ${result.error}`,
+          message: `Parameter "${key}" in "${descriptor.keyword}" block "${node.name}" references unknown codec "${param.codecId}".`,
+          sourceId,
+          span: captured.span,
+        });
+        return;
+      }
+      let jsonValue: unknown;
+      try {
+        jsonValue = JSON.parse(captured.raw);
+      } catch {
+        diagnostics.push({
+          code: 'PSL_EXTENSION_INVALID_VALUE',
+          message: `Parameter "${key}" in "${descriptor.keyword}" block "${node.name}" is not a valid JSON literal (expected a JSON string, number, boolean, or null): ${captured.raw}`,
+          sourceId,
+          span: captured.span,
+        });
+        return;
+      }
+      try {
+        codec.decodeJson(
+          blindCast<JsonValue, 'JSON.parse returns a JsonValue-compatible value'>(jsonValue),
+        );
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        diagnostics.push({
+          code: 'PSL_EXTENSION_INVALID_VALUE',
+          message: `Parameter "${key}" in "${descriptor.keyword}" block "${node.name}" was rejected by codec "${param.codecId}": ${reason}`,
           sourceId,
           span: captured.span,
         });

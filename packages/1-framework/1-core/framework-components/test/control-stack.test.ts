@@ -759,7 +759,6 @@ describe('validateScalarTypeCodecIds', () => {
       targetTypesFor: () => undefined,
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,
-      parsePslLiteralFor: (id) => ({ ok: false, error: `codec "${id}" is not registered` }),
     };
     const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toHaveLength(1);
@@ -782,7 +781,6 @@ describe('validateScalarTypeCodecIds', () => {
       targetTypesFor: (id: string) => (id === 'test/text@1' ? ['text'] : undefined),
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,
-      parsePslLiteralFor: (id) => ({ ok: false, error: `codec "${id}" is not registered` }),
     };
     const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toEqual([]);

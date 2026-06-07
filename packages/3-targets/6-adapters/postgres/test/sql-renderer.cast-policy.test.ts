@@ -23,7 +23,6 @@ const emptyLookup: CodecLookup = {
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
-  parsePslLiteralFor: (id) => ({ ok: false as const, error: `codec "${id}" is not registered` }),
 };
 
 // `Codec`-side static metadata (`targetTypes` / `meta` / `renderOutputType`) retired with the SQL `Codec` narrow (TML-2357); these tests supply the metadata side-by-side with the codec instance to build the `CodecLookup` directly.
@@ -43,7 +42,6 @@ function lookupOf(
     targetTypesFor: (id) => byId[id]?.metadata?.targetTypes,
     metaFor: (id) => byId[id]?.metadata?.meta,
     renderOutputTypeFor: (id, params) => byId[id]?.metadata?.renderOutputType?.(params),
-    parsePslLiteralFor: (id) => ({ ok: false as const, error: `codec "${id}" is not registered` }),
   };
 }
 
@@ -166,10 +164,6 @@ describe('renderLoweredSql cast policy', () => {
           ? { db: { sql: { postgres: { nativeType: 'jsonb' } } } }
           : undefined,
       renderOutputTypeFor: () => undefined,
-      parsePslLiteralFor: (id) => ({
-        ok: false as const,
-        error: `codec "${id}" is not registered`,
-      }),
     };
 
     const ast = selectWithParam('profile', 'arktype/json@1', { name: 'Ada' });

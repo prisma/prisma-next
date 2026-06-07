@@ -34,7 +34,6 @@ import {
   CodecDescriptorImpl,
   CodecImpl,
   type CodecInstanceContext,
-  type PslLiteralParseResult,
   voidParamsSchema,
 } from '../src/exports/codec';
 import type { PslExtensionBlock } from '../src/exports/psl-ast';
@@ -53,7 +52,9 @@ function stubSpan() {
   };
 }
 
-// Minimal stub codec that accepts only double-quoted strings.
+// Minimal stub codec: accepts any JSON string value via decodeJson, rejects
+// non-string JSON values (throws). Used to exercise the value-validation path
+// in the validator, which calls codec.decodeJson(JSON.parse(raw)).
 class StubStringCodec extends CodecImpl<'stub/string@1', readonly ['textual'], string, string> {
   async encode(value: string, _ctx: CodecCallContext): Promise<string> {
     return value;
@@ -65,7 +66,10 @@ class StubStringCodec extends CodecImpl<'stub/string@1', readonly ['textual'], s
     return value;
   }
   decodeJson(json: JsonValue): string {
-    return json as string;
+    if (typeof json !== 'string') {
+      throw new TypeError(`expected a JSON string, got ${typeof json}`);
+    }
+    return json;
   }
 }
 
@@ -74,12 +78,6 @@ class StubStringDescriptor extends CodecDescriptorImpl<void> {
   override readonly traits = ['textual'] as const;
   override readonly targetTypes = ['text'] as const;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-      return { ok: true, value: raw.slice(1, -1) };
-    }
-    return { ok: false, error: `expected a double-quoted string, got: ${raw}` };
-  }
   override factory(): (ctx: CodecInstanceContext) => StubStringCodec {
     return () => new StubStringCodec(this);
   }
@@ -342,13 +340,43 @@ describe('validateExtensionBlock', () => {
   });
 
   describe('value rejected by its codec', () => {
-    it('reports PSL_EXTENSION_INVALID_VALUE when the codec rejects the raw literal', () => {
+    it('reports PSL_EXTENSION_INVALID_VALUE when the raw literal is not valid JSON', () => {
       const node: PslExtensionBlock = {
         ...validNode(),
         parameters: {
           ...validNode().parameters,
-          // Missing quotes — the stub codec rejects this.
+          // Not valid JSON — JSON.parse will throw a SyntaxError.
           using: { kind: 'value', raw: 'not_a_quoted_string', span: stubSpan() },
+        },
+      };
+
+      const ns = namespaceWithModel('public', 'Post');
+      const refCtx: ExtensionBlockRefResolutionContext = {
+        ownerNamespace: ns,
+        allNamespaces: [ns],
+      };
+
+      const diagnostics = validateExtensionBlock(
+        node,
+        policySelectDescriptor,
+        SOURCE_ID,
+        codecLookup,
+        refCtx,
+      );
+
+      const d = diagnostics.find((x) => x.code === 'PSL_EXTENSION_INVALID_VALUE');
+      expect(d).toBeDefined();
+      expect(d?.message).toContain('"using"');
+      expect(d?.message).toContain('JSON literal');
+    });
+
+    it('reports PSL_EXTENSION_INVALID_VALUE when decodeJson rejects the JSON value', () => {
+      const node: PslExtensionBlock = {
+        ...validNode(),
+        parameters: {
+          ...validNode().parameters,
+          // 42 is valid JSON but StubStringCodec.decodeJson rejects non-string values.
+          using: { kind: 'value', raw: '42', span: stubSpan() },
         },
       };
 

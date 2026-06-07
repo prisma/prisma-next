@@ -61,7 +61,9 @@ export type PslDiagnosticCode =
    */
   | 'PSL_EXTENSION_OPTION_OUT_OF_SET'
   /**
-   * A `value`-kind parameter was rejected by the codec's `parsePslLiteral` hook.
+   * A `value`-kind parameter's raw text is not a valid JSON literal, or the
+   * parsed JSON value was rejected by the codec's `decodeJson` method, or the
+   * codec id is not registered in the lookup.
    */
   | 'PSL_EXTENSION_INVALID_VALUE'
   /**

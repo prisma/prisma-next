@@ -22,7 +22,6 @@ function vectorCodecLookup(): CodecLookup {
     metaFor: () => undefined,
     renderOutputTypeFor: (id, params) =>
       id === 'pg/vector@1' ? `Vector<${params['length']}>` : undefined,
-    parsePslLiteralFor: (id) => ({ ok: false as const, error: `codec "${id}" is not registered` }),
   };
 }
 

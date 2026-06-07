@@ -21,14 +21,12 @@ import {
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
-  type PslLiteralParseResult,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
   sqlCharDescriptor,
   sqlFloatDescriptor,
   sqlIntDescriptor,
-  sqlTextDescriptor,
   sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -66,9 +64,6 @@ export class SqliteTextDescriptor extends CodecDescriptorImpl<void> {
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['text'] as const;
   override readonly paramsSchema = voidParamsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    return sqlTextDescriptor.parsePslLiteral(raw);
-  }
   override factory(): (ctx: CodecInstanceContext) => SqliteTextCodec {
     return () => new SqliteTextCodec(this);
   }

@@ -22,7 +22,6 @@ import {
   CodecDescriptorImpl,
   CodecImpl,
   type CodecInstanceContext,
-  type PslLiteralParseResult,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
@@ -70,12 +69,6 @@ class FixturePolicyTextDescriptor extends CodecDescriptorImpl<void> {
   override readonly traits = ['textual'] as const;
   override readonly targetTypes = ['text'] as const;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-      return { ok: true, value: raw.slice(1, -1) };
-    }
-    return { ok: false, error: `expected a double-quoted string, got: ${raw}` };
-  }
   override factory(): (ctx: CodecInstanceContext) => FixturePolicyTextCodec {
     return () => new FixturePolicyTextCodec(this);
   }

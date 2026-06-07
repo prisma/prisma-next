@@ -1,5 +1,5 @@
 import type { AuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   flatPslCompositeTypes,
   flatPslEnums,
@@ -1180,19 +1180,23 @@ model Post {
   });
 
   describe('extension blocks (D3 generic parser)', () => {
-    // Stub codecLookup: accepts any raw string for the 'sql-expression' codec.
+    // Stub codecLookup: supplies a minimal Codec for the 'sql-expression' codec
+    // whose decodeJson accepts any JSON string value.
     // Needed because D6 wires the D4 validator into parsePslDocument, which
     // runs whenever pslBlocks are registered and falls back to emptyCodecLookup
-    // (which rejects all codecs) when no codecLookup is supplied by the caller.
+    // (which has no codecs registered) when no codecLookup is supplied by the caller.
+    const stubSqlExpressionCodec: Codec = {
+      id: 'sql-expression',
+      encode: async (value) => value,
+      decode: async (wire) => wire,
+      encodeJson: (value) => value as string,
+      decodeJson: (json) => json as string,
+    };
     const stubSqlExpressionCodecLookup: CodecLookup = {
-      get: () => undefined,
+      get: (id) => (id === 'sql-expression' ? stubSqlExpressionCodec : undefined),
       targetTypesFor: () => undefined,
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,
-      parsePslLiteralFor: (id, raw) => {
-        if (id === 'sql-expression') return { ok: true, value: raw };
-        return { ok: false, error: `codec "${id}" is not registered` };
-      },
     };
 
     const policySelectDescriptor: AuthoringPslBlockDescriptor = {
@@ -1219,7 +1223,7 @@ policy_select ReadPosts {
   target = Post
   as = permissive
   roles = [admin, editor]
-  using = (true)
+  using = "true"
 }
 `;
       const result = parsePslDocument({
@@ -1261,7 +1265,7 @@ policy_select ReadPosts {
 
       expect(block?.parameters['using']).toMatchObject({
         kind: 'value',
-        raw: '(true)',
+        raw: '"true"',
       });
     });
 
@@ -1309,7 +1313,7 @@ policy_select ReadPosts {
   target = Post
   as = permissive
   roles = [admin]
-  using = (true)
+  using = "true"
 }
 `;
       const result = parsePslDocument({
@@ -1366,14 +1370,14 @@ policy_select Alpha {
   target = Model
   as = permissive
   roles = []
-  using = (true)
+  using = "true"
 }
 
 policy_select Beta {
   target = Model
   as = restrictive
   roles = [admin]
-  using = (false)
+  using = "false"
 }
 `;
       const result = parsePslDocument({
@@ -1400,7 +1404,7 @@ policy_select ReadPosts {
   target = Post
   as = permissive
   roles = []
-  using = (true)
+  using = "true"
   unrecognized_param = some_value
 }
 `;
@@ -1432,7 +1436,7 @@ policy_select ReadPosts {
   target = Post
   as = permissive
   roles = []
-  using = (true)
+  using = "true"
   not_an_assignment
 }
 `;
@@ -1460,7 +1464,7 @@ namespace auth {
     target = Post
     as = permissive
     roles = [admin]
-    using = (true)
+    using = "true"
   }
 }
 `;
@@ -1490,7 +1494,7 @@ policy_select ReadPosts {
   target = Post
   as = permissive
   roles = []
-  using = (true)
+  using = "true"
 }
 `;
       const result = parsePslDocument({

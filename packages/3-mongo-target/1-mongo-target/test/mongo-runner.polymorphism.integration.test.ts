@@ -83,7 +83,6 @@ const mongoCodecLookup: CodecLookup = {
   targetTypesFor: (id: string) => mongoTargetTypes[id],
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
-  parsePslLiteralFor: (id) => ({ ok: false as const, error: `codec "${id}" is not registered` }),
 };
 
 const polymorphicSchema = `

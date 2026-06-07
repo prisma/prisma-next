@@ -22,7 +22,6 @@ import {
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
-  type PslLiteralParseResult,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
@@ -150,9 +149,6 @@ export class PgTextDescriptor extends CodecDescriptorImpl<void> {
   override readonly targetTypes = ['text'] as const;
   override readonly meta = PG_TEXT_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    return sqlTextDescriptor.parsePslLiteral(raw);
-  }
   override factory(): (ctx: CodecInstanceContext) => PgTextCodec {
     return () => new PgTextCodec(this);
   }
@@ -974,9 +970,6 @@ export class PgCharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly meta = PG_CHAR_META;
   override readonly traits = sqlCharDescriptor.traits;
   override readonly paramsSchema = sqlCharDescriptor.paramsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    return sqlCharDescriptor.parsePslLiteral(raw);
-  }
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlCharDescriptor.renderOutputType(params);
   }
@@ -998,9 +991,6 @@ export class PgVarcharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly meta = PG_VARCHAR_META;
   override readonly traits = sqlVarcharDescriptor.traits;
   override readonly paramsSchema = sqlVarcharDescriptor.paramsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    return sqlVarcharDescriptor.parsePslLiteral(raw);
-  }
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlVarcharDescriptor.renderOutputType(params);
   }

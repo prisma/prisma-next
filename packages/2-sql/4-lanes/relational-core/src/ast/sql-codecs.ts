@@ -18,7 +18,6 @@ import {
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
-  type PslLiteralParseResult,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
@@ -51,26 +50,6 @@ import {
 
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
-
-/**
- * Parses a raw PSL literal as a string value. Accepts double-quoted strings
- * (e.g. `"auth.uid() = user_id"`) and strips the surrounding quotes. Rejects
- * any raw that is not a properly quoted string literal.
- *
- * Used by all string-typed SQL codec descriptors (text, varchar, char) to
- * implement {@link CodecDescriptor.parsePslLiteral}.
- */
-function parseStringPslLiteral(raw: string): PslLiteralParseResult {
-  const trimmed = raw.trim();
-  if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
-    const inner = trimmed.slice(1, -1);
-    return { ok: true, value: inner };
-  }
-  return {
-    ok: false,
-    error: `expected a double-quoted string literal (e.g. "value"), got: ${raw}`,
-  };
-}
 
 const lengthParamsSchema = arktype({
   'length?': 'number.integer > 0',
@@ -105,9 +84,6 @@ export class SqlTextDescriptor extends CodecDescriptorImpl<void> {
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['text'] as const;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    return parseStringPslLiteral(raw);
-  }
   override factory(): (ctx: CodecInstanceContext) => SqlTextCodec {
     return () => new SqlTextCodec(this);
   }
@@ -222,9 +198,6 @@ export class SqlCharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['char'] as const;
   override readonly paramsSchema: StandardSchemaV1<LengthParams> = lengthParamsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    return parseStringPslLiteral(raw);
-  }
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlCharRenderOutputType(params);
   }
@@ -266,9 +239,6 @@ export class SqlVarcharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['varchar'] as const;
   override readonly paramsSchema: StandardSchemaV1<LengthParams> = lengthParamsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    return parseStringPslLiteral(raw);
-  }
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlVarcharRenderOutputType(params);
   }

@@ -22,7 +22,6 @@ const testLookup: CodecLookup = {
   metaFor: (id) =>
     id === 'pg/int4@1' ? { db: { sql: { postgres: { nativeType: 'integer' } } } } : undefined,
   renderOutputTypeFor: () => undefined,
-  parsePslLiteralFor: (id) => ({ ok: false as const, error: `codec "${id}" is not registered` }),
 };
 
 // Lookup with no registered codecs — used for tests that contain no ParamRef elements.
@@ -31,7 +30,6 @@ const emptyLookup: CodecLookup = {
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
-  parsePslLiteralFor: (id) => ({ ok: false as const, error: `codec "${id}" is not registered` }),
 };
 
 const contract = new SqlContractSerializer().deserializeContract({

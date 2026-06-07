@@ -212,10 +212,6 @@ describe('defineConfig', () => {
         targetTypesFor: () => undefined,
         metaFor: () => undefined,
         renderOutputTypeFor: () => undefined,
-        parsePslLiteralFor: (id) => ({
-          ok: false as const,
-          error: `codec "${id}" is not registered`,
-        }),
       },
       controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
       resolvedInputs: [],

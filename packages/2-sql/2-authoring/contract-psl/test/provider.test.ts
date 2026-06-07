@@ -646,10 +646,6 @@ model Document {
               : undefined,
           metaFor: () => undefined,
           renderOutputTypeFor: () => undefined,
-          parsePslLiteralFor: (id) => ({
-            ok: false as const,
-            error: `codec "${id}" is not registered`,
-          }),
         },
       });
 

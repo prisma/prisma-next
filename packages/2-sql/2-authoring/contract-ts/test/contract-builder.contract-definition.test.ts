@@ -200,10 +200,6 @@ describe('shared contract definition lowering', () => {
       targetTypesFor: (id) => (id === 'pg/timestamptz@1' ? ['timestamptz'] : undefined),
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,
-      parsePslLiteralFor: (id) => ({
-        ok: false as const,
-        error: `codec "${id}" is not registered`,
-      }),
     };
 
     const contract = buildSqlContractFromDefinition(
