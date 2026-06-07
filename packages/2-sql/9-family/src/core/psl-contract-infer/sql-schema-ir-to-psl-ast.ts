@@ -12,7 +12,11 @@ import type {
   PslSpan,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
-import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import {
+  makePslNamespace,
+  makePslNamespaceEntries,
+  UNSPECIFIED_PSL_NAMESPACE_ID,
+} from '@prisma-next/framework-components/psl-ast';
 import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultMappingOptions } from './default-mapping';
 import { mapDefault } from './default-mapping';
@@ -164,14 +168,12 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
     kind: 'document',
     sourceId: '<sql-schema-ir>',
     namespaces: [
-      {
+      makePslNamespace({
         kind: 'namespace',
         name: UNSPECIFIED_PSL_NAMESPACE_ID,
-        models: sortedModels,
-        enums,
-        compositeTypes: [],
+        entries: makePslNamespaceEntries(sortedModels, enums, [], []),
         span: SYNTHETIC_SPAN,
-      },
+      }),
     ],
     ...(types ? { types } : {}),
     span: SYNTHETIC_SPAN,
