@@ -1,4 +1,4 @@
-import type { ReferentialAction } from '@prisma-next/sql-contract/types';
+import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type {
   DdlColumn,
   DdlColumnDefaultVisitor,
@@ -16,14 +16,6 @@ import type {
 } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteLoweredStatement } from './types';
-
-const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
-  noAction: 'NO ACTION',
-  restrict: 'RESTRICT',
-  cascade: 'CASCADE',
-  setNull: 'SET NULL',
-  setDefault: 'SET DEFAULT',
-};
 
 function renderPrimaryKeyConstraint(constraint: PrimaryKeyConstraint): string {
   const cols = constraint.columns.join(', ');

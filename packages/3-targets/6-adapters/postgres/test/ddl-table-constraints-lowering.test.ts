@@ -4,7 +4,7 @@ import {
   UniqueConstraint,
 } from '@prisma-next/sql-relational-core/ast';
 import { col } from '@prisma-next/sql-relational-core/contract-free';
-import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
+import { createTable } from '@prisma-next/target-postgres/contract-free';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
@@ -14,7 +14,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     // Representative user table: a many-to-many join between "posts" and "tags"
     // with a composite primary key (postId, tagId), two FKs, and a unique
     // on (tagId, postId) for reverse lookups.
-    const ast = new PostgresCreateTable({
+    const ast = createTable({
       table: 'post_tags',
       schema: 'public',
       columns: [col('postId', 'text', { notNull: true }), col('tagId', 'text', { notNull: true })],
@@ -53,7 +53,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
   });
 
   it('renders a named primary key', () => {
-    const ast = new PostgresCreateTable({
+    const ast = createTable({
       table: 'items',
       columns: [col('a', 'text'), col('b', 'text')],
       constraints: [new PrimaryKeyConstraint({ columns: ['a', 'b'], name: 'pk_items' })],
@@ -66,7 +66,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
   });
 
   it('renders FK with onUpdate action', () => {
-    const ast = new PostgresCreateTable({
+    const ast = createTable({
       table: 'orders',
       columns: [col('userId', 'text', { notNull: true })],
       constraints: [
@@ -90,7 +90,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
   });
 
   it('omits constraints section when no constraints given', () => {
-    const ast = new PostgresCreateTable({
+    const ast = createTable({
       table: 'simple',
       columns: [col('id', 'text', { primaryKey: true, notNull: true })],
     });

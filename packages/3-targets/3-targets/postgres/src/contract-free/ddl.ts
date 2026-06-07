@@ -1,8 +1,12 @@
-import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
+import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { PostgresCreateSchema, PostgresCreateTable } from '../core/ddl/nodes';
 
 /**
  * Build a Postgres `CREATE TABLE` query node.
+ *
+ * Pass `constraints` for table-level composite primary keys, foreign keys, and
+ * unique constraints — use the {@link PrimaryKeyConstraint}, {@link ForeignKeyConstraint},
+ * and {@link UniqueConstraint} classes from `@prisma-next/sql-relational-core/ast`.
  *
  * Precondition: identifiers (`table`, `schema`, column names/types) are
  * emitted to SQL verbatim — they are not quoted or escaped, so callers must
@@ -16,6 +20,7 @@ export function createTable(options: {
   readonly schema?: string;
   readonly ifNotExists?: boolean;
   readonly columns: readonly DdlColumn[];
+  readonly constraints?: readonly DdlTableConstraint[];
 }): PostgresCreateTable {
   return new PostgresCreateTable(options);
 }

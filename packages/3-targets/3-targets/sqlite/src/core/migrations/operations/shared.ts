@@ -1,4 +1,5 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
+import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import { quoteIdentifier } from '../../sql-utils';
 import type { SqlitePlanTargetDetails } from '../planner-target-details';
@@ -74,14 +75,6 @@ export interface SqliteIndexSpec {
   readonly name: string;
   readonly columns: readonly string[];
 }
-
-const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
-  noAction: 'NO ACTION',
-  restrict: 'RESTRICT',
-  cascade: 'CASCADE',
-  setNull: 'SET NULL',
-  setDefault: 'SET DEFAULT',
-};
 
 /**
  * Renders a single column's inline DDL fragment within a `CREATE TABLE`

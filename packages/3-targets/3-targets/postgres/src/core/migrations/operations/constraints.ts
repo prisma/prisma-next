@@ -1,15 +1,7 @@
-import type { ReferentialAction } from '@prisma-next/sql-contract/types';
+import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import { quoteIdentifier } from '../../sql-utils';
 import { constraintExistsCheck, qualifyTableName } from '../planner-sql-checks';
 import { type ForeignKeySpec, type Op, step, targetDetails } from './shared';
-
-const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
-  noAction: 'NO ACTION',
-  restrict: 'RESTRICT',
-  cascade: 'CASCADE',
-  setNull: 'SET NULL',
-  setDefault: 'SET DEFAULT',
-};
 
 function renderForeignKeySql(schemaName: string, tableName: string, fk: ForeignKeySpec): string {
   let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}

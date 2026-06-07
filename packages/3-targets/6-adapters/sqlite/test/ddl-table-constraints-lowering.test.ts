@@ -4,7 +4,7 @@ import {
   UniqueConstraint,
 } from '@prisma-next/sql-relational-core/ast';
 import { col } from '@prisma-next/sql-relational-core/contract-free';
-import { SqliteCreateTable } from '@prisma-next/target-sqlite/ddl';
+import { createTable } from '@prisma-next/target-sqlite/contract-free';
 import { describe, expect, it } from 'vitest';
 import { createSqliteAdapter } from '../src/core/adapter';
 import type { SqliteContract } from '../src/core/types';
@@ -13,7 +13,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
   it('renders a join table with composite PK, two FKs, and a table-level unique', () => {
     // Representative user table: same join table as the Postgres test.
     // SQLite renders constraints inline in the CREATE TABLE body.
-    const ast = new SqliteCreateTable({
+    const ast = createTable({
       table: 'post_tags',
       columns: [col('postId', 'TEXT', { notNull: true }), col('tagId', 'TEXT', { notNull: true })],
       constraints: [
@@ -51,7 +51,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
   });
 
   it('renders a named primary key', () => {
-    const ast = new SqliteCreateTable({
+    const ast = createTable({
       table: 'items',
       columns: [col('a', 'TEXT'), col('b', 'TEXT')],
       constraints: [new PrimaryKeyConstraint({ columns: ['a', 'b'], name: 'pk_items' })],
@@ -64,7 +64,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
   });
 
   it('renders FK with onUpdate action', () => {
-    const ast = new SqliteCreateTable({
+    const ast = createTable({
       table: 'orders',
       columns: [col('userId', 'TEXT', { notNull: true })],
       constraints: [
@@ -88,7 +88,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
   });
 
   it('omits constraints section when no constraints given', () => {
-    const ast = new SqliteCreateTable({
+    const ast = createTable({
       table: 'simple',
       columns: [col('id', 'TEXT', { primaryKey: true, notNull: true })],
     });

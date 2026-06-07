@@ -1,8 +1,8 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
+import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type {
   ForeignKey,
   PostgresEnumStorageEntry,
-  ReferentialAction,
   StorageColumn,
   StorageTable,
   StorageTypeInstance,
@@ -216,14 +216,6 @@ export function buildAddColumnSql(
   ].filter(Boolean);
   return parts.join(' ');
 }
-
-const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
-  noAction: 'NO ACTION',
-  restrict: 'RESTRICT',
-  cascade: 'CASCADE',
-  setNull: 'SET NULL',
-  setDefault: 'SET DEFAULT',
-};
 
 export function buildForeignKeySql(
   schemaName: string,
