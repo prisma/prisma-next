@@ -45,6 +45,8 @@ The planner-adoption work ("simplify migrations" payoff) is **not one slice**. G
   - Postgres column ops (`AddColumn`/`DropColumn`/`AlterColumnType`/`SetNotNull`/`DropNotNull`/`SetDefault`/`DropDefault`); constraint ALTERs (`AddPrimaryKey`/`AddUnique`/`AddForeignKey`/`DropConstraint`); indexes (`CreateIndex`/`DropIndex`); Postgres types/db (`CreateEnumType`/`AddEnumValues`/`DropEnumType`/`RenameType`/`CreateExtension`); `DropTable`; SQLite `RecreateTable`.
 - **Mongo planner adoption (tracked follow-up slice).** Planner adoption spans **all three targets, not just SQL.** The Mongo migration planner's ops (`CreateCollection`/`CreateIndex`/…) must construct the contract-free Mongo command surface and route through `MongoControlAdapter.lower()` → driver, symmetric to the SQL planner adoption. (See project spec DoD.)
 
+**End-state cleanup (project DoD):** once every Postgres op is migrated onto its `*Call.toOp()` (the `*Call` IR nodes are the common interface), the free Op-builder modules under `packages/3-targets/3-targets/postgres/src/core/migrations/operations/` have no callers and **must be deleted** — starting with `operations/tables.ts` (now down to just the unmigrated `dropTable`), and likewise the other `operations/*.ts` builders as their ops adopt `toOp()`. No free string-gluing Op-builder should survive the planner-adoption phase.
+
 ## Dependencies (external)
 
 - [ ] Existing SQL query AST (DML nodes, `ExprVisitor`, frozen-class machinery) — present; no blocker.
