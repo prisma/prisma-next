@@ -21,6 +21,7 @@ import {
   type PlannerError,
   planMigration,
 } from '@prisma-next/migration-tools/aggregate';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { CliStructuredError } from '../../utils/cli-errors';
@@ -332,7 +333,10 @@ function mapPlannerError(error: PlannerError): DbInitResult | DbUpdateResult {
       why: undefined,
       meta: undefined,
     };
-    return notOk(failure) as DbInitResult | DbUpdateResult;
+    return blindCast<
+      DbInitResult | DbUpdateResult,
+      'notOk(failure) is shape-compatible with both DbInitResult and DbUpdateResult; the union is the return type of the surrounding function'
+    >(notOk(failure));
   }
   if (error.kind === 'extensionPathUnreachable') {
     return buildRunnerFailure({
@@ -427,5 +431,8 @@ function buildRunnerFailure(args: {
     conflicts: undefined,
     ...ifDefined('warnings', args.warnings),
   };
-  return notOk(failure) as DbInitResult | DbUpdateResult;
+  return blindCast<
+    DbInitResult | DbUpdateResult,
+    'notOk(failure) is shape-compatible with both DbInitResult and DbUpdateResult; the union is the return type of the surrounding function'
+  >(notOk(failure));
 }
