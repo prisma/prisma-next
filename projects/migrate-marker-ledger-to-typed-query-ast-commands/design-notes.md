@@ -195,3 +195,20 @@ The Mongo slice is structurally unlike the SQL slices: Mongo has **no column/exp
 **Question (a stop-condition that halted D3 round 1).** The planner's `CreateTableCall.toOp()` lives in the **target** package and must produce its `sql` by lowering a DDL-AST node. But lowering (`renderLoweredDdl`) was placed in the **adapter** package (slice 1), and `adapter-postgres` depends on `target-postgres` — so the target cannot import the adapter (circular). A first D3 attempt wrongly tried to **relocate** the renderer into the target (contradicting "the adapter owns lowering"); a runtime-lowering alternative would have changed the step contract the spec deferred.
 
 **Resolution (operator-confirmed, verified).** Neither relocate nor defer. The adapter **interface** `SqlControlAdapter<TTarget>` already lives in `@prisma-next/family-sql/control-adapter` (`packages/2-sql/9-family`) — a layer below both target and adapter, which both already depend on. It exposes `lower(ast: AnyQueryAst | DdlNode, ctx): LoweredStatement`. The migration class (`PostgresMigration extends SqlMigration`) holds the concrete adapter as `this.controlAdapter`, and the existing `dataTransform()` method is the proven pattern: it threads `this.controlAdapter` into a free operation factory that calls `adapter.lower(...)`. So `CreateTableCall.toOp()` receives the adapter (via the same threading), builds the node with the contract-free constructor, and lowers it through the interface **at plan/JSON-write time** (the op's `.sql` is finalized before serialization). The renderer stays in the adapter; "adapter owns lowering" holds; the target depends only on the low-level *interface*, never the concrete adapter.
+
+## Migration authoring API: SQL-free, builder-options methods (PR #751 revision)
+
+**Principle (operator).** The migration op factories are the user-facing authoring API. **No SQL may appear in that interface** — not `typeSql`/`defaultSql` fragments, not raw `sql` strings, not glued `CREATE TABLE …`. SQL is produced **only** by lowering a typed DDL node through the adapter, at one boundary.
+
+**Shape.** `createTable` / `createSchema` are **`Migration` methods** (mirroring the existing `dataTransform`) that take the contract-free builder's *options* and lower internally:
+
+```ts
+this.createTable({ schema: 'public', table: 'bug', columns: [col('severity', 'text', { notNull: true })], constraints: [primaryKey(['id'])] })
+this.createSchema({ schema: 'public' })
+```
+
+The method builds the `CreateTable` DDL node from the options (via the D1/D2 contract-free constructor), lowers it through `this.controlAdapter` (a `Lowerer` — a structural subset of `SqlControlAdapter`), and assembles the `Op` (precheck/postcheck derived from `schema`/`table`). The plan path (`CreateTableCall.toOp(lowerer)`) builds the same node from its `*Call` fields and feeds the **same** `buildCreateTableOp(node, lowerer)` assembler — one lowering implementation, no second renderer to keep byte-identical.
+
+**Why options, not the node, as the method input.** Passing the node forces `this.createTable(createTable({…}))` — repetition. Taking the builder's *options* fuses build + lower + assemble into one call. `col()` stays the column vocabulary; no `ColumnSpec` for createTable.
+
+**Consequences.** `createTableOp(sql)`, the `sql` parameter, the string-gluing, the `LowerFn` callback, the free `renderOps`, and the `blindCast` all disappear. The shared `ColumnSpec` reverts to its `origin/main` shape (the bolted-on `columnDefault` goes away — resolving the CodeRabbit leak), untouched and still used by `addColumn` et al. (their adoption is a follow-up slice).
