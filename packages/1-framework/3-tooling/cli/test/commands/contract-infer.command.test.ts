@@ -375,5 +375,9 @@ describe('createContractInferCommand', () => {
     expect(existsSync(outputPath)).toBe(true);
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toContain('fake_policy ReadOnlyUser');
+    // Verify the contributed block's fields are rendered in the correct format:
+    // `target = <Identifier>` and `using = "<predicate>"` (= not :, predicate quoted).
+    expect(content).toContain('target = User');
+    expect(content).toContain('using = "auth.uid = user_id"');
   });
 });
