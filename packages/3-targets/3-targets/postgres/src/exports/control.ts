@@ -63,7 +63,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     schemaVerifier: new PostgresSchemaVerifier(),
     migrations: {
       createPlanner(family: SqlControlFamilyInstance) {
-        return createPostgresMigrationPlanner(family);
+        return createPostgresMigrationPlanner({ lower: (ast, ctx) => family.lowerAst(ast, ctx) });
       },
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
@@ -108,7 +108,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
      * @deprecated Use migrations.createPlanner() for CLI compatibility.
      */
     createPlanner(family: SqlControlFamilyInstance) {
-      return createPostgresMigrationPlanner(family);
+      return createPostgresMigrationPlanner({ lower: (ast, ctx) => family.lowerAst(ast, ctx) });
     },
     /**
      * Direct method for SQL-specific usage.

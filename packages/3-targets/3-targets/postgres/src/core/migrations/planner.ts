@@ -1,7 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
-  SqlControlFamilyInstance,
   SqlMigrationPlannerPlanOptions,
   SqlPlannerConflict,
   SqlPlannerFailureResult,
@@ -23,7 +22,6 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
@@ -54,16 +52,7 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
   readonly frameworkComponents: PlannerFrameworkComponents;
 };
 
-export function createPostgresMigrationPlanner(
-  family: SqlControlFamilyInstance | Lowerer,
-): PostgresMigrationPlanner {
-  const lower: Lowerer =
-    'lowerAst' in family
-      ? {
-          lower: (ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) =>
-            family.lowerAst(ast, ctx),
-        }
-      : family;
+export function createPostgresMigrationPlanner(lower: Lowerer): PostgresMigrationPlanner {
   return new PostgresMigrationPlanner(lower);
 }
 
