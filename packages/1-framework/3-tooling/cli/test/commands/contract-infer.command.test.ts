@@ -1,6 +1,10 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import type { PslDocumentAst, PslSpan } from '@prisma-next/framework-components/psl-ast';
+import type {
+  PslDocumentAst,
+  PslExtensionBlock,
+  PslSpan,
+} from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
@@ -73,11 +77,13 @@ const mocks = vi.hoisted(() => {
   const introspectMock = vi.fn();
   const toSchemaViewMock = vi.fn();
   const inferPslContractMock = vi.fn();
+  const getPslBlocksNamespaceMock = vi.fn();
   const closeMock = vi.fn();
   const createControlClientMock = vi.fn(() => ({
     introspect: introspectMock,
     toSchemaView: toSchemaViewMock,
     inferPslContract: inferPslContractMock,
+    getPslBlocksNamespace: getPslBlocksNamespaceMock,
     close: closeMock,
   }));
 
@@ -86,6 +92,7 @@ const mocks = vi.hoisted(() => {
     introspectMock,
     toSchemaViewMock,
     inferPslContractMock,
+    getPslBlocksNamespaceMock,
     closeMock,
     createControlClientMock,
   };
@@ -161,6 +168,7 @@ describe('createContractInferCommand', () => {
     mocks.introspectMock.mockResolvedValue(schemaIR);
     mocks.toSchemaViewMock.mockReturnValue(undefined);
     mocks.inferPslContractMock.mockReturnValue(buildSyntheticUserAst());
+    mocks.getPslBlocksNamespaceMock.mockReturnValue({});
     mocks.closeMock.mockResolvedValue(undefined);
     mocks.createControlClientMock.mockClear();
   }, timeouts.typeScriptCompilation);
@@ -304,5 +312,75 @@ describe('createContractInferCommand', () => {
     expect(stderr).toContain('contract infer is not supported for this family');
     // Capability-based wording — must not name the familyId string directly.
     expect(stderr).not.toContain('family "mongo"');
+  });
+
+  it('renders a declarative policy_select extension block in the written PSL', async () => {
+    process.chdir(testDir);
+
+    // A minimal declarative pslBlocks namespace for a `policy_select` block.
+    // The generic printer (P2) reads the descriptor's `parameters` map and renders
+    // each parameter by kind — no contributed printer function needed.
+    const policySelectDiscriminator = 'cmd-test-policy-select';
+    const policySelectPslBlocks = {
+      policy_select: {
+        kind: 'pslBlock' as const,
+        keyword: 'policy_select',
+        discriminator: policySelectDiscriminator,
+        name: { required: true as const },
+        parameters: {
+          target: {
+            kind: 'ref' as const,
+            refKind: 'model' as const,
+            scope: 'same-namespace' as const,
+            required: true as const,
+          },
+          using: { kind: 'value' as const, codecId: 'test-codec@1', required: true as const },
+        },
+      },
+    };
+    mocks.getPslBlocksNamespaceMock.mockReturnValue(policySelectPslBlocks);
+
+    // Build an AST whose namespace contains a policy_select extension block.
+    // The `using` value param stores the raw PSL literal (including quotes);
+    // without a codecLookup the printer emits the raw string as-is.
+    const policySelectBlock: PslExtensionBlock = {
+      kind: policySelectDiscriminator,
+      name: 'ReadOnlyUsers',
+      parameters: {
+        target: { kind: 'ref', identifier: 'User', span: SYNTHETIC_SPAN },
+        using: { kind: 'value', raw: '"auth.uid() = user_id"', span: SYNTHETIC_SPAN },
+      },
+      span: SYNTHETIC_SPAN,
+    };
+    const astWithPolicySelect: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 'test',
+      namespaces: [
+        {
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [],
+          enums: [],
+          compositeTypes: [],
+          extensionBlocks: [policySelectBlock],
+          span: SYNTHETIC_SPAN,
+        },
+      ],
+      span: SYNTHETIC_SPAN,
+    };
+    mocks.inferPslContractMock.mockReturnValue(astWithPolicySelect);
+
+    await executeCommand(createContractInferCommand(), [
+      '--config',
+      'prisma-next.config.ts',
+      '--no-color',
+    ]);
+
+    const outputPath = join(testDir, 'output/contract.prisma');
+    expect(existsSync(outputPath)).toBe(true);
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain('policy_select ReadOnlyUsers {');
+    expect(content).toContain('target = User');
+    expect(content).toContain('using = "auth.uid() = user_id"');
   });
 });

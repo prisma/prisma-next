@@ -1,3 +1,4 @@
+import type { AuthoringPslBlockNamespace } from '@prisma-next/framework-components/authoring';
 import type { CoreSchemaView } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -39,6 +40,12 @@ export interface InspectLiveSchemaResult {
    * support inference (e.g. Mongo today).
    */
   readonly pslContractAst: PslDocumentAst | undefined;
+  /**
+   * Assembled `pslBlocks` namespace from the control stack. Extension-contributed
+   * PSL block descriptors register here; downstream commands pass this through to
+   * `printPsl` so contributed-block AST nodes round-trip back to source.
+   */
+  readonly pslBlocksNamespace: AuthoringPslBlockNamespace;
   readonly target: {
     readonly familyId: string;
     readonly id: string;
@@ -134,6 +141,7 @@ export async function inspectLiveSchema(
     });
     const schemaView = client.toSchemaView(schema);
     const pslContractAst = client.inferPslContract(schema);
+    const pslBlocksNamespace = client.getPslBlocksNamespace();
 
     const dbUrl = typeof dbConnection === 'string' ? maskConnectionUrl(dbConnection) : undefined;
 
@@ -142,6 +150,7 @@ export async function inspectLiveSchema(
       schema,
       schemaView,
       pslContractAst,
+      pslBlocksNamespace,
       target: {
         familyId: config.family.familyId,
         id: config.target.targetId,

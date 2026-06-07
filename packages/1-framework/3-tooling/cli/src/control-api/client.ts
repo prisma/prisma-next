@@ -4,6 +4,7 @@ import type {
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
 import { emit as emitContractArtifacts } from '@prisma-next/emitter';
+import type { AuthoringPslBlockNamespace } from '@prisma-next/framework-components/authoring';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlAdapterInstance,
@@ -569,6 +570,11 @@ class ControlClientImpl implements ControlClient {
       return this.familyInstance.inferPslContract(schemaIR);
     }
     return undefined;
+  }
+
+  getPslBlocksNamespace(): AuthoringPslBlockNamespace {
+    this.init();
+    return this.stack!.authoringContributions.pslBlocks;
   }
 
   toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview | undefined {
