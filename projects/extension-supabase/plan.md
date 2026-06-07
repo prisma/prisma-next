@@ -25,28 +25,24 @@ A slip in any upstream project cascades into this project. The implementer shoul
 
 The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each milestone is one PR.
 
-### M1 — Package scaffolding + contract + typed handles + walking skeleton
+### M1 — Package scaffolding + PSL contract + `/pack` + walking skeleton
 
-**Goal:** the package exists with the subpath exports, the shipped contract is in place, an app contract can import `AuthUser` and `roles` and reference them, and the `examples/supabase` walking skeleton runs end-to-end against `public.*` on the stock Postgres runtime. No Supabase runtime yet (`/runtime` is M2).
+> **Scope re-cut 2026-06-05.** The `/contract` typed handles + roles were **cut from M1** (no consumer; deferred to `cross-contract-refs` / `postgres-rls`). The `bootstrapSupabaseShim` **splits**: M1 ships the *schemas + tables* increment (the verifier needs the `external` tables present); the roles + `auth.uid()`/`jwt()`/`role()` functions defer to `postgres-rls`. The authoritative M1 spec + 7-dispatch plan live at [`slices/m1-scaffold-and-skeleton/`](slices/m1-scaffold-and-skeleton/spec.md); the slice spec governs.
+
+**Goal:** the package exists with `/pack` (real) + `/runtime` (stub) exports and the emitting PSL Supabase contract; the `examples/supabase` skeleton **proves the `external`-contract machinery end-to-end** — it migrates the composed contract against a seeded PGlite DB, the planner emits no DDL for `auth.*`/`storage.*`, the verifier confirms them present, and the app's own `public.profile` round-trip runs on the stock runtime. No Supabase runtime (`/runtime` is M2); no `/contract` handles, no roles, no `auth.*` functions.
 
 **Tasks:**
 
-- [ ] Scaffold the package at `packages/3-extensions/supabase/`. `package.json` with `exports` field declaring `/pack`, `/contract`, `/runtime` subpaths. `tsconfig.json` matching the existing extension packages (`cipherstash`, `pgvector`). The `/runtime` subpath may be a stub in M1 (filled in by M2); `/pack` + `/contract` are complete.
-- [ ] Hand-author `src/contract/contract.json`. Models: `AuthUser`, `AuthIdentity`, `StorageBucket`, `StorageObject` (the minimum set the example app needs). Roles: `anon`, `authenticated`, `service_role`. `defaultControl: 'external'`. Namespaces: `auth`, `storage`, `realtime`, `extensions`.
-- [ ] Generate `src/contract/contract.d.ts` via the standard emitter pipeline. The contract type is consumed by the runtime facade's generics in M2.
-- [ ] Hand-author `src/contract/index.ts` exporting branded `ModelHandle<'supabase', …>` instances for each model and `roles: { anon, authenticated, serviceRole }` as `RoleRef<'supabase'>` values. Each handle exposes `.refs.<column>` accessors typed from the `contract.d.ts` model shape.
-- [ ] Scaffold `src/pack/index.ts` exporting the `ExtensionPack` value (default export) and `supabasePackWith(options)` factory. The pack carries the contract.json + the `spaceId: 'supabase'`.
-- [ ] Smoke test from an app contract:
-  - `import supabasePack from '@prisma-next/extension-supabase/pack'` resolves.
-  - `import { AuthUser, roles } from '@prisma-next/extension-supabase/contract'` resolves.
-  - Using `AuthUser.refs.id` in `constraints.foreignKey(...)` and `roles.anon` in `.rls([...])` typechecks.
-  - The contract lowers correctly when the app's `defineContract` declares `extensionPacks: [supabasePack]`.
-- [ ] `pnpm lint:deps` passes. `/pack` does not transitively import runtime; `/contract` does not transitively import SDK/runtime.
-- [ ] Bundle-size measurement: `/pack` under 5 KB gzip; `/contract` under 10 KB gzip.
-- [ ] **Stand up the walking skeleton** at `examples/supabase` (top-level, alongside the other example apps). Minimal runnable app: `prisma-next.config.ts` wiring `extensionPacks: [supabasePack]`; an app contract with a `Profile` model in `public`; a `db.ts` that builds a db via the **stock `@prisma-next/postgres/runtime`** factory (not the Supabase `/runtime` — that's M2); one handler that runs a basic `public.*` query. Gate it out of the default test matrix until green (or mark its integration test `.skip` / `todo`) so an intentionally-WIP example never reds CI.
-- [ ] **Author `bootstrapSupabaseShim(client)`** (mirroring [`test/integration/test/postgres-bootstrap.ts`](../../test/integration/test/postgres-bootstrap.ts)) for the hermetic PGlite lane: seeds the `anon`/`authenticated`/`service_role`/`authenticator` roles, the `auth` schema + `auth.users`, and `auth.uid()`/`auth.jwt()`/`auth.role()` SQL functions reading the session GUCs. This is the shared fixture every later constituent's `examples/supabase` test uses (decision [C14](../supabase-integration/decisions.md)).
+- [ ] Scaffold the package at `packages/3-extensions/supabase/`, modeled on `pgvector` (`cipherstash` no longer exists). `package.json` `exports` declaring `/pack` (real) + `/runtime` (stub, M2). Register in `architecture.config.json`.
+- [ ] Author `src/contract/contract.prisma` in **PSL** — namespaces `auth`/`storage` (omit empty `realtime`/`extensions`); models `AuthUser`/`AuthIdentity`/`StorageBucket`/`StorageObject`. Emit `contract.json` + `contract.d.ts`. `defaultControl: 'external'` via the `prismaContract({ defaultControlPolicy: 'external' })` config option. **No roles** (no `PostgresRole` IR yet).
+- [ ] `src/pack/index.ts` exporting the `ExtensionPack` value (default) + `supabasePackWith(options)`. Carries the contract + `spaceId: 'supabase'`.
+- [ ] Author the **minimal `bootstrapSupabaseShim`** — `CREATE SCHEMA auth, storage` + the four tables (matching the contract). No roles, no `auth.*` functions. The shared fixture's first increment.
+- [ ] **Stand up the walking skeleton** at `examples/supabase`: `prisma-next.config.ts` wiring `extensionPacks: [supabasePack]`; an app contract with a `Profile` model in `public`; a `db.ts` on the **stock `@prisma-next/postgres/runtime`**; one handler running a `public.profile` round-trip. Integration test (modelled on `cli.control-policy.postgres.e2e.test.ts`): seed via the shim → migrate the composed contract → assert no DDL for `auth.*`/`storage.*` + verifier passes + `public.profile` created → run the round-trip. Committed `.skip` until green.
+- [ ] Smoke test: `import supabasePack from '@prisma-next/extension-supabase/pack'` resolves + typechecks from an app contract declaring `extensionPacks: [supabasePack]`. `pnpm lint:deps` green. `/pack` bundle < 5 KB gzip. `pnpm fixtures:check` green.
 
-**Validation:** AC1, AC2, AC3 verified through end-to-end authoring smoke tests. The skeleton boots and runs a `public.*` query on the stock Postgres runtime against the shim-bootstrapped PGlite database. No Supabase runtime yet; AC4 onwards land in M2.
+**Deferred from M1 (land with their consumer):** `/contract` handles + `ModelHandle`/`RoleRef` + roles → `cross-contract-refs` / `postgres-rls`; the **roles + `auth.uid()`/`jwt()`/`role()` functions** of the shim → `postgres-rls`; real `/runtime` → M2.
+
+**Validation:** AC1 (subpath resolves, bundle budget) verified for `/pack`; the skeleton migrates the composed contract against a shim-seeded PGlite DB with `auth.*`/`storage.*` correctly handled as `external`, and the `public.profile` round-trip runs on the stock runtime. AC2/AC3 (cross-contract FK + RLS authoring) and AC4 onwards land with their constituents / M2.
 
 ### M2 — Runtime facade (`SupabaseRuntime`, role binding, SET LOCAL)
 

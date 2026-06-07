@@ -167,9 +167,9 @@ describe('migration graph legend stream split', () => {
     expect(stderrText).toContain('Legend:');
     expect(stderrText).toContain('applied');
     expect(stderrText).toContain('pending');
-    expect(stderrText).toContain('<contract, db>');
+    expect(stderrText).toContain('@contract @db');
     expect(stderrText).toContain('(prod, staging)');
-    expect(stderrText).toContain('live markers (contract on disk, database state)');
+    expect(stderrText).toContain('reserved markers — also typeable as --from/--to tokens');
     expect(stderrText).toContain('user-defined refs');
     expect(stderrText).toContain('migration from contract aaaaaa to bbbbbb');
     expect(stderrText).not.toContain('gutter lanes by column');

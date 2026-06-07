@@ -16,7 +16,7 @@ function styleMarkerName(name: string): string {
 }
 
 function plainMarkers(names: readonly string[]): string {
-  return `<${names.join(', ')}>`;
+  return names.map((name) => `@${name}`).join(' ');
 }
 
 export function formatContractNodeOverlays(
@@ -62,8 +62,8 @@ function styleRefName(name: string): string {
  * - `glyph` (`→` / `⟲` / `∅`): dim
  * - `lane` (graph gutter lines `│` and fan/join connectors `├─┐` / `├─┘`): dim
  * - `invariants` (`{...}`): yellow
- * - `markers` (`<...>`): green; the `contract` desired-state marker inside is
- *   green-bold (`db` is plain green)
+ * - `markers` (`@contract @db`): green; the `contract` desired-state marker is
+ *   green-bold (`db` is plain green); the `@` sigil is applied to each name
  * - `refs` (`(...)`): green (the active ref is bolded separately by the tree styler)
  * - `spaceHeading` (`<spaceId>:`): bold
  * - `summary`: dim
@@ -88,10 +88,8 @@ export function createAnsiMigrationListStyler(opts: {
     lane: (text) => dim(text),
     invariants: (ids) => yellow(`{${ids.join(', ')}}`),
     markers: (names) => {
-      const open = green('<');
-      const close = green('>');
-      const separator = green(', ');
-      return open + names.map(styleMarkerName).join(separator) + close;
+      const sigil = green('@');
+      return names.map((name) => sigil + styleMarkerName(name)).join(' ');
     },
     refs: (names) => {
       const open = green('(');

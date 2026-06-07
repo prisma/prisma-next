@@ -1,15 +1,19 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { type ContractSpaceMember, requireHeadRef } from '@prisma-next/migration-tools/aggregate';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
-import type { RefEntry } from '@prisma-next/migration-tools/refs';
+import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
+import { planMemberPath } from '../control-api/operations/migrate';
 import type {
   MigrateFailure,
   MigratePathDecision,
@@ -29,6 +33,7 @@ import {
   errorUnexpected,
   mapMigrationToolsError,
   mapRefResolutionError,
+  requireLiveDatabase,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -42,10 +47,21 @@ import {
 } from '../utils/command-helpers';
 import { mapContractAtError } from '../utils/contract-at-errors';
 import {
+  buildReadAggregate,
   loadContractSpaceAggregateForCli,
   refuseContractSpaceIntegrity,
 } from '../utils/contract-space-aggregate-loader';
 import { toDeclaredExtensionsFromRaw } from '../utils/extension-pack-inputs';
+import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
+import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
+import { indentMigrationGraphTreeBlock } from '../utils/formatters/migration-graph-space-render';
+import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
+import {
+  computeMaxDirNameLengthForLayout,
+  computeMaxEdgeTreePrefixWidthForLayout,
+  formatOnPathMigrationRow,
+  renderMigrationGraphTree,
+} from '../utils/formatters/migration-graph-tree-render';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -53,12 +69,51 @@ import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags'
 import { executeRefAdvancement, readContractIR } from '../utils/ref-advancement';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import { listRefsByContractHash } from './migration-list';
 
 interface MigrateCommandOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly to?: string;
   readonly advanceRef?: string;
+  readonly show?: boolean;
+  readonly from?: string;
+}
+
+/**
+ * One migration that will run in a `migrate --show` preview, in execution order.
+ */
+export interface MigrateShowMigration {
+  readonly spaceId: string;
+  readonly dirName: string;
+  readonly migrationHash: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+/** Result returned by `migrate --show`. Read-only; no writes performed. */
+export interface MigrateShowResult {
+  readonly ok: true;
+  readonly migrations: readonly MigrateShowMigration[];
+  readonly summary: string;
+  /**
+   * Pre-rendered Tier-3 graph tree for human output. Off-path migrations render
+   * dim; on-path migrations render in ordinary colours. Only present in human
+   * (non-JSON) mode.
+   */
+  readonly graphOutput?: string;
+  /**
+   * Name column width for the "Will run, in order:" list — globally aligned with
+   * every graph-tree section. Only present in human (non-JSON) mode.
+   */
+  readonly runListDirNameWidth?: number;
+  /**
+   * Left-pad offset (number of blank spaces) matching the graph's data-column
+   * offset (`globalMaxEdgeTreePrefixWidth`). Used to align list rows with graph
+   * rows so every `→` in the output (graph + list) lands at the same column.
+   * Only present in human (non-JSON) mode when multiple spaces are rendered.
+   */
+  readonly runListLeftPad?: number;
 }
 
 export interface MigrateResult {
@@ -81,6 +136,435 @@ export interface MigrateResult {
     readonly total: number;
   };
   readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
+}
+
+/**
+ * Read-only preview of the migration path `migrate` will take.
+ *
+ * Computes the path through the SAME seam as `executeMigrate`:
+ * - `readAllMarkers()` for the from-state (when no `--from` is given), preserving
+ *   the full marker including `invariants` (not just `storageHash`).
+ * - `planMemberPath()` (shared with `executeMigrate`) for per-member path selection,
+ *   which feeds `graphWalkStrategy()` with the same target hash, target invariants,
+ *   and current marker as the real apply path uses.
+ *
+ * Returns BEFORE any write boundary (`runMigration` / marker / DDL). No
+ * DB state is mutated.
+ */
+async function executeMigrateShowCommand(
+  options: MigrateCommandOptions,
+  flags: GlobalFlags,
+  ui: TerminalUI,
+): Promise<Result<MigrateShowResult, CliStructuredErrorType>> {
+  const config = await loadConfig(options.config);
+  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
+    options.config,
+    config,
+  );
+
+  const dbConnection = options.db ?? config.db?.connection;
+  const hasDriver = !!config.driver;
+  const hasExplicitFrom = options.from !== undefined;
+
+  // When --from is omitted we read the live DB marker (same as migrate's default).
+  // When --from is given, we're in offline hypothetical mode — no connection needed.
+  if (!hasExplicitFrom) {
+    const missingDb = requireLiveDatabase({
+      dbConnection,
+      hasDriver,
+      why: 'migrate --show needs a database connection to read the live marker (or pass --from <contract> for an offline preview)',
+      retryCommand: 'prisma-next migrate --show --from <contract>',
+    });
+    if (missingDb) {
+      return notOk(missingDb);
+    }
+  }
+
+  let allRefs: Refs = {};
+  try {
+    allRefs = await readRefs(refsDir);
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    throw error;
+  }
+
+  const loaded = await buildReadAggregate(config, { migrationsDir });
+  if (!loaded.ok) {
+    return notOk(loaded.failure);
+  }
+  const { aggregate, contractHash } = loaded.value;
+  const appGraph = aggregate.app.graph();
+
+  // Resolve the --to target (defaults to the on-disk contract, same as migrate).
+  // Also capture the ref's invariants so planMemberPath feeds graphWalkStrategy the
+  // same target invariants that real migrate would use (refInvariants ?? headRef.invariants).
+  let targetHash: string = contractHash;
+  let refInvariants: readonly string[] | undefined;
+  if (options.to) {
+    const toResult = parseContractRef(options.to, {
+      graph: appGraph,
+      refs: allRefs,
+      contractHash,
+    });
+    if (!toResult.ok) {
+      return notOk(mapRefResolutionError(toResult.failure));
+    }
+    if (toResult.value.provenance.kind === 'reserved-db') {
+      return notOk(
+        errorDatabaseConnectionRequired({
+          why: '@db is not valid as a --to target; it names the live database state, not a target contract.',
+          commandName: 'migrate --show',
+        }),
+      );
+    }
+    targetHash = toResult.value.hash;
+    if (toResult.value.provenance.kind === 'ref') {
+      const refEntry = allRefs[toResult.value.provenance.refName];
+      if (refEntry) refInvariants = refEntry.invariants;
+    }
+  }
+
+  if (!flags.json && !flags.quiet) {
+    const details: Array<{ label: string; value: string }> = [
+      { label: 'config', value: configPath },
+      { label: 'migrations', value: migrationsRelative },
+    ];
+    if (dbConnection && !hasExplicitFrom) {
+      details.push({ label: 'database', value: maskConnectionUrl(String(dbConnection)) });
+    }
+    if (options.from) {
+      details.push({ label: 'from', value: options.from });
+    }
+    if (options.to) {
+      details.push({ label: 'to', value: options.to });
+    }
+    const header = formatStyledHeader({
+      command: 'migrate --show',
+      description: 'Preview the migration path migrate will take (read-only)',
+      details,
+      flags,
+    });
+    ui.stderr(header);
+  }
+
+  // Resolve the from-state.
+  // - Explicit --from: parse it offline (no connection).
+  // - Omitted: read the live DB marker via readAllMarkers() — the same source migrate uses.
+  //
+  // Full marker records (storageHash + invariants) are preserved so planMemberPath
+  // can feed graphWalkStrategy the complete currentMarker — exactly as executeMigrate
+  // does via familyInstance.readAllMarkers(). A stripped { storageHash, invariants: [] }
+  // marker would produce a different `required` set and a different (incorrect) path.
+  type LiveMarker = { readonly storageHash: string; readonly invariants: readonly string[] };
+  const markerBySpace = new Map<string, LiveMarker | null>();
+  const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
+
+  if (hasExplicitFrom) {
+    // @db with explicit --from requires a connection
+    if (options.from === '@db') {
+      const missingDb = requireLiveDatabase({
+        dbConnection,
+        hasDriver,
+        why: '@db resolves to the live database marker and requires a --db connection',
+        retryCommand: 'prisma-next migrate --show --from @db --db $DATABASE_URL',
+      });
+      if (missingDb) {
+        return notOk(missingDb);
+      }
+      // Fall through to the connection path below
+    } else {
+      const fromResult = parseContractRef(options.from, {
+        graph: appGraph,
+        refs: allRefs,
+        contractHash,
+      });
+      if (!fromResult.ok) {
+        return notOk(mapRefResolutionError(fromResult.failure));
+      }
+      if (fromResult.value.provenance.kind === 'reserved-db') {
+        // Unreachable given the @db branch above, but guard for safety
+        const missingDb = requireLiveDatabase({
+          dbConnection,
+          hasDriver,
+          why: '@db resolves to the live database marker and requires a --db connection',
+        });
+        if (missingDb) {
+          return notOk(missingDb);
+        }
+      } else {
+        // Offline hypothetical: the --from ref only carries a hash (no live invariants).
+        // Apply the from-hash marker to the APP space only. Extension spaces are left
+        // absent from markerBySpace (treated as null / greenfield by planMemberPath),
+        // so they plan from their own marker → own head — exactly as executeMigrate does.
+        const fromHash = fromResult.value.hash;
+        const offlineMarker: LiveMarker | null =
+          fromHash === EMPTY_CONTRACT_HASH ? null : { storageHash: fromHash, invariants: [] };
+        markerBySpace.set(aggregate.app.spaceId, offlineMarker);
+      }
+    }
+  }
+
+  // If we need the live DB marker (no --from, or --from @db), connect and read.
+  const needsLiveMarker = !hasExplicitFrom || options.from === '@db';
+  if (needsLiveMarker) {
+    if (!dbConnection || !hasDriver) {
+      return notOk(
+        errorDatabaseConnectionRequired({
+          why: 'A database connection is required to read the live marker for migrate --show',
+          commandName: 'migrate --show',
+        }),
+      );
+    }
+    const client = createControlClient({
+      family: config.family,
+      target: config.target,
+      adapter: config.adapter,
+      driver: config.driver!,
+      extensionPacks: config.extensionPacks ?? [],
+    });
+    try {
+      await client.connect(dbConnection);
+      const allMarkers = await client.readAllMarkers();
+      // Store the full marker record (storageHash + invariants) per space.
+      // This is the same data executeMigrate uses via familyInstance.readAllMarkers().
+      for (const member of allMembers) {
+        const marker = allMarkers.get(member.spaceId);
+        markerBySpace.set(member.spaceId, marker ?? null);
+      }
+    } catch (error) {
+      if (CliStructuredError.is(error)) {
+        return notOk(error);
+      }
+      if (MigrationToolsError.is(error)) {
+        return notOk(mapMigrationToolsError(error));
+      }
+      return notOk(
+        errorUnexpected(error instanceof Error ? error.message : String(error), {
+          why: `Failed to read live DB marker: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+      );
+    } finally {
+      await client.close();
+    }
+  }
+
+  // Walk the path via planMemberPath — the same helper executeMigrate uses.
+  // planMemberPath feeds graphWalkStrategy identical inputs (targetHash, targetInvariants,
+  // currentMarker with full invariants), so the preview path is always the path migrate runs.
+  //
+  // Canonical schedule order: extensions alphabetically first, then app — mirroring the
+  // runner's `applyOrder` in operations/migrate.ts so the "Will run, in order:" list
+  // reflects the actual execution sequence (extensions install first, app last).
+  const canonicalOrderMembers: ReadonlyArray<ContractSpaceMember> = [
+    ...aggregate.extensions,
+    aggregate.app,
+  ];
+  const orderedMigrations: MigrateShowMigration[] = [];
+  for (const member of canonicalOrderMembers) {
+    const isAppMember = member.spaceId === aggregate.app.spaceId;
+    const headRef = requireHeadRef(member);
+    const memberTargetHash = isAppMember ? targetHash : headRef.hash;
+    const memberRefInvariants = isAppMember ? refInvariants : undefined;
+    const liveMarker = markerBySpace.get(member.spaceId) ?? null;
+
+    const outcome = planMemberPath({
+      member,
+      aggregate,
+      targetHash: memberTargetHash,
+      refInvariants: memberRefInvariants,
+      liveMarker,
+    });
+
+    if (outcome.kind === 'at-head') {
+      // Empty-graph member already at target — nothing to run for this space.
+      continue;
+    }
+    if (outcome.kind === 'never-planned') {
+      return notOk(
+        errorPathUnreachable({
+          code: 'MIGRATION_PATH_NOT_FOUND',
+          summary: `No on-disk migrations for contract space "${outcome.spaceId}"`,
+          why: `migrate is replay-only: space "${outcome.spaceId}" has no on-disk migrations but its head ref targets "${outcome.targetHash}".`,
+          meta: { spaceId: outcome.spaceId, target: outcome.targetHash, kind: 'neverPlanned' },
+        }),
+      );
+    }
+    if (outcome.kind === 'unreachable') {
+      const fromHash = outcome.liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
+      return notOk(
+        errorPathUnreachable({
+          code: 'MIGRATION_PATH_NOT_FOUND',
+          summary: `No migration path from ${fromHash.slice(0, 14)} to ${outcome.targetHash.slice(0, 14)} in space "${outcome.spaceId}".`,
+          why: `The migration graph has no path from the from-state to the target in space "${outcome.spaceId}".`,
+          meta: { spaceId: outcome.spaceId, from: fromHash, to: outcome.targetHash },
+        }),
+      );
+    }
+    if (outcome.kind === 'unsatisfiable') {
+      return notOk(
+        errorRuntime(`Missing required invariants for space "${outcome.spaceId}"`, {
+          why: `The path requires invariants not available on disk: ${outcome.missing.join(', ')}`,
+        }),
+      );
+    }
+
+    for (const edge of outcome.plan.migrationEdges) {
+      orderedMigrations.push({
+        spaceId: member.spaceId,
+        dirName: edge.dirName,
+        migrationHash: edge.migrationHash,
+        from: edge.from,
+        to: edge.to,
+      });
+    }
+  }
+
+  const count = orderedMigrations.length;
+  const summary =
+    count === 0
+      ? 'Already up to date — nothing to run'
+      : `${count} migration${count === 1 ? '' : 's'} will run`;
+
+  // Build the Tier-3 graph visualization (human mode only; skipped for --json).
+  // Reuses the existing annotation hook — no parallel renderer.
+  let graphOutput: string | undefined;
+  let runListDirNameWidth: number | undefined;
+  let runListLeftPad: number | undefined;
+  if (!flags.json) {
+    const onPathHashes = new Set(orderedMigrations.map((m) => m.migrationHash));
+    const colorize = flags.color !== false;
+
+    // Build layouts for all spaces first so we can compute global column widths
+    // before rendering. This ensures the name column, hash column, and ops column
+    // start at the same horizontal offset across every space section AND the
+    // "Will run, in order:" list below.
+    const memberLayouts = allMembers.map((member) => {
+      const isApp = member.spaceId === aggregate.app.spaceId;
+      const memberGraph = member.graph();
+      const rowModel = buildMigrationGraphRows(memberGraph, isApp ? { contractHash } : {});
+      const layout = buildMigrationGraphLayout(rowModel);
+      return { member, isApp, memberGraph, layout };
+    });
+
+    // Global max across all space layouts.
+    const globalMaxEdgeTreePrefixWidth =
+      memberLayouts.length > 1
+        ? Math.max(
+            ...memberLayouts.map(({ layout }) => computeMaxEdgeTreePrefixWidthForLayout(layout)),
+          )
+        : undefined;
+    const globalMaxDirNameWidthFromLayouts =
+      memberLayouts.length > 1
+        ? Math.max(...memberLayouts.map(({ layout }) => computeMaxDirNameLengthForLayout(layout)))
+        : undefined;
+    // The run-list name column width must be at least as wide as the global tree dirName
+    // width so that tree sections and the list align at the hash column.
+    const runListMaxFromMigrations =
+      orderedMigrations.length > 0
+        ? Math.max(...orderedMigrations.map((m) => m.dirName.length))
+        : 0;
+    const globalMaxDirNameWidth =
+      globalMaxDirNameWidthFromLayouts !== undefined
+        ? Math.max(globalMaxDirNameWidthFromLayouts, runListMaxFromMigrations)
+        : undefined;
+    runListDirNameWidth = globalMaxDirNameWidth ?? runListMaxFromMigrations;
+    runListLeftPad = globalMaxEdgeTreePrefixWidth;
+
+    // Render each space section with globally computed widths.
+    const showSpaceHeadings = allMembers.length > 1;
+    const sections: string[] = [];
+    for (const { member, isApp, memberGraph, layout } of memberLayouts) {
+      const edgeAnnotations = new Map<string, MigrationEdgeAnnotation>();
+      for (const edge of memberGraph.migrationByHash.values()) {
+        edgeAnnotations.set(edge.migrationHash, {
+          pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
+        });
+      }
+      const liveMarker = markerBySpace.get(member.spaceId) ?? null;
+      const liveMarkerHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
+      const tree = renderMigrationGraphTree(layout, {
+        contractHash,
+        isAppSpace: isApp,
+        ...(needsLiveMarker ? { dbHash: liveMarkerHash } : {}),
+        refsByHash: listRefsByContractHash(member),
+        edgeAnnotationsByHash: edgeAnnotations,
+        colorize,
+        ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
+        ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
+      });
+      if (tree.length === 0) continue;
+      if (showSpaceHeadings) {
+        sections.push(`${member.spaceId}:\n${indentMigrationGraphTreeBlock(tree, '  ')}`);
+      } else {
+        sections.push(tree);
+      }
+    }
+    graphOutput = sections.join('\n\n');
+  }
+
+  return ok({
+    ok: true,
+    migrations: orderedMigrations,
+    summary,
+    ...(graphOutput !== undefined ? { graphOutput } : {}),
+    ...(runListDirNameWidth !== undefined ? { runListDirNameWidth } : {}),
+    ...(runListLeftPad !== undefined ? { runListLeftPad } : {}),
+  });
+}
+
+function formatMigrateShowOutput(result: MigrateShowResult, flags: GlobalFlags): string {
+  if (flags.quiet) return '';
+  const colorize = flags.color !== false;
+  const lines: string[] = [];
+  // Graph tree first (shows the full topology with on-path highlighted).
+  if (result.graphOutput !== undefined && result.graphOutput.length > 0) {
+    lines.push(result.graphOutput);
+    lines.push('');
+  }
+  const n = result.migrations.length;
+  if (n > 0) {
+    // Consolidated header: one line replaces the old separate summary + blank +
+    // "Will run, in order:" header.
+    lines.push(`The following ${n} migration${n === 1 ? '' : 's'} will run:`);
+    // Ordered list rendered through the SAME on-path row renderer as the tree.
+    // `formatOnPathMigrationRow` uses PATH_HIGHLIGHT_STYLES.onPath so the list and
+    // graph-tree rows are styled identically — changing the on-path colour in future
+    // is a one-line edit in PATH_HIGHLIGHT_STYLES.
+    //
+    // Alignment anchor: the `→` arrow (source-hash onward) must land at the SAME
+    // absolute column as in graph edge rows, across every graph section and this list.
+    //
+    // Multi-space output layout (space headings + 2-space indented tree sections):
+    //   Graph edge row:  [2 heading][G gutter][D dirName][7 source] [→] [dest]
+    //   List row:        [2 spaces][L dirName][  ][7 source] [→] [dest]
+    //   Alignment:  2 + G + D + 9 = 2 + L + 2 + 9   =>   L = G + D - 2
+    //
+    // Single-space output layout (flat tree, no heading indent):
+    //   Graph edge row:  [G gutter][D dirName][7 source] [→] [dest]
+    //   List row:        [2 spaces][L dirName][  ][7 source] [→] [dest]
+    //   Alignment:  G + D + 9 = 2 + L + 2 + 9   =>   L = G + D - 4
+    //
+    // D (edgeDirNameWidth) = max(rawDirNameWidth + LABEL_GAP, MIN_HASH_DATA_COLUMN - G)
+    // where LABEL_GAP = 2 and MIN_HASH_DATA_COLUMN = 25 (same constants as the renderer).
+    //
+    // runListLeftPad is set only for multi-space; undefined means single-space.
+    const isMultiSpace = result.runListLeftPad !== undefined;
+    const gutter = result.runListLeftPad ?? 0;
+    const rawDirNameWidth =
+      result.runListDirNameWidth ?? Math.max(...result.migrations.map((m) => m.dirName.length));
+    const edgeDirNameWidth = Math.max(rawDirNameWidth + 2, 25 - gutter);
+    const listDirNameWidth = gutter + edgeDirNameWidth - (isMultiSpace ? 2 : 4);
+    for (const m of result.migrations) {
+      lines.push(
+        `  ${formatOnPathMigrationRow(m.dirName, m.from, m.to, listDirNameWidth, colorize, 'unicode')}`,
+      );
+    }
+  } else {
+    lines.push(result.summary);
+  }
+  return lines.join('\n');
 }
 
 function mapApplyFailure(failure: MigrateFailure): CliStructuredErrorType {
@@ -384,12 +868,15 @@ export function createMigrateCommand(): Command {
     'Walks every contract space (app + extensions) and applies pending\n' +
       'on-disk migrations in canonical order (extensions alphabetically,\n' +
       'then app). Graph-walks the on-disk migration graph for every space.\n' +
-      'Use --to to target a specific contract (hash, ref name, migration dir).',
+      'Use --to to target a specific contract (hash, ref name, migration dir).\n' +
+      'Use --show for a read-only preview of the path that would run.',
   );
   setCommandExamples(command, [
     'prisma-next migrate --db $DATABASE_URL',
     'prisma-next migrate --to production --db $DATABASE_URL',
     'prisma-next migrate --to sha256:abc123 --db $DATABASE_URL',
+    'prisma-next migrate --show --db $DATABASE_URL',
+    'prisma-next migrate --show --from @contract --to production',
   ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
@@ -399,11 +886,34 @@ export function createMigrateCommand(): Command {
       'Target contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
     .option('--advance-ref <name>', 'Advance the named ref to the post-apply marker after success')
+    .option('--show', 'Preview the migration path without applying (read-only)')
+    .option(
+      '--from <contract>',
+      'From-state for --show preview (@contract, @db, hash, ref name, or migration dir)',
+    )
     .action(async (options: MigrateCommandOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const startTime = Date.now();
 
       const ui = createTerminalUI(flags);
+
+      if (options.show) {
+        // Read-only path: compute the migration plan and print the ordered list.
+        // NEVER reaches runMigration() or any write boundary.
+        const result = await executeMigrateShowCommand(options, flags, ui);
+
+        const exitCode = handleResult(result, flags, ui, (showResult) => {
+          if (flags.json) {
+            ui.output(JSON.stringify(showResult, null, 2));
+          } else {
+            // Print directly to stdout — not via ui.log() which injects Clack's │ gutter.
+            ui.output(formatMigrateShowOutput(showResult, flags));
+          }
+        });
+
+        process.exit(exitCode);
+        return;
+      }
 
       const result = await executeMigrateCommand(options, flags, ui, startTime);
 
