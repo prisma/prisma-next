@@ -1,4 +1,4 @@
-export type { AuthoringPslBlockNamespace } from '../shared/framework-authoring';
+export type { AuthoringPslBlockDescriptorNamespace } from '../shared/framework-authoring';
 export type {
   PslBlockParam,
   PslBlockParamList,
@@ -17,7 +17,7 @@ export type {
 } from '../shared/psl-extension-block';
 
 import type { CodecLookup } from '../shared/codec-types';
-import type { AuthoringPslBlockNamespace } from '../shared/framework-authoring';
+import type { AuthoringPslBlockDescriptorNamespace } from '../shared/framework-authoring';
 import type { PslDiagnosticCode, PslExtensionBlock, PslSpan } from '../shared/psl-extension-block';
 
 export interface PslDiagnostic {
@@ -201,12 +201,19 @@ export interface PslNamespace {
   readonly compositeTypes: readonly PslCompositeType[];
   /**
    * Extension-contributed top-level blocks parsed inside this namespace.
-   * Absent when no extension blocks were parsed (the parser populates this
-   * slot in D3; prior to that dispatch, the field is not set). Order matches
+   * These are the parsed AST nodes produced by the generic framework parser
+   * when it encounters a keyword claimed by a registered
+   * {@link AuthoringPslBlockDescriptorNamespace} entry.
+   *
+   * Absent when no extension blocks appear in this namespace. Order matches
    * source order within the namespace; extension-contributed and built-in
    * blocks live in their own slots, so a namespace mixing `model X { … }` and
    * `policy_select Y { … }` keeps the model in `models` and the policy in
    * `extensionBlocks`.
+   *
+   * Contrast with {@link ParsePslDocumentInput.pslBlockDescriptors}: that
+   * field holds the registry of declarative descriptors that teach the parser
+   * which keywords to accept; this field holds the resulting parsed nodes.
    */
   readonly extensionBlocks?: readonly PslExtensionBlock[];
   readonly span: PslSpan;
@@ -246,20 +253,27 @@ export interface ParsePslDocumentInput {
   readonly schema: string;
   readonly sourceId: string;
   /**
-   * Registry of declared extension block descriptors, keyed by keyword.
-   * When provided, the parser dispatches unknown top-level keywords against
-   * this namespace and reads matching blocks generically into `PslExtensionBlock`
-   * nodes. Absent or undefined means no extension blocks are registered and any
-   * unknown keyword yields `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`.
+   * Registry of declarative block descriptors, keyed by arbitrary path
+   * segments with {@link AuthoringPslBlockDescriptor} leaves. The registry
+   * teaches the parser which top-level keywords belong to extension
+   * contributions: when the parser encounters an unknown keyword, it looks
+   * it up here and, when found, reads the block generically into a
+   * {@link PslExtensionBlock} node. Absent or undefined means no extension
+   * blocks are registered and any unknown keyword yields
+   * `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`.
+   *
+   * Contrast with {@link PslNamespace.extensionBlocks}: that field holds the
+   * parsed block nodes in a namespace; this field holds the registry of
+   * descriptors that teach the parser how to read those blocks.
    */
-  readonly pslBlocks?: AuthoringPslBlockNamespace;
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
   /**
-   * Codec lookup for validating `value`-kind extension block parameters (D4).
-   * When provided alongside `pslBlocks`, the generic validator runs over every
-   * parsed extension block after the full AST is assembled, appending any
-   * diagnostics to the parse result. Absent or undefined means no codec
-   * validation runs; `ref` resolution still runs when `refCtx` is available
-   * (built from the assembled namespaces).
+   * Codec lookup for validating `value`-kind extension block parameters.
+   * When provided alongside `pslBlockDescriptors`, the generic validator runs
+   * over every parsed extension block after the full AST is assembled,
+   * appending any diagnostics to the parse result. Absent or undefined means
+   * no codec validation runs; `ref` resolution still runs when namespace
+   * context is available (built from the assembled namespaces).
    */
   readonly codecLookup?: CodecLookup;
 }

@@ -113,9 +113,9 @@ describe('AuthoringPslBlockDescriptor', () => {
     void withPrinter;
   });
 
-  it('AuthoringContributions accepts a pslBlocks namespace', () => {
+  it('AuthoringContributions accepts a pslBlockDescriptors namespace', () => {
     const contributions: AuthoringContributions = {
-      pslBlocks: {
+      pslBlockDescriptors: {
         policySelect: {
           kind: 'pslBlock',
           keyword: 'policy_select',
@@ -127,7 +127,7 @@ describe('AuthoringPslBlockDescriptor', () => {
         },
       },
     };
-    expectTypeOf(contributions.pslBlocks).not.toBeUndefined();
+    expectTypeOf(contributions.pslBlockDescriptors).not.toBeUndefined();
   });
 });
 

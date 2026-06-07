@@ -1,5 +1,5 @@
 /**
- * Generic validator for extension-contributed top-level PSL blocks (D4, TML-2804).
+ * Generic validator for extension-contributed top-level PSL blocks.
  *
  * One function — {@link validateExtensionBlock} — takes a parsed
  * {@link PslExtensionBlock}, its {@link AuthoringPslBlockDescriptor}, a
@@ -48,8 +48,8 @@
  * ### `cross-space` scope
  * Implemented as a documented pass-through. The spec permits scoping
  * cross-space enforcement to first-consumer need (RLS roles). When RLS roles
- * arrive, wire `cross-space` resolution through the `(spaceId, namespaceId,
- * entityKind, entityName)` coordinate model from PR #745 / TML-2500.
+ * arrive, wire `cross-space` resolution through the cross-contract-space
+ * coordinate model `(spaceId, namespaceId, entityKind, entityName)`.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
@@ -86,7 +86,7 @@ export interface ExtensionBlockRefResolutionContext {
  * — the returned objects already have `sourceId` set from the `sourceId`
  * parameter.
  *
- * @param node - The parsed block node produced by the generic D3 parser.
+ * @param node - The parsed block node produced by the generic framework parser.
  * @param descriptor - The descriptor that claims this block's keyword.
  * @param sourceId - The PSL source file identifier (threaded into diagnostics).
  * @param codecLookup - Used to validate `value`-kind parameter literals via
@@ -277,8 +277,9 @@ function validateRef(
     // cross-space enforcement is a documented pass-through. The spec permits
     // scoping cross-space resolution to first-consumer need (RLS roles). When
     // that consumer arrives, wire resolution here through the
-    // (spaceId, namespaceId, entityKind, entityName) coordinate model from
-    // PR #745 / TML-2500. For now, cross-space refs pass validation unconditionally.
+    // cross-contract-space coordinate model
+    // (spaceId, namespaceId, entityKind, entityName).
+    // For now, cross-space refs pass validation unconditionally.
     return;
   }
 

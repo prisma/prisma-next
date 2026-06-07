@@ -39,10 +39,10 @@ export type PslDiagnosticCode =
    * A malformed line inside an extension-contributed top-level block body, or
    * a structurally invalid element inside a `list` parameter value.
    *
-   * Replaces the overloaded `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` code that D3
-   * (the generic parser) previously used for these two parse-error sites inside
-   * extension blocks — keeping `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` for its
-   * original meaning (an unknown keyword at the top level) and giving
+   * Replaces the overloaded `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` code that the
+   * generic framework parser previously used for these two parse-error sites
+   * inside extension blocks — keeping `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` for
+   * its original meaning (an unknown keyword at the top level) and giving
    * extension-block parse errors their own code.
    */
   | 'PSL_INVALID_EXTENSION_BLOCK_MEMBER'
@@ -127,8 +127,8 @@ export interface PslBlockParamList {
  * - `option` → `PslExtensionBlockParamOption` — the chosen token.
  * - `list`   → `PslExtensionBlockParamList` — ordered list of the above.
  *
- * These shapes are intentionally minimal for D1. The validator (D4) and
- * lowering (D6) refine and consume them; the parser (D3) produces them.
+ * These shapes are intentionally minimal. The validator and lowering refine
+ * and consume them; the generic framework parser produces them.
  */
 export type PslExtensionBlockParamValue =
   | PslExtensionBlockParamRef
@@ -162,8 +162,8 @@ export interface PslExtensionBlockParamList {
 
 /**
  * Base shape for a uniform extension-contributed top-level PSL block
- * node, as produced by the generic framework parser (D3) and consumed
- * by the validator (D4) and lowering factory (D6).
+ * node, as produced by the generic framework parser and consumed by the
+ * validator and lowering factory.
  *
  * - `kind` is the routing discriminant, equal to the descriptor's
  *   `discriminator`. The framework parser sets this to

@@ -5,7 +5,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
-  AuthoringPslBlockNamespace,
+  AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 import {
@@ -35,7 +35,7 @@ export interface AssembledAuthoringContributions {
   readonly field: AuthoringFieldNamespace;
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
-  readonly pslBlocks: AuthoringPslBlockNamespace;
+  readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
 }
 
 export interface ControlStack<
@@ -155,7 +155,7 @@ export function assembleAuthoringContributions(
   const field = {} as Record<string, unknown>;
   const type = {} as Record<string, unknown>;
   const entityTypes = {} as Record<string, unknown>;
-  const pslBlocks: Record<string, unknown> = {};
+  const pslBlockDescriptors: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
@@ -185,10 +185,10 @@ export function assembleAuthoringContributions(
         'entity',
       );
     }
-    if (descriptor.authoring?.pslBlocks) {
+    if (descriptor.authoring?.pslBlockDescriptors) {
       mergeAuthoringNamespaces(
-        pslBlocks,
-        descriptor.authoring.pslBlocks,
+        pslBlockDescriptors,
+        descriptor.authoring.pslBlockDescriptors,
         [],
         isAuthoringPslBlockDescriptor,
         'pslBlock',
@@ -199,22 +199,22 @@ export function assembleAuthoringContributions(
   const fieldNamespace = field as AuthoringFieldNamespace;
   const typeNamespace = type as AuthoringTypeNamespace;
   const entityTypeNamespace = entityTypes as AuthoringEntityTypeNamespace;
-  const pslBlockNamespace = blindCast<
-    AuthoringPslBlockNamespace,
+  const pslBlockDescriptorNamespace = blindCast<
+    AuthoringPslBlockDescriptorNamespace,
     'merge target accumulator narrows to typed namespace post-merge'
-  >(pslBlocks);
+  >(pslBlockDescriptors);
   assertNoCrossRegistryCollisions(
     typeNamespace,
     fieldNamespace,
     entityTypeNamespace,
-    pslBlockNamespace,
+    pslBlockDescriptorNamespace,
   );
 
   return {
     field: fieldNamespace,
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
-    pslBlocks: pslBlockNamespace,
+    pslBlockDescriptors: pslBlockDescriptorNamespace,
   };
 }
 

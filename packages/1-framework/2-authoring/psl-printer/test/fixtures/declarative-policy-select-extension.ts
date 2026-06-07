@@ -1,9 +1,8 @@
 /**
  * Test-only fixture extension: a DECLARATIVE `policy_select` block descriptor.
  *
- * Unlike the function-SPI fixture on PR #718, this extension contributes NO
- * parser or printer code. The framework owns the generic parser (D3), validator
- * (D4), and printer (Slice 2). The extension supplies only:
+ * This extension contributes NO parser or printer code. The framework owns
+ * the generic parser, validator, and printer. The extension supplies only:
  *
  *  - A declarative `AuthoringPslBlockDescriptor` with keyword, discriminator,
  *    name.required, and a `parameters` map.
@@ -170,7 +169,7 @@ export const declarativePolicySelectContributions = {
       },
     },
   },
-  pslBlocks: {
+  pslBlockDescriptors: {
     policy_select: {
       kind: 'pslBlock',
       keyword: POLICY_SELECT_KEYWORD,

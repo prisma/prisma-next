@@ -1,5 +1,5 @@
 /**
- * Tests for the generic extension-block validator (D4, TML-2804).
+ * Tests for the generic extension-block validator.
  *
  * Covers each of the five validator failure modes plus the fully-valid path:
  *
@@ -15,8 +15,8 @@
  * Also covers:
  * - A fully-valid block emits no diagnostics.
  * - `list` recurses into each element.
- * - The new `PSL_INVALID_EXTENSION_BLOCK_MEMBER` diagnostic codes emitted by
- *   the D3 parser for malformed body lines and malformed list syntax.
+ * - The `PSL_INVALID_EXTENSION_BLOCK_MEMBER` diagnostic codes emitted by
+ *   the generic parser for malformed body lines and malformed list syntax.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';

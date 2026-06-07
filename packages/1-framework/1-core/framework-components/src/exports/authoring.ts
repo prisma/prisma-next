@@ -12,7 +12,7 @@ export type {
   AuthoringFieldPresetDescriptor,
   AuthoringFieldPresetOutput,
   AuthoringPslBlockDescriptor,
-  AuthoringPslBlockNamespace,
+  AuthoringPslBlockDescriptorNamespace,
   AuthoringStorageTypeTemplate,
   AuthoringTemplateValue,
   AuthoringTypeConstructorDescriptor,

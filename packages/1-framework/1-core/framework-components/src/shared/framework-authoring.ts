@@ -188,15 +188,26 @@ export interface AuthoringPslBlockDescriptor {
   readonly parameters: Record<string, PslBlockParam>;
 }
 
-export type AuthoringPslBlockNamespace = {
-  readonly [name: string]: AuthoringPslBlockDescriptor | AuthoringPslBlockNamespace;
+export type AuthoringPslBlockDescriptorNamespace = {
+  readonly [name: string]: AuthoringPslBlockDescriptor | AuthoringPslBlockDescriptorNamespace;
 };
 
 export interface AuthoringContributions {
   readonly type?: AuthoringTypeNamespace;
   readonly field?: AuthoringFieldNamespace;
   readonly entityTypes?: AuthoringEntityTypeNamespace;
-  readonly pslBlocks?: AuthoringPslBlockNamespace;
+  /**
+   * Registry of declarative block descriptors this contribution registers,
+   * keyed by arbitrary path segments. Each leaf is an
+   * {@link AuthoringPslBlockDescriptor} that claims a PSL top-level keyword.
+   * The framework owns the generic parser, validator, and printer; the
+   * contribution supplies only these declarative descriptors.
+   *
+   * Contrast with {@link PslNamespace.extensionBlocks}: that field holds
+   * the parsed block nodes in a namespace; this field holds the registry
+   * of descriptors that teach the parser how to read those blocks.
+   */
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -494,7 +505,7 @@ function assertUniqueDiscriminators(entries: readonly AuthoringLeafEntry[], labe
 }
 
 /**
- * Every `pslBlocks` descriptor needs a matching `entityTypes` factory
+ * Every `pslBlockDescriptors` entry needs a matching `entityTypes` factory
  * (same discriminator): the parser would otherwise produce an AST node
  * nothing can lower to an IR class instance. The link is one-directional
  * — an `entityTypes` factory may stand alone (e.g. `enum`, reachable from
@@ -502,7 +513,7 @@ function assertUniqueDiscriminators(entries: readonly AuthoringLeafEntry[], labe
  */
 function assertPslBlocksHaveFactories(
   entityTypeNamespace: AuthoringEntityTypeNamespace,
-  pslBlockNamespace: AuthoringPslBlockNamespace,
+  pslBlockNamespace: AuthoringPslBlockDescriptorNamespace,
 ): void {
   const blockEntries = collectAuthoringLeafDiscriminators(
     pslBlockNamespace,
@@ -533,7 +544,7 @@ export function assertNoCrossRegistryCollisions(
   typeNamespace: AuthoringTypeNamespace,
   fieldNamespace: AuthoringFieldNamespace,
   entityTypeNamespace: AuthoringEntityTypeNamespace = {},
-  pslBlockNamespace: AuthoringPslBlockNamespace = {},
+  pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = {},
 ): void {
   const typePaths = new Set(
     collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
@@ -552,12 +563,12 @@ export function assertNoCrossRegistryCollisions(
   //
   // Cross-registry collisions are checked among `type` / `field` /
   // `entityTypes` only — these three are user-facing helper paths that PSL
-  // must resolve unambiguously. `pslBlocks` is an internal framework index
-  // consumed by parser and printer dispatch, not a user-facing helper path;
-  // the natural authoring pattern is the same path key in `entityTypes` and
-  // `pslBlocks` for a single contribution. The block→factory link is
-  // enforced by `assertPslBlocksHaveFactories` via the discriminator string,
-  // not by path.
+  // must resolve unambiguously. `pslBlockDescriptors` is an internal
+  // framework index consumed by parser and printer dispatch, not a
+  // user-facing helper path; the natural authoring pattern is the same
+  // path key in `entityTypes` and `pslBlockDescriptors` for a single
+  // contribution. The block→factory link is enforced by
+  // `assertPslBlocksHaveFactories` via the discriminator string, not by path.
   const ambiguityHint =
     'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.';
   for (const fieldPath of fieldPaths) {

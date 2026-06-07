@@ -1,16 +1,15 @@
 /**
- * Round-trip test for the declarative extension-block mechanism (D6, TML-2804).
+ * Round-trip test for the declarative extension-block mechanism.
  *
  * Exercises the read pipeline for a declarative extension contribution:
  *
- *   text → parse (D3) → validate (D4, wired in D6) → lower via entityTypes
- *          factory (D6) → PolicySelectIr instance
+ *   text → parse → validate → lower via entityTypes factory → PolicySelectIr instance
  *
  * The fixture (`./fixtures/declarative-policy-select-extension.ts`) contributes
  * NO parser or printer code. All parsing and validation is framework-owned.
  * Serialize/hydrate of the IR is also included (falls out of the IRNodeBase
- * pattern). The print leg (PSL text → IR → PSL text) is Slice 2 (TML-2854)
- * and is intentionally absent here.
+ * pattern). The print leg (PSL text → IR → PSL text) is covered by the
+ * printer tests and is intentionally absent here.
  *
  * A stub codec for `fixture-policy/text@1` is registered for the duration of
  * these tests so the validator can accept double-quoted `using` literals.
@@ -124,7 +123,7 @@ policy_select ProfilesSelect {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -142,7 +141,7 @@ policy_select ProfilesSelect {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -154,7 +153,7 @@ policy_select ProfilesSelect {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -181,7 +180,7 @@ policy_select ProfilesSelect {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
       const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
@@ -215,7 +214,7 @@ policy_select AdminRead {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -246,7 +245,7 @@ policy_select BadBlock {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -271,7 +270,7 @@ policy_select BadBlock {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -301,7 +300,7 @@ policy_select NakedParse {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'r1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         // codecLookup intentionally omitted
       });
 

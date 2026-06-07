@@ -1179,11 +1179,11 @@ model Post {
     });
   });
 
-  describe('extension blocks (D3 generic parser)', () => {
+  describe('extension blocks (generic framework parser)', () => {
     // Stub codecLookup: supplies a minimal Codec for the 'sql-expression' codec
     // whose decodeJson accepts any JSON string value.
-    // Needed because D6 wires the D4 validator into parsePslDocument, which
-    // runs whenever pslBlocks are registered and falls back to emptyCodecLookup
+    // Needed because the parser wires the validator into parsePslDocument, which
+    // runs whenever pslBlockDescriptors are registered and falls back to emptyCodecLookup
     // (which has no codecs registered) when no codecLookup is supplied by the caller.
     const stubSqlExpressionCodec: Codec = {
       id: 'sql-expression',
@@ -1229,7 +1229,7 @@ policy_select ReadPosts {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
         codecLookup: stubSqlExpressionCodecLookup,
       });
 
@@ -1278,7 +1278,7 @@ unknown_keyword Foo {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
       });
 
       expect(result.ok).toBe(false);
@@ -1287,7 +1287,7 @@ unknown_keyword Foo {
       expect(result.diagnostics[0]?.message).toContain('unknown_keyword');
     });
 
-    it('emits PSL_UNSUPPORTED_TOP_LEVEL_BLOCK when pslBlocks is omitted and keyword is unknown', () => {
+    it('emits PSL_UNSUPPORTED_TOP_LEVEL_BLOCK when pslBlockDescriptors is omitted and keyword is unknown', () => {
       const schema = `
 policy_select ReadPosts {
   target = Post
@@ -1319,7 +1319,7 @@ policy_select ReadPosts {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
         codecLookup: stubSqlExpressionCodecLookup,
       });
 
@@ -1335,7 +1335,7 @@ policy_select ReadPosts {
       expect(ns?.extensionBlocks?.[0]?.name).toBe('ReadPosts');
     });
 
-    it('built-in block parsing is unchanged when pslBlocks is provided', () => {
+    it('built-in block parsing is unchanged when pslBlockDescriptors is provided', () => {
       const schema = `
 model User {
   id Int @id
@@ -1350,7 +1350,7 @@ enum Role {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
       });
 
       expect(result.ok).toBe(true);
@@ -1383,7 +1383,7 @@ policy_select Beta {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
         codecLookup: stubSqlExpressionCodecLookup,
       });
 
@@ -1411,11 +1411,11 @@ policy_select ReadPosts {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
         codecLookup: stubSqlExpressionCodecLookup,
       });
 
-      // D4 validation runs after parsing and flags unknown parameters.
+      // The validator runs after parsing and flags unknown parameters.
       expect(result.ok).toBe(false);
       expect(result.diagnostics).toMatchObject([{ code: 'PSL_EXTENSION_UNKNOWN_PARAMETER' }]);
       // The parameter is still captured in the AST node.
@@ -1443,7 +1443,7 @@ policy_select ReadPosts {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
         codecLookup: stubSqlExpressionCodecLookup,
       });
 
@@ -1471,7 +1471,7 @@ namespace auth {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
         codecLookup: stubSqlExpressionCodecLookup,
       });
 
@@ -1500,7 +1500,7 @@ policy_select ReadPosts {
       const result = parsePslDocument({
         schema,
         sourceId: 'schema.prisma',
-        pslBlocks: { policy_select: policySelectDescriptor },
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
         codecLookup: stubSqlExpressionCodecLookup,
       });
 

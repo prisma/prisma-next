@@ -1,6 +1,6 @@
 import type {
   AuthoringPslBlockDescriptor,
-  AuthoringPslBlockNamespace,
+  AuthoringPslBlockDescriptorNamespace,
 } from '@prisma-next/framework-components/authoring';
 import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
@@ -106,7 +106,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
   };
 
   let typesBlock: PslTypesBlock | undefined;
-  const pslBlockNamespace: AuthoringPslBlockNamespace = input.pslBlocks ?? {};
+  const pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = input.pslBlockDescriptors ?? {};
 
   // Walk a contiguous range of lines, routing top-level declarations into the
   // active namespace bucket. Called once for the whole document and once per
@@ -371,15 +371,15 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     });
   }
 
-  // Validate extension blocks with the generic validator (D4) after the full
+  // Validate extension blocks with the generic validator after the full
   // AST is assembled. The validator needs all namespaces for ref resolution.
-  // It runs whenever pslBlocks are registered — codecLookup falls back to
-  // emptyCodecLookup when not provided, which rejects value-kind parameters
-  // with unknown codecs. Callers with value parameters should always supply
-  // a codecLookup.
+  // It runs whenever pslBlockDescriptors are registered — codecLookup falls
+  // back to emptyCodecLookup when not provided, which rejects value-kind
+  // parameters with unknown codecs. Callers with value parameters should
+  // always supply a codecLookup.
   if (Object.keys(pslBlockNamespace).length > 0) {
     const codecLookup = input.codecLookup ?? emptyCodecLookup;
-    // Build a discriminator → descriptor reverse map from the flat pslBlocks
+    // Build a discriminator → descriptor reverse map from the descriptor
     // namespace. The parser keyed by keyword; the validator resolves by
     // node.kind (= discriminator) so we need the reverse direction.
     const descriptorByDiscriminator = new Map<string, AuthoringPslBlockDescriptor>();
@@ -1538,7 +1538,7 @@ function pushDiagnostic(
 }
 
 function lookupExtensionBlockDescriptor(
-  namespace: AuthoringPslBlockNamespace,
+  namespace: AuthoringPslBlockDescriptorNamespace,
   keyword: string,
 ): AuthoringPslBlockDescriptor | undefined {
   if (!Object.hasOwn(namespace, keyword)) {
@@ -1560,8 +1560,8 @@ function lookupExtensionBlockDescriptor(
  *   (`PslExtensionBlockParamList`)
  *
  * No validation runs here (unknown key, missing required, codec acceptance,
- * option-in-set, ref resolution — all D4). A body line that is not `key =
- * value` shaped emits a `PSL_INVALID_EXTENSION_BLOCK_MEMBER` parse diagnostic.
+ * option-in-set, ref resolution). A body line that is not `key = value`
+ * shaped emits a `PSL_INVALID_EXTENSION_BLOCK_MEMBER` parse diagnostic.
  */
 function parseExtensionBlock(
   context: ParserContext,
@@ -1594,7 +1594,7 @@ function parseExtensionBlock(
     const paramDescriptor = descriptor.parameters[key];
 
     if (paramDescriptor === undefined) {
-      // Unknown parameter — captured as a raw value; the validator (D4) reports this.
+      // Unknown parameter — captured as a raw value; the generic validator reports this.
       parameters[key] = {
         kind: 'value',
         raw: rhsRaw,
@@ -1621,7 +1621,7 @@ function parseExtensionBlock(
  * Captures a single parameter RHS string according to the declared parameter
  * kind. Returns `undefined` and pushes a diagnostic only if the syntax is
  * genuinely malformed (e.g. a `list` with no opening bracket). Value
- * acceptance (codec, option-in-set, ref resolution) is D4.
+ * acceptance (codec, option-in-set, ref resolution) is handled by the validator.
  */
 function captureParamRhs(
   context: ParserContext,
