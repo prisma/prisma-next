@@ -29,3 +29,7 @@ _Three dispatches: an in-slice spike that settles the table-level constraint nod
 ## Handoff completeness check
 
 The three hand-offs add up to the slice-DoD: constraint node shape settled + recorded (D1); planner `toOp()` produces SQL via `adapter.lower()` with the raw builders grepping to zero (D3); rendered SQL byte-stable + fixtures green (D2 establishes the rendering, D3 proves planner parity). No slice-DoD item is unreachable from the sequence.
+
+### Dispatch 4 (D4): SQL-free authoring API (PR #751 review rework)
+
+Added post-review. Operator + CodeRabbit (CHANGES_REQUESTED) flagged that the migration op factories are the user-facing authoring API and must contain no SQL. D4 makes `createTable`/`createSchema` `Migration` methods taking the contract-free builder options and lowering a typed DDL node through the adapter — `this.createTable({ schema, table, columns: [col(...)], constraints })`. Introduces the `Lowerer` interface; deletes the string-gluing, `createTableOp(sql)`, the `LowerFn` callback, and the `columnDefault` leak on the shared `ColumnSpec`; fixes constraint-name/`refTable` quoting + JSON-default escaping. SATISFIED (2 rounds).
