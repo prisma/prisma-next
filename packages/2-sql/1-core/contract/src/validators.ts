@@ -204,6 +204,13 @@ export const ForeignKeySchema = type.declare<ForeignKeyInput>().type({
   index: 'boolean',
 });
 
+export const CheckConstraintSchema = type({
+  '+': 'reject',
+  name: 'string',
+  column: 'string',
+  valueSet: ValueSetRefSchema,
+});
+
 const StorageTableSchema = type({
   '+': 'reject',
   columns: type({ '[string]': StorageColumnSchema }),
@@ -212,6 +219,7 @@ const StorageTableSchema = type({
   indexes: IndexSchema.array().readonly(),
   foreignKeys: ForeignKeySchema.array().readonly(),
   'control?': ControlPolicySchema,
+  'checks?': CheckConstraintSchema.array().readonly(),
 });
 
 /**

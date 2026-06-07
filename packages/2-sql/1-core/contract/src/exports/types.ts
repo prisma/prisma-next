@@ -1,4 +1,5 @@
 export type {
+  CheckConstraintInput,
   CodecTypesOf,
   ContractWithTypeMaps,
   ExtractCodecTypes,
@@ -41,6 +42,7 @@ export {
   applyFkDefaults,
   buildSqlNamespace,
   buildSqlNamespaceMap,
+  CheckConstraint,
   CODEC_INSTANCE_KIND,
   DEFAULT_FK_CONSTRAINT,
   DEFAULT_FK_INDEX,

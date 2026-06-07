@@ -34,6 +34,7 @@ import {
 import {
   applyFkDefaults,
   buildSqlNamespace,
+  type CheckConstraintInput,
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
@@ -499,6 +500,14 @@ export function buildSqlContractFromDefinition(
       }
       tableNameToNamespaceId.set(tableName, namespaceId);
 
+      const checksForTable: CheckConstraintInput[] = Object.entries(columns)
+        .filter(([, col]) => col.valueSet !== undefined)
+        .map(([columnName, col]) => ({
+          name: `${tableName}_${columnName}_check`,
+          column: columnName,
+          valueSet: col.valueSet!,
+        }));
+
       const tableInput: StorageTableInput = {
         columns,
         ...ifDefined('control', semanticModel.control),
@@ -521,6 +530,7 @@ export function buildSqlContractFromDefinition(
               },
             }
           : {}),
+        ...(checksForTable.length > 0 ? { checks: checksForTable } : {}),
       };
 
       let nsTables = tablesByNamespace[namespaceId];
