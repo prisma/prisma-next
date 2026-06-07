@@ -103,16 +103,15 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
   /**
-   * Extension contracts keyed by space ID. When provided for a space,
-   * the interpreter resolves cross-space FK `target.tableName` directly
-   * from the contract instead of using the symbolic `modelName.toLowerCase()`
-   * placeholder. If a space's contract is in this map but the referenced
-   * model or namespace is not found in that contract, the interpreter emits
-   * `PSL_UNKNOWN_CROSS_SPACE_TARGET`. When a space's contract is absent from
-   * the map (or the map is not provided), the interpreter falls back to
-   * `fieldTypeName.toLowerCase()` as the table name.
+   * Extension contracts keyed by space ID. Required for cross-space FK
+   * resolution. A composed space must have an entry here; if the space ID
+   * appears in `composedExtensionPacks` but is absent from this map, the
+   * interpreter emits `PSL_UNKNOWN_CONTRACT_SPACE` and fails fast — there
+   * is no silent fallback. If a space's contract is present but the
+   * referenced model or namespace is not found in it, the interpreter
+   * emits `PSL_UNKNOWN_CROSS_SPACE_TARGET`.
    */
-  readonly composedExtensionContracts?: ReadonlyMap<string, Contract>;
+  readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
   /**
    * Target-supplied `Namespace` factory threaded into
    * `buildSqlContractFromDefinition` for the contract's
@@ -1002,8 +1001,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     // Cross-contract-space relation: the target model lives in a different contract space
     // identified by `typeContractSpaceId` (e.g. `supabase:auth.User`).
     if (fieldTypeContractSpaceId !== undefined) {
-      // Fail fast if the space is not in the composed extension packs (AC5 PSL half).
-      if (!input.composedExtensions.has(fieldTypeContractSpaceId)) {
+      // Fail fast if the space has no entry in composedExtensionContracts (AC5 PSL half).
+      const extContractForSpace = input.composedExtensionContracts.get(fieldTypeContractSpaceId);
+      if (extContractForSpace === undefined) {
         diagnostics.push({
           code: 'PSL_UNKNOWN_CONTRACT_SPACE',
           message: `Relation field "${model.name}.${relationAttribute.field.name}" references contract space "${fieldTypeContractSpaceId}" which is not declared in extensionPacks. Add "${fieldTypeContractSpaceId}" to extensionPacks in prisma-next.config.ts.`,
@@ -1089,39 +1089,33 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       // no-namespace form is used (e.g. `supabase:User` → AC3).
       const crossTargetNamespaceId = fieldTypeNamespaceId ?? '__unbound__';
 
-      // Target table name: look up the real table name from the extension contract when
-      // available. If the contract is in the map but the model or namespace is not found,
-      // emit PSL_UNKNOWN_CROSS_SPACE_TARGET (user typo). When no contract is available for
-      // the space, fall back to fieldTypeName.toLowerCase() as a symbolic placeholder.
-      const extContract = input.composedExtensionContracts.get(fieldTypeContractSpaceId);
-      let crossTargetTableName: string;
-      if (extContract !== undefined) {
-        const resolvedTable =
-          extContract.domain.namespaces[crossTargetNamespaceId]?.models[fieldTypeName]?.storage[
-            'table'
-          ];
-        if (typeof resolvedTable !== 'string') {
-          const availableModels =
-            Object.keys(extContract.domain.namespaces[crossTargetNamespaceId]?.models ?? {}).join(
-              ', ',
-            ) || '(none)';
-          diagnostics.push({
-            code: 'PSL_UNKNOWN_CROSS_SPACE_TARGET',
-            message: `Relation field "${model.name}.${relationAttribute.field.name}" references model "${fieldTypeName}" in namespace "${crossTargetNamespaceId}" of space "${fieldTypeContractSpaceId}", but that model was not found in the extension contract. Available models: ${availableModels}`,
-            sourceId,
-            span: relationAttribute.field.span,
-            data: {
-              space: fieldTypeContractSpaceId,
-              namespace: crossTargetNamespaceId,
-              model: fieldTypeName,
-            },
-          });
-          continue;
-        }
-        crossTargetTableName = resolvedTable;
-      } else {
-        crossTargetTableName = fieldTypeName.toLowerCase();
+      // Target table name: resolved from the extension contract. The get() check above
+      // guarantees extContractForSpace is defined here; if the model or namespace is not
+      // found in it, emit PSL_UNKNOWN_CROSS_SPACE_TARGET (user typo).
+      const extContract = extContractForSpace;
+      const resolvedTable =
+        extContract.domain.namespaces[crossTargetNamespaceId]?.models[fieldTypeName]?.storage[
+          'table'
+        ];
+      if (typeof resolvedTable !== 'string') {
+        const availableModels =
+          Object.keys(extContract.domain.namespaces[crossTargetNamespaceId]?.models ?? {}).join(
+            ', ',
+          ) || '(none)';
+        diagnostics.push({
+          code: 'PSL_UNKNOWN_CROSS_SPACE_TARGET',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" references model "${fieldTypeName}" in namespace "${crossTargetNamespaceId}" of space "${fieldTypeContractSpaceId}", but that model was not found in the extension contract. Available models: ${availableModels}`,
+          sourceId,
+          span: relationAttribute.field.span,
+          data: {
+            space: fieldTypeContractSpaceId,
+            namespace: crossTargetNamespaceId,
+            model: fieldTypeName,
+          },
+        });
+        continue;
       }
+      const crossTargetTableName = resolvedTable;
 
       foreignKeyNodes.push({
         columns: localColumns,
@@ -1935,7 +1929,7 @@ export function interpretPslDocumentToSqlContract(
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
   const composedExtensionContracts: ReadonlyMap<string, Contract> =
-    input.composedExtensionContracts ?? new Map();
+    input.composedExtensionContracts;
   const defaultFunctionRegistry: ControlMutationDefaultRegistry =
     input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map();
   const generatorDescriptors = input.controlMutationDefaults?.generatorDescriptors ?? [];

@@ -16,6 +16,7 @@ function interpret(schema: string) {
     document: parsePslDocument({ schema, sourceId: 'schema.prisma' }),
     target: postgresPack,
     scalarTypeDescriptors,
+    composedExtensionContracts: new Map(),
     composedExtensionPacks: [paradedbPack.id],
     composedExtensionPackRefs: [paradedbPack],
   });

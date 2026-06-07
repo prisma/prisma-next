@@ -54,6 +54,7 @@ namespace public {
       document: pslDocument,
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
     });
 
@@ -220,5 +221,37 @@ namespace public {
 
     // Both authoring paths produce identical FK carriers including tableName = 'users'.
     expect(tsFks).toEqual(pslFks);
+  });
+
+  it('emits PSL_UNKNOWN_CONTRACT_SPACE when the extension contract is absent from composedExtensionContracts', () => {
+    // No contract for 'supabase' in the map — the interpreter must fail fast, not fall back to 'user'.
+    const pslDocument = parsePslDocument({
+      schema: `model Profile {
+  id    Int @id
+  userId Int
+  user  supabase:auth.User @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document: pslDocument,
+      target: postgresTarget,
+      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      composedExtensionPacks: ['supabase'],
+      composedExtensionContracts: new Map(),
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNKNOWN_CONTRACT_SPACE',
+          data: expect.objectContaining({ space: 'supabase' }),
+        }),
+      ]),
+    );
   });
 });
