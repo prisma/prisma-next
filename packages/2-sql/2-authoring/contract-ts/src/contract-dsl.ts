@@ -24,6 +24,8 @@ import type {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { NamedConstraintSpec } from './authoring-type-utils';
+import type { EnumTypeHandle } from './enum-type';
+import { isEnumTypeHandle } from './enum-type';
 
 export type NamingStrategy = 'identity' | 'snake_case';
 
@@ -32,7 +34,7 @@ export type NamingConfig = {
   readonly columns?: NamingStrategy;
 };
 
-type NamedStorageTypeRef = string | StorageTypeInstance | PostgresEnumStorageEntry;
+type NamedStorageTypeRef = string | StorageTypeInstance | PostgresEnumStorageEntry | EnumTypeHandle;
 
 type NamedConstraintNameSpec<Name extends string = string> = {
   readonly name: Name;
@@ -369,9 +371,19 @@ function namedTypeField<TypeRef extends StorageTypeInstance>(
 function namedTypeField<TypeRef extends PostgresEnumStorageEntry>(
   typeRef: TypeRef,
 ): ScalarFieldBuilder<ScalarFieldState<string, TypeRef, false, undefined>>;
+function namedTypeField<Handle extends EnumTypeHandle>(
+  typeRef: Handle,
+): ScalarFieldBuilder<ScalarFieldState<Handle['codecId'], Handle, false, undefined>>;
 function namedTypeField(
   typeRef: NamedStorageTypeRef,
 ): ScalarFieldBuilder<ScalarFieldState<string, NamedStorageTypeRef, false, undefined>> {
+  if (isEnumTypeHandle(typeRef)) {
+    return new ScalarFieldBuilder({
+      kind: 'scalar',
+      typeRef,
+      nullable: false,
+    });
+  }
   return new ScalarFieldBuilder({
     kind: 'scalar',
     typeRef,
@@ -1474,6 +1486,12 @@ export type ContractInput<
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
+  /**
+   * Domain enum handles authored via `enumType()`. Each handle lowers to a
+   * domain `enum` entry and a storage `valueSet` entry in the target's
+   * default namespace. Fields reference the enum via `field.namedType(handle)`.
+   */
+  readonly enums?: Record<string, import('./enum-type').EnumTypeHandle>;
 };
 
 export function model<

@@ -25,3 +25,5 @@ export type {
   UniqueConstraintNode,
 } from '../contract-definition';
 export type { TargetFieldRef } from '../contract-dsl';
+export type { EnumMember, EnumTypeHandle } from '../enum-type';
+export { enumType, member } from '../enum-type';
