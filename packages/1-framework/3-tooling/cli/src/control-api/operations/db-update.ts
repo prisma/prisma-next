@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  ControlAdapterInstance,
   ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyInstance,
@@ -26,6 +27,7 @@ const DB_UPDATE_POLICY = {
  */
 export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
+  readonly adapter: ControlAdapterInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   readonly contract: Contract;
   readonly mode: 'plan' | 'apply';
@@ -56,6 +58,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 ): Promise<DbUpdateResult> {
   const sharedInputs = {
     driver: options.driver,
+    adapter: options.adapter,
     familyInstance: options.familyInstance,
     contract: options.contract,
     migrations: options.migrations,

@@ -77,6 +77,7 @@ async function executeMigrationNewCommand(
   // at the read site, not somewhere downstream. See TML-2536.
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
+  const controlAdapter = config.adapter.create(stack);
 
   const contractPathAbsolute = resolveContractPath(config);
 
@@ -234,7 +235,7 @@ async function executeMigrationNewCommand(
       }
     }
 
-    const planner = migrations.createPlanner(familyInstance);
+    const planner = migrations.createPlanner(controlAdapter);
     const emptyPlan = planner.emptyMigration(
       {
         packageDir,

@@ -289,7 +289,12 @@ function setupBaseConfig(
         contractToSchema: vi.fn().mockReturnValue({}),
       },
     },
-    adapter: { kind: 'adapter', familyId: 'mongo', targetId: 'mongo' },
+    adapter: {
+      kind: 'adapter',
+      familyId: 'mongo',
+      targetId: 'mongo',
+      create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
+    },
     contract: { output: '/tmp/test/contract.json' },
     migrations: { dir: '/tmp/test/migrations' },
   });
@@ -512,7 +517,12 @@ describe('migration plan command', () => {
             contractToSchema: vi.fn().mockReturnValue({}),
           },
         },
-        adapter: { kind: 'adapter', familyId: 'mongo', targetId: 'mongo' },
+        adapter: {
+          kind: 'adapter',
+          familyId: 'mongo',
+          targetId: 'mongo',
+          create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
+        },
         contract: { output: '/tmp/test/contract.json' },
         migrations: { dir: '/tmp/test/migrations' },
         extensionPacks: [
@@ -683,7 +693,12 @@ describe('migration plan command', () => {
             emit: vi.fn(),
           },
         },
-        adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres' },
+        adapter: {
+          kind: 'adapter',
+          familyId: 'sql',
+          targetId: 'postgres',
+          create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+        },
         contract: { output: '/tmp/test/contract.json' },
         migrations: { dir: '/tmp/test/migrations' },
       });

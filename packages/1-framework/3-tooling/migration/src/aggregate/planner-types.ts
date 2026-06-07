@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  ControlAdapterInstance,
   ControlFamilyInstance,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -58,8 +59,8 @@ export interface AggregateCurrentDBState {
  * Inputs to {@link planMigration}.
  *
  * The planner is target-agnostic but family-aware: per-member synth
- * delegates to the family's `createPlanner(familyInstance).plan(...)`,
- * which is why `familyInstance`, `migrations` (the
+ * delegates to the family's `createPlanner(adapter).plan(...)`,
+ * which is why `adapter`, `migrations` (the
  * `TargetMigrationsCapability`), and `frameworkComponents` are all
  * threaded through. (`frameworkComponents` is passed verbatim into
  * `planner.plan(...)` per ADR 212; the planner does not interpret it.)
@@ -71,7 +72,7 @@ export interface AggregateCurrentDBState {
 export interface PlannerInput<TFamilyId extends string, TTargetId extends string> {
   readonly aggregate: ContractSpaceAggregate;
   readonly currentDBState: AggregateCurrentDBState;
-  readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
+  readonly adapter: ControlAdapterInstance<TFamilyId, TTargetId>;
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
     TTargetId,

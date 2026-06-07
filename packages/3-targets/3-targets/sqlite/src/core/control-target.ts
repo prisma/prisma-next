@@ -1,9 +1,7 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
-import type {
-  SqlControlFamilyInstance,
-  SqlControlTargetDescriptor,
-} from '@prisma-next/family-sql/control';
+import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR } from '@prisma-next/family-sql/control';
+import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
@@ -38,7 +36,7 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
     contractSerializer: new SqliteContractSerializer(),
     schemaVerifier: new SqliteSchemaVerifier(),
     migrations: {
-      createPlanner(_family: SqlControlFamilyInstance): MigrationPlanner<'sql', 'sqlite'> {
+      createPlanner(_adapter: SqlControlAdapter<'sqlite'>): MigrationPlanner<'sql', 'sqlite'> {
         return createSqliteMigrationPlanner();
       },
       createRunner(family) {
@@ -69,7 +67,7 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
         targetId: 'sqlite',
       };
     },
-    createPlanner(_family: SqlControlFamilyInstance) {
+    createPlanner(_adapter: SqlControlAdapter<'sqlite'>) {
       return createSqliteMigrationPlanner();
     },
     createRunner(family) {

@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  ControlAdapterInstance,
   ControlDriverInstance,
   ControlFamilyInstance,
   TargetMigrationsCapability,
@@ -56,6 +57,7 @@ describe('executeDbInit progress emission', () => {
 
     await executeDbInit({
       driver: mockDriver,
+      adapter: {} as unknown as ControlAdapterInstance<string, string>,
       familyInstance: mockFamilyInstance,
       contract: {
         target: 'postgres',
@@ -141,6 +143,7 @@ describe('executeDbInit progress emission', () => {
 
     await executeDbInit({
       driver: mockDriver,
+      adapter: {} as unknown as ControlAdapterInstance<string, string>,
       familyInstance: mockFamilyInstance,
       contract: {
         target: 'postgres',
@@ -208,6 +211,7 @@ describe('executeDbInit progress emission', () => {
 
     const result = await executeDbInit({
       driver: mockDriver,
+      adapter: {} as unknown as ControlAdapterInstance<string, string>,
       familyInstance: mockFamilyInstance,
       contract: {
         target: 'postgres',

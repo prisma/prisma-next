@@ -1,4 +1,5 @@
 import type {
+  ControlAdapterInstance,
   ControlFamilyInstance,
   MigrationOperationPolicy,
   MigrationPlanner,
@@ -16,10 +17,8 @@ const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
 };
 
-const STUB_FAMILY: ControlFamilyInstance<'sql', unknown> = {} as unknown as ControlFamilyInstance<
-  'sql',
-  unknown
->;
+const STUB_ADAPTER: ControlAdapterInstance<'sql', 'postgres'> =
+  {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
 
 function makeMember(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
   return makeContractSpaceMember({
@@ -86,7 +85,7 @@ describe('synthStrategy', () => {
       member: appMember,
       otherMembers: [extMember],
       schemaIntrospection: liveSchema,
-      familyInstance: STUB_FAMILY,
+      adapter: STUB_ADAPTER,
       migrations: stubMigrations,
       frameworkComponents: [],
       operationPolicy: POLICY,
@@ -140,7 +139,7 @@ describe('synthStrategy', () => {
       member: makeMember('app', {}),
       otherMembers: [],
       schemaIntrospection: { tables: {} },
-      familyInstance: STUB_FAMILY,
+      adapter: STUB_ADAPTER,
       migrations: stubMigrations,
       frameworkComponents: [],
       operationPolicy: POLICY,

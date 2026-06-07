@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  ControlAdapterInstance,
   ControlFamilyInstance,
   MigrationOperationPolicy,
   MigrationPlanner,
@@ -72,11 +73,11 @@ function makeStubMigrations(
   };
 }
 
-const STUB_FAMILY: ControlFamilyInstance<'sql', unknown> =
-  // The planner only forwards `familyInstance` to `migrations.createPlanner`
+const STUB_ADAPTER: ControlAdapterInstance<'sql', 'postgres'> =
+  // The planner only forwards `adapter` to `migrations.createPlanner`
   // and never inspects fields on it. The cast is the minimum surface that
   // satisfies the generic.
-  {} as unknown as ControlFamilyInstance<'sql', unknown>;
+  {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
 
 function makeSyntheticPlan(targetId: string): MigrationPlanWithAuthoringSurface {
   return {
@@ -102,7 +103,7 @@ describe('planMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
       },
-      familyInstance: STUB_FAMILY,
+      adapter: STUB_ADAPTER,
       migrations: makeStubMigrations(planner),
       frameworkComponents: [],
       callerPolicy: { ignoreGraphFor: new Set(['app']) },
@@ -139,7 +140,7 @@ describe('planMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
       },
-      familyInstance: STUB_FAMILY,
+      adapter: STUB_ADAPTER,
       migrations: makeStubMigrations(planner),
       frameworkComponents: [],
       callerPolicy: { ignoreGraphFor: new Set(['app']) },
@@ -177,7 +178,7 @@ describe('planMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
       },
-      familyInstance: STUB_FAMILY,
+      adapter: STUB_ADAPTER,
       migrations: makeStubMigrations(planner),
       frameworkComponents: [],
       callerPolicy: { ignoreGraphFor: new Set(['app']) },
@@ -209,7 +210,7 @@ describe('planMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
       },
-      familyInstance: STUB_FAMILY,
+      adapter: STUB_ADAPTER,
       migrations: makeStubMigrations(planner),
       frameworkComponents: [],
       // ignoreGraphFor a space that requires graph-walk — that's a
@@ -247,7 +248,7 @@ describe('planMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
       },
-      familyInstance: STUB_FAMILY,
+      adapter: STUB_ADAPTER,
       migrations: makeStubMigrations(planner),
       frameworkComponents: [],
       // Extension is not in ignoreGraphFor, but its graph is empty —
@@ -279,7 +280,7 @@ describe('planMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
       },
-      familyInstance: STUB_FAMILY,
+      adapter: STUB_ADAPTER,
       migrations: makeStubMigrations(failingPlanner),
       frameworkComponents: [],
       callerPolicy: { ignoreGraphFor: new Set(['app']) },

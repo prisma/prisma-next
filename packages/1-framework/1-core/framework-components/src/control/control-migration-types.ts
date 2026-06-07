@@ -13,7 +13,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { ImportRequirement } from '@prisma-next/ts-render';
 import type { Result } from '@prisma-next/utils/result';
 import type { TargetBoundComponentDescriptor } from '../shared/framework-components';
-import type { ControlDriverInstance, ControlFamilyInstance } from './control-instances';
+import type {
+  ControlAdapterInstance,
+  ControlDriverInstance,
+  ControlFamilyInstance,
+} from './control-instances';
 import type { OperationContext } from './control-result-types';
 
 // ============================================================================
@@ -537,7 +541,9 @@ export interface TargetMigrationsCapability<
     unknown
   >,
 > {
-  createPlanner(family: TFamilyInstance): MigrationPlanner<TFamilyId, TTargetId>;
+  createPlanner(
+    adapter: ControlAdapterInstance<TFamilyId, TTargetId>,
+  ): MigrationPlanner<TFamilyId, TTargetId>;
   createRunner(family: TFamilyInstance): MigrationRunner<TFamilyId, TTargetId>;
   /**
    * Synthesizes a family-specific schema IR from a contract for offline planning.

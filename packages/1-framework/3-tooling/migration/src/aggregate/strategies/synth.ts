@@ -1,5 +1,6 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  ControlAdapterInstance,
   ControlFamilyInstance,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -19,7 +20,7 @@ export interface SynthStrategyInputs<TFamilyId extends string, TTargetId extends
   readonly member: ContractSpaceMember;
   readonly otherMembers: ReadonlyArray<ContractSpaceMember>;
   readonly schemaIntrospection: unknown;
-  readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
+  readonly adapter: ControlAdapterInstance<TFamilyId, TTargetId>;
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
     TTargetId,
@@ -74,7 +75,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     input.otherMembers,
   );
 
-  const planner = input.migrations.createPlanner(input.familyInstance);
+  const planner = input.migrations.createPlanner(input.adapter);
   const plannerResult: MigrationPlannerResult = await (planner.plan({
     contract: input.member.contract(),
     schema: projectedSchema,

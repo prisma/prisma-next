@@ -276,6 +276,7 @@ async function executeMigrationPlanCommand(
   // started dispatching on raw shapes. See TML-2536.
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
+  const controlAdapter = config.adapter.create(stack);
 
   let toContract: Contract;
   try {
@@ -475,7 +476,7 @@ async function executeMigrationPlanCommand(
   }
 
   try {
-    const planner = migrations.createPlanner(familyInstance);
+    const planner = migrations.createPlanner(controlAdapter);
 
     if (
       isAutoBaseline &&

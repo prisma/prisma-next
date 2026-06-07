@@ -10,6 +10,7 @@ import type {
   MongoControlTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import { contractToMongoSchemaIR } from '@prisma-next/family-mongo/control';
+import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type {
   MigrationRunner,
   MigrationRunnerPerSpaceOptions,
@@ -49,7 +50,7 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
   contractSerializer: new MongoTargetContractSerializer(),
   schemaVerifier: new MongoTargetSchemaVerifier(),
   migrations: {
-    createPlanner(_family: MongoControlFamilyInstance) {
+    createPlanner(_adapter: MongoControlAdapter<'mongo'>) {
       return new MongoMigrationPlanner();
     },
     createRunner(family: MongoControlFamilyInstance) {

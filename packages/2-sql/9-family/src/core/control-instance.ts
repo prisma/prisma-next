@@ -243,14 +243,6 @@ export interface SqlControlFamilyInstance
   lowerAst(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
 
   /**
-   * The target control adapter, constructed once when the family instance is
-   * built and held for the family's lifetime. Satisfies the `Lowerer`
-   * interface (`lower(ast, ctx)`), so callers that only need lowering — e.g.
-   * the migration planner — take it directly without wrapping `lowerAst`.
-   */
-  readonly adapter: SqlControlAdapter<string>;
-
-  /**
    * Inserts the initial marker row for `space` (upsert on `space`).
    * Delegates to the target control adapter's write SPI; see
    * `SqlControlAdapter.initMarker`.
@@ -754,8 +746,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     lowerAst(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement {
       return getControlAdapter().lower(ast, context);
     },
-
-    adapter: controlAdapter,
 
     bootstrapControlTableQueries(): readonly DdlNode[] {
       return getControlAdapter().bootstrapControlTableQueries();

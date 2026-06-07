@@ -6,6 +6,7 @@ import type {
 import { emit as emitContractArtifacts } from '@prisma-next/emitter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  ControlAdapterInstance,
   ControlDriverInstance,
   ControlFamilyInstance,
   ControlStack,
@@ -151,6 +152,23 @@ class ControlClientImpl implements ControlClient {
       await this.driver.close();
       this.driver = null;
     }
+  }
+
+  /**
+   * Construct the control adapter once for a migration operation and return
+   * it, mirroring how the runtime plane builds the execution adapter once in
+   * `createExecutionStack`. Only `dbInit` / `dbUpdate` need it (it lowers the
+   * planner's DDL); read-only operations never build it. The descriptor is
+   * optional on the stack — targets without migrations omit it.
+   */
+  private buildControlAdapter(): ControlAdapterInstance<string, string> {
+    this.init();
+    if (!this.stack?.adapter) {
+      throw new Error(
+        `Target "${this.options.target.targetId}" requires an adapter for migrations`,
+      );
+    }
+    return this.stack.adapter.create(this.stack);
   }
 
   private async ensureConnected(): Promise<{
@@ -363,6 +381,8 @@ class ControlClientImpl implements ControlClient {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
+    const adapter = this.buildControlAdapter();
+
     let contract: Contract;
     try {
       contract = familyInstance.deserializeContract(options.contract);
@@ -373,6 +393,7 @@ class ControlClientImpl implements ControlClient {
 
     return executeDbInit({
       driver,
+      adapter,
       familyInstance,
       contract,
       mode: options.mode,
@@ -394,6 +415,8 @@ class ControlClientImpl implements ControlClient {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
+    const adapter = this.buildControlAdapter();
+
     let contract: Contract;
     try {
       contract = familyInstance.deserializeContract(options.contract);
@@ -404,6 +427,7 @@ class ControlClientImpl implements ControlClient {
 
     return executeDbUpdate({
       driver,
+      adapter,
       familyInstance,
       contract,
       mode: options.mode,

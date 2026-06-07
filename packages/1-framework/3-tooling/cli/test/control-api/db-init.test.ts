@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  ControlAdapterInstance,
   ControlDriverInstance,
   ControlFamilyInstance,
   TargetMigrationsCapability,
@@ -60,6 +61,7 @@ describe('executeDbInit', () => {
 
     await executeDbInit({
       driver: createMockDriver(),
+      adapter: {} as unknown as ControlAdapterInstance<'sql', 'postgres'>,
       familyInstance: createMockFamilyInstance(),
       contract: dummyContract,
       mode: 'plan',

@@ -1,5 +1,6 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
+  ControlAdapterInstance,
   ControlDriverInstance,
   ControlFamilyInstance,
   MigrationPlannerResult,
@@ -34,6 +35,8 @@ function createMockDriver() {
     close: vi.fn(),
   } as unknown as ControlDriverInstance<'sql', 'postgres'>;
 }
+
+const STUB_ADAPTER = {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
 
 function createMockFamilyInstance(overrides?: {
   readAllMarkers?: () => Promise<ReadonlyMap<string, ContractMarkerRecord>>;
@@ -116,6 +119,7 @@ describe('executeDbUpdate', () => {
   it('succeeds on a fresh database without marker', async () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance(),
       contract: dummyContract,
       mode: 'plan',
@@ -135,6 +139,7 @@ describe('executeDbUpdate', () => {
   it('returns PLANNING_FAILED when planner reports conflicts', async () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
         readAllMarkers: async () =>
           new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
@@ -190,6 +195,7 @@ describe('executeDbUpdate', () => {
 
     const result = await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
         readAllMarkers: async () =>
           new Map([
@@ -225,6 +231,7 @@ describe('executeDbUpdate', () => {
   it('returns RUNNER_FAILED when runner rejects apply', async () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
         readAllMarkers: async () =>
           new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
@@ -258,6 +265,7 @@ describe('executeDbUpdate', () => {
   it('returns success with execution stats and marker in apply mode', async () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
         readAllMarkers: async () =>
           new Map([
@@ -301,6 +309,7 @@ describe('executeDbUpdate', () => {
   it('returns success with 0 operations when database already matches contract', async () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
         readAllMarkers: async () =>
           new Map([
@@ -370,6 +379,7 @@ describe('executeDbUpdate', () => {
 
     const result = await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
         readAllMarkers: async () =>
           new Map([
@@ -428,6 +438,7 @@ describe('executeDbUpdate', () => {
 
     await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
         readAllMarkers: async () =>
           new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
@@ -485,6 +496,7 @@ describe('executeDbUpdate', () => {
     it('returns DESTRUCTIVE_CHANGES in apply mode without acceptDataLoss', async () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
+        adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance({
           readAllMarkers: async () =>
             new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
@@ -512,6 +524,7 @@ describe('executeDbUpdate', () => {
     it('proceeds to runner in apply mode with acceptDataLoss: true', async () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
+        adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance({
           readAllMarkers: async () =>
             new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
@@ -535,6 +548,7 @@ describe('executeDbUpdate', () => {
     it('returns success in plan mode regardless of destructive operations', async () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
+        adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance({
           readAllMarkers: async () =>
             new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
@@ -589,6 +603,7 @@ describe('executeDbUpdate', () => {
 
     const result = await executeDbUpdate({
       driver: createMockDriver(),
+      adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance(),
       contract: dummyContract,
       mode: 'apply',
@@ -620,6 +635,7 @@ describe('executeDbUpdate', () => {
 
       await executeDbUpdate({
         driver: createMockDriver(),
+        adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance(),
         contract: dummyContract,
         mode: 'plan',
@@ -645,6 +661,7 @@ describe('executeDbUpdate', () => {
 
       await executeDbUpdate({
         driver: createMockDriver(),
+        adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance(),
         contract: dummyContract,
         mode: 'apply',
@@ -676,6 +693,7 @@ describe('executeDbUpdate', () => {
 
       await executeDbUpdate({
         driver: createMockDriver(),
+        adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance(),
         contract: dummyContract,
         mode: 'plan',
@@ -697,6 +715,7 @@ describe('executeDbUpdate', () => {
 
       await executeDbUpdate({
         driver: createMockDriver(),
+        adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance(),
         contract: dummyContract,
         mode: 'apply',
@@ -722,6 +741,7 @@ describe('executeDbUpdate', () => {
     it('does not throw when onProgress is omitted', async () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
+        adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance(),
         contract: dummyContract,
         mode: 'plan',

@@ -5,6 +5,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  ControlAdapterInstance,
   ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyInstance,
@@ -66,6 +67,7 @@ const SPAN_IDS = {
  */
 export interface ExecuteRunOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
+  readonly adapter: ControlAdapterInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   readonly contract: Contract;
   readonly mode: 'plan' | 'apply';
@@ -107,6 +109,7 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
 ): Promise<DbInitResult | DbUpdateResult> {
   const {
     driver,
+    adapter,
     familyInstance,
     contract,
     mode,
@@ -172,7 +175,7 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
   const planResult = await planMigration<TFamilyId, TTargetId>({
     aggregate,
     currentDBState: { markersBySpaceId: markerRows, schemaIntrospection: schemaIR },
-    familyInstance,
+    adapter,
     migrations,
     frameworkComponents,
     callerPolicy: { ignoreGraphFor: new Set([aggregate.app.spaceId]) },

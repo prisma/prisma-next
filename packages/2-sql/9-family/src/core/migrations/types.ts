@@ -473,7 +473,7 @@ export interface SqlControlTargetDescriptor<
    * the base, the target-specific dispatch on the subclass.
    */
   readonly schemaVerifier: SchemaVerifier<TContract, SqlSchemaIR>;
-  createPlanner(family: SqlControlFamilyInstance): SqlMigrationPlanner<TTargetDetails>;
+  createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }
 

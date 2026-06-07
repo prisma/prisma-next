@@ -145,6 +145,7 @@ function createMockComponents() {
     kind: 'adapter',
     familyId: 'sql',
     targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
   } as unknown as ControlAdapterDescriptor<any, any, any>;
 

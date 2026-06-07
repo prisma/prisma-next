@@ -117,7 +117,12 @@ function setupConfigMock(): void {
       kind: 'target',
       migrations: {},
     },
-    adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
+    adapter: {
+      kind: 'adapter',
+      familyId: TARGET_FAMILY,
+      targetId: TARGET,
+      create: () => ({ familyId: TARGET_FAMILY, targetId: TARGET }),
+    },
     driver: {
       kind: 'driver',
       create: vi.fn().mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) }),
@@ -486,7 +491,12 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
               }),
             },
           },
-          adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
+          adapter: {
+            kind: 'adapter',
+            familyId: TARGET_FAMILY,
+            targetId: TARGET,
+            create: () => ({ familyId: TARGET_FAMILY, targetId: TARGET }),
+          },
           driver: { kind: 'driver', familyId: TARGET_FAMILY, targetId: TARGET },
           contract: { output: 'src/prisma/contract.json' },
         });

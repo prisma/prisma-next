@@ -1,9 +1,7 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
-import type {
-  SqlControlFamilyInstance,
-  SqlControlTargetDescriptor,
-} from '@prisma-next/family-sql/control';
+import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
 import { contractToSchemaIR, extractCodecControlHooks } from '@prisma-next/family-sql/control';
+import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlTargetInstance,
@@ -62,8 +60,8 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     contractSerializer: new PostgresContractSerializer(),
     schemaVerifier: new PostgresSchemaVerifier(),
     migrations: {
-      createPlanner(family: SqlControlFamilyInstance) {
-        return createPostgresMigrationPlanner(family.adapter);
+      createPlanner(adapter: SqlControlAdapter<'postgres'>) {
+        return createPostgresMigrationPlanner(adapter);
       },
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
@@ -107,8 +105,8 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
      * Direct method for SQL-specific usage.
      * @deprecated Use migrations.createPlanner() for CLI compatibility.
      */
-    createPlanner(family: SqlControlFamilyInstance) {
-      return createPostgresMigrationPlanner(family.adapter);
+    createPlanner(adapter: SqlControlAdapter<'postgres'>) {
+      return createPostgresMigrationPlanner(adapter);
     },
     /**
      * Direct method for SQL-specific usage.
