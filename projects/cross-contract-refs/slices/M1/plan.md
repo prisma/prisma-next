@@ -52,3 +52,32 @@ ACs owned by M1: **AC6** (collision + cycle rejection), **AC8** (round-trip prop
 ## Open items (deferred from M1)
 
 - **Transitive auto-loading of unlisted contract spaces.** M1.2 builds the dependency graph + cycle detection over the descriptor set the app lists in `extensionPacks`, with edges from each pack's declared `extensionPacks`, and errors on a declared-but-absent dependency. Auto-discovering and loading a pack the app did **not** list (via an extension's bundled `extensionPacks`) is deferred — it requires a `spaceId → descriptor` resolution mechanism not present today. Additive when needed.
+
+## Amendment dispatches (2026-06-06) — reconciliation + walking skeleton
+
+Added after merging `main` (PR#746 walking skeleton + #719). See `spec.md` § Amendment / Decision D-recon.
+
+### Dispatch M1.5 — Reconcile cross-space ownership checks
+
+- **Outcome:** make `main`'s `disjointness` check **namespace-aware** and **remove our duplicate `namespaceOwnershipCollision`** entirely. After this, one correct cross-space ownership check exists.
+- **Fix `disjointness`** (`packages/1-framework/3-tooling/migration/src/aggregate/check-integrity.ts` ~`contractViolations`, lines ~230–246): key `elementClaimedBy` on the full `(namespaceId, entityKind, entityName)` coordinate (all already yielded by `elementCoordinates`), not bare `entityName`. The `disjointness` violation's `element` becomes the qualified coordinate string (`claimedBy` shape unchanged). Update consumers' display strings (`contract-space-aggregate-loader.ts`, cli `integrity-violation-to-check-failure.ts`) and the assertion in `loader.test.ts` (~:366, `'user'` → qualified form).
+- **Remove `namespaceOwnershipCollision`:** the IntegrityViolation kind (`integrity-violation.ts:67–73` + JSDoc); `findNamespaceOwnershipCollisions` + `NamespaceCollision*` types (`control-stack.ts:382–459`) + their `exports/control.ts` re-exports; the call + helper in `check-integrity.ts` (line 118 + `namespaceOwnershipCollisionViolations` 261–286 + import); the cli case `PN-MIG-CHECK-017` (`integrity-violation-to-check-failure.ts:138–145`); the `migration-check.ts:384` filter entry; and the tests (`control-stack.test.ts:730–784`, `check-integrity.test.ts:78–118`).
+- **Migrate test coverage to `disjointness`:** add tests proving (a) same name in **different** namespaces across spaces → **no** collision (the `auth.users` vs `public.users` case — the false-positive we're fixing); (b) same `(namespace, kind, name)` across two spaces → collision naming both contributors; through the real load path.
+- **Validation gate (expanded — closes the babysit gaps):** the touched packages' tests + `pnpm typecheck` + `pnpm lint:deps` + `pnpm lint:casts` AND **full `pnpm lint`** (`biome check --error-on-warnings`) AND **`pnpm fixtures:check`** AND the **`examples/supabase` skeleton test** — the last three were the gaps CI caught during babysit. Rebuild dependent `dist` before downstream tests.
+- **dispatch-INVEST:** one logical change (make the check correct, drop the duplicate); Small-ish (mostly deletions + one keying fix + test migration).
+
+### Dispatch M1.6 — Walking-skeleton verification + FK-deferral record
+
+> **Resolution (2026-06-06): no code dispatch needed.** M1.5's review confirmed the skeleton requires **no M1 change** (the cross-contract FK genuinely needs M2 authoring + M3 planner/verifier), and `examples/supabase/test/skeleton.integration.test.ts`'s JSDoc already frames "later constituents extend in place." So M1.6 is satisfied by: (a) the **PR #745 description** recording that the `Profile.userId → auth.User.id` FK + cascade DoD is deferred to M2/M3, and (b) **CI** verifying the skeleton stays green against M1's reconciled checks (it couldn't be run locally — `examples/supabase` deps aren't installed in this worktree subtree). No implementer dispatch was spawned.
+
+- **Outcome:** confirm the `examples/supabase` skeleton integration test is green against M1 (post-M1.5), and **record that the cross-contract FK + cascade-delete DoD is deferred to M2 (authoring) + M3 (planner/verifier)** — not achievable in M1 (no authoring surface). No change to the skeleton's app contract / migration artefacts.
+- **Where the record lands:** the skeleton test's JSDoc (already frames "later constituents extend in place" — make the M1-vs-M2/M3 boundary explicit) and the PR #745 walking-skeleton note.
+- **Validation gate:** `examples/supabase` test green; `pnpm fixtures:check` clean (the skeleton emits `migrations/supabase/*`).
+- **dispatch-INVEST:** verification + docs; no production code change.
+
+## Revised slice DoD (supersedes the above for the amended scope)
+
+- AC6 delivered via the **namespace-aware `disjointness`** (cycle + reverse-ref + collision); `namespaceOwnershipCollision` removed; AC8/AC10 green; AC9 regression.
+- `examples/supabase` skeleton green against M1; FK-step deferral to M2/M3 recorded.
+- Full `pnpm lint` + `pnpm fixtures:check` + skeleton test added to the slice's standing gate (babysit lesson).
+- Reviewer SATISFIED; CI green on PR #745.
