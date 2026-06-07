@@ -35,7 +35,7 @@ Author tests **before** the implementation, in this order, and **prove they go r
 - [ ] The captured-failure tests (Y + showcase bleed) are RED against current code and GREEN after this slice — verified by the revert-to-red check (revert the new renderer, the colour tests fail; restore, they pass).
 - [ ] Force-render of the real showcase `@db→prod` path shows **zero** off-path green and no rotation colour on a path-highlighted graph (the ground-truth check we used in PR #735).
 - [ ] The old `StructuralCell` kinds, the render `switch`, and the `migrationHash?` bolt-on no longer exist.
-- [ ] Normal-mode (`graph`/`status`/`list`) rendering is unchanged — existing snapshots byte-identical.
+- [ ] Normal-mode (`graph`/`status`/`list`) rendering changes **intentionally**: the single-owner discipline replaces tees (`├`/`branchTee`/`mergeTee`) with corners, so the trunk stays a continuous `│` and parents corner in beneath it (`│─╮─╮`). The `graph-render.test.ts` snapshots are **regenerated** and the new corner rendering is visually reviewed. (Byte-identical is impossible here — it would contradict the no-tee rule. Only the *node labels, alignment, and lane assignment* stay equivalent; the *junction glyphs* change tee→corner.)
 
 ## Open Questions
 
