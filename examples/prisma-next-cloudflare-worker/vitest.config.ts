@@ -48,12 +48,13 @@ export default defineConfig({
       optimizer: {
         ssr: {
           enabled: true,
-          include: ['pg', 'pg-protocol', 'pg-connection-string', 'pg-cursor', 'pg-cloudflare'],
+          include: ['pg'],
           rolldownOptions: {
             external: [
               'net',
               'events',
               'util',
+              'util/types',
               'tls',
               'path',
               'fs',

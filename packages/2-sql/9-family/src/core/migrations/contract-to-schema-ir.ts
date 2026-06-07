@@ -219,7 +219,7 @@ function convertTable(
     name,
     columns,
     ...ifDefined('primaryKey', table.primaryKey),
-    foreignKeys: table.foreignKeys.map(convertForeignKey),
+    foreignKeys: table.foreignKeys.filter((fk) => fk.constraint !== false).map(convertForeignKey),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
   };

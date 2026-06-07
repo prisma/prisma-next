@@ -562,6 +562,81 @@ describe('contractToSchemaIR', () => {
     ]);
   });
 
+  it('omits constraintless foreign keys from physical schema IR', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: {
+            table: {
+              Workflow: table({
+                columns: {
+                  id: col({ nativeType: 'text' }),
+                  teamId: col({ nativeType: 'text' }),
+                },
+                primaryKey: { columns: ['id', 'teamId'] },
+              }),
+              WorkflowState: table({
+                columns: {
+                  workflowId: col({ nativeType: 'text' }),
+                  teamId: col({ nativeType: 'text' }),
+                },
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'WorkflowState',
+                      columns: ['workflowId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Workflow',
+                      columns: ['id'],
+                    },
+                    constraint: false,
+                    index: true,
+                  },
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'WorkflowState',
+                      columns: ['workflowId', 'teamId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Workflow',
+                      columns: ['id', 'teamId'],
+                    },
+                    name: 'workflow_state_workflow_team_fkey',
+                    onDelete: 'cascade',
+                    constraint: true,
+                    index: false,
+                  },
+                ],
+              }),
+            },
+          },
+        }),
+      },
+    });
+
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
+    expect(result.tables['WorkflowState']!.foreignKeys).toEqual([
+      {
+        columns: ['workflowId', 'teamId'],
+        referencedTable: 'Workflow',
+        referencedSchema: UNBOUND_NAMESPACE_ID,
+        referencedColumns: ['id', 'teamId'],
+        name: 'workflow_state_workflow_team_fkey',
+        onDelete: 'cascade',
+      },
+    ]);
+    expect(result.tables['WorkflowState']!.indexes).toEqual([
+      { columns: ['workflowId'], unique: false, name: 'WorkflowState_workflowId_idx' },
+    ]);
+  });
+
   it('converts multiple tables', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
