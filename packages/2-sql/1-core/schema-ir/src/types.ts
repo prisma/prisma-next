@@ -11,6 +11,10 @@
 
 export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export {
+  SqlCheckConstraintIR,
+  type SqlCheckConstraintIRInput,
+} from './ir/sql-check-constraint-ir';
+export {
   type SqlAnnotations,
   SqlColumnIR,
   type SqlColumnIRInput,

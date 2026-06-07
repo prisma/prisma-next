@@ -29,6 +29,7 @@ import type {
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
   PrimaryKey,
+  SqlCheckConstraintIRInput,
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
@@ -660,32 +661,39 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: SqlControlDriverInstance<'postgres'>,
     schema: string,
   ): Promise<SqlSchemaIR> {
-    // Execute all queries in parallel for efficiency (6 queries instead of 5T+1)
-    const [tablesResult, columnsResult, pkResult, fkResult, uniqueResult, indexResult] =
-      await Promise.all([
-        // Query all tables
-        driver.query<{ table_name: string }>(
-          `SELECT table_name
+    // Execute all queries in parallel for efficiency (7 queries instead of 6T+1)
+    const [
+      tablesResult,
+      columnsResult,
+      pkResult,
+      fkResult,
+      uniqueResult,
+      indexResult,
+      checkResult,
+    ] = await Promise.all([
+      // Query all tables
+      driver.query<{ table_name: string }>(
+        `SELECT table_name
          FROM information_schema.tables
          WHERE table_schema = $1
            AND table_type = 'BASE TABLE'
          ORDER BY table_name`,
-          [schema],
-        ),
-        // Query all columns for all tables in schema
-        driver.query<{
-          table_name: string;
-          column_name: string;
-          data_type: string;
-          udt_name: string;
-          is_nullable: string;
-          character_maximum_length: number | null;
-          numeric_precision: number | null;
-          numeric_scale: number | null;
-          column_default: string | null;
-          formatted_type: string | null;
-        }>(
-          `SELECT
+        [schema],
+      ),
+      // Query all columns for all tables in schema
+      driver.query<{
+        table_name: string;
+        column_name: string;
+        data_type: string;
+        udt_name: string;
+        is_nullable: string;
+        character_maximum_length: number | null;
+        numeric_precision: number | null;
+        numeric_scale: number | null;
+        column_default: string | null;
+        formatted_type: string | null;
+      }>(
+        `SELECT
            c.table_name,
            column_name,
            data_type,
@@ -709,16 +717,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            AND NOT a.attisdropped
          WHERE c.table_schema = $1
          ORDER BY c.table_name, c.ordinal_position`,
-          [schema],
-        ),
-        // Query all primary keys for all tables in schema
-        driver.query<{
-          table_name: string;
-          constraint_name: string;
-          column_name: string;
-          ordinal_position: number;
-        }>(
-          `SELECT
+        [schema],
+      ),
+      // Query all primary keys for all tables in schema
+      driver.query<{
+        table_name: string;
+        constraint_name: string;
+        column_name: string;
+        ordinal_position: number;
+      }>(
+        `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -731,24 +739,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'PRIMARY KEY'
          ORDER BY tc.table_name, kcu.ordinal_position`,
-          [schema],
-        ),
-        // Query all foreign keys for all tables in schema, including referential actions.
-        // Uses pg_catalog for correct positional pairing of composite FK columns
-        // (information_schema.constraint_column_usage lacks ordinal_position,
-        // which causes Cartesian products for multi-column FKs).
-        driver.query<{
-          table_name: string;
-          constraint_name: string;
-          column_name: string;
-          ordinal_position: number;
-          referenced_table_schema: string;
-          referenced_table_name: string;
-          referenced_column_name: string;
-          delete_rule: string;
-          update_rule: string;
-        }>(
-          `SELECT
+        [schema],
+      ),
+      // Query all foreign keys for all tables in schema, including referential actions.
+      // Uses pg_catalog for correct positional pairing of composite FK columns
+      // (information_schema.constraint_column_usage lacks ordinal_position,
+      // which causes Cartesian products for multi-column FKs).
+      driver.query<{
+        table_name: string;
+        constraint_name: string;
+        column_name: string;
+        ordinal_position: number;
+        referenced_table_schema: string;
+        referenced_table_name: string;
+        referenced_column_name: string;
+        delete_rule: string;
+        update_rule: string;
+      }>(
+        `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -781,16 +789,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'FOREIGN KEY'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-          [schema],
-        ),
-        // Query all unique constraints for all tables in schema (excluding PKs)
-        driver.query<{
-          table_name: string;
-          constraint_name: string;
-          column_name: string;
-          ordinal_position: number;
-        }>(
-          `SELECT
+        [schema],
+      ),
+      // Query all unique constraints for all tables in schema (excluding PKs)
+      driver.query<{
+        table_name: string;
+        constraint_name: string;
+        column_name: string;
+        ordinal_position: number;
+      }>(
+        `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -803,31 +811,31 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'UNIQUE'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-          [schema],
-        ),
-        // Query all indexes for all tables in schema (excluding constraints).
-        // `index_position` is the column's position within the index (1-based),
-        // derived from `pg_index.indkey` so composite indexes round-trip with
-        // their declared column order intact.
-        driver.query<{
-          tablename: string;
-          indexname: string;
-          indisunique: boolean;
-          attname: string | null;
-          index_position: number;
-          amname: string | null;
-          reloptions: string[] | null;
-        }>(
-          // `ix.indkey` is an int2vector of column numbers in the order the
-          // columns appear in the index definition. Unnest it WITH ORDINALITY
-          // so each (index, column) row carries its position in the index,
-          // then ORDER BY that position. Without this the rows come back in
-          // table-column order (`a.attnum`), which silently shuffles the
-          // columns of any composite index whose index order differs from
-          // the table order — verification compares against the contract
-          // with order-sensitive equality and reports a spurious
-          // `index_mismatch`.
-          `SELECT
+        [schema],
+      ),
+      // Query all indexes for all tables in schema (excluding constraints).
+      // `index_position` is the column's position within the index (1-based),
+      // derived from `pg_index.indkey` so composite indexes round-trip with
+      // their declared column order intact.
+      driver.query<{
+        tablename: string;
+        indexname: string;
+        indisunique: boolean;
+        attname: string | null;
+        index_position: number;
+        amname: string | null;
+        reloptions: string[] | null;
+      }>(
+        // `ix.indkey` is an int2vector of column numbers in the order the
+        // columns appear in the index definition. Unnest it WITH ORDINALITY
+        // so each (index, column) row carries its position in the index,
+        // then ORDER BY that position. Without this the rows come back in
+        // table-column order (`a.attnum`), which silently shuffles the
+        // columns of any composite index whose index order differs from
+        // the table order — verification compares against the contract
+        // with order-sensitive equality and reports a spurious
+        // `index_mismatch`.
+        `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
@@ -853,9 +861,34 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
                AND tc.constraint_name = i.indexname
            )
          ORDER BY i.tablename, i.indexname, k.ord`,
-          [schema],
-        ),
-      ]);
+        [schema],
+      ),
+      // Query all check constraints for enum-restricted columns.
+      // `pg_get_constraintdef(oid)` returns the predicate including the
+      // `CHECK (...)` wrapper. We parse the inner predicate to extract
+      // the column name and permitted values.
+      //
+      // Scope: only parses the `= ANY (ARRAY[...])` and `IN (...)` shapes
+      // that this slice emits. Arbitrary SQL predicates are left as-is
+      // and will not produce check IR entries (they are silently skipped).
+      driver.query<{
+        table_name: string;
+        constraint_name: string;
+        constraintdef: string;
+      }>(
+        `SELECT
+           cl.relname AS table_name,
+           c.conname AS constraint_name,
+           pg_get_constraintdef(c.oid) AS constraintdef
+         FROM pg_catalog.pg_constraint c
+         JOIN pg_catalog.pg_class cl ON cl.oid = c.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         WHERE ns.nspname = $1
+           AND c.contype = 'c'
+         ORDER BY cl.relname, c.conname`,
+        [schema],
+      ),
+    ]);
 
     // Group results by table name for efficient lookup
     const columnsByTable = groupBy(columnsResult.rows, 'table_name');
@@ -863,6 +896,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const fksByTable = groupBy(fkResult.rows, 'table_name');
     const uniquesByTable = groupBy(uniqueResult.rows, 'table_name');
     const indexesByTable = groupBy(indexResult.rows, 'tablename');
+    const checksByTable = groupBy(checkResult.rows, 'table_name');
 
     // Get set of PK constraint names per table (to exclude from uniques)
     const pkConstraintsByTable = new Map<string, Set<string>>();
@@ -1034,6 +1068,21 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...(idx.options !== undefined && { options: idx.options }),
       }));
 
+      // Process check constraints — parse each predicate into column + value set.
+      // Only the two shapes emitted by this slice are recognised; free-form
+      // predicates are silently skipped (they won't produce check IR entries).
+      const checksForTable: SqlCheckConstraintIRInput[] = [];
+      for (const checkRow of checksByTable.get(tableName) ?? []) {
+        const parsed = parseCheckConstraintDef(checkRow.constraintdef);
+        if (parsed) {
+          checksForTable.push({
+            name: checkRow.constraint_name,
+            column: parsed.column,
+            permittedValues: parsed.permittedValues,
+          });
+        }
+      }
+
       tables[tableName] = {
         name: tableName,
         columns,
@@ -1041,6 +1090,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         foreignKeys,
         uniques,
         indexes,
+        ...ifDefined('checks', checksForTable.length > 0 ? checksForTable : undefined),
       };
     }
 
@@ -1221,4 +1271,82 @@ function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<T[K], T
     group.push(item);
   }
   return map;
+}
+
+/**
+ * Parses a Postgres check-constraint definition string (as returned by
+ * `pg_get_constraintdef`) into a column name and permitted values array.
+ *
+ * Handles two shapes that Postgres emits for enum-style checks:
+ *
+ * 1. `= ANY (ARRAY[...])` — Postgres rewrites `col IN ('a','b')` to this form:
+ *    `CHECK ((col = ANY (ARRAY['a'::text, 'b'::text])))`
+ *
+ * 2. `IN (...)` — stays as-is when written directly:
+ *    `CHECK ((col IN ('a', 'b')))`
+ *
+ * Returns `{ column, permittedValues }` when the predicate matches one of
+ * the two recognised shapes. Returns `undefined` for anything else (e.g.
+ * a free-form SQL predicate that wasn't emitted by this slice).
+ */
+export function parseCheckConstraintDef(
+  constraintdef: string,
+): { column: string; permittedValues: readonly string[] } | undefined {
+  // Strip outer `CHECK (...)` wrapper and any extra parentheses.
+  // pg_get_constraintdef returns e.g. `CHECK ((col = ANY (ARRAY[...])))` — note
+  // the double parens: one from CHECK and one that Postgres wraps the predicate
+  // in. Strip both outer layers.
+  const afterCheck = constraintdef
+    .replace(/^CHECK\s*\(/i, '')
+    .replace(/\)$/, '')
+    .trim();
+  // Strip one more optional paren pair (the inner wrap Postgres adds)
+  const inner =
+    afterCheck.startsWith('(') && afterCheck.endsWith(')')
+      ? afterCheck.slice(1, -1).trim()
+      : afterCheck;
+
+  // Shape 1: col = ANY (ARRAY['a'::text, 'b'::text])
+  // The column name may be quoted; the cast (::text, ::character varying, etc.) is optional.
+  const anyArrayMatch = inner.match(/^"?(\w+)"?\s*=\s*ANY\s*\(\s*ARRAY\s*\[(.+)\]\s*\)/i);
+  if (anyArrayMatch) {
+    const column = anyArrayMatch[1];
+    const arrayBody = anyArrayMatch[2];
+    if (!column || !arrayBody) return undefined;
+    const permittedValues = extractArrayLiterals(arrayBody);
+    return permittedValues ? { column, permittedValues } : undefined;
+  }
+
+  // Shape 2: col IN ('a', 'b')
+  const inMatch = inner.match(/^"?(\w+)"?\s+IN\s*\((.+)\)/i);
+  if (inMatch) {
+    const column = inMatch[1];
+    const listBody = inMatch[2];
+    if (!column || !listBody) return undefined;
+    const permittedValues = extractQuotedLiterals(listBody);
+    return permittedValues ? { column, permittedValues } : undefined;
+  }
+
+  return undefined;
+}
+
+/**
+ * Extracts string literals from an `ARRAY[...]` body.
+ * Handles `'value'::type` casts by stripping the cast part.
+ */
+function extractArrayLiterals(arrayBody: string): readonly string[] | undefined {
+  // Match 'value'::cast or 'value' (with possible spaces)
+  const pattern = /'((?:[^'\\]|\\.|'')*)'\s*(?:::[^\s,\]]+)?/g;
+  const values = [...arrayBody.matchAll(pattern)].map((m) => m[1] ?? '');
+  return values.length > 0 ? values : undefined;
+}
+
+/**
+ * Extracts string literals from an `IN (...)` list.
+ * Handles single-quoted literals with possible escaped quotes.
+ */
+function extractQuotedLiterals(listBody: string): readonly string[] | undefined {
+  const pattern = /'((?:[^'\\]|\\.|'')*)'/g;
+  const values = [...listBody.matchAll(pattern)].map((m) => m[1] ?? '');
+  return values.length > 0 ? values : undefined;
 }

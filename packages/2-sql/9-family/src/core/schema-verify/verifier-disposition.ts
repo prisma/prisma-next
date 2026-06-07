@@ -41,7 +41,12 @@ export function classifySqlVerifierIssueKind(kind: SchemaIssue['kind']): Verifie
     case 'unique_constraint_mismatch':
     case 'index_mismatch':
     case 'default_mismatch':
+    case 'check_mismatch':
       return 'declaredIncompatible';
+    case 'check_missing':
+      return 'declaredMissing';
+    case 'check_removed':
+      return 'extraAuxiliary';
   }
 }
 

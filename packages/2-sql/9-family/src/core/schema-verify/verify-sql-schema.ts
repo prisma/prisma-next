@@ -37,6 +37,7 @@ import { verifierDisposition } from './verifier-disposition';
 import {
   arraysEqual,
   computeCounts,
+  verifyCheckConstraints,
   verifyForeignKeys,
   verifyIndexes,
   verifyPrimaryKey,
@@ -475,6 +476,7 @@ function verifySchemaTables(options: {
         typeMetadataRegistry,
         codecHooks,
         storageTypes,
+        contractStorage: contract.storage,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
       });
@@ -533,6 +535,7 @@ function verifyTableChildren(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  contractStorage: SqlStorage;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -548,6 +551,7 @@ function verifyTableChildren(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    contractStorage,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
@@ -708,6 +712,33 @@ function verifyTableChildren(options: {
     strict,
   );
   tableChildren.push(...indexStatuses);
+
+  // Verify check constraints when the contract declares checks for this table.
+  // schemaTable.checks carries the introspected live checks (parsed value sets).
+  // This call is additive: verifyEnumType (the native enum path) is untouched.
+  if (contractTable.checks && contractTable.checks.length > 0) {
+    const contractCheckIRs = contractTable.checks.map((c) => {
+      const ref = c.valueSet;
+      const ns = contractStorage.namespaces[ref.namespaceId];
+      const permittedValues: readonly string[] = ns?.entries.valueSet?.[ref.name]?.values ?? [];
+      return {
+        name: c.name,
+        column: c.column,
+        permittedValues,
+      };
+    });
+    const checkStatuses = verifyCheckConstraints(
+      contractCheckIRs,
+      schemaTable.checks ?? [],
+      tableName,
+      namespaceId,
+      tablePath,
+      tableControlPolicy,
+      issues,
+      strict,
+    );
+    tableChildren.push(...checkStatuses);
+  }
 
   return tableChildren;
 }

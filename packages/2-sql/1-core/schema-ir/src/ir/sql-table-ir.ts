@@ -1,5 +1,6 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
+import { SqlCheckConstraintIR, type SqlCheckConstraintIRInput } from './sql-check-constraint-ir';
 import { type SqlAnnotations, SqlColumnIR, type SqlColumnIRInput } from './sql-column-ir';
 import { SqlForeignKeyIR, type SqlForeignKeyIRInput } from './sql-foreign-key-ir';
 import { SqlIndexIR, type SqlIndexIRInput } from './sql-index-ir';
@@ -14,6 +15,8 @@ export interface SqlTableIRInput {
   readonly indexes: ReadonlyArray<SqlIndexIR | SqlIndexIRInput>;
   readonly primaryKey?: PrimaryKey | PrimaryKeyInput;
   readonly annotations?: SqlAnnotations;
+  /** Optional check constraints for enum-restricted columns. Omitted when none present. */
+  readonly checks?: ReadonlyArray<SqlCheckConstraintIR | SqlCheckConstraintIRInput>;
 }
 
 /**
@@ -38,6 +41,7 @@ export class SqlTableIR extends SqlSchemaIRNode {
   readonly indexes: ReadonlyArray<SqlIndexIR>;
   declare readonly primaryKey?: PrimaryKey;
   declare readonly annotations?: SqlAnnotations;
+  declare readonly checks?: ReadonlyArray<SqlCheckConstraintIR>;
 
   constructor(input: SqlTableIRInput) {
     super();
@@ -66,6 +70,13 @@ export class SqlTableIR extends SqlSchemaIRNode {
           : new PrimaryKey(input.primaryKey);
     }
     if (input.annotations !== undefined) this.annotations = input.annotations;
+    if (input.checks !== undefined && input.checks.length > 0) {
+      this.checks = Object.freeze(
+        input.checks.map((c) =>
+          c instanceof SqlCheckConstraintIR ? c : new SqlCheckConstraintIR(c),
+        ),
+      );
+    }
     freezeNode(this);
   }
 }

@@ -58,7 +58,10 @@ export interface BaseSchemaIssue {
     | 'index_mismatch'
     | 'default_missing'
     | 'default_mismatch'
-    | 'extra_default';
+    | 'extra_default'
+    | 'check_missing'
+    | 'check_removed'
+    | 'check_mismatch';
   readonly table?: string;
   /**
    * Namespace coordinate of the issue's subject (e.g. the schema a SQL
