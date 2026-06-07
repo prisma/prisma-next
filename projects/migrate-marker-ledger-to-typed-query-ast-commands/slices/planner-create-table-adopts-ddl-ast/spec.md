@@ -45,8 +45,8 @@ One reviewer holds it because it is a single mechanism with a single consumer: "
 **In:**
 - Extend the `CreateTable` DDL node + the contract-free `createTable(...)` constructor (Postgres + SQLite) with a target-contributed table-level **constraint** surface (composite PK, FK, unique).
 - Render the new constraints in the Postgres and SQLite adapter DDL visitors (dialect-correct).
-- Migrate `CreateTableCall.toOp()` (Postgres + SQLite) and `CreateSchemaCall.toOp()` (Postgres) to build the node via the constructors and lower via `adapter.lower()`; the `execute` step `sql` comes from lowering. Remove the raw `buildCreateTableSql` / `renderCreateTableSql` SQL-assembly (retain the native-type resolution as a node-construction input).
-- Tests pinning the rendered `CREATE TABLE` (including composite PK / FK / unique) and `CREATE SCHEMA` byte-stable vs current planner output; regenerate + commit any migration fixtures/snapshots that legitimately change.
+- Migrate **Postgres** `CreateTableCall.toOp()` + `CreateSchemaCall.toOp()` to build the node via the constructors and lower it through the injected `SqlControlAdapter` interface at plan time (see `design-notes.md § Planner DDL lowering mechanism (D3) — RESOLVED`); the `execute` step `sql` comes from lowering, with **no string-build fallback path**. Remove the raw `buildCreateTableSql` (PG) SQL-assembly (retain native-type resolution as node input). _(SQLite planner migration is split to a follow-up slice — see Out; narrowed post-D3-review, operator-approved.)_
+- A unit test that drives `CreateTableCall.toOp(lower)` / `CreateSchemaCall.toOp(lower)` **end-to-end through the lower path** and asserts the rendered Postgres `CREATE TABLE` (incl. composite PK) + `CREATE SCHEMA` is **byte-identical to pre-D3 planner output** (adapter-level rendering tests are not sufficient — the proof must exercise `toOp(lower)`). Migration golden/snapshot tests stay green with no regeneration.
 
 **Out (tracked follow-up slices in this project — each adds the node(s) + adapter visitor case + planner adoption):**
 - **Postgres column ops:** `AddColumn`, `DropColumn`, `AlterColumnType`, `SetNotNull`, `DropNotNull`, `SetDefault`, `DropDefault`.
@@ -54,6 +54,7 @@ One reviewer holds it because it is a single mechanism with a single consumer: "
 - **Indexes:** `CreateIndex`, `DropIndex` (both targets).
 - **Postgres types/db:** `CreateEnumType`, `AddEnumValues`, `DropEnumType`, `RenameType`, `CreateExtension`.
 - **`DropTable`** (both); **SQLite `RecreateTable`** (the table-rebuild dance — likely its own slice).
+- **SQLite `CreateTable` planner adoption — split out of this slice** (post-D3-review, operator-approved: D3 proved hard as a two-dialect dispatch, so Postgres lands first per the plan's sanctioned Postgres-then-SQLite fan-out). The shared substrate already exists from D1/D2 (the constraint node + `createTable(constraints)` constructor + SQLite adapter constraint-rendering); the SQLite follow-up slice does the SQLite adapter byte-parity reconciliation + migrates SQLite `CreateTableCall.toOp()` onto the lower path, mirroring the Postgres pattern proven here. Its own ticket at pickup.
 - **Mongo migration planner adoption.** This planner-adoption phase spans **all three targets, not just the SQL databases.** The Mongo migration planner's ops (`CreateCollection`/`CreateIndex`/… built today via the migration `*Call` path) must likewise construct the **contract-free Mongo command surface** (the `Create*Command` nodes the marker/ledger slice introduced) and route through `MongoControlAdapter.lower()` → driver, symmetric to the SQL planner adoption here. Tracked as a sibling follow-up slice.
 - Unchanged by design: the step contract (`sql: string` stays — no `{sql,params}`-on-step yet), runner / preview / snapshot consumers, prechecks/postchecks (stay introspection `SELECT`s), the TS-migration render path (`renderTypeScript()`).
 
@@ -69,8 +70,8 @@ One reviewer holds it because it is a single mechanism with a single consumer: "
 ## Slice-specific done conditions
 
 - [ ] The table-level constraint node shape (Open Question 1) is settled by the first dispatch and recorded in `design-notes.md` before the planner call sites are migrated.
-- [ ] `CreateTableCall.toOp()` (PG + SQLite) and `CreateSchemaCall.toOp()` (PG) produce their `execute` step `sql` via `adapter.lower()` of a DDL node; `git grep` for `buildCreateTableSql` / `renderCreateTableSql` SQL-assembly returns zero.
-- [ ] Rendered `CREATE TABLE` (incl. composite PK / FK / unique) + `CREATE SCHEMA` are byte-stable vs current output, pinned by tests; migration fixtures/snapshots green (`pnpm fixtures:check`).
+- [ ] **Postgres** `CreateTableCall.toOp()` + `CreateSchemaCall.toOp()` produce their `execute` step `sql` via `adapter.lower()` of a DDL node, with **no string-build fallback** (the planner tests pass a real lowerer and exercise the lower path); `git grep buildCreateTableSql` returns zero. _(SQLite's assembler legitimately remains — SQLite adoption is a follow-up slice.)_
+- [ ] Rendered Postgres `CREATE TABLE` (incl. composite PK) + `CREATE SCHEMA` are **byte-identical to pre-D3 output, pinned by a test that drives `toOp(lower)`** (not just adapter-level rendering); migration golden/snapshot tests green with no regeneration; `pnpm fixtures:check` green.
 
 ## Open Questions
 
