@@ -3,13 +3,12 @@ import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control'
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
-import * as contractFreeDdl from '../../contract-free/ddl';
 import { errorPostgresMigrationStackMissing } from '../errors';
+import { CreateSchemaCall, CreateTableCall } from './op-factory-call';
 import { type DataTransformOptions, dataTransform } from './operations/data-transform';
-import { buildCreateSchemaOp } from './operations/dependencies';
-import { buildCreateTableOp } from './operations/tables';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 /**
@@ -87,8 +86,12 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    const node = contractFreeDdl.createTable(options);
-    return buildCreateTableOp(node, this.controlAdapter);
+    return new CreateTableCall(
+      options.schema ?? UNBOUND_NAMESPACE_ID,
+      options.table,
+      options.columns,
+      options.constraints,
+    ).toOp(this.controlAdapter);
   }
 
   /**
@@ -103,10 +106,6 @@ export abstract class PostgresMigration extends SqlMigration<
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
-    const node = contractFreeDdl.createSchema({
-      ...options,
-      ifNotExists: options.ifNotExists ?? true,
-    });
-    return buildCreateSchemaOp(node, this.controlAdapter);
+    return new CreateSchemaCall(options.schema).toOp(this.controlAdapter);
   }
 }

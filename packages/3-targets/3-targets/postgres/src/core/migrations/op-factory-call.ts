@@ -49,11 +49,13 @@ import {
   setNotNull,
 } from './operations/columns';
 import { addForeignKey, addPrimaryKey, addUnique, dropConstraint } from './operations/constraints';
-import { buildCreateSchemaOp, createExtension } from './operations/dependencies';
+import { createExtension } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
 import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
-import { buildCreateTableOp, dropTable } from './operations/tables';
+import { step, targetDetails } from './operations/shared';
+import { dropTable } from './operations/tables';
+import { toRegclassLiteral } from './planner-sql-checks';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -205,7 +207,29 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
       columns: this.columns,
       ...(this.constraints ? { constraints: this.constraints } : {}),
     });
-    return buildCreateTableOp(ddlNode, lower);
+    const { sql } = lower.lower(ddlNode, { contract: {} });
+    const schemaName = this.schemaName;
+    const tableName = this.tableName;
+    return {
+      id: `table.${tableName}`,
+      label: `Create table "${tableName}"`,
+      summary: `Creates table "${tableName}"`,
+      operationClass: 'additive',
+      target: targetDetails('table', tableName, schemaName),
+      precheck: [
+        step(
+          `ensure table "${tableName}" does not exist`,
+          `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
+        ),
+      ],
+      execute: [step(`create table "${tableName}"`, sql)],
+      postcheck: [
+        step(
+          `verify table "${tableName}" exists`,
+          `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NOT NULL`,
+        ),
+      ],
+    };
   }
 
   renderTypeScript(): string {
@@ -913,7 +937,17 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
       );
     }
     const ddlNode = contractFreeDdl.createSchema({ schema: this.schemaName, ifNotExists: true });
-    return buildCreateSchemaOp(ddlNode, lower);
+    const { sql } = lower.lower(ddlNode, { contract: {} });
+    const schemaName = this.schemaName;
+    return {
+      id: `schema.${schemaName}`,
+      label: `Create schema "${schemaName}"`,
+      operationClass: 'additive',
+      target: { id: 'postgres' },
+      precheck: [],
+      execute: [step(`Create schema "${schemaName}"`, sql)],
+      postcheck: [],
+    };
   }
 
   renderTypeScript(): string {
