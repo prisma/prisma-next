@@ -14,6 +14,11 @@ changes:
 ---
 
 <!--
+dependabot/runtime-deps: bumped pg 8.20→8.21, pg-cursor 2.19→2.20, vitest 4.1.6→4.1.7,
+vite 8.0.13→8.0.15, tsdown 0.22.0→0.22.1, tsx 4.22.3→4.22.4, next 16.2.4→16.2.6,
+postcss 8.5.14→8.5.15, evlog 2.16.0→2.18.1, @prisma/dev 0.24.7→0.24.8,
+@types/node 25.6.0→25.9.1 — all incidental to examples; no user-side action required.
+
 TML-2808: the SQL/Mongo contract storage IR moved to a namespace
 envelope (`namespaces.<ns>.entries.<kind>`) and lifted cross-references
 from bare strings to `{ namespace, model }` objects in `domain`.
