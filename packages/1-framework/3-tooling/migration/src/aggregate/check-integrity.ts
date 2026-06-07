@@ -1,4 +1,3 @@
-import { findNamespaceOwnershipCollisions } from '@prisma-next/framework-components/control';
 import { elementCoordinates } from '@prisma-next/framework-components/ir';
 import { EMPTY_CONTRACT_HASH } from '../constants';
 import { MigrationToolsError } from '../errors';
@@ -115,7 +114,6 @@ export function computeIntegrityViolations(
 
   if (opts?.checkContracts === true) {
     violations.push(...contractViolations(input));
-    violations.push(...namespaceOwnershipCollisionViolations(input));
   }
 
   return violations;
@@ -208,6 +206,7 @@ function layoutViolations(
 function contractViolations(input: IntegrityComputationInput): readonly IntegrityViolation[] {
   const out: IntegrityViolation[] = [];
   const elementClaimedBy = new Map<string, string[]>();
+  const elementLabel = new Map<string, string>();
 
   for (const { member } of input.spaces) {
     let contract: ReturnType<ContractSpaceMember['contract']>;
@@ -227,16 +226,21 @@ function contractViolations(input: IntegrityComputationInput): readonly Integrit
       });
     }
 
-    for (const { entityName: elementName } of elementCoordinates(contract.storage)) {
-      const claimers = elementClaimedBy.get(elementName);
+    for (const { namespaceId, entityKind, entityName } of elementCoordinates(contract.storage)) {
+      const key = `${namespaceId}:${entityKind}:${entityName}`;
+      const claimers = elementClaimedBy.get(key);
       if (claimers) claimers.push(member.spaceId);
-      else elementClaimedBy.set(elementName, [member.spaceId]);
+      else {
+        elementClaimedBy.set(key, [member.spaceId]);
+        elementLabel.set(key, `${namespaceId}.${entityName}`);
+      }
     }
   }
 
   const disjointness: IntegrityViolation[] = [];
-  for (const [element, claimedBy] of elementClaimedBy) {
+  for (const [key, claimedBy] of elementClaimedBy) {
     if (claimedBy.length > 1) {
+      const element = elementLabel.get(key) ?? key;
       disjointness.push({ kind: 'disjointness', element, claimedBy: [...claimedBy].sort() });
     }
   }
@@ -245,44 +249,6 @@ function contractViolations(input: IntegrityComputationInput): readonly Integrit
   );
   out.push(...disjointness);
   return out;
-}
-
-/**
- * Collect namespace primitive ownership collisions across all contract spaces.
- *
- * Delegates detection to `findNamespaceOwnershipCollisions` from
- * framework-components (the canonical home for this logic) and maps each
- * returned collision to a `namespaceOwnershipCollision` IntegrityViolation.
- *
- * Runs inside the `checkContracts` gate because it reads `member.contract()`.
- * Spaces whose `contract()` throws (already surfaced as `contractUnreadable`)
- * are skipped.
- */
-function namespaceOwnershipCollisionViolations(
-  input: IntegrityComputationInput,
-): readonly IntegrityViolation[] {
-  const entries: {
-    spaceId: string;
-    storage: ReturnType<ContractSpaceMember['contract']>['storage'];
-  }[] = [];
-
-  for (const { member } of input.spaces) {
-    let contract: ReturnType<ContractSpaceMember['contract']>;
-    try {
-      contract = member.contract();
-    } catch {
-      continue;
-    }
-    entries.push({ spaceId: member.spaceId, storage: contract.storage });
-  }
-
-  return findNamespaceOwnershipCollisions(entries).map((c) => ({
-    kind: 'namespaceOwnershipCollision' as const,
-    namespace: c.namespaceId,
-    primitiveKind: c.entityKind,
-    name: c.name,
-    contributorSpaceIds: c.contributorSpaceIds,
-  }));
 }
 
 function detailOf(error: unknown): string {
