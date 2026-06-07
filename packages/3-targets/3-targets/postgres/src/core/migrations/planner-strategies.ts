@@ -24,6 +24,7 @@ import type {
   MigrationOperationPolicy,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
+import { resolveValueSetValues } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -31,7 +32,7 @@ import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlStorage,
-  type StorageTable,
+  StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -44,11 +45,13 @@ import {
   resolveDdlSchemaForNamespaceStorage,
 } from './enum-planning';
 import {
+  AddCheckConstraintCall,
   AddColumnCall,
   AddEnumValuesCall,
   AlterColumnTypeCall,
   CreateEnumTypeCall,
   DataTransformCall,
+  DropCheckConstraintCall,
   DropEnumTypeCall,
   type PostgresOpFactoryCall,
   RawSqlCall,
@@ -658,6 +661,134 @@ function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, Post
 }
 
 /**
+ * Collects every check constraint from a table in the contract storage.
+ * Returns an empty array when the table has no checks or the table is absent.
+ */
+function collectContractChecks(
+  storage: SqlStorage,
+  namespaceId: string,
+  tableName: string,
+): ReadonlyArray<{ name: string; column: string; permittedValues: readonly string[] }> {
+  const ns = storage.namespaces[namespaceId];
+  const tableRaw = ns?.entries.table[tableName];
+  if (!(tableRaw instanceof StorageTable)) return [];
+  const checks = tableRaw.checks;
+  if (!checks || checks.length === 0) return [];
+  return checks.map((c) => ({
+    name: c.name,
+    column: c.column,
+    permittedValues: resolveValueSetValues(
+      c.valueSet,
+      storage,
+      `check "${c.name}" on "${tableName}"`,
+    ),
+  }));
+}
+
+/**
+ * Compares two value arrays as unordered sets.
+ */
+function checkValueSetsEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const bSet = new Set(b);
+  return a.every((v) => bSet.has(v));
+}
+
+/**
+ * Plans check-constraint migrations for `enumType`-authored columns.
+ *
+ * Walks every namespace's tables in the target contract. For each table that
+ * carries `checks`, diffs the contract-expected checks against the live
+ * schema's checks:
+ *
+ * - Check in contract, absent from live DB → `AddCheckConstraintCall`.
+ * - Check in live DB, absent from contract → `DropCheckConstraintCall`.
+ * - Check on both sides but value sets differ → `DropCheckConstraintCall`
+ *   then `AddCheckConstraintCall` (drop + recreate; a check predicate cannot
+ *   be altered in place).
+ *
+ * Consumes `check_missing`, `check_removed`, and `check_mismatch` issues.
+ * Does not touch the native enum path (`nativeEnumPlanCallStrategy` is
+ * unchanged).
+ */
+export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  const calls: PostgresOpFactoryCall[] = [];
+  const handledIssueKeys = new Set<string>();
+
+  for (const [namespaceId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
+    for (const [tableName, tableRaw] of Object.entries(ns.entries.table)) {
+      if (!(tableRaw instanceof StorageTable)) continue;
+      const contractChecks = collectContractChecks(ctx.toContract.storage, namespaceId, tableName);
+      if (contractChecks.length === 0) continue;
+
+      const schemaTable = ctx.schema.tables[tableName];
+      const liveChecks = schemaTable?.checks ?? [];
+      const ddlSchema = resolveDdlSchemaForNamespace(ctx, namespaceId);
+
+      for (const contractCheck of contractChecks) {
+        const liveCheck = liveChecks.find((c) => c.name === contractCheck.name);
+        const issueKey = `${tableName} ${contractCheck.name}`;
+        if (!liveCheck) {
+          calls.push(
+            new AddCheckConstraintCall(
+              ddlSchema,
+              tableName,
+              contractCheck.name,
+              contractCheck.column,
+              contractCheck.permittedValues,
+            ),
+          );
+          handledIssueKeys.add(issueKey);
+        } else if (!checkValueSetsEqual(contractCheck.permittedValues, liveCheck.permittedValues)) {
+          calls.push(
+            new DropCheckConstraintCall(ddlSchema, tableName, contractCheck.name),
+            new AddCheckConstraintCall(
+              ddlSchema,
+              tableName,
+              contractCheck.name,
+              contractCheck.column,
+              contractCheck.permittedValues,
+            ),
+          );
+          handledIssueKeys.add(issueKey);
+        }
+        // else: values match — no op needed, still consume the issue
+        else {
+          handledIssueKeys.add(issueKey);
+        }
+      }
+
+      // Emit drops for checks that are live but not in the contract.
+      for (const liveCheck of liveChecks) {
+        const inContract = contractChecks.some((c) => c.name === liveCheck.name);
+        if (!inContract) {
+          const issueKey = `${tableName} ${liveCheck.name}`;
+          calls.push(new DropCheckConstraintCall(ddlSchema, tableName, liveCheck.name));
+          handledIssueKeys.add(issueKey);
+        }
+      }
+    }
+  }
+
+  if (calls.length === 0 && handledIssueKeys.size === 0) return { kind: 'no_match' };
+
+  const remaining = issues.filter((issue) => {
+    if (
+      issue.kind !== 'check_missing' &&
+      issue.kind !== 'check_removed' &&
+      issue.kind !== 'check_mismatch'
+    ) {
+      return true;
+    }
+    if (!issue.table || !issue.indexOrConstraint) return true;
+    const key = `${issue.table} ${issue.indexOrConstraint}`;
+    return !handledIssueKeys.has(key);
+  });
+
+  return { kind: 'match', issues: remaining, calls };
+};
+
+/**
  * Dispatches non-enum codec-typed storage types through their codec's
  * `planTypeOperations` hook (the authoritative source for codec-driven DDL
  * such as custom type creation). Enum dispatch lives in
@@ -929,6 +1060,7 @@ export const postgresPlannerStrategies: readonly CallMigrationStrategy[] = [
   typeChangeCallStrategy,
   nullableTighteningCallStrategy,
   nativeEnumPlanCallStrategy,
+  checkConstraintPlanCallStrategy,
   storageTypePlanCallStrategy,
   notNullAddColumnCallStrategy,
 ];

@@ -8,7 +8,8 @@ export type OperationClass =
   | 'primaryKey'
   | 'unique'
   | 'index'
-  | 'foreignKey';
+  | 'foreignKey'
+  | 'checkConstraint';
 
 export interface PostgresPlanTargetDetails {
   readonly schema: string;

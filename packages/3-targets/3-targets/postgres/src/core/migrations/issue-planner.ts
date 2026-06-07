@@ -42,6 +42,7 @@ import {
   CreateIndexCall,
   CreateSchemaCall,
   CreateTableCall,
+  DropCheckConstraintCall,
   DropColumnCall,
   DropConstraintCall,
   DropDefaultCall,
@@ -121,6 +122,11 @@ const ISSUE_KIND_ORDER: Record<string, number> = {
   unique_constraint_mismatch: 51,
   index_mismatch: 52,
   foreign_key_mismatch: 60,
+
+  // Check constraints
+  check_missing: 53,
+  check_mismatch: 54,
+  check_removed: 55,
 };
 
 function issueOrder(issue: SchemaIssue): number {
@@ -572,6 +578,48 @@ function mapIssueToCall(
         ),
       );
 
+    case 'check_missing': {
+      if (!issue.table || !issue.indexOrConstraint)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Check missing issue has no table/constraint name'),
+        );
+      // check_missing is normally consumed by checkConstraintPlanCallStrategy.
+      // This case handles any that arrive here (e.g. in tests that invoke
+      // mapIssueToCall directly or skip the strategy).
+      return notOk(
+        issueConflict(
+          'unsupportedOperation',
+          `Check constraint "${issue.indexOrConstraint}" missing on "${issue.table}" — handled by checkConstraintPlanCallStrategy`,
+        ),
+      );
+    }
+
+    case 'check_mismatch': {
+      if (!issue.table || !issue.indexOrConstraint)
+        return notOk(
+          issueConflict(
+            'unsupportedOperation',
+            'Check mismatch issue has no table/constraint name',
+          ),
+        );
+      return notOk(
+        issueConflict(
+          'unsupportedOperation',
+          `Check constraint "${issue.indexOrConstraint}" values mismatch on "${issue.table}" — handled by checkConstraintPlanCallStrategy`,
+        ),
+      );
+    }
+
+    case 'check_removed': {
+      if (!issue.table || !issue.indexOrConstraint)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Check removed issue has no table/constraint name'),
+        );
+      return ok([
+        new DropCheckConstraintCall(tableSchema(issue), issue.table, issue.indexOrConstraint),
+      ]);
+    }
+
     case 'foreign_key_mismatch':
       if (!issue.table)
         return notOk(issueConflict('foreignKeyConflict', 'Foreign key issue has no table name'));
@@ -704,9 +752,12 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
     case 'dropTable':
     case 'dropColumn':
     case 'dropConstraint':
+    case 'dropCheckConstraint':
     case 'dropIndex':
     case 'dropDefault':
       return 'drop';
+    case 'addCheckConstraint':
+      return 'unique'; // after uniques, before indexes
     case 'createTable':
       return 'table';
     case 'addColumn':

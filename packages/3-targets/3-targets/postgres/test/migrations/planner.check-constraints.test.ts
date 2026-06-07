@@ -1,0 +1,381 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  buildSqlNamespace,
+  CheckConstraint,
+  SqlStorage,
+  StorageTable,
+  StorageValueSet,
+} from '@prisma-next/sql-contract/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
+import { planIssues } from '../../src/core/migrations/issue-planner';
+import { checkConstraintPlanCallStrategy } from '../../src/core/migrations/planner-strategies';
+
+const VALUE_SET_NAME = 'Status_values';
+const CHECK_NAME = 'user_status_check';
+const TABLE_NAME = 'user';
+const COLUMN_NAME = 'status';
+const SCHEMA_NAME = 'public';
+
+function makeValueSetRef() {
+  return {
+    plane: 'storage' as const,
+    entityKind: 'value-set' as const,
+    namespaceId: UNBOUND_NAMESPACE_ID,
+    name: VALUE_SET_NAME,
+  };
+}
+
+function makeContractWithCheck(values: readonly string[]): Contract<SqlStorage> {
+  const ns = buildSqlNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: {
+      table: {
+        [TABLE_NAME]: new StorageTable({
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            [COLUMN_NAME]: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          checks: [
+            new CheckConstraint({
+              name: CHECK_NAME,
+              column: COLUMN_NAME,
+              valueSet: makeValueSetRef(),
+            }),
+          ],
+        }),
+      },
+      valueSet: {
+        [VALUE_SET_NAME]: new StorageValueSet({
+          kind: 'value-set',
+          values: values as string[],
+        }),
+      },
+    },
+  });
+  return {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:test'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:contract'),
+      namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
+    }),
+    roots: {},
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+}
+
+function makeContractWithoutCheck(): Contract<SqlStorage> {
+  const ns = buildSqlNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: {
+      table: {
+        [TABLE_NAME]: new StorageTable({
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            [COLUMN_NAME]: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        }),
+      },
+    },
+  });
+  return {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:test'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:contract'),
+      namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
+    }),
+    roots: {},
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+}
+
+function schemaWithCheck(values: readonly string[]): SqlSchemaIR {
+  return {
+    tables: {
+      [TABLE_NAME]: {
+        name: TABLE_NAME,
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+        checks: [
+          new SqlCheckConstraintIR({
+            name: CHECK_NAME,
+            column: COLUMN_NAME,
+            permittedValues: [...values],
+          }),
+        ],
+      },
+    },
+  };
+}
+
+function schemaWithoutCheck(): SqlSchemaIR {
+  return {
+    tables: {
+      [TABLE_NAME]: {
+        name: TABLE_NAME,
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+    },
+  };
+}
+
+const defaultCtx = {
+  schemaName: SCHEMA_NAME,
+  codecHooks: new Map(),
+  storageTypes: {},
+};
+
+describe('checkConstraintPlanCallStrategy', () => {
+  it('emits AddCheckConstraintCall when contract has a check absent from live schema', () => {
+    const contract = makeContractWithCheck(['active', 'inactive']);
+    const result = checkConstraintPlanCallStrategy(
+      [
+        {
+          kind: 'check_missing',
+          table: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          indexOrConstraint: CHECK_NAME,
+          expected: 'active, inactive',
+          message: `Table "${TABLE_NAME}" is missing check "${CHECK_NAME}"`,
+        },
+      ],
+      {
+        ...defaultCtx,
+        toContract: contract,
+        fromContract: null,
+        schema: schemaWithoutCheck(),
+        policy: { allowedOperationClasses: ['additive'] },
+        frameworkComponents: [],
+      },
+    );
+
+    expect(result.kind).toBe('match');
+    if (result.kind !== 'match') return;
+    expect(result.calls).toHaveLength(1);
+    expect(result.calls[0]).toMatchObject({
+      factoryName: 'addCheckConstraint',
+      tableName: TABLE_NAME,
+      constraintName: CHECK_NAME,
+      column: COLUMN_NAME,
+      values: expect.arrayContaining(['active', 'inactive']),
+    });
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it('emits DropCheckConstraintCall + AddCheckConstraintCall when value sets differ', () => {
+    const contract = makeContractWithCheck(['active', 'inactive', 'pending']);
+    const result = checkConstraintPlanCallStrategy(
+      [
+        {
+          kind: 'check_mismatch',
+          table: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          indexOrConstraint: CHECK_NAME,
+          expected: 'active, inactive, pending',
+          actual: 'active, inactive',
+          message: `Table "${TABLE_NAME}" check "${CHECK_NAME}" has different values`,
+        },
+      ],
+      {
+        ...defaultCtx,
+        toContract: contract,
+        fromContract: null,
+        schema: schemaWithCheck(['active', 'inactive']),
+        policy: { allowedOperationClasses: ['additive', 'destructive'] },
+        frameworkComponents: [],
+      },
+    );
+
+    expect(result.kind).toBe('match');
+    if (result.kind !== 'match') return;
+    expect(result.calls).toHaveLength(2);
+    expect(result.calls[0]).toMatchObject({
+      factoryName: 'dropCheckConstraint',
+      tableName: TABLE_NAME,
+      constraintName: CHECK_NAME,
+    });
+    expect(result.calls[1]).toMatchObject({
+      factoryName: 'addCheckConstraint',
+      tableName: TABLE_NAME,
+      constraintName: CHECK_NAME,
+      values: expect.arrayContaining(['active', 'inactive', 'pending']),
+    });
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it('emits DropCheckConstraintCall when live has a check absent from contract', () => {
+    const contract = makeContractWithoutCheck();
+    const result = checkConstraintPlanCallStrategy(
+      [
+        {
+          kind: 'check_removed',
+          table: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          indexOrConstraint: CHECK_NAME,
+          actual: 'active, inactive',
+          message: `Table "${TABLE_NAME}" has extra check "${CHECK_NAME}"`,
+        },
+      ],
+      {
+        ...defaultCtx,
+        toContract: contract,
+        fromContract: null,
+        schema: schemaWithCheck(['active', 'inactive']),
+        policy: { allowedOperationClasses: ['destructive'] },
+        frameworkComponents: [],
+      },
+    );
+
+    // Contract has no checks — the strategy has nothing to iterate over.
+    // The check_removed issue falls through (no tables with checks in contract).
+    // The DropCheckConstraintCall should come from mapIssueToCall via check_removed.
+    expect(result.kind).toBe('no_match');
+  });
+
+  it('emits no calls and consumes the issue when value sets match (no-op)', () => {
+    const contract = makeContractWithCheck(['active', 'inactive']);
+    const result = checkConstraintPlanCallStrategy(
+      [
+        {
+          kind: 'check_missing',
+          table: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          indexOrConstraint: CHECK_NAME,
+          expected: 'active, inactive',
+          message: 'stale issue: already satisfied',
+        },
+      ],
+      {
+        ...defaultCtx,
+        toContract: contract,
+        fromContract: null,
+        schema: schemaWithCheck(['active', 'inactive']),
+        policy: { allowedOperationClasses: ['additive'] },
+        frameworkComponents: [],
+      },
+    );
+
+    expect(result.kind).toBe('match');
+    if (result.kind !== 'match') return;
+    expect(result.calls).toHaveLength(0);
+    expect(result.issues).toHaveLength(0);
+  });
+});
+
+describe('planIssues — check constraint strategy', () => {
+  it('check_removed produces DropCheckConstraintCall when contract has no check', () => {
+    const contract = makeContractWithoutCheck();
+    const result = planIssues({
+      ...defaultCtx,
+      issues: [
+        {
+          kind: 'check_removed',
+          table: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          indexOrConstraint: CHECK_NAME,
+          actual: 'active, inactive',
+          message: `Table "${TABLE_NAME}" has extra check "${CHECK_NAME}"`,
+        },
+      ],
+      toContract: contract,
+      fromContract: null,
+      schema: schemaWithCheck(['active', 'inactive']),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const call = result.value.calls.find((c) => c.factoryName === 'dropCheckConstraint');
+    expect(call).toMatchObject({
+      factoryName: 'dropCheckConstraint',
+      tableName: TABLE_NAME,
+      constraintName: CHECK_NAME,
+    });
+  });
+
+  it('check_missing produces AddCheckConstraintCall in the unique bucket', () => {
+    const contract = makeContractWithCheck(['active', 'inactive']);
+    const result = planIssues({
+      ...defaultCtx,
+      issues: [
+        {
+          kind: 'check_missing',
+          table: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          indexOrConstraint: CHECK_NAME,
+          expected: 'active, inactive',
+          message: `Table "${TABLE_NAME}" is missing check "${CHECK_NAME}"`,
+        },
+      ],
+      toContract: contract,
+      fromContract: null,
+      schema: schemaWithoutCheck(),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const call = result.value.calls.find((c) => c.factoryName === 'addCheckConstraint');
+    expect(call).toMatchObject({
+      factoryName: 'addCheckConstraint',
+      tableName: TABLE_NAME,
+      constraintName: CHECK_NAME,
+    });
+  });
+
+  it('check_mismatch produces DropCheckConstraintCall + AddCheckConstraintCall', () => {
+    const contract = makeContractWithCheck(['active', 'inactive', 'pending']);
+    const result = planIssues({
+      ...defaultCtx,
+      issues: [
+        {
+          kind: 'check_mismatch',
+          table: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          indexOrConstraint: CHECK_NAME,
+          expected: 'active, inactive, pending',
+          actual: 'active, inactive',
+          message: `Table "${TABLE_NAME}" check "${CHECK_NAME}" values mismatch`,
+        },
+      ],
+      toContract: contract,
+      fromContract: null,
+      schema: schemaWithCheck(['active', 'inactive']),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const calls = result.value.calls;
+    expect(calls.some((c) => c.factoryName === 'dropCheckConstraint')).toBe(true);
+    expect(calls.some((c) => c.factoryName === 'addCheckConstraint')).toBe(true);
+    // Drop must come before add in final call order
+    const dropIdx = calls.findIndex((c) => c.factoryName === 'dropCheckConstraint');
+    const addIdx = calls.findIndex((c) => c.factoryName === 'addCheckConstraint');
+    expect(dropIdx).toBeLessThan(addIdx);
+  });
+});
