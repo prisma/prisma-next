@@ -45,7 +45,13 @@ The planner-adoption work ("simplify migrations" payoff) is **not one slice**. G
   - Postgres column ops (`AddColumn`/`DropColumn`/`AlterColumnType`/`SetNotNull`/`DropNotNull`/`SetDefault`/`DropDefault`); constraint ALTERs (`AddPrimaryKey`/`AddUnique`/`AddForeignKey`/`DropConstraint`); indexes (`CreateIndex`/`DropIndex`); Postgres types/db (`CreateEnumType`/`AddEnumValues`/`DropEnumType`/`RenameType`/`CreateExtension`); `DropTable`; SQLite `RecreateTable`.
 - **Mongo planner adoption (tracked follow-up slice).** Planner adoption spans **all three targets, not just SQL.** The Mongo migration planner's ops (`CreateCollection`/`CreateIndex`/…) must construct the contract-free Mongo command surface and route through `MongoControlAdapter.lower()` → driver, symmetric to the SQL planner adoption. (See project spec DoD.)
 
-**End-state cleanup (project DoD):** once every Postgres op is migrated onto its `*Call.toOp()` (the `*Call` IR nodes are the common interface), the free Op-builder modules under `packages/3-targets/3-targets/postgres/src/core/migrations/operations/` have no callers and **must be deleted** — starting with `operations/tables.ts` (now down to just the unmigrated `dropTable`), and likewise the other `operations/*.ts` builders as their ops adopt `toOp()`. No free string-gluing Op-builder should survive the planner-adoption phase.
+**End-state cleanup (project DoD):** once every Postgres op is migrated onto its `*Call.toOp()` (the `*Call` IR nodes are the common interface), the free Op-builder modules under `packages/3-targets/3-targets/postgres/src/core/migrations/operations/` have no callers and **must be deleted** — and so must the parallel free builders elsewhere. Marked for demolition:
+- `operations/tables.ts` — now down to just the unmigrated `dropTable`.
+- `operations/dependencies.ts` — `createExtension` / `installExtension` (the schema-side dead code is already gone); deleted once `CreateExtensionCall` adopts `toOp()` (and `installExtension`, the hand-rolled extension-pack baseline, is reconciled).
+- the other `operations/*.ts` builders (`enums.ts`, `indexes.ts`, `columns.ts`, `constraints.ts`, `raw.ts`) — deleted as their ops adopt `toOp()`.
+No free string-gluing Op-builder should survive the planner-adoption phase.
+
+**Also for demolition: raw SQL in `*Call.toOp()` precheck/postcheck.** The idempotency-probe introspection (`SELECT to_regclass(...) IS NULL`, etc.) is still hand-built raw SQL in every op's `toOp()`. It's deferred by the slice spec and is cross-cutting (every op), but it's the same "express, don't concatenate" violation — these are `SELECT`s and should be expressed via the query AST + lowered like the `execute` step. Follow-up across all ops.
 
 ## Dependencies (external)
 
