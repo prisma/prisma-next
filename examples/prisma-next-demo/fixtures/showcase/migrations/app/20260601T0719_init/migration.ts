@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node
-import { createTable, Migration, MigrationCLI } from '@prisma-next/postgres/migration';
+import { col, Migration, MigrationCLI, primaryKey } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -11,15 +11,14 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      createTable(
-        '__unbound__',
-        'account',
-        [
-          { name: 'email', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'id', typeSql: 'character(36)', defaultSql: '', nullable: false },
+      this.createTable({
+        table: 'account',
+        columns: [
+          col('email', 'text', { notNull: true }),
+          col('id', 'character(36)', { notNull: true }),
         ],
-        { columns: ['id'] },
-      ),
+        constraints: [primaryKey(['id'])],
+      }),
     ];
   }
 }

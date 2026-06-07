@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
   CreateExtensionCall,
@@ -35,16 +36,14 @@ import { createPostgresAdapter } from '../../src/core/adapter';
 
 const execFileAsync = promisify(execFile);
 const testAdapter = createPostgresAdapter();
-const testLower = (
-  ast:
-    | Parameters<typeof testAdapter.lower>[0]
-    | import('@prisma-next/sql-relational-core/ast').DdlNode,
-  ctx: import('@prisma-next/sql-relational-core/ast').LowererContext<unknown>,
-) =>
-  testAdapter.lower(
-    ast as Parameters<typeof testAdapter.lower>[0],
-    ctx as Parameters<typeof testAdapter.lower>[1],
-  );
+const testLower = {
+  lower(
+    ast: Parameters<typeof testAdapter.lower>[0],
+    ctx: Parameters<typeof testAdapter.lower>[1],
+  ) {
+    return testAdapter.lower(ast, ctx);
+  },
+};
 const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const targetPostgresRoot = resolve(repoRoot, 'packages/3-targets/3-targets/postgres');
@@ -52,6 +51,9 @@ const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 
 const targetPostgresMigrationExport = pathToFileURL(
   resolve(targetPostgresRoot, 'src/exports/migration.ts'),
+).href;
+const relationalCoreContractFreeExport = pathToFileURL(
+  resolve(repoRoot, 'packages/2-sql/4-lanes/relational-core/src/exports/contract-free.ts'),
 ).href;
 const cliConfigTypesExport = pathToFileURL(
   resolve(repoRoot, 'packages/1-framework/3-tooling/cli/src/exports/config-types.ts'),
@@ -97,10 +99,12 @@ const fixtureConfigSource = [
  * a single rewrite is enough.
  */
 function rewriteImports(tsSource: string): string {
-  return tsSource.replace(
-    "'@prisma-next/postgres/migration'",
-    `'${targetPostgresMigrationExport}'`,
-  );
+  return tsSource
+    .replace("'@prisma-next/postgres/migration'", `'${targetPostgresMigrationExport}'`)
+    .replace(
+      "'@prisma-next/sql-relational-core/contract-free'",
+      `'${relationalCoreContractFreeExport}'`,
+    );
 }
 
 const META = {
@@ -130,29 +134,13 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
       new CreateTableCall(
         'public',
         'user',
-        [
-          {
-            name: 'id',
-            typeSql: 'text',
-            defaultSql: '',
-            columnDefault: undefined,
-            nullable: false,
-          },
-          {
-            name: 'email',
-            typeSql: 'text',
-            defaultSql: '',
-            columnDefault: undefined,
-            nullable: false,
-          },
-        ],
-        { columns: ['id'] },
+        [col('id', 'text', { notNull: true }), col('email', 'text', { notNull: true })],
+        [primaryKey(['id'])],
       ),
       new AddColumnCall('public', 'user', {
         name: 'nickname',
         typeSql: 'text',
         defaultSql: '',
-        columnDefault: undefined,
         nullable: true,
       }),
       new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),

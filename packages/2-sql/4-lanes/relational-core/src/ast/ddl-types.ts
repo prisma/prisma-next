@@ -57,14 +57,14 @@ export class DdlColumn {
   readonly type: string;
   readonly notNull?: boolean | undefined;
   readonly primaryKey?: boolean | undefined;
-  readonly default?: DdlColumnDefault | undefined;
+  readonly default?: AnyDdlColumnDefault | undefined;
 
   constructor(options: {
     readonly name: string;
     readonly type: string;
     readonly notNull?: boolean;
     readonly primaryKey?: boolean;
-    readonly default?: DdlColumnDefault;
+    readonly default?: AnyDdlColumnDefault;
   }) {
     this.name = options.name;
     this.type = options.type;

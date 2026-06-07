@@ -10,6 +10,14 @@ export { MigrationCLI } from '@prisma-next/cli/migration-cli';
 // directly. The planner emits an import from this same module.
 export { placeholder } from '@prisma-next/errors/migration';
 export {
+  col,
+  fn,
+  foreignKey,
+  lit,
+  primaryKey,
+  unique,
+} from '@prisma-next/sql-relational-core/contract-free';
+export {
   addColumn,
   alterColumnType,
   dropColumn,
@@ -31,7 +39,6 @@ export {
 } from '../core/migrations/operations/data-transform';
 export {
   createExtension,
-  createSchema,
   installExtension,
 } from '../core/migrations/operations/dependencies';
 export {
@@ -42,7 +49,7 @@ export {
 } from '../core/migrations/operations/enums';
 export { createIndex, dropIndex } from '../core/migrations/operations/indexes';
 export { rawSql } from '../core/migrations/operations/raw';
-export { createTable, dropTable } from '../core/migrations/operations/tables';
+export { dropTable } from '../core/migrations/operations/tables';
 // Target-owned base class for migrations. Aliased to `Migration` so
 // user-edited migration.ts files (and the renderer's scaffold) read as
 // `class M extends Migration { … }` without having to thread the

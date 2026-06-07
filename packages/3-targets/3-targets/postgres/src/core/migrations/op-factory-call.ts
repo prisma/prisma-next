@@ -22,17 +22,18 @@
 
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
+import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   MigrationOperationClass,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
+import type {
+  AnyDdlColumnDefault,
   DdlColumn,
-  FunctionColumnDefault,
-  LiteralColumnDefault,
-  PrimaryKeyConstraint,
+  DdlTableConstraint,
 } from '@prisma-next/sql-relational-core/ast';
+import { FunctionColumnDefault, LiteralColumnDefault } from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { blindCast } from '@prisma-next/utils/casts';
 import * as contractFreeDdl from '../../contract-free/ddl';
@@ -48,23 +49,23 @@ import {
   setNotNull,
 } from './operations/columns';
 import { addForeignKey, addPrimaryKey, addUnique, dropConstraint } from './operations/constraints';
-import { createExtension, createSchemaOp } from './operations/dependencies';
+import { buildCreateSchemaOp, createExtension } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
 import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
-import { createTableOp, dropTable } from './operations/tables';
+import { buildCreateTableOp, dropTable } from './operations/tables';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
-import type { LowerFn } from './render-ops';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
 const TARGET_MIGRATION_MODULE = '@prisma-next/postgres/migration';
+const RELATIONAL_CORE_CONTRACT_FREE = '@prisma-next/sql-relational-core/contract-free';
 
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract toOp(lower?: LowerFn): Op;
+  abstract toOp(lower?: Lowerer): Op;
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
@@ -79,7 +80,7 @@ abstract class PostgresOpFactoryCallNode extends TsExpression implements Framewo
 // Table
 // ============================================================================
 
-function postgresDefaultToDdlColumnDefault(
+export function postgresDefaultToDdlColumnDefault(
   columnDefault: PostgresColumnDefault | undefined,
 ): DdlColumn['default'] {
   if (!columnDefault) return undefined;
@@ -102,18 +103,70 @@ function postgresDefaultToDdlColumnDefault(
   }
 }
 
-function columnSpecToDdlColumn(spec: ColumnSpec): DdlColumn {
-  const columnDefault = postgresDefaultToDdlColumnDefault(spec.columnDefault);
-  return new DdlColumn({
-    name: spec.name,
-    type: spec.typeSql,
-    ...(spec.nullable ? {} : { notNull: true }),
-    ...(columnDefault !== undefined ? { default: columnDefault } : {}),
-  });
+// ---------------------------------------------------------------------------
+// TypeScript rendering helpers for DdlColumn / DdlTableConstraint
+// ---------------------------------------------------------------------------
+
+function renderDdlColumnDefault(def: AnyDdlColumnDefault | undefined): string {
+  if (!def) return '';
+  if (def.kind === 'literal') {
+    return `lit(${jsonToTsSource(def.value)})`;
+  }
+  return `fn(${jsonToTsSource(def.expression)})`;
 }
 
-export interface CreateTablePrimaryKey {
-  readonly columns: readonly string[];
+function renderDdlColumnAsTsCall(col: DdlColumn): string {
+  const opts: string[] = [];
+  if (col.notNull) opts.push('notNull: true');
+  if (col.primaryKey) opts.push('primaryKey: true');
+  if (col.default) opts.push(`default: ${renderDdlColumnDefault(col.default)}`);
+  const optsStr = opts.length > 0 ? `, { ${opts.join(', ')} }` : '';
+  return `col(${jsonToTsSource(col.name)}, ${jsonToTsSource(col.type)}${optsStr})`;
+}
+
+function renderDdlConstraintAsTsCall(constraint: DdlTableConstraint): string {
+  switch (constraint.kind) {
+    case 'primary-key': {
+      const nameOpt = constraint.name ? `, { name: ${jsonToTsSource(constraint.name)} }` : '';
+      return `primaryKey(${jsonToTsSource(constraint.columns)}${nameOpt})`;
+    }
+    case 'foreign-key': {
+      const opts: string[] = [];
+      if (constraint.name) opts.push(`name: ${jsonToTsSource(constraint.name)}`);
+      if (constraint.onDelete) opts.push(`onDelete: ${jsonToTsSource(constraint.onDelete)}`);
+      if (constraint.onUpdate) opts.push(`onUpdate: ${jsonToTsSource(constraint.onUpdate)}`);
+      const optsStr = opts.length > 0 ? `, { ${opts.join(', ')} }` : '';
+      return `foreignKey(${jsonToTsSource(constraint.columns)}, ${jsonToTsSource(constraint.refTable)}, ${jsonToTsSource(constraint.refColumns)}${optsStr})`;
+    }
+    case 'unique': {
+      const nameOpt = constraint.name ? `, { name: ${jsonToTsSource(constraint.name)} }` : '';
+      return `unique(${jsonToTsSource(constraint.columns)}${nameOpt})`;
+    }
+  }
+}
+
+function needsColOrConstraintImport(columns: readonly DdlColumn[]): boolean {
+  return columns.length > 0;
+}
+
+function constraintImportSymbols(constraints: readonly DdlTableConstraint[] | undefined): string[] {
+  if (!constraints || constraints.length === 0) return [];
+  const symbols = new Set<string>();
+  for (const c of constraints) {
+    if (c.kind === 'primary-key') symbols.add('primaryKey');
+    else if (c.kind === 'foreign-key') symbols.add('foreignKey');
+    else if (c.kind === 'unique') symbols.add('unique');
+  }
+  return [...symbols];
+}
+
+function defaultImportSymbols(columns: readonly DdlColumn[]): string[] {
+  const symbols = new Set<string>();
+  for (const col of columns) {
+    if (col.default?.kind === 'literal') symbols.add('lit');
+    else if (col.default?.kind === 'function') symbols.add('fn');
+  }
+  return [...symbols];
 }
 
 export class CreateTableCall extends PostgresOpFactoryCallNode {
@@ -121,26 +174,26 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
-  readonly columns: readonly ColumnSpec[];
-  readonly primaryKey: CreateTablePrimaryKey | undefined;
+  readonly columns: readonly DdlColumn[];
+  readonly constraints: readonly DdlTableConstraint[] | undefined;
   readonly label: string;
 
   constructor(
     schemaName: string,
     tableName: string,
-    columns: readonly ColumnSpec[],
-    primaryKey?: CreateTablePrimaryKey,
+    columns: readonly DdlColumn[],
+    constraints?: readonly DdlTableConstraint[],
   ) {
     super();
     this.schemaName = schemaName;
     this.tableName = tableName;
-    this.columns = columns;
-    this.primaryKey = primaryKey;
+    this.columns = Object.freeze([...columns]);
+    this.constraints = constraints ? Object.freeze([...constraints]) : undefined;
     this.label = `Create table "${tableName}"`;
     this.freeze();
   }
 
-  toOp(lower?: LowerFn): Op {
+  toOp(lower?: Lowerer): Op {
     if (lower === undefined) {
       throw new Error(
         `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass a SqlControlFamilyInstance to createPostgresMigrationPlanner.`,
@@ -149,23 +202,41 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
     const ddlNode = contractFreeDdl.createTable({
       ...(this.schemaName !== UNBOUND_NAMESPACE_ID ? { schema: this.schemaName } : {}),
       table: this.tableName,
-      columns: this.columns.map(columnSpecToDdlColumn),
-      ...(this.primaryKey
-        ? { constraints: [new PrimaryKeyConstraint({ columns: this.primaryKey.columns })] }
-        : {}),
+      columns: this.columns,
+      ...(this.constraints ? { constraints: this.constraints } : {}),
     });
-    const { sql } = lower(ddlNode, { contract: {} });
-    return createTableOp(this.schemaName, this.tableName, sql);
+    return buildCreateTableOp(ddlNode, lower);
   }
 
   renderTypeScript(): string {
-    const args = [
-      jsonToTsSource(this.schemaName),
-      jsonToTsSource(this.tableName),
-      jsonToTsSource(this.columns),
-    ];
-    if (this.primaryKey) args.push(jsonToTsSource(this.primaryKey));
-    return `createTable(${args.join(', ')})`;
+    const columnsList = this.columns.map(renderDdlColumnAsTsCall).join(', ');
+    const constraintsList = this.constraints
+      ? this.constraints.map(renderDdlConstraintAsTsCall).join(', ')
+      : undefined;
+
+    const opts: string[] = [];
+    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    }
+    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`columns: [${columnsList}]`);
+    if (constraintsList) opts.push(`constraints: [${constraintsList}]`);
+
+    return `this.createTable({ ${opts.join(', ')} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    const req: ImportRequirement[] = [];
+    if (needsColOrConstraintImport(this.columns)) {
+      req.push({ moduleSpecifier: RELATIONAL_CORE_CONTRACT_FREE, symbol: 'col' });
+      for (const sym of defaultImportSymbols(this.columns)) {
+        req.push({ moduleSpecifier: RELATIONAL_CORE_CONTRACT_FREE, symbol: sym });
+      }
+    }
+    for (const sym of constraintImportSymbols(this.constraints)) {
+      req.push({ moduleSpecifier: RELATIONAL_CORE_CONTRACT_FREE, symbol: sym });
+    }
+    return req;
   }
 }
 
@@ -835,19 +906,22 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(lower?: LowerFn): Op {
+  toOp(lower?: Lowerer): Op {
     if (lower === undefined) {
       throw new Error(
         `CreateSchemaCall.toOp: a DDL lowerer is required on the Postgres planner path (schema "${this.schemaName}"). Pass a SqlControlFamilyInstance to createPostgresMigrationPlanner.`,
       );
     }
     const ddlNode = contractFreeDdl.createSchema({ schema: this.schemaName, ifNotExists: true });
-    const { sql } = lower(ddlNode, { contract: {} });
-    return createSchemaOp(this.schemaName, sql);
+    return buildCreateSchemaOp(ddlNode, lower);
   }
 
   renderTypeScript(): string {
-    return `createSchema(${jsonToTsSource(this.schemaName)})`;
+    return `this.createSchema({ schema: ${jsonToTsSource(this.schemaName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 

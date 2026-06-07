@@ -15,6 +15,7 @@
  */
 
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { col } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
   AddEnumValuesCall,
@@ -48,6 +49,14 @@ import { createPostgresAdapter } from '../../src/core/adapter';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 const testAdapter = createPostgresAdapter();
+const testLower = {
+  lower(
+    ast: Parameters<typeof testAdapter.lower>[0],
+    ctx: Parameters<typeof testAdapter.lower>[1],
+  ) {
+    return testAdapter.lower(ast, ctx);
+  },
+};
 
 describe('renderOps', () => {
   it('lowers each variant via its pure factory, pinning id/operationClass/target.details', () => {
@@ -61,15 +70,12 @@ describe('renderOps', () => {
       postcheck: [],
     };
     const calls = [
-      new CreateTableCall('public', 'user', [
-        { name: 'id', typeSql: 'text', defaultSql: '', columnDefault: undefined, nullable: false },
-      ]),
+      new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]),
       new DropTableCall('public', 'stale'),
       new AddColumnCall('public', 'user', {
         name: 'email',
         typeSql: 'text',
         defaultSql: '',
-        columnDefault: undefined,
         nullable: true,
       }),
       new DropColumnCall('public', 'user', 'legacy'),
@@ -103,12 +109,7 @@ describe('renderOps', () => {
       new CreateSchemaCall('app'),
     ];
 
-    const ops = renderOps(calls, (ast, ctx) =>
-      testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      ),
-    );
+    const ops = renderOps(calls, testLower);
 
     const schemaObject = (objectType: string, name: string, table?: string) => ({
       schema: 'public',

@@ -25,6 +25,8 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
+import * as contractFree from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -47,6 +49,7 @@ import {
   DropNotNullCall,
   DropTableCall,
   type PostgresOpFactoryCall,
+  postgresDefaultToDdlColumnDefault,
   SetDefaultCall,
   SetNotNullCall,
 } from './op-factory-call';
@@ -191,15 +194,24 @@ function toColumnSpec(
 ): ColumnSpec {
   return {
     name,
-    typeSql: buildColumnTypeSql(
-      column,
-      codecHooks as Map<string, CodecControlHooks>,
-      storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
-    ),
+    typeSql: buildColumnTypeSql(column, codecHooks, storageTypes),
     defaultSql: buildColumnDefaultSql(column.default, column),
-    columnDefault: column.default,
     nullable: column.nullable,
   };
+}
+
+function toDdlColumn(
+  name: string,
+  column: StorageColumn,
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+): DdlColumn {
+  const typeSql = buildColumnTypeSql(column, codecHooks, storageTypes);
+  const ddlDefault = postgresDefaultToDdlColumnDefault(column.default);
+  return contractFree.col(name, typeSql, {
+    ...(!column.nullable ? { notNull: true } : {}),
+    ...(ddlDefault ? { default: ddlDefault } : {}),
+  });
 }
 
 function mapIssueToCall(
@@ -246,14 +258,18 @@ function mapIssueToCall(
         );
       }
       const schemaForTable = tableSchema(issue);
-      const columns: ColumnSpec[] = Object.entries(contractTable.columns).map(([name, column]) =>
-        toColumnSpec(name, column, codecHooks, storageTypes),
+      const ddlColumns: DdlColumn[] = Object.entries(contractTable.columns).map(([name, column]) =>
+        toDdlColumn(name, column, codecHooks, storageTypes),
       );
-      const primaryKey = contractTable.primaryKey
-        ? { columns: contractTable.primaryKey.columns }
+      const ddlConstraints: DdlTableConstraint[] | undefined = contractTable.primaryKey
+        ? [
+            contractFree.primaryKey(contractTable.primaryKey.columns, {
+              ...(contractTable.primaryKey.name ? { name: contractTable.primaryKey.name } : {}),
+            }),
+          ]
         : undefined;
       const calls: PostgresOpFactoryCall[] = [
-        new CreateTableCall(schemaForTable, issue.table, columns, primaryKey),
+        new CreateTableCall(schemaForTable, issue.table, ddlColumns, ddlConstraints),
       ];
       for (const index of contractTable.indexes) {
         const indexName = index.name ?? `${issue.table}_${index.columns.join('_')}_idx`;

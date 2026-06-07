@@ -22,6 +22,17 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
 
 /**
+ * Structural interface for anything that can lower a SQL/DDL AST node to a
+ * `LoweredStatement`. `SqlControlAdapter` satisfies this interface; the
+ * migration planner and op-factory calls accept `Lowerer` rather than the
+ * full `SqlControlAdapter` so they are not coupled to the broader control
+ * adapter surface.
+ */
+export interface Lowerer {
+  lower(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
+}
+
+/**
  * SQL control adapter interface for control-plane operations.
  * Implemented by target-specific adapters (e.g., Postgres, MySQL).
  *

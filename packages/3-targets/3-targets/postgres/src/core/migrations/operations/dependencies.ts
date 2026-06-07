@@ -1,5 +1,17 @@
+import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { PostgresCreateSchema } from '../../ddl/nodes';
 import { quoteIdentifier } from '../../sql-utils';
 import { type Op, step } from './shared';
+
+/**
+ * Assemble a `CREATE SCHEMA` migration op from a lowered `PostgresCreateSchema`
+ * node. This is the single rendering path for both `CreateSchemaCall.toOp(lowerer)`
+ * and `PostgresMigration.createSchema(options)`.
+ */
+export function buildCreateSchemaOp(node: PostgresCreateSchema, lowerer: Lowerer): Op {
+  const { sql } = lowerer.lower(node, { contract: {} });
+  return createSchemaOp(node.schema, sql);
+}
 
 export function createExtension(extensionName: string): Op {
   return {

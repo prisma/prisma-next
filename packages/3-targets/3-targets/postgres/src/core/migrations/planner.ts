@@ -13,6 +13,7 @@ import {
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
+import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -22,6 +23,7 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
@@ -36,7 +38,6 @@ import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
-import type { LowerFn } from './render-ops';
 import { verifyPostgresNamespacePresence } from './verify-postgres-namespaces';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
@@ -54,10 +55,15 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
 };
 
 export function createPostgresMigrationPlanner(
-  family: SqlControlFamilyInstance | LowerFn,
+  family: SqlControlFamilyInstance | Lowerer,
 ): PostgresMigrationPlanner {
-  const lower: LowerFn =
-    typeof family === 'function' ? family : (ast, ctx) => family.lowerAst(ast, ctx);
+  const lower: Lowerer =
+    'lowerAst' in family
+      ? {
+          lower: (ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) =>
+            family.lowerAst(ast, ctx),
+        }
+      : family;
   return new PostgresMigrationPlanner(lower);
 }
 
@@ -93,9 +99,9 @@ export type PostgresPlanResult =
  * authoring surface.
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
-  readonly #lower: LowerFn | undefined;
+  readonly #lower: Lowerer | undefined;
 
-  constructor(lower?: LowerFn) {
+  constructor(lower?: Lowerer) {
     this.#lower = lower;
   }
 

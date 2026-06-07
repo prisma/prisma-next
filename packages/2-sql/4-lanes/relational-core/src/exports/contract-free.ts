@@ -1,4 +1,12 @@
-export { col, type DdlColumnOptions, fn, lit } from '../contract-free/column';
+export {
+  col,
+  type DdlColumnOptions,
+  fn,
+  foreignKey,
+  lit,
+  primaryKey,
+  unique,
+} from '../contract-free/column';
 export {
   CfConflictClause,
   CfExpr,

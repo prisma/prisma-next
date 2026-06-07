@@ -21,7 +21,7 @@ import type { PostgresLoweredStatement } from './types';
 function renderPrimaryKeyConstraint(constraint: PrimaryKeyConstraint): string {
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
-    return `CONSTRAINT ${constraint.name} PRIMARY KEY (${cols})`;
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} PRIMARY KEY (${cols})`;
   }
   return `PRIMARY KEY (${cols})`;
 }
@@ -29,7 +29,7 @@ function renderPrimaryKeyConstraint(constraint: PrimaryKeyConstraint): string {
 function renderForeignKeyConstraint(constraint: ForeignKeyConstraint): string {
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   const refCols = constraint.refColumns.map(quoteIdentifier).join(', ');
-  let sql = `FOREIGN KEY (${cols}) REFERENCES ${constraint.refTable} (${refCols})`;
+  let sql = `FOREIGN KEY (${cols}) REFERENCES ${quoteIdentifier(constraint.refTable)} (${refCols})`;
   if (constraint.onDelete !== undefined) {
     sql += ` ON DELETE ${REFERENTIAL_ACTION_SQL[constraint.onDelete]}`;
   }
@@ -37,7 +37,7 @@ function renderForeignKeyConstraint(constraint: ForeignKeyConstraint): string {
     sql += ` ON UPDATE ${REFERENTIAL_ACTION_SQL[constraint.onUpdate]}`;
   }
   if (constraint.name !== undefined) {
-    sql = `CONSTRAINT ${constraint.name} ${sql}`;
+    sql = `CONSTRAINT ${quoteIdentifier(constraint.name)} ${sql}`;
   }
   return sql;
 }
@@ -45,7 +45,7 @@ function renderForeignKeyConstraint(constraint: ForeignKeyConstraint): string {
 function renderUniqueConstraint(constraint: UniqueConstraint): string {
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
-    return `CONSTRAINT ${constraint.name} UNIQUE (${cols})`;
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} UNIQUE (${cols})`;
   }
   return `UNIQUE (${cols})`;
 }
@@ -92,14 +92,11 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
     if (value === null) {
       return 'DEFAULT NULL';
     }
-    return `DEFAULT '${JSON.stringify(value)}'`;
+    return `DEFAULT '${escapeLiteral(JSON.stringify(value))}'`;
   },
   function(node: FunctionColumnDefault): string {
     if (node.expression === 'autoincrement()') {
       return '';
-    }
-    if (node.expression.startsWith('nextval(')) {
-      return `DEFAULT ${node.expression}`;
     }
     return `DEFAULT (${node.expression})`;
   },

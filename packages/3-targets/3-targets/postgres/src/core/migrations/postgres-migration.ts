@@ -4,8 +4,12 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
+import * as contractFreeDdl from '../../contract-free/ddl';
 import { errorPostgresMigrationStackMissing } from '../errors';
 import { type DataTransformOptions, dataTransform } from './operations/data-transform';
+import { buildCreateSchemaOp } from './operations/dependencies';
+import { buildCreateTableOp } from './operations/tables';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 /**
@@ -66,5 +70,43 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return dataTransform(contract, name, options, this.controlAdapter);
+  }
+
+  /**
+   * Emit a `CREATE TABLE` migration operation. Builds a typed DDL node from
+   * the supplied options and lowers it through the stored control adapter.
+   * Throws if no adapter is present (i.e. migration instantiated without a stack).
+   */
+  protected createTable(options: {
+    readonly schema?: string;
+    readonly table: string;
+    readonly ifNotExists?: boolean;
+    readonly columns: readonly DdlColumn[];
+    readonly constraints?: readonly DdlTableConstraint[];
+  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    const node = contractFreeDdl.createTable(options);
+    return buildCreateTableOp(node, this.controlAdapter);
+  }
+
+  /**
+   * Emit a `CREATE SCHEMA` migration operation. Builds a typed DDL node from
+   * the supplied options and lowers it through the stored control adapter.
+   * Throws if no adapter is present (i.e. migration instantiated without a stack).
+   */
+  protected createSchema(options: {
+    readonly schema: string;
+    readonly ifNotExists?: boolean;
+  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    const node = contractFreeDdl.createSchema({
+      ...options,
+      ifNotExists: options.ifNotExists ?? true,
+    });
+    return buildCreateSchemaOp(node, this.controlAdapter);
   }
 }

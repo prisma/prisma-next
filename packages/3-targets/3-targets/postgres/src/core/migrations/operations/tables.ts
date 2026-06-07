@@ -1,8 +1,19 @@
-import { quoteIdentifier } from '../../sql-utils';
+import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { PostgresCreateTable } from '../../ddl/nodes';
 import { qualifyTableName, toRegclassLiteral } from '../planner-sql-checks';
-import { type ColumnSpec, type Op, renderColumnDefinition, step, targetDetails } from './shared';
+import { type Op, step, targetDetails } from './shared';
 
-export function createTableOp(schemaName: string, tableName: string, sql: string): Op {
+/**
+ * Assemble a `CREATE TABLE` migration op from a lowered `PostgresCreateTable`
+ * node. This is the single rendering path for both the planner-produced
+ * `CreateTableCall.toOp(lowerer)` and the `PostgresMigration.createTable(...)`
+ * instance method.
+ */
+export function buildCreateTableOp(node: PostgresCreateTable, lowerer: Lowerer): Op {
+  const { sql } = lowerer.lower(node, { contract: {} });
+  const schemaName = node.schema ?? UNBOUND_NAMESPACE_ID;
+  const tableName = node.table;
   return {
     id: `table.${tableName}`,
     label: `Create table "${tableName}"`,
@@ -23,23 +34,6 @@ export function createTableOp(schemaName: string, tableName: string, sql: string
       ),
     ],
   };
-}
-
-export function createTable(
-  schemaName: string,
-  tableName: string,
-  columns: ReadonlyArray<ColumnSpec>,
-  primaryKey?: { readonly columns: readonly string[] },
-): Op {
-  const qualified = qualifyTableName(schemaName, tableName);
-  const columnDefs = columns.map(renderColumnDefinition);
-  const constraintDefs: string[] = [];
-  if (primaryKey) {
-    constraintDefs.push(`PRIMARY KEY (${primaryKey.columns.map(quoteIdentifier).join(', ')})`);
-  }
-  const allDefs = [...columnDefs, ...constraintDefs];
-  const createSql = `CREATE TABLE ${qualified} (\n  ${allDefs.join(',\n  ')}\n)`;
-  return createTableOp(schemaName, tableName, createSql);
 }
 
 export function dropTable(schemaName: string, tableName: string): Op {

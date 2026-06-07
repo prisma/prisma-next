@@ -8,7 +8,7 @@ import {
   type SqlStorageInput,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -25,12 +25,14 @@ import {
 import { PostgresEnumType } from '../../src/exports/types';
 
 const testAdapter = createPostgresAdapter();
-const testLower: Parameters<CreateTableCall['toOp']>[0] = (ast, ctx) =>
-  // test file: adapter.lower is more specific than LowerFn; cast at the boundary
-  testAdapter.lower(
-    ast as AnyQueryAst | PostgresDdlNode,
-    ctx as Parameters<typeof testAdapter.lower>[1],
-  );
+const testLower: Parameters<CreateTableCall['toOp']>[0] = {
+  lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
+    return testAdapter.lower(
+      ast as AnyQueryAst | PostgresDdlNode,
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    );
+  },
+};
 
 function makeContract(
   overrides: {

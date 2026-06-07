@@ -6,6 +6,8 @@
  * lowering is covered in op-factory-call.lowering.test.ts.
  */
 
+import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
+import { col, fn, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   CreateSchemaCall,
   CreateTableCall,
@@ -15,25 +17,18 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../src/core/adapter';
 
 const testAdapter = createPostgresAdapter();
-const testLower = (
-  ast:
-    | Parameters<typeof testAdapter.lower>[0]
-    | import('@prisma-next/sql-relational-core/ast').DdlNode,
-  ctx: import('@prisma-next/sql-relational-core/ast').LowererContext<unknown>,
-) =>
-  testAdapter.lower(
-    ast as Parameters<typeof testAdapter.lower>[0],
-    ctx as Parameters<typeof testAdapter.lower>[1],
-  );
+const testLower = {
+  lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
+    return testAdapter.lower(
+      ast as Parameters<typeof testAdapter.lower>[0],
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    );
+  },
+};
 
 describe('Postgres call classes - construction + toOp parity', () => {
   it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', () => {
-    const call = new CreateTableCall(
-      'public',
-      'user',
-      [{ name: 'id', typeSql: 'text', defaultSql: '', columnDefault: undefined, nullable: false }],
-      { columns: ['id'] },
-    );
+    const call = new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]);
 
     expect(Object.isFrozen(call)).toBe(true);
     expect(call.factoryName).toBe('createTable');
@@ -65,23 +60,11 @@ describe('Postgres call classes - construction + toOp parity', () => {
       'public',
       'item',
       [
-        {
-          name: 'tenant_id',
-          typeSql: 'uuid',
-          defaultSql: '',
-          columnDefault: undefined,
-          nullable: false,
-        },
-        { name: 'id', typeSql: 'uuid', defaultSql: '', columnDefault: undefined, nullable: false },
-        {
-          name: 'name',
-          typeSql: 'text',
-          defaultSql: '',
-          columnDefault: undefined,
-          nullable: false,
-        },
+        col('tenant_id', 'uuid', { notNull: true }),
+        col('id', 'uuid', { notNull: true }),
+        col('name', 'text', { notNull: true }),
       ],
-      { columns: ['tenant_id', 'id'] },
+      [primaryKey(['tenant_id', 'id'])],
     );
 
     const op = call.toOp(testLower);
@@ -104,19 +87,13 @@ describe('Postgres call classes - construction + toOp parity', () => {
 
   it('CreateTableCall.toOp with a sequence default produces nextval SQL (byte-parity)', () => {
     const call = new CreateTableCall('public', 'user', [
-      {
-        name: 'id',
-        typeSql: 'bigint',
-        defaultSql: '',
-        columnDefault: { kind: 'sequence', name: 'user_id_seq' },
-        nullable: false,
-      },
+      col('id', 'bigint', { notNull: true, default: fn(`nextval('"user_id_seq"'::regclass)`) }),
     ]);
 
     const op = call.toOp(testLower);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "public"."user" (\n' +
-        '  "id" bigint NOT NULL DEFAULT nextval(\'"user_id_seq"\'::regclass)\n' +
+        `  "id" bigint NOT NULL DEFAULT (nextval('"user_id_seq"'::regclass))\n` +
         ')',
     );
   });
@@ -125,8 +102,8 @@ describe('Postgres call classes - construction + toOp parity', () => {
     const call = new CreateTableCall(
       '__unbound__',
       'item',
-      [{ name: 'id', typeSql: 'text', defaultSql: '', columnDefault: undefined, nullable: false }],
-      { columns: ['id'] },
+      [col('id', 'text', { notNull: true })],
+      [primaryKey(['id'])],
     );
 
     const op = call.toOp(testLower);

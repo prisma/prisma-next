@@ -44,9 +44,9 @@ describe('PostgresCreateTable with table-level constraints', () => {
         '  "postId" text NOT NULL,\n' +
         '  "tagId" text NOT NULL,\n' +
         '  PRIMARY KEY ("postId", "tagId"),\n' +
-        '  FOREIGN KEY ("postId") REFERENCES posts ("id") ON DELETE CASCADE,\n' +
-        '  FOREIGN KEY ("tagId") REFERENCES tags ("id") ON DELETE CASCADE,\n' +
-        '  CONSTRAINT uq_post_tags_reverse UNIQUE ("tagId", "postId")\n' +
+        '  FOREIGN KEY ("postId") REFERENCES "posts" ("id") ON DELETE CASCADE,\n' +
+        '  FOREIGN KEY ("tagId") REFERENCES "tags" ("id") ON DELETE CASCADE,\n' +
+        '  CONSTRAINT "uq_post_tags_reverse" UNIQUE ("tagId", "postId")\n' +
         ')',
     );
     expect(lowered.params).toEqual([]);
@@ -62,7 +62,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     const adapter = createPostgresAdapter();
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
-    expect(lowered.sql).toContain('CONSTRAINT pk_items PRIMARY KEY ("a", "b")');
+    expect(lowered.sql).toContain('CONSTRAINT "pk_items" PRIMARY KEY ("a", "b")');
   });
 
   it('renders FK with onUpdate action', () => {
@@ -85,7 +85,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(
-      'CONSTRAINT fk_orders_user FOREIGN KEY ("userId") REFERENCES users ("id") ON DELETE RESTRICT ON UPDATE CASCADE',
+      'CONSTRAINT "fk_orders_user" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE',
     );
   });
 

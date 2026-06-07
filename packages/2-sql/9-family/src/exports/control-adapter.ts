@@ -1,1 +1,5 @@
-export type { SqlControlAdapter, SqlControlAdapterDescriptor } from '../core/control-adapter';
+export type {
+  Lowerer,
+  SqlControlAdapter,
+  SqlControlAdapterDescriptor,
+} from '../core/control-adapter';

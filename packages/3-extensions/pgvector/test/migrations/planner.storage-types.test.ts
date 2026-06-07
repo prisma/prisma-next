@@ -25,12 +25,14 @@ const emptySchema: SqlSchemaIR = {
 
 describe('PostgresMigrationPlanner - storage types', () => {
   it('plans type operations before table operations', () => {
-    const planner = createPostgresMigrationPlanner((ast, ctx) =>
-      testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      ),
-    );
+    const planner = createPostgresMigrationPlanner({
+      lower(ast, ctx) {
+        return testAdapter.lower(
+          ast as Parameters<typeof testAdapter.lower>[0],
+          ctx as Parameters<typeof testAdapter.lower>[1],
+        );
+      },
+    });
     const hooks: CodecControlHooks = {
       planTypeOperations: (_options) => ({
         operations: [
@@ -124,12 +126,14 @@ describe('PostgresMigrationPlanner - storage types', () => {
   });
 
   it('fails when storage type operations are non-additive under init policy', () => {
-    const planner = createPostgresMigrationPlanner((ast, ctx) =>
-      testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      ),
-    );
+    const planner = createPostgresMigrationPlanner({
+      lower(ast, ctx) {
+        return testAdapter.lower(
+          ast as Parameters<typeof testAdapter.lower>[0],
+          ctx as Parameters<typeof testAdapter.lower>[1],
+        );
+      },
+    });
     const hooks: CodecControlHooks = {
       planTypeOperations: (_options) => ({
         operations: [
@@ -206,12 +210,14 @@ describe('PostgresMigrationPlanner - storage types', () => {
   });
 
   it('quotes custom type names in CREATE TABLE to preserve case', () => {
-    const planner = createPostgresMigrationPlanner((ast, ctx) =>
-      testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      ),
-    );
+    const planner = createPostgresMigrationPlanner({
+      lower(ast, ctx) {
+        return testAdapter.lower(
+          ast as Parameters<typeof testAdapter.lower>[0],
+          ctx as Parameters<typeof testAdapter.lower>[1],
+        );
+      },
+    });
     const hooks: CodecControlHooks = {
       planTypeOperations: (_options) => ({
         operations: [
@@ -315,12 +321,14 @@ describe('PostgresMigrationPlanner - storage types', () => {
   });
 
   it('expands parameterized storage type refs when creating tables', () => {
-    const planner = createPostgresMigrationPlanner((ast, ctx) =>
-      testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      ),
-    );
+    const planner = createPostgresMigrationPlanner({
+      lower(ast, ctx) {
+        return testAdapter.lower(
+          ast as Parameters<typeof testAdapter.lower>[0],
+          ctx as Parameters<typeof testAdapter.lower>[1],
+        );
+      },
+    });
     const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
@@ -387,12 +395,14 @@ describe('PostgresMigrationPlanner - storage types', () => {
   });
 
   it('fails when parameterized storage type refs cannot expand without codec hooks', () => {
-    const planner = createPostgresMigrationPlanner((ast, ctx) =>
-      testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      ),
-    );
+    const planner = createPostgresMigrationPlanner({
+      lower(ast, ctx) {
+        return testAdapter.lower(
+          ast as Parameters<typeof testAdapter.lower>[0],
+          ctx as Parameters<typeof testAdapter.lower>[1],
+        );
+      },
+    });
     const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',

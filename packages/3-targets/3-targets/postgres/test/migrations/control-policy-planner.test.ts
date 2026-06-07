@@ -3,7 +3,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -44,13 +44,14 @@ const RECONCILIATION_POLICY: MigrationOperationPolicy = {
 };
 
 const testAdapter = createPostgresAdapter();
-const planner = createPostgresMigrationPlanner((ast, ctx) =>
-  // test file: adapter.lower is more specific than LowerFn; cast at the boundary
-  testAdapter.lower(
-    ast as AnyQueryAst | PostgresDdlNode,
-    ctx as Parameters<typeof testAdapter.lower>[1],
-  ),
-);
+const planner = createPostgresMigrationPlanner({
+  lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
+    return testAdapter.lower(
+      ast as AnyQueryAst | PostgresDdlNode,
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    );
+  },
+});
 
 const emptySchema: SqlSchemaIR = { tables: {} };
 
