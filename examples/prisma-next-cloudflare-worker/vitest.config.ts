@@ -48,7 +48,7 @@ export default defineConfig({
       optimizer: {
         ssr: {
           enabled: true,
-          include: ['pg', 'pg-protocol', 'pg-connection-string', 'pg-cursor', 'pg-cloudflare'],
+          include: ['pg', 'pg-protocol', 'pg-connection-string', 'pg-cursor'],
           rolldownOptions: {
             external: [
               'net',
