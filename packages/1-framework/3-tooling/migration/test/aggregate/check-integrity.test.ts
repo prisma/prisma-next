@@ -7,13 +7,16 @@ import type { IntegritySpaceState } from '../../src/aggregate/check-integrity';
 import { computeIntegrityViolations } from '../../src/aggregate/check-integrity';
 import { createAttestedPackage } from '../fixtures';
 
-function contractWithTables(tables: readonly string[]): Contract {
+function contractWithTables(
+  tables: readonly string[],
+  namespaceId: string = UNBOUND_NAMESPACE_ID,
+): Contract {
   const tableEntries = Object.fromEntries(tables.map((name) => [name, { columns: { id: {} } }]));
   return createSqlContract({
     target: 'postgres',
     storage: {
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: tableEntries } },
+        [namespaceId]: { id: namespaceId, entries: { table: tableEntries } },
       },
     },
   });
@@ -75,8 +78,8 @@ describe('computeIntegrityViolations', () => {
     expect(() => member.graph()).not.toThrow();
   });
 
-  describe('namespaceOwnershipCollision (checkContracts)', () => {
-    it('reports a collision when two spaces claim the same (namespace, kind, name) primitive', () => {
+  describe('disjointness (checkContracts)', () => {
+    it('reports a violation when two spaces claim the same (namespace, kind, name) primitive', () => {
       const app = makeSpaceState('app', contractWithTables(['users']), true);
       const ext = makeSpaceState('ext-auth', contractWithTables(['users']));
 
@@ -85,17 +88,29 @@ describe('computeIntegrityViolations', () => {
         { checkContracts: true },
       );
 
-      const collisions = violations.filter((v) => v.kind === 'namespaceOwnershipCollision');
-      expect(collisions).toHaveLength(1);
-      expect(collisions[0]).toMatchObject({
-        kind: 'namespaceOwnershipCollision',
-        namespace: UNBOUND_NAMESPACE_ID,
-        name: 'users',
-        contributorSpaceIds: expect.arrayContaining(['app', 'ext-auth']),
+      const disjoint = violations.filter((v) => v.kind === 'disjointness');
+      expect(disjoint).toHaveLength(1);
+      expect(disjoint[0]).toMatchObject({
+        kind: 'disjointness',
+        element: `${UNBOUND_NAMESPACE_ID}.users`,
+        claimedBy: expect.arrayContaining(['app', 'ext-auth']),
       });
     });
 
-    it('does not report a collision when spaces claim different primitives in the same namespace', () => {
+    it('does not report a violation when same entity name appears in different namespaces across spaces', () => {
+      // app declares public.users, extension declares auth.users — different coordinates, no collision
+      const app = makeSpaceState('app', contractWithTables(['users'], 'public'), true);
+      const ext = makeSpaceState('ext-auth', contractWithTables(['users'], 'auth'));
+
+      const violations = computeIntegrityViolations(
+        { targetId: 'postgres', spaces: [app, ext] },
+        { checkContracts: true },
+      );
+
+      expect(violations.filter((v) => v.kind === 'disjointness')).toHaveLength(0);
+    });
+
+    it('does not report a violation when spaces claim different primitives in the same namespace', () => {
       const app = makeSpaceState('app', contractWithTables(['users']), true);
       const ext = makeSpaceState('ext-billing', contractWithTables(['invoices']));
 
@@ -104,16 +119,16 @@ describe('computeIntegrityViolations', () => {
         { checkContracts: true },
       );
 
-      expect(violations.filter((v) => v.kind === 'namespaceOwnershipCollision')).toHaveLength(0);
+      expect(violations.filter((v) => v.kind === 'disjointness')).toHaveLength(0);
     });
 
-    it('does not run the collision check without checkContracts', () => {
+    it('does not run the disjointness check without checkContracts', () => {
       const app = makeSpaceState('app', contractWithTables(['users']), true);
       const ext = makeSpaceState('ext-auth', contractWithTables(['users']));
 
       const violations = computeIntegrityViolations({ targetId: 'postgres', spaces: [app, ext] });
 
-      expect(violations.filter((v) => v.kind === 'namespaceOwnershipCollision')).toHaveLength(0);
+      expect(violations.filter((v) => v.kind === 'disjointness')).toHaveLength(0);
     });
   });
 

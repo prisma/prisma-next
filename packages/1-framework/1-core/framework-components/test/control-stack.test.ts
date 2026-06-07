@@ -12,7 +12,6 @@ import {
   extractCodecTypeImports,
   extractComponentIds,
   extractQueryOperationTypeImports,
-  findNamespaceOwnershipCollisions,
   validateScalarTypeCodecIds,
 } from '../src/control/control-stack';
 import type { Codec } from '../src/shared/codec';
@@ -701,84 +700,5 @@ describe('buildExtensionLoadOrder', () => {
     );
     const extIds = stack.extensionPacks.map((e: { id: string }) => e.id);
     expect(extIds.indexOf('dep')).toBeLessThan(extIds.indexOf('consumer'));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// findNamespaceOwnershipCollisions
-// ---------------------------------------------------------------------------
-
-function makeCollisionEntry(
-  spaceId: string,
-  namespaces: Record<string, Record<string, Record<string, unknown>>>,
-): {
-  spaceId: string;
-  storage: {
-    namespaces: Record<string, { id: string; entries: Record<string, Record<string, unknown>> }>;
-  };
-} {
-  return {
-    spaceId,
-    storage: {
-      namespaces: Object.fromEntries(
-        Object.entries(namespaces).map(([nsId, entries]) => [nsId, { id: nsId, entries }]),
-      ),
-    },
-  };
-}
-
-describe('findNamespaceOwnershipCollisions', () => {
-  it('returns empty array when no contracts are provided', () => {
-    expect(findNamespaceOwnershipCollisions([])).toEqual([]);
-  });
-
-  it('returns empty array when a single contract owns all its primitives', () => {
-    const entry = makeCollisionEntry('app', {
-      public: { table: { users: {}, posts: {} } },
-    });
-    expect(findNamespaceOwnershipCollisions([entry])).toEqual([]);
-  });
-
-  it('returns empty array when two contracts contribute DIFFERENT primitives to the same namespace', () => {
-    const app = makeCollisionEntry('app', { public: { table: { users: {} } } });
-    const ext = makeCollisionEntry('ext-posts', { public: { table: { posts: {} } } });
-    expect(findNamespaceOwnershipCollisions([app, ext])).toEqual([]);
-  });
-
-  it('returns collision naming both contributors for extension-vs-extension duplicate primitive', () => {
-    const extA = makeCollisionEntry('ext-a', { public: { table: { users: {} } } });
-    const extB = makeCollisionEntry('ext-b', { public: { table: { users: {} } } });
-    const collisions = findNamespaceOwnershipCollisions([extA, extB]);
-    expect(collisions).toHaveLength(1);
-    expect(collisions[0]).toMatchObject({
-      namespaceId: 'public',
-      entityKind: 'table',
-      name: 'users',
-      contributorSpaceIds: ['ext-a', 'ext-b'],
-    });
-  });
-
-  it('returns collision naming both contributors for app-vs-extension duplicate primitive', () => {
-    const app = makeCollisionEntry('app', { public: { table: { users: {} } } });
-    const ext = makeCollisionEntry('ext-auth', { public: { table: { users: {} } } });
-    const collisions = findNamespaceOwnershipCollisions([app, ext]);
-    expect(collisions).toHaveLength(1);
-    expect(collisions[0]?.contributorSpaceIds).toEqual(['app', 'ext-auth']);
-    expect(collisions[0]?.name).toBe('users');
-  });
-
-  it('returns empty array when contracts have non-overlapping namespaces', () => {
-    const app = makeCollisionEntry('app', { ns1: { table: { widget: {} } } });
-    const ext = makeCollisionEntry('ext', { ns2: { table: { gadget: {} } } });
-    expect(findNamespaceOwnershipCollisions([app, ext])).toEqual([]);
-  });
-
-  it('detects collision across the same entity kind within a namespace', () => {
-    const extA = makeCollisionEntry('ext-a', { public: { collection: { orders: {} } } });
-    const extB = makeCollisionEntry('ext-b', { public: { collection: { orders: {} } } });
-    const collisions = findNamespaceOwnershipCollisions([extA, extB]);
-    expect(collisions).toHaveLength(1);
-    expect(collisions[0]?.name).toBe('orders');
-    expect(collisions[0]?.entityKind).toBe('collection');
   });
 });
