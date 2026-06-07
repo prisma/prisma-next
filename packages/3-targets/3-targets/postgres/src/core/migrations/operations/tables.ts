@@ -1,7 +1,8 @@
+import { quoteIdentifier } from '../../sql-utils';
 import { qualifyTableName, toRegclassLiteral } from '../planner-sql-checks';
-import { type Op, step, targetDetails } from './shared';
+import { type ColumnSpec, type Op, renderColumnDefinition, step, targetDetails } from './shared';
 
-export function createTable(schemaName: string, tableName: string, sql: string): Op {
+export function createTableOp(schemaName: string, tableName: string, sql: string): Op {
   return {
     id: `table.${tableName}`,
     label: `Create table "${tableName}"`,
@@ -22,6 +23,23 @@ export function createTable(schemaName: string, tableName: string, sql: string):
       ),
     ],
   };
+}
+
+export function createTable(
+  schemaName: string,
+  tableName: string,
+  columns: ReadonlyArray<ColumnSpec>,
+  primaryKey?: { readonly columns: readonly string[] },
+): Op {
+  const qualified = qualifyTableName(schemaName, tableName);
+  const columnDefs = columns.map(renderColumnDefinition);
+  const constraintDefs: string[] = [];
+  if (primaryKey) {
+    constraintDefs.push(`PRIMARY KEY (${primaryKey.columns.map(quoteIdentifier).join(', ')})`);
+  }
+  const allDefs = [...columnDefs, ...constraintDefs];
+  const createSql = `CREATE TABLE ${qualified} (\n  ${allDefs.join(',\n  ')}\n)`;
+  return createTableOp(schemaName, tableName, createSql);
 }
 
 export function dropTable(schemaName: string, tableName: string): Op {

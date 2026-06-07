@@ -50,11 +50,11 @@ import {
   setNotNull,
 } from './operations/columns';
 import { addForeignKey, addPrimaryKey, addUnique, dropConstraint } from './operations/constraints';
-import { createExtension, createSchema as createSchemaOp } from './operations/dependencies';
+import { createExtension, createSchemaOp } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
 import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
-import { createTable as createTableOp, dropTable } from './operations/tables';
+import { createTableOp, dropTable } from './operations/tables';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import type { LowerFn } from './render-ops';
 

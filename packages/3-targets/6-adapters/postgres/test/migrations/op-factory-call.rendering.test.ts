@@ -400,4 +400,65 @@ describe('renderCallsToTypeScript', () => {
     );
     expect(source).toContain('MigrationCLI.run(import.meta.url, M);');
   });
+
+  it('renders CreateTableCall as the column-list form (not SQL-string form) in the scaffold', () => {
+    const calls = [
+      new CreateTableCall('public', 'bug', [
+        {
+          name: 'severity',
+          typeSql: 'text',
+          defaultSql: '',
+          columnDefault: undefined,
+          nullable: false,
+        },
+        {
+          name: 'stepsToRepro',
+          typeSql: 'text',
+          defaultSql: '',
+          columnDefault: undefined,
+          nullable: true,
+        },
+      ]),
+      new CreateTableCall(
+        'public',
+        'item',
+        [
+          {
+            name: 'tenant_id',
+            typeSql: 'uuid',
+            defaultSql: '',
+            columnDefault: undefined,
+            nullable: false,
+          },
+          {
+            name: 'id',
+            typeSql: 'uuid',
+            defaultSql: '',
+            columnDefault: undefined,
+            nullable: false,
+          },
+        ],
+        { columns: ['tenant_id', 'id'] },
+      ),
+    ];
+    const source = renderCallsToTypeScript(calls, META);
+    // The scaffold must emit the column-list form so that authored migration.ts
+    // files call createTable(schema, table, [columns], pk?) — not a pre-built SQL
+    // string. If this ever switches to the SQL-string form, this test catches it.
+    //
+    // The renderer pretty-prints arrays across multiple lines, so assertions
+    // match on the opening of each call (schema + table + array start) rather
+    // than the entire single-line form.
+    expect(source).toContain('createTable("public", "bug", [');
+    expect(source).toContain('createTable("public", "item", [');
+    expect(source).toContain('{ columns: ["tenant_id", "id"] }');
+    // Column names and types must appear in the array literal.
+    expect(source).toContain('name: "severity"');
+    expect(source).toContain('name: "stepsToRepro"');
+    expect(source).toContain('name: "tenant_id"');
+    // The scaffold must NOT embed a raw SQL string (the forbidden form is
+    // createTable("public", "bug", "CREATE TABLE ...")).
+    expect(source).not.toMatch(/createTable\("public", "bug", "CREATE TABLE/);
+    expect(source).not.toMatch(/createTable\("public", "item", "CREATE TABLE/);
+  });
 });

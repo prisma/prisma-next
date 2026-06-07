@@ -70,7 +70,7 @@ export function installExtension(options: {
   };
 }
 
-export function createSchema(schemaName: string, sql: string): Op {
+export function createSchemaOp(schemaName: string, sql: string): Op {
   return {
     id: `schema.${schemaName}`,
     label: `Create schema "${schemaName}"`,
@@ -80,4 +80,8 @@ export function createSchema(schemaName: string, sql: string): Op {
     execute: [step(`Create schema "${schemaName}"`, sql)],
     postcheck: [],
   };
+}
+
+export function createSchema(schemaName: string): Op {
+  return createSchemaOp(schemaName, `CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schemaName)}`);
 }
