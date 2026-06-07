@@ -76,9 +76,10 @@ export class TypeScriptRenderablePostgresMigration
   }
 
   renderTypeScript(): string {
-    return renderCallsToTypeScript(this.#calls, {
-      from: this.#meta.from,
-      to: this.#meta.to,
-    });
+    return renderCallsToTypeScript(
+      this.#calls,
+      { from: this.#meta.from, to: this.#meta.to },
+      this.#lower,
+    );
   }
 }

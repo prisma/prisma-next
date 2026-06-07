@@ -7,6 +7,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../src/core/adapter';
 
 function createFkTestContract(fkConfig: {
   constraint: boolean;
@@ -78,7 +79,13 @@ const emptySchema: SqlSchemaIR = {
 };
 
 describe('PostgresMigrationPlanner - per-FK config combinations', () => {
-  const planner = createPostgresMigrationPlanner();
+  const testAdapter = createPostgresAdapter();
+  const planner = createPostgresMigrationPlanner((ast, ctx) =>
+    testAdapter.lower(
+      ast as Parameters<typeof testAdapter.lower>[0],
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    ),
+  );
 
   it('emits both FK constraints and FK indexes when constraint=true, index=true', () => {
     const contract = createFkTestContract({ constraint: true, index: true });

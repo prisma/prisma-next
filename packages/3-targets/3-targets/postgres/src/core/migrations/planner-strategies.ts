@@ -253,6 +253,7 @@ function buildColumnSpec(
     name: column,
     typeSql: buildColumnTypeSql(col, mutableHooks, mutableTypes),
     defaultSql: buildColumnDefaultSql(col.default, col),
+    columnDefault: col.default,
     nullable: overrides?.nullable ?? col.nullable,
   };
 }

@@ -54,9 +54,10 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
 };
 
 export function createPostgresMigrationPlanner(
-  family?: SqlControlFamilyInstance,
+  family: SqlControlFamilyInstance | LowerFn,
 ): PostgresMigrationPlanner {
-  const lower: LowerFn | undefined = family ? (ast, ctx) => family.lowerAst(ast, ctx) : undefined;
+  const lower: LowerFn =
+    typeof family === 'function' ? family : (ast, ctx) => family.lowerAst(ast, ctx);
   return new PostgresMigrationPlanner(lower);
 }
 

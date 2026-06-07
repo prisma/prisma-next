@@ -44,8 +44,10 @@ import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postg
 import { renderOps } from '@prisma-next/target-postgres/render-ops';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../src/core/adapter';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
+const testAdapter = createPostgresAdapter();
 
 describe('renderOps', () => {
   it('lowers each variant via its pure factory, pinning id/operationClass/target.details', () => {
@@ -60,13 +62,14 @@ describe('renderOps', () => {
     };
     const calls = [
       new CreateTableCall('public', 'user', [
-        { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
+        { name: 'id', typeSql: 'text', defaultSql: '', columnDefault: undefined, nullable: false },
       ]),
       new DropTableCall('public', 'stale'),
       new AddColumnCall('public', 'user', {
         name: 'email',
         typeSql: 'text',
         defaultSql: '',
+        columnDefault: undefined,
         nullable: true,
       }),
       new DropColumnCall('public', 'user', 'legacy'),
@@ -100,7 +103,12 @@ describe('renderOps', () => {
       new CreateSchemaCall('app'),
     ];
 
-    const ops = renderOps(calls);
+    const ops = renderOps(calls, (ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const schemaObject = (objectType: string, name: string, table?: string) => ({
       schema: 'public',

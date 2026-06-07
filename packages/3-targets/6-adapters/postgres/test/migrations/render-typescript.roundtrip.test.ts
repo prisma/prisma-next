@@ -31,8 +31,20 @@ import { renderOps } from '@prisma-next/target-postgres/render-ops';
 import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../src/core/adapter';
 
 const execFileAsync = promisify(execFile);
+const testAdapter = createPostgresAdapter();
+const testLower = (
+  ast:
+    | Parameters<typeof testAdapter.lower>[0]
+    | import('@prisma-next/sql-relational-core/ast').DdlNode,
+  ctx: import('@prisma-next/sql-relational-core/ast').LowererContext<unknown>,
+) =>
+  testAdapter.lower(
+    ast as Parameters<typeof testAdapter.lower>[0],
+    ctx as Parameters<typeof testAdapter.lower>[1],
+  );
 const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const targetPostgresRoot = resolve(repoRoot, 'packages/3-targets/3-targets/postgres');
@@ -119,8 +131,20 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
         'public',
         'user',
         [
-          { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'email', typeSql: 'text', defaultSql: '', nullable: false },
+          {
+            name: 'id',
+            typeSql: 'text',
+            defaultSql: '',
+            columnDefault: undefined,
+            nullable: false,
+          },
+          {
+            name: 'email',
+            typeSql: 'text',
+            defaultSql: '',
+            columnDefault: undefined,
+            nullable: false,
+          },
         ],
         { columns: ['id'] },
       ),
@@ -128,12 +152,18 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
         name: 'nickname',
         typeSql: 'text',
         defaultSql: '',
+        columnDefault: undefined,
         nullable: true,
       }),
       new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
       new DropTableCall('public', 'stale'),
     ];
-    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderablePostgresMigration(
+      calls,
+      META,
+      APP_SPACE_ID,
+      testLower,
+    );
 
     const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -147,7 +177,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
     const ops = JSON.parse(opsJson);
 
-    const expected = JSON.parse(JSON.stringify(renderOps(calls)));
+    const expected = JSON.parse(JSON.stringify(renderOps(calls, testLower)));
     expect(ops).toEqual(expected);
   });
 

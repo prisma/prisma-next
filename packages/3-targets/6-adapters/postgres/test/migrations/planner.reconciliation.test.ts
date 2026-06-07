@@ -9,6 +9,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../src/core/adapter';
 
 const RECONCILIATION_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
@@ -19,7 +20,13 @@ const WIDENING_POLICY: MigrationOperationPolicy = {
 };
 
 describe('PostgresMigrationPlanner - reconciliation planning', () => {
-  const planner = createPostgresMigrationPlanner();
+  const testAdapter = createPostgresAdapter();
+  const planner = createPostgresMigrationPlanner((ast, ctx) =>
+    testAdapter.lower(
+      ast as Parameters<typeof testAdapter.lower>[0],
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    ),
+  );
 
   it('plans destructive drop for extra column when policy allows destructive', () => {
     const contract = createContract({

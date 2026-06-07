@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -7,9 +8,11 @@ import {
   type SqlStorageInput,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
+import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import type { PostgresDdlNode } from '../../src/core/ddl/nodes';
 import { enumStorageCompoundKey } from '../../src/core/migrations/enum-planning';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import type { CreateTableCall } from '../../src/core/migrations/op-factory-call';
@@ -20,6 +23,14 @@ import {
   postgresCreateNamespace,
 } from '../../src/core/postgres-schema';
 import { PostgresEnumType } from '../../src/exports/types';
+
+const testAdapter = createPostgresAdapter();
+const testLower: Parameters<CreateTableCall['toOp']>[0] = (ast, ctx) =>
+  // test file: adapter.lower is more specific than LowerFn; cast at the boundary
+  testAdapter.lower(
+    ast as AnyQueryAst | PostgresDdlNode,
+    ctx as Parameters<typeof testAdapter.lower>[1],
+  );
 
 function makeContract(
   overrides: {
@@ -919,7 +930,7 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       const call = result.value.calls[0]!;
       expect(call.factoryName).toBe('createSchema');
-      const op = call.toOp();
+      const op = call.toOp(testLower);
       expect(op.execute?.[0]?.sql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
     });
   });

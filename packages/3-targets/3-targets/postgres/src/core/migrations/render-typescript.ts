@@ -11,7 +11,9 @@
 
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import { detectScaffoldRuntime, shebangLineFor } from '@prisma-next/migration-tools/migration-ts';
-import { type ImportRequirement, renderImports } from '@prisma-next/ts-render';
+import { type ImportRequirement, jsonToTsSource, renderImports } from '@prisma-next/ts-render';
+import { CreateSchemaCall, CreateTableCall } from './op-factory-call';
+import type { LowerFn } from './render-ops';
 
 export interface RenderMigrationMeta {
   readonly from: string | null;
@@ -44,9 +46,10 @@ const BASE_IMPORTS: readonly ImportRequirement[] = [
 export function renderCallsToTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,
   meta: RenderMigrationMeta,
+  lower?: LowerFn,
 ): string {
   const imports = buildImports(calls);
-  const operationsBody = calls.map((c) => c.renderTypeScript()).join(',\n');
+  const operationsBody = calls.map((c) => renderCall(c, lower)).join(',\n');
 
   return [
     shebangLineFor(detectScaffoldRuntime()),
@@ -64,6 +67,37 @@ export function renderCallsToTypeScript(
     'MigrationCLI.run(import.meta.url, M);',
     '',
   ].join('\n');
+}
+
+/**
+ * Render a single call as a TypeScript expression.
+ *
+ * DDL calls (`CreateTableCall`, `CreateSchemaCall`) need a DDL lowerer to
+ * produce their SQL string, because the pure factory functions they call in
+ * the scaffold (`createTable`, `createSchema`) accept a pre-built SQL string.
+ * When a lowerer is available, embed the SQL directly so the scaffold is
+ * self-contained. Without a lowerer (e.g. when rendering for display only),
+ * fall back to the call's own `renderTypeScript()`.
+ */
+function renderCall(call: OpFactoryCall, lower: LowerFn | undefined): string {
+  if (lower !== undefined) {
+    if (call instanceof CreateTableCall) {
+      const op = call.toOp(lower);
+      const sql = op.execute[0]?.sql ?? '';
+      const args = [
+        jsonToTsSource(call.schemaName),
+        jsonToTsSource(call.tableName),
+        jsonToTsSource(sql),
+      ];
+      return `createTable(${args.join(', ')})`;
+    }
+    if (call instanceof CreateSchemaCall) {
+      const op = call.toOp(lower);
+      const sql = op.execute[0]?.sql ?? '';
+      return `createSchema(${jsonToTsSource(call.schemaName)}, ${jsonToTsSource(sql)})`;
+    }
+  }
+  return call.renderTypeScript();
 }
 
 function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {

@@ -1,28 +1,7 @@
-import { quoteIdentifier } from '../../sql-utils';
 import { qualifyTableName, toRegclassLiteral } from '../planner-sql-checks';
-import { type ColumnSpec, type Op, renderColumnDefinition, step, targetDetails } from './shared';
+import { type Op, step, targetDetails } from './shared';
 
-export function createTable(
-  schemaName: string,
-  tableName: string,
-  columns: ReadonlyArray<ColumnSpec>,
-  primaryKey?: { readonly columns: readonly string[] },
-  prebuiltSql?: string,
-): Op {
-  const qualified = qualifyTableName(schemaName, tableName);
-  let createSql: string;
-  if (prebuiltSql !== undefined) {
-    createSql = prebuiltSql;
-  } else {
-    const columnDefs = columns.map(renderColumnDefinition);
-    const constraintDefs: string[] = [];
-    if (primaryKey) {
-      constraintDefs.push(`PRIMARY KEY (${primaryKey.columns.map(quoteIdentifier).join(', ')})`);
-    }
-    const allDefs = [...columnDefs, ...constraintDefs];
-    createSql = `CREATE TABLE ${qualified} (\n  ${allDefs.join(',\n  ')}\n)`;
-  }
-
+export function createTable(schemaName: string, tableName: string, sql: string): Op {
   return {
     id: `table.${tableName}`,
     label: `Create table "${tableName}"`,
@@ -35,7 +14,7 @@ export function createTable(
         `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
       ),
     ],
-    execute: [step(`create table "${tableName}"`, createSql)],
+    execute: [step(`create table "${tableName}"`, sql)],
     postcheck: [
       step(
         `verify table "${tableName}" exists`,

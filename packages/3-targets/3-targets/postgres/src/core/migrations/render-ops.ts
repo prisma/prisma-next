@@ -6,6 +6,7 @@ import type {
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -36,7 +37,10 @@ function assertPostgresOp(
 
 export function renderOps(calls: readonly OpFactoryCall[], lower?: LowerFn): Op[] {
   return calls.map((c) => {
-    const op = (c as { toOp(lower?: LowerFn): ReturnType<OpFactoryCall['toOp']> }).toOp(lower);
+    const op = blindCast<
+      { toOp(lower?: LowerFn): ReturnType<OpFactoryCall['toOp']> },
+      'PG OpFactoryCall.toOp accepts an optional LowerFn; the framework interface omits it because not all targets need a lowerer — the PG target overrides with this extended signature'
+    >(c).toOp(lower);
     assertPostgresOp(op, c.factoryName);
     return op;
   });

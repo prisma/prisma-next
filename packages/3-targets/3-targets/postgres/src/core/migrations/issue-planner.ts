@@ -197,6 +197,7 @@ function toColumnSpec(
       storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
     ),
     defaultSql: buildColumnDefaultSql(column.default, column),
+    columnDefault: column.default,
     nullable: column.nullable,
   };
 }

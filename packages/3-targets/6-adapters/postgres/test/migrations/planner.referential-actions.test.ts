@@ -12,6 +12,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../src/core/adapter';
 
 function createRefActionContract(
   onDelete?: ReferentialAction,
@@ -82,7 +83,13 @@ const emptySchema: SqlSchemaIR = {
 };
 
 function planAndGetFkSql(onDelete?: ReferentialAction, onUpdate?: ReferentialAction): string {
-  const planner = createPostgresMigrationPlanner();
+  const testAdapter = createPostgresAdapter();
+  const planner = createPostgresMigrationPlanner((ast, ctx) =>
+    testAdapter.lower(
+      ast as Parameters<typeof testAdapter.lower>[0],
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    ),
+  );
   const contract = createRefActionContract(onDelete, onUpdate);
   const result = planner.plan({
     contract,

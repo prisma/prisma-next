@@ -115,7 +115,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
 
   it('CreateTableCall emits columns as an array literal; omits the primary-key arg when absent', () => {
     const withoutPk = new CreateTableCall('public', 'user', [
-      { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
+      { name: 'id', typeSql: 'text', defaultSql: '', columnDefault: undefined, nullable: false },
     ]);
     expect(withoutPk.renderTypeScript()).toBe(
       'createTable("public", "user", [{ name: "id", typeSql: "text", defaultSql: "", nullable: false }])',
@@ -125,7 +125,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     const withPk = new CreateTableCall(
       'public',
       'user',
-      [{ name: 'id', typeSql: 'text', defaultSql: '', nullable: false }],
+      [{ name: 'id', typeSql: 'text', defaultSql: '', columnDefault: undefined, nullable: false }],
       { columns: ['id'] },
     );
     expect(withPk.renderTypeScript()).toBe(
@@ -138,6 +138,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
       name: 'email',
       typeSql: 'text',
       defaultSql: '',
+      columnDefault: undefined,
       nullable: true,
     });
     expect(call.renderTypeScript()).toBe(
@@ -331,13 +332,14 @@ describe('renderCallsToTypeScript', () => {
   it('deduplicates + sorts imports across a mixed call list and keeps the base Migration import', () => {
     const calls = [
       new CreateTableCall('public', 'user', [
-        { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
+        { name: 'id', typeSql: 'text', defaultSql: '', columnDefault: undefined, nullable: false },
       ]),
       new DropTableCall('public', 'old_user'),
       new AddColumnCall('public', 'user', {
         name: 'email',
         typeSql: 'text',
         defaultSql: '',
+        columnDefault: undefined,
         nullable: true,
       }),
       new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),

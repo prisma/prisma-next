@@ -98,6 +98,9 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
     if (node.expression === 'autoincrement()') {
       return '';
     }
+    if (node.expression.startsWith('nextval(')) {
+      return `DEFAULT ${node.expression}`;
+    }
     return `DEFAULT (${node.expression})`;
   },
 };

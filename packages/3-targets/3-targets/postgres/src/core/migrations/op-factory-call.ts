@@ -26,6 +26,7 @@ import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   MigrationOperationClass,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   DdlColumn,
   FunctionColumnDefault,
@@ -37,6 +38,8 @@ import {
   createSchema as createSchemaDdl,
   createTable as createTableDdl,
 } from '../../contract-free/ddl';
+import { escapeLiteral, quoteIdentifier } from '../sql-utils';
+import type { PostgresColumnDefault } from '../types';
 import {
   addColumn,
   alterColumnType,
@@ -78,39 +81,31 @@ abstract class PostgresOpFactoryCallNode extends TsExpression implements Framewo
 // Table
 // ============================================================================
 
-/**
- * Parse a pre-rendered `defaultSql` string (as produced by `buildColumnDefaultSql`)
- * back into a `DdlColumnDefault` for DDL AST construction. Returns `undefined`
- * when `defaultSql` is empty (no default).
- *
- * Mapping:
- *   `""` → undefined
- *   `"DEFAULT 'x'"` → LiteralColumnDefault('x')
- *   `"DEFAULT 7"` → LiteralColumnDefault(7)
- *   `"DEFAULT true/false"` → LiteralColumnDefault(boolean)
- *   `"DEFAULT NULL"` → LiteralColumnDefault(null)
- *   `"DEFAULT (expr)"` → FunctionColumnDefault(expr)  [strips outer parens]
- *   `"DEFAULT nextval(...)"` → FunctionColumnDefault("nextval(...)")
- */
-function parseDefaultSql(defaultSql: string): DdlColumn['default'] {
-  if (!defaultSql) return undefined;
-  const body = defaultSql.slice('DEFAULT '.length);
-  if (body.startsWith('(') && body.endsWith(')')) {
-    return new FunctionColumnDefault(body.slice(1, -1));
+function postgresDefaultToDdlColumnDefault(
+  columnDefault: PostgresColumnDefault | undefined,
+): DdlColumn['default'] {
+  if (!columnDefault) return undefined;
+  switch (columnDefault.kind) {
+    case 'literal':
+      return new LiteralColumnDefault(columnDefault.value);
+    case 'function':
+      if (columnDefault.expression === 'autoincrement()') return undefined;
+      return new FunctionColumnDefault(columnDefault.expression);
+    case 'sequence':
+      return new FunctionColumnDefault(
+        `nextval('${escapeLiteral(quoteIdentifier(columnDefault.name))}'::regclass)`,
+      );
+    default: {
+      const exhaustive: never = columnDefault;
+      throw new Error(
+        `postgresDefaultToDdlColumnDefault: unhandled kind "${(exhaustive as { kind: string }).kind}"`,
+      );
+    }
   }
-  if (body === 'NULL') return new LiteralColumnDefault(null);
-  if (body === 'true') return new LiteralColumnDefault(true);
-  if (body === 'false') return new LiteralColumnDefault(false);
-  if (body.startsWith("'") && body.endsWith("'")) {
-    return new LiteralColumnDefault(body.slice(1, -1).replaceAll("''", "'"));
-  }
-  const num = Number(body);
-  if (!Number.isNaN(num)) return new LiteralColumnDefault(num);
-  return new FunctionColumnDefault(body);
 }
 
 function columnSpecToDdlColumn(spec: ColumnSpec): DdlColumn {
-  const columnDefault = parseDefaultSql(spec.defaultSql);
+  const columnDefault = postgresDefaultToDdlColumnDefault(spec.columnDefault);
   return new DdlColumn({
     name: spec.name,
     type: spec.typeSql,
@@ -148,19 +143,21 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
   }
 
   toOp(lower?: LowerFn): Op {
-    if (lower) {
-      const ddlNode = createTableDdl({
-        schema: this.schemaName,
-        table: this.tableName,
-        columns: this.columns.map(columnSpecToDdlColumn),
-        ...(this.primaryKey
-          ? { constraints: [new PrimaryKeyConstraint({ columns: this.primaryKey.columns })] }
-          : {}),
-      });
-      const { sql } = lower(ddlNode, { contract: {} });
-      return createTableOp(this.schemaName, this.tableName, this.columns, this.primaryKey, sql);
+    if (lower === undefined) {
+      throw new Error(
+        `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass a SqlControlFamilyInstance to createPostgresMigrationPlanner.`,
+      );
     }
-    return createTableOp(this.schemaName, this.tableName, this.columns, this.primaryKey);
+    const ddlNode = createTableDdl({
+      ...(this.schemaName !== UNBOUND_NAMESPACE_ID ? { schema: this.schemaName } : {}),
+      table: this.tableName,
+      columns: this.columns.map(columnSpecToDdlColumn),
+      ...(this.primaryKey
+        ? { constraints: [new PrimaryKeyConstraint({ columns: this.primaryKey.columns })] }
+        : {}),
+    });
+    const { sql } = lower(ddlNode, { contract: {} });
+    return createTableOp(this.schemaName, this.tableName, sql);
   }
 
   renderTypeScript(): string {
@@ -841,12 +838,14 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
   }
 
   toOp(lower?: LowerFn): Op {
-    if (lower) {
-      const ddlNode = createSchemaDdl({ schema: this.schemaName, ifNotExists: true });
-      const { sql } = lower(ddlNode, { contract: {} });
-      return createSchemaOp(this.schemaName, sql);
+    if (lower === undefined) {
+      throw new Error(
+        `CreateSchemaCall.toOp: a DDL lowerer is required on the Postgres planner path (schema "${this.schemaName}"). Pass a SqlControlFamilyInstance to createPostgresMigrationPlanner.`,
+      );
     }
-    return createSchemaOp(this.schemaName);
+    const ddlNode = createSchemaDdl({ schema: this.schemaName, ifNotExists: true });
+    const { sql } = lower(ddlNode, { contract: {} });
+    return createSchemaOp(this.schemaName, sql);
   }
 
   renderTypeScript(): string {

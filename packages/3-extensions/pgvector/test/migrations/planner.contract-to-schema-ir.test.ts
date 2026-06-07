@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
@@ -27,6 +28,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
+const testAdapter = createPostgresAdapter();
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {
   if (!input.codecId) return input.nativeType;
@@ -102,7 +104,12 @@ function planFromStorages(
     expandNativeType: expandParameterizedNativeType,
     renderDefault: postgresRenderDefault,
   });
-  const planner = createPostgresMigrationPlanner();
+  const planner = createPostgresMigrationPlanner((ast, ctx) =>
+    testAdapter.lower(
+      ast as Parameters<typeof testAdapter.lower>[0],
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    ),
+  );
   return planner.plan({
     contract: toContract,
     schema: fromSchemaIR,
@@ -137,7 +144,12 @@ describe('contractToSchemaIR → planner round-trip', () => {
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
     });
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const result = planner.plan({
       contract,
@@ -176,7 +188,12 @@ describe('contractToSchemaIR → planner round-trip', () => {
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
     });
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const result = planner.plan({
       contract,
@@ -241,7 +258,12 @@ describe('contractToSchemaIR → planner round-trip', () => {
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
     });
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const result = planner.plan({
       contract,
@@ -296,7 +318,12 @@ describe('contractToSchemaIR → planner round-trip', () => {
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
     });
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const result = planner.plan({
       contract,
@@ -832,7 +859,12 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       renderDefault: postgresRenderDefault,
     });
     const toContract = createDemoContract(toStorage);
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const result = planner.plan({
       contract: toContract,
@@ -860,7 +892,12 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       renderDefault: postgresRenderDefault,
     });
     const toContract = createDemoContract(DEMO_BASE_STORAGE);
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const result = planner.plan({
       contract: toContract,
@@ -885,7 +922,12 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       renderDefault: postgresRenderDefault,
     });
     const toContract = createDemoContract(DEMO_BASE_STORAGE);
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const result = planner.plan({
       contract: toContract,

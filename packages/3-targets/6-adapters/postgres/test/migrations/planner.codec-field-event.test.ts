@@ -15,8 +15,10 @@ import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/pla
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
+import { createPostgresAdapter } from '../../src/core/adapter';
 
 const emptySchema: SqlSchemaIR = { tables: {} };
+const testAdapter = createPostgresAdapter();
 
 const PG_TEXT_CODEC = 'pg/text@1';
 const HOOKED_CODEC = 'cs/string@1';
@@ -85,7 +87,12 @@ function makeFrameworkComponents(
 
 describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
   it('inlines ops emitted by onFieldEvent after structural DDL', () => {
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [
@@ -128,7 +135,12 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
   });
 
   it('does not fire when no codec has an onFieldEvent hook', () => {
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>> = [];
 
@@ -151,7 +163,12 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
   });
 
   it('produces byte-identical operations across re-emits (deterministic)', () => {
-    const planner = createPostgresMigrationPlanner();
+    const planner = createPostgresMigrationPlanner((ast, ctx) =>
+      testAdapter.lower(
+        ast as Parameters<typeof testAdapter.lower>[0],
+        ctx as Parameters<typeof testAdapter.lower>[1],
+      ),
+    );
 
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [

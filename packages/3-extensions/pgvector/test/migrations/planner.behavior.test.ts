@@ -1,3 +1,4 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import {
   asNamespaceId,
   type ColumnDefaultLiteralInputValue,
@@ -23,8 +24,15 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
+const testAdapter = createPostgresAdapter();
+
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
-  const planner = createPostgresMigrationPlanner();
+  const planner = createPostgresMigrationPlanner((ast, ctx) =>
+    testAdapter.lower(
+      ast as Parameters<typeof testAdapter.lower>[0],
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    ),
+  );
   const contract = createTestContract();
 
   it('returns empty plan when schema already satisfies contract (superset)', () => {
@@ -691,7 +699,12 @@ function planUserTableOperations(
     extraSchemaTables?: SqlSchemaIR['tables'];
   },
 ) {
-  const planner = createPostgresMigrationPlanner();
+  const planner = createPostgresMigrationPlanner((ast, ctx) =>
+    testAdapter.lower(
+      ast as Parameters<typeof testAdapter.lower>[0],
+      ctx as Parameters<typeof testAdapter.lower>[1],
+    ),
+  );
   const contract = createTestContract({
     storage: {
       namespaces: {
