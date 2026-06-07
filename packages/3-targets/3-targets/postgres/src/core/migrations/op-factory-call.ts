@@ -26,7 +26,17 @@ import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   MigrationOperationClass,
 } from '@prisma-next/framework-components/control';
+import {
+  DdlColumn,
+  FunctionColumnDefault,
+  LiteralColumnDefault,
+  PrimaryKeyConstraint,
+} from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
+import {
+  createSchema as createSchemaDdl,
+  createTable as createTableDdl,
+} from '../../contract-free/ddl';
 import {
   addColumn,
   alterColumnType,
@@ -37,12 +47,13 @@ import {
   setNotNull,
 } from './operations/columns';
 import { addForeignKey, addPrimaryKey, addUnique, dropConstraint } from './operations/constraints';
-import { createExtension, createSchema } from './operations/dependencies';
+import { createExtension, createSchema as createSchemaOp } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
 import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
-import { createTable, dropTable } from './operations/tables';
+import { createTable as createTableOp, dropTable } from './operations/tables';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
+import type { LowerFn } from './render-ops';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
@@ -52,7 +63,7 @@ abstract class PostgresOpFactoryCallNode extends TsExpression implements Framewo
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract toOp(): Op;
+  abstract toOp(lower?: LowerFn): Op;
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
@@ -66,6 +77,47 @@ abstract class PostgresOpFactoryCallNode extends TsExpression implements Framewo
 // ============================================================================
 // Table
 // ============================================================================
+
+/**
+ * Parse a pre-rendered `defaultSql` string (as produced by `buildColumnDefaultSql`)
+ * back into a `DdlColumnDefault` for DDL AST construction. Returns `undefined`
+ * when `defaultSql` is empty (no default).
+ *
+ * Mapping:
+ *   `""` → undefined
+ *   `"DEFAULT 'x'"` → LiteralColumnDefault('x')
+ *   `"DEFAULT 7"` → LiteralColumnDefault(7)
+ *   `"DEFAULT true/false"` → LiteralColumnDefault(boolean)
+ *   `"DEFAULT NULL"` → LiteralColumnDefault(null)
+ *   `"DEFAULT (expr)"` → FunctionColumnDefault(expr)  [strips outer parens]
+ *   `"DEFAULT nextval(...)"` → FunctionColumnDefault("nextval(...)")
+ */
+function parseDefaultSql(defaultSql: string): DdlColumn['default'] {
+  if (!defaultSql) return undefined;
+  const body = defaultSql.slice('DEFAULT '.length);
+  if (body.startsWith('(') && body.endsWith(')')) {
+    return new FunctionColumnDefault(body.slice(1, -1));
+  }
+  if (body === 'NULL') return new LiteralColumnDefault(null);
+  if (body === 'true') return new LiteralColumnDefault(true);
+  if (body === 'false') return new LiteralColumnDefault(false);
+  if (body.startsWith("'") && body.endsWith("'")) {
+    return new LiteralColumnDefault(body.slice(1, -1).replaceAll("''", "'"));
+  }
+  const num = Number(body);
+  if (!Number.isNaN(num)) return new LiteralColumnDefault(num);
+  return new FunctionColumnDefault(body);
+}
+
+function columnSpecToDdlColumn(spec: ColumnSpec): DdlColumn {
+  const columnDefault = parseDefaultSql(spec.defaultSql);
+  return new DdlColumn({
+    name: spec.name,
+    type: spec.typeSql,
+    ...(spec.nullable ? {} : { notNull: true }),
+    ...(columnDefault !== undefined ? { default: columnDefault } : {}),
+  });
+}
 
 export interface CreateTablePrimaryKey {
   readonly columns: readonly string[];
@@ -95,8 +147,20 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
-    return createTable(this.schemaName, this.tableName, this.columns, this.primaryKey);
+  toOp(lower?: LowerFn): Op {
+    if (lower) {
+      const ddlNode = createTableDdl({
+        schema: this.schemaName,
+        table: this.tableName,
+        columns: this.columns.map(columnSpecToDdlColumn),
+        ...(this.primaryKey
+          ? { constraints: [new PrimaryKeyConstraint({ columns: this.primaryKey.columns })] }
+          : {}),
+      });
+      const { sql } = lower(ddlNode, { contract: {} });
+      return createTableOp(this.schemaName, this.tableName, this.columns, this.primaryKey, sql);
+    }
+    return createTableOp(this.schemaName, this.tableName, this.columns, this.primaryKey);
   }
 
   renderTypeScript(): string {
@@ -776,8 +840,13 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
-    return createSchema(this.schemaName);
+  toOp(lower?: LowerFn): Op {
+    if (lower) {
+      const ddlNode = createSchemaDdl({ schema: this.schemaName, ifNotExists: true });
+      const { sql } = lower(ddlNode, { contract: {} });
+      return createSchemaOp(this.schemaName, sql);
+    }
+    return createSchemaOp(this.schemaName);
   }
 
   renderTypeScript(): string {

@@ -4,42 +4,12 @@ import type {
   ForeignKey,
   PostgresEnumStorageEntry,
   StorageColumn,
-  StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { qualifyTableName } from './planner-sql-checks';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
-
-export function buildCreateTableSql(
-  qualifiedTableName: string,
-  table: StorageTable,
-  codecHooks: Map<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
-): string {
-  const columnDefinitions = Object.entries(table.columns).map(
-    ([columnName, column]: [string, StorageColumn]) => {
-      const parts = [
-        quoteIdentifier(columnName),
-        buildColumnTypeSql(column, codecHooks, storageTypes),
-        buildColumnDefaultSql(column.default, column),
-        column.nullable ? '' : 'NOT NULL',
-      ].filter(Boolean);
-      return parts.join(' ');
-    },
-  );
-
-  const constraintDefinitions: string[] = [];
-  if (table.primaryKey) {
-    constraintDefinitions.push(
-      `PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
-    );
-  }
-
-  const allDefinitions = [...columnDefinitions, ...constraintDefinitions];
-  return `CREATE TABLE ${qualifiedTableName} (\n  ${allDefinitions.join(',\n  ')}\n)`;
-}
 
 /**
  * Pattern for safe PostgreSQL type names.

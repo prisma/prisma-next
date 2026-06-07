@@ -62,8 +62,8 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     contractSerializer: new PostgresContractSerializer(),
     schemaVerifier: new PostgresSchemaVerifier(),
     migrations: {
-      createPlanner(_family: SqlControlFamilyInstance) {
-        return createPostgresMigrationPlanner();
+      createPlanner(family: SqlControlFamilyInstance) {
+        return createPostgresMigrationPlanner(family);
       },
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
@@ -107,8 +107,8 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
      * Direct method for SQL-specific usage.
      * @deprecated Use migrations.createPlanner() for CLI compatibility.
      */
-    createPlanner(_family: SqlControlFamilyInstance) {
-      return createPostgresMigrationPlanner();
+    createPlanner(family: SqlControlFamilyInstance) {
+      return createPostgresMigrationPlanner(family);
     },
     /**
      * Direct method for SQL-specific usage.

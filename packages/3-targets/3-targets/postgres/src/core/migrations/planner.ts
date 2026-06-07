@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
+  SqlControlFamilyInstance,
   SqlMigrationPlannerPlanOptions,
   SqlPlannerConflict,
   SqlPlannerFailureResult,
@@ -35,6 +36,7 @@ import { planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
+import type { LowerFn } from './render-ops';
 import { verifyPostgresNamespacePresence } from './verify-postgres-namespaces';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
@@ -51,8 +53,11 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
   readonly frameworkComponents: PlannerFrameworkComponents;
 };
 
-export function createPostgresMigrationPlanner(): PostgresMigrationPlanner {
-  return new PostgresMigrationPlanner();
+export function createPostgresMigrationPlanner(
+  family?: SqlControlFamilyInstance,
+): PostgresMigrationPlanner {
+  const lower: LowerFn | undefined = family ? (ast, ctx) => family.lowerAst(ast, ctx) : undefined;
+  return new PostgresMigrationPlanner(lower);
 }
 
 /**
@@ -87,6 +92,12 @@ export type PostgresPlanResult =
  * authoring surface.
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
+  readonly #lower: LowerFn | undefined;
+
+  constructor(lower?: LowerFn) {
+    this.#lower = lower;
+  }
+
   plan(options: {
     readonly contract: unknown;
     readonly schema: unknown;
@@ -129,6 +140,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         to: context.toHash,
       },
       spaceId,
+      this.#lower,
     );
   }
 
@@ -225,6 +237,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           to: options.contract.storage.storageHash,
         },
         options.spaceId,
+        this.#lower,
       ),
       ...(warnings.length > 0 ? { warnings: Object.freeze(warnings) } : {}),
     });

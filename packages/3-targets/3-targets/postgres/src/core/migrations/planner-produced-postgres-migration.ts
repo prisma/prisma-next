@@ -31,7 +31,7 @@ import type {
 import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import { PostgresMigration } from './postgres-migration';
-import { renderOps } from './render-ops';
+import { type LowerFn, renderOps } from './render-ops';
 import { renderCallsToTypeScript } from './render-typescript';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -43,16 +43,23 @@ export class TypeScriptRenderablePostgresMigration
   readonly #calls: readonly OpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #spaceId: string;
+  readonly #lower: LowerFn | undefined;
 
-  constructor(calls: readonly OpFactoryCall[], meta: MigrationMeta, spaceId: string) {
+  constructor(
+    calls: readonly OpFactoryCall[],
+    meta: MigrationMeta,
+    spaceId: string,
+    lower?: LowerFn,
+  ) {
     super();
     this.#calls = calls;
     this.#meta = meta;
     this.#spaceId = spaceId;
+    this.#lower = lower;
   }
 
   override get operations(): readonly Op[] {
-    return renderOps(this.#calls);
+    return renderOps(this.#calls, this.#lower);
   }
 
   override describe(): MigrationMeta {

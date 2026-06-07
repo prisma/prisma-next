@@ -1,8 +1,19 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
+import type {
+  AnyQueryAst,
+  DdlNode,
+  LoweredStatement,
+  LowererContext,
+} from '@prisma-next/sql-relational-core/ast';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
+
+export type LowerFn = (
+  ast: AnyQueryAst | DdlNode,
+  context: LowererContext<unknown>,
+) => LoweredStatement;
 
 /**
  * Asserts an op materialised by an `OpFactoryCall` targets postgres. The
@@ -23,9 +34,9 @@ function assertPostgresOp(
   }
 }
 
-export function renderOps(calls: readonly OpFactoryCall[]): Op[] {
+export function renderOps(calls: readonly OpFactoryCall[], lower?: LowerFn): Op[] {
   return calls.map((c) => {
-    const op = c.toOp();
+    const op = (c as { toOp(lower?: LowerFn): ReturnType<OpFactoryCall['toOp']> }).toOp(lower);
     assertPostgresOp(op, c.factoryName);
     return op;
   });

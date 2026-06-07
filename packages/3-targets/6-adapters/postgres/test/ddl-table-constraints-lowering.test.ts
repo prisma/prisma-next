@@ -40,14 +40,14 @@ describe('PostgresCreateTable with table-level constraints', () => {
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toBe(
-      'create table public.post_tags (\n' +
-        '    postId text not null,\n' +
-        '    tagId text not null,\n' +
-        '    PRIMARY KEY (postId, tagId),\n' +
-        '    FOREIGN KEY (postId) REFERENCES posts (id) ON DELETE CASCADE,\n' +
-        '    FOREIGN KEY (tagId) REFERENCES tags (id) ON DELETE CASCADE,\n' +
-        '    CONSTRAINT uq_post_tags_reverse UNIQUE (tagId, postId)\n' +
-        '  )',
+      'CREATE TABLE "public"."post_tags" (\n' +
+        '  "postId" text NOT NULL,\n' +
+        '  "tagId" text NOT NULL,\n' +
+        '  PRIMARY KEY ("postId", "tagId"),\n' +
+        '  FOREIGN KEY ("postId") REFERENCES posts ("id") ON DELETE CASCADE,\n' +
+        '  FOREIGN KEY ("tagId") REFERENCES tags ("id") ON DELETE CASCADE,\n' +
+        '  CONSTRAINT uq_post_tags_reverse UNIQUE ("tagId", "postId")\n' +
+        ')',
     );
     expect(lowered.params).toEqual([]);
   });
@@ -62,7 +62,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     const adapter = createPostgresAdapter();
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
-    expect(lowered.sql).toContain('CONSTRAINT pk_items PRIMARY KEY (a, b)');
+    expect(lowered.sql).toContain('CONSTRAINT pk_items PRIMARY KEY ("a", "b")');
   });
 
   it('renders FK with onUpdate action', () => {
@@ -85,7 +85,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(
-      'CONSTRAINT fk_orders_user FOREIGN KEY (userId) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE',
+      'CONSTRAINT fk_orders_user FOREIGN KEY ("userId") REFERENCES users ("id") ON DELETE RESTRICT ON UPDATE CASCADE',
     );
   });
 
@@ -98,6 +98,6 @@ describe('PostgresCreateTable with table-level constraints', () => {
     const adapter = createPostgresAdapter();
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
-    expect(lowered.sql).toBe('create table simple (\n    id text not null primary key\n  )');
+    expect(lowered.sql).toBe('CREATE TABLE "simple" (\n  "id" text NOT NULL PRIMARY KEY\n)');
   });
 });

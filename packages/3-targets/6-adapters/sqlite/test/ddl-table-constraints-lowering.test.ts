@@ -38,14 +38,14 @@ describe('SqliteCreateTable with table-level constraints', () => {
     const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
 
     expect(lowered.sql).toBe(
-      'CREATE TABLE post_tags (\n' +
-        '    postId TEXT NOT NULL,\n' +
-        '    tagId TEXT NOT NULL,\n' +
-        '    PRIMARY KEY (postId, tagId),\n' +
-        '    FOREIGN KEY (postId) REFERENCES posts (id) ON DELETE CASCADE,\n' +
-        '    FOREIGN KEY (tagId) REFERENCES tags (id) ON DELETE CASCADE,\n' +
-        '    CONSTRAINT uq_post_tags_reverse UNIQUE (tagId, postId)\n' +
-        '  )',
+      'CREATE TABLE "post_tags" (\n' +
+        '  "postId" TEXT NOT NULL,\n' +
+        '  "tagId" TEXT NOT NULL,\n' +
+        '  PRIMARY KEY ("postId", "tagId"),\n' +
+        '  FOREIGN KEY ("postId") REFERENCES posts ("id") ON DELETE CASCADE,\n' +
+        '  FOREIGN KEY ("tagId") REFERENCES tags ("id") ON DELETE CASCADE,\n' +
+        '  CONSTRAINT uq_post_tags_reverse UNIQUE ("tagId", "postId")\n' +
+        ')',
     );
     expect(lowered.params).toEqual([]);
   });
@@ -60,7 +60,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
     const adapter = createSqliteAdapter();
     const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
 
-    expect(lowered.sql).toContain('CONSTRAINT pk_items PRIMARY KEY (a, b)');
+    expect(lowered.sql).toContain('CONSTRAINT pk_items PRIMARY KEY ("a", "b")');
   });
 
   it('renders FK with onUpdate action', () => {
@@ -83,7 +83,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
     const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
 
     expect(lowered.sql).toContain(
-      'CONSTRAINT fk_orders_user FOREIGN KEY (userId) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE',
+      'CONSTRAINT fk_orders_user FOREIGN KEY ("userId") REFERENCES users ("id") ON DELETE RESTRICT ON UPDATE CASCADE',
     );
   });
 
@@ -96,6 +96,6 @@ describe('SqliteCreateTable with table-level constraints', () => {
     const adapter = createSqliteAdapter();
     const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
 
-    expect(lowered.sql).toBe('CREATE TABLE simple (\n    id TEXT NOT NULL PRIMARY KEY\n  )');
+    expect(lowered.sql).toBe('CREATE TABLE "simple" (\n  "id" TEXT NOT NULL PRIMARY KEY\n)');
   });
 });

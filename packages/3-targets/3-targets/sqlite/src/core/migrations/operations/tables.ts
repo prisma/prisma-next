@@ -19,7 +19,7 @@ import {
  * inline on the column; the table-level PRIMARY KEY clause is emitted only
  * when no column carries `inlineAutoincrementPrimaryKey`.
  */
-function renderCreateTableSql(tableName: string, spec: SqliteTableSpec): string {
+function buildTableBodySql(tableName: string, spec: SqliteTableSpec): string {
   const columnDefs = spec.columns.map(renderColumnDefinition);
 
   const constraintDefs: string[] = [];
@@ -55,7 +55,7 @@ export function createTable(tableName: string, spec: SqliteTableSpec): Op {
         `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
       ),
     ],
-    execute: [step(`create table "${tableName}"`, renderCreateTableSql(tableName, spec))],
+    execute: [step(`create table "${tableName}"`, buildTableBodySql(tableName, spec))],
     postcheck: [
       step(
         `verify table "${tableName}" exists`,
@@ -168,7 +168,7 @@ export function recreateTable(args: RecreateTableArgs): Op {
     execute: [
       step(
         `create new table "${tempName}" with desired schema`,
-        renderCreateTableSql(tempName, contractTable),
+        buildTableBodySql(tempName, contractTable),
       ),
       ...copyStep,
       step(`drop old table "${tableName}"`, `DROP TABLE ${quoteIdentifier(tableName)}`),

@@ -7,15 +7,21 @@ export function createTable(
   tableName: string,
   columns: ReadonlyArray<ColumnSpec>,
   primaryKey?: { readonly columns: readonly string[] },
+  prebuiltSql?: string,
 ): Op {
   const qualified = qualifyTableName(schemaName, tableName);
-  const columnDefs = columns.map(renderColumnDefinition);
-  const constraintDefs: string[] = [];
-  if (primaryKey) {
-    constraintDefs.push(`PRIMARY KEY (${primaryKey.columns.map(quoteIdentifier).join(', ')})`);
+  let createSql: string;
+  if (prebuiltSql !== undefined) {
+    createSql = prebuiltSql;
+  } else {
+    const columnDefs = columns.map(renderColumnDefinition);
+    const constraintDefs: string[] = [];
+    if (primaryKey) {
+      constraintDefs.push(`PRIMARY KEY (${primaryKey.columns.map(quoteIdentifier).join(', ')})`);
+    }
+    const allDefs = [...columnDefs, ...constraintDefs];
+    createSql = `CREATE TABLE ${qualified} (\n  ${allDefs.join(',\n  ')}\n)`;
   }
-  const allDefs = [...columnDefs, ...constraintDefs];
-  const createSql = `CREATE TABLE ${qualified} (\n  ${allDefs.join(',\n  ')}\n)`;
 
   return {
     id: `table.${tableName}`,

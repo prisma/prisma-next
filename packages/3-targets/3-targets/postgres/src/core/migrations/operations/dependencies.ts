@@ -70,19 +70,18 @@ export function installExtension(options: {
   };
 }
 
-export function createSchema(schemaName: string): Op {
+export function createSchema(schemaName: string, prebuiltSql?: string): Op {
+  const sql =
+    prebuiltSql !== undefined
+      ? prebuiltSql
+      : `CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schemaName)}`;
   return {
     id: `schema.${schemaName}`,
     label: `Create schema "${schemaName}"`,
     operationClass: 'additive',
     target: { id: 'postgres' },
     precheck: [],
-    execute: [
-      step(
-        `Create schema "${schemaName}"`,
-        `CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schemaName)}`,
-      ),
-    ],
+    execute: [step(`Create schema "${schemaName}"`, sql)],
     postcheck: [],
   };
 }

@@ -15,11 +15,11 @@ import type {
   PostgresDdlNode,
   PostgresDdlVisitor,
 } from '@prisma-next/target-postgres/ddl';
-import { escapeLiteral } from '@prisma-next/target-postgres/sql-utils';
+import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import type { PostgresLoweredStatement } from './types';
 
 function renderPrimaryKeyConstraint(constraint: PrimaryKeyConstraint): string {
-  const cols = constraint.columns.join(', ');
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
     return `CONSTRAINT ${constraint.name} PRIMARY KEY (${cols})`;
   }
@@ -27,8 +27,8 @@ function renderPrimaryKeyConstraint(constraint: PrimaryKeyConstraint): string {
 }
 
 function renderForeignKeyConstraint(constraint: ForeignKeyConstraint): string {
-  const cols = constraint.columns.join(', ');
-  const refCols = constraint.refColumns.join(', ');
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
+  const refCols = constraint.refColumns.map(quoteIdentifier).join(', ');
   let sql = `FOREIGN KEY (${cols}) REFERENCES ${constraint.refTable} (${refCols})`;
   if (constraint.onDelete !== undefined) {
     sql += ` ON DELETE ${REFERENTIAL_ACTION_SQL[constraint.onDelete]}`;
@@ -43,7 +43,7 @@ function renderForeignKeyConstraint(constraint: ForeignKeyConstraint): string {
 }
 
 function renderUniqueConstraint(constraint: UniqueConstraint): string {
-  const cols = constraint.columns.join(', ');
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
     return `CONSTRAINT ${constraint.name} UNIQUE (${cols})`;
   }
@@ -63,18 +63,20 @@ function renderTableConstraint(constraint: DdlTableConstraint): string {
 
 class PostgresDdlVisitorImpl implements PostgresDdlVisitor<string> {
   createTable(node: PostgresCreateTable): string {
-    const ifNotExists = node.ifNotExists ? 'if not exists ' : '';
-    const tableRef = node.schema ? `${node.schema}.${node.table}` : node.table;
+    const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+    const tableRef = node.schema
+      ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
+      : quoteIdentifier(node.table);
     const columnDefs = node.columns.map((column) => renderColumn(column));
     const constraintDefs =
       node.constraints !== undefined ? node.constraints.map(renderTableConstraint) : [];
-    const allDefs = [...columnDefs, ...constraintDefs].join(',\n    ');
-    return `create table ${ifNotExists}${tableRef} (\n    ${allDefs}\n  )`;
+    const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
+    return `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`;
   }
 
   createSchema(node: PostgresCreateSchema): string {
-    const ifNotExists = node.ifNotExists ? 'if not exists ' : '';
-    return `create schema ${ifNotExists}${node.schema}`;
+    const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+    return `CREATE SCHEMA ${ifNotExists}${quoteIdentifier(node.schema)}`;
   }
 }
 
@@ -82,34 +84,31 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
   literal(node: LiteralColumnDefault): string {
     const { value } = node;
     if (typeof value === 'string') {
-      return `default '${escapeLiteral(value)}'`;
+      return `DEFAULT '${escapeLiteral(value)}'`;
     }
     if (typeof value === 'number' || typeof value === 'boolean') {
-      return `default ${String(value)}`;
+      return `DEFAULT ${String(value)}`;
     }
     if (value === null) {
-      return 'default null';
+      return 'DEFAULT NULL';
     }
-    return `default '${JSON.stringify(value)}'`;
+    return `DEFAULT '${JSON.stringify(value)}'`;
   },
   function(node: FunctionColumnDefault): string {
     if (node.expression === 'autoincrement()') {
       return '';
     }
-    if (node.expression === 'now()') {
-      return 'default now()';
-    }
-    return `default (${node.expression})`;
+    return `DEFAULT (${node.expression})`;
   },
 };
 
 function renderColumn(column: DdlColumn): string {
-  const parts = [column.name, column.type];
+  const parts = [quoteIdentifier(column.name), column.type];
   if (column.notNull) {
-    parts.push('not null');
+    parts.push('NOT NULL');
   }
   if (column.primaryKey) {
-    parts.push('primary key');
+    parts.push('PRIMARY KEY');
   }
   const defaultClause = column.default ? column.default.accept(defaultVisitor) : '';
   if (defaultClause.length > 0) {

@@ -1,12 +1,11 @@
 import { asNamespaceId } from '@prisma-next/contract/types';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { ForeignKey, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type { ForeignKey, StorageColumn } from '@prisma-next/sql-contract/types';
 import {
   buildAddColumnSql,
   buildColumnDefaultSql,
   buildColumnTypeSql,
-  buildCreateTableSql,
   buildForeignKeySql,
   renderDefaultLiteral,
 } from '@prisma-next/target-postgres/planner-ddl-builders';
@@ -203,43 +202,6 @@ describe('buildAddColumnSql', () => {
     );
     expect(sql).toContain('DEFAULT true');
     expect(sql).not.toContain('DEFAULT false');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// buildCreateTableSql
-// ---------------------------------------------------------------------------
-
-describe('buildCreateTableSql', () => {
-  it('builds CREATE TABLE with columns and primary key', () => {
-    const table: StorageTable = {
-      columns: {
-        id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-        name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-      },
-      primaryKey: { columns: ['id'] },
-      uniques: [],
-      foreignKeys: [],
-      indexes: [],
-    };
-    const sql = buildCreateTableSql('"public"."user"', table, noHooks);
-    expect(sql).toContain('CREATE TABLE "public"."user"');
-    expect(sql).toContain('"id" int4 NOT NULL');
-    expect(sql).toContain('"name" text');
-    expect(sql).toContain('PRIMARY KEY ("id")');
-  });
-
-  it('omits PRIMARY KEY when not defined', () => {
-    const table: StorageTable = {
-      columns: {
-        value: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-      },
-      uniques: [],
-      foreignKeys: [],
-      indexes: [],
-    };
-    const sql = buildCreateTableSql('"public"."kv"', table, noHooks);
-    expect(sql).not.toContain('PRIMARY KEY');
   });
 });
 

@@ -20,7 +20,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toBe(
-      'create table if not exists prisma_contract.marker (\n    space text not null primary key,\n    core_hash text not null\n  )',
+      'CREATE TABLE IF NOT EXISTS "prisma_contract"."marker" (\n  "space" text NOT NULL PRIMARY KEY,\n  "core_hash" text NOT NULL\n)',
     );
     expect(lowered.params).toEqual([]);
   });
@@ -42,13 +42,13 @@ describe('PostgresCreateTable DDL lowering', () => {
     const adapter = createPostgresAdapter();
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
-    expect(lowered.sql).toContain("a text default 'x'");
-    expect(lowered.sql).toContain('b int default 7');
-    expect(lowered.sql).toContain('c boolean default true');
-    expect(lowered.sql).toContain('d text default null');
-    expect(lowered.sql).toContain('e timestamptz default now()');
-    expect(lowered.sql).toContain('f uuid default (gen_random_uuid())');
-    expect(lowered.sql).toContain('g bigserial');
+    expect(lowered.sql).toContain(`"a" text DEFAULT 'x'`);
+    expect(lowered.sql).toContain('"b" int DEFAULT 7');
+    expect(lowered.sql).toContain('"c" boolean DEFAULT true');
+    expect(lowered.sql).toContain('"d" text DEFAULT NULL');
+    expect(lowered.sql).toContain('"e" timestamptz DEFAULT (now())');
+    expect(lowered.sql).toContain('"f" uuid DEFAULT (gen_random_uuid())');
+    expect(lowered.sql).toContain('"g" bigserial');
     expect(lowered.sql).not.toContain('autoincrement');
   });
 
@@ -61,6 +61,6 @@ describe('PostgresCreateTable DDL lowering', () => {
     const adapter = createPostgresAdapter();
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
-    expect(lowered.sql).toContain("name text default 'O''Reilly'");
+    expect(lowered.sql).toContain(`"name" text DEFAULT 'O''Reilly'`);
   });
 });
