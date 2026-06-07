@@ -1,3 +1,4 @@
+export type { AuthoringPslBlockNamespace } from '../shared/framework-authoring';
 export type {
   PslBlockParam,
   PslBlockParamList,
@@ -15,6 +16,7 @@ export type {
   PslSpan,
 } from '../shared/psl-extension-block';
 
+import type { AuthoringPslBlockNamespace } from '../shared/framework-authoring';
 import type { PslDiagnosticCode, PslExtensionBlock, PslSpan } from '../shared/psl-extension-block';
 
 export interface PslDiagnostic {
@@ -242,6 +244,14 @@ export function flatPslCompositeTypes(ast: PslDocumentAst): readonly PslComposit
 export interface ParsePslDocumentInput {
   readonly schema: string;
   readonly sourceId: string;
+  /**
+   * Registry of declared extension block descriptors, keyed by keyword.
+   * When provided, the parser dispatches unknown top-level keywords against
+   * this namespace and reads matching blocks generically into `PslExtensionBlock`
+   * nodes. Absent or undefined means no extension blocks are registered and any
+   * unknown keyword yields `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`.
+   */
+  readonly pslBlocks?: AuthoringPslBlockNamespace;
 }
 
 export interface ParsePslDocumentResult {
