@@ -1,4 +1,5 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
+import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
@@ -484,7 +485,7 @@ function resolveRelationNode(
   return lowerManyToManyRelation(relationName, relation, currentSpec, allSpecs);
 }
 
-function lowerForeignKeyNode(
+function lowerLocalForeignKeyNode(
   spec: RuntimeModelSpec,
   targetSpec: RuntimeModelSpec,
   foreignKey: {
@@ -516,9 +517,58 @@ function lowerForeignKeyNode(
   };
 }
 
+function lowerCrossSpaceForeignKeyNode(
+  spec: RuntimeModelSpec,
+  foreignKey: {
+    readonly fields: readonly string[];
+    readonly targetFields: readonly string[];
+    readonly targetModel: string;
+    readonly targetSpaceId: string;
+    readonly targetNamespaceId?: string;
+    readonly targetTableName?: string;
+    readonly name?: string | undefined;
+    readonly onDelete?: ForeignKeyConstraint['onDelete'] | undefined;
+    readonly onUpdate?: ForeignKeyConstraint['onUpdate'] | undefined;
+    readonly constraint?: boolean | undefined;
+    readonly index?: boolean | undefined;
+  },
+): ForeignKeyNode {
+  return {
+    columns: mapFieldNamesToColumnNames(spec.modelName, foreignKey.fields, spec.fieldToColumn),
+    references: {
+      model: foreignKey.targetModel,
+      table: foreignKey.targetTableName ?? foreignKey.targetModel.toLowerCase(),
+      columns: foreignKey.targetFields,
+      ...(foreignKey.targetNamespaceId !== undefined
+        ? { namespaceId: foreignKey.targetNamespaceId }
+        : {}),
+      spaceId: foreignKey.targetSpaceId,
+    },
+    ...(foreignKey.name ? { name: foreignKey.name } : {}),
+    ...(foreignKey.onDelete ? { onDelete: foreignKey.onDelete } : {}),
+    ...(foreignKey.onUpdate ? { onUpdate: foreignKey.onUpdate } : {}),
+    ...(foreignKey.constraint !== undefined ? { constraint: foreignKey.constraint } : {}),
+    ...(foreignKey.index !== undefined ? { index: foreignKey.index } : {}),
+  };
+}
+
+function assertKnownExtensionPack(
+  extensionPacks: Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  spaceId: string,
+  context: string,
+): void {
+  if (extensionPacks !== undefined && Object.hasOwn(extensionPacks, spaceId)) {
+    return;
+  }
+  throw new Error(
+    `${context} references contract space "${spaceId}" but "${spaceId}" is not declared in extensionPacks. Add the pack to extensionPacks.`,
+  );
+}
+
 function resolveForeignKeyNodes(
   spec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): readonly ForeignKeyNode[] {
   const relationForeignKeys = resolveRelationForeignKeys(spec, allSpecs).map((foreignKey) => {
     const targetSpec = allSpecs.get(foreignKey.targetModel);
@@ -528,10 +578,22 @@ function resolveForeignKeyNodes(
       );
     }
 
-    return lowerForeignKeyNode(spec, targetSpec, foreignKey);
+    return lowerLocalForeignKeyNode(spec, targetSpec, foreignKey);
   });
 
   const sqlForeignKeys = (spec.sqlSpec?.foreignKeys ?? []).map((foreignKey) => {
+    if (foreignKey.targetSpaceId !== undefined) {
+      assertKnownExtensionPack(
+        extensionPacks,
+        foreignKey.targetSpaceId,
+        `Foreign key on "${spec.modelName}"`,
+      );
+      return lowerCrossSpaceForeignKeyNode(spec, {
+        ...foreignKey,
+        targetSpaceId: foreignKey.targetSpaceId,
+      });
+    }
+
     const targetSpec = allSpecs.get(foreignKey.targetModel);
     if (!targetSpec) {
       throw new Error(
@@ -539,7 +601,7 @@ function resolveForeignKeyNodes(
       );
     }
 
-    return lowerForeignKeyNode(spec, targetSpec, foreignKey);
+    return lowerLocalForeignKeyNode(spec, targetSpec, foreignKey);
   });
 
   return [...relationForeignKeys, ...sqlForeignKeys];
@@ -550,6 +612,7 @@ function resolveModelNode(
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
   storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
   storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance | PostgresEnumStorageEntry, string>,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): ModelNode {
   const fields: FieldNode[] = [];
 
@@ -588,7 +651,7 @@ function resolveModelNode(
     ...ifDefined('type', index.type),
     ...ifDefined('options', index.options),
   })) satisfies readonly IndexNode[];
-  const foreignKeys = resolveForeignKeyNodes(spec, allSpecs);
+  const foreignKeys = resolveForeignKeyNodes(spec, allSpecs, extensionPacks);
   const relations = Object.entries(spec.relations).map(([relationName, relationBuilder]) =>
     resolveRelationNode(relationName, relationBuilder.build(), spec, allSpecs),
   );
@@ -688,7 +751,10 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
   };
 }
 
-function lowerModels(collection: RuntimeCollection): readonly ModelNode[] {
+function lowerModels(
+  collection: RuntimeCollection,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
+): readonly ModelNode[] {
   emitTypedCrossModelFallbackWarnings(collection);
 
   const storageTypeReverseLookup = buildStorageTypeReverseLookup(collection.storageTypes);
@@ -698,13 +764,14 @@ function lowerModels(collection: RuntimeCollection): readonly ModelNode[] {
       collection.modelSpecs,
       collection.storageTypes,
       storageTypeReverseLookup,
+      extensionPacks,
     ),
   );
 }
 
 export function buildContractDefinition(definition: ContractInput): ContractDefinition {
   const collection = collectRuntimeModelSpecs(definition);
-  const models = lowerModels(collection);
+  const models = lowerModels(collection, definition.extensionPacks);
 
   return {
     target: definition.target,

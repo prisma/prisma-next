@@ -395,6 +395,31 @@ export function buildSqlContractFromDefinition(
     }
 
     const foreignKeys = (semanticModel.foreignKeys ?? []).map((fk) => {
+      if (fk.references.spaceId !== undefined) {
+        // Cross-space FK: the target lives in a different contract space.
+        // Skip local model lookup and carry the spaceId coordinate through.
+        const targetNamespaceId = fk.references.namespaceId ?? defaultNamespaceId;
+        return {
+          source: { namespaceId: asNamespaceId(namespaceId), tableName, columns: fk.columns },
+          target: {
+            namespaceId: asNamespaceId(targetNamespaceId),
+            tableName: fk.references.table,
+            columns: fk.references.columns,
+            spaceId: fk.references.spaceId,
+          },
+          ...applyFkDefaults(
+            {
+              ...ifDefined('constraint', fk.constraint),
+              ...ifDefined('index', fk.index),
+            },
+            definition.foreignKeyDefaults,
+          ),
+          ...ifDefined('name', fk.name),
+          ...ifDefined('onDelete', fk.onDelete),
+          ...ifDefined('onUpdate', fk.onUpdate),
+        };
+      }
+
       const targetModel = assertKnownTargetModel(
         modelsByName,
         semanticModel.modelName,

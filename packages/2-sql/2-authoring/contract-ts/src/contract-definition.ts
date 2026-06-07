@@ -56,6 +56,12 @@ export interface ForeignKeyNode {
      * know the target namespace can stamp it explicitly.
      */
     readonly namespaceId?: string;
+    /**
+     * Contract-space identity of the referenced table. When present, the
+     * table lives in a different contract space (identified by this value)
+     * rather than the current contract. Absent for local FKs.
+     */
+    readonly spaceId?: string;
   };
   readonly name?: string;
   readonly onDelete?: ReferentialAction;

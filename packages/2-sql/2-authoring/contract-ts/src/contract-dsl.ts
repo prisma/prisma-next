@@ -521,27 +521,64 @@ export class RelationBuilder<State extends RelationState = AnyRelationState> {
   }
 }
 
-export type ColumnRef<FieldName extends string = string> = {
+/**
+ * Reference to a column on the current (local) model.
+ *
+ * The `TSpaceId` phantom parameter carries the contract-space identity of the
+ * column's model. Columns on models defined inside `defineContract` are branded
+ * `'<self>'`; columns on extension model handles carry the extension's
+ * `spaceId` (e.g. `'supabase'`). The brand is inspectable at lowering time via
+ * `TargetFieldRef.spaceId`.
+ */
+export type ColumnRef<FieldName extends string = string, TSpaceId extends string = string> = {
   readonly kind: 'columnRef';
   readonly fieldName: FieldName;
+  readonly _spaceId?: TSpaceId;
 };
 
+/**
+ * Reference to a field on a target model, produced by model `.refs` and
+ * `constraints.ref(modelName, fieldName)`.
+ *
+ * The `TSpaceId` phantom parameter carries the contract-space identity of the
+ * target model. Local model handles produce `TSpaceId = '<self>'`; extension
+ * handles carry the extension's `spaceId`. The brand is propagated from the
+ * parent `ContractModelBuilder` via the `spaceId?` property: absent means local
+ * (`'<self>'`), present means cross-space.
+ */
 export type TargetFieldRef<
   ModelName extends string = string,
   FieldName extends string = string,
-  Source extends TargetFieldRefSource = TargetFieldRefSource,
+  TSpaceId extends string = string,
 > = {
   readonly kind: 'targetFieldRef';
-  readonly source: Source;
+  readonly source: TargetFieldRefSource;
   readonly modelName: ModelName;
   readonly fieldName: FieldName;
+  /**
+   * Cross-space discriminator. When present, the referenced model lives in a
+   * different contract space identified by this value. Absent for local refs.
+   */
+  readonly spaceId?: TSpaceId extends '<self>' ? never : TSpaceId;
+  /**
+   * Namespace id of the cross-space target model (e.g. `'auth'` for
+   * `supabase` `auth.User`). Only present for cross-space refs.
+   */
+  readonly namespaceId?: string;
+  /**
+   * Physical table name of the cross-space target model. Only present for
+   * cross-space refs; allows the lowering path to bypass the local model
+   * registry.
+   */
+  readonly tableName?: string;
 };
 
 export type ModelTokenRefs<
   ModelName extends string,
   Fields extends Record<string, ScalarFieldBuilder>,
+  TSpaceId extends string = '<self>',
 > = {
-  readonly [K in keyof Fields]: TargetFieldRef<ModelName, K & string>;
+  readonly [K in keyof Fields]: TargetFieldRef<ModelName, K & string, TSpaceId>;
 };
 
 type ConstraintOptions<Name extends string | undefined = string | undefined> = {
@@ -613,6 +650,22 @@ export type ForeignKeyConstraint<
   readonly targetModel: TargetModelName;
   readonly targetFields: TargetFieldNames;
   readonly targetSource?: TargetFieldRefSource;
+  /**
+   * Cross-space discriminator. When present, the FK target lives in a
+   * different contract space identified by this value. Absent for local FKs.
+   */
+  readonly targetSpaceId?: string;
+  /**
+   * Namespace coordinate of the cross-space target model. Populated when
+   * the target model handle carries a `namespace` (e.g. `auth` for supabase
+   * `auth.User`). Absent for local FKs.
+   */
+  readonly targetNamespaceId?: string;
+  /**
+   * Table name of the cross-space target. Populated for cross-space FKs
+   * so the lowering path doesn't need a local model lookup.
+   */
+  readonly targetTableName?: string;
   readonly name?: Name;
   readonly onDelete?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
   readonly onUpdate?: 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
@@ -628,6 +681,9 @@ function normalizeTargetFieldRefInput(input: TargetFieldRef | readonly TargetFie
   readonly modelName: string;
   readonly fieldNames: readonly string[];
   readonly source: TargetFieldRefSource;
+  readonly spaceId: string | undefined;
+  readonly namespaceId: string | undefined;
+  readonly tableName: string | undefined;
 } {
   const refs = Array.isArray(input) ? input : [input];
   const [first] = refs;
@@ -641,6 +697,9 @@ function normalizeTargetFieldRefInput(input: TargetFieldRef | readonly TargetFie
     modelName: first.modelName,
     fieldNames: refs.map((ref) => ref.fieldName),
     source: refs.some((ref) => ref.source === 'string') ? 'string' : 'token',
+    spaceId: first.spaceId,
+    namespaceId: first.namespaceId,
+    tableName: first.tableName,
   };
 }
 
@@ -760,6 +819,15 @@ function createConstraintsDsl<IndexTypes extends IndexTypeMap = Record<never, ne
       targetModel: normalizedTarget.modelName,
       targetFields: normalizedTarget.fieldNames,
       targetSource: normalizedTarget.source,
+      ...(normalizedTarget.spaceId !== undefined
+        ? { targetSpaceId: normalizedTarget.spaceId }
+        : {}),
+      ...(normalizedTarget.namespaceId !== undefined
+        ? { targetNamespaceId: normalizedTarget.namespaceId }
+        : {}),
+      ...(normalizedTarget.tableName !== undefined
+        ? { targetTableName: normalizedTarget.tableName }
+        : {}),
       ...(options?.name ? { name: options.name } : {}),
       ...(options?.onDelete ? { onDelete: options.onDelete } : {}),
       ...(options?.onUpdate ? { onUpdate: options.onUpdate } : {}),
@@ -835,7 +903,16 @@ function createFieldRefs<Fields extends Record<string, ScalarFieldBuilder>>(
 function createModelTokenRefs<
   ModelName extends string,
   Fields extends Record<string, ScalarFieldBuilder>,
->(modelName: ModelName, fields: Fields): ModelTokenRefs<ModelName, Fields> {
+  TSpaceId extends string = '<self>',
+>(
+  modelName: ModelName,
+  fields: Fields,
+  crossSpaceCoordinate?: {
+    readonly spaceId: TSpaceId;
+    readonly namespaceId?: string;
+    readonly tableName?: string;
+  },
+): ModelTokenRefs<ModelName, Fields, TSpaceId> {
   const refs = {} as Record<string, TargetFieldRef>;
   for (const fieldName of Object.keys(fields)) {
     refs[fieldName] = {
@@ -843,9 +920,20 @@ function createModelTokenRefs<
       source: 'token',
       modelName,
       fieldName,
+      ...(crossSpaceCoordinate !== undefined
+        ? {
+            spaceId: crossSpaceCoordinate.spaceId,
+            ...(crossSpaceCoordinate.namespaceId !== undefined
+              ? { namespaceId: crossSpaceCoordinate.namespaceId }
+              : {}),
+            ...(crossSpaceCoordinate.tableName !== undefined
+              ? { tableName: crossSpaceCoordinate.tableName }
+              : {}),
+          }
+        : {}),
     };
   }
-  return refs as ModelTokenRefs<ModelName, Fields>;
+  return refs as ModelTokenRefs<ModelName, Fields, TSpaceId>;
 }
 
 type StageInput<Context, Spec> = Spec | ((context: Context) => Spec);
@@ -990,6 +1078,7 @@ export class ContractModelBuilder<
   AttributesSpec extends ModelAttributesSpec | undefined = undefined,
   SqlSpec extends SqlStageSpec | undefined = undefined,
   IndexTypes extends IndexTypeMap = Record<never, never>,
+  TSpaceId extends string = '<self>',
 > {
   declare readonly __name: ModelName;
   declare readonly __fields: Fields;
@@ -997,7 +1086,8 @@ export class ContractModelBuilder<
   declare readonly __attributes: AttributesSpec;
   declare readonly __sql: SqlSpec;
   declare readonly __indexTypes: IndexTypes;
-  readonly refs: ModelName extends string ? ModelTokenRefs<ModelName, Fields> : never;
+  declare readonly __spaceId: TSpaceId;
+  readonly refs: ModelName extends string ? ModelTokenRefs<ModelName, Fields, TSpaceId> : never;
 
   constructor(
     readonly stageOne: {
@@ -1008,10 +1098,20 @@ export class ContractModelBuilder<
     },
     readonly attributesFactory?: StageInput<AttributeContext<Fields>, AttributesSpec>,
     readonly sqlFactory?: StageInput<SqlContext<Fields, IndexTypes>, SqlSpec>,
+    readonly spaceId?: TSpaceId,
   ) {
+    const crossSpaceCoordinate =
+      spaceId !== undefined
+        ? {
+            spaceId,
+            ...(stageOne.namespace !== undefined ? { namespaceId: stageOne.namespace } : {}),
+          }
+        : undefined;
     this.refs = (
-      stageOne.modelName ? createModelTokenRefs(stageOne.modelName, stageOne.fields) : undefined
-    ) as ModelName extends string ? ModelTokenRefs<ModelName, Fields> : never;
+      stageOne.modelName
+        ? createModelTokenRefs(stageOne.modelName, stageOne.fields, crossSpaceCoordinate)
+        : undefined
+    ) as ModelName extends string ? ModelTokenRefs<ModelName, Fields, TSpaceId> : never;
   }
 
   ref<FieldName extends keyof Fields & string>(
