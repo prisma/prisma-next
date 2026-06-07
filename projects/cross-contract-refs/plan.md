@@ -1,16 +1,49 @@
 # Project Plan
 
-## Status / next-up (2026-06-06) — resume here after compaction
+## Status / next-up (2026-06-07) — resume here
 
-- **M1 — Foundation: ✅ MERGED (PR #745).** Delivered: the FK carrier (`ForeignKeyReference` carries an optional `spaceId`; **presence is the discriminator**, absent = local — no `origin` tag); cross-space dependency graph + cycle rejection (`buildExtensionLoadOrder` in framework-components, errors on an unlisted declared dependency); reverse-reference rejection (SQL family); and **primitive-ownership collisions via a namespace-aware `disjointness`** check (we fixed `main`'s `disjointness` to key on the full `(namespaceId, entityKind, entityName)` coordinate — it was namespace-blind and would have false-positived on `auth.users` vs `public.users` — and removed our redundant `namespaceOwnershipCollision`).
-- **NEXT — M2 — Authoring surfaces.** Start a fresh branch off the updated `main`. Scope + decisions to honor:
-  - TS: `ColumnRef<TSpaceId>` brand + branded extension model handles; `rel.belongsTo(ExtModel, …)` and `constraints.foreignKey(cols.x, ExtModel.refs.y, …)` lower to a `spaceId`-bearing carrier; missing-pack fail-fast diagnostic.
-  - PSL: colon-prefix grammar `supabase:auth.User` (`:` token in type position) + `PslField.typeContractSpace?` AST field threaded into lowering.
-  - **Option B (operator-approved): declared, non-navigable cross-space relations** — the domain-plane relation carries `spaceId`; the emitter makes ORM `include` of a cross-space relation a **compile error**. Add `spaceId` to `TargetFieldRef`/`RelationModelSource`/`RelationNode`; gate the lowering (it currently throws for non-local targets); non-navigable emitter typing. See `spec.md` § "Declared, non-navigable cross-space relations".
-  - The `@prisma-next/supabase` extension ships `auth.User` etc. but does **not** yet export branded `/contract` model handles — M2 likely adds them.
-  - The walking-skeleton DoD (`Profile.userId → auth.User.id` cross-contract FK in `examples/supabase`) becomes authorable in M2 (planner/verifier + cascade test land in M3).
-- **Standing gate (lessons from M1 babysit — apply to every dispatch):** run full `pnpm lint` (`biome check --error-on-warnings`) + `pnpm fixtures:check` + the `examples/supabase` skeleton test, not just `lint:casts`/`lint:deps`/package tests; **rebuild dependent `dist` before downstream tests** (cross-package type changes); **emit trace events live** (don't back-fill). Worktree caveat: `examples/supabase` + some mongo packages may fail locally on missing deps/build — CI's clean env is the arbiter.
-- **Deferred (recorded):** transitive auto-loading of unlisted contract spaces (needs a `spaceId→descriptor` resolver); runtime cross-space query + relation traversal (needs a runtime contract-space aggregate); Mongo cross-space *relationships* (own future project; Mongo has no FK).
+- **M1 — Foundation: ✅ MERGED (PR #745).** FK carrier (`ForeignKeyReference.spaceId`, presence =
+  cross-space discriminator); cross-space dependency graph + cycle rejection; reverse-reference
+  rejection; primitive-ownership collisions via a namespace-aware `disjointness`.
+- **M2 — Authoring surfaces: ✅ COMPLETE (branch `tml-2500-m2-authoring-surfaces`, PR opening).**
+  All 5 dispatches SATISFIED (M2.1–M2.5), trace backstop green, full gate green (typecheck 138/138,
+  lint 79/79, lint:deps clean, lint:casts delta=0, fixtures:check exit 0). Delivered:
+  - **M2.1** TS brand foundation (`TargetFieldRef<…, TSpaceId>`, `<self>`/spaceId; brand survives the
+    staged builder) + storage cross-space FK lowering (`ForeignKeyReference.spaceId`) + missing-pack
+    fail-fast (AC5 TS) + cascade no-diagnostic (AC4).
+  - **M2.2** TS cross-space relation, **Option B non-navigable** — `spaceId` on
+    `BelongsToRelation`/`RelationNode`/`CrossReference.space`; emitter renders cross-space relations as
+    `never` so ORM `include` is a compile error (proven by a negative type test).
+  - **M2.3** Supabase `/contract` branded handles (`AuthUser` etc.) via a new **`extensionModel(...)`
+    factory** in contract-ts (`ContractModelBuilder` stays type-only); handle↔contract consistency test.
+  - **M2.4** PSL colon-prefix grammar (`supabase:auth.User` / `supabase:User`) — `PslField.typeContractSpaceId`,
+    parser branch, interpreter **symbolic** lowering (spaceId + namespace + columns) + missing-pack
+    diagnostic (`PSL_UNKNOWN_CONTRACT_SPACE`, AC5 PSL).
+  - **M2.5** PSL printer round-trip for the qualified form (also fixed the pre-existing TML-2459
+    `typeNamespaceId` printer-drop bug); AC2 round-trip closed.
+- **NEXT — M3 — Planner + verifier integration.** Scope: planner DDL (qualified vs unqualified
+  `REFERENCES`), verifier walk of `source:'space'` FKs, PGlite integration test (AC7), the `__unspecified__`
+  planner half of AC3, **and the deferred items below that M3 must resolve**:
+  - **PSL cross-space target-table resolution** — M2.4 carries a *symbolic* coordinate; the PSL carrier's
+    `tableName` is `modelName.toLowerCase()` (e.g. `user`), NOT the real table (`users`). M3 resolves
+    model→table against the **loaded aggregate** (where the extension contracts are available — the PSL
+    interpreter only has space *names*). The `psl-ts-namespace-parity.test.ts` pins this divergence with a
+    failing-on-resolution assertion; M3 flips it. (FR10/FR19/FR20.)
+  - **Walking-skeleton FK wiring** — add `Profile.userId → auth.User.id` (onDelete cascade) to
+    `examples/supabase` + the cascade-delete hermetic test (needs the planner).
+  - **FK-target `spaceId` type-surface gap** — `BuiltStorageTables<Definition>` omits `spaceId` on the FK
+    target at the type level (runtime carrier has it). Small `contract-ts`/`sql-contract` cleanup.
+- **Standing gate (M1+M2 lessons — apply every dispatch):** full `pnpm lint` + `pnpm fixtures:check` +
+  full `pnpm typecheck` (not just package-scoped — implementers default to package scope and miss
+  downstream); **run `pnpm build` / rebuild dependent `dist` before downstream tests and before
+  fixtures:check** (fixtures:check executes the CLI dist + imports extension dist — missing dist like
+  `extension-pgvector/dist/control.mjs` makes it red environmentally, not a regression); **emit trace
+  events live**; orchestrator independently re-verifies the gate (implementer reports were thin/optimistic
+  and two returned truncated mid-work — verify via git + re-run the risky gates).
+- **Worktree note:** this worktree needed `pnpm install` (supabase/mongo had no `node_modules`) + a full
+  `pnpm build` to materialize all dist; after that the full gate is genuinely clean (no mongo/cli caveat).
+- **Deferred (recorded):** transitive auto-loading of unlisted contract spaces; runtime cross-space query +
+  relation traversal (needs a runtime contract-space aggregate); Mongo cross-space *relationships*.
 
 ## Summary
 
