@@ -202,11 +202,30 @@ function modelToPrinterModel(model: PslModel): PrinterModel {
   };
 }
 
+/**
+ * Assembles the qualified type name string for a field type reference.
+ *
+ * Handles all four forms:
+ * - `space:ns.Name`  — typeContractSpaceId + typeNamespaceId + typeName
+ * - `space:Name`     — typeContractSpaceId + typeName (no namespace)
+ * - `ns.Name`        — typeNamespaceId + typeName (no space); fixes TML-2459 printer gap
+ * - `Name`           — typeName only (no qualifier)
+ */
+function assembleQualifiedTypeName(field: PslField): string {
+  const { typeName, typeNamespaceId, typeContractSpaceId } = field;
+  const dotted = typeNamespaceId !== undefined ? `${typeNamespaceId}.${typeName}` : typeName;
+  return typeContractSpaceId !== undefined ? `${typeContractSpaceId}:${dotted}` : dotted;
+}
+
 function fieldToPrinterField(field: PslField): PrinterField {
+  // Assemble the qualified type identifier: `space:ns.Name` / `space:Name` / `ns.Name` / `Name`.
+  // When a typeConstructor is present it takes precedence and carries no qualifier.
+  // Line-wrap policy (pinned): keep the identifier on one line until the existing column limit —
+  // no special wrap logic at `:` or `.` (project-spec open question; simplest readable default).
   const typeName =
     field.typeConstructor !== undefined
       ? formatTypeConstructor(field.typeConstructor)
-      : field.typeName;
+      : assembleQualifiedTypeName(field);
 
   let mapName: string | undefined;
   const attrStrings: string[] = [];

@@ -964,4 +964,152 @@ namespace auth {
       expect(printed).toMatch(/@@map\("a\\rb\\\\zc"\)/);
     });
   });
+
+  describe('qualified field-type rendering (TML-2500 M2.5 + TML-2459 gap fix)', () => {
+    // Helper: build a minimal AST with a single model containing one field.
+    function astWithField(field: {
+      name: string;
+      typeName: string;
+      typeNamespaceId?: string;
+      typeContractSpaceId?: string;
+    }): PslDocumentAst {
+      return {
+        kind: 'document',
+        sourceId: 't',
+        namespaces: [
+          {
+            kind: 'namespace',
+            name: UNSPECIFIED_PSL_NAMESPACE_ID,
+            models: [
+              {
+                kind: 'model',
+                name: 'Profile',
+                fields: [
+                  {
+                    kind: 'field',
+                    name: field.name,
+                    typeName: field.typeName,
+                    typeNamespaceId: field.typeNamespaceId,
+                    typeContractSpaceId: field.typeContractSpaceId,
+                    optional: true,
+                    list: false,
+                    attributes: [],
+                    span: span(0),
+                  },
+                ],
+                attributes: [],
+                span: span(0),
+              },
+            ],
+            enums: [],
+            compositeTypes: [],
+            span: span(0),
+          },
+        ],
+        span: span(0),
+      };
+    }
+
+    it('renders a bare typeName without any qualifier (no regression)', () => {
+      const out = printPslFromAst(astWithField({ name: 'user', typeName: 'User' }));
+      // The field line must not contain a colon-prefix or dot qualifier.
+      const fieldLine = out.split('\n').find((l) => l.includes('user') && l.includes('User'));
+      expect(fieldLine).toBeDefined();
+      expect(fieldLine).not.toContain(':');
+      expect(fieldLine).not.toContain('.');
+    });
+
+    it('renders typeNamespaceId + typeName as ns.Name — TML-2459 gap fix', () => {
+      // Before the fix, auth.User round-tripped back to bare User (the namespace was dropped).
+      const out = printPslFromAst(
+        astWithField({ name: 'user', typeName: 'User', typeNamespaceId: 'auth' }),
+      );
+      expect(out).toMatch(/user\s+auth\.User\?/);
+    });
+
+    it('renders typeContractSpaceId + typeNamespaceId + typeName as space:ns.Name', () => {
+      const out = printPslFromAst(
+        astWithField({
+          name: 'user',
+          typeName: 'User',
+          typeNamespaceId: 'auth',
+          typeContractSpaceId: 'supabase',
+        }),
+      );
+      expect(out).toMatch(/user\s+supabase:auth\.User\?/);
+    });
+
+    it('renders typeContractSpaceId + typeName (no namespace) as space:Name', () => {
+      const out = printPslFromAst(
+        astWithField({ name: 'user', typeName: 'User', typeContractSpaceId: 'supabase' }),
+      );
+      expect(out).toMatch(/user\s+supabase:User\?/);
+    });
+
+    it('does not affect typeConstructor rendering', () => {
+      const ast: PslDocumentAst = {
+        kind: 'document',
+        sourceId: 't',
+        namespaces: [
+          {
+            kind: 'namespace',
+            name: UNSPECIFIED_PSL_NAMESPACE_ID,
+            models: [
+              {
+                kind: 'model',
+                name: 'Account',
+                fields: [
+                  {
+                    kind: 'field',
+                    name: 'balance',
+                    typeName: 'Decimal',
+                    typeConstructor: {
+                      kind: 'typeConstructor',
+                      path: ['Money'],
+                      args: [{ kind: 'positional', value: '2', span: span(0) }],
+                      span: span(0),
+                    },
+                    optional: false,
+                    list: false,
+                    attributes: [],
+                    span: span(0),
+                  },
+                ],
+                attributes: [],
+                span: span(0),
+              },
+            ],
+            enums: [],
+            compositeTypes: [],
+            span: span(0),
+          },
+        ],
+        span: span(0),
+      };
+      expect(printPslFromAst(ast)).toContain('balance Money(2)');
+    });
+
+    it('parser → printer → parser round-trip for a cross-space colon-prefix field', () => {
+      // AC2: a field authored as `supabase:auth.User` must survive a full
+      // text→parse→print→text round-trip with the colon-prefix intact.
+      const source = `// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+
+model Profile {
+  id     Int             @id
+  userId Int
+  user   supabase:auth.User? @relation(fields: [userId], references: [id])
+}`;
+      const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
+      expect(parsed1.ok).toBe(true);
+      const printed = printPslFromAst(parsed1.ast);
+      expect(printed).toContain('supabase:auth.User?');
+      const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
+      expect(parsed2.ok).toBe(true);
+      const profile = flatPslModels(parsed2.ast).find((m) => m.name === 'Profile');
+      const userField = profile?.fields.find((f) => f.name === 'user');
+      expect(userField?.typeContractSpaceId).toBe('supabase');
+      expect(userField?.typeNamespaceId).toBe('auth');
+      expect(userField?.typeName).toBe('User');
+    });
+  });
 });

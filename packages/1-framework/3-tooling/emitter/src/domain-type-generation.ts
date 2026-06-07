@@ -55,7 +55,8 @@ export function serializeNamespaceId(value: string): string {
 export function serializeCrossReference(ref: CrossReference): string {
   const namespace = serializeNamespaceId(String(ref.namespace));
   const model = serializeValue(ref.model);
-  return `{ readonly namespace: ${namespace}; readonly model: ${model} }`;
+  const space = ref.space !== undefined ? `; readonly space: ${serializeValue(ref.space)}` : '';
+  return `{ readonly namespace: ${namespace}; readonly model: ${model}${space} }`;
 }
 
 export function generateRootsType(roots: Record<string, CrossReference> | undefined): string {
@@ -104,11 +105,31 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
   for (const [relName, rel] of Object.entries(relations)) {
     if (typeof rel !== 'object' || rel === null) continue;
     const relObj = rel as Record<string, unknown>;
+
+    // Option B: cross-space relations are declared but non-navigable.
+    // A relation whose `to.space` is set lives in a foreign contract space;
+    // emitting `never` for its entry makes `include` of it a compile error
+    // while the relation is still present in the contract JSON for introspection.
+    const toRef = relObj['to'];
+    // Option B: cross-space relations are declared but non-navigable.
+    // When the relation's `to` ref carries a `space` field the target lives
+    // in a foreign contract space; emit `never` so `include` of it is a
+    // compile error while the relation stays in the contract JSON.
+    if (
+      toRef !== null &&
+      typeof toRef === 'object' &&
+      'space' in toRef &&
+      toRef.space !== undefined
+    ) {
+      relationEntries.push(`readonly ${serializeObjectKey(relName)}: never`);
+      continue;
+    }
+
     const parts: string[] = [];
 
-    if (relObj['to'])
+    if (toRef)
       parts.push(
-        `readonly to: ${serializeCrossReference(blindCast<CrossReference, 'contract JSON schema-validated before serialization; truthy check above confirms presence'>(relObj['to']))}`,
+        `readonly to: ${serializeCrossReference(blindCast<CrossReference, 'contract JSON schema-validated before serialization; truthy check above confirms presence'>(toRef))}`,
       );
     if (relObj['cardinality'])
       parts.push(`readonly cardinality: ${serializeValue(relObj['cardinality'])}`);
@@ -128,7 +149,7 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
     }
 
     if (parts.length > 0) {
-      relationEntries.push(`readonly ${relName}: { ${parts.join('; ')} }`);
+      relationEntries.push(`readonly ${serializeObjectKey(relName)}: { ${parts.join('; ')} }`);
     }
   }
 

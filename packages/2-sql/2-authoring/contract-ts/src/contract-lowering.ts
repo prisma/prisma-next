@@ -1,4 +1,5 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
+import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
@@ -261,6 +262,41 @@ function resolveRelationForeignKeys(
     }
 
     const targetModelName = resolveRelationModelName(relation.toModel);
+
+    // F-relfk: cross-space relations carry a spaceId; skip the local spec lookup
+    // and include cross-space coordinates so resolveForeignKeyNodes routes the FK
+    // through the cross-space path.
+    if (relation.spaceId !== undefined) {
+      const fields = normalizeRelationFieldNames(relation.from);
+      const targetFields = normalizeRelationFieldNames(relation.to);
+      assertRelationFieldArity({
+        modelName: spec.modelName,
+        relationName,
+        leftLabel: 'source',
+        leftFields: fields,
+        rightLabel: 'target',
+        rightFields: targetFields,
+      });
+
+      foreignKeys.push({
+        kind: 'fk',
+        fields,
+        targetModel: targetModelName,
+        targetFields,
+        targetSpaceId: relation.spaceId,
+        ...(relation.namespaceId !== undefined ? { targetNamespaceId: relation.namespaceId } : {}),
+        ...(relation.tableName !== undefined ? { targetTableName: relation.tableName } : {}),
+        ...(relation.sql.fk.name ? { name: relation.sql.fk.name } : {}),
+        ...(relation.sql.fk.onDelete ? { onDelete: relation.sql.fk.onDelete } : {}),
+        ...(relation.sql.fk.onUpdate ? { onUpdate: relation.sql.fk.onUpdate } : {}),
+        ...(relation.sql.fk.constraint !== undefined
+          ? { constraint: relation.sql.fk.constraint }
+          : {}),
+        ...(relation.sql.fk.index !== undefined ? { index: relation.sql.fk.index } : {}),
+      });
+      continue;
+    }
+
     if (!allSpecs.has(targetModelName)) {
       throw new Error(
         `Relation "${spec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
@@ -316,17 +352,12 @@ function lowerBelongsToRelation(
   relation: Extract<RelationState, { kind: 'belongsTo' }>,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): RelationNode {
   const targetModelName = resolveRelationModelName(relation.toModel);
-  const targetSpec = allSpecs.get(targetModelName);
-  if (!targetSpec) {
-    throw new Error(
-      `Relation "${currentSpec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
-    );
-  }
-
   const fromFields = normalizeRelationFieldNames(relation.from);
   const toFields = normalizeRelationFieldNames(relation.to);
+
   assertRelationFieldArity({
     modelName: currentSpec.modelName,
     relationName,
@@ -335,6 +366,48 @@ function lowerBelongsToRelation(
     rightLabel: 'target',
     rightFields: toFields,
   });
+
+  // Cross-space path: the target lives in a different contract space.
+  // Resolve from the brand carried on the BelongsToRelation instead of
+  // requiring a local model spec — matching how the FK lowering works.
+  if (relation.spaceId !== undefined) {
+    assertKnownExtensionPack(
+      extensionPacks,
+      relation.spaceId,
+      `Relation "${currentSpec.modelName}.${relationName}"`,
+    );
+    const targetTable = relation.tableName ?? targetModelName.toLowerCase();
+    const parentColumns = mapFieldNamesToColumnNames(
+      currentSpec.modelName,
+      fromFields,
+      currentSpec.fieldToColumn,
+    );
+    // For cross-space relations, the `to` field names map directly to column
+    // names because we have no fieldToColumn map for the remote model.
+    // (The brand carries the table name; field→column resolution on the remote
+    // side is deferred to the planner which has access to the remote contract.)
+    return {
+      fieldName: relationName,
+      toModel: targetModelName,
+      toTable: targetTable,
+      cardinality: 'N:1',
+      spaceId: relation.spaceId,
+      ...(relation.namespaceId !== undefined ? { namespaceId: relation.namespaceId } : {}),
+      on: {
+        parentTable: currentSpec.tableName,
+        parentColumns,
+        childTable: targetTable,
+        childColumns: toFields,
+      },
+    };
+  }
+
+  const targetSpec = allSpecs.get(targetModelName);
+  if (!targetSpec) {
+    throw new Error(
+      `Relation "${currentSpec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
+    );
+  }
 
   return {
     fieldName: relationName,
@@ -480,9 +553,10 @@ function resolveRelationNode(
   relation: RelationState,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): RelationNode {
   if (relation.kind === 'belongsTo') {
-    return lowerBelongsToRelation(relationName, relation, currentSpec, allSpecs);
+    return lowerBelongsToRelation(relationName, relation, currentSpec, allSpecs, extensionPacks);
   }
 
   if (relation.kind === 'hasMany' || relation.kind === 'hasOne') {
@@ -492,7 +566,7 @@ function resolveRelationNode(
   return lowerManyToManyRelation(relationName, relation, currentSpec, allSpecs);
 }
 
-function lowerForeignKeyNode(
+function lowerLocalForeignKeyNode(
   spec: RuntimeModelSpec,
   targetSpec: RuntimeModelSpec,
   foreignKey: {
@@ -524,11 +598,74 @@ function lowerForeignKeyNode(
   };
 }
 
+function lowerCrossSpaceForeignKeyNode(
+  spec: RuntimeModelSpec,
+  foreignKey: {
+    readonly fields: readonly string[];
+    readonly targetFields: readonly string[];
+    readonly targetModel: string;
+    readonly targetSpaceId: string;
+    readonly targetNamespaceId?: string;
+    readonly targetTableName?: string;
+    readonly name?: string | undefined;
+    readonly onDelete?: ForeignKeyConstraint['onDelete'] | undefined;
+    readonly onUpdate?: ForeignKeyConstraint['onUpdate'] | undefined;
+    readonly constraint?: boolean | undefined;
+    readonly index?: boolean | undefined;
+  },
+): ForeignKeyNode {
+  return {
+    columns: mapFieldNamesToColumnNames(spec.modelName, foreignKey.fields, spec.fieldToColumn),
+    references: {
+      model: foreignKey.targetModel,
+      table: foreignKey.targetTableName ?? foreignKey.targetModel.toLowerCase(),
+      columns: foreignKey.targetFields,
+      ...(foreignKey.targetNamespaceId !== undefined
+        ? { namespaceId: foreignKey.targetNamespaceId }
+        : {}),
+      spaceId: foreignKey.targetSpaceId,
+    },
+    ...(foreignKey.name ? { name: foreignKey.name } : {}),
+    ...(foreignKey.onDelete ? { onDelete: foreignKey.onDelete } : {}),
+    ...(foreignKey.onUpdate ? { onUpdate: foreignKey.onUpdate } : {}),
+    ...(foreignKey.constraint !== undefined ? { constraint: foreignKey.constraint } : {}),
+    ...(foreignKey.index !== undefined ? { index: foreignKey.index } : {}),
+  };
+}
+
+function assertKnownExtensionPack(
+  extensionPacks: Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  spaceId: string,
+  context: string,
+): void {
+  if (extensionPacks !== undefined && Object.hasOwn(extensionPacks, spaceId)) {
+    return;
+  }
+  throw new Error(
+    `${context} references contract space "${spaceId}" but "${spaceId}" is not declared in extensionPacks. Add the pack to extensionPacks.`,
+  );
+}
+
 function resolveForeignKeyNodes(
   spec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): readonly ForeignKeyNode[] {
   const relationForeignKeys = resolveRelationForeignKeys(spec, allSpecs).map((foreignKey) => {
+    // F-relfk: relation-derived FKs for cross-space targets carry targetSpaceId;
+    // route them through the cross-space path, just like explicit sql() FKs.
+    if (foreignKey.targetSpaceId !== undefined) {
+      assertKnownExtensionPack(
+        extensionPacks,
+        foreignKey.targetSpaceId,
+        `Relation-derived foreign key on "${spec.modelName}"`,
+      );
+      return lowerCrossSpaceForeignKeyNode(spec, {
+        ...foreignKey,
+        targetSpaceId: foreignKey.targetSpaceId,
+      });
+    }
+
     const targetSpec = allSpecs.get(foreignKey.targetModel);
     if (!targetSpec) {
       throw new Error(
@@ -536,10 +673,22 @@ function resolveForeignKeyNodes(
       );
     }
 
-    return lowerForeignKeyNode(spec, targetSpec, foreignKey);
+    return lowerLocalForeignKeyNode(spec, targetSpec, foreignKey);
   });
 
   const sqlForeignKeys = (spec.sqlSpec?.foreignKeys ?? []).map((foreignKey) => {
+    if (foreignKey.targetSpaceId !== undefined) {
+      assertKnownExtensionPack(
+        extensionPacks,
+        foreignKey.targetSpaceId,
+        `Foreign key on "${spec.modelName}"`,
+      );
+      return lowerCrossSpaceForeignKeyNode(spec, {
+        ...foreignKey,
+        targetSpaceId: foreignKey.targetSpaceId,
+      });
+    }
+
     const targetSpec = allSpecs.get(foreignKey.targetModel);
     if (!targetSpec) {
       throw new Error(
@@ -547,7 +696,7 @@ function resolveForeignKeyNodes(
       );
     }
 
-    return lowerForeignKeyNode(spec, targetSpec, foreignKey);
+    return lowerLocalForeignKeyNode(spec, targetSpec, foreignKey);
   });
 
   return [...relationForeignKeys, ...sqlForeignKeys];
@@ -558,6 +707,7 @@ function resolveModelNode(
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
   storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
   storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance | PostgresEnumStorageEntry, string>,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
 ): ModelNode {
   const fields: FieldNode[] = [];
 
@@ -602,9 +752,9 @@ function resolveModelNode(
     ...ifDefined('type', index.type),
     ...ifDefined('options', index.options),
   })) satisfies readonly IndexNode[];
-  const foreignKeys = resolveForeignKeyNodes(spec, allSpecs);
+  const foreignKeys = resolveForeignKeyNodes(spec, allSpecs, extensionPacks);
   const relations = Object.entries(spec.relations).map(([relationName, relationBuilder]) =>
-    resolveRelationNode(relationName, relationBuilder.build(), spec, allSpecs),
+    resolveRelationNode(relationName, relationBuilder.build(), spec, allSpecs, extensionPacks),
   );
 
   return {
@@ -702,7 +852,10 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
   };
 }
 
-function lowerModels(collection: RuntimeCollection): readonly ModelNode[] {
+function lowerModels(
+  collection: RuntimeCollection,
+  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
+): readonly ModelNode[] {
   emitTypedCrossModelFallbackWarnings(collection);
 
   const storageTypeReverseLookup = buildStorageTypeReverseLookup(collection.storageTypes);
@@ -712,13 +865,14 @@ function lowerModels(collection: RuntimeCollection): readonly ModelNode[] {
       collection.modelSpecs,
       collection.storageTypes,
       storageTypeReverseLookup,
+      extensionPacks,
     ),
   );
 }
 
 export function buildContractDefinition(definition: ContractInput): ContractDefinition {
   const collection = collectRuntimeModelSpecs(definition);
-  const models = lowerModels(collection);
+  const models = lowerModels(collection, definition.extensionPacks);
 
   return {
     target: definition.target,

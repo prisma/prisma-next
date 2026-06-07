@@ -1073,7 +1073,18 @@ export type RelationNames<
   ModelName extends string,
 > = (string extends keyof RelationsOf<TContract, ModelName>
   ? never
-  : keyof RelationsOf<TContract, ModelName>) &
+  : {
+      // Filter out relation keys whose type is `never` — those are cross-space
+      // relations (Option B): declared in the contract but non-navigable via
+      // `include`. Emitting the relation as `never` in the `.d.ts` and
+      // excluding it here makes `include('relName')` a compile error.
+      [K in keyof RelationsOf<TContract, ModelName>]: RelationsOf<
+        TContract,
+        ModelName
+      >[K] extends never
+        ? never
+        : K;
+    }[keyof RelationsOf<TContract, ModelName>]) &
   string;
 
 type RelationModelName<Relation> = Relation extends {

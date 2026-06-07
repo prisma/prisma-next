@@ -22,6 +22,7 @@ import {
 import {
   type ContractInput,
   type ContractModelBuilder,
+  extensionModel,
   field,
   isContractInput,
   type ModelAttributesSpec,
@@ -529,4 +530,4 @@ export type {
   ModelLike,
   ScalarFieldBuilder,
 };
-export { field, model, rel };
+export { extensionModel, field, model, rel };
