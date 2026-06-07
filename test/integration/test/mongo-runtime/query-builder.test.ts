@@ -90,9 +90,11 @@ const contractJson = {
       __unbound__: {
         id: '__unbound__',
         kind: 'mongo-namespace',
-        collections: {
-          orders: { kind: 'mongo-collection' },
-          users: { kind: 'mongo-collection' },
+        entries: {
+          collection: {
+            orders: { kind: 'mongo-collection' },
+            users: { kind: 'mongo-collection' },
+          },
         },
       },
     },

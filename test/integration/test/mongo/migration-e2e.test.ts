@@ -1,7 +1,11 @@
-import { createMongoRunnerDeps, extractDb, readMarker } from '@prisma-next/adapter-mongo/control';
+import {
+  createMongoRunnerDeps,
+  extractDb,
+  MongoControlAdapterImpl,
+} from '@prisma-next/adapter-mongo/control';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
-import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import mongoControlDriver, { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import {
   contractToMongoSchemaIR,
   createMongoFamilyInstance,
@@ -18,6 +22,8 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { synthMigrationEdges } from './synth-migration-edges';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 const MIGRATIONS_COLLECTION = '_prisma_migrations';
 
@@ -42,8 +48,10 @@ const emptyContract: MongoContract = {
       __unbound__: {
         id: '__unbound__' as const,
         kind: 'mongo-namespace' as const,
-        collections: {
-          users: new MongoCollection(),
+        entries: {
+          collection: {
+            users: new MongoCollection(),
+          },
         },
       },
     },
@@ -76,12 +84,14 @@ const indexedContract: MongoContract = {
       __unbound__: {
         id: '__unbound__' as const,
         kind: 'mongo-namespace' as const,
-        collections: {
-          users: new MongoCollection({
-            indexes: [
-              new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
-            ],
-          }),
+        entries: {
+          collection: {
+            users: new MongoCollection({
+              indexes: [
+                new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+              ],
+            }),
+          },
         },
       },
     },
@@ -245,7 +255,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           frameworkComponents: [],
         });
 
-        const marker = await readMarker(db, 'app');
+        const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
         expect(marker).not.toBeNull();
         expect(marker!.storageHash).toBe(indexedContract.storage.storageHash);
       } finally {
@@ -385,7 +395,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         expect(emailIndex).toBeUndefined();
 
         // Verify marker updated
-        const marker = await readMarker(db, 'app');
+        const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
         expect(marker!.storageHash).toBe(emptyContract.storage.storageHash);
 
         // Verify second ledger entry with correct target hash

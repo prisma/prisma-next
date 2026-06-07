@@ -8,13 +8,18 @@ import {
 } from '../src/core/sqlite-unbound-database';
 
 describe('SqliteUnboundDatabase', () => {
+  it('materializes kind non-enumerably as sqlite-namespace', () => {
+    expect(SqliteUnboundDatabase.instance.kind).toBe('sqlite-namespace');
+    expect(Object.keys(SqliteUnboundDatabase.instance)).not.toContain('kind');
+  });
+
   it('exposes the framework-reserved unbound id as its singleton id', () => {
     expect(SqliteUnboundDatabase.instance.id).toBe(UNBOUND_NAMESPACE_ID);
   });
 
   it('carries an empty frozen tables map', () => {
-    expect(SqliteUnboundDatabase.instance.tables).toEqual({});
-    expect(Object.isFrozen(SqliteUnboundDatabase.instance.tables)).toBe(true);
+    expect(SqliteUnboundDatabase.instance.entries.table).toEqual({});
+    expect(Object.isFrozen(SqliteUnboundDatabase.instance.entries.table)).toBe(true);
   });
 
   it('elides every qualifier — SQLite has no schema concept and emits unqualified DDL', () => {
@@ -31,15 +36,17 @@ describe('SqliteDatabase', () => {
   it('qualifies table names without a schema prefix for runtime SQL rendering', () => {
     const database = new SqliteDatabase({
       id: UNBOUND_NAMESPACE_ID,
-      tables: {
-        user: new StorageTable({
-          columns: {
-            id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        }),
+      entries: {
+        table: {
+          user: new StorageTable({
+            columns: {
+              id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          }),
+        },
       },
     });
     expect(database.qualifyTable('user')).toBe('"user"');
@@ -48,10 +55,14 @@ describe('SqliteDatabase', () => {
 
 describe('sqliteCreateNamespace factory', () => {
   it('returns the unbound singleton for the framework-reserved sentinel', () => {
-    expect(sqliteCreateNamespace(UNBOUND_NAMESPACE_ID)).toBe(SqliteUnboundDatabase.instance);
+    expect(sqliteCreateNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: {} } })).toBe(
+      SqliteUnboundDatabase.instance,
+    );
   });
 
   it('rejects every non-unbound coordinate — SQLite contracts cannot declare named namespaces', () => {
-    expect(() => sqliteCreateNamespace('auth')).toThrow(/SQLite has no schema concept/);
+    expect(() => sqliteCreateNamespace({ id: 'auth', entries: { table: {} } })).toThrow(
+      /SQLite has no schema concept/,
+    );
   });
 });

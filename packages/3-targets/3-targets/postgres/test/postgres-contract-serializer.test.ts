@@ -20,7 +20,13 @@ import { PostgresContractSerializer } from '../src/core/postgres-contract-serial
 import postgresTargetDescriptor from '../src/exports/control';
 
 function makeValidContractJson() {
-  return createSqlContract();
+  return createSqlContract({
+    storage: {
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } },
+      },
+    },
+  });
 }
 
 function makeContractWithTablesJson() {
@@ -29,37 +35,43 @@ function makeContractWithTablesJson() {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-            post: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
-                    tableName: 'post',
-                    columns: ['userId'],
-                  },
-                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                  constraint: true,
-                  index: true,
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
                 },
-              ],
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              post: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: UNBOUND_NAMESPACE_ID,
+                      tableName: 'post',
+                      columns: ['userId'],
+                    },
+                    target: {
+                      namespaceId: UNBOUND_NAMESPACE_ID,
+                      tableName: 'user',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: true,
+                  },
+                ],
+              },
             },
           },
         },
@@ -78,7 +90,7 @@ describe('PostgresContractSerializer', () => {
     const serializer = new PostgresContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({});
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table).toEqual({});
   });
 
   it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
@@ -86,7 +98,7 @@ describe('PostgresContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const tables = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables;
+    const tables = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table;
     const userTable = tables['user'] as StorageTable | undefined;
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
@@ -114,22 +126,24 @@ describe('PostgresContractSerializer', () => {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
             kind: 'postgres-unbound-schema',
-            tables: {
-              user: {
-                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            entries: {
+              table: {
+                user: {
+                  columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                },
               },
+              type: {},
             },
-            enum: {},
           },
         },
       },
     });
     expect(reparsed.storage).not.toHaveProperty('kind');
-    expect(reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user).not.toHaveProperty(
+    expect(reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].entries.table.user).not.toHaveProperty(
       'kind',
     );
     expect(
-      reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user.columns.id,
+      reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].entries.table.user.columns.id,
     ).not.toHaveProperty('kind');
   });
 
@@ -150,7 +164,13 @@ describe('PostgresContractSerializer', () => {
       }
 
       protected override parseSqlContractStructure(_json: unknown): Contract<SqlStorage> {
-        const base = createSqlContract() as unknown as Contract<SqlStorage>;
+        const base = createSqlContract({
+          storage: {
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } },
+            },
+          },
+        }) as unknown as Contract<SqlStorage>;
         return {
           ...base,
           storage: {
@@ -175,22 +195,24 @@ describe('control-policy round-trip fidelity', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: {
-                  id: {
-                    nativeType: 'int4',
-                    codecId: 'pg/int4@1',
-                    nullable: false,
-                    control: 'observed',
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: {
+                      nativeType: 'int4',
+                      codecId: 'pg/int4@1',
+                      nullable: false,
+                      control: 'observed',
+                    },
+                    email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
                   },
-                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                  control: 'external',
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
-                control: 'external',
               },
             },
           },
@@ -205,13 +227,16 @@ describe('control-policy round-trip fidelity', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             ...base.storage.namespaces[UNBOUND_NAMESPACE_ID]!,
-            enum: {
-              Role: {
-                kind: 'postgres-enum',
-                name: 'Role',
-                nativeType: 'role',
-                values: ['admin', 'user'],
-                control: 'managed',
+            entries: {
+              ...base.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries,
+              type: {
+                Role: {
+                  kind: 'postgres-enum',
+                  name: 'Role',
+                  nativeType: 'role',
+                  values: ['admin', 'user'],
+                  control: 'managed',
+                },
               },
             },
           },
@@ -230,10 +255,10 @@ describe('control-policy round-trip fidelity', () => {
     expect(reparsed.defaultControlPolicy).toBe('tolerated');
 
     const ns = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID];
-    const table = ns.tables.user;
+    const table = ns.entries.table.user;
     const idColumn = table.columns.id;
     const emailColumn = table.columns.email;
-    const enumEntry = ns.enum.Role;
+    const enumEntry = ns.entries.type.Role;
 
     const def = reparsed.defaultControlPolicy;
     expect(effectiveControlPolicy(table.control, def)).toBe('external');

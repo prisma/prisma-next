@@ -36,9 +36,9 @@ describe('MongoTargetDatabase', () => {
   it('normalises plain collection inputs into MongoCollection instances', () => {
     const db = new MongoTargetDatabase({
       id: 'app',
-      collections: { users: {} },
+      entries: { collection: { users: {} } },
     });
-    expect(db.collections['users']).toBeInstanceOf(MongoCollection);
+    expect(db.entries.collection['users']).toBeInstanceOf(MongoCollection);
   });
 });
 
@@ -54,8 +54,8 @@ describe('MongoTargetUnboundDatabase', () => {
   });
 
   it('carries an empty frozen collections map', () => {
-    expect(MongoTargetUnboundDatabase.instance.collections).toEqual({});
-    expect(Object.isFrozen(MongoTargetUnboundDatabase.instance.collections)).toBe(true);
+    expect(MongoTargetUnboundDatabase.instance.entries.collection).toEqual({});
+    expect(Object.isFrozen(MongoTargetUnboundDatabase.instance.entries.collection)).toBe(true);
   });
 
   it('exposes a stable singleton reference', () => {

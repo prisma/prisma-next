@@ -27,6 +27,9 @@ export interface IntegritySpaceState {
    * `null` means the head ref was read cleanly or is genuinely absent —
    * the absent case is judged `headRefMissing`, the corrupt case here is
    * judged `refUnreadable` (and suppresses `headRefMissing`).
+   *
+   * Always `null` for the app space — the app head ref is synthesised from
+   * the live contract, so there is no on-disk `head.json` to read or fail on.
    */
   readonly headRefProblem: RefLoadProblem | null;
   readonly isApp: boolean;
@@ -85,15 +88,21 @@ export function computeIntegrityViolations(
 
     violations.push(...duplicateMigrationHashViolations(spaceId, member.packages));
 
-    // The app head ref is synthesised from the live contract, so it is
-    // always present and reachable; only extension spaces read their head
-    // ref from disk and can be missing or point outside the graph. A head
-    // ref that exists but is unparseable is already surfaced above as
-    // `refUnreadable`, so it is not also reported as `headRefMissing`.
+    // For non-app spaces: a missing head.json is always an authoring error
+    // (headRefMissing). The graph-reachability check (headRefNotInGraph) only
+    // applies when the space actually has a migration graph — an extension that
+    // ships no packages (e.g. all-external auth/storage spaces) has nothing to
+    // reach the head ref through, and requiring the head hash to appear in an
+    // empty graph would always fail. When a space ships no migrations, the
+    // planner emits no DDL for it — the database is treated as already at the
+    // declared state.
     if (!isApp && headRefProblem === null) {
       if (member.headRef === null) {
         violations.push({ kind: 'headRefMissing', spaceId });
-      } else if (!headRefPresentInGraph(member, member.headRef.hash)) {
+      } else if (
+        member.packages.length > 0 &&
+        !headRefPresentInGraph(member, member.headRef.hash)
+      ) {
         violations.push({ kind: 'headRefNotInGraph', spaceId, hash: member.headRef.hash });
       }
     }

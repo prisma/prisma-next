@@ -147,16 +147,18 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
           kind: 'sql-namespace',
-          tables: {
-            [APP_TABLE]: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                [APP_FIELD]: embeddingColumn,
+          entries: {
+            table: {
+              [APP_TABLE]: {
+                columns: {
+                  id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                  [APP_FIELD]: embeddingColumn,
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },

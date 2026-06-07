@@ -21,7 +21,7 @@ export function createTestContract(
 ): Contract<SqlStorage> {
   const unboundNs = buildSqlNamespace({
     id: UNBOUND_NAMESPACE_ID,
-    tables: overrides.tables ?? {},
+    entries: { table: overrides.tables ?? {} },
   });
   return createContract<SqlStorage>({
     storage: new SqlStorage({

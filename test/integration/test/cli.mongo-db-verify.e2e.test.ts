@@ -1,8 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { initMarker } from '@prisma-next/adapter-mongo/control';
+import { MongoControlAdapterImpl } from '@prisma-next/adapter-mongo/control';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
@@ -16,6 +17,8 @@ import {
   setupTestDirectoryFromFixtures,
   withTempDir,
 } from './utils/cli-test-helpers';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 const testContract: MongoContract = {
   target: 'mongo',
@@ -42,12 +45,14 @@ const testContract: MongoContract = {
       __unbound__: {
         id: '__unbound__' as const,
         kind: 'mongo-namespace' as const,
-        collections: {
-          users: new MongoCollection({
-            indexes: [
-              new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
-            ],
-          }),
+        entries: {
+          collection: {
+            users: new MongoCollection({
+              indexes: [
+                new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+              ],
+            }),
+          },
         },
       },
     },
@@ -155,7 +160,7 @@ describe('mongo db verify command (e2e)', { timeout: timeouts.spinUpMongoMemoryS
     it('verifies matching marker and schema', async () => {
       await db.createCollection('users');
       await db.collection('users').createIndex({ email: 1 }, { unique: true });
-      await initMarker(db, 'app', {
+      await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: testContract.storage.storageHash,
         profileHash: testContract.profileHash!,
       });
@@ -253,7 +258,7 @@ describe('mongo db verify command (e2e)', { timeout: timeouts.spinUpMongoMemoryS
     });
 
     it('runs marker-only verification with matching marker', async () => {
-      await initMarker(db, 'app', {
+      await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: testContract.storage.storageHash,
         profileHash: testContract.profileHash!,
       });

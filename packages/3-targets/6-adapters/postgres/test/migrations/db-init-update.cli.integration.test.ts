@@ -54,20 +54,22 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            _ext_helper: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                ...(version === 2
-                  ? {
-                      note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-                    }
-                  : {}),
+          entries: {
+            table: {
+              _ext_helper: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  ...(version === 2
+                    ? {
+                        note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+                      }
+                    : {}),
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         }),

@@ -18,6 +18,10 @@ import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sq
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
+import type { Contract as PolyContract } from './fixtures/polymorphism/generated/contract';
+import polyContractJson from './fixtures/polymorphism/generated/contract.json' with {
+  type: 'json',
+};
 
 export function isSelectAst(ast: unknown): ast is SelectAst {
   return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
@@ -110,6 +114,27 @@ export function getTestContext(): ExecutionContext<TestContract> {
   return testContext;
 }
 
+export type { PolyContract };
+
+export function deserializePolyContract(json: unknown = polyContractJson): PolyContract {
+  return postgresContractSerializer.deserializeContract(json) as PolyContract;
+}
+
+const polyTestContract = deserializePolyContract();
+
+const polyTestContext: ExecutionContext<PolyContract> = createExecutionContext({
+  contract: polyTestContract,
+  stack: createSqlExecutionStack({
+    target: postgresTarget,
+    adapter: postgresAdapter,
+    extensionPacks: [pgvectorRuntime],
+  }),
+});
+
+export function getPolyTestContext(): ExecutionContext<PolyContract> {
+  return polyTestContext;
+}
+
 export interface MockExecution {
   plan: SqlExecutionPlan | SqlQueryPlan<unknown>;
   rows: Record<string, unknown>[];
@@ -168,7 +193,7 @@ export function buildMixedPolyContract(): TestContract {
     base: { model: 'Task', namespace: POSTGRES_DEFAULT_NAMESPACE_ID },
   };
 
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.tasks = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -181,7 +206,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.features = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -241,17 +266,17 @@ export function buildStiPolyContract(): TestContract {
     base: { model: 'User', namespace: POSTGRES_DEFAULT_NAMESPACE_ID },
   };
 
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.kind = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.role = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].tables.users.columns.plan = {
+  raw.storage.namespaces[POSTGRES_DEFAULT_NAMESPACE_ID].entries.table.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,

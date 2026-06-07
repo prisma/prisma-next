@@ -67,7 +67,9 @@ const TEST_APP_CONTRACT = createSqlContract({
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: { user: { columns: { id: {} } } },
+        entries: {
+          table: { user: { columns: { id: {} } } },
+        },
       },
     },
   },
@@ -300,7 +302,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     // "every on-disk migration shows up exactly once".
     expect(result.value.ok).toBe(true);
     expect(result.value.spaces).toHaveLength(1);
-    const renderedDirs = result.value.spaces[0]!.migrations.map((m) => m.dirName).sort();
+    const renderedDirs = result.value.spaces[0]!.migrations.map((m) => m.name).sort();
     const fixtureDirs = specs.map((s) => s.dirName).sort();
     expect(renderedDirs).toEqual(fixtureDirs);
     expect(renderedDirs).toHaveLength(specs.length);
@@ -443,7 +445,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     const migrations = result.value.spaces[0]!.migrations;
     expect(migrations).toHaveLength(2);
     for (const m of migrations) {
-      expect(m.to).toBe(HASH_FAN_C);
+      expect(m.toContract).toBe(HASH_FAN_C);
       expect(m.refs).toEqual(['production']);
     }
     const human = renderListed(result.value);
@@ -471,8 +473,8 @@ describe('runMigrationList — slice-spec worked example', () => {
     const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
     const [entry] = result.value.spaces[0]!.migrations;
-    expect(entry?.from).toBe(HASH_4cb4256);
-    expect(entry?.to).toBe(HASH_4cb4256);
+    expect(entry?.fromContract).toBe(HASH_4cb4256);
+    expect(entry?.toContract).toBe(HASH_4cb4256);
     expect(entry?.providedInvariants).toEqual([]);
     expect(entry?.refs).toEqual([]);
 
@@ -514,7 +516,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     expectOk(result);
     // Empty-state synthesizes the app space so the renderer can name a
     // directory.
-    expect(result.value.spaces).toEqual([{ spaceId: 'app', migrations: [] }]);
+    expect(result.value.spaces).toEqual([{ space: 'app', migrations: [] }]);
     expect(renderListed(result.value)).toBe('There are no migrations in migrations/app/ yet');
   });
 
@@ -588,8 +590,8 @@ describe('runMigrationList — --space flag', () => {
     });
     expectOk(result);
     expect(result.value.spaces).toHaveLength(1);
-    expect(result.value.spaces[0]!.spaceId).toBe('postgis');
-    expect(result.value.spaces[0]!.migrations.map((m) => m.dirName)).toEqual([
+    expect(result.value.spaces[0]!.space).toBe('postgis');
+    expect(result.value.spaces[0]!.migrations.map((m) => m.name)).toEqual([
       '20260601T0000_install_postgis_extension',
     ]);
 
@@ -611,7 +613,7 @@ describe('runMigrationList — --space flag', () => {
       spaceFilter: 'postgis',
     });
     expectOk(result);
-    expect(result.value.spaces).toEqual([{ spaceId: 'postgis', migrations: [] }]);
+    expect(result.value.spaces).toEqual([{ space: 'postgis', migrations: [] }]);
     expect(renderListed(result.value)).toBe('There are no migrations in migrations/postgis/ yet');
   });
 
@@ -726,18 +728,18 @@ describe('runMigrationList — JSON output shape', () => {
     expect(json.ok).toBe(true);
     expect(json.summary).toBe('2 migration(s) on disk');
     expect(json.spaces).toHaveLength(1);
-    expect(json.spaces[0]!.spaceId).toBe('app');
+    expect(json.spaces[0]!.space).toBe('app');
 
     // Migrations latest-first.
     const latest = json.spaces[0]!.migrations[0]!;
     const oldest = json.spaces[0]!.migrations[1]!;
-    expect(latest.dirName).toBe('20260422T0742_migration');
-    expect(oldest.dirName).toBe('20260422T0720_initial');
+    expect(latest.name).toBe('20260422T0742_migration');
+    expect(oldest.name).toBe('20260422T0720_initial');
 
     // Full sha256 hash preserved in JSON (no abbreviation).
-    expect(latest.migrationHash).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(latest.from).toBe(HASH_4cb4256);
-    expect(latest.to).toBe(HASH_55bada2);
+    expect(latest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(latest.fromContract).toBe(HASH_4cb4256);
+    expect(latest.toContract).toBe(HASH_55bada2);
 
     // refs / providedInvariants / operationCount / createdAt populated
     // on every entry, even when empty.
@@ -766,7 +768,7 @@ describe('runMigrationList — JSON output shape', () => {
 
     const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
-    expect(result.value.spaces.map((s) => s.spaceId)).toEqual(['app', 'postgis']);
+    expect(result.value.spaces.map((s) => s.space)).toEqual(['app', 'postgis']);
     expect(result.value.summary).toBe('2 migration(s) across 2 contract space(s)');
   });
 
@@ -796,7 +798,7 @@ describe('runMigrationList — JSON output shape', () => {
 
     const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
-    const postgis = result.value.spaces.find((s) => s.spaceId === 'postgis');
+    const postgis = result.value.spaces.find((s) => s.space === 'postgis');
     expect(postgis?.migrations[0]?.refs).toEqual(['head']);
   });
 });

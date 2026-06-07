@@ -32,7 +32,7 @@ The contract expresses this with one field. The Supabase extension ships its con
 }
 ```
 
-The verifier confirms `auth.users` exists and that the declared columns match in a target-compatible shape. The planner emits zero DDL into `auth`. The same intent can be authored per object rather than per contract, from either authoring surface:
+The verifier confirms `auth.users` exists and that the declared columns match exactly (after native-type normalization). The planner emits zero DDL into `auth`. The same intent can be authored per object rather than per contract, from either authoring surface:
 
 ```prisma
 model AuthUser {
@@ -79,7 +79,7 @@ The four values sit on a spectrum of framework ownership:
 |---|---|---|
 | `managed` | Must exist and match exactly; any drift is a `fail`. | Full lifecycle: `CREATE`, `ALTER`, `DROP`. |
 | `tolerated` | Declared columns must match; extra, undeclared columns are accepted. | Create if missing; never `ALTER` or `DROP` an existing object. |
-| `external` | Declared columns must match in a target-compatible shape; extra columns and constraints are ignored. | Never emit DDL. |
+| `external` | Declared columns must match exactly; extra columns and constraints are ignored. | Never emit DDL. |
 | `observed` | May exist or not, may mismatch; every divergence is a `warn`, never a `fail`. | Never emit DDL. |
 
 `managed` is the framework's home ground: it owns the object end to end. `external` is the opposite pole — the framework will *check* the object against a declaration but will never *write* to it, which is exactly what referencing someone else's schema requires. `tolerated` and `observed` fill the middle: `tolerated` creates an object once and then leaves it alone (useful for objects the framework introduces but does not keep in lockstep), and `observed` is purely informational, a declaration the framework reports on but never acts upon.
@@ -115,20 +115,16 @@ Where the field lives is shaped by the contract IR's structure ([ADR 221](ADR%20
 
 The verifier and the planner both decide what to do per object by switching on its effective policy. That decision is identical across every target within a family, so it lives **once on the family's abstract base** rather than being re-implemented per target. This is the [three-layer polymorphic IR pattern](../patterns/three-layer-polymorphic-ir.md): the framework defines the vocabulary and the resolver, the family owns the dispatch, and the target supplies only the hooks the dispatch cannot know on its own.
 
-There is exactly one such hook, and it exists for one reason. Verifying an `external` object means comparing a declared column type against whatever shape the live database reports — and "compatible shape" is a target-specific relation, because what counts as a compatible type in Postgres is not what counts in another SQL dialect. So the family base owns the *dispatch* ("for `external`, compare shapes leniently") and delegates the *relation* ("are these two types compatible?") to the target:
+For the SQL verifier, the target supplies two hooks. `normalizeNativeType` canonicalises the spelling of a type string (e.g. `int4` and `integer` are the same Postgres type; `normalizeNativeType` maps both to a single canonical form before the comparison). `normalizeDefault` performs the equivalent canonicalisation for column default expressions. Both hooks are about spelling normalisation — they do not claim that two distinct types are equivalent. After normalisation, column-type comparison is **exact equality** for all four control policies. There is no "compatible-shape" seam; the family base does not delegate a compatibility relation to the target.
 
-```ts
-export type ColumnsCompatible = (declared: string, live: string) => boolean;
-```
-
-Postgres supplies a deliberately conservative relation: identical type strings are compatible, and beyond that only an explicit allow-list of pairs is honoured. The allow-list starts empty — no broad equivalences such as `int4`/`int8` or `varchar`/`text` are granted speculatively — because a false "compatible" silently weakens the one guarantee `external` verification offers. Widening the relation is additive and owned entirely by the target.
+**Why there is no compatibility hook.** Column-type compatibility is a question about whether two *codecs'* storage types are interchangeable — a concern that is correct only with full knowledge of the codecs involved. Codecs are an open extension point: a user-supplied codec can map a domain type onto any native type, and a list of "compatible" native-type pairs maintained by the framework or the target would necessarily be incomplete. More critically, any pair that appeared on such a list would silently suppress a `type_mismatch` under `external`, which is the one policy where the framework offers no DDL safety net. A false "compatible" result under `external` is worse than useless: it lets a schema drift go undetected with no corrective path. Exact equality after normalisation is the only guarantee the framework can make honestly.
 
 **Verifier dispatch** maps each policy to a severity per situation:
 
 | Live-vs-declared situation | `managed` | `tolerated` | `external` | `observed` |
 |---|---|---|---|---|
 | Declared object/column missing | `fail` | `fail` | `fail` | `warn` |
-| Declared column type mismatch | `fail` (exact) | `fail` (exact) | `fail` (compatible-shape) | `warn` |
+| Declared column type mismatch | `fail` (exact) | `fail` (exact) | `fail` (exact) | `warn` |
 | Extra, undeclared column | `fail` | accepted | accepted | `warn` |
 | Extra constraint / index | `fail` | `fail` | accepted | `warn` |
 
@@ -170,11 +166,11 @@ The contract default is set wherever a contract is specified, with parity across
 
 ## Consequences
 
-An extension that wraps an externally-owned schema sets `defaultControlPolicy: 'external'` once. Every object it declares stays out of application migration plans automatically, while the verifier still confirms those objects exist and have compatible shapes — the behaviour the opening example needs, with no per-object ceremony.
+An extension that wraps an externally-owned schema sets `defaultControlPolicy: 'external'` once. Every object it declares stays out of application migration plans automatically, while the verifier still confirms those objects exist and match exactly — the behaviour the opening example needs, with no per-object ceremony.
 
 The common case stays free. An application that owns its whole schema names no policies, resolves to `managed` everywhere, and produces byte-identical contract hashes to a world without control policy. The field is invisible to anyone who does not use it.
 
-Dispatch lives once per family. A new SQL target inherits the four-way semantics for free and supplies only its own compatible-shape relation and any target-only carrier kinds; no gating logic is copied per target.
+Dispatch lives once per family. A new SQL target inherits the four-way semantics for free and supplies only its own native-type normaliser and any target-only carrier kinds; no gating logic is copied per target.
 
 The cost is borne at the IR leaves. Because the framework namespace interface carries no family-specific base ([ADR 221](ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)), each new persisted object kind must add the policy field explicitly. The idiom is mechanical and well-worn across the existing carriers, but it is a recurring touch-point a future kind must remember.
 

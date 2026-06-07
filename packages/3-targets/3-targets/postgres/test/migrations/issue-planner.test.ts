@@ -23,15 +23,20 @@ import { PostgresEnumType } from '../../src/exports/types';
 
 function makeContract(
   overrides: {
-    tables?: Record<string, StorageTableInput>;
-    enum?: Record<string, PostgresEnumStorageEntry>;
+    entries?: {
+      table?: Record<string, StorageTableInput>;
+      type?: Record<string, PostgresEnumStorageEntry>;
+    };
   } = {},
 ): Contract<SqlStorage> {
-  const unboundNs = postgresCreateNamespace({
-    id: UNBOUND_NAMESPACE_ID,
-    tables: overrides.tables ?? {},
-    ...(overrides.enum !== undefined ? { enum: overrides.enum } : {}),
-  });
+  const { table = {}, type } = overrides.entries ?? {};
+  const unboundNs = postgresCreateNamespace(
+    {
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table },
+    },
+    type,
+  );
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -86,16 +91,18 @@ describe('planIssues', () => {
   describe('missing_table', () => {
     it('emits CreateTableCall with columns', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -125,16 +132,18 @@ describe('planIssues', () => {
   describe('notNullBackfill call strategy', () => {
     it('emits AddColumnCall(nullable) + DataTransformCall + SetNotNullCall', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -166,16 +175,18 @@ describe('planIssues', () => {
 
     it('DataTransformCall.toOp() throws PN-MIG-2001', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -207,30 +218,34 @@ describe('planIssues', () => {
   describe('nullableTightening call strategy', () => {
     it('emits DataTransformCall + SetNotNullCall', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
       const fromContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -265,30 +280,34 @@ describe('planIssues', () => {
   describe('typeChange call strategy', () => {
     it('emits AlterColumnTypeCall for safe widening', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              age: { nativeType: 'int8', codecId: 'pg/int8@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                age: { nativeType: 'int8', codecId: 'pg/int8@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
       const fromContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -320,30 +339,34 @@ describe('planIssues', () => {
 
     it('emits DataTransformCall + AlterColumnTypeCall for unsafe change', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              age: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                age: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
       const fromContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -378,21 +401,25 @@ describe('planIssues', () => {
   describe('enumChange call strategy', () => {
     it('emits AddEnumValuesCall for add-only', () => {
       const toContract = makeContract({
-        tables: {},
-        enum: {
-          status: new PostgresEnumType({
-            name: 'status',
-            values: ['active', 'inactive', 'archived'],
-          }),
+        entries: {
+          table: {},
+          type: {
+            status: new PostgresEnumType({
+              name: 'status',
+              values: ['active', 'inactive', 'archived'],
+            }),
+          },
         },
       });
       const fromContract = makeContract({
-        tables: {},
-        enum: {
-          status: new PostgresEnumType({
-            name: 'status',
-            values: ['active', 'inactive'],
-          }),
+        entries: {
+          table: {},
+          type: {
+            status: new PostgresEnumType({
+              name: 'status',
+              values: ['active', 'inactive'],
+            }),
+          },
         },
       });
       const issues: SchemaIssue[] = [
@@ -424,53 +451,57 @@ describe('planIssues', () => {
 
     it('emits DataTransformCall + rebuild recipe for removal', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              status: {
-                nativeType: 'status',
-                codecId: 'pg/enum@1',
-                nullable: false,
-                typeRef: 'status',
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                status: {
+                  nativeType: 'status',
+                  codecId: 'pg/enum@1',
+                  nullable: false,
+                  typeRef: 'status',
+                },
               },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
-        },
-        enum: {
-          status: new PostgresEnumType({
-            name: 'status',
-            values: ['active'],
-          }),
+          type: {
+            status: new PostgresEnumType({
+              name: 'status',
+              values: ['active'],
+            }),
+          },
         },
       });
       const fromContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              status: {
-                nativeType: 'status',
-                codecId: 'pg/enum@1',
-                nullable: false,
-                typeRef: 'status',
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                status: {
+                  nativeType: 'status',
+                  codecId: 'pg/enum@1',
+                  nullable: false,
+                  typeRef: 'status',
+                },
               },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
-        },
-        enum: {
-          status: new PostgresEnumType({
-            name: 'status',
-            values: ['active', 'inactive'],
-          }),
+          type: {
+            status: new PostgresEnumType({
+              name: 'status',
+              values: ['active', 'inactive'],
+            }),
+          },
         },
       });
       const issues: SchemaIssue[] = [
@@ -507,16 +538,18 @@ describe('planIssues', () => {
   describe('index_mismatch', () => {
     it('threads contract index type and options into CreateIndexCall when the index is missing', () => {
       const toContract = makeContract({
-        tables: {
-          doc: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            doc: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [{ columns: ['body'], type: 'gin', options: { fastupdate: false } }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['body'], type: 'gin', options: { fastupdate: false } }],
-            foreignKeys: [],
           },
         },
       });
@@ -550,23 +583,25 @@ describe('planIssues', () => {
 
     it('uses the contract index name when set', () => {
       const toContract = makeContract({
-        tables: {
-          doc: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [
-              {
-                columns: ['body'],
-                name: 'doc_body_bm25_idx',
-                type: 'bm25',
-                options: { key_field: 'id' },
+        entries: {
+          table: {
+            doc: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
               },
-            ],
-            foreignKeys: [],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [
+                {
+                  columns: ['body'],
+                  name: 'doc_body_bm25_idx',
+                  type: 'bm25',
+                  options: { key_field: 'id' },
+                },
+              ],
+              foreignKeys: [],
+            },
           },
         },
       });
@@ -600,16 +635,18 @@ describe('planIssues', () => {
 
     it('falls back to a default index name when the contract index has no name', () => {
       const toContract = makeContract({
-        tables: {
-          doc: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            doc: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [{ columns: ['body'] }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['body'] }],
-            foreignKeys: [],
           },
         },
       });
@@ -645,16 +682,18 @@ describe('planIssues', () => {
   describe('foreign_key_mismatch', () => {
     it('returns foreignKeyConflict when the destination contract lacks a matching FK entry', () => {
       const toContract = makeContract({
-        tables: {
-          order: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              user_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        entries: {
+          table: {
+            order: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                user_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -689,16 +728,18 @@ describe('planIssues', () => {
   describe('strategies override', () => {
     it('bypasses data-safety strategies when strategies: [] is passed', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -733,16 +774,18 @@ describe('planIssues', () => {
   describe('renderTypeScript round-trip', () => {
     it('renders calls to valid TypeScript', () => {
       const toContract = makeContract({
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       });
@@ -780,14 +823,14 @@ describe('planIssues', () => {
 
   describe('missing_schema', () => {
     function makeNamespacedContract(
-      namespaces: Record<string, { tables: Record<string, StorageTableInput> }>,
+      namespaces: Record<string, { entries: { table: Record<string, StorageTableInput> } }>,
     ): Contract<SqlStorage> {
       const nsMap: SqlStorageInput['namespaces'] = {
         [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
         ...Object.fromEntries(
           Object.entries(namespaces).map(([id, ns]) => [
             id,
-            new PostgresSchema({ id, tables: ns.tables }),
+            new PostgresSchema({ id, entries: { table: ns.entries.table, type: {} } }),
           ]),
         ),
       };
@@ -819,7 +862,7 @@ describe('planIssues', () => {
         foreignKeys: [],
       };
       const toContract = makeNamespacedContract({
-        auth: { tables: { user: userTable } },
+        auth: { entries: { table: { user: userTable } } },
       });
       const issues: SchemaIssue[] = [
         {
@@ -855,7 +898,7 @@ describe('planIssues', () => {
     });
 
     it('emits a CreateSchemaCall whose toOp emits CREATE SCHEMA IF NOT EXISTS', () => {
-      const toContract = makeNamespacedContract({ auth: { tables: {} } });
+      const toContract = makeNamespacedContract({ auth: { entries: { table: {} } } });
       const issues: SchemaIssue[] = [
         {
           kind: 'missing_schema',
@@ -901,8 +944,14 @@ describe('planIssues', () => {
           storageHash: coreHash('sha256:multi-namespace-contract'),
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
-            tenant_a: new PostgresSchema({ id: 'tenant_a', tables: { users: userTable } }),
-            tenant_b: new PostgresSchema({ id: 'tenant_b', tables: { users: userTable } }),
+            tenant_a: new PostgresSchema({
+              id: 'tenant_a',
+              entries: { table: { users: userTable }, type: {} },
+            }),
+            tenant_b: new PostgresSchema({
+              id: 'tenant_b',
+              entries: { table: { users: userTable }, type: {} },
+            }),
           },
         }),
         roots: {},

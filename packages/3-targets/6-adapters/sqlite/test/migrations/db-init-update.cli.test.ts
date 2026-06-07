@@ -62,20 +62,22 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            _ext_helper: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                ...(version === 2
-                  ? {
-                      note: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
-                    }
-                  : {}),
+          entries: {
+            table: {
+              _ext_helper: {
+                columns: {
+                  id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                  ...(version === 2
+                    ? {
+                        note: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+                      }
+                    : {}),
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         }),
@@ -448,20 +450,22 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                  email: {
-                    nativeType: 'text',
-                    codecId: HOOKED_CODEC,
-                    nullable: false,
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                    email: {
+                      nativeType: 'text',
+                      codecId: HOOKED_CODEC,
+                      nullable: false,
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [{ columns: ['email'] }],
+                  indexes: [{ columns: ['email'] }],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [{ columns: ['email'] }],
-                indexes: [{ columns: ['email'] }],
-                foreignKeys: [],
               },
             },
           }),

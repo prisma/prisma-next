@@ -77,7 +77,7 @@ withTempDir(({ createTempDir }) => {
         const statusData = parseMigrationStatusJson(statusAuto);
         expect(statusData.ok, 'L.04: ok').toBe(true);
         expect(
-          migrationStatusAppSpace(statusData).targetHash,
+          migrationStatusAppSpace(statusData).targetContract,
           'L.04: target is C3 (contract hash)',
         ).toBe(c3Hash);
 

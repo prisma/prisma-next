@@ -11,13 +11,14 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import {
-  APP_SPACE_ID,
-  type ControlDriverInstance,
-} from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
-import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  PostgresEnumStorageEntry,
+  SqlControlDriverInstance,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   DdlNode,
@@ -36,7 +37,6 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import { postgresColumnsCompatible } from '@prisma-next/target-postgres/column-type-compatibility';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -118,13 +118,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
   /**
-   * Target-supplied compatible-shape relation used under the `external`
-   * control policy. Threading the same relation the migration planner/runner
-   * use keeps runtime verify and migration verify in agreement.
-   */
-  readonly columnsCompatible = postgresColumnsCompatible;
-
-  /**
    * Bridges native `PostgresEnumStorageEntry` IR walks against the Postgres
    * introspection shape (`schema.annotations.pg.storageTypes`). Lets
    * the family-level schema verifier walk enum types without reaching
@@ -177,7 +170,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * parse errors, so we probe before reading.
    */
   async readMarker(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space: string,
   ): Promise<ContractMarkerRecord | null> {
     const result = await this.readMarkerDiscriminated(driver, space);
@@ -185,7 +178,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   async readMarkerDiscriminated(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space: string,
   ): Promise<MarkerReadResult> {
     const markerContext = { space, markerLocation: POSTGRES_MARKER_TABLE };
@@ -199,14 +192,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * map rather than raising "relation does not exist".
    */
   async readAllMarkers(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
     const markerContext = { space: APP_SPACE_ID, markerLocation: POSTGRES_MARKER_TABLE };
     return withMarkerReadErrorHandling(() => this.readAllMarkersResult(driver), markerContext);
   }
 
   private async readAllMarkersResult(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
     const probe = infoSchemaTables
@@ -263,7 +256,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * not exist".
    */
   async readLedger(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space?: string,
   ): Promise<readonly LedgerEntryRecord[]> {
     const ledgerContext = { space: space ?? '*', markerLocation: POSTGRES_LEDGER_TABLE };
@@ -271,7 +264,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   private async readLedgerResult(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space: string | undefined,
   ): Promise<readonly LedgerEntryRecord[]> {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
@@ -323,7 +316,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * `SqlControlAdapter.initMarker` contract.
    */
   async insertMarker(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space: string,
     destination: {
       readonly storageHash: string;
@@ -351,7 +344,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   async initMarker(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space: string,
     destination: {
       readonly storageHash: string;
@@ -394,7 +387,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * `SqlControlAdapter.updateMarker` contract.
    */
   async updateMarker(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space: string,
     expectedFrom: string,
     destination: {
@@ -433,7 +426,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * `SqlControlAdapter.writeLedgerEntry` contract.
    */
   async writeLedgerEntry(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space: string,
     entry: {
       readonly edgeId: string;
@@ -461,7 +454,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   private async assertMarkerTableHasSpaceColumn(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     space: string,
   ): Promise<void> {
     const result = await driver.query<{ column_name: string }>(
@@ -486,7 +479,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     });
   }
 
-  private async readMarkerResult(driver: ControlDriverInstance<'sql', 'postgres'>, space: string) {
+  private async readMarkerResult(driver: SqlControlDriverInstance<'postgres'>, space: string) {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
     const probe = infoSchemaTables
       .select(infoSchemaTables.table_schema)
@@ -539,13 +532,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * Uses batched queries to minimize database round trips (6 queries per
    * schema walked).
    *
-   * @param driver - ControlDriverInstance<'sql', 'postgres'> instance for executing queries
+   * @param driver - SqlControlDriverInstance<'postgres'> instance for executing queries
    * @param contract - Optional contract for contract-guided introspection (multi-namespace walk, filtering)
    * @param schema - Schema name to introspect when no contract is provided (defaults to 'public')
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   async introspect(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     contract?: unknown,
     schema = 'public',
   ): Promise<SqlSchemaIR> {
@@ -579,7 +572,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * `CREATE SCHEMA` before table DDL.
    */
   private async listExistingSchemas(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
   ): Promise<readonly string[]> {
     const result = await driver.query<{ nspname: string }>(
       `SELECT nspname
@@ -600,7 +593,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * table regardless of which namespace it lives in.
    */
   private async introspectNamespaces(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     namespaceIds: readonly string[],
   ): Promise<SqlSchemaIR> {
     const resolvedSchemas = await Promise.all(
@@ -664,7 +657,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * the per-namespace walk.
    */
   private async introspectSchema(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
+    driver: SqlControlDriverInstance<'postgres'>,
     schema: string,
   ): Promise<SqlSchemaIR> {
     // Execute all queries in parallel for efficiency (6 queries instead of 5T+1)
@@ -1077,9 +1070,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   /**
    * Gets the Postgres version from the database.
    */
-  private async getPostgresVersion(
-    driver: ControlDriverInstance<'sql', 'postgres'>,
-  ): Promise<string> {
+  private async getPostgresVersion(driver: SqlControlDriverInstance<'postgres'>): Promise<string> {
     const result = await driver.query<{ version: string }>('SELECT version() AS version', []);
     const versionString = result.rows[0]?.version ?? '';
     // Extract version number from "PostgreSQL 15.1 ..." format

@@ -1,10 +1,10 @@
 import {
-  createMongoControlDriver,
   createMongoRunnerDeps,
   introspectSchema,
-  readMarker,
+  MongoControlAdapterImpl,
 } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import type {
   ControlFamilyInstance,
   MigrationPlan,
@@ -22,6 +22,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
 import { MongoMigrationRunner } from '../src/core/mongo-runner';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -78,7 +80,7 @@ function makeContract(
         __unbound__: {
           id: '__unbound__',
           kind: 'mongo-namespace',
-          collections: storageCollections,
+          entries: { collection: storageCollections },
         },
       },
     },
@@ -125,7 +127,7 @@ function fakeFamily(): ControlFamilyInstance<'mongo', MongoSchemaIR> {
 function makeRunner() {
   return new MongoMigrationRunner(
     createMongoRunnerDeps(
-      createMongoControlDriver(db, client),
+      new MongoControlDriver(db, client),
       MongoDriverImpl.fromDb(db),
       fakeFamily(),
     ),
@@ -160,7 +162,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
 
     expect(result.ok).toBe(true);
 
-    const marker = await readMarker(db, 'app');
+    const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
     expect(marker?.storageHash).toBe('sha256:dest');
 
     const ledgerEntries = await db
@@ -200,7 +202,10 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
       expect((issues as readonly unknown[]).length).toBeGreaterThan(0);
     }
 
-    const markerAfterFailure = await readMarker(db, 'app');
+    const markerAfterFailure = await controlAdapter.readMarker(
+      new MongoControlDriver(db, client),
+      'app',
+    );
     expect(markerAfterFailure).toBeNull();
 
     const ledgerAfterFailure = await db
@@ -224,7 +229,10 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
       expect(recoveryResult.value.operationsExecuted).toBe(0);
     }
 
-    const markerAfterRecovery = await readMarker(db, 'app');
+    const markerAfterRecovery = await controlAdapter.readMarker(
+      new MongoControlDriver(db, client),
+      'app',
+    );
     expect(markerAfterRecovery?.storageHash).toBe('sha256:dest');
 
     const ledgerAfterRecovery = await db
@@ -255,7 +263,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
 
     expect(result.ok).toBe(true);
 
-    const marker = await readMarker(db, 'app');
+    const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
     expect(marker?.storageHash).toBe('sha256:dest');
 
     const ledgerEntries = await db

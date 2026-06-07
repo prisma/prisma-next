@@ -126,10 +126,8 @@ withTempDir(({ createTempDir }) => {
 
         const migration = json?.['migration'] as Record<string, unknown> | undefined;
         expect(migration, 'response carries a migration object').toBeTruthy();
-        expect(migration?.['spaceId'], 'returned space is the app space').toBe('app');
-        expect(migration?.['dirName'], 'returned dirName matches the targeted migration').toBe(
-          dirName,
-        );
+        expect(migration?.['space'], 'returned space is the app space').toBe('app');
+        expect(migration?.['name'], 'returned name matches the targeted migration').toBe(dirName);
       },
       timeouts.typeScriptCompilation,
     );

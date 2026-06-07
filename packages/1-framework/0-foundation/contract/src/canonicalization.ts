@@ -56,6 +56,12 @@ const DOMAIN_MODEL_STORAGE_PATTERN = [
   '*',
   'storage',
 ] as const satisfies PathPattern;
+const STORAGE_NAMESPACE_ENTRIES_PATTERN = [
+  'storage',
+  'namespaces',
+  '*',
+  'entries',
+] as const satisfies PathPattern;
 
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
@@ -122,9 +128,10 @@ function omitDefaults(
         DOMAIN_MODELS_CONTAINER_PATTERN,
       );
       const isRequiredStorageNamespaces = isArrayEqual(currentPath, ['storage', 'namespaces']);
-      const isStorageNamespaceSlot =
-        currentPath.length === 3 &&
-        isArrayEqual([currentPath[0], currentPath[1]], ['storage', 'namespaces']);
+      const isStorageNamespaceEntries = matchesPathPattern(
+        currentPath,
+        STORAGE_NAMESPACE_ENTRIES_PATTERN,
+      );
       const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
       const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
@@ -147,7 +154,7 @@ function omitDefaults(
         !isDomainNamespaceSlot &&
         !isRequiredDomainModels &&
         !isRequiredStorageNamespaces &&
-        !isStorageNamespaceSlot &&
+        !isStorageNamespaceEntries &&
         !isRequiredRoots &&
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&

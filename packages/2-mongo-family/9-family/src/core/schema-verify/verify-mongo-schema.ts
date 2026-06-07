@@ -71,7 +71,7 @@ function resolveMongoCollectionControlPolicy(
   contract: MongoContract,
 ): (collectionName: string) => ControlPolicy {
   const namespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
-  const collections: Record<string, MongoCollection> = namespace?.collections ?? {};
+  const collections: Record<string, MongoCollection> = namespace?.entries.collection ?? {};
   const defaultControlPolicy = contract.defaultControlPolicy;
   return (collectionName: string) =>
     effectiveControlPolicy(collections[collectionName]?.control, defaultControlPolicy);

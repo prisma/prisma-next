@@ -82,7 +82,7 @@ type VOContract = MongoContractWithTypeMaps<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly collections: { readonly users: MongoCollection };
+          readonly entries: { readonly collection: { readonly users: MongoCollection } };
         };
       };
     };
@@ -227,7 +227,7 @@ type VOContractWithFieldTypes = MongoContractWithTypeMaps<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly collections: { readonly users: MongoCollection };
+          readonly entries: { readonly collection: { readonly users: MongoCollection } };
         };
       };
     };
@@ -410,9 +410,11 @@ type ExtContract = MongoContractWithTypeMaps<
         readonly __unbound__: {
           readonly id: '__unbound__';
           readonly kind: 'mongo-namespace';
-          readonly collections: {
-            readonly tasks: MongoCollection;
-            readonly users: MongoCollection;
+          readonly entries: {
+            readonly collection: {
+              readonly tasks: MongoCollection;
+              readonly users: MongoCollection;
+            };
           };
         };
       };

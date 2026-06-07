@@ -64,7 +64,7 @@ describe('arktype-json column round-trip', { timeout: timeouts.spinUpPpgDev }, (
         profile: { name: 'alice', age: 30 },
       });
 
-      const found = await db.orm.Embedding.where((e) => e.id.eq(created.id)).first();
+      const found = await db.orm.Embedding.where({ id: created.id }).first();
       expect(found).not.toBeNull();
       expect(found!.profile).toEqual({ name: 'alice', age: 30 });
     });

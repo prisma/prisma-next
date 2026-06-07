@@ -1,5 +1,5 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import { enumStorageCompoundKey } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
@@ -17,7 +17,7 @@ function includes(fragment: string): (sql: string) => boolean {
 
 function createMockDriver(
   handlers: ReadonlyArray<QueryHandler>,
-): ControlDriverInstance<'sql', 'postgres'> {
+): SqlControlDriverInstance<'postgres'> {
   return {
     familyId: 'sql',
     targetId: 'postgres',
@@ -39,7 +39,7 @@ describe('PostgresControlAdapter', () => {
   describe('introspect', () => {
     it('introspects empty schema', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>() => ({ rows: [] as unknown as Row[] }),
@@ -62,7 +62,7 @@ describe('PostgresControlAdapter', () => {
 
     it('introspects enum storage types', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -107,7 +107,7 @@ describe('PostgresControlAdapter', () => {
     it('introspects schema with tables and columns', async () => {
       const adapter = new PostgresControlAdapter();
       let _queryCallCount = 0;
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -196,7 +196,7 @@ describe('PostgresControlAdapter', () => {
 
     it('handles character varying without length', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -254,7 +254,7 @@ describe('PostgresControlAdapter', () => {
 
     it('handles numeric with precision and scale', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -312,7 +312,7 @@ describe('PostgresControlAdapter', () => {
 
     it('handles numeric with precision only', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -370,7 +370,7 @@ describe('PostgresControlAdapter', () => {
 
     it('handles numeric without precision', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -425,7 +425,7 @@ describe('PostgresControlAdapter', () => {
 
     it('maps json and jsonb columns to native types', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -1067,7 +1067,7 @@ describe('PostgresControlAdapter', () => {
 
     it('skips index rows with null attname', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -1149,7 +1149,7 @@ describe('PostgresControlAdapter', () => {
 
     it('handles custom schema name', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -1179,7 +1179,7 @@ describe('PostgresControlAdapter', () => {
       'handles version string without match',
       async () => {
         const adapter = new PostgresControlAdapter();
-        const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+        const mockDriver: SqlControlDriverInstance<'postgres'> = {
           familyId: 'sql',
           targetId: 'postgres',
           query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -1208,7 +1208,7 @@ describe('PostgresControlAdapter', () => {
 
     it('handles missing version result', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -1233,7 +1233,7 @@ describe('PostgresControlAdapter', () => {
 
     it('handles table without primary key', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -1288,7 +1288,7 @@ describe('PostgresControlAdapter', () => {
 
     it('handles primary key without constraint name', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {
@@ -1697,7 +1697,7 @@ describe('PostgresControlAdapter', () => {
 
     it('throws PN-RUN-3006 when marker read query fails', async () => {
       const adapter = new PostgresControlAdapter();
-      const driver: ControlDriverInstance<'sql', 'postgres'> = {
+      const driver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
         query: async <Row = Record<string, unknown>>(sql: string) => {

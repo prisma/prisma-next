@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const emptyNamespacedStorage = () => ({
   namespaces: {
-    __unbound__: { id: '__unbound__' as const, tables: {} },
+    __unbound__: { id: '__unbound__' as const, entries: { table: {} } },
   },
 });
 

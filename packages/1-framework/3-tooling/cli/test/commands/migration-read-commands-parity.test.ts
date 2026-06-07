@@ -11,14 +11,23 @@ import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { createSqlContract } from '@prisma-next/test-utils';
+import { type } from 'arktype';
 import { join } from 'pathe';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  type MigrationGraphJsonResult,
+  migrationCheckResultSchema,
+  migrationGraphJsonResultSchema,
+  migrationListResultSchema,
+  migrationLogResultSchema,
+  migrationShowResultSchema,
+  migrationStatusJsonResultSchema,
+} from '../../src/commands/json/schemas';
 import {
   createMigrationCheckCommand,
   enumerateCheckSpaces,
   runMigrationCheck,
 } from '../../src/commands/migration-check';
-import type { MigrationGraphJsonResult } from '../../src/commands/migration-graph';
 import {
   createMigrationGraphCommand,
   formatMigrationGraphHumanOutput,
@@ -42,7 +51,6 @@ import {
 import {
   createMigrationStatusCommand,
   formatStatusHumanOutput,
-  type MigrationStatusResult,
 } from '../../src/commands/migration-status';
 import { deriveStatusEdgeAnnotations } from '../../src/commands/migration-status-overlay';
 import * as configLoader from '../../src/config-loader';
@@ -79,7 +87,7 @@ const TEST_APP_CONTRACT = createSqlContract({
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: { user: { columns: { id: {} } } },
+        entries: { table: { user: { columns: { id: {} } } } },
       },
     },
   },
@@ -179,7 +187,7 @@ function assertIndentedTreesUnderSpaceHeadings(output: string): void {
 }
 
 function multiSpaceGlobalWidths(
-  spaces: readonly { readonly spaceId: string; readonly migrations: readonly unknown[] }[],
+  spaces: readonly { readonly space: string; readonly migrations: readonly unknown[] }[],
   aggregate: Awaited<ReturnType<typeof loadContractSpaceAggregate>>,
   liveContractHash: string,
   showSpaceHeadings: boolean,
@@ -193,7 +201,7 @@ function multiSpaceGlobalWidths(
   const inputs = spaces
     .filter((space) => space.migrations.length > 0)
     .map((space) => ({
-      graph: aggregate.space(space.spaceId)!.graph(),
+      graph: aggregate.space(space.space)!.graph(),
       liveContractHash,
     }));
   if (inputs.length === 0) {
@@ -307,8 +315,9 @@ describe('migration read commands pretty parity', () => {
       formatMigrationGraphHumanOutput({
         ok: true,
         graph: aggregate.app.graph(),
+        spaces: [],
         treeSections: listResult.value.spaces.map((spaceEntry) => {
-          const member = aggregate.space(spaceEntry.spaceId)!;
+          const member = aggregate.space(spaceEntry.space)!;
           const tree =
             spaceEntry.migrations.length === 0
               ? ''
@@ -322,7 +331,7 @@ describe('migration read commands pretty parity', () => {
                   ...globalWidths,
                 });
           return {
-            spaceId: spaceEntry.spaceId,
+            space: spaceEntry.space,
             tree:
               showSpaceHeadings && tree.length > 0
                 ? indentMigrationGraphTreeBlock(tree, '  ')
@@ -365,12 +374,12 @@ describe('migration read commands pretty parity', () => {
       showSpaceHeadings,
     );
     const treeSections = listResult.value.spaces.map((spaceEntry) => {
-      const member = aggregate.space(spaceEntry.spaceId)!;
+      const member = aggregate.space(spaceEntry.space)!;
       const graph = member.graph();
       const targetHash =
-        spaceEntry.spaceId === 'postgis'
+        spaceEntry.space === 'postgis'
           ? HASH_POSTGIS
-          : spaceEntry.spaceId === 'app'
+          : spaceEntry.space === 'app'
             ? HASH_804e018
             : (graph.nodes.values().next().value ?? EMPTY_CONTRACT_HASH);
       const statusOverlay = deriveStatusEdgeAnnotations({
@@ -394,15 +403,15 @@ describe('migration read commands pretty parity', () => {
               ...globalWidths,
             });
       return {
-        spaceId: spaceEntry.spaceId,
+        space: spaceEntry.space,
         tree:
           showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree,
         showHeading: showSpaceHeadings,
       };
     });
 
-    const statusResult: MigrationStatusResult = {
-      ok: true,
+    const statusResult = {
+      ok: true as const,
       spaces: [],
       summary: '3 pending — run `prisma-next migrate --to 804e018`',
       diagnostics: [],
@@ -539,7 +548,7 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     expect(Array.isArray(envelope.spaces)).toBe(true);
   });
 
-  it('migration graph --json emits { ok: true, nodes: [...], edges: [...], summary }', async () => {
+  it('migration graph --json emits { ok: true, spaces: [{ contracts, migrations }], summary }', async () => {
     const { cwd } = await buildMultiSpaceFixture();
     const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
     loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
@@ -553,10 +562,23 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     }
 
     const envelope = parseJsonObjectFromCliCapture(consoleOutput) as MigrationGraphJsonResult;
+    expect(migrationGraphJsonResultSchema(envelope) instanceof type.errors).toBe(false);
     expect(envelope.ok).toBe(true);
-    expect(Array.isArray(envelope.nodes)).toBe(true);
-    expect(Array.isArray(envelope.edges)).toBe(true);
-    expect(typeof envelope.summary).toBe('string');
+    expect(envelope.spaces.length).toBeGreaterThan(1);
+    const appSpace = envelope.spaces.find((space) => space.space === 'app');
+    expect(appSpace).toBeDefined();
+    expect(Array.isArray(appSpace?.contracts)).toBe(true);
+    expect(Array.isArray(appSpace?.migrations)).toBe(true);
+    expect(appSpace?.migrations[0]).toMatchObject({
+      name: expect.any(String),
+      hash: expect.any(String),
+      toContract: expect.any(String),
+    });
+    expect(
+      appSpace?.migrations[0] !== undefined &&
+        (appSpace.migrations[0].fromContract === null ||
+          typeof appSpace.migrations[0].fromContract === 'string'),
+    ).toBe(true);
   });
 
   it('migration status --json (with --from) emits { ok: true, spaces: [...] }', async () => {
@@ -590,17 +612,16 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     // (removing `ok` or removing/renaming `migration`) fails at typecheck.
     const sample: MigrationShowResult = {
       ok: true,
+      summary: 'Migration 20260101T0000_init in app: 0 operation(s)',
       migration: {
-        spaceId: 'app',
-        dirName: '20260101T0000_init',
-        dirPath: 'migrations/app/20260101T0000_init',
-        from: null,
-        to: 'sha256:a',
-        migrationHash: 'sha256:edge',
+        space: 'app',
+        name: '20260101T0000_init',
+        fromContract: null,
+        toContract: 'sha256:a',
+        hash: 'sha256:edge',
         createdAt: '2026-01-01T00:00:00.000Z',
         operations: [],
         preview: { statements: [] },
-        summary: '0 operation(s)',
       },
     };
     const parsed = JSON.parse(JSON.stringify(sample)) as { ok: boolean; migration: unknown };
@@ -633,14 +654,23 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
     expect(typeof envelope.summary).toBe('string');
   });
 
-  it('migration log --json emits { ok: true, entries: [...] } (type-shape lock)', () => {
+  it('migration log --json emits { ok: true, records: [...], summary } (type-shape lock)', () => {
     // The runtime JSON path is pinned by read-commands-json-golden.test.ts.
     // This assertion locks the exported type's shape so a type-level regression
-    // (removing `ok` or renaming `entries`) fails immediately at typecheck.
-    const sample: MigrationLogResult = { ok: true, entries: [] };
-    const parsed = JSON.parse(JSON.stringify(sample)) as { ok: boolean; entries: unknown[] };
+    // (removing `ok` or renaming `records`) fails immediately at typecheck.
+    const sample: MigrationLogResult = {
+      ok: true,
+      records: [],
+      summary: '0 migration(s) applied',
+    };
+    const parsed = JSON.parse(JSON.stringify(sample)) as {
+      ok: boolean;
+      records: unknown[];
+      summary: string;
+    };
     expect(parsed.ok).toBe(true);
-    expect(Array.isArray(parsed.entries)).toBe(true);
+    expect(Array.isArray(parsed.records)).toBe(true);
+    expect(typeof parsed.summary).toBe('string');
     // `ok` must be the discriminator field — no bare-array fallback.
     expect(Array.isArray(parsed)).toBe(false);
   });
@@ -820,5 +850,331 @@ describe('migration check multi-space parity (D6 lock)', () => {
     expect(envelope.ok).toBe(false);
     expect(typeof envelope.code).toBe('string');
     expect(envelope.meta?.['code']).toBe('MIGRATION.SPACE_NOT_FOUND');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D8 lock: cross-command JSON consistency
+//   1. Schema validation — each verb's --json output validates against its
+//      exported arktype schema.
+//   2. Field-name consistency — retired names are absent from all outputs.
+//   3. Empty-start rule — fromContract is null (never "sha256:empty") for the
+//      first migration in a chain.
+//   4. ok mirrors exit code — ok:true ⇒ exit 0; ok:false ⇒ non-zero exit.
+//   5. Space topology — list/graph/status nest under spaces[]; log is a flat
+//      records[] tagged with space; check is flat failures[]; show is a
+//      single migration object with a space field.
+// ---------------------------------------------------------------------------
+
+const RETIRED_NAMES = [
+  'dirName',
+  'spaceId',
+  'migrationName',
+  'migrationHash',
+  'markerHash',
+  'targetHash',
+] as const;
+
+function assertNoRetiredNames(json: unknown, label: string): void {
+  const serialized = JSON.stringify(json);
+  for (const retired of RETIRED_NAMES) {
+    const pattern = new RegExp(`"${retired}"\\s*:`);
+    expect(
+      pattern.test(serialized),
+      `${label} output must not contain retired field name "${retired}"`,
+    ).toBe(false);
+  }
+  expect(serialized).not.toMatch(/"nodes"\s*:/);
+  expect(serialized).not.toMatch(/"edges"\s*:/);
+}
+
+describe('migration read-verb --json consistency lock (D8)', () => {
+  const originalCwd = process.cwd();
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+  });
+
+  it('list --json validates against migrationListResultSchema and has no retired names', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await executeCommand(createMigrationListCommand(), ['--json']);
+    } finally {
+      cleanup();
+    }
+
+    const output = parseJsonObjectFromCliCapture(consoleOutput);
+    expect(migrationListResultSchema(output) instanceof type.errors).toBe(false);
+    assertNoRetiredNames(output, 'list');
+
+    const result = output as { ok: boolean; spaces: unknown[] };
+    expect(result.ok).toBe(true);
+    expect(Array.isArray(result.spaces)).toBe(true);
+  });
+
+  it('graph --json validates against migrationGraphJsonResultSchema, no retired names, fromContract null at empty-start', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await executeCommand(createMigrationGraphCommand(), ['--json']);
+    } finally {
+      cleanup();
+    }
+
+    const output = parseJsonObjectFromCliCapture(consoleOutput) as MigrationGraphJsonResult;
+    expect(migrationGraphJsonResultSchema(output) instanceof type.errors).toBe(false);
+    assertNoRetiredNames(output, 'graph');
+
+    const appSpace = output.spaces.find((s) => s.space === 'app');
+    expect(appSpace).toBeDefined();
+
+    const firstMigration = appSpace?.migrations[0];
+    expect(firstMigration).toBeDefined();
+    expect(firstMigration?.fromContract).toBeNull();
+
+    const nonFirstMigration = appSpace?.migrations.find((m) => m.fromContract !== null);
+    expect(nonFirstMigration?.fromContract).toMatch(/^sha256:/);
+
+    for (const space of output.spaces) {
+      for (const migration of space.migrations) {
+        expect(
+          migration.fromContract,
+          `migration ${migration.name} in space ${space.space}: fromContract must be null or a real hash, never "sha256:empty"`,
+        ).not.toBe('sha256:empty');
+      }
+    }
+  });
+
+  it('status --json (with --from) validates against migrationStatusJsonResultSchema and has no retired names', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await executeCommand(createMigrationStatusCommand(), [
+        '--json',
+        '--from',
+        EMPTY_CONTRACT_HASH,
+      ]);
+    } finally {
+      cleanup();
+    }
+
+    const output = parseJsonObjectFromCliCapture(consoleOutput);
+    expect(migrationStatusJsonResultSchema(output) instanceof type.errors).toBe(false);
+    assertNoRetiredNames(output, 'status');
+
+    const result = output as { ok: boolean; spaces: unknown[] };
+    expect(result.ok).toBe(true);
+    expect(Array.isArray(result.spaces)).toBe(true);
+  });
+
+  it('log --json result validates against migrationLogResultSchema and has no retired names', () => {
+    const sample: { ok: true; summary: string; records: unknown[] } = {
+      ok: true,
+      records: [
+        {
+          space: 'app',
+          name: '20260101T0000_init',
+          hash: 'sha256:abc',
+          fromContract: null,
+          toContract: 'sha256:def',
+          appliedAt: '2026-01-01T00:00:00.000Z',
+          operationCount: 1,
+        },
+      ],
+      summary: '1 migration(s) applied',
+    };
+
+    expect(migrationLogResultSchema(sample) instanceof type.errors).toBe(false);
+    assertNoRetiredNames(sample, 'log');
+
+    expect(Array.isArray(sample.records)).toBe(true);
+    const record = sample.records[0] as { space: string; fromContract: string | null };
+    expect(typeof record.space).toBe('string');
+    expect(record.fromContract).toBeNull();
+  });
+
+  it('show --json result validates against migrationShowResultSchema and has no retired names', () => {
+    const sample = {
+      ok: true,
+      summary: 'Migration 20260101T0000_init in app: 1 operation(s)',
+      migration: {
+        space: 'app',
+        name: '20260101T0000_init',
+        hash: 'sha256:edge',
+        fromContract: null,
+        toContract: 'sha256:def',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        operations: [
+          { id: 'table.users', label: 'Create table users', operationClass: 'additive' },
+        ],
+        preview: { statements: [] },
+      },
+    };
+
+    expect(migrationShowResultSchema(sample) instanceof type.errors).toBe(false);
+    assertNoRetiredNames(sample, 'show');
+
+    expect(typeof sample.migration.space).toBe('string');
+    expect(Array.isArray(sample.migration.operations)).toBe(true);
+    expect(Array.isArray(sample)).toBe(false);
+  });
+
+  it('check --json validates against migrationCheckResultSchema and has no retired names', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput, cleanup } = setupCommandMocks();
+    try {
+      await runAndCaptureExit(() => executeCommand(createMigrationCheckCommand(), ['--json']));
+    } finally {
+      cleanup();
+    }
+
+    const output = parseJsonObjectFromCliCapture(consoleOutput);
+    expect(migrationCheckResultSchema(output) instanceof type.errors).toBe(false);
+    assertNoRetiredNames(output, 'check');
+
+    const result = output as { ok: boolean; failures: unknown[]; summary: string };
+    expect(typeof result.ok).toBe('boolean');
+    expect(Array.isArray(result.failures)).toBe(true);
+    expect(typeof result.summary).toBe('string');
+  });
+
+  it('ok:true ⇒ exit 0 for list --json; ok:false ⇒ non-zero exit for check --json with failures', async () => {
+    const { cwd, migrationsDir } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const { consoleOutput: listOutput, cleanup: cleanupList } = setupCommandMocks();
+    let listExitCode: number;
+    try {
+      listExitCode = await executeCommand(createMigrationListCommand(), ['--json']);
+    } finally {
+      cleanupList();
+    }
+
+    const listResult = parseJsonObjectFromCliCapture(listOutput) as { ok: boolean };
+    expect(listResult.ok).toBe(true);
+    expect(listExitCode).toBe(0);
+
+    // Plant a dangling ref on disk so the real CLI check command will find a failure.
+    await writeRefFor(migrationsDir, {
+      spaceId: 'app',
+      name: 'phantom',
+      hash: `sha256:${'dead'.repeat(16)}`,
+    });
+
+    const { consoleOutput: checkOutput, cleanup: cleanupCheck } = setupCommandMocks();
+    let checkExitCode: number;
+    try {
+      checkExitCode = await runAndCaptureExit(() =>
+        executeCommand(createMigrationCheckCommand(), ['--json']),
+      );
+    } finally {
+      cleanupCheck();
+    }
+
+    expect(checkExitCode).not.toBe(0);
+    const checkJson = parseJsonObjectFromCliCapture(checkOutput);
+    expect(migrationCheckResultSchema(checkJson) instanceof type.errors).toBe(false);
+    const checkResult = checkJson as { ok: boolean; failures: unknown[] };
+    expect(checkResult.ok).toBe(false);
+    expect(checkResult.failures.length).toBeGreaterThan(0);
+  });
+
+  it('space topology: list/graph/status have spaces[]; log has records[]; check has failures[]; show has migration.space', async () => {
+    const { cwd } = await buildMultiSpaceFixture();
+    const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig');
+    loadConfigSpy.mockResolvedValue(makeOfflineConfig(cwd));
+    process.chdir(cwd);
+
+    const runAndCapture = async (
+      factory: () => ReturnType<typeof createMigrationListCommand>,
+      args: string[],
+    ): Promise<unknown> => {
+      const { consoleOutput, cleanup } = setupCommandMocks();
+      try {
+        await runAndCaptureExit(() => executeCommand(factory(), args));
+      } finally {
+        cleanup();
+      }
+      return parseJsonObjectFromCliCapture(consoleOutput);
+    };
+
+    const listOut = (await runAndCapture(createMigrationListCommand, ['--json'])) as {
+      spaces: unknown[];
+    };
+    const graphOut = (await runAndCapture(createMigrationGraphCommand, ['--json'])) as {
+      spaces: unknown[];
+    };
+    const statusOut = (await runAndCapture(createMigrationStatusCommand, [
+      '--json',
+      '--from',
+      EMPTY_CONTRACT_HASH,
+    ])) as { spaces: unknown[] };
+    const checkOut = (await runAndCapture(createMigrationCheckCommand, ['--json'])) as {
+      failures: unknown[];
+    };
+
+    expect(Array.isArray(listOut.spaces)).toBe(true);
+    expect(Array.isArray(graphOut.spaces)).toBe(true);
+    expect(Array.isArray(statusOut.spaces)).toBe(true);
+    expect(Array.isArray(checkOut.failures)).toBe(true);
+    expect('records' in listOut).toBe(false);
+    expect('spaces' in checkOut).toBe(false);
+
+    const logSample: { ok: true; records: Array<Record<string, unknown>>; summary: string } = {
+      ok: true,
+      records: [
+        {
+          space: 'app',
+          name: '20260101T0000_init',
+          hash: 'sha256:abc',
+          fromContract: null,
+          toContract: 'sha256:def',
+          appliedAt: '2026-01-01T00:00:00.000Z',
+          operationCount: 1,
+        },
+      ],
+      summary: '1 migration(s) applied',
+    };
+    expect(Array.isArray(logSample.records)).toBe(true);
+    expect(typeof logSample.records[0]?.['space']).toBe('string');
+    expect('spaces' in logSample).toBe(false);
+
+    const showSample = {
+      ok: true,
+      summary: 'Migration in app',
+      migration: {
+        space: 'app',
+        name: 'x',
+        hash: 'sha256:a',
+        fromContract: null,
+        toContract: 'sha256:b',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        operations: [],
+        preview: { statements: [] },
+      },
+    };
+    expect(typeof showSample.migration.space).toBe('string');
+    expect('spaces' in showSample).toBe(false);
+    expect('records' in showSample).toBe(false);
   });
 });

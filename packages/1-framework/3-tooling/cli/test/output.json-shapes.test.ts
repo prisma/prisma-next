@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { MigrationStatusResult } from '../src/commands/json/schemas';
 import type { MigrateResult } from '../src/commands/migrate';
-import type { MigrationStatusResult } from '../src/commands/migration-status';
 
 describe('MigrateResult JSON shape (aggregate-walking)', () => {
   it('pins keys for an apply that touched both an extension and the app space', () => {
@@ -81,15 +81,15 @@ describe('MigrationStatusResult JSON shape', () => {
       ok: true,
       spaces: [
         {
-          spaceId: 'app',
-          markerHash: 'sha256:marker',
-          targetHash: 'sha256:leaf',
+          space: 'app',
+          currentContract: 'sha256:marker',
+          targetContract: 'sha256:leaf',
           migrations: [
             {
-              dirName: '20260101T1200_init',
-              from: 'sha256:a',
-              to: 'sha256:b',
-              migrationHash: 'sha256:mid',
+              name: '20260101T1200_init',
+              hash: 'sha256:mid',
+              fromContract: 'sha256:a',
+              toContract: 'sha256:b',
               operationCount: 3,
               createdAt: '2026-01-01T00:00:00.000Z',
               refs: [],
@@ -101,7 +101,6 @@ describe('MigrationStatusResult JSON shape', () => {
       ],
       summary: 'up to date',
       diagnostics: [],
-      treeSections: [],
     };
     expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
       [
@@ -109,14 +108,13 @@ describe('MigrationStatusResult JSON shape', () => {
         "ok",
         "spaces",
         "summary",
-        "treeSections",
       ]
     `);
     expect(Object.keys(result.spaces[0]!).sort()).toEqual([
-      'markerHash',
+      'currentContract',
       'migrations',
-      'spaceId',
-      'targetHash',
+      'space',
+      'targetContract',
     ]);
   });
 });

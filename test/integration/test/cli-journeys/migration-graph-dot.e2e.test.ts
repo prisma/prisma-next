@@ -47,7 +47,7 @@ withTempDir(({ createTempDir }) => {
 
         // Negative: the auto-JSON payload shape must NOT appear.
         expect(graphDot.stdout, 'no JSON envelope ok-field').not.toContain('"ok": true');
-        expect(graphDot.stdout, 'no JSON nodes array').not.toContain('"nodes":');
+        expect(graphDot.stdout, 'no JSON spaces array').not.toContain('"spaces":');
 
         // Sanity: bare `migration graph` in the same non-TTY mode still
         // produces JSON (auto-JSON default), proving the precedence fix is
@@ -55,7 +55,7 @@ withTempDir(({ createTempDir }) => {
         const graphJson = await runMigrationGraph(ctx, [], { isTTY: false });
         expect(graphJson.exitCode, 'graph json exit code').toBe(0);
         expect(graphJson.stdout, 'auto-JSON ok-field').toContain('"ok": true');
-        expect(graphJson.stdout, 'auto-JSON nodes array').toContain('"nodes":');
+        expect(graphJson.stdout, 'auto-JSON spaces array').toContain('"spaces":');
       },
       timeouts.typeScriptCompilation,
     );

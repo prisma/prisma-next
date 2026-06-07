@@ -161,11 +161,14 @@ describe('mutation-executor', () => {
           ...contract.storage.namespaces,
           public: {
             ...publicNs,
-            tables: {
-              ...publicNs.tables,
-              users: {
-                ...publicNs.tables.users,
-                primaryKey: { columns: ['pk_id'] },
+            entries: {
+              ...publicNs.entries,
+              table: {
+                ...publicNs.entries.table,
+                users: {
+                  ...publicNs.entries.table.users,
+                  primaryKey: { columns: ['pk_id'] },
+                },
               },
             },
           },

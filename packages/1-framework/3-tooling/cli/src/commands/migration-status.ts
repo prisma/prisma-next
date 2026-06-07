@@ -55,9 +55,15 @@ import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { shouldShowLegend, validateLegendOptions } from '../utils/legend';
-import type { StatusDiagnostic } from '../utils/migration-types';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import type {
+  MigrationStatusEntry,
+  MigrationStatusResult,
+  MigrationStatusSpace,
+  StatusDiagnosticJson,
+} from './json/schemas';
+import { migrationStatusJsonResultSchema } from './json/schemas';
 import {
   listRefsByContractHash,
   migrationSpaceListEntriesFromAggregate,
@@ -69,7 +75,16 @@ import {
   statusForMigrationHash,
 } from './migration-status-overlay';
 
-interface MigrationStatusOptions extends CommonCommandOptions {
+export type { StatusRef } from '../utils/migration-types';
+export type {
+  MigrationStatusEntry,
+  MigrationStatusResult,
+  MigrationStatusSpace,
+  StatusDiagnosticJson,
+};
+export { migrationStatusJsonResultSchema };
+
+export interface MigrationStatusOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly to?: string;
@@ -79,33 +94,19 @@ interface MigrationStatusOptions extends CommonCommandOptions {
   readonly ascii?: boolean;
 }
 
-export interface MigrationStatusMigrationEntry extends MigrationListEntry {
-  readonly status: 'applied' | 'pending' | null;
-}
-
-export interface MigrationStatusSpaceResult {
-  readonly spaceId: string;
-  readonly markerHash: string | null;
-  readonly targetHash: string;
-  readonly migrations: readonly MigrationStatusMigrationEntry[];
-}
-
-export interface MigrationStatusResult {
-  readonly ok: true;
-  readonly spaces: readonly MigrationStatusSpaceResult[];
-  readonly summary: string;
-  readonly missingInvariantsLine?: string;
-  readonly diagnostics: readonly StatusDiagnostic[];
-  readonly treeSections: readonly MigrationStatusTreeSection[];
-}
-
 export interface MigrationStatusTreeSection {
-  readonly spaceId: string;
+  readonly space: string;
   readonly tree: string;
   readonly showHeading: boolean;
 }
 
-export type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
+interface MigrationStatusCommandResult {
+  readonly ok: true;
+  readonly spaces: readonly MigrationStatusSpace[];
+  readonly summary: string;
+  readonly diagnostics: readonly StatusDiagnosticJson[];
+  readonly treeSections: readonly MigrationStatusTreeSection[];
+}
 
 function shortDisplayHash(hash: string): string {
   const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
@@ -119,10 +120,10 @@ function resolveTarget(contractHash: string, activeRefHash: string | undefined):
 function buildStatusMigrations(
   listMigrations: readonly MigrationListEntry[],
   annotations: ReadonlyMap<string, MigrationEdgeAnnotation>,
-): readonly MigrationStatusMigrationEntry[] {
+): readonly MigrationStatusEntry[] {
   return listMigrations.map((migration) => ({
     ...migration,
-    status: statusForMigrationHash(migration.migrationHash, annotations),
+    status: statusForMigrationHash(migration.hash, annotations),
   }));
 }
 
@@ -162,7 +163,7 @@ function renderSpaceTree(args: {
   });
 }
 
-function countPending(migrations: readonly MigrationStatusMigrationEntry[]): number {
+function countPending(migrations: readonly MigrationStatusEntry[]): number {
   return migrations.filter((m) => m.status === 'pending').length;
 }
 
@@ -202,7 +203,10 @@ export function buildStatusHeadline(args: {
   return `${args.pendingCount} pending — run \`prisma-next migrate --to ${shortDisplayHash(args.targetHash)}\``;
 }
 
-export function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): string {
+export function formatStatusSummary(
+  result: MigrationStatusCommandResult,
+  colorize: boolean,
+): string {
   const c = (fn: (s: string) => string, s: string) => (colorize ? fn(s) : s);
   const lines: string[] = [];
   const pendingTotal = result.spaces.reduce(
@@ -217,17 +221,23 @@ export function formatStatusSummary(result: MigrationStatusResult, colorize: boo
   } else {
     lines.push(result.summary);
   }
-  if (result.missingInvariantsLine !== undefined) {
-    lines.push(c(dim, result.missingInvariantsLine));
+  const missingInvariantsDiagnostic = result.diagnostics.find(
+    (d) => d.code === 'MIGRATION.MISSING_INVARIANTS',
+  );
+  if (missingInvariantsDiagnostic !== undefined) {
+    lines.push(c(dim, missingInvariantsDiagnostic.message));
   }
   return lines.join('\n');
 }
 
-export function formatStatusHumanOutput(result: MigrationStatusResult, colorize: boolean): string {
+export function formatStatusHumanOutput(
+  result: MigrationStatusCommandResult,
+  colorize: boolean,
+): string {
   const sections: string[] = [];
   for (const section of result.treeSections) {
     if (section.showHeading) {
-      sections.push(`${section.spaceId}:`);
+      sections.push(`${section.space}:`);
     }
     if (section.tree.length > 0) {
       sections.push(section.tree);
@@ -259,11 +269,11 @@ async function readMarkersAndLedgers(args: {
   return { markersBySpace, ledgersBySpace };
 }
 
-async function executeMigrationStatusCommand(
+export async function executeMigrationStatusCommand(
   options: MigrationStatusOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<Result<MigrationStatusResult, CliStructuredError>> {
+): Promise<Result<MigrationStatusCommandResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
   const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
@@ -296,7 +306,7 @@ async function executeMigrationStatusCommand(
     throw error;
   }
 
-  const diagnostics: StatusDiagnostic[] = [];
+  const diagnostics: StatusDiagnosticJson[] = [];
   let contractHash: string = EMPTY_CONTRACT_HASH;
   try {
     const envelope = await readContractEnvelope(config);
@@ -416,7 +426,7 @@ async function executeMigrationStatusCommand(
       connected = true;
       const read = await readMarkersAndLedgers({
         client,
-        spaceIds: scopedSpaces.map((s) => s.spaceId),
+        spaceIds: scopedSpaces.map((s) => s.space),
       });
       markersBySpace = new Map(read.markersBySpace);
       ledgersBySpace = new Map(read.ledgersBySpace);
@@ -458,7 +468,7 @@ async function executeMigrationStatusCommand(
   const glyphMode = ui.resolveGlyphMode(options.ascii === true);
   const colorize = flags.color !== false;
 
-  const statusSpaces: MigrationStatusSpaceResult[] = [];
+  const statusSpaces: MigrationStatusSpace[] = [];
   const treeSections: MigrationStatusTreeSection[] = [];
   let markerDiverged = false;
   let markerCannotReachTarget = false;
@@ -469,7 +479,7 @@ async function executeMigrationStatusCommand(
     ? scopedSpaces
         .filter((spaceEntry) => spaceEntry.migrations.length > 0)
         .map((spaceEntry) => ({
-          graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+          graph: aggregate.space(spaceEntry.space)!.graph(),
           liveContractHash: contractHash,
         }))
     : [];
@@ -481,18 +491,18 @@ async function executeMigrationStatusCommand(
     globalLayoutInputs.length > 0 ? computeGlobalMaxDirNameWidth(globalLayoutInputs) : undefined;
 
   for (const spaceEntry of scopedSpaces) {
-    const member = aggregate.space(spaceEntry.spaceId);
+    const member = aggregate.space(spaceEntry.space);
     if (member === undefined) {
       continue;
     }
     const graph = member.graph();
     const spaceContractHash = member.contract().storage.storageHash;
     const targetHash = resolveTarget(spaceContractHash, activeRefHash);
-    if (spaceEntry.spaceId === aggregate.app.spaceId) {
+    if (spaceEntry.space === aggregate.app.spaceId) {
       headlineTargetHash = targetHash;
     }
 
-    const markerRecord = markersBySpace.get(spaceEntry.spaceId);
+    const markerRecord = markersBySpace.get(spaceEntry.space);
     const markerHash = usingFromOverride
       ? fromOverrideHash
       : (markerRecord?.storageHash ?? undefined);
@@ -523,7 +533,7 @@ async function executeMigrationStatusCommand(
       });
     }
 
-    const ledger = ledgersBySpace.get(spaceEntry.spaceId) ?? [];
+    const ledger = ledgersBySpace.get(spaceEntry.space) ?? [];
     const appliedHashes = showAppliedOverlay ? appliedHashesFromLedger(ledger) : new Set<string>();
 
     const annotations = deriveStatusEdgeAnnotations({
@@ -552,27 +562,31 @@ async function executeMigrationStatusCommand(
     totalPending += pending;
 
     statusSpaces.push({
-      spaceId: spaceEntry.spaceId,
-      markerHash: markerHash ?? null,
-      targetHash,
-      migrations,
+      space: spaceEntry.space,
+      currentContract: markerHash ?? null,
+      targetContract: targetHash,
+      migrations: [...migrations],
     });
     const displayTree =
       showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;
     treeSections.push({
-      spaceId: spaceEntry.spaceId,
+      space: spaceEntry.space,
       tree: displayTree,
       showHeading: showSpaceHeadings,
     });
   }
 
-  let missingInvariantsLine: string | undefined;
   if (connected && requiredInvariants.length > 0) {
     const markerInvariants = markersBySpace.get(aggregate.app.spaceId)?.invariants ?? [];
     const markerSet = new Set(markerInvariants);
     const missing = requiredInvariants.filter((id) => !markerSet.has(id));
     if (missing.length > 0) {
-      missingInvariantsLine = `missing invariant(s): ${missing.join(', ')}`;
+      diagnostics.push({
+        code: 'MIGRATION.MISSING_INVARIANTS',
+        ...ifDefined('ref', activeRefName),
+        invariants: missing,
+        message: `missing invariant(s): ${missing.join(', ')}`,
+      });
       if (activeRefHash !== undefined) {
         const originHash =
           markersBySpace.get(aggregate.app.spaceId)?.storageHash ?? EMPTY_CONTRACT_HASH;
@@ -618,7 +632,6 @@ async function executeMigrationStatusCommand(
       summary: 'No migrations found',
       diagnostics,
       treeSections,
-      ...ifDefined('missingInvariantsLine', missingInvariantsLine),
     });
   }
 
@@ -628,7 +641,6 @@ async function executeMigrationStatusCommand(
     summary,
     diagnostics,
     treeSections,
-    ...ifDefined('missingInvariantsLine', missingInvariantsLine),
   });
 }
 
@@ -684,23 +696,13 @@ export function createMigrationStatusCommand(): Command {
 
       const exitCode = handleResult(result, flags, ui, (statusResult) => {
         if (flags.json) {
-          ui.output(
-            JSON.stringify(
-              {
-                ok: true,
-                spaces: statusResult.spaces,
-                summary: statusResult.summary,
-                ...(statusResult.diagnostics.length > 0
-                  ? { diagnostics: statusResult.diagnostics }
-                  : {}),
-                ...(statusResult.missingInvariantsLine
-                  ? { missingInvariants: statusResult.missingInvariantsLine }
-                  : {}),
-              },
-              null,
-              2,
-            ),
-          );
+          const jsonResult: MigrationStatusResult = {
+            ok: true,
+            spaces: [...statusResult.spaces],
+            summary: statusResult.summary,
+            diagnostics: [...statusResult.diagnostics],
+          };
+          ui.output(JSON.stringify(jsonResult, null, 2));
         } else if (!flags.quiet) {
           ui.output(formatStatusHumanOutput(statusResult, flags.color !== false));
         }

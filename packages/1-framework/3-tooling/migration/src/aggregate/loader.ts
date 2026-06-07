@@ -92,7 +92,13 @@ async function loadAppSpace(
 
   // The app head ref is synthesised from the live contract, so there is
   // no on-disk head.json to be missing or corrupt for it.
-  return { member, problems, refProblems, headRefProblem: null, isApp: true };
+  return {
+    member,
+    problems,
+    refProblems,
+    headRefProblem: null,
+    isApp: true,
+  };
 }
 
 async function loadExtensionSpaces(
@@ -122,6 +128,7 @@ async function loadExtensionSpace(
   const { packages, problems } = await readMigrationsDir(spaceDir);
   const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
   const { headRef, problem: headRefProblem } = await readHeadRefTolerant(migrationsDir, spaceId);
+
   const rawContract = await readRawContractDeferred(migrationsDir, spaceId);
 
   const member = createContractSpaceMember({

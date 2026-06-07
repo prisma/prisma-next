@@ -19,7 +19,9 @@ function sqlContractWithTables(args: { target?: string; tables: readonly string[
   return createSqlContract({
     target: args.target ?? 'postgres',
     storage: {
-      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: tables } },
+      },
     },
   });
 }
@@ -117,6 +119,71 @@ describe('loadContractSpaceAggregate', () => {
     });
   });
 
+  describe('extension spaces with no migration packages', () => {
+    it('reads head ref from disk when space has no packages', async () => {
+      const extContract = sqlContractWithTables({ tables: ['ext_table'] });
+      const headHash = extContract.storage.storageHash;
+      // Write the space artefacts including head.json (as emitContractSpaceArtefacts does).
+      await writeContractJson('supabase', extContract);
+      await writeHeadRef('supabase', { hash: headHash, invariants: [] });
+
+      const aggregate = await load();
+      const member = aggregate.space('supabase');
+      expect(member).toBeDefined();
+      expect(member?.packages).toHaveLength(0);
+      expect(member?.headRef).toEqual({ hash: headHash, invariants: [] });
+    });
+
+    it('produces no headRefNotInGraph violation when packages is empty and head.json is on disk', async () => {
+      const extContract = sqlContractWithTables({ tables: ['ext_table'] });
+      await writeContractJson('supabase', extContract);
+      await writeHeadRef('supabase', { hash: extContract.storage.storageHash, invariants: [] });
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+      expect(violationsOfKind(violations, 'headRefMissing').map((v) => v.spaceId)).not.toContain(
+        'supabase',
+      );
+      expect(violationsOfKind(violations, 'headRefNotInGraph').map((v) => v.spaceId)).not.toContain(
+        'supabase',
+      );
+    });
+
+    it('reports headRefMissing for an extension space with no packages and no head.json', async () => {
+      // No packages and no head.json — headRefMissing is always an authoring error.
+      const extContract = sqlContractWithTables({ tables: ['ext_table'] });
+      await writeContractJson('supabase', extContract);
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+      expect(violationsOfKind(violations, 'headRefMissing').map((v) => v.spaceId)).toContain(
+        'supabase',
+      );
+    });
+
+    it('still reports headRefMissing for a migration-backed space with no head.json', async () => {
+      await writePackage('backed', '20260101T0000_init', { from: null, to: 'sha256:b1' });
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+      expect(violationsOfKind(violations, 'headRefMissing').map((v) => v.spaceId)).toContain(
+        'backed',
+      );
+    });
+
+    it('reports headRefNotInGraph for a migration-backed space whose head hash is not in graph', async () => {
+      // A loadable package with a known graph node, but head.json points elsewhere.
+      await writePackage('backed', '20260101T0000_init', { from: null, to: 'sha256:b1' });
+      await writeHeadRef('backed', { hash: 'sha256:not-in-graph', invariants: [] });
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+      expect(violationsOfKind(violations, 'headRefNotInGraph').map((v) => v.spaceId)).toContain(
+        'backed',
+      );
+    });
+  });
+
   describe('app member', () => {
     it('synthesises the app head ref from the live contract storage hash', async () => {
       const aggregate = await load();
@@ -185,8 +252,11 @@ describe('loadContractSpaceAggregate', () => {
         from: 'sha256:app-head',
         to: 'sha256:app-head',
       });
+      // alpha: hash-mismatched package (retained) and no head.json → headRefMissing.
       await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
       await writeFile(join(migrationsDir, 'alpha', '20260101T0000_init', 'ops.json'), '[]');
+      // beta: unloadable package → packageUnloadable. Head.json present but
+      // packages.length === 0 after load, so headRefNotInGraph does NOT fire.
       await mkdir(join(migrationsDir, 'beta', '20260101T0000_broken'), { recursive: true });
       await writeFile(
         join(migrationsDir, 'beta', '20260101T0000_broken', 'migration.json'),
@@ -194,6 +264,9 @@ describe('loadContractSpaceAggregate', () => {
       );
       await writeFile(join(migrationsDir, 'beta', '20260101T0000_broken', 'ops.json'), '[]');
       await writeHeadRef('beta', { hash: 'sha256:b1', invariants: [] });
+      // gamma: loadable package but head.json points to a hash not in graph → headRefNotInGraph.
+      await writePackage('gamma', '20260101T0000_init', { from: null, to: 'sha256:g1' });
+      await writeHeadRef('gamma', { hash: 'sha256:not-in-graph', invariants: [] });
 
       const violations = (await load()).checkIntegrity();
 
@@ -208,7 +281,7 @@ describe('loadContractSpaceAggregate', () => {
         'beta',
       );
       expect(violationsOfKind(violations, 'headRefNotInGraph').map((v) => v.spaceId)).toContain(
-        'beta',
+        'gamma',
       );
       // No bail: violations span more than one space.
       expect(

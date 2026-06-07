@@ -39,7 +39,7 @@ export default {
       }
       const limit = parseLimit(url.searchParams.get('limit'), 10);
       const orm = createOrmClient(runtime);
-      const rows = await orm.Post.forUser(userId)
+      const rows = await orm.Post.where({ userId })
         .orderBy((post) => post.createdAt.desc())
         .take(limit)
         .all();

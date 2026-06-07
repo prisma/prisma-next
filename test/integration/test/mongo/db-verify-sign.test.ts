@@ -1,8 +1,8 @@
 import mongoAdapterDescriptor, {
-  createMongoControlDriver,
-  initMarker,
+  MongoControlAdapterImpl,
 } from '@prisma-next/adapter-mongo/control';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 
 import {
   createMongoFamilyInstance,
@@ -15,6 +15,8 @@ import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 const baseContract: MongoContract = {
   target: 'mongo',
@@ -37,12 +39,14 @@ const baseContract: MongoContract = {
       __unbound__: {
         id: '__unbound__' as const,
         kind: 'mongo-namespace' as const,
-        collections: {
-          users: new MongoCollection({
-            indexes: [
-              new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
-            ],
-          }),
+        entries: {
+          collection: {
+            users: new MongoCollection({
+              indexes: [
+                new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+              ],
+            }),
+          },
         },
       },
     },
@@ -93,7 +97,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
   }, timeouts.databaseOperation);
 
   function makeDriver() {
-    return createMongoControlDriver(db, client);
+    return new MongoControlDriver(db, client);
   }
 
   describe('verify (marker-only)', () => {
@@ -112,7 +116,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
     });
 
     it('returns ok when marker matches', async () => {
-      await initMarker(db, 'app', {
+      await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: baseContract.storage.storageHash,
         profileHash: baseContract.profileHash,
       });
@@ -130,7 +134,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
     });
 
     it('returns PN-RUN-3002 when storage hash differs', async () => {
-      await initMarker(db, 'app', {
+      await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: coreHash('sha256:old-hash'),
         profileHash: baseContract.profileHash,
       });
@@ -148,7 +152,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
     });
 
     it('returns PN-RUN-3002 when profile hash differs', async () => {
-      await initMarker(db, 'app', {
+      await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: baseContract.storage.storageHash,
         profileHash: profileHash('sha256:old-profile'),
       });
@@ -340,7 +344,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       // Sign re-anchors the marker hashes; it must not clobber the
       // applied-invariants set. `updateMarker` called without
       // `invariants` leaves the field untouched.
-      await initMarker(db, 'app', {
+      await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: baseContract.storage.storageHash,
         profileHash: baseContract.profileHash,
         invariants: ['email-verified', 'phone-backfill'],

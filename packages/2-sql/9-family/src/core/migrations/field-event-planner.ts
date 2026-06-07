@@ -77,8 +77,8 @@ export function planFieldEventOperations(
   for (const namespaceId of namespaceIds) {
     const priorNs = priorContract?.storage.namespaces[namespaceId];
     const newNs = newContract.storage.namespaces[namespaceId];
-    const priorTables = priorNs?.tables;
-    const newTables = newNs?.tables;
+    const priorTables = priorNs?.entries.table;
+    const newTables = newNs?.entries.table;
 
     const tableNames = unionSorted(
       priorTables ? Object.keys(priorTables) : [],

@@ -152,7 +152,7 @@ describe('hand-authored migration (backfill-product-status)', {
               [UNBOUND_NAMESPACE_ID]: {
                 id: UNBOUND_NAMESPACE_ID,
                 kind: 'mongo-namespace' as const,
-                collections: {},
+                entries: { collection: {} },
               },
             },
           },

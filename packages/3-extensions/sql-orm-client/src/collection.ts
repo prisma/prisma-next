@@ -16,6 +16,7 @@ import {
   type ToWhereExpr,
   type WhereArg,
 } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
@@ -115,6 +116,7 @@ import {
   type RuntimeQueryable,
   type ShorthandWhereFilter,
   type UniqueConstraintCriterion,
+  type VariantAwareModelAccessor,
   type VariantModelRow,
   type VariantNames,
 } from './types';
@@ -241,11 +243,13 @@ export class Collection<
    * ```
    */
   where(
-    fn: (model: ModelAccessor<TContract, ModelName>) => WhereDirectInput,
+    fn: (
+      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+    ) => WhereDirectInput,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(input: WhereDirectInput): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
-    fn: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+    fn: (model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
     filters: ShorthandWhereFilter<TContract, ModelName>,
@@ -253,13 +257,30 @@ export class Collection<
   where(
     input:
       | WhereDirectInput
-      | ((model: ModelAccessor<TContract, ModelName>) => WhereDirectInput)
-      | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
+      | ((
+          model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+        ) => WhereDirectInput)
+      | ((model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>> {
     const whereArg =
       typeof input === 'function'
-        ? input(createModelAccessor(this.ctx.context, this.modelName))
+        ? input(
+            // The variant name is already threaded through the type state
+            // (`State['variantName']`, set by `variant()`); that is what the
+            // callback param's `VariantAwareModelAccessor` reads. The blindCast
+            // remains because `createModelAccessor` is declared to return the
+            // base `ModelAccessor` — its runtime proxy carries the selected
+            // variant's fields when `variantName` is passed, but its *return
+            // type* is not variant-parameterized. Making that return type
+            // variant-aware would ripple into every non-variant caller
+            // (relation predicates, orderBy, etc.), so the widening is kept
+            // callback-param-only and bridged here with a single narrow cast.
+            blindCast<
+              VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+              'runtime accessor carries the selected variant fields; the variant widening is callback-param-only'
+            >(createModelAccessor(this.ctx.context, this.modelName, this.state.variantName)),
+          )
         : isWhereDirectInput(input)
           ? input
           : shorthandToWhereExpr(this.ctx.context, this.modelName, input);
@@ -393,7 +414,7 @@ export class Collection<
     > = IncludeRefinementCollection<
       TContract,
       RelatedName,
-      DefaultModelRow<TContract, RelatedName>,
+      SimplifyDeep<InferRootRow<TContract, RelatedName>>,
       CollectionTypeState,
       IsToMany
     >,
@@ -403,7 +424,7 @@ export class Collection<
       collection: IncludeRefinementCollection<
         TContract,
         RelatedName,
-        DefaultModelRow<TContract, RelatedName>,
+        SimplifyDeep<InferRootRow<TContract, RelatedName>>,
         DefaultCollectionTypeState,
         IsToMany
       >,
@@ -417,7 +438,7 @@ export class Collection<
           TContract,
           ModelName,
           K,
-          DefaultModelRow<TContract, RelatedName>,
+          SimplifyDeep<InferRootRow<TContract, RelatedName>>,
           RefinedResult
         >;
       }
@@ -433,7 +454,7 @@ export class Collection<
     if (refineFn) {
       const nestedCollection = this.#createCollection<
         RelatedName,
-        DefaultModelRow<TContract, RelatedName>,
+        SimplifyDeep<InferRootRow<TContract, RelatedName>>,
         DefaultCollectionTypeState
       >(relation.relatedModelName as RelatedName, {
         tableName: relation.relatedTableName,
@@ -444,7 +465,7 @@ export class Collection<
         nestedCollection as unknown as IncludeRefinementCollection<
           TContract,
           RelatedName,
-          DefaultModelRow<TContract, RelatedName>,
+          SimplifyDeep<InferRootRow<TContract, RelatedName>>,
           DefaultCollectionTypeState,
           IsToMany
         >,
@@ -493,7 +514,7 @@ export class Collection<
             TContract,
             ModelName,
             K,
-            DefaultModelRow<TContract, RelatedName>,
+            SimplifyDeep<InferRootRow<TContract, RelatedName>>,
             RefinedResult
           >;
         }
@@ -965,7 +986,9 @@ export class Collection<
     configure: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null>;
   async first(
-    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+    filter: (
+      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+    ) => WhereArg,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null>;
   async first(
@@ -974,7 +997,7 @@ export class Collection<
   ): Promise<Row | null>;
   async first(
     filter?:
-      | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
+      | ((model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null> {

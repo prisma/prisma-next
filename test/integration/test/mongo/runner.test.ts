@@ -1,6 +1,6 @@
-import { readAllMarkers, readMarker } from '@prisma-next/adapter-mongo/control';
+import { MongoControlAdapterImpl } from '@prisma-next/adapter-mongo/control';
 import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
-import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import mongoControlDriver, { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import {
   contractToMongoSchemaIR,
   createMongoFamilyInstance,
@@ -22,6 +22,8 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { synthMigrationEdges } from './synth-migration-edges';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -78,26 +80,28 @@ function buildAppContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
-            users: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'email', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
-            },
-            posts: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'slug', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
+          entries: {
+            collection: {
+              users: {
+                kind: 'mongo-collection' as const,
+                indexes: [
+                  {
+                    kind: 'mongo-index' as const,
+                    keys: [{ field: 'email', direction: 1 as const }],
+                    unique: true,
+                  },
+                ],
+              },
+              posts: {
+                kind: 'mongo-collection' as const,
+                indexes: [
+                  {
+                    kind: 'mongo-index' as const,
+                    keys: [{ field: 'slug', direction: 1 as const }],
+                    unique: true,
+                  },
+                ],
+              },
             },
           },
         },
@@ -141,16 +145,18 @@ function buildAppContractMissingPosts(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
-            users: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'email', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
+          entries: {
+            collection: {
+              users: {
+                kind: 'mongo-collection' as const,
+                indexes: [
+                  {
+                    kind: 'mongo-index' as const,
+                    keys: [{ field: 'email', direction: 1 as const }],
+                    unique: true,
+                  },
+                ],
+              },
             },
           },
         },
@@ -175,16 +181,18 @@ function buildExtContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          collections: {
-            cipherstash_state: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'tenantId', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
+          entries: {
+            collection: {
+              cipherstash_state: {
+                kind: 'mongo-collection' as const,
+                indexes: [
+                  {
+                    kind: 'mongo-index' as const,
+                    keys: [{ field: 'tenantId', direction: 1 as const }],
+                    unique: true,
+                  },
+                ],
+              },
             },
           },
         },
@@ -295,7 +303,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
       if (!result.ok) throw new Error('unreachable');
       expect(result.value.perSpaceResults.map((r) => r.space)).toEqual([EXT_SPACE, APP_SPACE_ID]);
 
-      const markers = await readAllMarkers(db);
+      const markers = await controlAdapter.readAllMarkers(new MongoControlDriver(db, client));
       expect(markers.size).toBe(2);
       expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContract.storage.storageHash);
       expect(markers.get(EXT_SPACE)?.storageHash).toBe(extContract.storage.storageHash);
@@ -408,9 +416,15 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
       expect(failingResult.failure.failingSpace).toBe(APP_SPACE_ID);
       expect(failingResult.failure.code).toBe('SCHEMA_VERIFY_FAILED');
 
-      const extMarkerAfterFail = await readMarker(db, EXT_SPACE);
+      const extMarkerAfterFail = await controlAdapter.readMarker(
+        new MongoControlDriver(db, client),
+        EXT_SPACE,
+      );
       expect(extMarkerAfterFail?.storageHash).toBe(extContract.storage.storageHash);
-      const appMarkerAfterFail = await readMarker(db, APP_SPACE_ID);
+      const appMarkerAfterFail = await controlAdapter.readMarker(
+        new MongoControlDriver(db, client),
+        APP_SPACE_ID,
+      );
       expect(appMarkerAfterFail).toBeNull();
 
       // Re-run with the corrected app plan (covers both
@@ -460,7 +474,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
         APP_SPACE_ID,
       ]);
 
-      const markers = await readAllMarkers(db);
+      const markers = await controlAdapter.readAllMarkers(new MongoControlDriver(db, client));
       expect(markers.size).toBe(2);
       expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContractFull.storage.storageHash);
       expect(markers.get(EXT_SPACE)?.storageHash).toBe(extContract.storage.storageHash);

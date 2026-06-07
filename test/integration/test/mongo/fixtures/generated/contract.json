@@ -242,31 +242,33 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "collections": {
-          "tasks": {
-            "kind": "mongo-collection"
-          },
-          "users": {
-            "indexes": [
-              {
-                "keys": [
-                  {
-                    "direction": 1,
-                    "field": "email"
-                  }
-                ],
-                "kind": "mongo-index",
-                "unique": true
+        "entries": {
+          "collection": {
+            "tasks": {
+              "kind": "mongo-collection"
+            },
+            "users": {
+              "indexes": [
+                {
+                  "keys": [
+                    {
+                      "direction": 1,
+                      "field": "email"
+                    }
+                  ],
+                  "kind": "mongo-index",
+                  "unique": true
+                }
+              ],
+              "kind": "mongo-collection",
+              "options": {
+                "collation": {
+                  "kind": "mongo-collation-options",
+                  "locale": "en",
+                  "strength": 2
+                },
+                "kind": "mongo-collection-options"
               }
-            ],
-            "kind": "mongo-collection",
-            "options": {
-              "collation": {
-                "kind": "mongo-collation-options",
-                "locale": "en",
-                "strength": 2
-              },
-              "kind": "mongo-collection-options"
             }
           }
         },

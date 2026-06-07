@@ -41,7 +41,7 @@ function makeContract(collections: Record<string, MongoCollectionData>): MongoCo
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          collections: builtCollections,
+          entries: { collection: builtCollections },
         },
       },
     },

@@ -1,4 +1,4 @@
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import {
   type AnyQueryAst,
   type LoweredStatement,
@@ -121,4 +121,4 @@ export async function execute(
 
 export type PostgresMarkerDriver = MarkerDriver;
 export type PostgresMarkerLower = Lower;
-export type PostgresMarkerWriteDriver = ControlDriverInstance<'sql', 'postgres'>;
+export type PostgresMarkerWriteDriver = SqlControlDriverInstance<'postgres'>;

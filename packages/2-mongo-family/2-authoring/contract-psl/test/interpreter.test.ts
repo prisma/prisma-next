@@ -61,9 +61,12 @@ function mongoCollectionsFromIr(ir: {
   readonly storage: unknown;
 }): Record<string, Record<string, unknown>> {
   const storage = ir.storage as {
-    namespaces: Record<string, { collections: Record<string, Record<string, unknown>> }>;
+    namespaces: Record<
+      string,
+      { entries: { collection: Record<string, Record<string, unknown>> } }
+    >;
   };
-  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
+  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.collection;
 }
 
 interface MongoModel {
@@ -245,7 +248,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            collections: { userProfile: {} },
+            entries: { collection: { userProfile: {} } },
           },
         },
       });
@@ -266,7 +269,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            collections: { users: {} },
+            entries: { collection: { users: {} } },
           },
         },
       });
@@ -661,10 +664,9 @@ describe('interpretPslDocumentToMongoContract', () => {
       const namespaces = (canonical['storage'] as Record<string, Record<string, unknown>>)[
         'namespaces'
       ] as Record<string, Record<string, unknown>>;
-      const collections = namespaces[UNBOUND_NAMESPACE_ID]!['collections'] as Record<
-        string,
-        Record<string, unknown>
-      >;
+      const collections = (
+        namespaces[UNBOUND_NAMESPACE_ID]!['entries'] as { collection: Record<string, unknown> }
+      ).collection as Record<string, Record<string, unknown>>;
       const validator = collections['users']!['validator'] as Record<string, unknown>;
       const jsonSchema = validator['jsonSchema'] as Record<string, Record<string, unknown>>;
       expect(jsonSchema['properties']!['_id']).toEqual({ bsonType: 'objectId' });
@@ -716,9 +718,11 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            collections: {
-              user: {},
-              post: {},
+            entries: {
+              collection: {
+                user: {},
+                post: {},
+              },
             },
           },
         },
@@ -949,42 +953,44 @@ describe('interpretPslDocumentToMongoContract', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
               id: UNBOUND_NAMESPACE_ID,
-              collections: {
-                users: new MongoCollection({
-                  validator: new MongoValidator({
-                    jsonSchema: {
-                      bsonType: 'object',
-                      required: ['_id', 'email', 'name'],
-                      properties: {
-                        _id: { bsonType: 'objectId' },
-                        name: { bsonType: 'string' },
-                        email: { bsonType: 'string' },
-                        bio: { bsonType: ['null', 'string'] },
+              entries: {
+                collection: {
+                  users: new MongoCollection({
+                    validator: new MongoValidator({
+                      jsonSchema: {
+                        bsonType: 'object',
+                        required: ['_id', 'email', 'name'],
+                        properties: {
+                          _id: { bsonType: 'objectId' },
+                          name: { bsonType: 'string' },
+                          email: { bsonType: 'string' },
+                          bio: { bsonType: ['null', 'string'] },
+                        },
+                        additionalProperties: false,
                       },
-                      additionalProperties: false,
-                    },
-                    validationLevel: 'strict',
-                    validationAction: 'error',
+                      validationLevel: 'strict',
+                      validationAction: 'error',
+                    }),
                   }),
-                }),
-                posts: new MongoCollection({
-                  validator: new MongoValidator({
-                    jsonSchema: {
-                      bsonType: 'object',
-                      required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
-                      properties: {
-                        _id: { bsonType: 'objectId' },
-                        title: { bsonType: 'string' },
-                        content: { bsonType: 'string' },
-                        authorId: { bsonType: 'objectId' },
-                        createdAt: { bsonType: 'date' },
+                  posts: new MongoCollection({
+                    validator: new MongoValidator({
+                      jsonSchema: {
+                        bsonType: 'object',
+                        required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
+                        properties: {
+                          _id: { bsonType: 'objectId' },
+                          title: { bsonType: 'string' },
+                          content: { bsonType: 'string' },
+                          authorId: { bsonType: 'objectId' },
+                          createdAt: { bsonType: 'date' },
+                        },
+                        additionalProperties: false,
                       },
-                      additionalProperties: false,
-                    },
-                    validationLevel: 'strict',
-                    validationAction: 'error',
+                      validationLevel: 'strict',
+                      validationAction: 'error',
+                    }),
                   }),
-                }),
+                },
               },
             }),
           },

@@ -15,7 +15,7 @@ describe('elementCoordinates with PostgresSchema', () => {
   it('walks Postgres-promoted namespace (kind === schema)', () => {
     const schema = new PostgresSchema({
       id: 'public',
-      tables: { users: emptyTableInput },
+      entries: { table: { users: emptyTableInput }, type: {} },
     });
     expect(schema.kind).toBe('schema');
 
@@ -31,7 +31,7 @@ describe('elementCoordinates with PostgresSchema', () => {
     expect(coordinates).toContainEqual({
       plane: 'storage',
       namespaceId: 'public',
-      entityKind: 'tables',
+      entityKind: 'table',
       entityName: 'users',
     });
   });

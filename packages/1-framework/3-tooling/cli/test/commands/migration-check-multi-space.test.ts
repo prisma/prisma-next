@@ -7,11 +7,13 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
+import { type } from 'arktype';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   enumerateCheckSpaces,
   type MigrationCheckResult,
+  migrationCheckResultSchema,
   runMigrationCheck,
 } from '../../src/commands/migration-check';
 
@@ -136,7 +138,7 @@ describe('migration check — multi-space policy core', () => {
 
     const { result } = await checkFromDisk({ migrationsDir: migrationsRoot });
     expect(result?.ok).toBe(false);
-    const danglingRefFailures = result?.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-004');
+    const danglingRefFailures = result?.failures.filter((f) => f.code === 'PN-MIG-CHECK-004');
     expect(danglingRefFailures).toHaveLength(1);
     expect(danglingRefFailures?.[0]?.where).toContain('postgis');
     expect(danglingRefFailures?.[0]?.where).toContain('broken');
@@ -182,7 +184,7 @@ describe('migration check — multi-space policy core', () => {
 
     const { result } = await checkFromDisk({ migrationsDir: migrationsRoot });
     expect(result?.ok).toBe(false);
-    const unreachable = result?.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-003');
+    const unreachable = result?.failures.filter((f) => f.code === 'PN-MIG-CHECK-003');
     expect(unreachable).toHaveLength(1);
     expect(unreachable?.[0]?.where).toContain('postgis');
   });
@@ -213,7 +215,7 @@ describe('migration check — --space narrowing', () => {
       spaceFilter: 'postgis',
     });
     expect(result?.ok).toBe(false);
-    const danglingRefFailures = result?.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-004');
+    const danglingRefFailures = result?.failures.filter((f) => f.code === 'PN-MIG-CHECK-004');
     expect(danglingRefFailures).toHaveLength(1);
     expect(danglingRefFailures?.[0]?.where).toContain('postgis');
   });
@@ -240,7 +242,7 @@ describe('migration check — --space narrowing', () => {
       spaceFilter: 'app',
     });
     expect(result?.ok).toBe(false);
-    const danglingRefFailures = result?.failures.filter((f) => f.pnCode === 'PN-MIG-CHECK-004');
+    const danglingRefFailures = result?.failures.filter((f) => f.code === 'PN-MIG-CHECK-004');
     expect(danglingRefFailures).toHaveLength(1);
     expect(danglingRefFailures?.[0]?.where).toContain('app');
     expect(danglingRefFailures?.[0]?.where).not.toContain('postgis');
@@ -289,5 +291,67 @@ describe('migration check — --space narrowing', () => {
     expect(envelope.meta?.['code']).toBe('MIGRATION.SPACE_NOT_FOUND');
     expect(envelope.meta?.['spaceId']).toBe('nope');
     expect(envelope.meta?.['availableSpaces']).toEqual(['app']);
+  });
+});
+
+describe('migration check — migrationCheckResultSchema validation', () => {
+  it('ok:true result validates against the schema', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_init',
+      from: null,
+      to: HASH_APP,
+    });
+
+    const aggregate = await loadContractSpaceAggregate({
+      migrationsDir: migrationsRoot,
+      appContract: TEST_APP_CONTRACT,
+      deserializeContract: identityDeserialize,
+    });
+    const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
+    const outcome = runMigrationCheck({ spaces });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('unreachable');
+
+    const result: MigrationCheckResult = outcome.value;
+    expect(result.ok).toBe(true);
+    expect(migrationCheckResultSchema(result) instanceof type.errors).toBe(false);
+  });
+
+  it('ok:false result with failures validates against the schema', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_init',
+      from: null,
+      to: HASH_APP,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0000_install',
+      from: null,
+      to: HASH_EXT,
+    });
+    await writeRefFor(migrationsRoot, { spaceId: 'postgis', name: 'broken', hash: HASH_DANGLING });
+
+    const aggregate = await loadContractSpaceAggregate({
+      migrationsDir: migrationsRoot,
+      appContract: TEST_APP_CONTRACT,
+      deserializeContract: identityDeserialize,
+    });
+    const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
+    const outcome = runMigrationCheck({ spaces });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('unreachable');
+
+    const result: MigrationCheckResult = outcome.value;
+    expect(result.ok).toBe(false);
+    expect(result.failures.length).toBeGreaterThan(0);
+    expect(migrationCheckResultSchema(result) instanceof type.errors).toBe(false);
+
+    const failure = result.failures[0]!;
+    expect(failure.space).toBe('postgis');
+    expect(failure.code).toBe('PN-MIG-CHECK-004');
   });
 });

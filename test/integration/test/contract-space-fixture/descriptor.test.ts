@@ -24,7 +24,7 @@ describe('test-contract-space fixture descriptor', () => {
     const space = testContractSpaceExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
     expect(
-      Object.keys(space!.contractJson.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables),
+      Object.keys(space!.contractJson.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries.table),
     ).toEqual([TEST_BOX_TABLE]);
   });
 

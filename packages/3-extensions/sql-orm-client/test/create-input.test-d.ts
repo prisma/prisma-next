@@ -8,35 +8,37 @@ type CreateInputContract = Contract<
       __unbound__: {
         id: '__unbound__';
         kind: 'sql-namespace';
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4';
-                codecId: 'pg/int4@1';
-                nullable: false;
-                default: {
-                  kind: 'function';
-                  expression: "nextval('user_id_seq'::regclass)";
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: {
+                  nativeType: 'int4';
+                  codecId: 'pg/int4@1';
+                  nullable: false;
+                  default: {
+                    kind: 'function';
+                    expression: "nextval('user_id_seq'::regclass)";
+                  };
+                };
+                email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
+                slug: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                created_at: {
+                  nativeType: 'timestamptz';
+                  codecId: 'pg/text@1';
+                  nullable: false;
+                  default: {
+                    kind: 'function';
+                    expression: 'now()';
+                  };
                 };
               };
-              email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
-              slug: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-              created_at: {
-                nativeType: 'timestamptz';
-                codecId: 'pg/text@1';
-                nullable: false;
-                default: {
-                  kind: 'function';
-                  expression: 'now()';
-                };
-              };
+              primaryKey: { columns: ['id'] };
+              uniques: [];
+              indexes: [];
+              foreignKeys: [];
             };
-            primaryKey: { columns: ['id'] };
-            uniques: [];
-            indexes: [];
-            foreignKeys: [];
           };
         };
       };

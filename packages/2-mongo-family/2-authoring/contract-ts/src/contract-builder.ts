@@ -1577,7 +1577,7 @@ function buildContractFromDefinition<
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
         id: UNBOUND_NAMESPACE_ID,
-        collections,
+        entries: { collection: collections },
       }),
     },
   }) as unknown as MongoStorageShape<string>;
@@ -1612,6 +1612,127 @@ function buildContractFromDefinition<
   >(builtContract);
 }
 
+// Input for buildBoundContract that omits family/target (injected by the builder).
+type BoundDefinitionInput<
+  Models extends Record<string, AnyModelBuilder> = Record<never, never>,
+  ValueObjects extends Record<string, AnyValueObjectBuilder> = Record<never, never>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+  Roots extends Record<string, ModelNameInput> | undefined = undefined,
+> = {
+  readonly extensionPacks?: ExtensionPacks;
+  readonly roots?: Roots;
+  readonly defaultControlPolicy?: ControlPolicy;
+  readonly models?: Models;
+  readonly valueObjects?: ValueObjects;
+};
+
+// Merges a bound input with the pre-bound family/target to produce a full ContractDefinition.
+type WithFamilyTarget<
+  Input,
+  F extends FamilyPackRef<string>,
+  T extends TargetPackRef<string, string>,
+> = Input & { readonly family: F; readonly target: T };
+
+/**
+ * Shared builder that assembles a MongoContract with pre-bound family and target.
+ * Extension wrappers keep their own public overloads and delegate their impl body here;
+ * this is a plain overloaded function (not a factory returning an overloaded function)
+ * so no overloaded-function-return cast is needed.
+ *
+ * Overload 1: definition form (no factory).
+ */
+export function buildBoundContract<
+  const F extends FamilyPackRef<string>,
+  const T extends TargetPackRef<string, string>,
+  const Definition extends BoundDefinitionInput<
+    Record<string, AnyModelBuilder>,
+    Record<string, AnyValueObjectBuilder>,
+    Record<string, ExtensionPackRef<string, string>> | undefined,
+    Record<string, ModelNameInput> | undefined
+  >,
+>(
+  family: F,
+  target: T,
+  definition: Definition,
+  factory?: undefined,
+): MongoContractResult<WithFamilyTarget<Definition, F, T>>;
+/**
+ * Overload 2: factory form.
+ */
+export function buildBoundContract<
+  const F extends FamilyPackRef<string>,
+  const T extends TargetPackRef<string, string>,
+  const Definition extends BoundDefinitionInput<
+    Record<string, AnyModelBuilder>,
+    Record<string, AnyValueObjectBuilder>,
+    Record<string, ExtensionPackRef<string, string>> | undefined,
+    Record<string, ModelNameInput> | undefined
+  >,
+  const Built extends {
+    readonly models?: Record<string, AnyModelBuilder>;
+    readonly valueObjects?: Record<string, AnyValueObjectBuilder>;
+    readonly roots?: Record<string, ModelNameInput> | undefined;
+  },
+>(
+  family: F,
+  target: T,
+  definition: Definition,
+  factory: (
+    helpers: ContractAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>,
+  ) => Built,
+): MongoContractResult<WithFamilyTarget<Definition & Built, F, T>>;
+/** Implementation. */
+export function buildBoundContract<
+  const F extends FamilyPackRef<string>,
+  const T extends TargetPackRef<string, string>,
+  const Definition extends BoundDefinitionInput<
+    Record<string, AnyModelBuilder>,
+    Record<string, AnyValueObjectBuilder>,
+    Record<string, ExtensionPackRef<string, string>> | undefined,
+    Record<string, ModelNameInput> | undefined
+  >,
+  const Built extends {
+    readonly models?: Record<string, AnyModelBuilder>;
+    readonly valueObjects?: Record<string, AnyValueObjectBuilder>;
+    readonly roots?: Record<string, ModelNameInput> | undefined;
+  },
+>(
+  family: F,
+  target: T,
+  definition: Definition,
+  factory?:
+    | ((
+        helpers: ContractAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>,
+      ) => Built)
+    | undefined,
+) {
+  const full = { ...definition, family, target };
+
+  if (factory !== undefined) {
+    const entities = composeMongoEntityHelpers(family, target, definition.extensionPacks);
+    // composeMongoEntityHelpers returns Record<string, unknown> via an opaque runtime
+    // namespace walk; there is no way to reconstruct ContractAuthoringHelpers<F,T,Ext>
+    // structurally from that return type, so this single cast is irreducible.
+    const helpers = {
+      ...entities,
+      field,
+      index,
+      model,
+      rel,
+      valueObject,
+    } as unknown as ContractAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>;
+    const built = factory(helpers);
+    return buildContractFromDefinition({
+      ...full,
+      ...ifDefined('models', built.models),
+      ...ifDefined('valueObjects', built.valueObjects),
+      ...ifDefined('roots', built.roots),
+    });
+  }
+
+  return buildContractFromDefinition(full);
+}
+
 export function defineContract<
   const Definition extends ContractDefinition<
     FamilyPackRef<string>,
@@ -1632,7 +1753,7 @@ export function defineContract<
   const Built extends {
     readonly models?: Record<string, AnyModelBuilder>;
     readonly valueObjects?: Record<string, AnyValueObjectBuilder>;
-    readonly roots?: Record<string, ModelNameInput>;
+    readonly roots?: Record<string, ModelNameInput> | undefined;
   },
   const Family extends FamilyPackRef<string> = FamilyPackRef<string>,
   const Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
@@ -1662,26 +1783,8 @@ export function defineContract(
     );
   }
 
-  if (!factory) {
-    return buildContractFromDefinition(definition);
+  if (factory !== undefined) {
+    return buildBoundContract(definition.family, definition.target, definition, factory);
   }
-
-  const entities = composeMongoEntityHelpers(
-    definition.family,
-    definition.target,
-    definition.extensionPacks,
-  );
-  const helpers = {
-    ...entities,
-    field,
-    index,
-    model,
-    rel,
-    valueObject,
-  } as unknown as ContractAuthoringHelpers;
-
-  return buildContractFromDefinition({
-    ...definition,
-    ...factory(helpers),
-  });
+  return buildBoundContract(definition.family, definition.target, definition);
 }

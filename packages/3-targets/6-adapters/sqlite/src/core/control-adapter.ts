@@ -2,11 +2,9 @@ import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contr
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
-import {
-  APP_SPACE_ID,
-  type ControlDriverInstance,
-} from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   DdlNode,
@@ -140,7 +138,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * "no such table" error.
    */
   async readMarker(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     space: string,
   ): Promise<ContractMarkerRecord | null> {
     const result = await this.readMarkerDiscriminated(driver, space);
@@ -148,7 +146,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   }
 
   async readMarkerDiscriminated(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     space: string,
   ): Promise<MarkerReadResult> {
     const markerContext = { space, markerLocation: SQLITE_MARKER_TABLE };
@@ -161,14 +159,14 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * fresh database without the marker table returns an empty map.
    */
   async readAllMarkers(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
     const markerContext = { space: APP_SPACE_ID, markerLocation: SQLITE_MARKER_TABLE };
     return withMarkerReadErrorHandling(() => this.readAllMarkersResult(driver), markerContext);
   }
 
   private async readAllMarkersResult(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
     const probe = sqliteCatalog
@@ -218,7 +216,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * table returns `[]` instead of raising "no such table".
    */
   async readLedger(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     space?: string,
   ): Promise<readonly LedgerEntryRecord[]> {
     const ledgerContext = { space: space ?? '*', markerLocation: SQLITE_LEDGER_TABLE };
@@ -226,7 +224,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   }
 
   private async readLedgerResult(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     space: string | undefined,
   ): Promise<readonly LedgerEntryRecord[]> {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
@@ -271,7 +269,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * `SqlControlAdapter.initMarker` contract.
    */
   async insertMarker(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     space: string,
     destination: {
       readonly storageHash: string;
@@ -299,7 +297,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   }
 
   async initMarker(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     space: string,
     destination: {
       readonly storageHash: string;
@@ -342,7 +340,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * `SqlControlAdapter.updateMarker` contract.
    */
   async updateMarker(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     space: string,
     expectedFrom: string,
     destination: {
@@ -381,7 +379,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * `SqlControlAdapter.writeLedgerEntry` contract.
    */
   async writeLedgerEntry(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     space: string,
     entry: {
       readonly edgeId: string;
@@ -408,7 +406,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
     );
   }
 
-  private async readMarkerResult(driver: ControlDriverInstance<'sql', 'sqlite'>, space: string) {
+  private async readMarkerResult(driver: SqlControlDriverInstance<'sqlite'>, space: string) {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
     const probe = sqliteCatalog
       .select(sqliteCatalog.name)
@@ -440,7 +438,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   }
 
   async introspect(
-    driver: ControlDriverInstance<'sql', 'sqlite'>,
+    driver: SqlControlDriverInstance<'sqlite'>,
     _contract?: unknown,
   ): Promise<SqlSchemaIR> {
     // Filter out runner-managed control tables (`_prisma_marker`,

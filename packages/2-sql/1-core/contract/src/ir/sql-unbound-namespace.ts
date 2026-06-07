@@ -19,9 +19,10 @@ import type { StorageTable } from './storage-table';
  * envelope and runtime walk are honest at every layer.
  *
  * The `kind` discriminator is installed as a non-enumerable own property
- * so the JSON envelope reads `{ "id": "__unbound__" }` — symmetric
- * with the family-level non-enumerable `kind` on `SqlNode` and bounded
- * to the minimum data the framework `Namespace` interface promises.
+ * so the JSON envelope reads `{ "id": "__unbound__", "entries": { … } }`
+ * — symmetric with the family-level non-enumerable `kind` on `SqlNode`
+ * and bounded to the minimum data the framework `Namespace` interface
+ * promises.
  *
  * **Freeze-trap warning.** The leaf constructor calls
  * `freezeNode(this)` after installing `kind`. The leaf-class shape
@@ -39,7 +40,9 @@ export class SqlUnboundNamespace extends NamespaceBase {
   static readonly instance: SqlUnboundNamespace = new SqlUnboundNamespace();
 
   readonly id = UNBOUND_NAMESPACE_ID;
-  readonly tables: Readonly<Record<string, StorageTable>> = Object.freeze({});
+  readonly entries: Readonly<{
+    readonly table: Readonly<Record<string, StorageTable>>;
+  }> = Object.freeze({ table: Object.freeze({}) });
   declare readonly kind: string;
 
   private constructor() {

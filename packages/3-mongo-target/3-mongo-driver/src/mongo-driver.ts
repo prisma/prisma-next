@@ -21,12 +21,12 @@ import { type Db, MongoClient } from 'mongodb';
 import { DRIVER_INFO } from './core/driver-info';
 
 export class MongoDriverImpl implements MongoDriver {
-  readonly #db: Db;
-  readonly #client: MongoClient | undefined;
+  protected readonly db: Db;
+  protected readonly client: MongoClient | undefined;
 
-  private constructor(db: Db, client: MongoClient | undefined) {
-    this.#db = db;
-    this.#client = client;
+  protected constructor(db: Db, client: MongoClient | undefined) {
+    this.db = db;
+    this.client = client;
   }
 
   static async fromConnection(uri: string, dbName: string): Promise<MongoDriverImpl> {
@@ -42,23 +42,23 @@ export class MongoDriverImpl implements MongoDriver {
   execute<Row = Record<string, unknown>>(wireCommand: AnyMongoWireCommand): AsyncIterable<Row> {
     switch (wireCommand.kind) {
       case 'insertOne':
-        return this.#executeInsertOneCommand(wireCommand) as AsyncIterable<Row>;
+        return this.executeInsertOneCommand(wireCommand) as AsyncIterable<Row>;
       case 'updateOne':
-        return this.#executeUpdateOneCommand(wireCommand) as AsyncIterable<Row>;
+        return this.executeUpdateOneCommand(wireCommand) as AsyncIterable<Row>;
       case 'insertMany':
-        return this.#executeInsertManyCommand(wireCommand) as AsyncIterable<Row>;
+        return this.executeInsertManyCommand(wireCommand) as AsyncIterable<Row>;
       case 'updateMany':
-        return this.#executeUpdateManyCommand(wireCommand) as AsyncIterable<Row>;
+        return this.executeUpdateManyCommand(wireCommand) as AsyncIterable<Row>;
       case 'deleteOne':
-        return this.#executeDeleteOneCommand(wireCommand) as AsyncIterable<Row>;
+        return this.executeDeleteOneCommand(wireCommand) as AsyncIterable<Row>;
       case 'deleteMany':
-        return this.#executeDeleteManyCommand(wireCommand) as AsyncIterable<Row>;
+        return this.executeDeleteManyCommand(wireCommand) as AsyncIterable<Row>;
       case 'findOneAndUpdate':
-        return this.#executeFindOneAndUpdateCommand(wireCommand) as AsyncIterable<Row>;
+        return this.executeFindOneAndUpdateCommand(wireCommand) as AsyncIterable<Row>;
       case 'findOneAndDelete':
-        return this.#executeFindOneAndDeleteCommand(wireCommand) as AsyncIterable<Row>;
+        return this.executeFindOneAndDeleteCommand(wireCommand) as AsyncIterable<Row>;
       case 'aggregate':
-        return this.#executeAggregateCommand<Row>(wireCommand);
+        return this.executeAggregateCommand<Row>(wireCommand);
       // v8 ignore next 4
       default: {
         const _exhaustive: never = wireCommand;
@@ -68,17 +68,21 @@ export class MongoDriverImpl implements MongoDriver {
   }
 
   async close(): Promise<void> {
-    await this.#client?.close();
+    await this.client?.close();
   }
 
-  async *#executeInsertOneCommand(cmd: InsertOneWireCommand): AsyncIterable<InsertOneResult> {
-    const collection = this.#db.collection(cmd.collection);
+  protected async *executeInsertOneCommand(
+    cmd: InsertOneWireCommand,
+  ): AsyncIterable<InsertOneResult> {
+    const collection = this.db.collection(cmd.collection);
     const result = await collection.insertOne(cmd.document);
     yield { insertedId: result.insertedId };
   }
 
-  async *#executeUpdateOneCommand(cmd: UpdateOneWireCommand): AsyncIterable<UpdateOneResult> {
-    const collection = this.#db.collection(cmd.collection);
+  protected async *executeUpdateOneCommand(
+    cmd: UpdateOneWireCommand,
+  ): AsyncIterable<UpdateOneResult> {
+    const collection = this.db.collection(cmd.collection);
     const result = await collection.updateOne(cmd.filter, cmd.update, { upsert: cmd.upsert });
     yield {
       matchedCount: result.matchedCount,
@@ -88,15 +92,19 @@ export class MongoDriverImpl implements MongoDriver {
     };
   }
 
-  async *#executeInsertManyCommand(cmd: InsertManyWireCommand): AsyncIterable<InsertManyResult> {
-    const collection = this.#db.collection(cmd.collection);
+  protected async *executeInsertManyCommand(
+    cmd: InsertManyWireCommand,
+  ): AsyncIterable<InsertManyResult> {
+    const collection = this.db.collection(cmd.collection);
     const result = await collection.insertMany(cmd.documents as Record<string, unknown>[]);
     const insertedIds = Object.values(result.insertedIds);
     yield { insertedIds, insertedCount: result.insertedCount };
   }
 
-  async *#executeUpdateManyCommand(cmd: UpdateManyWireCommand): AsyncIterable<UpdateManyResult> {
-    const collection = this.#db.collection(cmd.collection);
+  protected async *executeUpdateManyCommand(
+    cmd: UpdateManyWireCommand,
+  ): AsyncIterable<UpdateManyResult> {
+    const collection = this.db.collection(cmd.collection);
     const result = await collection.updateMany(cmd.filter, cmd.update, { upsert: cmd.upsert });
     yield {
       matchedCount: result.matchedCount,
@@ -106,22 +114,26 @@ export class MongoDriverImpl implements MongoDriver {
     };
   }
 
-  async *#executeDeleteOneCommand(cmd: DeleteOneWireCommand): AsyncIterable<DeleteOneResult> {
-    const collection = this.#db.collection(cmd.collection);
+  protected async *executeDeleteOneCommand(
+    cmd: DeleteOneWireCommand,
+  ): AsyncIterable<DeleteOneResult> {
+    const collection = this.db.collection(cmd.collection);
     const result = await collection.deleteOne(cmd.filter);
     yield { deletedCount: result.deletedCount };
   }
 
-  async *#executeDeleteManyCommand(cmd: DeleteManyWireCommand): AsyncIterable<DeleteManyResult> {
-    const collection = this.#db.collection(cmd.collection);
+  protected async *executeDeleteManyCommand(
+    cmd: DeleteManyWireCommand,
+  ): AsyncIterable<DeleteManyResult> {
+    const collection = this.db.collection(cmd.collection);
     const result = await collection.deleteMany(cmd.filter);
     yield { deletedCount: result.deletedCount };
   }
 
-  async *#executeFindOneAndUpdateCommand(
+  protected async *executeFindOneAndUpdateCommand(
     cmd: FindOneAndUpdateWireCommand,
   ): AsyncIterable<Record<string, unknown>> {
-    const collection = this.#db.collection(cmd.collection);
+    const collection = this.db.collection(cmd.collection);
     const result = await collection.findOneAndUpdate(cmd.filter, cmd.update, {
       upsert: cmd.upsert,
       ...(cmd.returnDocument != null ? { returnDocument: cmd.returnDocument } : {}),
@@ -132,10 +144,10 @@ export class MongoDriverImpl implements MongoDriver {
     }
   }
 
-  async *#executeFindOneAndDeleteCommand(
+  protected async *executeFindOneAndDeleteCommand(
     cmd: FindOneAndDeleteWireCommand,
   ): AsyncIterable<Record<string, unknown>> {
-    const collection = this.#db.collection(cmd.collection);
+    const collection = this.db.collection(cmd.collection);
     const result = await collection.findOneAndDelete(cmd.filter, {
       ...(cmd.sort != null ? { sort: cmd.sort } : {}),
     });
@@ -144,8 +156,8 @@ export class MongoDriverImpl implements MongoDriver {
     }
   }
 
-  async *#executeAggregateCommand<Row>(cmd: AggregateWireCommand): AsyncIterable<Row> {
-    const collection = this.#db.collection(cmd.collection);
+  protected async *executeAggregateCommand<Row>(cmd: AggregateWireCommand): AsyncIterable<Row> {
+    const collection = this.db.collection(cmd.collection);
     const cursor = collection.aggregate(cmd.pipeline as Record<string, unknown>[]);
     yield* cursor as AsyncIterable<Row>;
   }

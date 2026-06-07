@@ -49,9 +49,12 @@ describe('computeIntegrityViolations', () => {
   });
 
   it('rethrows when graph() fails for an unexpected reason', () => {
+    // Give the member a package so packages.length > 0, which triggers the
+    // graph-reachability check and therefore the graph() call.
+    const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: 'sha256:head' });
     const member = createContractSpaceMember({
       spaceId: 'ext',
-      packages: [],
+      packages: [pkg],
       refs: {},
       headRef: { hash: 'sha256:head', invariants: [] },
       refsDir: '/tmp/refs',

@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
@@ -14,14 +13,14 @@ const mockSqlHook = createMockSpi();
 
 const emptySqlStorage = {
   namespaces: {
-    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} },
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } },
   },
 };
 
 function unboundNamespaceTables(tables: Record<string, unknown>) {
   return {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: tables } },
     },
   };
 }
@@ -116,7 +115,8 @@ describe('emitter', () => {
       expect(namespaces).toBeDefined();
       const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
       expect(unbound).toBeDefined();
-      const tables = unbound['tables'] as Record<string, unknown>;
+      const entries = unbound['entries'] as Record<string, unknown>;
+      const tables = entries['table'] as Record<string, unknown>;
       expect(tables).toBeDefined();
     },
     timeouts.typeScriptCompilation,
@@ -478,7 +478,40 @@ describe('emitter', () => {
     expect(result.contractDts).toContain('export type AddressOutput');
   });
 
-  it('throws when domain has more than one namespace', () => {
+  it('emits per-namespace valueObjects block when a single namespace declares value objects', () => {
+    const addressModel = {
+      fields: {
+        street: { type: { kind: 'scalar' as const, codecId: 'pg/text@1' }, nullable: false },
+      },
+    };
+    const contract = {
+      ...createTestContract(),
+      domain: {
+        namespaces: {
+          public: {
+            models: {},
+            valueObjects: { Address: addressModel },
+          },
+        },
+      },
+    };
+    const dts = generateContractDts(contract, mockSqlHook, [], {
+      storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
+      profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+    });
+    // The per-namespace valueObjects block must appear inside the namespace block.
+    // A positive match on the nested structure proves it is inside domain.namespaces.public.
+    expect(dts).toContain('readonly public:');
+    const publicNsIndex = dts.indexOf('readonly public:');
+    const afterPublic = dts.slice(publicNsIndex);
+    // valueObjects must appear before the closing of the namespace block
+    expect(afterPublic.indexOf('readonly valueObjects:')).toBeGreaterThan(0);
+    expect(afterPublic.indexOf('readonly valueObjects:')).toBeLessThan(
+      afterPublic.indexOf('readonly capabilities:'),
+    );
+  });
+
+  it('emits successfully when domain has more than one namespace', () => {
     const contract = {
       ...createTestContract(),
       domain: {
@@ -488,12 +521,12 @@ describe('emitter', () => {
         },
       },
     };
-    expect(() =>
-      generateContractDts(contract, mockSqlHook, [], {
-        storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
-        profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
-      }),
-    ).toThrow(DomainNamespaceResolutionError);
+    const dts = generateContractDts(contract, mockSqlHook, [], {
+      storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
+      profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+    });
+    expect(dts).toContain('readonly auth:');
+    expect(dts).toContain('readonly public:');
   });
 
   it('throws when the sole namespace id has no namespace payload on the contract', () => {

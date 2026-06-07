@@ -16,7 +16,9 @@ import { defineContract } from '../src/contract-builder';
 class StubNamespace extends NamespaceBase {
   readonly kind = 'schema' as const;
   readonly id: string;
-  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
+  readonly entries = Object.freeze({
+    table: Object.freeze({}) as Readonly<Record<string, IRNode>>,
+  });
 
   constructor(id: string) {
     super();

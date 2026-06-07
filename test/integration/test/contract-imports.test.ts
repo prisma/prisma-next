@@ -114,21 +114,23 @@ describe('contract.d.ts imports resolution', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                    createdAt: {
-                      codecId: 'pg/timestamptz@1',
-                      nativeType: 'timestamptz',
-                      nullable: false,
+              entries: {
+                table: {
+                  user: {
+                    columns: {
+                      id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                      email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                      createdAt: {
+                        codecId: 'pg/timestamptz@1',
+                        nativeType: 'timestamptz',
+                        nullable: false,
+                      },
                     },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
                   },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
                 },
                 post: {
                   columns: {
@@ -180,8 +182,8 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 const _contract: Contract = {} as any;
 const _storage: Contract['storage'] = _contract.storage;
 const _namespaces: Contract['storage']['namespaces'] = _storage.namespaces;
-const _tables: Contract['storage']['namespaces']['__unbound__']['tables'] =
-  _namespaces['__unbound__'].tables;
+const _tables: Contract['storage']['namespaces']['__unbound__']['entries']['table'] =
+  _namespaces['__unbound__'].entries.table;
 
 // Verify we can access CodecTypes
 const _codecTypes: CodecTypes = {} as any;
@@ -190,7 +192,7 @@ const _codecTypes: CodecTypes = {} as any;
 const _sqlStorage: SqlStorage = _contract.storage;
 
 // Verify the contract type is correctly structured
-type UserTable = Contract['storage']['namespaces']['__unbound__']['tables']['user'];
+type UserTable = Contract['storage']['namespaces']['__unbound__']['entries']['table']['user'];
 type UserColumns = UserTable['columns'];
 type UserIdColumn = UserColumns['id'];
 `;
@@ -270,16 +272,18 @@ type UserIdColumn = UserColumns['id'];
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              entries: {
+                table: {
+                  user: {
+                    columns: {
+                      id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                      email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                    },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
                   },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
                 },
               },
             },
@@ -320,11 +324,11 @@ const contract = new SqlContractSerializer().deserializeContract(contractJson) a
 
 // Verify we can access all exported types
 const _namespaces: Namespaces = contract.storage.namespaces;
-const _tables = _namespaces['__unbound__'].tables;
+const _tables = _namespaces['__unbound__'].entries.table;
 const _models: Models = domainModelsAtDefaultNamespace(contract.domain);
 
 // Verify we can access nested types
-type UserTable = Namespaces['__unbound__']['tables']['user'];
+type UserTable = Namespaces['__unbound__']['entries']['table']['user'];
 type UserColumns = UserTable['columns'];
 type UserIdColumn = UserColumns['id'];
 type UserIdCodecId = UserIdColumn['codecId'];

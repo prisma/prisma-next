@@ -24,7 +24,6 @@ import { createAnsiMigrationListStyler } from '../utils/formatters/migration-lis
 import {
   MIGRATION_LOG_EMPTY_MESSAGE,
   renderMigrationLogTable,
-  type SerializedLedgerEntryRecord,
   serializeLedgerEntriesForJson,
 } from '../utils/formatters/migration-log-table';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -32,17 +31,15 @@ import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import type { MigrationLogResult } from './json/schemas';
+
+export type { MigrationLogResult };
 
 interface MigrationLogOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly utc?: boolean;
   readonly ascii?: boolean;
-}
-
-export interface MigrationLogResult {
-  readonly ok: true;
-  readonly entries: readonly SerializedLedgerEntryRecord[];
 }
 
 export async function executeMigrationLogCommand(
@@ -138,9 +135,11 @@ export function createMigrationLogCommand(): Command {
       const result = await executeMigrationLogCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, (entries) => {
         if (flags.json) {
+          const records = serializeLedgerEntriesForJson(entries);
           const result: MigrationLogResult = {
             ok: true,
-            entries: serializeLedgerEntriesForJson(entries),
+            records,
+            summary: `${records.length} migration(s) applied`,
           };
           ui.output(JSON.stringify(result, null, 2));
         } else if (!flags.quiet) {

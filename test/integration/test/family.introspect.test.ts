@@ -1,8 +1,8 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -217,7 +217,7 @@ describe('family instance introspect', () => {
           }),
         );
 
-        const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+        const mockDriver: SqlControlDriverInstance<'postgres'> = {
           familyId: 'sql',
           targetId: 'postgres',
           query: async () => ({ rows: [] }),

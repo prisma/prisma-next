@@ -1,4 +1,4 @@
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import { PG_ENUM_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
 
 /**
@@ -117,7 +117,7 @@ function parseArrayElements(input: string): string[] {
  * (which writes them under `schema.annotations.pg.storageTypes`).
  */
 export async function introspectPostgresEnumTypes(options: {
-  readonly driver: ControlDriverInstance<'sql', 'postgres'>;
+  readonly driver: SqlControlDriverInstance<'postgres'>;
   readonly schemaName?: string;
 }): Promise<Record<string, PostgresEnumStorageTypeAnnotation>> {
   const namespace = options.schemaName ?? 'public';

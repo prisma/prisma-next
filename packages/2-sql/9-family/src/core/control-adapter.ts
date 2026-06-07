@@ -5,10 +5,13 @@ import type {
 } from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
-  ControlDriverInstance,
   ControlStack,
 } from '@prisma-next/framework-components/control';
-import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  PostgresEnumStorageEntry,
+  SqlControlDriverInstance,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   DdlNode,
@@ -16,11 +19,7 @@ import type {
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type {
-  ColumnsCompatible,
-  DefaultNormalizer,
-  NativeTypeNormalizer,
-} from './schema-verify/verify-sql-schema';
+import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
 
 /**
  * SQL control adapter interface for control-plane operations.
@@ -46,7 +45,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * @returns Resolved marker record, or `null` if not yet stamped.
    */
   readMarker(
-    driver: ControlDriverInstance<'sql', TTarget>,
+    driver: SqlControlDriverInstance<TTarget>,
     space: string,
   ): Promise<ContractMarkerRecord | null>;
 
@@ -58,7 +57,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * yet exist (fresh database / never-signed project).
    */
   readAllMarkers(
-    driver: ControlDriverInstance<'sql', TTarget>,
+    driver: SqlControlDriverInstance<TTarget>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
 
   /**
@@ -66,7 +65,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * omitted, returns rows for every space.
    */
   readLedger(
-    driver: ControlDriverInstance<'sql', TTarget>,
+    driver: SqlControlDriverInstance<TTarget>,
     space?: string,
   ): Promise<readonly LedgerEntryRecord[]>;
 
@@ -77,7 +76,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * (`now()` / `datetime('now')`). Mirrors `MongoControlAdapter.initMarker`.
    */
   insertMarker(
-    driver: ControlDriverInstance<'sql', TTarget>,
+    driver: SqlControlDriverInstance<TTarget>,
     space: string,
     destination: {
       readonly storageHash: string;
@@ -93,7 +92,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * time expression (`now()` / `datetime('now')`), never an app-side clock.
    */
   initMarker(
-    driver: ControlDriverInstance<'sql', TTarget>,
+    driver: SqlControlDriverInstance<TTarget>,
     space: string,
     destination: {
       readonly storageHash: string;
@@ -110,7 +109,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * and left untouched when omitted. Mirrors `MongoControlAdapter.updateMarker`.
    */
   updateMarker(
-    driver: ControlDriverInstance<'sql', TTarget>,
+    driver: SqlControlDriverInstance<TTarget>,
     space: string,
     expectedFrom: string,
     destination: {
@@ -127,7 +126,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * land in `origin_core_hash` / `destination_core_hash`.
    */
   writeLedgerEntry(
-    driver: ControlDriverInstance<'sql', TTarget>,
+    driver: SqlControlDriverInstance<TTarget>,
     space: string,
     entry: {
       readonly edgeId: string;
@@ -152,7 +151,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   introspect(
-    driver: ControlDriverInstance<'sql', TTarget>,
+    driver: SqlControlDriverInstance<TTarget>,
     contract?: unknown,
     schema?: string,
   ): Promise<SqlSchemaIR>;
@@ -170,16 +169,6 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * before comparison with contract native types during schema verification.
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
-
-  /**
-   * Optional target-supplied compatible-shape relation for column native types.
-   * When provided, schema verification uses it under the `external` control
-   * policy to decide whether a declared column type is compatible with the
-   * live type (instead of exact equality). Threading the same relation the
-   * migration planner/runner use keeps runtime verify and migration verify in
-   * agreement; when omitted, verification falls back to exact equality.
-   */
-  readonly columnsCompatible?: ColumnsCompatible;
 
   /**
    * Optional bridging adapter for resolving the existing values of a

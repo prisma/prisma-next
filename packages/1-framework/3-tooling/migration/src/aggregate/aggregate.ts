@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, StorageNamespace } from '@prisma-next/contract/types';
 import { join } from 'pathe';
 import {
   errorBundleNotFoundForGraphNode,
@@ -234,6 +234,28 @@ export function createContractSpaceMember(args: {
       return result;
     },
   };
+}
+
+/**
+ * Collect the union of every namespace declared across all members of an
+ * aggregate (app + extensions) and return a minimal object with the shape
+ * `{ storage: { namespaces } }` suitable for passing to
+ * `familyInstance.introspect`.
+ *
+ * Callers invoke this after the integrity gate (`buildContractSpaceAggregate`
+ * with `checkContracts: true`), so every `member.contract()` call is safe —
+ * no try/catch is needed here.
+ */
+export function collectAggregateNamespaces(aggregate: ContractSpaceAggregate): {
+  readonly storage: { readonly namespaces: Readonly<Record<string, StorageNamespace>> };
+} {
+  const merged: Record<string, StorageNamespace> = {};
+  for (const member of aggregate.spaces()) {
+    for (const [key, ns] of Object.entries(member.contract().storage.namespaces)) {
+      merged[key] = ns;
+    }
+  }
+  return { storage: { namespaces: merged } };
 }
 
 /**

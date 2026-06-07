@@ -709,19 +709,14 @@ function getInsertColumnOrder(
     return orderedColumns;
   }
 
-  let table: { columns: Record<string, unknown> } | undefined;
+  let table: { columns: Readonly<Record<string, unknown>> } | undefined;
   if (tableRef.namespaceId !== undefined) {
     const ns = contract.storage.namespaces[tableRef.namespaceId];
-    const found = ns?.tables[tableName] as { columns: Record<string, unknown> } | undefined;
-    if (found !== undefined) {
-      table = found;
-    }
+    table = ns?.entries.table[tableName];
   }
   if (table === undefined) {
     for (const ns of Object.values(contract.storage.namespaces)) {
-      // Namespace.tables is Record<string, IRNode> at the interface level;
-      // SQL family namespaces hold StorageTable instances which have .columns.
-      const found = ns.tables[tableName] as { columns: Record<string, unknown> } | undefined;
+      const found = ns.entries.table[tableName];
       if (found !== undefined) {
         table = found;
         break;

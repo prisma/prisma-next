@@ -1,3 +1,4 @@
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok, type Result } from '@prisma-next/utils/result';
@@ -25,6 +26,7 @@ import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags'
 import { shouldShowLegend, validateLegendOptions } from '../utils/legend';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+import type { MigrationGraphJsonResult, MigrationSpaceGraphEntry } from './json/schemas';
 import {
   listRefsByContractHash,
   migrationSpaceListEntriesFromAggregate,
@@ -40,42 +42,32 @@ interface MigrationGraphOptions extends CommonCommandOptions {
 }
 
 export interface MigrationGraphTreeSection {
-  readonly spaceId: string;
+  readonly space: string;
   readonly tree: string;
   readonly showHeading: boolean;
 }
 
 export interface MigrationGraphResult {
   readonly ok: true;
-  /** App-space graph for `--json` / `--dot` (unchanged machine output). */
+  /** App-space graph for the `--dot` Graphviz output. */
   readonly graph: MigrationGraph;
+  /** Nested per-space contracts + migrations for `--json`. */
+  readonly spaces: readonly MigrationSpaceGraphEntry[];
   readonly treeSections: readonly MigrationGraphTreeSection[];
   readonly summary: string;
 }
 
-export interface MigrationGraphJsonEdge {
-  readonly dirName: string;
-  readonly from: string;
-  readonly to: string;
-  readonly migrationHash: string;
-}
-
-export interface MigrationGraphJsonResult {
-  readonly ok: true;
-  readonly nodes: readonly string[];
-  readonly edges: readonly MigrationGraphJsonEdge[];
-  readonly summary: string;
-}
-
-function computeGraphSummary(graph: MigrationGraph): string {
-  return `${graph.nodes.size} node(s), ${graph.migrationByHash.size} edge(s)`;
+function computeGraphSummary(spaces: readonly MigrationSpaceGraphEntry[]): string {
+  const contractCount = spaces.reduce((count, space) => count + space.contracts.length, 0);
+  const migrationCount = spaces.reduce((count, space) => count + space.migrations.length, 0);
+  return `${spaces.length} space(s), ${contractCount} contract(s), ${migrationCount} migration(s)`;
 }
 
 export function formatMigrationGraphHumanOutput(result: MigrationGraphResult): string {
   const sections: string[] = [];
   for (const section of result.treeSections) {
     if (section.showHeading) {
-      sections.push(`${section.spaceId}:`);
+      sections.push(`${section.space}:`);
     }
     if (section.tree.length > 0) {
       sections.push(section.tree);
@@ -148,7 +140,7 @@ export async function executeMigrationGraphCommand(
     ? scopedSpaces
         .filter((spaceEntry) => spaceEntry.migrations.length > 0)
         .map((spaceEntry) => ({
-          graph: aggregate.space(spaceEntry.spaceId)!.graph(),
+          graph: aggregate.space(spaceEntry.space)!.graph(),
           liveContractHash,
         }))
     : [];
@@ -160,13 +152,15 @@ export async function executeMigrationGraphCommand(
     globalLayoutInputs.length > 0 ? computeGlobalMaxDirNameWidth(globalLayoutInputs) : undefined;
 
   const treeSections: MigrationGraphTreeSection[] = [];
+  const spaces: MigrationSpaceGraphEntry[] = [];
   for (const spaceEntry of scopedSpaces) {
-    const member = aggregate.space(spaceEntry.spaceId);
+    const member = aggregate.space(spaceEntry.space);
     if (member === undefined) {
       continue;
     }
     const graph = member.graph();
-    const isAppSpace = spaceEntry.spaceId === aggregate.app.spaceId;
+    const isAppSpace = spaceEntry.space === aggregate.app.spaceId;
+    const refsByHash = listRefsByContractHash(member);
     const tree =
       spaceEntry.migrations.length === 0
         ? ''
@@ -177,24 +171,38 @@ export async function executeMigrationGraphCommand(
             glyphMode,
             colorize,
             isAppSpace,
-            refsByHash: listRefsByContractHash(member),
+            refsByHash,
             ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
             ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
           });
     const displayTree =
       showSpaceHeadings && tree.length > 0 ? indentMigrationGraphTreeBlock(tree, '  ') : tree;
     treeSections.push({
-      spaceId: spaceEntry.spaceId,
+      space: spaceEntry.space,
       tree: displayTree,
       showHeading: showSpaceHeadings,
+    });
+    spaces.push({
+      space: spaceEntry.space,
+      contracts: [...graph.nodes].map((hash) => ({
+        hash,
+        refs: [...(refsByHash.get(hash) ?? [])],
+      })),
+      migrations: [...graph.migrationByHash.values()].map((edge) => ({
+        name: edge.dirName,
+        hash: edge.migrationHash,
+        fromContract: edge.from === EMPTY_CONTRACT_HASH ? null : edge.from,
+        toContract: edge.to,
+      })),
     });
   }
 
   return ok({
     ok: true,
     graph: appGraph,
+    spaces,
     treeSections,
-    summary: computeGraphSummary(appGraph),
+    summary: computeGraphSummary(spaces),
   });
 }
 
@@ -248,20 +256,10 @@ export function createMigrationGraphCommand(): Command {
           lines.push('}');
           ui.output(lines.join('\n'));
         } else if (flags.json) {
-          const nodes = [...graphResult.graph.nodes];
-          const edges = [...graphResult.graph.migrationByHash.values()].map(
-            (e): MigrationGraphJsonEdge => ({
-              dirName: e.dirName,
-              from: e.from,
-              to: e.to,
-              migrationHash: e.migrationHash,
-            }),
-          );
           const jsonResult: MigrationGraphJsonResult = {
             ok: true,
-            nodes,
-            edges,
-            summary: `${graphResult.graph.nodes.size} node(s), ${graphResult.graph.migrationByHash.size} edge(s)`,
+            spaces: [...graphResult.spaces],
+            summary: graphResult.summary,
           };
           ui.output(JSON.stringify(jsonResult, null, 2));
         } else if (!flags.quiet) {

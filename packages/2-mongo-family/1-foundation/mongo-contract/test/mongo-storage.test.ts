@@ -16,7 +16,9 @@ const hash = coreHash('h_0');
 class TestNamespace extends NamespaceBase {
   readonly kind = 'test-namespace' as const;
   readonly id: string;
-  readonly collections: Readonly<Record<string, MongoCollection>> = Object.freeze({});
+  readonly entries: Readonly<{
+    readonly collection: Readonly<Record<string, MongoCollection>>;
+  }> = Object.freeze({ collection: Object.freeze({}) });
 
   constructor(id: string) {
     super();
@@ -42,15 +44,19 @@ describe('MongoStorage', () => {
       namespaces: {
         default: buildMongoNamespace({
           id: 'default',
-          collections: {
-            events: new MongoCollection({
-              indexes: [new MongoIndex({ keys: [{ field: 'ts', direction: 1 }] })],
-            }),
+          entries: {
+            collection: {
+              events: new MongoCollection({
+                indexes: [new MongoIndex({ keys: [{ field: 'ts', direction: 1 }] })],
+              }),
+            },
           },
         }),
       },
     });
-    expect(storage.namespaces['default']!.collections['events']).toBeInstanceOf(MongoCollection);
+    expect(storage.namespaces['default']!.entries.collection['events']).toBeInstanceOf(
+      MongoCollection,
+    );
   });
 
   it('preserves namespace instances passed in (target supplies)', () => {

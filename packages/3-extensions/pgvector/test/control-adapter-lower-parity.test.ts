@@ -32,15 +32,17 @@ const contract = new SqlContractSerializer().deserializeContract({
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+        entries: {
+          table: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },

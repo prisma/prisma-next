@@ -1,12 +1,10 @@
 import {
-  createMongoControlDriver,
   createMongoRunnerDeps,
-  initMarker,
   introspectSchema,
-  readLedger,
-  readMarker,
+  MongoControlAdapterImpl,
 } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoControlDriver } from '@prisma-next/driver-mongo/control';
 import type { MongoControlFamilyInstance } from '@prisma-next/family-mongo/control';
 import type {
   ControlFamilyInstance,
@@ -33,6 +31,8 @@ import { createCollection } from '../src/core/migration-factories';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
 import { MongoMigrationRunner } from '../src/core/mongo-runner';
+
+const controlAdapter = new MongoControlAdapterImpl();
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -100,7 +100,7 @@ function makeContract(
         __unbound__: {
           id: '__unbound__',
           kind: 'mongo-namespace',
-          collections: storageCollections,
+          entries: { collection: storageCollections },
         },
       },
     },
@@ -116,7 +116,11 @@ function bareContract(storageHash: string): MongoContract {
     storage: {
       storageHash,
       namespaces: {
-        __unbound__: { id: '__unbound__', kind: 'mongo-namespace', collections: {} },
+        __unbound__: {
+          id: '__unbound__',
+          kind: 'mongo-namespace',
+          entries: { collection: {} },
+        },
       },
     },
   } as unknown as MongoContract;
@@ -166,7 +170,7 @@ function fakeFamily(): ControlFamilyInstance<'mongo', MongoSchemaIR> {
 function makeRunner() {
   return new MongoMigrationRunner(
     createMongoRunnerDeps(
-      createMongoControlDriver(db, client),
+      new MongoControlDriver(db, client),
       MongoDriverImpl.fromDb(db),
       fakeFamily(),
     ),
@@ -327,7 +331,10 @@ describe('MongoMigrationRunner', () => {
   });
 
   it('returns MARKER_ORIGIN_MISMATCH when marker hash differs', async () => {
-    await initMarker(db, 'app', { storageHash: 'sha256:different', profileHash: 'sha256:p1' });
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
+      storageHash: 'sha256:different',
+      profileHash: 'sha256:p1',
+    });
 
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
@@ -355,7 +362,10 @@ describe('MongoMigrationRunner', () => {
     // `plan.origin == null` skips origin validation: the caller (`db update`)
     // does its own correctness check via live-schema introspection, so
     // marker continuity is not required.
-    await initMarker(db, 'app', { storageHash: 'sha256:existing', profileHash: 'sha256:p1' });
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
+      storageHash: 'sha256:existing',
+      profileHash: 'sha256:p1',
+    });
 
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
@@ -400,7 +410,10 @@ describe('MongoMigrationRunner', () => {
   });
 
   it('returns MARKER_CAS_FAILURE when concurrent marker change causes CAS miss', async () => {
-    await initMarker(db, 'app', { storageHash: 'sha256:origin', profileHash: 'sha256:profile' });
+    await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
+      storageHash: 'sha256:origin',
+      profileHash: 'sha256:profile',
+    });
 
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
@@ -474,7 +487,7 @@ describe('MongoMigrationRunner', () => {
       frameworkComponents: [],
     });
 
-    const marker = await readMarker(db, 'app');
+    const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
     expect(marker).not.toBeNull();
     expect(marker?.storageHash).toBe('sha256:dest');
 
@@ -920,7 +933,7 @@ describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', ()
     const runner = mongoTargetDescriptor.migrations.createRunner(
       fakeFamily() as MongoControlFamilyInstance,
     );
-    const driver = createMongoControlDriver(db, client);
+    const driver = new MongoControlDriver(db, client);
     const space = 'ledger-wrapper-test';
     const destHash = 'sha256:wrapper-dest';
     const midHash = 'sha256:wrapper-mid';
@@ -969,7 +982,7 @@ describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', ()
     });
 
     expect(result.ok).toBe(true);
-    const ledger = await readLedger(db, space);
+    const ledger = await controlAdapter.readLedger(new MongoControlDriver(db, client), space);
     expect(ledger).toHaveLength(2);
     expect(ledger.map((entry) => entry.migrationName)).toEqual(['001_a', '002_b']);
     expect(ledger.map((entry) => entry.migrationHash)).toEqual(['sha256:mig-a', 'sha256:mig-b']);
@@ -977,18 +990,11 @@ describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', ()
 });
 
 describe('MongoControlDriver', () => {
-  it('query() throws because MongoDB does not support SQL', () => {
-    const driver = createMongoControlDriver(db, client);
-    expect(() => driver.query('SELECT 1')).toThrow(
-      'MongoDB control driver does not support SQL queries',
-    );
-  });
-
   it('close() delegates to the underlying MongoClient', async () => {
     const closeClient = new MongoClient(replSet.getUri());
     await closeClient.connect();
     const closeDb = closeClient.db('close_test');
-    const driver = createMongoControlDriver(closeDb, closeClient);
+    const driver = new MongoControlDriver(closeDb, closeClient);
 
     await driver.close();
 

@@ -154,7 +154,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('Up to date');
-          expect(out).toContain('✓ applied');
+          expect(out).toContain('applied');
         },
         timeouts.spinUpPpgDev,
       );
@@ -373,7 +373,7 @@ withTempDir(({ createTempDir }) => {
           const hints =
             statusJson.diagnostics?.flatMap((diagnostic) => [
               diagnostic.message,
-              ...diagnostic.hints,
+              ...(diagnostic.hints ?? []),
             ]) ?? [];
           expect(hints.join('\n')).toMatch(/db sign/i);
           expect(hints.join('\n')).toMatch(/db update/i);
@@ -417,8 +417,8 @@ withTempDir(({ createTempDir }) => {
 
           expect(json.ok).toBe(true);
           expect(json.summary).toBeTruthy();
-          expect(appSpace.spaceId).toBe('app');
-          expect(appSpace.targetHash).toBeTruthy();
+          expect(appSpace.space).toBe('app');
+          expect(appSpace.targetContract).toBeTruthy();
           expect(appSpace.migrations.length).toBeGreaterThan(0);
           expect(appSpace.migrations[0]?.status).toBe('applied');
 

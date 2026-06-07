@@ -103,9 +103,9 @@ describe('integration/upsert', () => {
         ) as Record<string, unknown>;
         const usersTable = (
           raw['storage'] as {
-            namespaces: { public: { tables: { users: Record<string, unknown> } } };
+            namespaces: { public: { entries: { table: { users: Record<string, unknown> } } } };
           }
-        ).namespaces.public.tables.users;
+        ).namespaces.public.entries.table.users;
         delete usersTable['primaryKey'];
         const contract = deserializeTestContract(raw);
         const context = { ...getTestContext(), contract };

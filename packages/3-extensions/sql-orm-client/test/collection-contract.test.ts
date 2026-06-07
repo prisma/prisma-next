@@ -236,10 +236,12 @@ describe('collection-contract capability detection', () => {
           namespaces: {
             __unbound__: {
               id: '__unbound__',
-              tables: {
-                t: {
-                  primaryKey: table.primaryKey,
-                  uniques: table.uniques ?? [],
+              entries: {
+                table: {
+                  t: {
+                    primaryKey: table.primaryKey,
+                    uniques: table.uniques ?? [],
+                  },
                 },
               },
             },

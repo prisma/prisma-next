@@ -10,8 +10,10 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { type } from 'arktype';
 import stripAnsi from 'strip-ansi';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { migrationShowResultSchema } from '../../src/commands/json/schemas';
 import type { MigrationShowPresent } from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
@@ -112,18 +114,16 @@ function setupConfigMock(): void {
 
 function samplePresent(overrides: Partial<MigrationShowPresent> = {}): MigrationShowPresent {
   return {
-    spaceId: 'app',
-    dirName: '20260101_100000_add_user',
-    dirPath: 'migrations/app/20260101_100000_add_user',
-    from: null,
-    to: 'sha256:hash-a',
-    migrationHash: 'sha256:edge-abc',
+    space: 'app',
+    name: '20260101_100000_add_user',
+    fromContract: null,
+    toContract: 'sha256:hash-a',
+    hash: 'sha256:edge-abc',
     createdAt: '2026-01-01T10:00:00.000Z',
     operations: [{ id: 'table.user', label: 'Create table "user"', operationClass: 'additive' }],
     preview: {
       statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
     },
-    summary: '1 operation(s)',
     ...overrides,
   };
 }
@@ -203,7 +203,6 @@ describe('formatMigrationShowOutput', () => {
               operationClass: 'destructive',
             },
           ],
-          summary: '2 operation(s)',
           preview: { statements: [] },
         }),
       },
@@ -219,7 +218,7 @@ describe('formatMigrationShowOutput', () => {
   it('returns empty string in quiet mode', () => {
     const flags = parseGlobalFlags({ quiet: true });
     const output = formatMigrationShowOutput(
-      { migration: samplePresent({ operations: [], summary: '0 operation(s)' }) },
+      { migration: samplePresent({ operations: [] }) },
       flags,
     );
 
@@ -317,9 +316,17 @@ describe('migration show command', () => {
     expect(getExitCode()).toBe(0);
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
     expect(jsonLine).toBeDefined();
-    const parsed = JSON.parse(jsonLine!) as { ok?: boolean; migration?: { dirName?: string } };
-    expect(parsed.ok).toBe(true);
-    expect(parsed.migration?.dirName).toBe(dirName);
+    const parsed = JSON.parse(jsonLine!);
+    expect(migrationShowResultSchema(parsed) instanceof type.errors).toBe(false);
+    const result = parsed as {
+      ok?: boolean;
+      migration?: { name?: string; space?: string };
+      summary?: string;
+    };
+    expect(result.ok).toBe(true);
+    expect(result.migration?.name).toBe(dirName);
+    expect(result.migration?.space).toBe('app');
+    expect(typeof result.summary).toBe('string');
   });
 
   it('errors with contract validation when contract JSON is invalid', async () => {

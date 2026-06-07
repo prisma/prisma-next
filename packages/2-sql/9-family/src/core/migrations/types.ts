@@ -4,7 +4,6 @@ import type {
   ContractSerializer,
   ContractSpace,
   ControlAdapterDescriptor,
-  ControlDriverInstance,
   ControlExtensionDescriptor,
   MigratableTargetDescriptor,
   MigrationOperationPolicy,
@@ -24,6 +23,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type {
+  SqlControlDriverInstance,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -117,7 +117,7 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
     readonly schemaName?: string;
   }) => readonly SchemaIssue[];
   introspectTypes?: (options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly schemaName?: string;
   }) => Promise<Record<string, StorageTypeInstance>>;
   /**
@@ -353,7 +353,7 @@ export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails> {
 
 export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   readonly plan: SqlMigrationPlan<TTargetDetails>;
-  readonly driver: ControlDriverInstance<'sql', string>;
+  readonly driver: SqlControlDriverInstance<string>;
   /**
    * Logical contract space this plan applies to. When omitted the
    * runner derives the space from {@link SqlMigrationPlan.spaceId};
@@ -434,7 +434,7 @@ export interface SqlMigrationRunner<TTargetDetails> {
    * (the connection the outer transaction is open on).
    */
   execute(options: {
-    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly driver: SqlControlDriverInstance<string>;
     readonly perSpaceOptions: ReadonlyArray<SqlMigrationRunnerExecuteOptions<TTargetDetails>>;
   }): Promise<MigrationRunnerResult>;
 
