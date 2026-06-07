@@ -55,7 +55,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     expect(() => call.toOp()).toThrow(/Unfilled migration placeholder/);
   });
 
-  it('CreateTableCall.toOp produces byte-identical SQL for a composite-PK table (AC-3)', () => {
+  it('CreateTableCall.toOp produces byte-identical SQL for a composite-PK table', () => {
     const call = new CreateTableCall(
       'public',
       'item',
@@ -78,7 +78,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     );
   });
 
-  it('CreateSchemaCall.toOp produces byte-identical SQL (AC-3)', () => {
+  it('CreateSchemaCall.toOp produces byte-identical SQL', () => {
     const call = new CreateSchemaCall('app');
 
     const op = call.toOp(testLower);
