@@ -1,28 +1,21 @@
-export interface PslPosition {
-  readonly offset: number;
-  readonly line: number;
-  readonly column: number;
-}
+export type {
+  PslBlockParam,
+  PslBlockParamList,
+  PslBlockParamOption,
+  PslBlockParamRef,
+  PslBlockParamValue,
+  PslDiagnosticCode,
+  PslExtensionBlock,
+  PslExtensionBlockParamList,
+  PslExtensionBlockParamOption,
+  PslExtensionBlockParamRef,
+  PslExtensionBlockParamScalarValue,
+  PslExtensionBlockParamValue,
+  PslPosition,
+  PslSpan,
+} from '../shared/psl-extension-block';
 
-export interface PslSpan {
-  readonly start: PslPosition;
-  readonly end: PslPosition;
-}
-
-export type PslDiagnosticCode =
-  | 'PSL_UNTERMINATED_BLOCK'
-  | 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK'
-  | 'PSL_INVALID_NAMESPACE_BLOCK'
-  | 'PSL_INVALID_ATTRIBUTE_SYNTAX'
-  | 'PSL_INVALID_MODEL_MEMBER'
-  | 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE'
-  | 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE'
-  | 'PSL_INVALID_RELATION_ATTRIBUTE'
-  | 'PSL_INVALID_REFERENTIAL_ACTION'
-  | 'PSL_INVALID_DEFAULT_VALUE'
-  | 'PSL_INVALID_ENUM_MEMBER'
-  | 'PSL_INVALID_TYPES_MEMBER'
-  | 'PSL_INVALID_QUALIFIED_TYPE';
+import type { PslDiagnosticCode, PslExtensionBlock, PslSpan } from '../shared/psl-extension-block';
 
 export interface PslDiagnostic {
   readonly code: PslDiagnosticCode;
@@ -203,6 +196,16 @@ export interface PslNamespace {
   readonly models: readonly PslModel[];
   readonly enums: readonly PslEnum[];
   readonly compositeTypes: readonly PslCompositeType[];
+  /**
+   * Extension-contributed top-level blocks parsed inside this namespace.
+   * Absent when no extension blocks were parsed (the parser populates this
+   * slot in D3; prior to that dispatch, the field is not set). Order matches
+   * source order within the namespace; extension-contributed and built-in
+   * blocks live in their own slots, so a namespace mixing `model X { … }` and
+   * `policy_select Y { … }` keeps the model in `models` and the policy in
+   * `extensionBlocks`.
+   */
+  readonly extensionBlocks?: readonly PslExtensionBlock[];
   readonly span: PslSpan;
 }
 

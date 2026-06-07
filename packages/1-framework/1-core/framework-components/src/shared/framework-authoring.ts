@@ -7,8 +7,10 @@ import {
   isColumnDefaultLiteralInputValue,
   isExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
+import type { PslBlockParam } from './psl-extension-block';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -157,10 +159,44 @@ export type AuthoringEntityTypeNamespace = {
   readonly [name: string]: AuthoringEntityTypeDescriptor | AuthoringEntityTypeNamespace;
 };
 
+/**
+ * Declarative descriptor for an extension-contributed top-level PSL block.
+ *
+ * An extension registers one of these per keyword it contributes. The
+ * framework owns the generic parser, validator, and printer — no
+ * parsing or printing code runs from the extension.
+ *
+ * - `keyword` is the PSL top-level identifier this descriptor claims
+ *   (`policy_select`, `role`, …).
+ * - `discriminator` is the routing key used by the printer dispatch and
+ *   the `entityTypes` lowering factory lookup. Convention:
+ *   `<target-or-family>-<kind>` (`postgres-policy-select`).
+ * - `name.required` declares whether the block must have a name token
+ *   after the keyword. Currently always `true` — anonymous blocks are
+ *   not part of the closed-grammar premise — but the field is explicit
+ *   so the type can evolve without a breaking change.
+ * - `parameters` maps parameter names to their value-kind descriptors
+ *   (`ref` / `value` / `option` / `list`). The generic parser and
+ *   validator interpret these; the extension supplies no parser or
+ *   printer function.
+ */
+export interface AuthoringPslBlockDescriptor {
+  readonly kind: 'pslBlock';
+  readonly keyword: string;
+  readonly discriminator: string;
+  readonly name: { readonly required: boolean };
+  readonly parameters: Record<string, PslBlockParam>;
+}
+
+export type AuthoringPslBlockNamespace = {
+  readonly [name: string]: AuthoringPslBlockDescriptor | AuthoringPslBlockNamespace;
+};
+
 export interface AuthoringContributions {
   readonly type?: AuthoringTypeNamespace;
   readonly field?: AuthoringFieldNamespace;
   readonly entityTypes?: AuthoringEntityTypeNamespace;
+  readonly pslBlocks?: AuthoringPslBlockNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -226,6 +262,42 @@ export function isAuthoringEntityTypeDescriptor(
   const factory = (output as { factory?: unknown }).factory;
   const template = (output as { template?: unknown }).template;
   return typeof factory === 'function' || template !== undefined;
+}
+
+export function isAuthoringPslBlockDescriptor(
+  value: unknown,
+): value is AuthoringPslBlockDescriptor {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const record = blindCast<
+    Record<string, unknown>,
+    'type-guard probing an unknown candidate-descriptor object for known property names'
+  >(value);
+  if (record['kind'] !== 'pslBlock') {
+    return false;
+  }
+  const keyword = record['keyword'];
+  if (typeof keyword !== 'string' || keyword.length === 0) {
+    return false;
+  }
+  const discriminator = record['discriminator'];
+  if (typeof discriminator !== 'string' || discriminator.length === 0) {
+    return false;
+  }
+  const name = record['name'];
+  if (typeof name !== 'object' || name === null) {
+    return false;
+  }
+  const nameRecord = blindCast<
+    Record<string, unknown>,
+    'type-guard probing the name property of a candidate pslBlock descriptor'
+  >(name);
+  if (typeof nameRecord['required'] !== 'boolean') {
+    return false;
+  }
+  const parameters = record['parameters'];
+  return typeof parameters === 'object' && parameters !== null && !Array.isArray(parameters);
 }
 
 /**
