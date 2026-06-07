@@ -140,6 +140,12 @@ function validateVariantsAndBases(modelIndex: ModelIndex, errors: string[]): voi
 function validateRelationTargets(modelIndex: ModelIndex, errors: string[]): void {
   for (const { namespaceId, name: modelName, model } of iterateIndexedModels(modelIndex)) {
     for (const [relName, relation] of Object.entries(model.relations ?? {})) {
+      // Cross-space relations (relation.to.space is defined) target a model in a
+      // different contract space. The local domain index only contains this
+      // contract's own models, so the target is intentionally absent here.
+      // Existence of the target is verified by the aggregate verifier at
+      // deploy time (after the spaces are composed), not at parse time.
+      if (relation.to.space !== undefined) continue;
       if (!lookupModel(modelIndex, relation.to)) {
         errors.push(
           `Relation "${relName}" on model "${namespaceId}:${modelName}" targets "${relation.to.namespace}:${relation.to.model}" which does not exist in domain.namespaces`,
