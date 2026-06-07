@@ -45,6 +45,7 @@ export {
   type StorageTypeInstanceInput,
   toStorageTypeInstance,
 } from './ir/storage-type-instance';
+export { StorageValueSet, type StorageValueSetInput } from './ir/storage-value-set';
 export {
   UniqueConstraint,
   type UniqueConstraintInput,
