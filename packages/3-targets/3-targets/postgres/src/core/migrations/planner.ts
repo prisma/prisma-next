@@ -52,8 +52,8 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
   readonly frameworkComponents: PlannerFrameworkComponents;
 };
 
-export function createPostgresMigrationPlanner(lower: Lowerer): PostgresMigrationPlanner {
-  return new PostgresMigrationPlanner(lower);
+export function createPostgresMigrationPlanner(lowerer: Lowerer): PostgresMigrationPlanner {
+  return new PostgresMigrationPlanner(lowerer);
 }
 
 /**
@@ -88,10 +88,10 @@ export type PostgresPlanResult =
  * authoring surface.
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
-  readonly #lower: Lowerer | undefined;
+  readonly #lowerer: Lowerer | undefined;
 
-  constructor(lower?: Lowerer) {
-    this.#lower = lower;
+  constructor(lowerer?: Lowerer) {
+    this.#lowerer = lowerer;
   }
 
   plan(options: {
@@ -136,7 +136,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         to: context.toHash,
       },
       spaceId,
-      this.#lower,
+      this.#lowerer,
     );
   }
 
@@ -233,7 +233,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           to: options.contract.storage.storageHash,
         },
         options.spaceId,
-        this.#lower,
+        this.#lowerer,
       ),
       ...(warnings.length > 0 ? { warnings: Object.freeze(warnings) } : {}),
     });

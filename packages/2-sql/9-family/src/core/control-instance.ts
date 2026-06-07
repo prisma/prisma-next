@@ -243,9 +243,10 @@ export interface SqlControlFamilyInstance
   lowerAst(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
 
   /**
-   * The target control adapter. Satisfies the `Lowerer` interface
-   * (`lower(ast, ctx)`) so callers that only need lowering can pass it
-   * directly without a wrapper.
+   * The target control adapter, constructed once when the family instance is
+   * built and held for the family's lifetime. Satisfies the `Lowerer`
+   * interface (`lower(ast, ctx)`), so callers that only need lowering — e.g.
+   * the migration planner — take it directly without wrapping `lowerAst`.
    */
   readonly adapter: SqlControlAdapter<string>;
 
@@ -401,11 +402,15 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
-  // Family-instance methods accept `SqlControlDriverInstance<string>` — the
-  // family API isn't generic on the target id. The adapter descriptor's `create`
-  // returns the concrete `SqlControlAdapter<TTargetId>`; widening the target id to
-  // `string` here matches the family-level driver type without a per-method probe.
-  const getControlAdapter = (): SqlControlAdapter<string> => adapter.create(stack);
+  // Construct the control adapter once, when the family instance is built,
+  // and hold it — mirroring how `createExecutionStack` builds the runtime
+  // adapter a single time. Family-instance methods accept
+  // `SqlControlDriverInstance<string>` (the family API isn't generic on the
+  // target id); the adapter descriptor's `create` returns the concrete
+  // `SqlControlAdapter<TTargetId>`, and widening the target id to `string`
+  // here matches the family-level driver type without a per-method probe.
+  const controlAdapter: SqlControlAdapter<string> = adapter.create(stack);
+  const getControlAdapter = (): SqlControlAdapter<string> => controlAdapter;
 
   const targetSerializer = (
     target as unknown as {
@@ -750,9 +755,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return getControlAdapter().lower(ast, context);
     },
 
-    get adapter(): SqlControlAdapter<string> {
-      return getControlAdapter();
-    },
+    adapter: controlAdapter,
 
     bootstrapControlTableQueries(): readonly DdlNode[] {
       return getControlAdapter().bootstrapControlTableQueries();
