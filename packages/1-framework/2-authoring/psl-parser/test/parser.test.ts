@@ -1404,7 +1404,7 @@ policy_select ReadPosts {
 
       expect(result.ok).toBe(false);
       expect(result.diagnostics).toHaveLength(1);
-      expect(result.diagnostics[0]?.code).toBe('PSL_UNSUPPORTED_TOP_LEVEL_BLOCK');
+      expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_EXTENSION_BLOCK_MEMBER');
       expect(result.diagnostics[0]?.message).toContain('not_an_assignment');
     });
 

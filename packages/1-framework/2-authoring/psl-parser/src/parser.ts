@@ -1540,7 +1540,7 @@ function parseExtensionBlock(
     const assignMatch = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
     if (!assignMatch) {
       pushDiagnostic(context, {
-        code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
+        code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
         message: `Invalid extension block body line "${line}"; expected "key = value"`,
         span: createTrimmedLineSpan(context, lineIndex),
       });
@@ -1602,7 +1602,7 @@ function captureParamRhs(
     case 'list': {
       if (!rhs.startsWith('[') || !rhs.endsWith(']')) {
         pushDiagnostic(context, {
-          code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
+          code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
           message: `Expected a bracketed list "[…]" for list parameter, got "${rhs}"`,
           span,
         });

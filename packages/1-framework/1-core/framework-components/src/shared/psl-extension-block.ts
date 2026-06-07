@@ -34,7 +34,41 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_DEFAULT_VALUE'
   | 'PSL_INVALID_ENUM_MEMBER'
   | 'PSL_INVALID_TYPES_MEMBER'
-  | 'PSL_INVALID_QUALIFIED_TYPE';
+  | 'PSL_INVALID_QUALIFIED_TYPE'
+  /**
+   * A malformed line inside an extension-contributed top-level block body, or
+   * a structurally invalid element inside a `list` parameter value.
+   *
+   * Replaces the overloaded `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` code that D3
+   * (the generic parser) previously used for these two parse-error sites inside
+   * extension blocks — keeping `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` for its
+   * original meaning (an unknown keyword at the top level) and giving
+   * extension-block parse errors their own code.
+   */
+  | 'PSL_INVALID_EXTENSION_BLOCK_MEMBER'
+  /**
+   * An unknown parameter key in an extension-contributed block — a key present
+   * in the source block but absent from the descriptor's `parameters` map.
+   */
+  | 'PSL_EXTENSION_UNKNOWN_PARAMETER'
+  /**
+   * A required parameter declared in the descriptor is absent from the parsed block.
+   */
+  | 'PSL_EXTENSION_MISSING_REQUIRED_PARAMETER'
+  /**
+   * An `option`-kind parameter value is not one of the allowed tokens listed
+   * in the descriptor's `values` array.
+   */
+  | 'PSL_EXTENSION_OPTION_OUT_OF_SET'
+  /**
+   * A `value`-kind parameter was rejected by the codec's `parsePslLiteral` hook.
+   */
+  | 'PSL_EXTENSION_INVALID_VALUE'
+  /**
+   * A `ref`-kind parameter identifier does not resolve to a declared entity of
+   * the required `refKind` within the declared scope.
+   */
+  | 'PSL_EXTENSION_UNRESOLVED_REF';
 
 /**
  * Descriptor vocabulary for a single parameter on a declared block.
