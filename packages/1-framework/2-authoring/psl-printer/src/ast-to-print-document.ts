@@ -59,6 +59,7 @@ export function astDocumentToPrintDocument(ast: PslDocumentAst): PrintDocument {
         values: e.values,
       })),
       models: printerModels,
+      extensionBlocks: namespace.extensionBlocks ?? [],
     };
   });
 

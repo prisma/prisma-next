@@ -1,6 +1,64 @@
+import type {
+  AuthoringPslBlockDescriptor,
+  AuthoringPslBlockNamespace,
+} from '@prisma-next/framework-components/authoring';
+import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type {
+  PslBlockParam,
+  PslExtensionBlock,
+  PslExtensionBlockParamValue,
+} from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { PrintDocument, PrintNamespaceSection } from './print-document';
 import type { PrinterEnumValue, PrinterField, PrinterNamedType } from './types';
+
+/**
+ * Indent unit used for PSL block bodies and namespace nesting.
+ */
+const PSL_INDENT_UNIT = '  ';
+
+/**
+ * Discriminator-keyed map from a registered `pslBlocks` namespace to the
+ * descriptor that declares how each AST node `kind` renders. Built once per
+ * `serializePrintDocument` call so the per-block dispatch in
+ * `serializeNamespaceContents` is O(1). Parser and printer live on the same
+ * descriptor — no separate printer namespace.
+ */
+type PslBlockDispatchMap = ReadonlyMap<string, AuthoringPslBlockDescriptor>;
+
+function buildPslBlockDispatchMap(
+  namespace: AuthoringPslBlockNamespace | undefined,
+): PslBlockDispatchMap {
+  const entries = new Map<string, AuthoringPslBlockDescriptor>();
+  if (!namespace) {
+    return entries;
+  }
+  collectBlockDescriptors(namespace, entries);
+  return entries;
+}
+
+function collectBlockDescriptors(
+  namespace: AuthoringPslBlockNamespace,
+  out: Map<string, AuthoringPslBlockDescriptor>,
+): void {
+  for (const value of Object.values(namespace)) {
+    if (isAuthoringPslBlockDescriptor(value)) {
+      out.set(value.discriminator, value);
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      collectBlockDescriptors(
+        blindCast<
+          AuthoringPslBlockNamespace,
+          'recursive descent into a sub-namespace whose leaves are still walked by isAuthoringPslBlockDescriptor'
+        >(value),
+        out,
+      );
+    }
+  }
+}
 
 const PSL_IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
 const ENUM_MEMBER_RESERVED_WORDS = new Set([
@@ -21,7 +79,15 @@ export function escapePslString(value: string): string {
     .replace(/\r/g, '\\r');
 }
 
-export function serializePrintDocument(doc: PrintDocument): string {
+export interface SerializePrintDocumentOptions {
+  readonly pslBlocks?: AuthoringPslBlockNamespace;
+  readonly codecLookup?: CodecLookup;
+}
+
+export function serializePrintDocument(
+  doc: PrintDocument,
+  options: SerializePrintDocumentOptions = {},
+): string {
   const sections: string[] = [];
 
   sections.push(doc.headerComment);
@@ -31,8 +97,14 @@ export function serializePrintDocument(doc: PrintDocument): string {
     sections.push(serializeTypesBlock(namedTypeEntries));
   }
 
+  const blockDispatchMap = buildPslBlockDispatchMap(options.pslBlocks);
+
   for (const namespace of doc.namespaces) {
-    const namespaceSections = serializeNamespaceContents(namespace);
+    const namespaceSections = serializeNamespaceContents(
+      namespace,
+      blockDispatchMap,
+      options.codecLookup,
+    );
     if (namespaceSections.length === 0) {
       continue;
     }
@@ -49,7 +121,11 @@ export function serializePrintDocument(doc: PrintDocument): string {
   return `${sections.join('\n\n')}\n`;
 }
 
-function serializeNamespaceContents(namespace: PrintNamespaceSection): string[] {
+function serializeNamespaceContents(
+  namespace: PrintNamespaceSection,
+  blockDispatchMap: PslBlockDispatchMap,
+  codecLookup: CodecLookup | undefined,
+): string[] {
   const sections: string[] = [];
   const enumsSorted = [...namespace.enums].sort((a, b) => a.name.localeCompare(b.name));
   for (const e of enumsSorted) {
@@ -58,7 +134,103 @@ function serializeNamespaceContents(namespace: PrintNamespaceSection): string[] 
   for (const model of namespace.models) {
     sections.push(serializeModel(model));
   }
+  for (const extensionBlock of namespace.extensionBlocks) {
+    sections.push(serializeExtensionBlock(extensionBlock, blockDispatchMap, codecLookup));
+  }
   return sections;
+}
+
+function serializeExtensionBlock(
+  extensionBlock: PslExtensionBlock,
+  blockDispatchMap: PslBlockDispatchMap,
+  codecLookup: CodecLookup | undefined,
+): string {
+  const descriptor = blockDispatchMap.get(extensionBlock.kind);
+  if (!descriptor) {
+    throw new Error(
+      `No pslBlocks contribution registered for extension-contributed block discriminator "${extensionBlock.kind}". Provide a matching pslBlocks contribution to serializePrintDocument, or remove the block from the input AST.`,
+    );
+  }
+  const lines: string[] = [`${descriptor.keyword} ${extensionBlock.name} {`];
+  for (const [paramName, paramDescriptor] of Object.entries(descriptor.parameters)) {
+    const paramValue = extensionBlock.parameters[paramName];
+    if (paramValue === undefined) {
+      continue;
+    }
+    const rendered = renderParamValue(paramValue, paramDescriptor, codecLookup, paramName);
+    lines.push(`${PSL_INDENT_UNIT}${paramName} = ${rendered}`);
+  }
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function renderParamValue(
+  paramValue: PslExtensionBlockParamValue,
+  descriptor: PslBlockParam,
+  codecLookup: CodecLookup | undefined,
+  paramName: string,
+): string {
+  switch (descriptor.kind) {
+    case 'ref': {
+      if (paramValue.kind !== 'ref') {
+        throw new Error(
+          `Extension block parameter "${paramName}": descriptor is "ref" but AST node has kind "${paramValue.kind}"`,
+        );
+      }
+      return paramValue.identifier;
+    }
+    case 'value': {
+      if (paramValue.kind !== 'value') {
+        throw new Error(
+          `Extension block parameter "${paramName}": descriptor is "value" but AST node has kind "${paramValue.kind}"`,
+        );
+      }
+      return renderValueParam(paramValue.raw, descriptor.codecId, codecLookup, paramName);
+    }
+    case 'option': {
+      if (paramValue.kind !== 'option') {
+        throw new Error(
+          `Extension block parameter "${paramName}": descriptor is "option" but AST node has kind "${paramValue.kind}"`,
+        );
+      }
+      return paramValue.token;
+    }
+    case 'list': {
+      if (paramValue.kind !== 'list') {
+        throw new Error(
+          `Extension block parameter "${paramName}": descriptor is "list" but AST node has kind "${paramValue.kind}"`,
+        );
+      }
+      const items = paramValue.items.map((item) =>
+        renderParamValue(item, descriptor.of, codecLookup, paramName),
+      );
+      return `[${items.join(', ')}]`;
+    }
+  }
+}
+
+function renderValueParam(
+  raw: string,
+  codecId: string,
+  codecLookup: CodecLookup | undefined,
+  paramName: string,
+): string {
+  if (!codecLookup) {
+    return raw;
+  }
+  const parseResult = codecLookup.parsePslLiteralFor(codecId, raw);
+  if (!parseResult.ok) {
+    throw new Error(
+      `Extension block parameter "${paramName}": codec "${codecId}" rejected the raw literal during print-back parse phase: ${parseResult.error}`,
+    );
+  }
+  const printResult = codecLookup.printPslLiteralFor(codecId, parseResult.value);
+  if (!printResult.ok) {
+    throw new Error(
+      `Extension block parameter "${paramName}": codec "${codecId}" rejected the value during print-back: ${printResult.error}`,
+    );
+  }
+  return printResult.raw;
 }
 
 function wrapNamespaceBlock(name: string, innerSections: readonly string[]): string {
