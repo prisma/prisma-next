@@ -111,7 +111,8 @@ describe('value-set serializer hydration + round-trip', () => {
     const storageNs = hydrated.storage.namespaces['public'];
     const roleColumn = storageNs?.entries.table?.['Post']?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
-      kind: 'value-set',
+      plane: 'storage',
+      entityKind: 'value-set',
       namespaceId: 'public',
       name: 'Role',
     });
@@ -125,7 +126,8 @@ describe('value-set serializer hydration + round-trip', () => {
     const domainNs = hydrated.domain.namespaces['public'];
     const roleField = domainNs?.models?.['Post']?.fields?.['role'];
     expect(roleField?.valueSet).toEqual({
-      kind: 'enum',
+      plane: 'domain',
+      entityKind: 'enum',
       namespaceId: 'public',
       name: 'Role',
     });

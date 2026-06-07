@@ -7,8 +7,8 @@ import {
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import type { SqlNamespace, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
-import { StorageTable, type StorageTableInput } from './storage-table';
-import { StorageValueSet, type StorageValueSetInput } from './storage-value-set';
+import { StorageTable } from './storage-table';
+import { StorageValueSet } from './storage-value-set';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
 
@@ -47,33 +47,13 @@ class SqlBoundNamespace extends NamespaceBase {
     this.id = input.id;
     const table = Object.freeze(
       Object.fromEntries(
-        Object.entries(input.entries.table).map(([k, v]) => [
-          k,
-          v instanceof StorageTable
-            ? v
-            : new StorageTable(
-                blindCast<
-                  StorageTableInput,
-                  'non-instance entry in entries.table is a StorageTableInput'
-                >(v),
-              ),
-        ]),
+        Object.entries(input.entries.table).map(([k, v]) => [k, new StorageTable(v)]),
       ),
     );
     if (input.entries.valueSet !== undefined) {
       const valueSet = Object.freeze(
         Object.fromEntries(
-          Object.entries(input.entries.valueSet).map(([k, v]) => [
-            k,
-            v instanceof StorageValueSet
-              ? v
-              : new StorageValueSet(
-                  blindCast<
-                    StorageValueSetInput,
-                    'non-instance entry in entries.valueSet is a StorageValueSetInput'
-                  >(v),
-                ),
-          ]),
+          Object.entries(input.entries.valueSet).map(([k, v]) => [k, new StorageValueSet(v)]),
         ),
       );
       this.entries = Object.freeze({ table, valueSet });

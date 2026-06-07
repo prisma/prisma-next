@@ -219,7 +219,8 @@ describe('enumType() authoring → contract structure', () => {
     const userModel = domainNs?.models?.['User'];
     const roleField = userModel?.fields?.['role'];
     expect(roleField?.valueSet).toEqual({
-      kind: 'enum',
+      plane: 'domain',
+      entityKind: 'enum',
       namespaceId: 'public',
       name: 'Role',
     });
@@ -243,7 +244,8 @@ describe('enumType() authoring → contract structure', () => {
     const userTable = storageNs?.entries.table?.['User'];
     const roleColumn = userTable?.columns?.['role'];
     expect(roleColumn?.valueSet).toEqual({
-      kind: 'value-set',
+      plane: 'storage',
+      entityKind: 'value-set',
       namespaceId: 'public',
       name: 'Role',
     });
@@ -319,7 +321,8 @@ describe('enumType() — full integration via defineContract factory', () => {
     // domain field valueSet
     const postModel = domainNs?.models?.['Post'];
     expect(postModel?.fields?.['status']?.valueSet).toEqual({
-      kind: 'enum',
+      plane: 'domain',
+      entityKind: 'enum',
       namespaceId: 'public',
       name: 'Status',
     });
@@ -327,7 +330,8 @@ describe('enumType() — full integration via defineContract factory', () => {
     // storage column valueSet
     const postTable = storageNs?.entries.table?.['Post'];
     expect(postTable?.columns?.['status']?.valueSet).toEqual({
-      kind: 'value-set',
+      plane: 'storage',
+      entityKind: 'value-set',
       namespaceId: 'public',
       name: 'Status',
     });

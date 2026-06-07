@@ -379,11 +379,11 @@ export function buildSqlContractFromDefinition(
       const enumHandle = !isValueObjectField(field) ? field.enumTypeHandle : undefined;
       const storageValueSetRef: ValueSetRef | undefined =
         enumHandle !== undefined
-          ? { kind: 'value-set', namespaceId, name: enumHandle.enumName }
+          ? { plane: 'storage', entityKind: 'value-set', namespaceId, name: enumHandle.enumName }
           : undefined;
       const domainValueSetRef: ValueSetRef | undefined =
         enumHandle !== undefined
-          ? { kind: 'enum', namespaceId, name: enumHandle.enumName }
+          ? { plane: 'domain', entityKind: 'enum', namespaceId, name: enumHandle.enumName }
           : undefined;
 
       const column = buildStorageColumn(field, storageValueSetRef, codecLookup);

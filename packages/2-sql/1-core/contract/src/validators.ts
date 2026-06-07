@@ -77,6 +77,14 @@ const ExecutionSchema = type({
   },
 });
 
+const ValueSetRefSchema = type({
+  plane: "'domain' | 'storage'",
+  namespaceId: 'string',
+  entityKind: "'enum' | 'value-set'",
+  name: 'string',
+  'spaceId?': 'string',
+});
+
 const StorageColumnSchema = type({
   '+': 'reject',
   nativeType: 'string',
@@ -86,12 +94,7 @@ const StorageColumnSchema = type({
   'typeRef?': 'string',
   'default?': ColumnDefaultSchema,
   'control?': ControlPolicySchema,
-  'valueSet?': type({
-    kind: "'enum' | 'value-set'",
-    namespaceId: 'string',
-    name: 'string',
-    'spaceId?': 'string',
-  }),
+  'valueSet?': ValueSetRefSchema,
 }).narrow((col, ctx) => {
   if (col.typeParams !== undefined && col.typeRef !== undefined) {
     return ctx.mustBe('a column with either typeParams or typeRef, not both');
@@ -385,13 +388,6 @@ function isContractFieldType(value: unknown): boolean {
 const ContractFieldTypeSchema = type('unknown').narrow((value, ctx) =>
   isContractFieldType(value) ? true : ctx.mustBe('scalar, valueObject, or union field type'),
 );
-
-const ValueSetRefSchema = type({
-  kind: "'enum' | 'value-set'",
-  namespaceId: 'string',
-  name: 'string',
-  'spaceId?': 'string',
-});
 
 const ModelFieldSchema = type({
   '+': 'reject',
