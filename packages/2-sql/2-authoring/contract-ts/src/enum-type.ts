@@ -5,6 +5,11 @@ import { blindCast } from '@prisma-next/utils/casts';
 // EnumMember — a single member declaration with literal type preservation
 // ---------------------------------------------------------------------------
 
+/**
+ * A single enum member produced by `member()`. The `Name` and `Value` generics
+ * are preserved as literal types so `enumType()` can carry the ordered value
+ * tuple in its return type.
+ */
 export interface EnumMember<Name extends string, Value extends string> {
   readonly name: Name;
   readonly value: Value;
