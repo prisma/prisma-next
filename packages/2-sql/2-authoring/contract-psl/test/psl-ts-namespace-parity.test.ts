@@ -1,3 +1,6 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { resolveCrossSpaceFkTableName } from '@prisma-next/migration-tools/aggregate';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
@@ -7,6 +10,7 @@ import {
   model,
   rel,
 } from '@prisma-next/sql-contract-ts/contract-builder';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -125,7 +129,10 @@ namespace public {
   });
 
   it('PSL colon-prefix produces the same spaceId/namespaceId/columns as the TS builder for a cross-contract-space FK', () => {
-    // PSL: supabase:auth.User cross-space reference
+    // PSL: supabase:auth.User cross-space reference.
+    // The PSL field type 'supabase:auth.User' has fieldTypeName = 'User', so the interpreter
+    // stores the symbolic tableName 'user' (fieldTypeName.toLowerCase()). The TS builder matches
+    // the same model reference by using extensionModel('User', ...) with the real table 'users'.
     const pslDocument = parsePslDocument({
       schema: `model Profile {
   id    Int @id
@@ -147,9 +154,10 @@ namespace public {
     expect(pslResult.ok).toBe(true);
     if (!pslResult.ok) return;
 
-    // TS builder: AuthUser handle branded with spaceId:'supabase', namespace:'auth', table:'users'
-    const AuthUser = extensionModel(
-      'AuthUser',
+    // TS builder: User handle branded with spaceId:'supabase', namespace:'auth', table:'users'.
+    // Uses 'User' as the model name to match the PSL field type 'supabase:auth.User'.
+    const User = extensionModel(
+      'User',
       {
         namespace: 'auth',
         fields: { id: field.column({ codecId: 'pg/text@1', nativeType: 'text' }).id() },
@@ -163,10 +171,10 @@ namespace public {
         id: field.column({ codecId: 'pg/int4@1', nativeType: 'int4' }).id(),
         userId: field.column({ codecId: 'pg/int4@1', nativeType: 'int4' }),
       },
-      relations: { user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }) },
+      relations: { user: rel.belongsTo(User, { from: 'userId', to: 'id' }) },
     }).sql(({ cols, constraints }) => ({
       table: 'profile',
-      foreignKeys: [constraints.foreignKey(cols.userId, AuthUser.refs.id)],
+      foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
     }));
 
     const tsContract = defineContract({
@@ -206,12 +214,52 @@ namespace public {
       },
     });
 
-    // tableName differs: PSL uses 'User'.toLowerCase() = 'user' (symbolic fallback until M3
-    // resolves it against the extension contract); TS carries the real table 'users' from the
-    // branded handle. This is the documented resolution fork — see M2.4 brief "Known architecture
-    // constraint". M3 will fix the PSL path by resolving the model name against the extension
-    // contract at the aggregate stage.
-    expect(pslFks[0]?.target.tableName).toBe('user');
-    expect(tsFks[0]?.target.tableName).toBe('users');
+    // M3a.1: after resolution through the aggregate loader's resolver, both PSL and TS produce
+    // the real table name 'users'. The resolver is called here directly with a synthetic extension
+    // contract to verify the resolution logic; the aggregate loader applies it end-to-end.
+    //
+    // PSL path: raw tableName = 'user' (symbolic: fieldTypeName.toLowerCase()), resolved to
+    //   'users' via model-name-lowercase match ('User'.toLowerCase() === 'user').
+    // TS path: raw tableName = 'users' (real table name from extensionModel), resolved to
+    //   'users' via exact storage.table match.
+    const syntheticExtensionContract = blindCast<
+      Contract,
+      'synthetic extension contract for resolver unit test — only domain.namespaces needed'
+    >({
+      target: 'postgres',
+      targetFamily: 'sql',
+      roots: {},
+      domain: {
+        namespaces: {
+          auth: {
+            models: {
+              User: { fields: {}, relations: {}, storage: { table: 'users' } },
+            },
+          },
+        },
+      },
+      storage: { storageHash: coreHash('sha256:test'), namespaces: {} },
+      capabilities: {},
+      extensionPacks: {},
+      profileHash: profileHash('sha256:test-profile'),
+      meta: {},
+    });
+
+    const resolvedPslTableName = resolveCrossSpaceFkTableName(
+      syntheticExtensionContract,
+      'supabase',
+      pslFks[0]!.target.namespaceId,
+      pslFks[0]!.target.tableName,
+    );
+    const resolvedTsTableName = resolveCrossSpaceFkTableName(
+      syntheticExtensionContract,
+      'supabase',
+      tsFks[0]!.target.namespaceId,
+      tsFks[0]!.target.tableName,
+    );
+
+    expect(resolvedPslTableName).toBe('users');
+    expect(resolvedTsTableName).toBe('users');
+    expect(resolvedPslTableName).toEqual(resolvedTsTableName);
   });
 });
