@@ -716,8 +716,7 @@ export const checkConstraintPlanCallStrategy: CallMigrationStrategy = (issues, c
   const handledIssueKeys = new Set<string>();
 
   for (const [namespaceId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-    for (const [tableName, tableRaw] of Object.entries(ns.entries.table)) {
-      if (!(tableRaw instanceof StorageTable)) continue;
+    for (const tableName of Object.keys(ns.entries.table)) {
       const contractChecks = collectContractChecks(ctx.toContract.storage, namespaceId, tableName);
       if (contractChecks.length === 0) continue;
 

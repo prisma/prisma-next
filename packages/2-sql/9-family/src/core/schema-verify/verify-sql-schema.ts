@@ -31,6 +31,7 @@ import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
+import { resolveValueSetValues } from '../migrations/contract-to-schema-ir';
 import type { CodecControlHooks } from '../migrations/types';
 import { emitIssueAndNodeUnderControlPolicy } from './control-verify-emit';
 import { verifierDisposition } from './verifier-disposition';
@@ -717,16 +718,11 @@ function verifyTableChildren(options: {
   // schemaTable.checks carries the introspected live checks (parsed value sets).
   // This call is additive: verifyEnumType (the native enum path) is untouched.
   if (contractTable.checks && contractTable.checks.length > 0) {
-    const contractCheckIRs = contractTable.checks.map((c) => {
-      const ref = c.valueSet;
-      const ns = contractStorage.namespaces[ref.namespaceId];
-      const permittedValues: readonly string[] = ns?.entries.valueSet?.[ref.name]?.values ?? [];
-      return {
-        name: c.name,
-        column: c.column,
-        permittedValues,
-      };
-    });
+    const contractCheckIRs = contractTable.checks.map((c) => ({
+      name: c.name,
+      column: c.column,
+      permittedValues: resolveValueSetValues(c.valueSet, contractStorage, `check "${c.name}"`),
+    }));
     const checkStatuses = verifyCheckConstraints(
       contractCheckIRs,
       schemaTable.checks ?? [],

@@ -280,4 +280,67 @@ describe('verifySqlSchema — check constraints', () => {
       expect.objectContaining({ kind: 'check_missing', table: 'post' }),
     );
   });
+
+  it('throws when a check references a value-set that is absent from the contract (malformed contract)', () => {
+    // Build a contract where the check's valueSet ref points to a name that
+    // does not exist in the namespace. A well-formed contract always
+    // co-emits the value-set alongside the check; this case indicates a
+    // broken emitter — it must error consistently instead of silently
+    // resolving to an empty set.
+    const ns = buildSqlNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: {
+          post: new StorageTable({
+            columns: {
+              status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+            checks: [
+              new CheckConstraint({
+                name: 'post_status_check',
+                column: 'status',
+                valueSet: {
+                  plane: 'storage',
+                  entityKind: 'value-set',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  name: 'post_status_values_DOES_NOT_EXIST',
+                },
+              }),
+            ],
+          }),
+        },
+        valueSet: {},
+      },
+    });
+    const contract = {
+      target: 'postgres' as const,
+      targetFamily: 'sql' as const,
+      roots: {},
+      profileHash: profileHash('sha256:test'),
+      storage: new SqlStorage({
+        storageHash: 'sha256:test' as StorageHashBase<string>,
+        namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
+      }),
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      meta: {},
+      extensionPacks: {},
+    };
+    const schema = createTestSchemaIR({
+      post: createSchemaTable('post', { status: { nativeType: 'text', nullable: false } }),
+    });
+
+    expect(() =>
+      verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      }),
+    ).toThrow('resolveValueSetValues');
+  });
 });
