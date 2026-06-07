@@ -34,10 +34,8 @@ import {
   PrimaryKeyConstraint,
 } from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
-import {
-  createSchema as createSchemaDdl,
-  createTable as createTableDdl,
-} from '../../contract-free/ddl';
+import { blindCast } from '@prisma-next/utils/casts';
+import * as contractFreeDdl from '../../contract-free/ddl';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import {
@@ -98,7 +96,7 @@ function postgresDefaultToDdlColumnDefault(
     default: {
       const exhaustive: never = columnDefault;
       throw new Error(
-        `postgresDefaultToDdlColumnDefault: unhandled kind "${(exhaustive as { kind: string }).kind}"`,
+        `postgresDefaultToDdlColumnDefault: unhandled kind "${blindCast<{ kind: string }, 'exhaustiveness: surface the unhandled default kind'>(exhaustive).kind}"`,
       );
     }
   }
@@ -148,7 +146,7 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
         `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass a SqlControlFamilyInstance to createPostgresMigrationPlanner.`,
       );
     }
-    const ddlNode = createTableDdl({
+    const ddlNode = contractFreeDdl.createTable({
       ...(this.schemaName !== UNBOUND_NAMESPACE_ID ? { schema: this.schemaName } : {}),
       table: this.tableName,
       columns: this.columns.map(columnSpecToDdlColumn),
@@ -843,7 +841,7 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
         `CreateSchemaCall.toOp: a DDL lowerer is required on the Postgres planner path (schema "${this.schemaName}"). Pass a SqlControlFamilyInstance to createPostgresMigrationPlanner.`,
       );
     }
-    const ddlNode = createSchemaDdl({ schema: this.schemaName, ifNotExists: true });
+    const ddlNode = contractFreeDdl.createSchema({ schema: this.schemaName, ifNotExists: true });
     const { sql } = lower(ddlNode, { contract: {} });
     return createSchemaOp(this.schemaName, sql);
   }
