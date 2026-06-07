@@ -11,7 +11,7 @@ import { typescriptContract, typescriptContractFromPath } from '../src/config-ty
 const emptyContext: ContractSourceContext = {
   composedExtensionPacks: [],
   scalarTypeDescriptors: new Map(),
-  authoringContributions: { field: {}, type: {}, entityTypes: {} },
+  authoringContributions: { field: {}, type: {}, entityTypes: {}, pslBlocks: {} },
   codecLookup: emptyCodecLookup,
   controlMutationDefaults: {
     defaultFunctionRegistry: new Map(),
