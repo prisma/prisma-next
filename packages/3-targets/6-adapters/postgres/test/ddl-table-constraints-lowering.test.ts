@@ -89,6 +89,28 @@ describe('PostgresCreateTable with table-level constraints', () => {
     );
   });
 
+  it('quotes mixed-case constraint names and splits schema-qualified FK refTable', () => {
+    const ast = createTable({
+      table: 'orders',
+      schema: 'public',
+      columns: [col('id', 'text', { notNull: true }), col('userId', 'text', { notNull: true })],
+      constraints: [
+        new PrimaryKeyConstraint({ columns: ['id'], name: 'MyPK' }),
+        new ForeignKeyConstraint({
+          columns: ['userId'],
+          refTable: 'app.users',
+          refColumns: ['id'],
+        }),
+      ],
+    });
+
+    const adapter = createPostgresAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+
+    expect(lowered.sql).toContain('CONSTRAINT "MyPK" PRIMARY KEY ("id")');
+    expect(lowered.sql).toContain('REFERENCES "app"."users" ("id")');
+  });
+
   it('omits constraints section when no constraints given', () => {
     const ast = createTable({
       table: 'simple',

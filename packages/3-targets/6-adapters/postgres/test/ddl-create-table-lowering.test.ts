@@ -63,4 +63,16 @@ describe('PostgresCreateTable DDL lowering', () => {
 
     expect(lowered.sql).toContain(`"name" text DEFAULT 'O''Reilly'`);
   });
+
+  it('escapes single quotes in JSON-object literal defaults', () => {
+    const ast = new PostgresCreateTable({
+      table: 'defaults',
+      columns: [col('meta', 'jsonb', { default: lit({ a: "x'y" }) })],
+    });
+
+    const adapter = createPostgresAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+
+    expect(lowered.sql).toContain(`"meta" jsonb DEFAULT '{"a":"x''y"}'`);
+  });
 });

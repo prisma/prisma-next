@@ -18,6 +18,10 @@ import type {
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import type { PostgresLoweredStatement } from './types';
 
+function quoteQualifiedIdentifier(name: string): string {
+  return name.split('.').map(quoteIdentifier).join('.');
+}
+
 function renderPrimaryKeyConstraint(constraint: PrimaryKeyConstraint): string {
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
@@ -29,7 +33,7 @@ function renderPrimaryKeyConstraint(constraint: PrimaryKeyConstraint): string {
 function renderForeignKeyConstraint(constraint: ForeignKeyConstraint): string {
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   const refCols = constraint.refColumns.map(quoteIdentifier).join(', ');
-  let sql = `FOREIGN KEY (${cols}) REFERENCES ${quoteIdentifier(constraint.refTable)} (${refCols})`;
+  let sql = `FOREIGN KEY (${cols}) REFERENCES ${quoteQualifiedIdentifier(constraint.refTable)} (${refCols})`;
   if (constraint.onDelete !== undefined) {
     sql += ` ON DELETE ${REFERENTIAL_ACTION_SQL[constraint.onDelete]}`;
   }
