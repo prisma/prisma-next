@@ -389,13 +389,17 @@ describe('renderMigrationList', () => {
     // Topology: app chain ∅→HASH_A→HASH_B (liveContractHash = HASH_B = @contract node)
     //           pgvector chain ∅→HASH_C
     // With appSpaceId='app', @contract must appear in app section only.
-    const appInit = migration({ dirName: 'app_init', from: null, to: HASH_A });
-    const appNext = migration({ dirName: 'app_next', from: HASH_A, to: HASH_B });
-    const pgvectorInit = migration({ dirName: 'pgvector_init', from: null, to: HASH_C });
+    const appInit = migration({ name: 'app_init', fromContract: null, toContract: HASH_A });
+    const appNext = migration({ name: 'app_next', fromContract: HASH_A, toContract: HASH_B });
+    const pgvectorInit = migration({
+      name: 'pgvector_init',
+      fromContract: null,
+      toContract: HASH_C,
+    });
     const listResult = result(
       [
-        { spaceId: 'app', migrations: [appInit, appNext] },
-        { spaceId: 'pgvector', migrations: [pgvectorInit] },
+        { space: 'app', migrations: [appInit, appNext] },
+        { space: 'pgvector', migrations: [pgvectorInit] },
       ],
       '3 migration(s) across 2 contract space(s)',
     );

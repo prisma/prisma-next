@@ -543,7 +543,7 @@ export async function executeMigrationStatusCommand(
       appliedMigrationHashes: appliedHashes,
       showAppliedOverlay,
     });
-    const isAppSpace = spaceEntry.spaceId === aggregate.app.spaceId;
+    const isAppSpace = spaceEntry.space === aggregate.app.spaceId;
     const tree = renderSpaceTree({
       member,
       liveContractHash: contractHash,
