@@ -91,10 +91,11 @@ export function computeIntegrityViolations(
     // For non-app spaces: a missing head.json is always an authoring error
     // (headRefMissing). The graph-reachability check (headRefNotInGraph) only
     // applies when the space actually has a migration graph — an extension that
-    // ships no packages (e.g. all-external auth/storage spaces) has an empty
-    // graph by design, and requiring the head hash to appear in that empty graph
-    // would always fail. The planner handles empty-graph spaces via synth
-    // strategy (zero ops).
+    // ships no packages (e.g. all-external auth/storage spaces) has nothing to
+    // reach the head ref through, and requiring the head hash to appear in an
+    // empty graph would always fail. When a space ships no migrations, the
+    // planner emits no DDL for it — the database is treated as already at the
+    // declared state.
     if (!isApp && headRefProblem === null) {
       if (member.headRef === null) {
         violations.push({ kind: 'headRefMissing', spaceId });

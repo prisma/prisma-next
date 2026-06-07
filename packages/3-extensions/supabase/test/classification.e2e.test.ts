@@ -35,7 +35,12 @@ import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces'
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
-import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import {
+  applicationDomainOf,
+  createDevDatabase,
+  timeouts,
+  withClient,
+} from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
@@ -104,7 +109,9 @@ describe('supabase external-schema classification (db init + db verify)', () => 
       // The verifier's `external` policy confirms declared tables exist.
       // Without this seed, `db verify` would fail with `declaredMissing`
       // for every auth.*/storage.* table.
-      await bootstrapSupabaseShim(connectionString);
+      await withClient(connectionString, async (client) => {
+        await bootstrapSupabaseShim(client);
+      });
 
       // 2. Materialise the supabase extension contract space on disk.
       //

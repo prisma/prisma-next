@@ -16,19 +16,28 @@
  *   `service_role`) and the `auth.uid()`, `auth.jwt()`, `auth.role()` functions.
  * - `cross-contract-refs` constituent seeds `auth.users` rows for FK tests.
  *
+ * The caller owns the client lifecycle — pass any already-connected `pg.Client`
+ * (e.g. one the test is sharing across setup steps, or one bound to a
+ * transaction for isolation). Convenience wrapper for tests that don't already
+ * have one:
+ *
  * @example
  * ```ts
- * import { createDevDatabase } from '@prisma-next/test-utils';
+ * import { withClient } from '@prisma-next/test-utils';
  * import { bootstrapSupabaseShim } from '@prisma-next/extension-supabase/test/utils';
  *
- * const db = await createDevDatabase();
- * await bootstrapSupabaseShim(db.connectionString);
+ * await withClient(connectionString, async (client) => {
+ *   await bootstrapSupabaseShim(client);
+ * });
  * ```
  */
-import { Client } from 'pg';
+import type { Client } from 'pg';
 
 /**
- * Seeds the database with the external Supabase schemas and tables.
+ * Seeds the database with the external Supabase schemas and tables. The
+ * caller passes an already-connected `pg.Client` — this function does not
+ * open or close connections, so the same client can be reused across the
+ * test's other setup steps.
  *
  * Creates two schemas (`auth`, `storage`) and four tables whose columns
  * exactly match the `@prisma-next/extension-supabase` contract:
@@ -41,55 +50,49 @@ import { Client } from 'pg';
  * Does NOT create Postgres roles or `auth.*` functions — those are added by
  * the `postgres-rls` constituent.
  */
-export async function bootstrapSupabaseShim(connectionString: string): Promise<void> {
-  const client = new Client({ connectionString });
-  await client.connect();
-  try {
-    await client.query('CREATE SCHEMA IF NOT EXISTS auth');
-    await client.query('CREATE SCHEMA IF NOT EXISTS storage');
+export async function bootstrapSupabaseShim(client: Client): Promise<void> {
+  await client.query('CREATE SCHEMA IF NOT EXISTS auth');
+  await client.query('CREATE SCHEMA IF NOT EXISTS storage');
 
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS auth.users (
-        id          uuid        NOT NULL,
-        email       text        NOT NULL,
-        created_at  timestamptz NOT NULL,
-        updated_at  timestamptz NOT NULL,
-        PRIMARY KEY (id)
-      )
-    `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS auth.users (
+      id          uuid        NOT NULL,
+      email       text        NOT NULL,
+      created_at  timestamptz NOT NULL,
+      updated_at  timestamptz NOT NULL,
+      PRIMARY KEY (id)
+    )
+  `);
 
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS auth.identities (
-        id          uuid        NOT NULL,
-        user_id     uuid        NOT NULL,
-        provider    text        NOT NULL,
-        created_at  timestamptz NOT NULL,
-        updated_at  timestamptz NOT NULL,
-        PRIMARY KEY (id)
-      )
-    `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS auth.identities (
+      id          uuid        NOT NULL,
+      user_id     uuid        NOT NULL,
+      provider    text        NOT NULL,
+      created_at  timestamptz NOT NULL,
+      updated_at  timestamptz NOT NULL,
+      PRIMARY KEY (id)
+    )
+  `);
 
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS storage.buckets (
-        id          text        NOT NULL,
-        name        text        NOT NULL,
-        created_at  timestamptz NOT NULL,
-        updated_at  timestamptz NOT NULL,
-        PRIMARY KEY (id)
-      )
-    `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS storage.buckets (
+      id          text        NOT NULL,
+      name        text        NOT NULL,
+      created_at  timestamptz NOT NULL,
+      updated_at  timestamptz NOT NULL,
+      PRIMARY KEY (id)
+    )
+  `);
 
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS storage.objects (
-        id          uuid        NOT NULL,
-        bucket_id   text        NOT NULL,
-        name        text        NOT NULL,
-        created_at  timestamptz NOT NULL,
-        updated_at  timestamptz NOT NULL,
-        PRIMARY KEY (id)
-      )
-    `);
-  } finally {
-    await client.end();
-  }
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS storage.objects (
+      id          uuid        NOT NULL,
+      bucket_id   text        NOT NULL,
+      name        text        NOT NULL,
+      created_at  timestamptz NOT NULL,
+      updated_at  timestamptz NOT NULL,
+      PRIMARY KEY (id)
+    )
+  `);
 }

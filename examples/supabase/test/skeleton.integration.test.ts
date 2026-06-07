@@ -85,7 +85,9 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       // Without this, `db verify` would fail with `declaredMissing` for every
       // `auth.*` / `storage.*` table — the verifier's `external` policy
       // confirms declared tables actually exist.
-      await bootstrapSupabaseShim(connectionString);
+      await withClient(connectionString, async (client) => {
+        await bootstrapSupabaseShim(client);
+      });
 
       // Step 2 — Materialise the supabase extension space on disk.
       //
