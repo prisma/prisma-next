@@ -180,6 +180,7 @@ export function createSchemaTable(
       columns: readonly string[];
       referencedTable: string;
       referencedColumns: readonly string[];
+      referencedSchema?: string;
       name?: string;
       onDelete?: SqlReferentialAction;
       onUpdate?: SqlReferentialAction;
