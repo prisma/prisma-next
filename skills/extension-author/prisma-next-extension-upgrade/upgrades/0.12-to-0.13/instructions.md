@@ -62,6 +62,28 @@ authoring PSL would only feel this if they depended on the bug,
 which is implausible. No public API was removed or renamed; opting
 into the new capabilities is additive. No extension-author action
 required.
+
+TML-2500 (M3a): cross-contract-space FK planner + verifier integration.
+Internal framework changes only — no extension-author-facing API or
+behaviour change. (a) The CLI aggregate loader now resolves cross-space
+FK `tableName` values from the corresponding extension contract before
+handing off to the planner (previously the symbolic model-name fallback
+was passed through unchanged). Extensions that declare cross-space FKs
+via `extensionModel` + `constraints.foreignKey` automatically benefit;
+no changes required at call sites. (b) The Postgres planner's live DDL
+path (`renderForeignKeySql`, `operations/constraints.ts`) already reads
+`fk.references.schema` correctly for qualified REFERENCES targets; the
+dead secondary path (`buildForeignKeySql`) now carries a comment
+documenting it is not invoked in production. (c) The contract domain
+validator (`validate-domain.ts`) now skips relation-target existence
+checks for cross-space relations (those where `relation.to.space` is
+defined) — these targets live in a different contract space and are
+absent from the local domain index by design; they are verified by the
+aggregate verifier at deploy time. (d) The verifier's `verifyForeignKeys`
+already handles cross-space FKs without any change. The AC7 integration
+test (`packages/3-extensions/supabase/test/cross-contract-fk.integration.
+test.ts`) is internal scaffolding — it does not add a consumer-facing
+surface. No extension-author action required.
 -->
 
 # 0.12 → 0.13 — Extension-author upgrade instructions
