@@ -588,15 +588,14 @@ describe('referential actions integration', () => {
         const validatedContract = new SqlContractSerializer().deserializeContract(
           contract,
         ) as Contract<SqlStorage>;
-        const familyInstance = sql.create(
-          createControlStack({
-            family: sql,
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensionPacks: [],
-          }),
-        );
+        const controlStack = createControlStack({
+          family: sql,
+          target: postgres,
+          adapter: postgresAdapter,
+          driver: postgresDriver,
+          extensionPacks: [],
+        });
+        const familyInstance = sql.create(controlStack);
 
         // Introspect the empty database to get a baseline schema IR
         const driver = await postgresDriver.create(connectionString);
@@ -604,7 +603,7 @@ describe('referential actions integration', () => {
           const schemaIR = await familyInstance.introspect({ driver });
 
           // Plan migrations using the target's SQL-specific planner (contract → DDL)
-          const planner = postgres.createPlanner(familyInstance);
+          const planner = postgres.createPlanner(postgresAdapter.create(controlStack));
           const planResult = planner.plan({
             contract: validatedContract,
             schema: schemaIR,

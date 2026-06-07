@@ -10,19 +10,19 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { applicationDomainOf } from '@prisma-next/test-utils';
-import { describe, expect, it } from 'vitest';
-import type { PostgresDdlNode } from '../../src/core/ddl/nodes';
-import { enumStorageCompoundKey } from '../../src/core/migrations/enum-planning';
-import { planIssues } from '../../src/core/migrations/issue-planner';
-import type { CreateTableCall } from '../../src/core/migrations/op-factory-call';
-import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
+import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
+import { enumStorageCompoundKey } from '@prisma-next/target-postgres/enum-planning';
+import { planIssues } from '@prisma-next/target-postgres/issue-planner';
+import type { CreateTableCall } from '@prisma-next/target-postgres/op-factory-call';
+import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
 import {
+  PostgresEnumType,
   PostgresSchema,
   PostgresUnboundSchema,
   postgresCreateNamespace,
-} from '../../src/core/postgres-schema';
-import { PostgresEnumType } from '../../src/exports/types';
+} from '@prisma-next/target-postgres/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
 
 const testAdapter = createPostgresAdapter();
 const testLower: Parameters<CreateTableCall['toOp']>[0] = {

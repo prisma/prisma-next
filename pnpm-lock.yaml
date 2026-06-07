@@ -3934,9 +3934,6 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
     devDependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:0.12.0
-        version: link:../../6-adapters/postgres
       '@prisma-next/test-utils':
         specifier: workspace:0.12.0
         version: link:../../../../test/utils
@@ -4516,6 +4513,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:0.12.0
         version: link:../../packages/2-sql/5-runtime
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:0.12.0
+        version: link:../../packages/2-sql/1-core/schema-ir
       '@prisma-next/target-mongo':
         specifier: workspace:0.12.0
         version: link:../../packages/3-mongo-target/1-mongo-target

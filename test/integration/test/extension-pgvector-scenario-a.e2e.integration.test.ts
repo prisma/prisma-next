@@ -172,15 +172,15 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
   };
 }
 
-const familyInstance = sqlFamilyDescriptor.create(
-  createControlStack({
-    family: sqlFamilyDescriptor,
-    target: postgresTargetDescriptor,
-    adapter: postgresAdapterDescriptor,
-    driver: postgresDriverDescriptor,
-    extensionPacks: [pgvectorExtensionDescriptor],
-  }),
-);
+const controlStack = createControlStack({
+  family: sqlFamilyDescriptor,
+  target: postgresTargetDescriptor,
+  adapter: postgresAdapterDescriptor,
+  driver: postgresDriverDescriptor,
+  extensionPacks: [pgvectorExtensionDescriptor],
+});
+const familyInstance = sqlFamilyDescriptor.create(controlStack);
+const controlAdapter = postgresAdapterDescriptor.create(controlStack);
 
 const frameworkComponents = [
   postgresTargetDescriptor,
@@ -331,6 +331,7 @@ describe.sequential('pgvector Scenario A end-to-end (PGlite, T4.3)', {
 
     const result = await executeDbInit({
       driver: driver!,
+      adapter: controlAdapter,
       familyInstance,
       contract: buildAppContract({ withLength: true }),
       mode: 'plan',
@@ -364,6 +365,7 @@ describe.sequential('pgvector Scenario A end-to-end (PGlite, T4.3)', {
 
     const result = await executeDbInit({
       driver: driver!,
+      adapter: controlAdapter,
       familyInstance,
       contract: buildAppContract({ withLength: false }),
       mode: 'apply',

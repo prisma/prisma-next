@@ -5,11 +5,11 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
+import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { PostgresDdlNode } from '../../src/core/ddl/nodes';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
-import { postgresCreateNamespace } from '../../src/core/postgres-schema';
 
 function makeContract(
   tables: Record<string, StorageTableInput>,
