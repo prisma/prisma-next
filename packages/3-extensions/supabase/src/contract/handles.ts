@@ -1,23 +1,23 @@
 /**
  * Branded model handles for the Supabase contract space.
  *
- * Each handle is a `ContractModelBuilder` branded `spaceId: 'supabase'` with
- * its real namespace, table name, and columns — so `AuthUser.refs.id` is a
- * cross-space `TargetFieldRef` carrying `spaceId:'supabase'`, `namespaceId:'auth'`,
- * `tableName:'users'`.
+ * Each handle is built via `extensionModel` branded `spaceId: 'supabase'` with
+ * its real domain model name, namespace, table name, and columns — so
+ * `AuthUser.refs.id` is a cross-space `TargetFieldRef` carrying
+ * `spaceId:'supabase'`, `namespaceId:'auth'`, `tableName:'users'`.
  *
  * Columns mirror the shipped contract (`src/contract/contract.json`); the
  * handle↔contract consistency test (`test/contract-handles.test.ts`) asserts
  * they agree so any drift is caught at test time.
  */
-import { ContractModelBuilder, field } from '@prisma-next/sql-contract-ts/contract-builder';
+import { extensionModel, field } from '@prisma-next/sql-contract-ts/contract-builder';
 
 const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 const pgTimestamptz = { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' } as const;
 
-export const AuthUser = new ContractModelBuilder(
+export const AuthUser = extensionModel(
+  'AuthUser',
   {
-    modelName: 'User' as const,
     namespace: 'auth',
     fields: {
       id: field.column(pgText).id(),
@@ -25,16 +25,14 @@ export const AuthUser = new ContractModelBuilder(
       created_at: field.column(pgTimestamptz),
       updated_at: field.column(pgTimestamptz),
     },
-    relations: {},
+    table: 'users',
   },
-  undefined,
-  undefined,
   'supabase' as const,
-).sql({ table: 'users' });
+);
 
-export const AuthIdentity = new ContractModelBuilder(
+export const AuthIdentity = extensionModel(
+  'AuthIdentity',
   {
-    modelName: 'Identity' as const,
     namespace: 'auth',
     fields: {
       id: field.column(pgText).id(),
@@ -43,16 +41,14 @@ export const AuthIdentity = new ContractModelBuilder(
       created_at: field.column(pgTimestamptz),
       updated_at: field.column(pgTimestamptz),
     },
-    relations: {},
+    table: 'identities',
   },
-  undefined,
-  undefined,
   'supabase' as const,
-).sql({ table: 'identities' });
+);
 
-export const StorageBucket = new ContractModelBuilder(
+export const StorageBucket = extensionModel(
+  'StorageBucket',
   {
-    modelName: 'Bucket' as const,
     namespace: 'storage',
     fields: {
       id: field.column(pgText).id(),
@@ -60,16 +56,14 @@ export const StorageBucket = new ContractModelBuilder(
       created_at: field.column(pgTimestamptz),
       updated_at: field.column(pgTimestamptz),
     },
-    relations: {},
+    table: 'buckets',
   },
-  undefined,
-  undefined,
   'supabase' as const,
-).sql({ table: 'buckets' });
+);
 
-export const StorageObject = new ContractModelBuilder(
+export const StorageObject = extensionModel(
+  'StorageObject',
   {
-    modelName: 'Object' as const,
     namespace: 'storage',
     fields: {
       id: field.column(pgText).id(),
@@ -78,9 +72,7 @@ export const StorageObject = new ContractModelBuilder(
       created_at: field.column(pgTimestamptz),
       updated_at: field.column(pgTimestamptz),
     },
-    relations: {},
+    table: 'objects',
   },
-  undefined,
-  undefined,
   'supabase' as const,
-).sql({ table: 'objects' });
+);

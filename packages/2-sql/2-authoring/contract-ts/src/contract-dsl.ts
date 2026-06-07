@@ -1482,6 +1482,60 @@ export function model<
 }
 
 /**
+ * Factory for building a standalone branded extension model handle.
+ *
+ * Use this instead of `new ContractModelBuilder(…)` when constructing handles
+ * for models that live in a foreign contract space (e.g. a Supabase extension
+ * model referenced by a user's contract). The `spaceId` brands the returned
+ * handle so `refs.<field>.spaceId` carries the foreign space identifier.
+ *
+ * @param name - The domain model name as declared in the foreign contract
+ *   (e.g. `'AuthUser'`, not a bare table alias like `'User'`).
+ * @param input.namespace - The namespace within the foreign space (e.g. `'auth'`).
+ * @param input.fields - Field definitions (use `field.column(…)`).
+ * @param input.table - The physical table name in the foreign schema.
+ * @param spaceId - The extension space identifier (e.g. `'supabase'`).
+ */
+export function extensionModel<
+  const ModelName extends string,
+  Fields extends Record<string, ScalarFieldBuilder>,
+  const TSpaceId extends string,
+>(
+  name: ModelName,
+  input: {
+    readonly namespace: string;
+    readonly fields: Fields;
+    readonly table: string;
+  },
+  spaceId: TSpaceId,
+): ContractModelBuilder<
+  ModelName,
+  Fields,
+  Record<never, never>,
+  undefined,
+  undefined,
+  Record<never, never>,
+  TSpaceId
+> {
+  const builder = new ContractModelBuilder<
+    ModelName,
+    Fields,
+    Record<never, never>,
+    undefined,
+    undefined,
+    Record<never, never>,
+    TSpaceId
+  >(
+    { modelName: name, namespace: input.namespace, fields: input.fields, relations: {} },
+    undefined,
+    undefined,
+    spaceId,
+    input.table,
+  );
+  return builder;
+}
+
+/**
  * Narrow shape for detecting a cross-space branded model handle at runtime.
  * `ContractModelBuilder` exposes these fields but `AnyNamedModelToken` does
  * not declare them; this guard bridges the gap without a bare cast.

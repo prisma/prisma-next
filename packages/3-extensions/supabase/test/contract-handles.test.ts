@@ -18,11 +18,20 @@
  *
  * 3. Handle↔contract consistency: `AuthUser` / `AuthIdentity` / `StorageBucket`
  *    / `StorageObject` each agree with the shipped `contract.json` on namespace,
- *    table name, and column names.
+ *    table name, column names, and model name (key in contract.json domain).
+ *
+ * 4. extensionModel factory: a handle built via `extensionModel` carries the
+ *    same brand/coordinate as one built by hand.
  */
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { TargetFieldRef } from '@prisma-next/sql-contract-ts/contract-builder';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import {
+  defineContract,
+  extensionModel,
+  field,
+  model,
+  rel,
+} from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import contractJson from '../src/contract/contract.json' with { type: 'json' };
 import { AuthIdentity, AuthUser, StorageBucket, StorageObject } from '../src/exports/contract';
@@ -62,7 +71,7 @@ describe('AuthUser handle — brand and coordinate', () => {
   });
 
   it('refs.id is a cross-space TargetFieldRef branded "supabase"', () => {
-    expectTypeOf(AuthUser.refs.id).toEqualTypeOf<TargetFieldRef<'User', 'id', 'supabase'>>();
+    expectTypeOf(AuthUser.refs.id).toEqualTypeOf<TargetFieldRef<'AuthUser', 'id', 'supabase'>>();
     expect(AuthUser.refs.id.spaceId).toBe('supabase');
     expect(AuthUser.refs.id.namespaceId).toBe('auth');
     expect(AuthUser.refs.id.tableName).toBe('users');
@@ -158,7 +167,7 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
     const to = userRelation?.['to'] as Record<string, unknown> | undefined;
     expect(to?.['space']).toBe('supabase');
     expect(to?.['namespace']).toBe('auth');
-    expect(to?.['model']).toBe('User');
+    expect(to?.['model']).toBe('AuthUser');
   });
 });
 
@@ -176,9 +185,10 @@ type ContractJsonDomain = {
 describe('handle↔contract.json consistency', () => {
   const domain = contractJson.domain as unknown as ContractJsonDomain;
 
-  it('AuthUser namespace, table, and columns match contract.json', () => {
+  it('AuthUser modelName, namespace, table, and columns match contract.json', () => {
     const jsonModel = domain.namespaces['auth']?.models['AuthUser'];
     expect(jsonModel).toBeDefined();
+    expect(AuthUser.stageOne.modelName).toBe('AuthUser');
     expect(AuthUser.stageOne.namespace).toBe('auth');
     expect(AuthUser.tableName).toBe(jsonModel!.storage.table);
     const jsonColumns = Object.keys(jsonModel!.storage.fields);
@@ -186,9 +196,10 @@ describe('handle↔contract.json consistency', () => {
     expect(handleColumns.sort()).toEqual(jsonColumns.sort());
   });
 
-  it('AuthIdentity namespace, table, and columns match contract.json', () => {
+  it('AuthIdentity modelName, namespace, table, and columns match contract.json', () => {
     const jsonModel = domain.namespaces['auth']?.models['AuthIdentity'];
     expect(jsonModel).toBeDefined();
+    expect(AuthIdentity.stageOne.modelName).toBe('AuthIdentity');
     expect(AuthIdentity.stageOne.namespace).toBe('auth');
     expect(AuthIdentity.tableName).toBe(jsonModel!.storage.table);
     const jsonColumns = Object.keys(jsonModel!.storage.fields);
@@ -196,9 +207,10 @@ describe('handle↔contract.json consistency', () => {
     expect(handleColumns.sort()).toEqual(jsonColumns.sort());
   });
 
-  it('StorageBucket namespace, table, and columns match contract.json', () => {
+  it('StorageBucket modelName, namespace, table, and columns match contract.json', () => {
     const jsonModel = domain.namespaces['storage']?.models['StorageBucket'];
     expect(jsonModel).toBeDefined();
+    expect(StorageBucket.stageOne.modelName).toBe('StorageBucket');
     expect(StorageBucket.stageOne.namespace).toBe('storage');
     expect(StorageBucket.tableName).toBe(jsonModel!.storage.table);
     const jsonColumns = Object.keys(jsonModel!.storage.fields);
@@ -206,13 +218,47 @@ describe('handle↔contract.json consistency', () => {
     expect(handleColumns.sort()).toEqual(jsonColumns.sort());
   });
 
-  it('StorageObject namespace, table, and columns match contract.json', () => {
+  it('StorageObject modelName, namespace, table, and columns match contract.json', () => {
     const jsonModel = domain.namespaces['storage']?.models['StorageObject'];
     expect(jsonModel).toBeDefined();
+    expect(StorageObject.stageOne.modelName).toBe('StorageObject');
     expect(StorageObject.stageOne.namespace).toBe('storage');
     expect(StorageObject.tableName).toBe(jsonModel!.storage.table);
     const jsonColumns = Object.keys(jsonModel!.storage.fields);
     const handleColumns = Object.keys(StorageObject.stageOne.fields);
     expect(handleColumns.sort()).toEqual(jsonColumns.sort());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. extensionModel factory
+// ---------------------------------------------------------------------------
+
+describe('extensionModel factory', () => {
+  const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
+
+  it('produces a handle with the same brand/coordinate as a hand-constructed one', () => {
+    const handle = extensionModel(
+      'TestModel',
+      { namespace: 'auth', fields: { id: field.column(pgText).id() }, table: 'test_models' },
+      'supabase' as const,
+    );
+
+    expect(handle.stageOne.modelName).toBe('TestModel');
+    expect(handle.spaceId).toBe('supabase');
+    expect(handle.stageOne.namespace).toBe('auth');
+    expect(handle.tableName).toBe('test_models');
+    expect(handle.refs.id.spaceId).toBe('supabase');
+    expect(handle.refs.id.namespaceId).toBe('auth');
+    expect(handle.refs.id.tableName).toBe('test_models');
+  });
+
+  it('refs carry the correct type-level brand', () => {
+    const handle = extensionModel(
+      'TestModel',
+      { namespace: 'auth', fields: { id: field.column(pgText).id() }, table: 'test_models' },
+      'supabase' as const,
+    );
+    expectTypeOf(handle.refs.id).toEqualTypeOf<TargetFieldRef<'TestModel', 'id', 'supabase'>>();
   });
 });

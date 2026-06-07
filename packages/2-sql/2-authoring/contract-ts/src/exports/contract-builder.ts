@@ -1,14 +1,15 @@
 export type {
   ComposedAuthoringHelpers,
   ContractInput,
+  ContractModelBuilder,
   ModelLike,
   ScalarFieldBuilder,
 } from '../contract-builder';
 export {
   buildBoundContract,
   buildSqlContractFromDefinition,
-  ContractModelBuilder,
   defineContract,
+  extensionModel,
   field,
   model,
   rel,
