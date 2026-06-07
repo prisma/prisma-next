@@ -870,11 +870,45 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
 
   let typeName: string;
   let typeNamespaceId: string | undefined;
+  let typeContractSpaceId: string | undefined;
 
   if (typeConstructor) {
     typeName = typeConstructor.path.join('.');
   } else {
-    const dotCount = (baseTypeSource.match(/\./g) ?? []).length;
+    // Detect the colon-prefix cross-contract-space form: `<space>:<rest>` where
+    // `<rest>` is the existing dot-qualified or bare form (`<ns>.<Name>` or `<Name>`).
+    // Multiple colons (e.g. `a:b:c`) are invalid.
+    const colonCount = (baseTypeSource.match(/:/g) ?? []).length;
+    if (colonCount > 1) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_MODEL_MEMBER',
+        message: `Invalid model member declaration "${line}"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      return undefined;
+    }
+
+    let typeRefSource: string;
+    if (colonCount === 1) {
+      // Colon-prefix form: `<space>:<rest>`
+      const colonIndex = baseTypeSource.indexOf(':');
+      const spaceCandidate = baseTypeSource.slice(0, colonIndex);
+      typeRefSource = baseTypeSource.slice(colonIndex + 1);
+      // Validate space identifier
+      if (!/^[A-Za-z_]\w*$/.test(spaceCandidate)) {
+        pushDiagnostic(context, {
+          code: 'PSL_INVALID_MODEL_MEMBER',
+          message: `Invalid model member declaration "${line}"`,
+          span: createTrimmedLineSpan(context, lineIndex),
+        });
+        return undefined;
+      }
+      typeContractSpaceId = spaceCandidate;
+    } else {
+      typeRefSource = baseTypeSource;
+    }
+
+    const dotCount = (typeRefSource.match(/\./g) ?? []).length;
     if (dotCount > 1) {
       pushDiagnostic(context, {
         code: 'PSL_INVALID_QUALIFIED_TYPE',
@@ -888,7 +922,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
       });
       return undefined;
     }
-    const singleMatch = baseTypeSource.match(/^([A-Za-z_]\w*)(?:\.([A-Za-z_]\w*))?$/);
+    const singleMatch = typeRefSource.match(/^([A-Za-z_]\w*)(?:\.([A-Za-z_]\w*))?$/);
     if (!singleMatch) {
       pushDiagnostic(context, {
         code: 'PSL_INVALID_MODEL_MEMBER',
@@ -924,6 +958,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
       name: fieldName,
       typeName,
       ...ifDefined('typeNamespaceId', typeNamespaceId),
+      ...ifDefined('typeContractSpaceId', typeContractSpaceId),
       ...ifDefined('typeConstructor', typeConstructor),
       optional,
       list,
@@ -949,6 +984,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
     name: fieldName,
     typeName,
     ...ifDefined('typeNamespaceId', typeNamespaceId),
+    ...ifDefined('typeContractSpaceId', typeContractSpaceId),
     ...ifDefined('typeConstructor', typeConstructor),
     optional,
     list,

@@ -5,6 +5,12 @@ import { asNamespaceId, type NamespaceId } from './namespace-id';
 export interface CrossReference {
   readonly namespace: NamespaceId;
   readonly model: string;
+  /**
+   * Contract-space identity for cross-space relations. When present, the
+   * referenced model lives in a different contract space. Absent for local
+   * (same-space) relations.
+   */
+  readonly space?: string;
 }
 
 export const CrossReferenceSchema = /* @__PURE__ */ blindCast<
@@ -15,6 +21,7 @@ export const CrossReferenceSchema = /* @__PURE__ */ blindCast<
     '+': 'reject',
     namespace: 'string',
     model: 'string',
+    'space?': 'string',
   }),
 );
 
@@ -23,6 +30,11 @@ const DEFAULT_CROSS_REF_NAMESPACE = '__unbound__';
 export function crossRef(
   model: string,
   namespace: string = DEFAULT_CROSS_REF_NAMESPACE,
+  space?: string,
 ): CrossReference {
-  return { namespace: asNamespaceId(namespace), model };
+  return {
+    namespace: asNamespaceId(namespace),
+    model,
+    ...(space !== undefined ? { space } : {}),
+  };
 }

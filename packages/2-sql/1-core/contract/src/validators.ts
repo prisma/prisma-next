@@ -77,6 +77,14 @@ const ExecutionSchema = type({
   },
 });
 
+const ValueSetRefSchema = type({
+  plane: "'domain' | 'storage'",
+  namespaceId: 'string',
+  entityKind: "'enum' | 'value-set'",
+  name: 'string',
+  'spaceId?': 'string',
+});
+
 const StorageColumnSchema = type({
   '+': 'reject',
   nativeType: 'string',
@@ -86,6 +94,7 @@ const StorageColumnSchema = type({
   'typeRef?': 'string',
   'default?': ColumnDefaultSchema,
   'control?': ControlPolicySchema,
+  'valueSet?': ValueSetRefSchema,
 }).narrow((col, ctx) => {
   if (col.typeParams !== undefined && col.typeRef !== undefined) {
     return ctx.mustBe('a column with either typeParams or typeRef, not both');
@@ -123,6 +132,31 @@ const PostgresEnumTypeSchema = type({
 
 /** Document-scoped `storage.types`: codec triples only. */
 const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
+
+/**
+ * Storage value-set entry under `storage.namespaces[id].entries.valueSet[name]`.
+ * Carries a `kind: 'value-set'` discriminator (enumerable, survives JSON) and an
+ * ordered `values` array of codec-encoded permitted values.
+ */
+export const StorageValueSetSchema = type({
+  kind: "'value-set'",
+  values: type.string.array().readonly(),
+});
+
+/**
+ * Domain enum entry under `domain.namespaces[id].enum[name]`.
+ * Carries the codec id and an ordered `members` array of `{name, value}` pairs.
+ */
+export const ContractEnumSchema = type({
+  '+': 'reject',
+  codecId: 'string',
+  members: type({
+    name: 'string',
+    value: 'string',
+  })
+    .array()
+    .readonly(),
+});
 
 const PrimaryKeySchema = type.declare<PrimaryKeyInput>().type({
   columns: type.string.array().readonly(),
@@ -263,6 +297,7 @@ export function createNamespaceEntrySchema(
       'type?': type({
         '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
       }),
+      'valueSet?': type({ '[string]': StorageValueSetSchema }),
     }),
   }) as Type<unknown>;
 }
@@ -360,6 +395,7 @@ const ModelFieldSchema = type({
   type: ContractFieldTypeSchema,
   'many?': 'true',
   'dict?': 'true',
+  'valueSet?': ValueSetRefSchema,
 });
 
 const ModelStorageFieldSchema = type({
@@ -432,6 +468,7 @@ export function createSqlContractSchema(
         '[string]': type({
           models: type({ '[string]': ModelSchema }),
           'valueObjects?': 'Record<string, unknown>',
+          'enum?': type({ '[string]': ContractEnumSchema }),
         }),
       }),
     }),

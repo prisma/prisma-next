@@ -8,6 +8,7 @@ import {
   type ColumnDefault,
   type ColumnDefaultLiteralInputValue,
   type Contract,
+  type ContractEnum,
   type ContractField,
   type ContractModel,
   type ContractRelation,
@@ -18,6 +19,7 @@ import {
   type ExecutionMutationDefault,
   type JsonValue,
   type StorageHashBase,
+  type ValueSetRef,
 } from '@prisma-next/contract/types';
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -41,6 +43,7 @@ import {
   StorageTable,
   type StorageTableInput,
   type StorageTypeInstance,
+  type StorageValueSetInput,
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
@@ -166,6 +169,7 @@ function resolveModelNamespaceId(
 
 function buildStorageColumn(
   field: FieldNode | ValueObjectFieldNode,
+  storageValueSetRef: ValueSetRef | undefined,
   codecLookup?: CodecLookup,
 ): StorageColumn {
   if (isValueObjectField(field)) {
@@ -203,12 +207,14 @@ function buildStorageColumn(
     ...ifDefined('typeParams', field.descriptor.typeParams),
     ...ifDefined('default', encodedDefault),
     ...ifDefined('typeRef', field.descriptor.typeRef),
+    ...ifDefined('valueSet', storageValueSetRef),
   };
 }
 
 function buildDomainField(
   field: FieldNode | ValueObjectFieldNode,
   column: StorageColumn,
+  domainValueSetRef: ValueSetRef | undefined,
 ): ContractField {
   if (isValueObjectField(field)) {
     return {
@@ -226,6 +232,7 @@ function buildDomainField(
     },
     nullable: column.nullable,
     ...(field.many ? { many: true } : {}),
+    ...ifDefined('valueSet', domainValueSetRef),
   };
 }
 
@@ -369,11 +376,34 @@ export function buildSqlContractFromDefinition(
         }
       }
 
-      const column = buildStorageColumn(field, codecLookup);
+      const enumHandle = !isValueObjectField(field) ? field.enumTypeHandle : undefined;
+      // Authored enums are always registered under the contract's defaultNamespaceId
+      // (see the enum registration loop below), so refs must point there regardless
+      // of which namespace the consuming model lives in.
+      const storageValueSetRef: ValueSetRef | undefined =
+        enumHandle !== undefined
+          ? {
+              plane: 'storage',
+              entityKind: 'value-set',
+              namespaceId: defaultNamespaceId,
+              name: enumHandle.enumName,
+            }
+          : undefined;
+      const domainValueSetRef: ValueSetRef | undefined =
+        enumHandle !== undefined
+          ? {
+              plane: 'domain',
+              entityKind: 'enum',
+              namespaceId: defaultNamespaceId,
+              name: enumHandle.enumName,
+            }
+          : undefined;
+
+      const column = buildStorageColumn(field, storageValueSetRef, codecLookup);
       columns[field.columnName] = column;
       fieldToColumn[field.fieldName] = field.columnName;
 
-      domainFields[field.fieldName] = buildDomainField(field, column);
+      domainFields[field.fieldName] = buildDomainField(field, column, domainValueSetRef);
 
       if (isValueObjectField(field)) {
         domainFieldRefs[field.fieldName] = {
@@ -395,6 +425,31 @@ export function buildSqlContractFromDefinition(
     }
 
     const foreignKeys = (semanticModel.foreignKeys ?? []).map((fk) => {
+      if (fk.references.spaceId !== undefined) {
+        // Cross-space FK: the target lives in a different contract space.
+        // Skip local model lookup and carry the spaceId coordinate through.
+        const targetNamespaceId = fk.references.namespaceId ?? defaultNamespaceId;
+        return {
+          source: { namespaceId: asNamespaceId(namespaceId), tableName, columns: fk.columns },
+          target: {
+            namespaceId: asNamespaceId(targetNamespaceId),
+            tableName: fk.references.table,
+            columns: fk.references.columns,
+            spaceId: fk.references.spaceId,
+          },
+          ...applyFkDefaults(
+            {
+              ...ifDefined('constraint', fk.constraint),
+              ...ifDefined('index', fk.index),
+            },
+            definition.foreignKeyDefaults,
+          ),
+          ...ifDefined('name', fk.name),
+          ...ifDefined('onDelete', fk.onDelete),
+          ...ifDefined('onUpdate', fk.onUpdate),
+        };
+      }
+
       const targetModel = assertKnownTargetModel(
         modelsByName,
         semanticModel.modelName,
@@ -493,6 +548,24 @@ export function buildSqlContractFromDefinition(
     );
     const modelRelations: Record<string, ContractRelation> = {};
     for (const relation of semanticModel.relations ?? []) {
+      // Cross-space relations have `spaceId` set — the target model lives in
+      // a different contract space, so skip local model lookup and validation.
+      if (relation.spaceId !== undefined) {
+        const targetNamespaceId = relation.namespaceId ?? defaultNamespaceId;
+        modelRelations[relation.fieldName] = {
+          to: crossRef(relation.toModel, targetNamespaceId, relation.spaceId),
+          // Cross-space belongsTo relations are always N:1 (the FK-owning side).
+          cardinality: 'N:1',
+          on: {
+            localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
+            // For cross-space targets the lowering carries field names directly
+            // (no fieldToColumn map available for the remote model).
+            targetFields: relation.on.childColumns,
+          },
+        };
+        continue;
+      }
+
       const targetModel = assertKnownTargetModel(
         modelsByName,
         semanticModel.modelName,
@@ -585,6 +658,39 @@ export function buildSqlContractFromDefinition(
   for (const id of Object.keys(namespaceEnumTypesById)) {
     namespaceCoordinateIds.add(id);
   }
+
+  // Build per-namespace registries for `enumType()` handles.
+  // All authored enums target the contract's default namespace.
+  const domainEnumsByNs: Record<string, Record<string, ContractEnum>> = {};
+  const storageValueSetsByNs: Record<string, Record<string, StorageValueSetInput>> = {};
+  for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
+    if (enumName !== handle.enumName) {
+      throw new Error(
+        `enum declaration key "${enumName}" must match enumType name "${handle.enumName}". Aliases are not supported.`,
+      );
+    }
+    const nsId = defaultNamespaceId;
+    let domainSlot = domainEnumsByNs[nsId];
+    if (domainSlot === undefined) {
+      domainSlot = {};
+      domainEnumsByNs[nsId] = domainSlot;
+    }
+    domainSlot[enumName] = {
+      codecId: handle.codecId,
+      members: handle.enumMembers,
+    };
+
+    let storageSlot = storageValueSetsByNs[nsId];
+    if (storageSlot === undefined) {
+      storageSlot = {};
+      storageValueSetsByNs[nsId] = storageSlot;
+    }
+    storageSlot[enumName] = {
+      kind: 'value-set',
+      values: handle.values,
+    };
+  }
+
   const { createNamespace } = definition;
   const namespaces = blindCast<
     SqlStorageInput['namespaces'],
@@ -593,10 +699,14 @@ export function buildSqlContractFromDefinition(
     Object.fromEntries(
       [...namespaceCoordinateIds].sort().map((id) => {
         const enumTypes = namespaceEnumTypesById[id];
+        const valueSetEntries = storageValueSetsByNs[id];
         const nsInput: SqlNamespaceTablesInput = {
           id,
           entries: {
             table: tablesByNamespace[id] ?? {},
+            ...(valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0
+              ? { valueSet: valueSetEntries }
+              : {}),
           },
         };
         return [
@@ -711,13 +821,22 @@ export function buildSqlContractFromDefinition(
   if (valueObjects !== undefined) {
     domainNamespaceIds.add(defaultNamespaceId);
   }
+  for (const nsId of Object.keys(domainEnumsByNs)) {
+    domainNamespaceIds.add(nsId);
+  }
   const domainNamespaces = Object.fromEntries(
     [...domainNamespaceIds].sort().map((namespaceId) => {
       const modelsInNs = modelsByNamespace[namespaceId] ?? {};
-      const namespaceSlice =
-        namespaceId === defaultNamespaceId && valueObjects !== undefined
-          ? { models: modelsInNs, valueObjects }
-          : { models: modelsInNs };
+      const enumsInNs = domainEnumsByNs[namespaceId];
+      const namespaceSlice = {
+        models: modelsInNs,
+        ...(namespaceId === defaultNamespaceId && valueObjects !== undefined
+          ? { valueObjects }
+          : {}),
+        ...(enumsInNs !== undefined && Object.keys(enumsInNs).length > 0
+          ? { enum: enumsInNs }
+          : {}),
+      };
       return [namespaceId, namespaceSlice];
     }),
   );

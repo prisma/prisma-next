@@ -232,6 +232,12 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     if (isModelField && relationAttribute) {
       continue;
     }
+    // Cross-contract-space relation fields (e.g. `supabase:auth.User @relation(...)`) are not
+    // local model fields, but they carry a @relation attribute and should be skipped here.
+    // Their FK and RelationNode lowering is handled separately in the interpreter.
+    if (field.typeContractSpaceId !== undefined && relationAttribute) {
+      continue;
+    }
 
     const isValueObjectField = compositeTypeNames.has(field.typeName);
     const isListField = field.list;

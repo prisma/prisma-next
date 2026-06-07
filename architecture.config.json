@@ -589,6 +589,18 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/3-extensions/supabase/src/contract/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/supabase/src/exports/contract.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/2-mongo-family/1-foundation/**",
       "domain": "mongo",
       "layer": "foundation",

@@ -20,6 +20,7 @@ function interpretSchema(schema: string) {
     document,
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    composedExtensionContracts: new Map(),
     controlMutationDefaults: builtinControlMutationDefaults,
   });
 }

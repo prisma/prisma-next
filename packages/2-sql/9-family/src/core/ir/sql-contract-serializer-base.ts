@@ -16,6 +16,8 @@ import {
   SqlUnboundNamespace,
   StorageTable,
   type StorageTableInput,
+  StorageValueSet,
+  type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import {
   createSqlContractSchema,
@@ -197,15 +199,44 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
     }
     // Default to empty table; overwritten below if raw entries carry a table slot.
-    const entriesInput: { table: Record<string, StorageTable> } = { table: {} };
+    const entriesInput: {
+      table: Record<string, StorageTable>;
+      valueSet?: Record<string, StorageValueSet>;
+    } = { table: {} };
     const entriesRaw = parsed.entries;
     if (entriesRaw !== undefined && typeof entriesRaw === 'object' && entriesRaw !== null) {
-      const tableSlot = (entriesRaw as Record<string, unknown>)['table'];
+      const rawEntries = entriesRaw as Record<string, unknown>;
+      const tableSlot = rawEntries['table'];
       if (tableSlot !== null && typeof tableSlot === 'object' && !Array.isArray(tableSlot)) {
         entriesInput.table = Object.fromEntries(
           Object.entries(tableSlot as Record<string, unknown>).map(([tableName, table]) => [
             tableName,
             table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
+          ]),
+        );
+      }
+      const valueSetSlot = rawEntries['valueSet'];
+      if (
+        valueSetSlot !== null &&
+        typeof valueSetSlot === 'object' &&
+        !Array.isArray(valueSetSlot)
+      ) {
+        entriesInput.valueSet = Object.fromEntries(
+          Object.entries(
+            blindCast<
+              Record<string, unknown>,
+              'valueSet slot is a plain record after object check'
+            >(valueSetSlot),
+          ).map(([vsName, vs]) => [
+            vsName,
+            vs instanceof StorageValueSet
+              ? vs
+              : new StorageValueSet(
+                  blindCast<
+                    StorageValueSetInput,
+                    'non-instance valueSet entry is StorageValueSetInput'
+                  >(vs),
+                ),
           ]),
         );
       }

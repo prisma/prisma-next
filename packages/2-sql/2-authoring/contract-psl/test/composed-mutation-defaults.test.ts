@@ -12,11 +12,16 @@ import { postgresScalarTypeDescriptors, postgresTarget } from './fixtures';
 
 describe('composed mutation default registries', () => {
   const interpretPslDocumentToSqlContract = (
-    input: Omit<InterpretPslDocumentToSqlContractInput, 'target' | 'scalarTypeDescriptors'>,
+    input: Omit<
+      InterpretPslDocumentToSqlContractInput,
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts'
+    > &
+      Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
       ...input,
     });
 

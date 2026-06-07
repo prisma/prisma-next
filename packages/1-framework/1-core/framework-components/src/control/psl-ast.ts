@@ -78,10 +78,19 @@ export type PslFieldAttribute = PslAttribute;
 export interface PslField {
   readonly kind: 'field';
   readonly name: string;
-  /** Unqualified type name, e.g. `"User"` for both `User` and `auth.User`. */
+  /** Unqualified type name, e.g. `"User"` for both `User`, `auth.User`, and `supabase:auth.User`. */
   readonly typeName: string;
-  /** Namespace qualifier from a dot-qualified type reference, e.g. `"auth"` for `auth.User`. Absent for unqualified types. */
+  /** Namespace qualifier from a dot-qualified type reference, e.g. `"auth"` for `auth.User` or `supabase:auth.User`. Absent for unqualified types. */
   readonly typeNamespaceId?: string;
+  /**
+   * Contract-space qualifier from a colon-prefix type reference, e.g. `"supabase"` for
+   * `supabase:auth.User` or `supabase:User`. Absent for local (same-space) type references.
+   *
+   * When present, the field references a model from a different contract space. The namespace
+   * (`typeNamespaceId`) and model name (`typeName`) identify the target within that space.
+   * Physical table resolution against the extension contract is deferred to the aggregate stage (M3).
+   */
+  readonly typeContractSpaceId?: string;
   readonly typeConstructor?: PslTypeConstructorCall;
   readonly optional: boolean;
   readonly list: boolean;

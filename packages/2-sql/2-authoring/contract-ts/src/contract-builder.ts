@@ -22,6 +22,7 @@ import {
 import {
   type ContractInput,
   type ContractModelBuilder,
+  extensionModel,
   field,
   isContractInput,
   type ModelAttributesSpec,
@@ -34,6 +35,7 @@ import {
 } from './contract-dsl';
 import { buildContractDefinition } from './contract-lowering';
 import type { SqlContractResult } from './contract-types';
+import type { EnumTypeHandle } from './enum-type';
 
 export { buildSqlContractFromDefinition } from './build-contract';
 
@@ -73,6 +75,7 @@ type ContractDefinition<
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
+  readonly enums?: Record<string, EnumTypeHandle>;
 };
 
 type ContractScaffold<
@@ -96,6 +99,7 @@ type ContractScaffold<
   readonly types?: never;
   readonly models?: never;
   readonly codecLookup?: CodecLookup;
+  readonly enums?: Record<string, EnumTypeHandle>;
 };
 
 type ContractFactory<
@@ -317,6 +321,7 @@ type BoundDefinitionInput<
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
+  readonly enums?: Record<string, EnumTypeHandle>;
 };
 
 // Merges a bound input with the pre-bound family/target to produce a full ContractDefinition.
@@ -525,4 +530,4 @@ export type {
   ModelLike,
   ScalarFieldBuilder,
 };
-export { field, model, rel };
+export { extensionModel, field, model, rel };

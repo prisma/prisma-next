@@ -1,15 +1,12 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type {
-  ForeignKey,
   PostgresEnumStorageEntry,
-  ReferentialAction,
   StorageColumn,
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
-import { qualifyTableName } from './planner-sql-checks';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export function buildCreateTableSql(
@@ -215,43 +212,4 @@ export function buildAddColumnSql(
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
   return parts.join(' ');
-}
-
-const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
-  noAction: 'NO ACTION',
-  restrict: 'RESTRICT',
-  cascade: 'CASCADE',
-  setNull: 'SET NULL',
-  setDefault: 'SET DEFAULT',
-};
-
-export function buildForeignKeySql(
-  schemaName: string,
-  tableName: string,
-  fkName: string,
-  foreignKey: ForeignKey,
-): string {
-  let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(fkName)}
-FOREIGN KEY (${foreignKey.source.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, foreignKey.target.tableName)} (${foreignKey.target.columns
-    .map(quoteIdentifier)
-    .join(', ')})`;
-
-  if (foreignKey.onDelete !== undefined) {
-    const action = REFERENTIAL_ACTION_SQL[foreignKey.onDelete];
-    if (!action) {
-      throw new Error(`Unknown referential action for onDelete: ${String(foreignKey.onDelete)}`);
-    }
-    sql += `\nON DELETE ${action}`;
-  }
-  if (foreignKey.onUpdate !== undefined) {
-    const action = REFERENTIAL_ACTION_SQL[foreignKey.onUpdate];
-    if (!action) {
-      throw new Error(`Unknown referential action for onUpdate: ${String(foreignKey.onUpdate)}`);
-    }
-    sql += `\nON UPDATE ${action}`;
-  }
-
-  return sql;
 }

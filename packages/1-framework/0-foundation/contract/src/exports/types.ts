@@ -23,6 +23,7 @@ export {
 export type {
   ContractDiscriminator,
   ContractEmbedRelation,
+  ContractEnum,
   ContractField,
   ContractFieldType,
   ContractModel,
@@ -78,3 +79,4 @@ export {
   isExecutionMutationDefaultValue,
   profileHash,
 } from '../types';
+export type { ValueSetRef } from '../value-set-ref';

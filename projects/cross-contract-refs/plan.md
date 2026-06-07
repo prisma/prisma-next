@@ -1,5 +1,72 @@
 # Project Plan
 
+## Status / next-up (2026-06-07 — M2 merged) — resume here
+
+- **M1: ✅ MERGED (PR #745).** Storage IR carrier + aggregate-load checks.
+- **M2: ✅ MERGED (PR #752).** TS brands + PSL grammar + non-navigable cross-space relation + supabase `/contract` handles + CodeRabbit hardening.
+- **M3a: ✅ COMPLETE (branch `tml-2500-m3-planner-verifier`, PR opening).** All 4 dispatches
+  SATISFIED, trace backstop green (13 cumulative dispatches across M1+M2+M3a), full gate clean.
+  Delivered:
+  - **M3a.1** PSL aggregate resolution at the CLI loader (resolves cross-space FK `tableName` from
+    the symbolic `modelName.toLowerCase()` fallback to the real `users`); column-existence
+    validation; PSL↔TS parity test flip (closes AC2).
+  - **M3a.2** Postgres planner DDL audit — dead-path `buildForeignKeySql` documented, live-path
+    `renderForeignKeySql` pinned with regression tests for both qualified
+    `REFERENCES "auth"."users"` and unqualified `__unbound__` (closes AC3 planner half).
+  - **M3a.3** Verifier cross-space FK regression tests — no code change needed (the existing
+    target-table-agnostic comparison walks cross-space identically).
+  - **M3a.4** AC7 PGlite integration test — synthetic app contract with `Profile.userId →
+    auth.users.id`, runs CLI `dbInit` apply, queries `pg_constraint` cross-joined for the
+    cross-schema FK, asserts `confdeltype='c'`, runs `dbVerify` zero issues. Plus a 6-line
+    `validate-domain.ts` fix for a pre-existing M2.2 gap (cross-space relations were tripping
+    `validateRelationTargets` because no prior test deserialized a cross-space contract).
+- **NEXT — M3b (separate PR, opens after M3a merges).** Walking-skeleton FK wiring +
+  cascade-delete hermetic test + `BuiltStorageTables.spaceId` type-surface cleanup. Scope is
+  recorded in `slices/M3a/plan.md` § Open items.
+
+- **M1 — Foundation: ✅ MERGED (PR #745).** FK carrier (`ForeignKeyReference.spaceId`, presence =
+  cross-space discriminator); cross-space dependency graph + cycle rejection; reverse-reference
+  rejection; primitive-ownership collisions via a namespace-aware `disjointness`.
+- **M2 — Authoring surfaces: ✅ COMPLETE (branch `tml-2500-m2-authoring-surfaces`, PR opening).**
+  All 5 dispatches SATISFIED (M2.1–M2.5), trace backstop green, full gate green (typecheck 138/138,
+  lint 79/79, lint:deps clean, lint:casts delta=0, fixtures:check exit 0). Delivered:
+  - **M2.1** TS brand foundation (`TargetFieldRef<…, TSpaceId>`, `<self>`/spaceId; brand survives the
+    staged builder) + storage cross-space FK lowering (`ForeignKeyReference.spaceId`) + missing-pack
+    fail-fast (AC5 TS) + cascade no-diagnostic (AC4).
+  - **M2.2** TS cross-space relation, **Option B non-navigable** — `spaceId` on
+    `BelongsToRelation`/`RelationNode`/`CrossReference.space`; emitter renders cross-space relations as
+    `never` so ORM `include` is a compile error (proven by a negative type test).
+  - **M2.3** Supabase `/contract` branded handles (`AuthUser` etc.) via a new **`extensionModel(...)`
+    factory** in contract-ts (`ContractModelBuilder` stays type-only); handle↔contract consistency test.
+  - **M2.4** PSL colon-prefix grammar (`supabase:auth.User` / `supabase:User`) — `PslField.typeContractSpaceId`,
+    parser branch, interpreter **symbolic** lowering (spaceId + namespace + columns) + missing-pack
+    diagnostic (`PSL_UNKNOWN_CONTRACT_SPACE`, AC5 PSL).
+  - **M2.5** PSL printer round-trip for the qualified form (also fixed the pre-existing TML-2459
+    `typeNamespaceId` printer-drop bug); AC2 round-trip closed.
+- **NEXT — M3 — Planner + verifier integration.** Scope: planner DDL (qualified vs unqualified
+  `REFERENCES`), verifier walk of `source:'space'` FKs, PGlite integration test (AC7), the `__unspecified__`
+  planner half of AC3, **and the deferred items below that M3 must resolve**:
+  - **PSL cross-space target-table resolution** — M2.4 carries a *symbolic* coordinate; the PSL carrier's
+    `tableName` is `modelName.toLowerCase()` (e.g. `user`), NOT the real table (`users`). M3 resolves
+    model→table against the **loaded aggregate** (where the extension contracts are available — the PSL
+    interpreter only has space *names*). The `psl-ts-namespace-parity.test.ts` pins this divergence with a
+    failing-on-resolution assertion; M3 flips it. (FR10/FR19/FR20.)
+  - **Walking-skeleton FK wiring** — add `Profile.userId → auth.User.id` (onDelete cascade) to
+    `examples/supabase` + the cascade-delete hermetic test (needs the planner).
+  - **FK-target `spaceId` type-surface gap** — `BuiltStorageTables<Definition>` omits `spaceId` on the FK
+    target at the type level (runtime carrier has it). Small `contract-ts`/`sql-contract` cleanup.
+- **Standing gate (M1+M2 lessons — apply every dispatch):** full `pnpm lint` + `pnpm fixtures:check` +
+  full `pnpm typecheck` (not just package-scoped — implementers default to package scope and miss
+  downstream); **run `pnpm build` / rebuild dependent `dist` before downstream tests and before
+  fixtures:check** (fixtures:check executes the CLI dist + imports extension dist — missing dist like
+  `extension-pgvector/dist/control.mjs` makes it red environmentally, not a regression); **emit trace
+  events live**; orchestrator independently re-verifies the gate (implementer reports were thin/optimistic
+  and two returned truncated mid-work — verify via git + re-run the risky gates).
+- **Worktree note:** this worktree needed `pnpm install` (supabase/mongo had no `node_modules`) + a full
+  `pnpm build` to materialize all dist; after that the full gate is genuinely clean (no mongo/cli caveat).
+- **Deferred (recorded):** transitive auto-loading of unlisted contract spaces; runtime cross-space query +
+  relation traversal (needs a runtime contract-space aggregate); Mongo cross-space *relationships*.
+
 ## Summary
 
 The project ships in four PRs sequenced foundation → authoring surfaces → planner/verifier integration → documentation. M1 introduces the FK reference carrier extension (`source: 'local' | 'space'`) at the framework + SQL family layers and the contract-aggregate dependency-graph + namespace-ownership checks. M2 ships the TS authoring surface (model-handle brands, `ColumnRef<TSpaceId>`, lowering-pass cross-contract handling) and the PSL grammar/AST extension (colon-prefix tokenizer change, `PslField.typeContractSpace?`). M3 wires the carrier through the planner (qualified vs unqualified `REFERENCES` clause, composition with control-policy dispatch on the target table) and the verifier (target-table-existence check defers to control policy; FK-constraint check is identical to local FKs). M4 closes out documentation — the cross-contract pattern is captured in the canonical extension-authoring guidance and the namespace-ownership rules land in a subsystem doc.
