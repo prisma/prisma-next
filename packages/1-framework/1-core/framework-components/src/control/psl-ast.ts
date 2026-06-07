@@ -16,6 +16,7 @@ export type {
   PslSpan,
 } from '../shared/psl-extension-block';
 
+import type { CodecLookup } from '../shared/codec-types';
 import type { AuthoringPslBlockNamespace } from '../shared/framework-authoring';
 import type { PslDiagnosticCode, PslExtensionBlock, PslSpan } from '../shared/psl-extension-block';
 
@@ -252,6 +253,15 @@ export interface ParsePslDocumentInput {
    * unknown keyword yields `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`.
    */
   readonly pslBlocks?: AuthoringPslBlockNamespace;
+  /**
+   * Codec lookup for validating `value`-kind extension block parameters (D4).
+   * When provided alongside `pslBlocks`, the generic validator runs over every
+   * parsed extension block after the full AST is assembled, appending any
+   * diagnostics to the parse result. Absent or undefined means no codec
+   * validation runs; `ref` resolution still runs when `refCtx` is available
+   * (built from the assembled namespaces).
+   */
+  readonly codecLookup?: CodecLookup;
 }
 
 export interface ParsePslDocumentResult {

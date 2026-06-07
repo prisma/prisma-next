@@ -3,6 +3,7 @@ import type {
   AuthoringPslBlockNamespace,
 } from '@prisma-next/framework-components/authoring';
 import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ParsePslDocumentInput,
   ParsePslDocumentResult,
@@ -28,7 +29,10 @@ import type {
   PslTypeConstructorCall,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
-import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import {
+  UNSPECIFIED_PSL_NAMESPACE_ID,
+  validateExtensionBlock,
+} from '@prisma-next/framework-components/psl-ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 const SCALAR_TYPES = new Set([
@@ -365,6 +369,44 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       ),
       span: acc.span ?? documentSpan,
     });
+  }
+
+  // Validate extension blocks with the generic validator (D4) after the full
+  // AST is assembled. The validator needs all namespaces for ref resolution.
+  // It runs whenever pslBlocks are registered — codecLookup falls back to
+  // emptyCodecLookup when not provided, which rejects value-kind parameters
+  // with unknown codecs. Callers with value parameters should always supply
+  // a codecLookup.
+  if (Object.keys(pslBlockNamespace).length > 0) {
+    const codecLookup = input.codecLookup ?? emptyCodecLookup;
+    // Build a discriminator → descriptor reverse map from the flat pslBlocks
+    // namespace. The parser keyed by keyword; the validator resolves by
+    // node.kind (= discriminator) so we need the reverse direction.
+    const descriptorByDiscriminator = new Map<string, AuthoringPslBlockDescriptor>();
+    for (const value of Object.values(pslBlockNamespace)) {
+      if (isAuthoringPslBlockDescriptor(value)) {
+        descriptorByDiscriminator.set(value.discriminator, value);
+      }
+    }
+    for (const ns of namespaces) {
+      for (const block of ns.extensionBlocks ?? []) {
+        const descriptor = descriptorByDiscriminator.get(block.kind);
+        if (descriptor === undefined) {
+          continue;
+        }
+        const blockDiagnostics = validateExtensionBlock(
+          block,
+          descriptor,
+          input.sourceId,
+          codecLookup,
+          {
+            ownerNamespace: ns,
+            allNamespaces: namespaces,
+          },
+        );
+        diagnostics.push(...blockDiagnostics);
+      }
+    }
   }
 
   const ast: PslDocumentAst = {
@@ -1519,7 +1561,7 @@ function lookupExtensionBlockDescriptor(
  *
  * No validation runs here (unknown key, missing required, codec acceptance,
  * option-in-set, ref resolution — all D4). A body line that is not `key =
- * value` shaped emits a `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK` parse diagnostic.
+ * value` shaped emits a `PSL_INVALID_EXTENSION_BLOCK_MEMBER` parse diagnostic.
  */
 function parseExtensionBlock(
   context: ParserContext,

@@ -1,4 +1,5 @@
 import type { AuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   flatPslCompositeTypes,
   flatPslEnums,
@@ -1179,6 +1180,21 @@ model Post {
   });
 
   describe('extension blocks (D3 generic parser)', () => {
+    // Stub codecLookup: accepts any raw string for the 'sql-expression' codec.
+    // Needed because D6 wires the D4 validator into parsePslDocument, which
+    // runs whenever pslBlocks are registered and falls back to emptyCodecLookup
+    // (which rejects all codecs) when no codecLookup is supplied by the caller.
+    const stubSqlExpressionCodecLookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
+      parsePslLiteralFor: (id, raw) => {
+        if (id === 'sql-expression') return { ok: true, value: raw };
+        return { ok: false, error: `codec "${id}" is not registered` };
+      },
+    };
+
     const policySelectDescriptor: AuthoringPslBlockDescriptor = {
       kind: 'pslBlock',
       keyword: 'policy_select',
@@ -1187,13 +1203,18 @@ model Post {
       parameters: {
         target: { kind: 'ref', refKind: 'model', scope: 'same-namespace' },
         as: { kind: 'option', values: ['permissive', 'restrictive'] },
-        roles: { kind: 'list', of: { kind: 'ref', refKind: 'role', scope: 'same-namespace' } },
+        // cross-space: roles are external entities; validation is a documented pass-through.
+        roles: { kind: 'list', of: { kind: 'ref', refKind: 'role', scope: 'cross-space' } },
         using: { kind: 'value', codecId: 'sql-expression' },
       },
     };
 
     it('parses a policy_select block into a uniform PslExtensionBlock node', () => {
       const schema = `
+model Post {
+  id Int @id
+}
+
 policy_select ReadPosts {
   target = Post
   as = permissive
@@ -1205,6 +1226,7 @@ policy_select ReadPosts {
         schema,
         sourceId: 'schema.prisma',
         pslBlocks: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
       });
 
       expect(result.ok).toBe(true);
@@ -1294,6 +1316,7 @@ policy_select ReadPosts {
         schema,
         sourceId: 'schema.prisma',
         pslBlocks: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
       });
 
       expect(result.ok).toBe(true);
@@ -1335,6 +1358,10 @@ enum Role {
 
     it('lands extension blocks in the namespace extensionBlocks slot in source order', () => {
       const schema = `
+model Model {
+  id Int @id
+}
+
 policy_select Alpha {
   target = Model
   as = permissive
@@ -1353,6 +1380,7 @@ policy_select Beta {
         schema,
         sourceId: 'schema.prisma',
         pslBlocks: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
       });
 
       expect(result.ok).toBe(true);
@@ -1362,8 +1390,12 @@ policy_select Beta {
       expect(ns?.extensionBlocks?.[1]?.name).toBe('Beta');
     });
 
-    it('captures unknown parameters as raw values (validation deferred to D4)', () => {
+    it('captures unknown parameters as raw values and validation flags them', () => {
       const schema = `
+model Post {
+  id Int @id
+}
+
 policy_select ReadPosts {
   target = Post
   as = permissive
@@ -1376,9 +1408,13 @@ policy_select ReadPosts {
         schema,
         sourceId: 'schema.prisma',
         pslBlocks: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
       });
 
-      expect(result.ok).toBe(true);
+      // D4 validation runs after parsing and flags unknown parameters.
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toMatchObject([{ code: 'PSL_EXTENSION_UNKNOWN_PARAMETER' }]);
+      // The parameter is still captured in the AST node.
       const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
       expect(block?.parameters['unrecognized_param']).toMatchObject({
         kind: 'value',
@@ -1388,6 +1424,10 @@ policy_select ReadPosts {
 
     it('emits a diagnostic for a malformed body line (not key = value shaped)', () => {
       const schema = `
+model Post {
+  id Int @id
+}
+
 policy_select ReadPosts {
   target = Post
   as = permissive
@@ -1400,6 +1440,7 @@ policy_select ReadPosts {
         schema,
         sourceId: 'schema.prisma',
         pslBlocks: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
       });
 
       expect(result.ok).toBe(false);
@@ -1411,6 +1452,10 @@ policy_select ReadPosts {
     it('parses extension block inside a named namespace', () => {
       const schema = `
 namespace auth {
+  model Post {
+    id Int @id
+  }
+
   policy_select ReadPosts {
     target = Post
     as = permissive
@@ -1423,6 +1468,7 @@ namespace auth {
         schema,
         sourceId: 'schema.prisma',
         pslBlocks: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
       });
 
       expect(result.ok).toBe(true);
@@ -1436,6 +1482,10 @@ namespace auth {
 
     it('parses an empty list parameter correctly', () => {
       const schema = `
+model Post {
+  id Int @id
+}
+
 policy_select ReadPosts {
   target = Post
   as = permissive
@@ -1447,6 +1497,7 @@ policy_select ReadPosts {
         schema,
         sourceId: 'schema.prisma',
         pslBlocks: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
       });
 
       expect(result.ok).toBe(true);
