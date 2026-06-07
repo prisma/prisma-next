@@ -1,5 +1,6 @@
 import type { AuthoringPslBlockNamespace } from '@prisma-next/framework-components/authoring';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { astDocumentToPrintDocument } from './ast-to-print-document';
 import { serializePrintDocument } from './serialize-print-document';
 
@@ -25,8 +26,7 @@ export interface PrintPslOptions {
 
 export function printPslFromAst(ast: PslDocumentAst, options: PrintPslOptions = {}): string {
   const doc = astDocumentToPrintDocument(ast);
-  return serializePrintDocument(
-    doc,
-    options.pslBlocks !== undefined ? { pslBlocks: options.pslBlocks } : {},
-  );
+  return serializePrintDocument(doc, {
+    ...ifDefined('pslBlocks', options.pslBlocks),
+  });
 }
