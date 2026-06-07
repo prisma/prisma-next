@@ -5,15 +5,31 @@ import { describe, expect, it } from 'vitest';
 import { resolveCrossSpaceFkTableName } from '../src/aggregate/resolve-cross-space-fk';
 
 function makeExtensionContract(
-  namespaces: Record<string, Record<string, { storage: { table: string } }>>,
+  namespaces: Record<string, Record<string, { storage: { table: string }; columns?: string[] }>>,
 ): Contract {
   const domainNamespaces: Record<string, unknown> = {};
+  const storageNamespaces: Record<string, unknown> = {};
+
   for (const [nsId, models] of Object.entries(namespaces)) {
     const domainModels: Record<string, unknown> = {};
+    const storageTables: Record<string, unknown> = {};
+
     for (const [modelName, model] of Object.entries(models)) {
       domainModels[modelName] = { fields: {}, relations: {}, storage: model.storage };
+      const columns: Record<string, unknown> = {};
+      for (const col of model.columns ?? []) {
+        columns[col] = { type: 'text', nullable: false };
+      }
+      storageTables[model.storage.table] = {
+        columns,
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
     }
+
     domainNamespaces[nsId] = { models: domainModels };
+    storageNamespaces[nsId] = { id: nsId, entries: { table: storageTables } };
   }
 
   return blindCast<Contract, 'test-only synthetic extension contract for resolver unit tests'>({
@@ -23,7 +39,7 @@ function makeExtensionContract(
     domain: { namespaces: domainNamespaces },
     storage: {
       storageHash: coreHash('sha256:test'),
-      namespaces: {},
+      namespaces: storageNamespaces,
     },
     capabilities: {},
     extensionPacks: {},
@@ -152,6 +168,68 @@ describe('resolveCrossSpaceFkTableName', () => {
       // still works correctly for same-space lookups.
       const result = resolveCrossSpaceFkTableName(contract, 'app', 'public', 'post');
       expect(result).toBe('post');
+    });
+  });
+
+  describe('column-existence validation', () => {
+    it('returns the resolved tableName when all target columns exist on the resolved table', () => {
+      const contract = makeExtensionContract({
+        auth: {
+          User: { storage: { table: 'users' }, columns: ['id', 'email'] },
+        },
+      });
+
+      const result = resolveCrossSpaceFkTableName(contract, 'supabase', 'auth', 'user', ['id']);
+      expect(result).toBe('users');
+    });
+
+    it('throws a diagnostic naming column/model/space/namespace when a column is missing', () => {
+      const contract = makeExtensionContract({
+        auth: {
+          User: { storage: { table: 'users' }, columns: ['id', 'email'] },
+        },
+      });
+
+      expect(() =>
+        resolveCrossSpaceFkTableName(contract, 'supabase', 'auth', 'user', ['nonexistent_col']),
+      ).toThrow(
+        'column "nonexistent_col" not found on target model "User" in space "supabase" namespace "auth"',
+      );
+    });
+
+    it('throws listing available columns in the diagnostic', () => {
+      const contract = makeExtensionContract({
+        auth: {
+          User: { storage: { table: 'users' }, columns: ['id', 'email'] },
+        },
+      });
+
+      expect(() =>
+        resolveCrossSpaceFkTableName(contract, 'supabase', 'auth', 'user', ['nonexistent_col']),
+      ).toThrow('available columns: id, email');
+    });
+
+    it('throws for the first missing column when multiple columns are referenced', () => {
+      const contract = makeExtensionContract({
+        auth: {
+          User: { storage: { table: 'users' }, columns: ['id', 'email'] },
+        },
+      });
+
+      expect(() =>
+        resolveCrossSpaceFkTableName(contract, 'supabase', 'auth', 'user', ['id', 'missing_col']),
+      ).toThrow('column "missing_col" not found on target model "User"');
+    });
+
+    it('succeeds when no target columns are provided (empty array — no column check needed)', () => {
+      const contract = makeExtensionContract({
+        auth: {
+          User: { storage: { table: 'users' }, columns: ['id', 'email'] },
+        },
+      });
+
+      const result = resolveCrossSpaceFkTableName(contract, 'supabase', 'auth', 'user', []);
+      expect(result).toBe('users');
     });
   });
 });

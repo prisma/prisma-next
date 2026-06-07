@@ -334,11 +334,19 @@ function resolveAppContractCrossSpaceFks(
           const tableName = target['tableName'];
           if (typeof namespaceId !== 'string' || typeof tableName !== 'string') continue;
 
+          const columnsRaw = target['columns'];
+          const columns: readonly string[] = Array.isArray(columnsRaw)
+            ? blindCast<unknown[], 'Array.isArray check above confirms this is an array'>(
+                columnsRaw,
+              ).filter((c): c is string => typeof c === 'string')
+            : [];
+
           const resolvedTableName = resolveCrossSpaceFkTableName(
             extensionMember.contract(),
             spaceId,
             namespaceId,
             tableName,
+            columns,
           );
 
           if (resolvedTableName !== tableName) {
