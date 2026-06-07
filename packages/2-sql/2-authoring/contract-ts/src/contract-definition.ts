@@ -13,6 +13,7 @@ import type {
   SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import type { EnumTypeHandle } from './enum-type';
 
 export type { ExecutionMutationDefaultPhases };
 
@@ -24,6 +25,8 @@ export interface FieldNode {
   readonly default?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly many?: boolean;
+  /** Present when the field was authored with `field.namedType(enumHandle)`. */
+  readonly enumTypeHandle?: EnumTypeHandle;
 }
 
 export interface PrimaryKeyNode {
@@ -56,6 +59,12 @@ export interface ForeignKeyNode {
      * know the target namespace can stamp it explicitly.
      */
     readonly namespaceId?: string;
+    /**
+     * Contract-space identity of the referenced table. When present, the
+     * table lives in a different contract space (identified by this value)
+     * rather than the current contract. Absent for local FKs.
+     */
+    readonly spaceId?: string;
   };
   readonly name?: string;
   readonly onDelete?: ReferentialAction;
@@ -69,6 +78,17 @@ export interface RelationNode {
   readonly toModel: string;
   readonly toTable: string;
   readonly cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
+  /**
+   * Contract-space identity of the related model. When present, the
+   * related model lives in a different contract space. Absent for local
+   * (same-space) relations.
+   */
+  readonly spaceId?: string;
+  /**
+   * Namespace coordinate of the related model in the foreign space.
+   * Only set when `spaceId` is present.
+   */
+  readonly namespaceId?: string;
   readonly on: {
     readonly parentTable: string;
     readonly parentColumns: readonly string[];
@@ -163,4 +183,10 @@ export interface ContractDefinition {
   ) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
+  /**
+   * Domain enum handles authored via `enumType()`. Each entry lowers to a
+   * domain `enum` entry and a storage `valueSet` entry in the contract's
+   * default namespace.
+   */
+  readonly enums?: Record<string, EnumTypeHandle>;
 }

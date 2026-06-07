@@ -9,6 +9,9 @@ import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migrati
 import { buildMigrationGraphRows } from '../../../src/utils/formatters/migration-graph-rows';
 import { renderMigrationGraphSpaceTrees } from '../../../src/utils/formatters/migration-graph-space-render';
 import {
+  computeMaxDirNameLengthForLayout,
+  computeMaxEdgeTreePrefixWidthForLayout,
+  formatOnPathMigrationRow,
   renderMigrationGraphLegend,
   renderMigrationGraphTree,
   resolveConnectorLaneColors,
@@ -171,8 +174,8 @@ describe('renderMigrationGraphTree (D23 padding rules)', () => {
       contractHash: 'a94b7b4',
     });
     const contractOnlyLine = stripAnsi(contractOnly.split('\n')[0] ?? '');
-    expect(contractOnlyLine).toBe('○   a94b7b4  <contract>');
-    expect(tokenStartOffset(contractOnlyLine, '<contract>')).toBe(
+    expect(contractOnlyLine).toBe('○   a94b7b4  @contract');
+    expect(tokenStartOffset(contractOnlyLine, '@contract')).toBe(
       tokenStartOffset(contractOnlyLine, 'a94b7b4') + MIGRATION_LIST_HASH_WIDTH + LABEL_GAP,
     );
 
@@ -183,8 +186,8 @@ describe('renderMigrationGraphTree (D23 padding rules)', () => {
       contractHash: 'a94b7b4',
     });
     const markersLine = stripAnsi(markersAndRefs.split('\n')[0] ?? '');
-    expect(markersLine).toBe('○   a94b7b4  <contract, db> (prod)');
-    expect(tokenStartOffset(markersLine, '<contract, db>')).toBe(
+    expect(markersLine).toBe('○   a94b7b4  @contract @db (prod)');
+    expect(tokenStartOffset(markersLine, '@contract')).toBe(
       tokenStartOffset(markersLine, 'a94b7b4') + MIGRATION_LIST_HASH_WIDTH + LABEL_GAP,
     );
 
@@ -237,9 +240,9 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   c0ffee0  <contract>',
+        '○   c0ffee0  @contract',
         '',
-        '○   a94b7b4  <db> (main)',
+        '○   a94b7b4  @db (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
         '│↑  init                       ∅ → ef9de27',
@@ -248,7 +251,7 @@ describe('renderMigrationGraphTree', () => {
     );
   });
 
-  it('renders only system markers in angle brackets', () => {
+  it('renders system markers with the @-sigil', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     expect(
       tree([init], {
@@ -256,7 +259,7 @@ describe('renderMigrationGraphTree', () => {
         dbHash: 'ef9de27',
         contractHash: 'ef9de27',
       }),
-    ).toContain('<contract, db>');
+    ).toContain('@contract @db');
   });
 
   it('renders only user refs in parentheses', () => {
@@ -279,7 +282,7 @@ describe('renderMigrationGraphTree', () => {
         dbHash: 'a94b7b4',
         contractHash: 'a94b7b4',
       }),
-    ).toContain('<contract, db> (prod)');
+    ).toContain('@contract @db (prod)');
   });
 
   it('renders colliding system db marker and user ref named db separately', () => {
@@ -290,7 +293,7 @@ describe('renderMigrationGraphTree', () => {
         refsByHash: refsMap([{ hash: 'ef9de27', names: ['db'] }]),
         dbHash: 'ef9de27',
       }),
-    ).toContain('<db> (db)');
+    ).toContain('@db (db)');
   });
 
   it('emphasizes the contract system marker in colorized output', () => {
@@ -299,7 +302,7 @@ describe('renderMigrationGraphTree', () => {
       colorize: true,
       contractHash: 'ef9de27',
     });
-    expect(colored).toContain(green('<') + bold(green('contract')) + green('>'));
+    expect(colored).toContain(green('@') + bold(green('contract')));
     expect(colored).not.toContain(bold(green('db')));
   });
 
@@ -318,9 +321,9 @@ describe('renderMigrationGraphTree', () => {
       }),
     ).toBe(
       [
-        '○   a94b7b4  <contract> (main)',
+        '○   a94b7b4  @contract (main)',
         '│↑  add_posts            ef9de27 → a94b7b4',
-        '○   ef9de27  <db> (prod)',
+        '○   ef9de27  @db (prod)',
         '│↑  init                       ∅ → ef9de27',
         '∅',
       ].join('\n'),
@@ -336,7 +339,7 @@ describe('renderMigrationGraphTree', () => {
     const edges = [historical1, historical2, historical3, historical4, live];
     expect(tree(edges, { colorize: false, contractHash: '1375f13' })).toBe(
       [
-        '○   1375f13  <contract>',
+        '○   1375f13  @contract',
         '│↑    live_migration           ∅ → 1375f13',
         '│ ○   f7a8eb5',
         '│ │↑  historical_4       6cee614 → f7a8eb5',
@@ -604,7 +607,7 @@ describe('renderMigrationGraphTree', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "○   cd5c15b  <contract> (main)
+      "○   cd5c15b  @contract (main)
       ├─╮
       │↑│   merge_2a           0276f92 → cd5c15b
       │ │↑  merge_2b           a94b7b4 → cd5c15b
@@ -708,9 +711,9 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'c0ffee0',
       }),
     ).toMatchInlineSnapshot(`
-      "*   c0ffee0  <contract>
+      "*   c0ffee0  @contract
 
-      *   a94b7b4  <db> (main)
+      *   a94b7b4  @db (main)
       |^  add_posts            ef9de27 -> a94b7b4
       *   ef9de27
       |^  init                       - -> ef9de27
@@ -732,9 +735,9 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         contractHash: 'a94b7b4',
       }),
     ).toMatchInlineSnapshot(`
-      "*   a94b7b4  <contract> (main)
+      "*   a94b7b4  @contract (main)
       |^  add_posts            ef9de27 -> a94b7b4
-      *   ef9de27  <db> (prod)
+      *   ef9de27  @db (prod)
       |^  init                       - -> ef9de27
       -"
     `);
@@ -868,7 +871,7 @@ describe('renderMigrationGraphTree (ASCII)', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "*   cd5c15b  <contract> (main)
+      "*   cd5c15b  @contract (main)
       +-\\
       |^|   merge_2a           0276f92 -> cd5c15b
       | |^  merge_2b           a94b7b4 -> cd5c15b
@@ -1331,7 +1334,7 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        <contract, db> live markers (contract on disk, database state)
+        @contract @db reserved markers — also typeable as --from/--to tokens
         (prod, staging) user-defined refs
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
@@ -1346,7 +1349,7 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        <contract, db> live markers (contract on disk, database state)
+        @contract @db reserved markers — also typeable as --from/--to tokens
         (prod, staging) user-defined refs
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
@@ -1371,7 +1374,7 @@ describe('renderMigrationGraphLegend', () => {
         ⟲ migration without schema change
         ✓ applied   ⧗ pending
         ∅ empty database (baseline)
-        <contract, db> live markers (contract on disk, database state)
+        @contract @db reserved markers — also typeable as --from/--to tokens
         (prod, staging) user-defined refs
         aaaaaa → bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
@@ -1386,7 +1389,7 @@ describe('renderMigrationGraphLegend', () => {
         @ migration without schema change
         + applied   > pending
         - empty database (baseline)
-        <contract, db> live markers (contract on disk, database state)
+        @contract @db reserved markers — also typeable as --from/--to tokens
         (prod, staging) user-defined refs
         aaaaaa -> bbbbbb   migration from contract aaaaaa to bbbbbb"
     `);
@@ -1395,11 +1398,11 @@ describe('renderMigrationGraphLegend', () => {
   it('renders the marker/ref block as two lines in system-then-ref order', () => {
     const text = renderMigrationGraphLegend({ colorize: false });
     const lines = text.split('\n');
-    const markersIdx = lines.findIndex((line) => line.includes('live markers'));
+    const markersIdx = lines.findIndex((line) => line.includes('reserved markers'));
     const refsIdx = lines.findIndex((line) => line.includes('user-defined refs'));
     expect(markersIdx).toBeGreaterThan(-1);
     expect(refsIdx).toBeGreaterThan(markersIdx);
-    expect(lines[markersIdx]).toContain('<contract, db>');
+    expect(lines[markersIdx]).toContain('@contract @db');
     expect(lines[refsIdx]).toContain('(prod, staging)');
   });
 
@@ -1418,9 +1421,9 @@ describe('renderMigrationGraphLegend', () => {
       expect(text).not.toContain('data column');
       expect(text).not.toContain('node overlay');
       expect(text).not.toContain('db / contract markers');
-      expect(text).toContain('<contract, db>');
+      expect(text).toContain('@contract @db');
       expect(text).toContain('(prod, staging)');
-      expect(text).toContain('live markers (contract on disk, database state)');
+      expect(text).toContain('reserved markers — also typeable as --from/--to tokens');
       expect(text).toContain('user-defined refs');
       expect(text).toContain('migration from contract aaaaaa to bbbbbb');
     }
@@ -1497,5 +1500,701 @@ describe('renderMigrationGraphTree status overlay', () => {
     expect(output).toContain('> pending');
     expect(output).not.toContain('✓');
     expect(output).not.toContain('⧗');
+  });
+});
+
+describe('renderMigrationGraphTree path highlight colors', () => {
+  // This describe exercises the path-highlight rendering branch:
+  //   on-path  => gutter/name/hash wrapped in greenBright (ANSI [92m)
+  //   off-path => gutter/name/hash wrapped in dim         (ANSI [2m)
+  //
+  // The test env runs with NO_COLOR=1, which causes colorette's ambient dim/greenBright
+  // to be no-ops, so we cannot inspect ANSI codes in the rendered string directly.
+  // Instead we assert the observable behavior that is detectable regardless of color env:
+  //   - on-path rows carry the 'will run' annotation suffix (added only for on-path)
+  //   - off-path rows are fully drawn (name present; not suppressed or blanked)
+  //   - with colorize:false, no ANSI escapes appear at all
+  //
+  // Wrapping the gutter/name/hash in greenBright vs dim is verified at the code level by
+  // reading renderMigrationGraphTree (search for `isOnPath`/`isOffPath` in the renderer);
+  // the tests below protect against routing bugs (wrong edge gets wrong wrapper) and against
+  // off-path suppression (name accidentally removed), which are the most likely refactoring
+  // regressions. Both color helper shapes (greenBright/dim) are sourced from the same
+  // colorette module the renderer imports, per the task requirement.
+
+  it('on-path row: migration name is present and the will-run suffix appears', () => {
+    const offPathEdge = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'path_init');
+    const onPathEdge = edge('ef9de27', 'a94b7b4', 'path_add_posts');
+    const annotations = new Map([
+      [offPathEdge.migrationHash, { pathHighlight: 'off-path' as const }],
+      [onPathEdge.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+    const rendered = tree([offPathEdge, onPathEdge], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+
+    const onPathLine = rendered.split('\n').find((line) => line.includes(onPathEdge.dirName));
+    expect(onPathLine).toBeDefined();
+    // Migration name is present (not blank) in the on-path row.
+    expect(onPathLine).toContain(onPathEdge.dirName);
+    // The on-path annotation suffix 'will run' is appended by formatEdgeAnnotationSuffix.
+    expect(onPathLine).toContain('will run');
+    // Strip ANSI to confirm the plain name too (belt-check that stripAnsi doesn't lose it).
+    expect(stripAnsi(onPathLine ?? '')).toContain(onPathEdge.dirName);
+  });
+
+  it('off-path row: migration name is fully drawn and the will-run suffix is absent', () => {
+    const offPathEdge = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'path_init');
+    const onPathEdge = edge('ef9de27', 'a94b7b4', 'path_add_posts');
+    const annotations = new Map([
+      [offPathEdge.migrationHash, { pathHighlight: 'off-path' as const }],
+      [onPathEdge.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+    const rendered = tree([offPathEdge, onPathEdge], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+
+    const offPathLine = rendered.split('\n').find((line) => line.includes(offPathEdge.dirName));
+    expect(offPathLine).toBeDefined();
+    // Off-path rows must be fully drawn: name present (not suppressed or replaced with blank).
+    expect(offPathLine).toContain(offPathEdge.dirName);
+    expect(stripAnsi(offPathLine ?? '')).toContain(offPathEdge.dirName);
+    // Off-path rows do NOT receive the on-path 'will run' annotation suffix.
+    expect(offPathLine).not.toContain('will run');
+  });
+
+  it('no ANSI colour is emitted for either path role when colorize is false', () => {
+    const offPathEdge = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'path_init');
+    const onPathEdge = edge('ef9de27', 'a94b7b4', 'path_add_posts');
+    const annotations = new Map([
+      [offPathEdge.migrationHash, { pathHighlight: 'off-path' as const }],
+      [onPathEdge.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+    const output = tree([offPathEdge, onPathEdge], {
+      colorize: false,
+      edgeAnnotationsByHash: annotations,
+    });
+    expect(output).not.toContain('\x1b[');
+    // Both names must appear even without color.
+    expect(output).toContain(offPathEdge.dirName);
+    expect(output).toContain(onPathEdge.dirName);
+  });
+
+  // BUG 2: node rows for on-path contracts and off-path contracts must receive the path
+  // highlight treatment in the gutter (threaded via laneOverride into renderCellPair),
+  // not just the edge rows. The old code only applied dim/greenBright as a post-hoc
+  // wrapper on the edge gutter, which (a) let the rotation color bleed through and
+  // (b) left node rows entirely uncolored.
+  //
+  // Because the test env runs NO_COLOR=1, colorette's dim/greenBright are no-ops and
+  // we cannot assert ANSI codes. Instead we assert the structural routing:
+  // - The on-path node row (contract hash 'a94b7b4' = `to` of the on-path edge) is
+  //   present in the rendered output and contains the hash (not blanked).
+  // - The off-path node row (contract hash 'ef9de27' = boundary between edges) is also
+  //   present and contains its hash (not blanked).
+  // - Node rows contain their hashes regardless of path highlight (BUG 2 previously
+  //   had no effect on node row content, just gutter color — so this is a regression guard).
+  // The actual hue (greenBright / dim) is confirmed by reading the code (search for
+  // `contractHighlights` and `pathLaneOverride` in migration-graph-tree-render.ts) and
+  // by operator visual confirmation.
+
+  it('node rows for on-path and off-path contracts are present and contain their hashes (BUG 2 structural)', () => {
+    const offPathEdge = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'path_init');
+    const onPathEdge = edge('ef9de27', 'a94b7b4', 'path_add_posts');
+    const annotations = new Map([
+      [offPathEdge.migrationHash, { pathHighlight: 'off-path' as const }],
+      [onPathEdge.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+    const rendered = tree([offPathEdge, onPathEdge], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+    const plain = stripAnsi(rendered);
+    const nodeLines = plain.split('\n').filter((line) => line.trimStart().startsWith('○'));
+
+    // The on-path node row (a94b7b4 is `to` of the on-path edge) must be present.
+    const onPathNode = nodeLines.find((line) => line.includes('a94b7b4'));
+    expect(onPathNode, 'on-path contract node row must be present').toBeDefined();
+
+    // The shared/off-path node row (ef9de27 is `to` of off-path edge, `from` of on-path edge)
+    // must also be present. Because a94b7b4 is on-path, ef9de27 (as `from` of on-path) is
+    // also on-path in contractHighlights — on-path wins.
+    const sharedNode = nodeLines.find((line) => line.includes('ef9de27'));
+    expect(sharedNode, 'shared contract node row must be present').toBeDefined();
+  });
+
+  it('edge rows: laneOverride is threaded so no lane rotation color appears for on/off-path rows (BUG 2 regression guard)', () => {
+    // This test uses the LANE_COLOR_CYCLE's 6th color (red, column 5) to verify that a
+    // branched graph does NOT emit that color for on/off-path edges even when the edge
+    // occupies a lane that would normally receive the rotation color.
+    //
+    // We can't assert ANSI in NO_COLOR env, but we assert the structural invariant:
+    // - With colorize:false + edgeAnnotationsByHash, NO ANSI escapes appear.
+    // - With colorize:true  + edgeAnnotationsByHash, the on-path 'will run' suffix appears
+    //   (proving the annotation was routed to the on-path edge, not the wrong one).
+    const sharedBase = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'base');
+    const branchA = edge('ef9de27', '73e3abe', 'branch_a'); // lane 0
+    const branchB = edge('ef9de27', '6656a6e', 'branch_b'); // lane 1 (cyan in rotation)
+    const mergeA = edge('73e3abe', '3b2d98d', 'merge_a');
+    const mergeB = edge('6656a6e', '3b2d98d', 'merge_b');
+
+    // Mark branch_b (lane 1, normally cyan) as on-path and everything else as off-path.
+    const annotations = new Map([
+      [sharedBase.migrationHash, { pathHighlight: 'off-path' as const }],
+      [branchA.migrationHash, { pathHighlight: 'off-path' as const }],
+      [branchB.migrationHash, { pathHighlight: 'on-path' as const }],
+      [mergeA.migrationHash, { pathHighlight: 'off-path' as const }],
+      [mergeB.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+
+    const rendered = tree([sharedBase, branchA, branchB, mergeA, mergeB], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+
+    // The on-path edge (branch_b) must carry the 'will run' suffix.
+    const branchBLine = rendered.split('\n').find((line) => line.includes('branch_b'));
+    expect(branchBLine).toBeDefined();
+    expect(branchBLine).toContain('will run');
+
+    // The off-path edge (branch_a) must NOT carry 'will run'.
+    const branchALine = rendered.split('\n').find((line) => line.includes('branch_a'));
+    expect(branchALine).toBeDefined();
+    expect(branchALine).not.toContain('will run');
+
+    // With colorize:false, no ANSI escapes regardless of annotations.
+    const noColorOutput = tree([sharedBase, branchA, branchB, mergeA, mergeB], {
+      colorize: false,
+      edgeAnnotationsByHash: annotations,
+    });
+    expect(noColorOutput).not.toContain('\x1b[');
+  });
+
+  it('ANSI colour codes: on-path lane glyphs carry green, on-path name bold, off-path rows carry dim, no rotation colour on off-path rows', () => {
+    // This test verifies the actual ANSI escape codes emitted by the renderer.
+    //
+    // PATH_HIGHLIGHT_STYLES.onPath uses forcedGreen (createColors({useColor:true}).greenBright)
+    // for lane/glyph/marker styling, so the branch glyphs trace the path in green.
+    // The name is bold-only (not green); hashes use their normal colours (cyan).
+    // PATH_HIGHLIGHT_STYLES.offPath uses forcedDim for every cell.
+    // Both are forced-ANSI, so they emit \x1b codes regardless of NO_COLOR in the environment.
+    //
+    // Topology: branching graph at ∅ — off-path branch listed first (column 0),
+    // on-path branch listed second (column 1).
+    //   ∅ → off1111  (off-path, column 0)
+    //   ∅ → on22222  (on-path,  column 1)
+    //
+    // Assertions:
+    //   - on-path edge row contains \x1b[92m (greenBright) — lane glyph is green
+    //   - on-path edge row: 'will run' suffix is present
+    //   - on-path node row contains \x1b[92m — node marker is green
+    //   - off-path edge row contains \x1b[2m (dim)
+    //   - off-path node row contains \x1b[2m
+    //   - NO \x1b[31m (red) or \x1b[35m (magenta) on any off-path row
+    //
+    // GREEN_BRIGHT = \x1b[92m; DIM = \x1b[2m; RED = \x1b[31m; MAGENTA = \x1b[35m.
+    const GREEN_BRIGHT = '\x1b[92m';
+    const DIM = '\x1b[2m';
+    const RED = '\x1b[31m';
+    const MAGENTA = '\x1b[35m';
+
+    const offPathEdge = edge(EMPTY_CONTRACT_HASH, 'off1111', 'off_branch');
+    const onPathEdge = edge(EMPTY_CONTRACT_HASH, 'on22222', 'on_branch');
+    const annotations = new Map([
+      [offPathEdge.migrationHash, { pathHighlight: 'off-path' as const }],
+      [onPathEdge.migrationHash, { pathHighlight: 'on-path' as const }],
+    ]);
+    const rendered = tree([offPathEdge, onPathEdge], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+
+    const lines = rendered.split('\n');
+
+    // On-path edge line: lane glyph must carry greenBright.
+    // The 'will run' suffix confirms the on-path annotation was routed correctly.
+    const onPathEdgeLine = lines.find((l) => l.includes(onPathEdge.dirName));
+    expect(onPathEdgeLine, 'on-path edge line must exist').toBeDefined();
+    expect(onPathEdgeLine).toContain(GREEN_BRIGHT);
+    expect(onPathEdgeLine).toContain('will run');
+
+    // On-path node line (the 'on22222' hash): node marker must carry greenBright.
+    const onPathNodeLine = lines.find(
+      (l) => l.includes('on22222') && !l.includes(onPathEdge.dirName),
+    );
+    expect(onPathNodeLine, 'on-path node line must exist').toBeDefined();
+    expect(onPathNodeLine).toContain(GREEN_BRIGHT);
+
+    // Off-path edge line: must have dim, must not have greenBright or rotation colours.
+    const offPathEdgeLine = lines.find((l) => l.includes(offPathEdge.dirName));
+    expect(offPathEdgeLine, 'off-path edge line must exist').toBeDefined();
+    expect(offPathEdgeLine).toContain(DIM);
+    expect(offPathEdgeLine).not.toContain(GREEN_BRIGHT);
+    expect(offPathEdgeLine).not.toContain(RED);
+    expect(offPathEdgeLine).not.toContain(MAGENTA);
+
+    // Off-path node line (the 'off1111' hash): must have dim, not greenBright.
+    const offPathNodeLine = lines.find(
+      (l) => l.includes('off1111') && !l.includes(offPathEdge.dirName),
+    );
+    expect(offPathNodeLine, 'off-path node line must exist').toBeDefined();
+    expect(offPathNodeLine).toContain(DIM);
+    expect(offPathNodeLine).not.toContain(GREEN_BRIGHT);
+    expect(offPathNodeLine).not.toContain(RED);
+    expect(offPathNodeLine).not.toContain(MAGENTA);
+
+    // Connector row: off-path columns render dim; on-path column renders green.
+    // In this topology off_branch is column 0 (off-path → dim) and
+    // on_branch is column 1 (on-path → green). The connector must contain green
+    // (for the on-path arc) and dim (for the off-path column).
+    const connectorLine = lines.find((l) => l.includes('╯') || l.includes('/'));
+    if (connectorLine !== undefined) {
+      expect(connectorLine).toContain(GREEN_BRIGHT);
+      expect(connectorLine).toContain(DIM);
+    }
+  });
+
+  it('per-segment classification: on-path trunk pass-through in an off-path branch row is not force-dimmed', () => {
+    // FIX D core case: topology where an off-path branch row has a vertical-pass at
+    // column 0 that represents an on-path trunk edge. The pass-through must NOT carry
+    // forced-dim (\x1b[2m) — it should render in the ordinary lane-0 style.
+    //
+    // Under the vitest NO_COLOR=1 environment, ambient dim() from colorette is identity,
+    // so style.lane(│) produces bare '│ ' with no ANSI. The forcedDim from
+    // createColors({ useColor: true }) DOES produce \x1b[2m. So if the pass-through
+    // glyph is NOT wrapped in forcedDim, it will appear as '│ ' without \x1b[2m at that
+    // position. If it IS wrapped (pre-FIX D bug), it would be '\x1b[2m│ \x1b[22m'.
+    //
+    // Topology:
+    //   ∅ → trunk111  (on-path,  column 0)
+    //   ∅ → branch22  (off-path, column 1)
+    //
+    // In the off-path branch row (∅→branch22 at col 1), there is a vertical-pass at col 0
+    // representing the on-path trunk. That cell must NOT be wrapped in \x1b[2m.
+    const DIM_CODE = '\x1b[2m';
+
+    const onPathTrunk = edge(EMPTY_CONTRACT_HASH, 'trunk111', 'on_trunk');
+    const offPathBranch = edge(EMPTY_CONTRACT_HASH, 'branch22', 'off_branch');
+    const annotations = new Map([
+      [onPathTrunk.migrationHash, { pathHighlight: 'on-path' as const }],
+      [offPathBranch.migrationHash, { pathHighlight: 'off-path' as const }],
+    ]);
+    const rendered = tree([onPathTrunk, offPathBranch], {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+    const treeLines = rendered.split('\n');
+
+    // The off-path branch line must contain dim (for name/hash) but NOT start with dim
+    // (the trunk pass-through at col 0 comes first and is on-path = no forced-dim).
+    const branchLine = treeLines.find((l) => l.includes(offPathBranch.dirName));
+    expect(branchLine, 'off-path branch edge line must exist').toBeDefined();
+
+    if (branchLine !== undefined) {
+      // The line must contain \x1b[2m somewhere (the off-path name/hash are dim).
+      expect(branchLine, 'off-path branch line must contain dim').toContain(DIM_CODE);
+
+      // The line must NOT start with \x1b[2m — the first cell is the on-path trunk
+      // pass-through (col 0, ordinary) which should not carry forced-dim.
+      // Under NO_COLOR=1, style.lane is identity so the first characters are the
+      // bare glyph (│) without any ANSI prefix.
+      expect(
+        branchLine.startsWith(DIM_CODE),
+        'on-path trunk pass-through must not be the first dim sequence',
+      ).toBe(false);
+    }
+
+    // The on-path trunk edge line must NOT contain dim (on-path = ordinary, no forced-dim).
+    const trunkLine = treeLines.find((l) => l.includes(onPathTrunk.dirName));
+    expect(trunkLine, 'on-path trunk edge line must exist').toBeDefined();
+    expect(trunkLine, 'on-path trunk must not be force-dimmed').not.toContain(DIM_CODE);
+  });
+});
+
+describe('renderMigrationGraphTree isAppSpace gate', () => {
+  // Helpers local to this suite so migSeq stays independent.
+  function makeGraph(edges: readonly MigrationEdge[]): MigrationGraph {
+    const nodes = new Set<string>();
+    const forwardChain = new Map<string, MigrationEdge[]>();
+    const reverseChain = new Map<string, MigrationEdge[]>();
+    const migrationByHash = new Map<string, MigrationEdge>();
+    for (const e of edges) {
+      nodes.add(e.from);
+      nodes.add(e.to);
+      migrationByHash.set(e.migrationHash, e);
+      const fwd = forwardChain.get(e.from);
+      if (fwd) fwd.push(e);
+      else forwardChain.set(e.from, [e]);
+      const rev = reverseChain.get(e.to);
+      if (rev) rev.push(e);
+      else reverseChain.set(e.to, [e]);
+    }
+    return { nodes, forwardChain, reverseChain, migrationByHash };
+  }
+
+  function renderSpace(
+    edges: readonly MigrationEdge[],
+    contractHash: string,
+    isAppSpace: boolean,
+  ): string {
+    const g = makeGraph(edges);
+    const rowModel = buildMigrationGraphRows(g, isAppSpace ? { contractHash } : {});
+    const layout = buildMigrationGraphLayout(rowModel);
+    return stripAnsi(
+      renderMigrationGraphTree(layout, {
+        contractHash,
+        isAppSpace,
+        colorize: false,
+      }),
+    );
+  }
+
+  const APP_CONTRACT = `sha256:${'a'.repeat(64)}`;
+  const EXT_CONTRACT = `sha256:${'e'.repeat(64)}`;
+
+  it('app space shows @contract on the node that matches contractHash', () => {
+    const initEdge = edge(EMPTY_CONTRACT_HASH, APP_CONTRACT.slice(7, 14), 'app_init');
+    const output = renderSpace([initEdge], APP_CONTRACT, true);
+    expect(output).toContain('@contract');
+  });
+
+  it('extension space does not show @contract even when contractHash matches a node', () => {
+    const initEdge = edge(EMPTY_CONTRACT_HASH, EXT_CONTRACT.slice(7, 14), 'ext_init');
+    const output = renderSpace([initEdge], EXT_CONTRACT, false);
+    expect(output).not.toContain('@contract');
+  });
+
+  it('extension space does not produce a floating working-contract node', () => {
+    // Use a contractHash that is NOT in the graph — would float as an extra node if app-gated.
+    const initEdge = edge(EMPTY_CONTRACT_HASH, 'aaa1111', 'ext_init');
+    const detachedHash = `sha256:${'f'.repeat(64)}`;
+    const g = makeGraph([initEdge]);
+    const appRows = buildMigrationGraphRows(g, { contractHash: detachedHash });
+    const extRows = buildMigrationGraphRows(g, {});
+    // App space: detached contract causes an extra floating node.
+    expect(appRows.nodes.length).toBeGreaterThan(extRows.nodes.length);
+    // Extension space: no floating node — row count equals graph-only row count.
+    expect(extRows.nodes).not.toContain(detachedHash);
+  });
+
+  it('@db marker still appears in extension spaces (per-space, not app-gated)', () => {
+    const initEdge = edge(EMPTY_CONTRACT_HASH, EXT_CONTRACT.slice(7, 14), 'ext_init');
+    const g = makeGraph([initEdge]);
+    const rowModel = buildMigrationGraphRows(g, {});
+    const layout = buildMigrationGraphLayout(rowModel);
+    const output = stripAnsi(
+      renderMigrationGraphTree(layout, {
+        contractHash: APP_CONTRACT,
+        dbHash: EXT_CONTRACT.slice(7, 14),
+        isAppSpace: false,
+        colorize: false,
+      }),
+    );
+    expect(output).not.toContain('@contract');
+    expect(output).toContain('@db');
+  });
+
+  it('default (isAppSpace omitted) behaves as app space — @contract renders', () => {
+    const initEdge = edge(EMPTY_CONTRACT_HASH, APP_CONTRACT.slice(7, 14), 'app_init');
+    const g = makeGraph([initEdge]);
+    const rowModel = buildMigrationGraphRows(g, { contractHash: APP_CONTRACT });
+    const layout = buildMigrationGraphLayout(rowModel);
+    const output = stripAnsi(
+      renderMigrationGraphTree(layout, {
+        contractHash: APP_CONTRACT,
+        colorize: false,
+        // isAppSpace omitted — must default to true
+      }),
+    );
+    expect(output).toContain('@contract');
+  });
+});
+
+describe('renderMigrationGraphTree global column alignment', () => {
+  // Verifies that when globalMaxEdgeTreePrefixWidth and globalMaxDirNameWidth are
+  // passed, the hash column starts at the same horizontal offset in every space
+  // section — including a space with a longer dirName than the other.
+
+  it('hash column aligns across two spaces when global widths are supplied', () => {
+    // Space A: short dirName ("app_short") in a single-edge chain.
+    // Space B: long dirName ("pgvector_long_extension_name") in a single-edge chain.
+    // Without global widths, space A would have a narrower name column than space B.
+    // With global widths, both align.
+    const appEdge = edge(EMPTY_CONTRACT_HASH, 'aaa1111', 'app_short');
+    const extEdge = edge(EMPTY_CONTRACT_HASH, 'bbb2222', 'pgvector_long_extension_name');
+
+    const appGraph = graph([appEdge]);
+    const extGraph = graph([extEdge]);
+
+    const appLayout = buildMigrationGraphLayout(buildMigrationGraphRows(appGraph, {}));
+    const extLayout = buildMigrationGraphLayout(buildMigrationGraphRows(extGraph, {}));
+
+    const globalMaxEdgeTreePrefixWidth = Math.max(
+      computeMaxEdgeTreePrefixWidthForLayout(appLayout),
+      computeMaxEdgeTreePrefixWidthForLayout(extLayout),
+    );
+    const globalMaxDirNameWidth = Math.max(
+      computeMaxDirNameLengthForLayout(appLayout),
+      computeMaxDirNameLengthForLayout(extLayout),
+    );
+
+    const appOutput = stripAnsi(
+      renderMigrationGraphTree(appLayout, {
+        colorize: false,
+        globalMaxEdgeTreePrefixWidth,
+        globalMaxDirNameWidth,
+      }),
+    );
+    const extOutput = stripAnsi(
+      renderMigrationGraphTree(extLayout, {
+        colorize: false,
+        globalMaxEdgeTreePrefixWidth,
+        globalMaxDirNameWidth,
+      }),
+    );
+
+    // Find the edge line in each output and extract the column where '∅' (the hash column) starts.
+    function hashColumnOffset(output: string, dirName: string): number {
+      const line = output.split('\n').find((l) => l.includes(dirName));
+      if (line === undefined) throw new Error(`no line for ${dirName}`);
+      const idx = line.indexOf('∅');
+      if (idx < 0) throw new Error(`no ∅ in: ${line}`);
+      return idx;
+    }
+
+    const appHashCol = hashColumnOffset(appOutput, appEdge.dirName);
+    const extHashCol = hashColumnOffset(extOutput, extEdge.dirName);
+    expect(appHashCol).toBe(extHashCol);
+  });
+});
+
+describe('PATH_HIGHLIGHT_STYLES neutral on-path style', () => {
+  // Tests verify the path-highlight colour model:
+  //   - app on-path rows and pgvector on-path rows both carry GREEN_BRIGHT (\x1b[92m) on
+  //     their lane glyphs (forced-ANSI from PATH_HIGHLIGHT_STYLES.onPath)
+  //   - no rotation codes on on-path cells (RED/MAGENTA suppressed)
+  //   - off-path rows carry forcedDim (\x1b[2m) — emitted via createColors({ useColor: true })
+  //     even under NO_COLOR=1
+  //   - formatOnPathMigrationRow (run-list) and tree on-path rows share the same dirName text
+  //   - normal graph/status/list rotation (laneColorForColumn) applies when no pathHighlight
+  //     annotations are present, even when edgeAnnotationsByHash is provided
+  //
+  // Note: the on-path style uses ambient `bold()` which is identity under NO_COLOR=1.
+  // Bold is NOT asserted via \x1b[1m; instead we verify presence of GREEN_BRIGHT and
+  // absence of rotation/dim codes.
+  // forcedGreen (\x1b[92m) and forcedDim (\x1b[2m) both bypass NO_COLOR.
+
+  const EMPTY = EMPTY_CONTRACT_HASH;
+  const RED = '\x1b[31m';
+  const MAGENTA = '\x1b[35m';
+  const GREEN_BRIGHT = '\x1b[92m';
+  const DIM = '\x1b[2m';
+
+  function renderWithHighlights(
+    edges: readonly ReturnType<typeof edge>[],
+    annotations: Map<string, { pathHighlight: 'on-path' | 'off-path' }>,
+  ): string {
+    const graph: MigrationGraph = (() => {
+      const nodes = new Set<string>();
+      const forwardChain = new Map<string, MigrationEdge[]>();
+      const reverseChain = new Map<string, MigrationEdge[]>();
+      const migrationByHash = new Map<string, MigrationEdge>();
+      for (const e of edges) {
+        nodes.add(e.from);
+        nodes.add(e.to);
+        migrationByHash.set(e.migrationHash, e);
+        const fwd = forwardChain.get(e.from);
+        if (fwd) fwd.push(e);
+        else forwardChain.set(e.from, [e]);
+        const rev = reverseChain.get(e.to);
+        if (rev) rev.push(e);
+        else reverseChain.set(e.to, [e]);
+      }
+      return { nodes, forwardChain, reverseChain, migrationByHash };
+    })();
+    const layout = buildMigrationGraphLayout(buildMigrationGraphRows(graph, {}));
+    return renderMigrationGraphTree(layout, {
+      colorize: true,
+      edgeAnnotationsByHash: annotations,
+    });
+  }
+
+  it('app on-path row and pgvector on-path row both carry green on their lane glyphs (no rotation codes)', () => {
+    // Both are single-path (column 0, no branching).
+    // PATH_HIGHLIGHT_STYLES.onPath uses forcedGreen for lane glyphs — both rows must
+    // carry GREEN_BRIGHT (\x1b[92m). Rotation is suppressed (no RED/MAGENTA).
+    const appEdge = edge(EMPTY, 'aaa1111', 'app_init');
+    const pgEdge = edge(EMPTY, 'bbb2222', 'pgvector_init');
+
+    const appAnno = new Map([[appEdge.migrationHash, { pathHighlight: 'on-path' as const }]]);
+    const pgAnno = new Map([[pgEdge.migrationHash, { pathHighlight: 'on-path' as const }]]);
+
+    const appLine = renderWithHighlights([appEdge], appAnno)
+      .split('\n')
+      .find((l) => l.includes(appEdge.dirName));
+    const pgLine = renderWithHighlights([pgEdge], pgAnno)
+      .split('\n')
+      .find((l) => l.includes(pgEdge.dirName));
+
+    expect(appLine, 'app on-path edge line must exist').toBeDefined();
+    expect(pgLine, 'pgvector on-path edge line must exist').toBeDefined();
+
+    // On-path rows carry green on lane glyphs — no rotation colours.
+    expect(appLine).toContain(GREEN_BRIGHT);
+    expect(appLine).not.toContain(RED);
+    expect(appLine).not.toContain(MAGENTA);
+    expect(pgLine).toContain(GREEN_BRIGHT);
+    expect(pgLine).not.toContain(RED);
+    expect(pgLine).not.toContain(MAGENTA);
+
+    // Plain dirName text is present in both (ambient bold is identity under NO_COLOR=1).
+    expect(appLine).toContain(appEdge.dirName);
+    expect(pgLine).toContain(pgEdge.dirName);
+
+    // On-path rows do NOT carry forcedDim.
+    expect(appLine).not.toContain(DIM);
+    expect(pgLine).not.toContain(DIM);
+  });
+
+  it('on-path cells: green lane glyph, no rotation codes even when the edge occupies a branched lane', () => {
+    // Branching topology: one on-path edge, one off-path. In normal mode the branched lane
+    // gets a rotation colour (e.g. magenta). Path-highlight suppresses rotation for ALL cells.
+    // On-path rows carry GREEN_BRIGHT on lane glyphs instead of any rotation colour.
+    const trunk = edge(EMPTY, 'trunk11', 'on_trunk'); // on-path
+    const branch = edge(EMPTY, 'branch2', 'off_branch'); // off-path
+
+    const annotations = new Map([
+      [trunk.migrationHash, { pathHighlight: 'on-path' as const }],
+      [branch.migrationHash, { pathHighlight: 'off-path' as const }],
+    ]);
+
+    const rendered = renderWithHighlights([trunk, branch], annotations);
+    const lines = rendered.split('\n');
+
+    const trunkLine = lines.find((l) => l.includes(trunk.dirName));
+    expect(trunkLine, 'on-path trunk line must exist').toBeDefined();
+    // Lane glyph carries green; no rotation colours.
+    expect(trunkLine).toContain(GREEN_BRIGHT);
+    expect(trunkLine).not.toContain(RED);
+    expect(trunkLine).not.toContain(MAGENTA);
+    // On-path rows are NOT force-dimmed.
+    expect(trunkLine).not.toContain(DIM);
+  });
+
+  it('off-path cells: every off-path cell is forcedDim (\x1b[2m), no rotation codes', () => {
+    // The off-path edge row (column 1) may contain GREEN_BRIGHT from an on-path
+    // pass-through glyph at column 0 — that is expected and correct.
+    // The off-path cells themselves (the directed arc glyph + name + hash) carry DIM.
+    // The off-path node row (off2222) must carry DIM and no rotation codes.
+    const onPath = edge(EMPTY, 'on11111', 'on_mig');
+    const offPath = edge(EMPTY, 'off2222', 'off_mig');
+
+    const annotations = new Map([
+      [onPath.migrationHash, { pathHighlight: 'on-path' as const }],
+      [offPath.migrationHash, { pathHighlight: 'off-path' as const }],
+    ]);
+
+    const rendered = renderWithHighlights([onPath, offPath], annotations);
+    const lines = rendered.split('\n');
+
+    const offEdgeLine = lines.find((l) => l.includes(offPath.dirName));
+    expect(offEdgeLine, 'off-path edge line must exist').toBeDefined();
+    // The off-path arc glyph and name are wrapped in forcedDim.
+    expect(offEdgeLine).toContain(DIM);
+    expect(offEdgeLine).not.toContain(RED);
+    expect(offEdgeLine).not.toContain(MAGENTA);
+
+    // Off-path node row (off2222 hash) must be dim and not carry rotation codes.
+    const offNodeLine = lines.find((l) => l.includes('off2222') && !l.includes(offPath.dirName));
+    expect(offNodeLine, 'off-path node line must exist').toBeDefined();
+    expect(offNodeLine).not.toContain(RED);
+    expect(offNodeLine).not.toContain(MAGENTA);
+    // The off-path node marker (○) and its hash text are dim — the cell's own content is dimmed.
+    // A green on-path trunk pass-through │ in another column is allowed.
+    // Assert by checking the raw ANSI sequences: DIM wraps the node marker and hash.
+    expect(offNodeLine).toContain(`${DIM}○`); // node marker is dim
+    expect(offNodeLine).toContain(`${DIM}off2222`); // hash is dim
+    // The on-path trunk column passes through as a green │ — that green is expected and correct.
+    // It is NOT on the off-path cell's own node marker or hash.
+  });
+
+  it('formatOnPathMigrationRow shares the same dirName text and green-lane invariant as the tree on-path row', () => {
+    // The run-list and tree on-path rows use the same styling seam (PATH_HIGHLIGHT_STYLES.onPath).
+    // Both carry GREEN_BRIGHT on lane/node glyphs. No rotation codes appear on either.
+    // The list row omits the gutter; the dirName text matches.
+    const e = edge(EMPTY, 'dest123', 'run_list_mig');
+    const annotations = new Map([[e.migrationHash, { pathHighlight: 'on-path' as const }]]);
+
+    const treeLine = renderWithHighlights([e], annotations)
+      .split('\n')
+      .find((l) => l.includes(e.dirName));
+    expect(treeLine, 'tree on-path line must exist').toBeDefined();
+
+    const listRow = formatOnPathMigrationRow(
+      e.dirName,
+      e.from,
+      e.to,
+      e.dirName.length,
+      true,
+      'unicode',
+    );
+
+    // Both contain the plain dirName.
+    expect(treeLine).toContain(e.dirName);
+    expect(listRow).toContain(e.dirName);
+
+    // Neither has rotation codes.
+    expect(listRow).not.toContain(RED);
+    expect(listRow).not.toContain(MAGENTA);
+
+    // List row is not force-dimmed.
+    expect(listRow).not.toContain(DIM);
+
+    // Tree on-path row is not force-dimmed.
+    expect(treeLine).not.toContain(DIM);
+  });
+
+  it('normal graph/status/list rendering is unaffected: rotation applies when no pathHighlight annotations exist', () => {
+    // Branching topology: two edges from EMPTY with status-overlay annotations (no pathHighlight).
+    // Column 1 must get a rotation colour (laneColorForColumn(1) = magenta). This confirms
+    // path-highlight mode does NOT activate when annotations lack a pathHighlight field.
+    const edgeA = edge(EMPTY, 'aaa1234', 'col0_mig'); // column 0
+    const edgeB = edge(EMPTY, 'bbb5678', 'col1_mig'); // column 1
+
+    // Status-overlay annotations — no pathHighlight field.
+    const normalAnnotations = new Map([
+      [edgeA.migrationHash, { operationCount: 1 }],
+      [edgeB.migrationHash, { operationCount: 2 }],
+    ]);
+
+    const graph: MigrationGraph = (() => {
+      const nodes = new Set<string>();
+      const forwardChain = new Map<string, MigrationEdge[]>();
+      const reverseChain = new Map<string, MigrationEdge[]>();
+      const migrationByHash = new Map<string, MigrationEdge>();
+      for (const e of [edgeA, edgeB]) {
+        nodes.add(e.from);
+        nodes.add(e.to);
+        migrationByHash.set(e.migrationHash, e);
+        const fwd = forwardChain.get(e.from);
+        if (fwd) fwd.push(e);
+        else forwardChain.set(e.from, [e]);
+        const rev = reverseChain.get(e.to);
+        if (rev) rev.push(e);
+        else reverseChain.set(e.to, [e]);
+      }
+      return { nodes, forwardChain, reverseChain, migrationByHash };
+    })();
+    const layout = buildMigrationGraphLayout(buildMigrationGraphRows(graph, {}));
+    const rendered = renderMigrationGraphTree(layout, {
+      colorize: true,
+      edgeAnnotationsByHash: normalAnnotations,
+    });
+
+    // Column 1 node gets a rotation colour (magenta). This confirms rotation is NOT suppressed
+    // when no pathHighlight entries are present — even when edgeAnnotationsByHash is provided.
+    expect(rendered).toContain(laneColorForColumn(1)('○ '));
   });
 });

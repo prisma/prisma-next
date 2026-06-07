@@ -48,6 +48,7 @@ import {
   type IndexNode,
   type ModelNode,
   type PrimaryKeyNode,
+  type RelationNode,
   type UniqueConstraintNode,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -605,6 +606,8 @@ interface BuildModelNodeResult {
   readonly fkRelationMetadata: FkRelationMetadata[];
   readonly backrelationCandidates: ModelBackrelationCandidate[];
   readonly resolvedFields: readonly ResolvedField[];
+  /** Cross-contract-space relation nodes that bypass the local back-relation matching. */
+  readonly crossSpaceRelations: RelationNode[];
 }
 
 function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult {
@@ -960,13 +963,162 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   }
 
   const resultFkRelationMetadata: FkRelationMetadata[] = [];
+  const resultCrossSpaceRelations: RelationNode[] = [];
   for (const relationAttribute of relationAttributes) {
+    const {
+      typeName: fieldTypeName,
+      typeNamespaceId: fieldTypeNamespaceId,
+      typeContractSpaceId: fieldTypeContractSpaceId,
+    } = relationAttribute.field;
+
     if (relationAttribute.field.list) {
+      // F-list: cross-space list relations are explicitly unsupported (Option B does not
+      // navigate, so a list target makes no sense to carry). Emit a diagnostic instead of
+      // silently dropping the field — the author needs to know the field was ignored.
+      if (fieldTypeContractSpaceId !== undefined) {
+        diagnostics.push({
+          code: 'PSL_UNSUPPORTED_CROSS_SPACE_LIST',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" is a cross-space list relation (type "${fieldTypeContractSpaceId}:${fieldTypeNamespaceId !== undefined ? `${fieldTypeNamespaceId}.` : ''}${fieldTypeName}[]"). Cross-space relations must be singular in v0.1 — list cross-space relations are not supported.`,
+          sourceId,
+          span: relationAttribute.field.span,
+        });
+      }
       continue;
     }
 
-    const { typeName: fieldTypeName, typeNamespaceId: fieldTypeNamespaceId } =
-      relationAttribute.field;
+    // Cross-contract-space relation: the target model lives in a different contract space
+    // identified by `typeContractSpaceId` (e.g. `supabase:auth.User`).
+    if (fieldTypeContractSpaceId !== undefined) {
+      // Fail fast if the space is not in the composed extension packs (AC5 PSL half).
+      if (!input.composedExtensions.has(fieldTypeContractSpaceId)) {
+        diagnostics.push({
+          code: 'PSL_UNKNOWN_CONTRACT_SPACE',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" references contract space "${fieldTypeContractSpaceId}" which is not declared in extensionPacks. Add "${fieldTypeContractSpaceId}" to extensionPacks in prisma-next.config.ts.`,
+          sourceId,
+          span: relationAttribute.field.span,
+          data: { space: fieldTypeContractSpaceId, suggestedPack: fieldTypeContractSpaceId },
+        });
+        continue;
+      }
+
+      const parsedRelation = parseRelationAttribute({
+        attribute: relationAttribute.relation,
+        modelName: model.name,
+        fieldName: relationAttribute.field.name,
+        sourceId,
+        diagnostics,
+      });
+      if (!parsedRelation) {
+        continue;
+      }
+      if (!parsedRelation.fields || !parsedRelation.references) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" requires fields and references arguments`,
+          sourceId,
+          span: relationAttribute.relation.span,
+        });
+        continue;
+      }
+
+      const localColumns = mapFieldNamesToColumns({
+        modelName: model.name,
+        fieldNames: parsedRelation.fields,
+        mapping,
+        sourceId,
+        diagnostics,
+        span: relationAttribute.relation.span,
+        entityLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+      });
+      if (!localColumns) {
+        continue;
+      }
+
+      // For cross-space references the `references` list provides field names from the remote
+      // model. Since the interpreter has no access to the extension contract, these field names
+      // are treated as column names directly (matching the TS builder's cross-space path).
+      const referencedColumns = parsedRelation.references;
+
+      if (localColumns.length !== referencedColumns.length) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" must provide the same number of fields and references`,
+          sourceId,
+          span: relationAttribute.relation.span,
+        });
+        continue;
+      }
+
+      const onDelete = parsedRelation.onDelete
+        ? normalizeReferentialAction({
+            modelName: model.name,
+            fieldName: relationAttribute.field.name,
+            actionName: 'onDelete',
+            actionToken: parsedRelation.onDelete,
+            sourceId,
+            span: relationAttribute.field.span,
+            diagnostics,
+          })
+        : undefined;
+      const onUpdate = parsedRelation.onUpdate
+        ? normalizeReferentialAction({
+            modelName: model.name,
+            fieldName: relationAttribute.field.name,
+            actionName: 'onUpdate',
+            actionToken: parsedRelation.onUpdate,
+            sourceId,
+            span: relationAttribute.field.span,
+            diagnostics,
+          })
+        : undefined;
+
+      // Target namespace: use the colon-prefix namespace qualifier, or `__unbound__` when the
+      // no-namespace form is used (e.g. `supabase:User` → AC3).
+      const crossTargetNamespaceId = fieldTypeNamespaceId ?? '__unbound__';
+
+      // Target table name: the interpreter cannot resolve `User → users` because it has no
+      // access to the extension contract (only a Set<string> of space names is available).
+      // Use `fieldTypeName.toLowerCase()` as a symbolic fallback — the same convention the TS
+      // builder uses (`targetModelName.toLowerCase()`) when `targetTableName` is absent.
+      // Physical table resolution against the extension contract is deferred to the aggregate
+      // stage (M3), which has access to the full extension contract.
+      const crossTargetTableName = fieldTypeName.toLowerCase();
+
+      foreignKeyNodes.push({
+        columns: localColumns,
+        references: {
+          model: fieldTypeName,
+          table: crossTargetTableName,
+          columns: referencedColumns,
+          namespaceId: crossTargetNamespaceId,
+          spaceId: fieldTypeContractSpaceId,
+        },
+        ...ifDefined('name', parsedRelation.constraintName),
+        ...ifDefined('onDelete', onDelete),
+        ...ifDefined('onUpdate', onUpdate),
+      });
+
+      // Build the cross-space RelationNode directly (no local back-relation candidate).
+      // `buildSqlContractFromDefinition` recognises `spaceId` on a RelationNode and routes it
+      // through the cross-space domain-relation path (produces a non-navigable CrossReference).
+      resultCrossSpaceRelations.push({
+        fieldName: relationAttribute.field.name,
+        toModel: fieldTypeName,
+        toTable: crossTargetTableName,
+        cardinality: 'N:1',
+        spaceId: fieldTypeContractSpaceId,
+        namespaceId: crossTargetNamespaceId,
+        on: {
+          parentTable: tableName,
+          parentColumns: localColumns,
+          childTable: crossTargetTableName,
+          childColumns: referencedColumns,
+        },
+      });
+
+      continue;
+    }
+
     const qualifiedTypeName = fieldTypeNamespaceId
       ? `${fieldTypeNamespaceId}.${fieldTypeName}`
       : fieldTypeName;
@@ -1129,6 +1281,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       ...ifDefined('control', controlPolicy),
     },
     fkRelationMetadata: resultFkRelationMetadata,
+    crossSpaceRelations: resultCrossSpaceRelations,
     backrelationCandidates: resultBackrelationCandidates,
     resolvedFields,
   };
@@ -1809,6 +1962,9 @@ export function interpretPslDocumentToSqlContract(
   const fkRelationMetadata: FkRelationMetadata[] = [];
   const backrelationCandidates: ModelBackrelationCandidate[] = [];
   const modelResolvedFields = new Map<string, readonly ResolvedField[]>();
+  // Cross-space relation nodes keyed by declaring model name — merged into
+  // modelRelations after local back-relation matching so they bypass that step.
+  const crossSpaceRelationsByModel = new Map<string, RelationNode[]>();
 
   for (const model of models) {
     const mapping = modelMappings.get(model.name);
@@ -1843,6 +1999,10 @@ export function interpretPslDocumentToSqlContract(
     fkRelationMetadata.push(...result.fkRelationMetadata);
     backrelationCandidates.push(...result.backrelationCandidates);
     modelResolvedFields.set(model.name, result.resolvedFields);
+    if (result.crossSpaceRelations.length > 0) {
+      const existing = crossSpaceRelationsByModel.get(model.name) ?? [];
+      crossSpaceRelationsByModel.set(model.name, [...existing, ...result.crossSpaceRelations]);
+    }
   }
 
   const { modelRelations, fkRelationsByPair } = indexFkRelations({ fkRelationMetadata });
@@ -1853,6 +2013,17 @@ export function interpretPslDocumentToSqlContract(
     diagnostics,
     sourceId,
   });
+
+  // Merge cross-space relations into modelRelations after local back-relation matching.
+  // Cross-space targets have no local back-relation candidates, so they bypass that step.
+  for (const [modelName, relations] of crossSpaceRelationsByModel) {
+    const existing = modelRelations.get(modelName);
+    if (existing) {
+      existing.push(...relations);
+    } else {
+      modelRelations.set(modelName, [...relations]);
+    }
+  }
 
   const { discriminatorDeclarations, baseDeclarations } = collectPolymorphismDeclarations(
     models,

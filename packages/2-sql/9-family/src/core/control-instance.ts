@@ -347,6 +347,113 @@ function buildSqlTypeMetadataRegistry(options: {
   return registry;
 }
 
+interface CrossSpaceFkView {
+  readonly id: string;
+  readonly contractSpace?: {
+    readonly contractJson?: {
+      readonly extensionPacks?: Readonly<Record<string, unknown>>;
+      readonly storage?: {
+        readonly namespaces?: Readonly<Record<string, unknown>>;
+      };
+    };
+  };
+}
+
+/**
+ * Builds a map from each extension id to the set of extension ids it
+ * transitively depends on. Uses the same declared-dependency data that
+ * `buildExtensionLoadOrder` in control-stack uses.
+ */
+function buildTransitiveDependsOnMap(
+  extensions: readonly CrossSpaceFkView[],
+): Map<string, Set<string>> {
+  const directDeps = new Map<string, readonly string[]>();
+  for (const ext of extensions) {
+    const packs = ext.contractSpace?.contractJson?.extensionPacks;
+    const deps = packs !== null && typeof packs === 'object' ? Object.keys(packs) : [];
+    directDeps.set(ext.id, deps);
+  }
+
+  const result = new Map<string, Set<string>>();
+  const resolve = (id: string, visiting: Set<string>): Set<string> => {
+    const cached = result.get(id);
+    if (cached !== undefined) return cached;
+    const set = new Set<string>();
+    result.set(id, set);
+    for (const depId of directDeps.get(id) ?? []) {
+      set.add(depId);
+      if (!visiting.has(depId)) {
+        visiting.add(depId);
+        for (const transitive of resolve(depId, visiting)) {
+          set.add(transitive);
+        }
+        visiting.delete(depId);
+      }
+    }
+    return set;
+  };
+
+  for (const ext of extensions) {
+    resolve(ext.id, new Set([ext.id]));
+  }
+  return result;
+}
+
+/**
+ * Asserts that no cross-space FK in any extension points against the
+ * dependency direction.
+ *
+ * A cross-space FK (target.spaceId present) from extension A pointing at
+ * space B is a violation when B depends on A (directly or transitively),
+ * because that means A is pointing "upward" against the dependency arrows
+ * established by the extension load order.
+ *
+ * Throws with a diagnostic naming the violating extension (source), the
+ * target space, and the direction violation.
+ */
+function isObjectRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+export function assertNoCrossSpaceFkReverseReferences(
+  extensions: readonly CrossSpaceFkView[],
+): void {
+  const dependsOnMap = buildTransitiveDependsOnMap(extensions);
+
+  for (const ext of extensions) {
+    const namespaces = ext.contractSpace?.contractJson?.storage?.namespaces;
+    if (!isObjectRecord(namespaces)) continue;
+    for (const ns of Object.values(namespaces)) {
+      if (!isObjectRecord(ns)) continue;
+      const entries = ns['entries'];
+      if (!isObjectRecord(entries)) continue;
+      for (const slot of Object.values(entries)) {
+        if (!isObjectRecord(slot)) continue;
+        for (const table of Object.values(slot)) {
+          if (!isObjectRecord(table)) continue;
+          const foreignKeys = table['foreignKeys'];
+          if (!Array.isArray(foreignKeys)) continue;
+          for (const fk of foreignKeys) {
+            if (!isObjectRecord(fk)) continue;
+            const target = fk['target'];
+            if (!isObjectRecord(target)) continue;
+            if (target['spaceId'] === undefined) continue;
+            const targetSpaceId = target['spaceId'];
+            if (typeof targetSpaceId !== 'string') continue;
+            // Check if targetSpaceId depends on ext.id (directly or transitively)
+            const targetDeps = dependsOnMap.get(targetSpaceId);
+            if (targetDeps?.has(ext.id)) {
+              throw new Error(
+                `Cross-space FK reverse-reference detected: extension "${ext.id}" has a cross-space FK targeting space "${targetSpaceId}", but "${targetSpaceId}" depends on "${ext.id}". Cross-space FKs must follow the dependency direction (a space can only reference spaces it depends on, not spaces that depend on it).`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 export function createSqlFamilyInstance<TTargetId extends string>(
   stack: ControlStack<'sql', TTargetId>,
 ): SqlFamilyInstance {
@@ -385,6 +492,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       });
     }
   }
+
+  assertNoCrossSpaceFkReverseReferences(extensions);
 
   const { codecTypeImports, extensionIds } = stack;
 

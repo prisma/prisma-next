@@ -62,3 +62,9 @@ test/**/fixtures/generated/
 
 # Reference clones inside transient projects (browsing aids, not committed)
 projects/*/reference/
+
+# Drive loop-internal artifacts — never committed into slice PRs (the review
+# scoreboard + the learnings ledger are transient working state, migrated at
+# project close-out, not PR content).
+projects/*/reviews/
+projects/*/learnings.md

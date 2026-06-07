@@ -95,6 +95,7 @@ export {
   assembleControlMutationDefaults,
   assembleScalarTypeDescriptors,
   assertUniqueCodecOwner,
+  buildExtensionLoadOrder,
   createControlStack,
   extractCodecLookup,
   extractCodecTypeImports,

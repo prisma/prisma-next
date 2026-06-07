@@ -343,6 +343,41 @@ describe('generateModelRelationsType', () => {
       }),
     ).toThrow('missing localFields or targetFields');
   });
+
+  it('emits never for a cross-space relation (Option B non-navigable)', () => {
+    const crossSpaceRef = { namespace: '__unbound__', model: 'User', space: 'supabase' };
+    const result = generateModelRelationsType({
+      user: {
+        to: crossSpaceRef,
+        cardinality: 'N:1',
+        on: { localFields: ['userId'], targetFields: ['id'] },
+      },
+    });
+    expect(result).toBe('{ readonly user: never }');
+  });
+
+  it('emits never only for cross-space relations; local relations are unaffected', () => {
+    const localRef = crossRef('Post');
+    const crossSpaceRef = { namespace: 'auth', model: 'User', space: 'supabase' };
+    const result = generateModelRelationsType({
+      posts: { to: localRef, cardinality: '1:N' },
+      user: { to: crossSpaceRef, cardinality: 'N:1' },
+    });
+    expect(result).toContain('readonly posts: {');
+    expect(result).toContain('readonly user: never');
+    // local relation should not be never
+    expect(result).not.toContain('readonly posts: never');
+  });
+
+  it('local relation to.space is absent and the relation is not never', () => {
+    const result = generateModelRelationsType({
+      author: { to: crossRef('User'), cardinality: 'N:1' },
+    });
+    // local relation must not be emitted as never
+    expect(result).not.toContain('readonly author: never');
+    // the CrossReference for a local relation must not include a `space` property
+    expect(result).not.toContain('readonly space:');
+  });
 });
 
 describe('deduplicateImports', () => {

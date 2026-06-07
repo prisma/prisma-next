@@ -1,0 +1,7 @@
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    username String
+    @@map("profile")
+  }
+}

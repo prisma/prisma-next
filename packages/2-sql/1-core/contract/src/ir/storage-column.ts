@@ -1,4 +1,4 @@
-import type { ColumnDefault, ControlPolicy } from '@prisma-next/contract/types';
+import type { ColumnDefault, ControlPolicy, ValueSetRef } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 
@@ -20,6 +20,7 @@ export interface StorageColumnInput {
   readonly typeRef?: string;
   readonly default?: ColumnDefault;
   readonly control?: ControlPolicy;
+  readonly valueSet?: ValueSetRef;
 }
 
 /**
@@ -43,6 +44,7 @@ export class StorageColumn extends SqlNode {
   declare readonly typeRef?: string;
   declare readonly default?: ColumnDefault;
   declare readonly control?: ControlPolicy;
+  declare readonly valueSet?: ValueSetRef;
 
   constructor(input: StorageColumnInput) {
     super();
@@ -53,6 +55,7 @@ export class StorageColumn extends SqlNode {
     if (input.typeRef !== undefined) this.typeRef = input.typeRef;
     if (input.default !== undefined) this.default = input.default;
     if (input.control !== undefined) this.control = input.control;
+    if (input.valueSet !== undefined) this.valueSet = input.valueSet;
     freezeNode(this);
   }
 }

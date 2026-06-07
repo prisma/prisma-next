@@ -8,11 +8,12 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   type ContractSpaceMember,
+  collectAggregateNamespaces,
   requireHeadRef,
   type VerifierOutput,
   verifyMigration,
 } from '@prisma-next/migration-tools/aggregate';
-import { castAs } from '@prisma-next/utils/casts';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from '../../utils/cli-errors';
 import {
@@ -101,7 +102,12 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
   const markersBySpaceId = await familyInstance.readAllMarkers({ driver });
   const schemaIntrospection = skipSchema
     ? null
-    : await runIntrospection({ driver, familyInstance, onProgress });
+    : await runIntrospection({
+        driver,
+        familyInstance,
+        onProgress,
+        contract: collectAggregateNamespaces(aggregate),
+      });
 
   emitVerifySpan(onProgress, 'spanStart');
   const verifyResult = verifyMigration({
@@ -130,8 +136,9 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
   driver: ControlDriverInstance<TFamilyId, TTargetId>;
   familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   onProgress: OnControlProgress | undefined;
+  contract: unknown;
 }): Promise<unknown> {
-  const { driver, familyInstance, onProgress } = args;
+  const { driver, familyInstance, onProgress, contract } = args;
   onProgress?.({
     action: 'dbVerify',
     kind: 'spanStart',
@@ -139,7 +146,7 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
     label: 'Introspecting database schema',
   });
   try {
-    const result = await familyInstance.introspect({ driver });
+    const result = await familyInstance.introspect({ driver, contract });
     onProgress?.({
       action: 'dbVerify',
       kind: 'spanEnd',
@@ -179,7 +186,10 @@ export function createPerMemberVerifier<TFamilyId extends string, TTargetId exte
       // The family's `TSchemaIR` is opaque to migration-tools; the
       // aggregate verifier passes through whatever we hand it. The
       // family expects its own IR shape on the way back.
-      schema: projectedSchema as never,
+      schema: blindCast<
+        never,
+        'family TSchemaIR is opaque to migration-tools; projectedSchema is passed straight through'
+      >(projectedSchema),
       strict: verifyMode === 'strict',
       frameworkComponents,
     });

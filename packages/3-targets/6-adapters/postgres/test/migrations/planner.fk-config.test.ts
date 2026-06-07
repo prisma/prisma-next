@@ -1,5 +1,5 @@
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { contractToSchemaIR, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -78,6 +78,10 @@ function createFkTestContract(fkConfig: {
 const emptySchema: SqlSchemaIR = {
   tables: {},
 };
+
+const MIGRATION_PLAN_POLICY = {
+  allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
+} as const;
 
 describe('PostgresMigrationPlanner - per-FK config combinations', () => {
   const testAdapter = createPostgresAdapter();
@@ -217,4 +221,145 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     // No index: no user-declared and FK index=false
     expect(operationIds).not.toContain('index.post.post_userId_idx');
   });
+
+  it('does not plan a destructive drop for a constraintless FK in offline from-contract schema', () => {
+    const fromContract = createWorkflowStateContract({
+      storageHash: coreHash('sha256:from'),
+      includeStateColumn: false,
+    });
+    const contract = createWorkflowStateContract({
+      storageHash: coreHash('sha256:to'),
+      includeStateColumn: true,
+    });
+    const schema = contractToSchemaIR(fromContract, { annotationNamespace: 'pg' });
+
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: MIGRATION_PLAN_POLICY,
+      fromContract,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') throw new Error('Expected success');
+
+    const operationIds = result.plan.operations.map((op) => op.id);
+    expect(operationIds).toContain('column.workflow_states.state');
+    expect(operationIds).not.toContain('dropConstraint.workflow_states.fk(workflow_id)');
+    expect(result.plan.operations).not.toContainEqual(
+      expect.objectContaining({
+        operationClass: 'destructive',
+        label: expect.stringContaining('fk(workflow_id)'),
+      }),
+    );
+  });
 });
+
+function createWorkflowStateContract(options: {
+  storageHash: ReturnType<typeof coreHash>;
+  includeStateColumn: boolean;
+}): Contract<SqlStorage> {
+  const workflowStateColumns = {
+    workflow_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+    team_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+    ...(options.includeStateColumn
+      ? { state: { nativeType: 'jsonb', codecId: 'pg/json@1', nullable: true } }
+      : {}),
+  };
+
+  return {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:test'),
+    storage: new SqlStorage({
+      storageHash: options.storageHash,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: {
+            table: {
+              teams: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              workflows: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  team_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                },
+                primaryKey: { columns: ['id', 'team_id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'workflows',
+                      columns: ['team_id'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'teams',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: false,
+                  },
+                ],
+              },
+              workflow_states: {
+                columns: workflowStateColumns,
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'workflow_states',
+                      columns: ['workflow_id'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'workflows',
+                      columns: ['id'],
+                    },
+                    constraint: false,
+                    index: true,
+                  },
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'workflow_states',
+                      columns: ['workflow_id', 'team_id'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'workflows',
+                      columns: ['id', 'team_id'],
+                    },
+                    name: 'workflow_states_workflow_team_id_fkey',
+                    onDelete: 'cascade',
+                    constraint: true,
+                    index: false,
+                  },
+                ],
+              },
+            },
+          },
+        }),
+      },
+    }),
+    roots: {},
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+}

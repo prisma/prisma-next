@@ -1,4 +1,5 @@
 export {
+  collectAggregateNamespaces,
   createContractSpaceAggregate,
   createContractSpaceMember,
   requireHeadRef,

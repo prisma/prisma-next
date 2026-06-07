@@ -156,58 +156,36 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
     // The aggregate passed the integrity gate, so every member's head ref
     // is resolved (the app's is synthesised from the live contract).
     const headRef = requireHeadRef(member);
-    const targetHash = isAppMember && refHash !== undefined ? refHash : headRef.hash;
+    const memberTargetHash = isAppMember && refHash !== undefined ? refHash : headRef.hash;
+    const memberRefInvariants = isAppMember && refHash !== undefined ? refInvariants : undefined;
     const liveMarker = markerRows.get(member.spaceId) ?? null;
 
-    // Empty-graph members fail loudly: replay needs an on-disk path
-    // and an empty graph means the user has never planned this space.
-    if (member.graph().nodes.size === 0) {
-      // Edge case: target == EMPTY (greenfield, nothing to do) or
-      // the live marker already matches the target. Loader integrity
-      // allows this for extensions whose head ref is the empty
-      // sentinel. Record a zero-op resolution so the aggregate result
-      // still surfaces the member in `perSpace[]` as already-at-head;
-      // the runner is not invoked for these members because they have
-      // no authored ops and (for greenfield extensions) no marker to
-      // advance.
-      const liveHash = liveMarker?.storageHash;
-      if (
-        targetHash === liveHash ||
-        (liveHash === undefined && targetHash === EMPTY_CONTRACT_HASH)
-      ) {
-        atHeadResolutions.set(
-          member.spaceId,
-          buildAtHeadResolution({
-            aggregateTargetId: aggregate.targetId,
-            member,
-            targetHash,
-            liveMarker,
-          }),
-        );
-        continue;
-      }
-      return notOk(buildNeverPlannedFailure(member.spaceId, targetHash));
-    }
-
-    const targetInvariants =
-      isAppMember && refHash !== undefined && refInvariants !== undefined
-        ? refInvariants
-        : headRef.invariants;
-    const targetMember: ContractSpaceMember =
-      targetHash === headRef.hash && targetInvariants === headRef.invariants
-        ? member
-        : { ...member, headRef: { hash: targetHash, invariants: targetInvariants } };
-
-    const walked = graphWalkStrategy({
-      aggregateTargetId: aggregate.targetId,
-      member: targetMember,
-      currentMarker: liveMarker,
-      ...(isAppMember && refName !== undefined ? { refName } : {}),
+    const outcome = planMemberPath({
+      member,
+      aggregate,
+      targetHash: memberTargetHash,
+      refInvariants: memberRefInvariants,
+      liveMarker,
+      ...(isAppMember ? { refName } : {}),
     });
-    if (walked.kind === 'unreachable') {
-      return notOk(buildPathNotFoundFailure(member.spaceId, liveMarker, targetHash));
+
+    if (outcome.kind === 'at-head') {
+      // Empty-graph member whose live marker already matches the target.
+      // Kept out of the runner schedule so we don't write spurious markers
+      // for greenfield extensions, but merged back into the success envelope
+      // so every loaded member is represented.
+      atHeadResolutions.set(member.spaceId, outcome.plan);
+      continue;
     }
-    if (walked.kind === 'unsatisfiable') {
+    if (outcome.kind === 'never-planned') {
+      return notOk(buildNeverPlannedFailure(outcome.spaceId, outcome.targetHash));
+    }
+    if (outcome.kind === 'unreachable') {
+      return notOk(
+        buildPathNotFoundFailure(outcome.spaceId, outcome.liveMarker, outcome.targetHash),
+      );
+    }
+    if (outcome.kind === 'unsatisfiable') {
       // Surface the canonical MIGRATION.NO_INVARIANT_PATH envelope
       // (the error rendering pipeline maps it to meta.code +
       // meta.required + meta.missing + meta.structuralPath that the
@@ -218,10 +196,12 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
       // string here would leave the structural lookup with a hash that
       // is never a graph node, producing an empty `structuralPath` and
       // a less actionable diagnostic.
-      const fromHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
-      const structural = findPathWithDecision(targetMember.graph(), fromHash, targetHash, {
-        required: new Set<string>(),
-      });
+      const structural = findPathWithDecision(
+        outcome.targetMember.graph(),
+        outcome.liveHash,
+        memberTargetHash,
+        { required: new Set<string>() },
+      );
       const structuralPath =
         structural.kind === 'ok'
           ? structural.decision.selectedPath.map((edge) => ({
@@ -233,14 +213,14 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
             }))
           : [];
       throw errorNoInvariantPath({
-        ...(isAppMember && refName !== undefined ? { refName } : {}),
-        required: targetInvariants,
-        missing: walked.missing,
+        ...(outcome.refName !== undefined ? { refName: outcome.refName } : {}),
+        required: outcome.targetInvariants,
+        missing: outcome.missing,
         structuralPath,
       });
     }
 
-    perSpacePlans.set(member.spaceId, walked.result);
+    perSpacePlans.set(member.spaceId, outcome.plan);
   }
 
   const canonicalOrder = [...aggregate.extensions.map((m) => m.spaceId), aggregate.app.spaceId];
@@ -338,6 +318,119 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
       summary,
     }),
   );
+}
+
+/**
+ * Outcome variants for one member's path computation.
+ *
+ * Callers switch on `kind` and map to their own error representation:
+ * `executeMigrate` throws / returns `notOk`; `executeMigrateShowCommand`
+ * returns a CLI structured error. The shared discriminant guarantees both
+ * paths feed `graphWalkStrategy` the same inputs.
+ *
+ * @internal Exported for `executeMigrateShowCommand` to call.
+ */
+export type MemberPathOutcome =
+  | { readonly kind: 'ok'; readonly plan: PerSpacePlan }
+  | { readonly kind: 'at-head'; readonly plan: PerSpacePlan }
+  | { readonly kind: 'never-planned'; readonly spaceId: string; readonly targetHash: string }
+  | {
+      readonly kind: 'unreachable';
+      readonly spaceId: string;
+      readonly liveMarker: ContractMarkerRecordLike | null;
+      readonly targetHash: string;
+    }
+  | {
+      readonly kind: 'unsatisfiable';
+      readonly spaceId: string;
+      readonly isAppMember: boolean;
+      readonly missing: readonly string[];
+      readonly targetInvariants: readonly string[];
+      readonly targetMember: ContractSpaceMember;
+      readonly liveHash: string;
+      readonly refName: string | undefined;
+    };
+
+/**
+ * Compute the graph-walk path for one contract-space member.
+ *
+ * Encapsulates the invariant-correct input assembly that both
+ * `executeMigrate` and `executeMigrateShowCommand` must use:
+ * - `currentMarker` carries the full live marker including `invariants`
+ *   (not a stripped `{ storageHash, invariants: [] }` shell).
+ * - `targetInvariants` uses the caller-supplied `refInvariants` when a
+ *   `--to` ref was resolved (not always the file head ref's invariants).
+ *
+ * Both callers map the returned `MemberPathOutcome` to their own error
+ * representation; the path-compute logic is shared and identical.
+ *
+ * @internal Exported for `executeMigrateShowCommand`.
+ */
+export function planMemberPath({
+  member,
+  aggregate,
+  targetHash,
+  refInvariants,
+  liveMarker,
+  refName,
+}: {
+  readonly member: ContractSpaceMember;
+  readonly aggregate: Pick<ContractSpaceAggregate, 'targetId' | 'app'>;
+  readonly targetHash: string;
+  readonly refInvariants: readonly string[] | undefined;
+  readonly liveMarker: ContractMarkerRecordLike | null;
+  readonly refName?: string;
+}): MemberPathOutcome {
+  const isAppMember = member.spaceId === aggregate.app.spaceId;
+  const headRef = requireHeadRef(member);
+
+  if (member.graph().nodes.size === 0) {
+    const liveHash = liveMarker?.storageHash;
+    if (targetHash === liveHash || (liveHash === undefined && targetHash === EMPTY_CONTRACT_HASH)) {
+      return {
+        kind: 'at-head',
+        plan: buildAtHeadResolution({
+          aggregateTargetId: aggregate.targetId,
+          member,
+          targetHash,
+          liveMarker,
+        }),
+      };
+    }
+    return { kind: 'never-planned', spaceId: member.spaceId, targetHash };
+  }
+
+  const targetInvariants =
+    isAppMember && refInvariants !== undefined ? refInvariants : headRef.invariants;
+  const targetMember: ContractSpaceMember =
+    targetHash === headRef.hash && targetInvariants === headRef.invariants
+      ? member
+      : { ...member, headRef: { hash: targetHash, invariants: targetInvariants } };
+
+  const walked = graphWalkStrategy({
+    aggregateTargetId: aggregate.targetId,
+    member: targetMember,
+    currentMarker: liveMarker,
+    ...(isAppMember && refName !== undefined ? { refName } : {}),
+  });
+
+  if (walked.kind === 'unreachable') {
+    return { kind: 'unreachable', spaceId: member.spaceId, liveMarker, targetHash };
+  }
+  if (walked.kind === 'unsatisfiable') {
+    const liveHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
+    return {
+      kind: 'unsatisfiable',
+      spaceId: member.spaceId,
+      isAppMember,
+      missing: walked.missing,
+      targetInvariants,
+      targetMember,
+      liveHash,
+      refName,
+    };
+  }
+  return { kind: 'ok', plan: walked.result };
 }
 
 /**

@@ -136,6 +136,7 @@ function renderSpaceTree(args: {
   readonly statusOverlay: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly colorize: boolean;
   readonly glyphMode: 'unicode' | 'ascii';
+  readonly isAppSpace: boolean;
   readonly globalMaxEdgeTreePrefixWidth?: number;
   readonly globalMaxDirNameWidth?: number;
 }): string {
@@ -151,6 +152,7 @@ function renderSpaceTree(args: {
     statusOverlayByHash: args.statusOverlay,
     colorize: args.colorize,
     glyphMode: args.glyphMode,
+    isAppSpace: args.isAppSpace,
     ...(args.showDbMarker && args.markerHash !== undefined ? { dbHash: args.markerHash } : {}),
     ...(args.globalMaxEdgeTreePrefixWidth !== undefined
       ? { globalMaxEdgeTreePrefixWidth: args.globalMaxEdgeTreePrefixWidth }
@@ -541,6 +543,7 @@ export async function executeMigrationStatusCommand(
       appliedMigrationHashes: appliedHashes,
       showAppliedOverlay,
     });
+    const isAppSpace = spaceEntry.space === aggregate.app.spaceId;
     const tree = renderSpaceTree({
       member,
       liveContractHash: contractHash,
@@ -550,6 +553,7 @@ export async function executeMigrationStatusCommand(
       statusOverlay: annotations,
       colorize,
       glyphMode,
+      isAppSpace,
       ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
       ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
     });

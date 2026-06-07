@@ -345,12 +345,107 @@ export function validateScalarTypeCodecIds(
   return errors;
 }
 
+interface DependencyDeclaringDescriptor {
+  readonly id: string;
+  readonly contractSpace?: {
+    readonly contractJson?: {
+      readonly extensionPacks?: Readonly<Record<string, unknown>>;
+    };
+  };
+}
+
+function readDeclaredDependencyIds(descriptor: DependencyDeclaringDescriptor): readonly string[] {
+  const packs = descriptor.contractSpace?.contractJson?.extensionPacks;
+  if (packs === null || typeof packs !== 'object') return [];
+  return Object.keys(packs);
+}
+
+/**
+ * Builds a dependency-respecting load order for the given extension descriptors
+ * using Kahn's topological sort algorithm. Dependencies (packs declared in
+ * `contractSpace.contractJson.extensionPacks`) are placed before the extensions
+ * that depend on them.
+ *
+ * Throws if the dependency graph contains a cycle, with an error message that
+ * names every extension involved in the cycle.
+ *
+ * Throws if any extension declares a dependency on a pack ID that is not present
+ * in the provided list — add the missing pack to the `extensionPacks` list to
+ * resolve the error.
+ */
+
+export function buildExtensionLoadOrder(
+  extensions: ReadonlyArray<DependencyDeclaringDescriptor>,
+): readonly string[] {
+  if (extensions.length === 0) return [];
+
+  const idSet = new Set(extensions.map((e) => e.id));
+  const inDegree = new Map<string, number>();
+  const dependents = new Map<string, string[]>();
+
+  for (const ext of extensions) {
+    if (!inDegree.has(ext.id)) inDegree.set(ext.id, 0);
+    if (!dependents.has(ext.id)) dependents.set(ext.id, []);
+  }
+
+  for (const ext of extensions) {
+    for (const depId of readDeclaredDependencyIds(ext)) {
+      if (!idSet.has(depId)) {
+        throw new Error(
+          `Extension "${ext.id}" declares a dependency on "${depId}", but "${depId}" is not in the provided extension set. Add the missing space to extensionPacks.`,
+        );
+      }
+      inDegree.set(ext.id, (inDegree.get(ext.id) ?? 0) + 1);
+      const list = dependents.get(depId);
+      if (list !== undefined) list.push(ext.id);
+    }
+  }
+
+  const queue: string[] = [];
+  for (const [id, deg] of inDegree) {
+    if (deg === 0) queue.push(id);
+  }
+  queue.sort();
+
+  const result: string[] = [];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (id === undefined) break;
+    result.push(id);
+    const children = dependents.get(id) ?? [];
+    children.sort();
+    for (const childId of children) {
+      const newDeg = (inDegree.get(childId) ?? 1) - 1;
+      inDegree.set(childId, newDeg);
+      if (newDeg === 0) queue.push(childId);
+    }
+  }
+
+  if (result.length < extensions.length) {
+    const cycleMembers = extensions
+      .map((e) => e.id)
+      .filter((id) => !result.includes(id))
+      .sort();
+    throw new Error(
+      `Extension dependency cycle detected. Cycle members: ${cycleMembers.map((id) => `"${id}"`).join(', ')}.`,
+    );
+  }
+
+  return result;
+}
+
 export function createControlStack<TFamilyId extends string, TTargetId extends string>(
   input: CreateControlStackInput<TFamilyId, TTargetId>,
 ): ControlStack<TFamilyId, TTargetId> {
   const { family, target, adapter, driver, extensionPacks = [] } = input;
 
-  const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
+  const orderedIds = buildExtensionLoadOrder(extensionPacks);
+  const extensionById = new Map(extensionPacks.map((ext) => [ext.id, ext]));
+  const orderedExtensionPacks = orderedIds
+    .map((id) => extensionById.get(id))
+    .filter((ext): ext is ControlExtensionDescriptor<TFamilyId, TTargetId> => ext !== undefined);
+
+  const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...orderedExtensionPacks];
 
   const codecLookup = extractCodecLookup(allDescriptors);
   const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
@@ -360,11 +455,11 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     target,
     adapter,
     driver,
-    extensionPacks: extensionPacks as readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[],
+    extensionPacks: orderedExtensionPacks,
 
     codecTypeImports: extractCodecTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
-    extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
+    extensionIds: extractComponentIds(family, target, adapter, orderedExtensionPacks),
     codecLookup,
     authoringContributions: assembleAuthoringContributions(allDescriptors),
     scalarTypeDescriptors,

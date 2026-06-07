@@ -1,4 +1,4 @@
-import type { ContractModelBase, ContractValueObject } from './domain-types';
+import type { ContractEnum, ContractModelBase, ContractValueObject } from './domain-types';
 
 export { UNBOUND_DOMAIN_NAMESPACE_ID } from './default-namespace';
 
@@ -11,6 +11,7 @@ export interface ApplicationDomainNamespace<
 > {
   readonly models: TModels;
   readonly valueObjects?: Record<string, ContractValueObject>;
+  readonly enum?: Record<string, ContractEnum>;
 }
 
 /**

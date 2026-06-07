@@ -7,7 +7,8 @@ import {
 import { blindCast, castAs } from '@prisma-next/utils/casts';
 import type { SqlNamespace, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
-import { StorageTable, type StorageTableInput } from './storage-table';
+import { StorageTable } from './storage-table';
+import { StorageValueSet } from './storage-value-set';
 
 const SQL_NAMESPACE_KIND = 'sql-namespace' as const;
 
@@ -28,11 +29,14 @@ class SqlBoundNamespace extends NamespaceBase {
   readonly id: string;
   readonly entries: Readonly<{
     readonly table: Readonly<Record<string, StorageTable>>;
+    readonly valueSet?: Readonly<Record<string, StorageValueSet>>;
   }>;
 
   static fromTablesInput(input: SqlNamespaceTablesInput): SqlNamespace {
     const tableCount = Object.keys(input.entries.table).length;
-    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0) {
+    const hasValueSets =
+      input.entries.valueSet !== undefined && Object.keys(input.entries.valueSet).length > 0;
+    if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0 && !hasValueSets) {
       return castAs<SqlNamespace>(SqlUnboundNamespace.instance);
     }
     return castAs<SqlNamespace>(new SqlBoundNamespace(input));
@@ -41,16 +45,21 @@ class SqlBoundNamespace extends NamespaceBase {
   private constructor(input: SqlNamespaceTablesInput) {
     super();
     this.id = input.id;
-    this.entries = Object.freeze({
-      table: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.table).map(([k, v]) => [
-            k,
-            v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
-          ]),
-        ),
+    const table = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.entries.table).map(([k, v]) => [k, new StorageTable(v)]),
       ),
-    });
+    );
+    if (input.entries.valueSet !== undefined) {
+      const valueSet = Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.valueSet).map(([k, v]) => [k, new StorageValueSet(v)]),
+        ),
+      );
+      this.entries = Object.freeze({ table, valueSet });
+    } else {
+      this.entries = Object.freeze({ table });
+    }
     Object.defineProperty(this, 'kind', {
       value: SQL_NAMESPACE_KIND,
       writable: false,

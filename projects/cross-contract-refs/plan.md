@@ -1,5 +1,50 @@
 # Project Plan
 
+## Status / next-up (2026-06-07) — resume here
+
+- **M1 — Foundation: ✅ MERGED (PR #745).** FK carrier (`ForeignKeyReference.spaceId`, presence =
+  cross-space discriminator); cross-space dependency graph + cycle rejection; reverse-reference
+  rejection; primitive-ownership collisions via a namespace-aware `disjointness`.
+- **M2 — Authoring surfaces: ✅ COMPLETE (branch `tml-2500-m2-authoring-surfaces`, PR opening).**
+  All 5 dispatches SATISFIED (M2.1–M2.5), trace backstop green, full gate green (typecheck 138/138,
+  lint 79/79, lint:deps clean, lint:casts delta=0, fixtures:check exit 0). Delivered:
+  - **M2.1** TS brand foundation (`TargetFieldRef<…, TSpaceId>`, `<self>`/spaceId; brand survives the
+    staged builder) + storage cross-space FK lowering (`ForeignKeyReference.spaceId`) + missing-pack
+    fail-fast (AC5 TS) + cascade no-diagnostic (AC4).
+  - **M2.2** TS cross-space relation, **Option B non-navigable** — `spaceId` on
+    `BelongsToRelation`/`RelationNode`/`CrossReference.space`; emitter renders cross-space relations as
+    `never` so ORM `include` is a compile error (proven by a negative type test).
+  - **M2.3** Supabase `/contract` branded handles (`AuthUser` etc.) via a new **`extensionModel(...)`
+    factory** in contract-ts (`ContractModelBuilder` stays type-only); handle↔contract consistency test.
+  - **M2.4** PSL colon-prefix grammar (`supabase:auth.User` / `supabase:User`) — `PslField.typeContractSpaceId`,
+    parser branch, interpreter **symbolic** lowering (spaceId + namespace + columns) + missing-pack
+    diagnostic (`PSL_UNKNOWN_CONTRACT_SPACE`, AC5 PSL).
+  - **M2.5** PSL printer round-trip for the qualified form (also fixed the pre-existing TML-2459
+    `typeNamespaceId` printer-drop bug); AC2 round-trip closed.
+- **NEXT — M3 — Planner + verifier integration.** Scope: planner DDL (qualified vs unqualified
+  `REFERENCES`), verifier walk of `source:'space'` FKs, PGlite integration test (AC7), the `__unspecified__`
+  planner half of AC3, **and the deferred items below that M3 must resolve**:
+  - **PSL cross-space target-table resolution** — M2.4 carries a *symbolic* coordinate; the PSL carrier's
+    `tableName` is `modelName.toLowerCase()` (e.g. `user`), NOT the real table (`users`). M3 resolves
+    model→table against the **loaded aggregate** (where the extension contracts are available — the PSL
+    interpreter only has space *names*). The `psl-ts-namespace-parity.test.ts` pins this divergence with a
+    failing-on-resolution assertion; M3 flips it. (FR10/FR19/FR20.)
+  - **Walking-skeleton FK wiring** — add `Profile.userId → auth.User.id` (onDelete cascade) to
+    `examples/supabase` + the cascade-delete hermetic test (needs the planner).
+  - **FK-target `spaceId` type-surface gap** — `BuiltStorageTables<Definition>` omits `spaceId` on the FK
+    target at the type level (runtime carrier has it). Small `contract-ts`/`sql-contract` cleanup.
+- **Standing gate (M1+M2 lessons — apply every dispatch):** full `pnpm lint` + `pnpm fixtures:check` +
+  full `pnpm typecheck` (not just package-scoped — implementers default to package scope and miss
+  downstream); **run `pnpm build` / rebuild dependent `dist` before downstream tests and before
+  fixtures:check** (fixtures:check executes the CLI dist + imports extension dist — missing dist like
+  `extension-pgvector/dist/control.mjs` makes it red environmentally, not a regression); **emit trace
+  events live**; orchestrator independently re-verifies the gate (implementer reports were thin/optimistic
+  and two returned truncated mid-work — verify via git + re-run the risky gates).
+- **Worktree note:** this worktree needed `pnpm install` (supabase/mongo had no `node_modules`) + a full
+  `pnpm build` to materialize all dist; after that the full gate is genuinely clean (no mongo/cli caveat).
+- **Deferred (recorded):** transitive auto-loading of unlisted contract spaces; runtime cross-space query +
+  relation traversal (needs a runtime contract-space aggregate); Mongo cross-space *relationships*.
+
 ## Summary
 
 The project ships in four PRs sequenced foundation → authoring surfaces → planner/verifier integration → documentation. M1 introduces the FK reference carrier extension (`source: 'local' | 'space'`) at the framework + SQL family layers and the contract-aggregate dependency-graph + namespace-ownership checks. M2 ships the TS authoring surface (model-handle brands, `ColumnRef<TSpaceId>`, lowering-pass cross-contract handling) and the PSL grammar/AST extension (colon-prefix tokenizer change, `PslField.typeContractSpace?`). M3 wires the carrier through the planner (qualified vs unqualified `REFERENCES` clause, composition with control-policy dispatch on the target table) and the verifier (target-table-existence check defers to control policy; FK-constraint check is identical to local FKs). M4 closes out documentation — the cross-contract pattern is captured in the canonical extension-authoring guidance and the namespace-ownership rules land in a subsystem doc.
@@ -27,12 +72,22 @@ The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each mile
 
 **Goal:** declare the cross-contract FK carrier shape at the framework + SQL family layers, and add the cross-contract-specific checks to contract-aggregate loading. No authoring surface yet; the new shape compiles but is unreachable except through synthetic test fixtures.
 
+> **Reconciliation against landed substrate (2026-06-05).** The spec/plan were authored when TML-2459 + TML-2493 were future; both have landed. A read-only investigation of the current code corrected these M1 assumptions (drift IDs match the reconciliation report in chat / `rollups/2026-06-05-opening.md` lineage):
+>
+> - **D1/D2/D3 — FK carrier is a flat storage-layer class, not a `source`-discriminated union with model names.** Today `ForeignKey` (`packages/2-sql/1-core/contract/src/ir/foreign-key.ts`) holds `{ source, target }` where each side is `ForeignKeyReference { namespaceId: NamespaceId, tableName, columns }`. There is **no** `source: 'local' | 'space'` discriminator today and the carrier names tables/columns, **not** `modelName`/`fieldName` (model names live only in the pre-lowering domain-plane `ForeignKeyNode`). M1 **adds** the discriminator to a flat class; the spec's illustrative `{ source: 'local'; modelName; fieldName }` type is wrong — the `'local'` variant is `{ namespaceId, tableName, columns }`. Within-contract cross-namespace FKs (M5b) already work via `target.namespaceId`, with no discriminator.
+> - **D6 — use `UNBOUND_NAMESPACE_ID = '__unbound__'`, not `'__unspecified__'`, for the IR/unqualified-DDL sentinel.** `__unspecified__` (`UNSPECIFIED_PSL_NAMESPACE_ID`) is a **parser-only** bucket that never reaches the IR. The carrier's `namespace` coordinate uses `'__unbound__'` (`packages/1-framework/1-core/framework-components/src/ir/namespace.ts`). Apply this correction wherever the spec/plan say `__unspecified__` at the IR/DDL layer.
+> - **D5 — recursive `extensionPacks` resolution is NEW work.** Today only the top-level app contract's `extensionPacks` is consumed; extension-declared `extensionPacks` are not walked. The dependency-graph task below must build the recursive walk, not just validate an existing one.
+> - **D8 — ArkType validator co-change.** The SQL serializer is identity-based (JSON-clean by construction holds), but the FK validator schema in `packages/2-sql/1-core/contract/src/validators.ts` must be extended for the new variant — add it as an explicit sub-task of the round-trip task.
+> - **D9 — the build-contract assembler needs a space-FK code path.** `build-contract.ts` FK assembly looks up targets in local `allSpecs`; a `source: 'space'` carrier must bypass that lookup and accept pre-resolved coordinates. M1 is not purely a passive IR-class addition.
+> - **D10 — drop the Mongo mirror.** Mongo's contract IR has no FK concept (`MongoCollection` has no FKs), so "mirror the carrier in the Mongo family" has no object to extend. Reduced to a no-op note below.
+> - **Control-policy risk retired.** TML-2493's planner dispatch (`partitionIssuesByControlPolicy` in `packages/2-sql/9-family/src/core/migrations/control-policy.ts`, called from the Postgres planner) already drops `external` tables from planner input — so the M3 shim in "Risks and mitigations" is unnecessary. M3 calls the real dispatch directly.
+
 **Tasks:**
 
-- [ ] Extend the FK reference carrier (in the SQL family `SqlForeignKey` family abstract base + Postgres concretion) to discriminate `source: 'local' | 'space'`. The `'space'` variant carries `spaceId`, `namespace: NamespaceCoordinate`, `tableName`, `columnName`. The `'local'` variant retains its TML-2459 M5b shape.
-- [ ] Mirror the carrier extension in the Mongo family (no cross-family FKs in v0.1 per Non-goals, but the abstract base shape stays parallel across families).
-- [ ] Extend `ContractSerializer` round-trip in both SQL + Mongo families to cover the new variant. JSON-clean by construction; no `toJSON()` needed.
-- [ ] Implement contract-aggregate dependency-graph construction from `extensionPacks` (depends-on relationships, including extensions-depending-on-extensions). Reject cycles at load time.
+- [ ] Extend the FK reference carrier (`ForeignKey` / `ForeignKeyReference` in `packages/2-sql/1-core/contract/src/ir/`, + any Postgres concretion) to discriminate `source: 'local' | 'space'`. The `'space'` variant carries `spaceId`, `namespace` (the IR namespace coordinate, admitting `UNBOUND_NAMESPACE_ID`), `tableName`, `columnName`. The `'local'` variant retains today's flat `{ namespaceId, tableName, columns }` shape (per D1/D2/D3 above — this is a discriminator added to a non-discriminated class, not an extension of an existing union).
+- [ ] ~~Mirror the carrier extension in the Mongo family.~~ **No-op (D10):** Mongo's contract IR has no FK concept; nothing to mirror. Record this as a one-line note rather than a code change.
+- [ ] Extend the FK round-trip to cover the new variant. JSON-clean by construction; no `toJSON()` needed — **but** update the ArkType FK validator schema in `packages/2-sql/1-core/contract/src/validators.ts` (D8) and confirm the `new StorageTable(...) → new ForeignKey(...) → new ForeignKeyReference(...)` deserialization path handles both variants.
+- [ ] Implement contract-aggregate dependency-graph construction from `extensionPacks` (depends-on relationships, including extensions-depending-on-extensions). **This includes building the recursive walk of extension-declared `extensionPacks`, which does not exist today (D5)** — currently only the top-level app contract's list is consumed. Reject cycles at load time.
 - [ ] Implement namespace-ownership tracking on the loaded aggregate: every primitive `(namespace.id, name)` is owned by exactly one contributing contract. Duplicate declarations fail load with a diagnostic naming both contributors (FR16/AC6).
 - [ ] Implement reverse-reference rejection: an extension contract referencing an app model fails load with a clear diagnostic (FR14).
 - [ ] Round-trip property tests for the new IR carrier (AC8).
@@ -43,6 +98,12 @@ The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each mile
 ### M2 — Authoring surfaces (TS brands + PSL grammar)
 
 **Goal:** make the carrier reachable through user code. After this milestone, an app contract can declare a cross-contract FK in both TS and PSL forms; the surfaces produce the M1 IR shape.
+
+> **Design decision (2026-06-05, operator-approved): Option B — declared, non-navigable cross-space relations.** A cross-space ref declares a domain-plane *relationship* (not just a storage FK), via the unified surface (`rel.belongsTo(ExtModel, …)` in TS, `ext:ns.Model @relation(…)` in PSL). It is **non-navigable** — the emitter makes ORM `include` of a cross-space relation a compile-time error; runtime query/traversal across spaces is out of scope (spec Non-goals). Concrete M2 work this adds, grounded in the current code:
+> - Add a foreign-`spaceId` slot to the domain-plane relation carriers: `TargetFieldRef` / `RelationModelSource` (`packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts`) and `RelationNode` (`contract-definition.ts`). Today none carry `spaceId`.
+> - Gate the relation lowering: `lowerBelongsToRelation` (`contract-lowering.ts`) and `assertKnownTargetModel` (`build-contract.ts`) currently throw when the target isn't a local model. For a branded (cross-space) target, skip the local-model lookup and resolve the target table/columns from the loaded aggregate instead.
+> - Emitter: render cross-space relations as non-navigable so `include` is a compile error (sub-choice deferred to implementation: omit from the include surface vs `never`-type it — lean toward omit for a clearer error).
+> - The storage-plane FK path (`constraints.foreignKey(cols.x, ExtModel.refs.y, …)` + `ColumnRef<TSpaceId>` brand) is unchanged from this milestone's plan; it is what actually emits the DDL constraint.
 
 **Tasks:**
 
@@ -112,5 +173,5 @@ Per the umbrella's walking-skeleton strategy (decisions [C13/C14](../supabase-in
   - **Mitigation:** the open question in the spec acknowledges the implementer has two paths (closure-captured contract id vs post-hoc tagging). Either works for AC purposes; the implementer picks based on autocomplete responsiveness measured against a realistic schema.
 - **Risk:** namespace-ownership collision detection has to run at aggregate-load time, before any single contract is fully validated. Subtle ordering bugs could cause the detection to miss a collision or report a false positive.
   - **Mitigation:** the M1 milestone lands aggregate-load checks before any authoring surface exists. Synthetic test fixtures exercise every collision shape (two extensions same-namespace, app + extension same-namespace, cycle in dependency graph, reverse reference) before M2 begins.
-- **Risk:** the planner needs to compose with the control-policy project's dispatch on the target table. If `control-policy` lands later than expected, this project's M3 either blocks or ships with a stub.
-  - **Mitigation:** the projects are parallel-able. If `control-policy` slips, this project's M3 stubs the dispatch with a temporary `if (table.spaceId !== self.spaceId) skipDdl()` shim and replaces the shim with the real dispatch when `control-policy` lands. The shim is well-scoped; replacement is mechanical.
+- **Risk (RETIRED 2026-06-05):** the planner needs to compose with the control-policy project's dispatch on the target table.
+  - **Resolution:** TML-2493 has landed. The real dispatch (`partitionIssuesByControlPolicy` in `packages/2-sql/9-family/src/core/migrations/control-policy.ts`, called from the Postgres planner at `planner.ts`) already drops `external` tables from planner input — no `CREATE TABLE` is generated for them. The planned shim is unnecessary; M3 calls the landed dispatch directly.

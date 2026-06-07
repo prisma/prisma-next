@@ -145,6 +145,7 @@ export interface MigrationListHumanRenderOptions {
   readonly useColor: boolean;
   readonly liveContractHash: string;
   readonly graphForSpace: (spaceId: string) => MigrationGraph | undefined;
+  readonly appSpaceId?: string;
 }
 
 export function renderMigrationListHumanOutput(
@@ -156,6 +157,7 @@ export function renderMigrationListHumanOutput(
     colorize: options.useColor,
     liveContractHash: options.liveContractHash,
     graphForSpace: options.graphForSpace,
+    ...(options.appSpaceId !== undefined ? { appSpaceId: options.appSpaceId } : {}),
   });
 }
 
@@ -321,6 +323,7 @@ export function createMigrationListCommand(): Command {
               useColor: ui.useColor,
               liveContractHash,
               graphForSpace: (spaceId) => aggregate.space(spaceId)?.graph(),
+              appSpaceId: aggregate.app.spaceId,
             }),
           );
         }

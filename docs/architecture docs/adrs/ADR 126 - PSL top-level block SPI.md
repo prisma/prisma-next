@@ -1,5 +1,13 @@
 # ADR 126 — PSL top-level block SPI
 
+> **⚠️ Under revision (2026-06) — the function SPI below is superseded by a declarative descriptor.**
+>
+> This ADR records a `parseFn` / `validateFn` / `emitFn` *function* SPI: each extension ships imperative code to parse and emit its block. That shape is being replaced. The decision now is that an extension **describes** a top-level block as data — its keyword, name, and typed parameters (`ref` / `value` / `option` / `list`) — and the framework owns **one generic parser / validator / printer** that interprets any declared block. No extension-supplied parse/print code runs.
+>
+> Why: the PSL grammar is closed and uniform, so a block's structure can be described as data and validated/analysed without executing extension code; the function SPI re-implements parsing the framework already does and can't be inspected from its data. `value` rides the existing codec/type system (same rails as field types and `@default`); `option` is an authoring-time parameter constraint, **not** a domain or persistence enum (enums-as-domain is a separate project — PR #748).
+>
+> The authoritative current design is `projects/target-contributed-psl-blocks/spec.md`. This ADR is rewritten against the as-shipped substrate in the project's close-out slice (TML-2806). Treat the sections below as historical until then.
+
 ## Context
 
 We want third-party packs to add first-class domain constructs to PSL, such as `pg.view`, `pg.materializedView`, or `pg.enumType`. Today PSL does not allow external authors to register new top-level blocks or define new block-level attributes. Without an extension SPI, every new database concept forces a core change, which conflicts with our thin-core, fat-targets approach.

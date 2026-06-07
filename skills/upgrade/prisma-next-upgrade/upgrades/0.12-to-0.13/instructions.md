@@ -14,12 +14,29 @@ changes:
 ---
 
 <!--
+dependabot/runtime-deps: bumped pg 8.20→8.21, pg-cursor 2.19→2.20, vitest 4.1.6→4.1.7,
+vite 8.0.13→8.0.15, tsdown 0.22.0→0.22.1, tsx 4.22.3→4.22.4, next 16.2.4→16.2.6,
+postcss 8.5.14→8.5.15, evlog 2.16.0→2.18.1, @prisma/dev 0.24.7→0.24.8,
+@types/node 25.6.0→25.9.1 — all incidental to examples; no user-side action required.
+
 TML-2808: the SQL/Mongo contract storage IR moved to a namespace
 envelope (`namespaces.<ns>.entries.<kind>`) and lifted cross-references
 from bare strings to `{ namespace, model }` objects in `domain`.
 Consumer impact is incidental: re-emitting `contract.json` /
 `contract.d.ts` via the existing `prisma-next contract emit` produces
 the new shape with no source change. No codemod is required.
+
+TML-2834: scaffolds the new `@prisma-next/extension-supabase` package
+and adds `examples/supabase` as the Supabase walking-skeleton app. Two
+enabling framework changes ride along: (a) the emitter now emits
+multi-namespace contracts (single-namespace output is byte-identical),
+and (b) `db init` / `db verify` introspect all declared namespaces
+across a composed contract aggregate instead of only `public`. Both
+are forward-compatible — single-namespace contracts emit byte-identical
+output and introspect through the same path as before. The new
+extension package is purely additive (consumers opt in by adding
+`extensionPacks: [supabasePack]`). No codemod or user-side action
+required.
 -->
 
 # 0.12 → 0.13 — User upgrade instructions

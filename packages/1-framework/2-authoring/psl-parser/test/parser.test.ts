@@ -1176,4 +1176,117 @@ model Post {
       expect(titleField?.typeNamespaceId).toBeUndefined();
     });
   });
+
+  describe('colon-prefix field types (cross-contract-space)', () => {
+    it('parses space:namespace.TypeName into typeContractSpaceId + typeNamespaceId + typeName', () => {
+      const schema = `
+model Profile {
+  id Int @id
+  user supabase:auth.User @relation(fields: [userId], references: [id])
+  userId Int
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      const profile = flatPslModels(result.ast).find((m) => m.name === 'Profile');
+      const userField = profile?.fields.find((f) => f.name === 'user');
+      expect(userField?.typeContractSpaceId).toBe('supabase');
+      expect(userField?.typeNamespaceId).toBe('auth');
+      expect(userField?.typeName).toBe('User');
+    });
+
+    it('parses space:TypeName (no namespace) into typeContractSpaceId + typeName (no typeNamespaceId)', () => {
+      const schema = `
+model Profile {
+  id Int @id
+  user supabase:User @relation(fields: [userId], references: [id])
+  userId Int
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      const profile = flatPslModels(result.ast).find((m) => m.name === 'Profile');
+      const userField = profile?.fields.find((f) => f.name === 'user');
+      expect(userField?.typeContractSpaceId).toBe('supabase');
+      expect(userField?.typeNamespaceId).toBeUndefined();
+      expect(userField?.typeName).toBe('User');
+    });
+
+    it('parses a colon-prefix optional list field correctly', () => {
+      const schema = `
+model Profile {
+  id Int @id
+  orgs supabase:auth.Organization[]
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      const profile = flatPslModels(result.ast).find((m) => m.name === 'Profile');
+      const orgsField = profile?.fields.find((f) => f.name === 'orgs');
+      expect(orgsField?.typeContractSpaceId).toBe('supabase');
+      expect(orgsField?.typeNamespaceId).toBe('auth');
+      expect(orgsField?.typeName).toBe('Organization');
+      expect(orgsField?.list).toBe(true);
+    });
+
+    it('bare ns.Name is unchanged (no typeContractSpaceId)', () => {
+      const schema = `
+model Profile {
+  id Int @id
+  user auth.User @relation(fields: [userId], references: [id])
+  userId Int
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      const profile = flatPslModels(result.ast).find((m) => m.name === 'Profile');
+      const userField = profile?.fields.find((f) => f.name === 'user');
+      expect(userField?.typeContractSpaceId).toBeUndefined();
+      expect(userField?.typeNamespaceId).toBe('auth');
+      expect(userField?.typeName).toBe('User');
+    });
+
+    it('bare Name is unchanged (no typeContractSpaceId, no typeNamespaceId)', () => {
+      const schema = `
+model Profile {
+  id Int @id
+  user User @relation(fields: [userId], references: [id])
+  userId Int
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      const profile = flatPslModels(result.ast).find((m) => m.name === 'Profile');
+      const userField = profile?.fields.find((f) => f.name === 'user');
+      expect(userField?.typeContractSpaceId).toBeUndefined();
+      expect(userField?.typeNamespaceId).toBeUndefined();
+      expect(userField?.typeName).toBe('User');
+    });
+
+    it('rejects a:b:c (double colon) with a parse error', () => {
+      const schema = `
+model Foo {
+  id Int @id
+  bar a:b:c
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics.length).toBeGreaterThan(0);
+    });
+
+    it('rejects a.b.c (triple dot) with PSL_INVALID_QUALIFIED_TYPE', () => {
+      const schema = `
+model Foo {
+  id Int @id
+  bar a.b.c
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    });
+  });
 });

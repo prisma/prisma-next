@@ -6,6 +6,7 @@ import {
   assembleAuthoringContributions,
   assembleControlMutationDefaults,
   assembleScalarTypeDescriptors,
+  buildExtensionLoadOrder,
   createControlStack,
   extractCodecLookup,
   extractCodecTypeImports,
@@ -556,5 +557,148 @@ describe('validateScalarTypeCodecIds', () => {
     };
     const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toEqual([]);
+  });
+});
+
+function makeExtension(
+  id: string,
+  deps: readonly string[] = [],
+): { id: string; contractSpace?: { contractJson: { extensionPacks?: Record<string, unknown> } } } {
+  return {
+    id,
+    contractSpace:
+      deps.length > 0
+        ? {
+            contractJson: {
+              extensionPacks: Object.fromEntries(deps.map((dep) => [dep, {}])),
+            },
+          }
+        : { contractJson: {} },
+  };
+}
+
+describe('buildExtensionLoadOrder', () => {
+  it('returns an empty list when no extensions are provided', () => {
+    expect(buildExtensionLoadOrder([])).toEqual([]);
+  });
+
+  it('returns a single extension with no dependencies in a one-element list', () => {
+    const ext = makeExtension('a');
+    expect(buildExtensionLoadOrder([ext])).toEqual(['a']);
+  });
+
+  it('places a dependency before the extension that depends on it (linear A→B→C chain)', () => {
+    const a = makeExtension('a');
+    const b = makeExtension('b', ['a']);
+    const c = makeExtension('c', ['b']);
+    const order = buildExtensionLoadOrder([c, b, a]);
+    expect(order.indexOf('a')).toBeLessThan(order.indexOf('b'));
+    expect(order.indexOf('b')).toBeLessThan(order.indexOf('c'));
+  });
+
+  it('handles an extension with multiple dependencies', () => {
+    const a = makeExtension('a');
+    const b = makeExtension('b');
+    const c = makeExtension('c', ['a', 'b']);
+    const order = buildExtensionLoadOrder([c, a, b]);
+    expect(order.indexOf('a')).toBeLessThan(order.indexOf('c'));
+    expect(order.indexOf('b')).toBeLessThan(order.indexOf('c'));
+  });
+
+  it('places a declared dependency before the pack that depends on it', () => {
+    const a = makeExtension('a');
+    const b = makeExtension('b', ['a']);
+    const order = buildExtensionLoadOrder([b, a]);
+    expect(order.indexOf('a')).toBeLessThan(order.indexOf('b'));
+  });
+
+  it('throws when a declared dependency is absent from the provided set', () => {
+    const b = makeExtension('b', ['missing-pack']);
+    expect(() => buildExtensionLoadOrder([b])).toThrow(
+      /missing dependency|add .* to extensionPacks/i,
+    );
+    expect(() => buildExtensionLoadOrder([b])).toThrow(/missing-pack/);
+  });
+
+  it('rejects a 2-cycle (A↔B) and names both members in the error', () => {
+    const a = makeExtension('a', ['b']);
+    const b = makeExtension('b', ['a']);
+    expect(() => buildExtensionLoadOrder([a, b])).toThrow(/cycle/i);
+    expect(() => buildExtensionLoadOrder([a, b])).toThrow(/a/);
+    expect(() => buildExtensionLoadOrder([a, b])).toThrow(/b/);
+  });
+
+  it('rejects a 3-cycle (A→B→C→A) and names the cycle members in the error', () => {
+    const a = makeExtension('a', ['c']);
+    const b = makeExtension('b', ['a']);
+    const c = makeExtension('c', ['b']);
+    expect(() => buildExtensionLoadOrder([a, b, c])).toThrow(/cycle/i);
+    const msg = (() => {
+      try {
+        buildExtensionLoadOrder([a, b, c]);
+        return '';
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    })();
+    expect(msg).toMatch(/a/);
+    expect(msg).toMatch(/b/);
+    expect(msg).toMatch(/c/);
+  });
+
+  it('extensions without contractSpace are treated as having no declared dependencies', () => {
+    const plain = { id: 'plain' };
+    const withSpace = makeExtension('withSpace', ['plain']);
+    const order = buildExtensionLoadOrder([withSpace, plain]);
+    expect(order.indexOf('plain')).toBeLessThan(order.indexOf('withSpace'));
+  });
+
+  it('extensions with contractSpace but empty extensionPacks have no declared dependencies', () => {
+    const a = makeExtension('a');
+    const b = makeExtension('b');
+    const order = buildExtensionLoadOrder([a, b]);
+    expect(order).toContain('a');
+    expect(order).toContain('b');
+  });
+
+  it('createControlStack throws on a 2-cycle in extension dependencies', () => {
+    const a = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'ext-a' }),
+      contractSpace: { contractJson: { extensionPacks: { 'ext-b': {} } } },
+    };
+    const b = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'ext-b' }),
+      contractSpace: { contractJson: { extensionPacks: { 'ext-a': {} } } },
+    };
+    expect(() =>
+      createControlStack(
+        stubInput({
+          family: createDescriptor({ kind: 'family', id: 'sql' }),
+          target: createDescriptor({ kind: 'target', id: 'postgres' }),
+          extensionPacks: [a, b],
+        }),
+      ),
+    ).toThrow(/cycle/i);
+  });
+
+  it('assembles extensionPacks in dependency order even when input lists dependent before dependency', () => {
+    const dep = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'dep' }),
+      contractSpace: { contractJson: {} },
+    };
+    const consumer = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'consumer' }),
+      contractSpace: { contractJson: { extensionPacks: { dep: {} } } },
+    };
+    // Input order: consumer first (would fail ordering if not reordered)
+    const stack = createControlStack(
+      stubInput({
+        family: createDescriptor({ kind: 'family', id: 'sql' }),
+        target: createDescriptor({ kind: 'target', id: 'postgres' }),
+        extensionPacks: [consumer, dep],
+      }),
+    );
+    const extIds = stack.extensionPacks.map((e: { id: string }) => e.id);
+    expect(extIds.indexOf('dep')).toBeLessThan(extIds.indexOf('consumer'));
   });
 });

@@ -269,7 +269,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('<contract>');
+          expect(out).toContain('@contract');
           expect(out).toContain("to the application's contract");
           expect(out).toContain('prisma-next migration plan --name');
         },
@@ -314,7 +314,7 @@ withTempDir(({ createTempDir }) => {
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
-          expect(out).toContain('<contract, db>');
+          expect(out).toContain('@contract @db (db)');
           expect(out).toContain('Up to date');
         },
         timeouts.spinUpPpgDev,
