@@ -212,3 +212,7 @@ The method builds the `CreateTable` DDL node from the options (via the D1/D2 con
 **Why options, not the node, as the method input.** Passing the node forces `this.createTable(createTable({…}))` — repetition. Taking the builder's *options* fuses build + lower + assemble into one call. `col()` stays the column vocabulary; no `ColumnSpec` for createTable.
 
 **Consequences.** `createTableOp(sql)`, the `sql` parameter, the string-gluing, the `LowerFn` callback, the free `renderOps`, and the `blindCast` all disappear. The shared `ColumnSpec` reverts to its `origin/main` shape (the bolted-on `columnDefault` goes away — resolving the CodeRabbit leak), untouched and still used by `addColumn` et al. (their adoption is a follow-up slice).
+
+## The `*Call` op nodes are the common interface (PR #751 follow-up)
+
+Operator clarification: the `OpFactoryCall` IR nodes (`CreateTableCall`, `CreateSchemaCall`, …) **are** the single common interface for a migration operation. `toOp(lowerer)` is how a `*Call` renders itself into an `Op`; `renderTypeScript()` is how it renders its authoring source. There is no separate free `buildCreateTableOp(node, lowerer)` seam — the Op-assembly lives on `CreateTableCall.toOp()`. The two producers both go through the `*Call`: the planner constructs it during diffing; `PostgresMigration.createTable(options)` constructs one from the user's contract-free options and calls `.toOp(this.controlAdapter)`.
