@@ -31,12 +31,17 @@ Four slices, a mixed shape. A **foundational** slice expands the SQL query AST w
   - **Hands to:** A fully adapter-routed Mongo marker path and the contract-free Mongo construction surface that Mongo migration ops adopt next.
   - **Focus:** Mongo family only. Reuse existing `RawAggregateCommand`/`RawInsertOneCommand`/`RawFindOneAndUpdateCommand`. Decide `RawFindOneCommand`-vs-aggregate for `readMarker` at slice-planning time. **May fan out** (contract-free builder + marker routing vs migration-op adoption) if one review can't hold both.
 
-### Parallel group B (independent of stack and group A)
+### Parallel group B (planner adoption — **decomposed into multiple slices**)
 
-- **Slice `planner-ddl-adopts-ast`** — Linear: TML-2754
-  - **Outcome:** The migration planner's raw-string DDL (the `*Call.toOp()` factories and `statement-builders.ts` helpers, in both Postgres and SQLite) construct query-AST DDL nodes lowered via `adapter.lower()` instead of concatenating SQL — so planned DDL and marker-bootstrap DDL share one construction + lowering path. The "simplify migrations" payoff.
+The planner-adoption work ("simplify migrations" payoff) is **not one slice**. Grounding (TML-2754 pre-spec) showed slice 1 (TML-2761) shipped DDL-AST nodes only for `CreateTable`/`CreateSchema`, while the planner emits ~21 Postgres + ~7 SQLite DDL ops — adopting the rest means adding a node + adapter-visitor case + planner migration per op-family. The project spec anticipated this ("the planner-adoption slice scopes the rest"). So group B fans into a first slice plus tracked follow-ups, all in this project.
+
+- **Slice `planner-create-table-adopts-ddl-ast`** (first) — Linear: TML-2754
+  - **Outcome:** The planner's `CreateTableCall.toOp()` (PG + SQLite) and `CreateSchemaCall.toOp()` (PG) build the slice-1 DDL-AST nodes via the contract-free constructors and lower via `adapter.lower()`, replacing `buildCreateTableSql`/`renderCreateTableSql`. Extends the `CreateTable` node with a target-contributed table-level **constraint** surface (composite PK / FK / unique) that user tables need and marker bootstrap didn't. Spec: `slices/planner-create-table-adopts-ddl-ast/spec.md`.
   - **Builds on:** Slice 1's target-contributed DDL surface + adapter-lowering seam + contract-free constructors.
-  - **Focus:** Migration-planner DDL only. Scoping decisions settled at `drive-plan-slice` time: keep the step contract `SqlMigrationPlanOperationStep.sql: string` for the first pass (build the AST and lower to `{ sql, params }` inside `toOp()`, leaving the runner/preview/snapshots untouched); `execute` DDL steps only (prechecks/postchecks stay introspection `SELECT`s for now); the TS-migration render path (`renderTypeScript()`) is out of scope. **May fan out** (Postgres-then-SQLite, or per DDL-op family) if one review can't hold it.
+  - **Focus:** `CREATE TABLE`/`CREATE SCHEMA` only. Step contract `sql: string` unchanged (lower to `{sql,params}` inside `toOp()`); execute DDL steps only; TS-render path out. The table-constraint node shape is the load-bearing unknown, settled by dispatch 1 (in-slice spike), mirroring slice 1.
+
+- **Follow-up slices (tracked; tickets created at pickup):** Postgres column ops (`AddColumn`/`DropColumn`/`AlterColumnType`/`SetNotNull`/`DropNotNull`/`SetDefault`/`DropDefault`); constraint ALTERs (`AddPrimaryKey`/`AddUnique`/`AddForeignKey`/`DropConstraint`); indexes (`CreateIndex`/`DropIndex`); Postgres types/db (`CreateEnumType`/`AddEnumValues`/`DropEnumType`/`RenameType`/`CreateExtension`); `DropTable`; SQLite `RecreateTable`.
+- **Mongo planner adoption (tracked follow-up slice).** Planner adoption spans **all three targets, not just SQL.** The Mongo migration planner's ops (`CreateCollection`/`CreateIndex`/…) must construct the contract-free Mongo command surface and route through `MongoControlAdapter.lower()` → driver, symmetric to the SQL planner adoption. (See project spec DoD.)
 
 ## Dependencies (external)
 

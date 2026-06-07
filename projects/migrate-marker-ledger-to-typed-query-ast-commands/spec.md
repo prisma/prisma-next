@@ -67,7 +67,7 @@ Marker/ledger operations are the **first consumer** (proving the surface against
 - [ ] A contract-free construction surface exists **per family** (SQL + Mongo) and is the construction path for in-scope marker/ledger/DDL nodes — no in-scope operation hand-builds nodes by object literal or concatenates raw SQL.
 - [ ] The two `as` casts in Mongo `marker-ledger.ts` are eliminated (cast ratchet not regressed).
 - [ ] Invariant-merge converges on accumulate-dedupe across Postgres **and** SQLite (operator-confirmed); a test pins the merge for both dialects.
-- [ ] The migration planner's DDL builders construct query-AST DDL lowered through the adapter (planner-adoption slice), or the residual is explicitly deferred with a tracked follow-up.
+- [ ] The migration planner adopts the typed AST across **all three targets**, or the residual is explicitly deferred with tracked follow-up slices: the **SQL** planner (Postgres + SQLite) builds query-AST DDL lowered through the adapter, **and the Mongo migration planner** builds the contract-free Mongo command surface (`Create*Command` nodes) lowered through `MongoControlAdapter.lower()` — symmetric to the SQL adoption. Planner-adoption is not SQL-only; the Mongo migration planner still constructs its commands via the migration `*Call` path and must move onto the same adapter-lowering path the marker/ledger slice established.
 - [ ] An ADR records "DDL as a target-contributed query-AST kind + adapter DDL-lowering seam"; affected subsystem docs (Adapters & Targets, Migration System) updated.
 
 ## Open Questions
