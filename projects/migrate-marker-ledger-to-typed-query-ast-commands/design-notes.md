@@ -118,6 +118,47 @@ So the contract-free DML surface keeps full JS round-tripping (object ↔ `jsonb
     - **Each target package** defines its own `<Target>DdlVisitor<R>` (one method per kind that target has), a `<Target>DdlNode` abstract base (`extends DdlNode`) that declares `abstract accept<R>(v: <Target>DdlVisitor<R>): R`, and its concrete classes. Postgres: `PostgresDdlVisitor` (`createTable` + `createSchema`), `PostgresCreateTable`, `PostgresCreateSchema`. SQLite: `SqliteDdlVisitor` (`createTable`), `SqliteCreateTable`. No target stubs a kind it lacks. This mirrors the migration-op three-layer base (`PostgresOpFactoryCallNode` in `target-postgres/src/core/migrations/`) for placement + layering, combined with `ExprVisitor`-style double-dispatch.
     - **Adapter:** `lower(ast: AnyQueryAst | <Target>DdlNode, …)`; `isAnyDdlNode(ast)` narrows to `<Target>DdlNode` (the `AnyQueryAst` arm has no `DdlNode` member), then `ast.accept(new <Target>DdlVisitor())`. Impl-level signature widening (as the spike used) is sufficient and type-safe; formalizing the shared `Adapter` interface type-param is deferred unless a compile forces it.
   - **Columns:** `DdlColumn` gains `default?: ColumnDefault`, reusing the contract-authoring `ColumnDefault` vocabulary (sourced from `@prisma-next/contract/types` / the sql contract validators — **not** a new enum). Type stays an opaque native-type string.
+- **Table-level constraint shape on `CreateTable` — RESOLVED (D1 spike, validated end-to-end on both Postgres and SQLite):** a `constraints?: readonly DdlTableConstraint[]` field on `PostgresCreateTable` / `SqliteCreateTable`, where `DdlTableConstraint` is a frozen-class union of three kinds. The three classes live in `relational-core/src/ast/ddl-types.ts` and are exported from `@prisma-next/sql-relational-core/ast`:
+
+  ```ts
+  class PrimaryKeyConstraint {
+    readonly kind = 'primary-key';
+    readonly columns: ReadonlyArray<string>;
+    readonly name: string | undefined;    // present → CONSTRAINT <name> PRIMARY KEY (…)
+  }
+
+  class ForeignKeyConstraint {
+    readonly kind = 'foreign-key';
+    readonly columns: ReadonlyArray<string>;
+    readonly refTable: string;
+    readonly refColumns: ReadonlyArray<string>;
+    readonly onDelete: ReferentialAction | undefined;
+    readonly onUpdate: ReferentialAction | undefined;
+    readonly name: string | undefined;    // present → CONSTRAINT <name> FOREIGN KEY …
+  }
+
+  class UniqueConstraint {
+    readonly kind = 'unique';
+    readonly columns: ReadonlyArray<string>;
+    readonly name: string | undefined;    // present → CONSTRAINT <name> UNIQUE (…)
+  }
+
+  type DdlTableConstraint = PrimaryKeyConstraint | ForeignKeyConstraint | UniqueConstraint;
+  ```
+
+  Key decisions within this shape:
+
+  - **Array-of-frozen-sub-nodes.** Constraint objects are frozen on construction (same discipline as the `DdlNode` hierarchy). The array is frozen when stored on `CreateTable`. This matches the pattern used for `DdlColumn` and for `ReadonlyArray<DdlColumn>`.
+  - **`ReferentialAction` reused, not a new enum.** `onDelete` / `onUpdate` use the `ReferentialAction` type from `@prisma-next/sql-contract/types` (`'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'`). The adapter renderer maps these to SQL strings via the same `REFERENTIAL_ACTION_SQL` table already used by the migration operations package (`packages/3-targets/3-targets/postgres/src/core/migrations/operations/constraints.ts`). No parallel vocabulary.
+  - **`constraints` is optional (absent = no table-level constraints).** When absent, the adapter renders only column defs. Existing `CreateTable` nodes with no table-level constraints (including the marker/ledger bootstrap tables) render byte-identical to before — verified by `pnpm fixtures:check`.
+  - **SQLite uses the same node shapes.** SQLite renders all three constraint kinds inline in the `CREATE TABLE` body, which is the only form SQLite supports. The same `DdlTableConstraint` classes are used; only the case (uppercase vs lowercase) and quoting in the rendered output differ from Postgres — the rendering is handled by the `SqliteDdlVisitorImpl`, not by target-specific node classes.
+  - **Constraint classes are `relational-core`-level, not per-target.** The three constraint kinds are universal across SQL targets; the per-target variation is entirely in how the adapter renders them (Postgres uses lowercase `create table` / unquoted column names; SQLite uses uppercase). This is the correct split: target owns the node (by including `constraints` on its `CreateTable`), adapter owns the rendering.
+
+  **Rejected alternatives:**
+  - **Inline constraint representation (column-level only, no table-level array).** Composite PKs cannot be expressed column-level. Adding `primaryKey: true` to multiple columns would require the renderer to aggregate them — that is stateful and requires a separate pass. Rejected: the array-of-constraint-objects keeps the rendering a simple fold.
+  - **`onDelete`/`onUpdate` as raw SQL strings.** Raw strings allow arbitrary values and don't typecheck against valid referential actions. Rejected: `ReferentialAction` is the established vocabulary; reuse beats a new enum.
+  - **Per-target constraint node classes.** The rendering differences between Postgres and SQLite (`create table` vs `CREATE TABLE`, no-schema vs `schema.table`) are in the DDL visitor, not in the constraint shape. Having `PostgresPrimaryKeyConstraint` / `SqlitePrimaryKeyConstraint` would duplicate identical shapes. Rejected: one shared class, per-adapter rendering.
+
 - **Migration adoption: reuse vs extract.** Whether the `*Call` factories build the query-AST DDL directly, or a thin shared DDL-construction helper sits between them. **Working position:** factories build query-AST DDL directly via the contract-free constructors; extract a helper only if duplication bites. Settled at the planner-adoption slice.
 - **Contract-free builder altitude + surface.** Where it lives (a module in `relational-core` beside the AST vs a dedicated package) and how much of the AST it covers in the first pass. **Working position:** beside the AST, covering exactly the marker/migration DDL+DML needs, widened as consumers demand. Settled at slice-planning time.
 - **DDL identifier quoting — Deferred to planner adoption; string-literal default escaping — done.** The contract-free DDL renderers emit identifiers (`schema`, `table`, column names/types) verbatim — no `quoteIdentifier`, unlike the DML renderer in the same adapter. This is safe and byte-correct for the foundational slice because its only consumer is control-plane bootstrap with fixed, trusted identifiers. Identifier quoting is **load-bearing only once the migration planner feeds user-derived identifiers through this path**, so it lands with the planner-adoption slice (which already owns dialect quoting via `buildColumnDefaultSql` and `sql-utils`). String-literal *default values*, by contrast, are now single-quote-escaped via the shared `escapeLiteral` (embedded `'` doubled) — byte-identical for the quote-free control-plane defaults, but injection-safe for any future quote-bearing value. The remaining identifier-quoting deferral is recorded as a precondition in the `createTable`/`createSchema` JSDoc rather than left implicit, so callers can't assume identifiers are quoted.
