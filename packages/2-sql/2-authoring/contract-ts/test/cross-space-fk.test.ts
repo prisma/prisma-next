@@ -1,8 +1,8 @@
 /**
  * M2.1 — TS brand foundation + cross-space FK (storage plane)
  *
- * Tests for cross-contract foreign key lowering: ColumnRef<TSpaceId> brand,
- * model-handle branding, cross-space FK lowering, missing-pack diagnostics,
+ * Tests for cross-contract foreign key lowering: model-handle branding,
+ * cross-space FK lowering (including chained handles), missing-pack diagnostics,
  * cascade-action passthrough, and NFR2 local-FK regression.
  */
 import type {
@@ -53,8 +53,10 @@ const supabasePack: ExtensionPackRef<'sql', 'postgres'> = {
  * `supabase` contract space. M2.3 will produce this from the real extension
  * package; for M2.1 we build it directly in the test.
  *
- * The handle is a `ContractModelBuilder` branded with `spaceId: 'supabase'`.
- * Its `.refs.id` must carry the `'supabase'` brand.
+ * The handle is a `ContractModelBuilder` branded with `spaceId: 'supabase'`,
+ * then chained with `.sql({ table: 'users' })` — exactly how M2.3 will build it.
+ * The table name `users` differs from `modelName.toLowerCase()` (`user`), making
+ * the `tableName` assertion non-coincidental.
  */
 function buildSyntheticSupabaseAuthUser() {
   return new ContractModelBuilder(
@@ -70,7 +72,7 @@ function buildSyntheticSupabaseAuthUser() {
     undefined,
     undefined,
     'supabase' as const,
-  );
+  ).sql({ table: 'users' });
 }
 
 /** A local User model for NFR2 regression tests. */
@@ -112,6 +114,45 @@ describe('TargetFieldRef brand (type-level)', () => {
     const ExtUser = buildSyntheticSupabaseAuthUser();
     expectTypeOf(ExtUser.refs.id).toEqualTypeOf<TargetFieldRef<'User', 'id', 'supabase'>>();
   });
+
+  it('brand survives .sql() chaining — chained handle still carries the spaceId (F1)', () => {
+    // Build the handle using the staged pattern, exactly as M2.3 will.
+    const ExtUser = new ContractModelBuilder(
+      {
+        modelName: 'User' as const,
+        namespace: 'auth',
+        fields: { id: field.column(int4Column).id() },
+        relations: {},
+      },
+      undefined,
+      undefined,
+      'supabase' as const,
+    ).sql({ table: 'users' });
+    // The TSpaceId brand must still be 'supabase' after chaining through .sql().
+    expectTypeOf(ExtUser.refs.id).toEqualTypeOf<TargetFieldRef<'User', 'id', 'supabase'>>();
+    // Runtime: spaceId and tableName must be present on the ref.
+    expect(ExtUser.refs.id.spaceId).toBe('supabase');
+    expect(ExtUser.refs.id.tableName).toBe('users');
+  });
+
+  it('brand survives .relations() chaining (F1)', () => {
+    const ExtUser = new ContractModelBuilder(
+      {
+        modelName: 'User' as const,
+        namespace: 'auth',
+        fields: { id: field.column(int4Column).id() },
+        relations: {},
+      },
+      undefined,
+      undefined,
+      'supabase' as const,
+    )
+      .relations({})
+      .sql({ table: 'users' });
+    expectTypeOf(ExtUser.refs.id).toEqualTypeOf<TargetFieldRef<'User', 'id', 'supabase'>>();
+    expect(ExtUser.refs.id.spaceId).toBe('supabase');
+    expect(ExtUser.refs.id.tableName).toBe('users');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -143,7 +184,7 @@ describe('cross-space FK via constraints.foreignKey in sql()', () => {
     expect(fks).toHaveLength(1);
     expect(fks![0]!.target.spaceId).toBe('supabase');
     expect(fks![0]!.target.namespaceId).toBe('auth');
-    expect(fks![0]!.target.tableName).toBe('user');
+    expect(fks![0]!.target.tableName).toBe('users');
     expect(fks![0]!.target.columns).toEqual(['id']);
   });
 

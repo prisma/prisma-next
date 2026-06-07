@@ -524,16 +524,13 @@ export class RelationBuilder<State extends RelationState = AnyRelationState> {
 /**
  * Reference to a column on the current (local) model.
  *
- * The `TSpaceId` phantom parameter carries the contract-space identity of the
- * column's model. Columns on models defined inside `defineContract` are branded
- * `'<self>'`; columns on extension model handles carry the extension's
- * `spaceId` (e.g. `'supabase'`). The brand is inspectable at lowering time via
- * `TargetFieldRef.spaceId`.
+ * Source columns are always local to the contract being authored. The
+ * cross-space brand lives on `TargetFieldRef` (the target side of a foreign
+ * key), not here.
  */
-export type ColumnRef<FieldName extends string = string, TSpaceId extends string = string> = {
+export type ColumnRef<FieldName extends string = string> = {
   readonly kind: 'columnRef';
   readonly fieldName: FieldName;
-  readonly _spaceId?: TSpaceId;
 };
 
 /**
@@ -1099,12 +1096,14 @@ export class ContractModelBuilder<
     readonly attributesFactory?: StageInput<AttributeContext<Fields>, AttributesSpec>,
     readonly sqlFactory?: StageInput<SqlContext<Fields, IndexTypes>, SqlSpec>,
     readonly spaceId?: TSpaceId,
+    readonly tableName?: string,
   ) {
     const crossSpaceCoordinate =
       spaceId !== undefined
         ? {
             spaceId,
             ...(stageOne.namespace !== undefined ? { namespaceId: stageOne.namespace } : {}),
+            ...(tableName !== undefined ? { tableName } : {}),
           }
         : undefined;
     this.refs = (
@@ -1141,7 +1140,8 @@ export class ContractModelBuilder<
     Relations & NextRelations,
     AttributesSpec,
     SqlSpec,
-    IndexTypes
+    IndexTypes,
+    TSpaceId
   > {
     const duplicateRelationName = findDuplicateRelationName(this.stageOne.relations, relations);
     if (duplicateRelationName) {
@@ -1160,6 +1160,8 @@ export class ContractModelBuilder<
       },
       this.attributesFactory,
       this.sqlFactory,
+      this.spaceId,
+      this.tableName,
     );
   }
 
@@ -1168,17 +1170,56 @@ export class ContractModelBuilder<
       AttributeContext<Fields>,
       ValidateAttributesStageSpec<Fields, SqlSpec, NextAttributesSpec>
     >,
-  ): ContractModelBuilder<ModelName, Fields, Relations, NextAttributesSpec, SqlSpec, IndexTypes> {
-    return new ContractModelBuilder(this.stageOne, specOrFactory, this.sqlFactory);
+  ): ContractModelBuilder<
+    ModelName,
+    Fields,
+    Relations,
+    NextAttributesSpec,
+    SqlSpec,
+    IndexTypes,
+    TSpaceId
+  > {
+    return new ContractModelBuilder(
+      this.stageOne,
+      specOrFactory,
+      this.sqlFactory,
+      this.spaceId,
+      this.tableName,
+    );
   }
 
   sql<const NextSqlSpec extends SqlStageSpec>(
     specOrFactory: StageInput<SqlContext<Fields, IndexTypes>, NextSqlSpec>,
   ): [ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>] extends [never]
-    ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, never, IndexTypes>
-    : ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec, IndexTypes> {
+    ? ContractModelBuilder<
+        ModelName,
+        Fields,
+        Relations,
+        AttributesSpec,
+        never,
+        IndexTypes,
+        TSpaceId
+      >
+    : ContractModelBuilder<
+        ModelName,
+        Fields,
+        Relations,
+        AttributesSpec,
+        NextSqlSpec,
+        IndexTypes,
+        TSpaceId
+      > {
     // Conditional return type cannot be verified by the implementation; the runtime value is always a valid ContractModelBuilder regardless of the validation outcome (validation is type-level only).
-    return new ContractModelBuilder(this.stageOne, this.attributesFactory, specOrFactory) as never;
+    // When specOrFactory is a static object (not a function), extract tableName for the cross-space coordinate.
+    const nextTableName =
+      typeof specOrFactory !== 'function' ? specOrFactory.table : this.tableName;
+    return new ContractModelBuilder(
+      this.stageOne,
+      this.attributesFactory,
+      specOrFactory,
+      this.spaceId,
+      nextTableName,
+    ) as never;
   }
 
   buildAttributesSpec(): AttributesSpec {
