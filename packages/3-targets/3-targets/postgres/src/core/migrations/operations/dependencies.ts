@@ -69,19 +69,3 @@ export function installExtension(options: {
     ],
   };
 }
-
-export function createSchemaOp(schemaName: string, sql: string): Op {
-  return {
-    id: `schema.${schemaName}`,
-    label: `Create schema "${schemaName}"`,
-    operationClass: 'additive',
-    target: { id: 'postgres' },
-    precheck: [],
-    execute: [step(`Create schema "${schemaName}"`, sql)],
-    postcheck: [],
-  };
-}
-
-export function createSchema(schemaName: string): Op {
-  return createSchemaOp(schemaName, `CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schemaName)}`);
-}
