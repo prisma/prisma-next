@@ -36,8 +36,8 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
     contractSerializer: new SqliteContractSerializer(),
     schemaVerifier: new SqliteSchemaVerifier(),
     migrations: {
-      createPlanner(_adapter: SqlControlAdapter<'sqlite'>): MigrationPlanner<'sql', 'sqlite'> {
-        return createSqliteMigrationPlanner();
+      createPlanner(adapter: SqlControlAdapter<'sqlite'>): MigrationPlanner<'sql', 'sqlite'> {
+        return createSqliteMigrationPlanner(adapter);
       },
       createRunner(family) {
         return createSqliteMigrationRunner(family) as MigrationRunner<'sql', 'sqlite'>;
@@ -67,8 +67,8 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
         targetId: 'sqlite',
       };
     },
-    createPlanner(_adapter: SqlControlAdapter<'sqlite'>) {
-      return createSqliteMigrationPlanner();
+    createPlanner(adapter: SqlControlAdapter<'sqlite'>) {
+      return createSqliteMigrationPlanner(adapter);
     },
     createRunner(family) {
       return createSqliteMigrationRunner(family);

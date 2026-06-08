@@ -1,4 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -11,6 +12,10 @@ import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
+
+const stubLowerer: Lowerer = {
+  lower: () => ({ sql: '', params: [] }),
+};
 
 function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
   return {
@@ -94,7 +99,7 @@ function tightenedEmailContract() {
 }
 
 describe('nullability-tightening backfill', () => {
-  const planner = createSqliteMigrationPlanner();
+  const planner = createSqliteMigrationPlanner(stubLowerer);
 
   it("without 'data' in policy, recreate alone runs and would fail at runtime on NULLs", () => {
     const result = planner.plan({

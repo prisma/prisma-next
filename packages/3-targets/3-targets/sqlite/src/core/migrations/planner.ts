@@ -10,6 +10,7 @@ import {
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
+import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -27,8 +28,8 @@ import {
 import { sqlitePlannerStrategies } from './planner-strategies';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 
-export function createSqliteMigrationPlanner(): SqliteMigrationPlanner {
-  return new SqliteMigrationPlanner();
+export function createSqliteMigrationPlanner(lowerer: Lowerer): SqliteMigrationPlanner {
+  return new SqliteMigrationPlanner(lowerer);
 }
 
 export type SqlitePlanResult =
@@ -52,6 +53,12 @@ export type SqlitePlanResult =
 export class SqliteMigrationPlanner
   implements SqlMigrationPlanner<SqlitePlanTargetDetails>, MigrationPlanner<'sql', 'sqlite'>
 {
+  readonly #lowerer: Lowerer;
+
+  constructor(lowerer: Lowerer) {
+    this.#lowerer = lowerer;
+  }
+
   plan(options: {
     readonly contract: unknown;
     readonly schema: unknown;
@@ -89,6 +96,8 @@ export class SqliteMigrationPlanner
         to: context.toHash,
       },
       spaceId,
+      undefined,
+      this.#lowerer,
     );
   }
 
@@ -149,6 +158,7 @@ export class SqliteMigrationPlanner
         },
         options.spaceId,
         destination,
+        this.#lowerer,
       ),
     };
   }

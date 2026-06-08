@@ -16,6 +16,7 @@ import type {
   MigrationOperationClass,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
+import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
 import type { OpFactoryCall as FrameworkOpFactoryCall } from '@prisma-next/framework-components/control';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { addColumn, dropColumn } from './operations/columns';
@@ -32,7 +33,7 @@ abstract class SqliteOpFactoryCallNode extends TsExpression implements Framework
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract toOp(): Op;
+  abstract toOp(lowerer?: Lowerer): Op;
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
@@ -62,7 +63,7 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return createTable(this.tableName, this.spec);
   }
 
@@ -84,7 +85,7 @@ export class DropTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return dropTable(this.tableName);
   }
 
@@ -125,7 +126,7 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return recreateTable({
       tableName: this.tableName,
       contractTable: this.contractTable,
@@ -172,7 +173,7 @@ export class AddColumnCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return addColumn(this.tableName, this.column);
   }
 
@@ -196,7 +197,7 @@ export class DropColumnCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return dropColumn(this.tableName, this.columnName);
   }
 
@@ -226,7 +227,7 @@ export class CreateIndexCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return createIndex(this.tableName, this.indexName, this.columns);
   }
 
@@ -250,7 +251,7 @@ export class DropIndexCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return dropIndex(this.tableName, this.indexName);
   }
 
@@ -292,7 +293,7 @@ export class DataTransformCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     throw errorUnfilledPlaceholder(this.label);
   }
 
@@ -344,7 +345,7 @@ export class RawSqlCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
+  toOp(_lowerer?: Lowerer): Op {
     return this.op;
   }
 
