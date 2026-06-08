@@ -1,6 +1,5 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { ContractModel } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { ForeignKey, SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
