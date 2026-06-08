@@ -1511,6 +1511,92 @@ policy_select ReadPosts {
         items: [],
       });
     });
+
+    it('skips blank lines inside an extension block body', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+
+  as = permissive
+
+  roles = [admin]
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      expect(Object.keys(block?.parameters ?? {})).toEqual(['target', 'as', 'roles', 'using']);
+    });
+
+    it('emits a diagnostic and drops the parameter for a list given a non-bracketed value', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = admin
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toMatchObject([{ code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER' }]);
+      expect(result.diagnostics[0]?.message).toContain('bracketed list');
+      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      expect(block?.parameters['roles']).toBeUndefined();
+    });
+
+    it('skips empty segments in a list parameter', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = [admin, , editor]
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      expect(block?.parameters['roles']).toMatchObject({
+        kind: 'list',
+        items: [
+          { kind: 'ref', identifier: 'admin' },
+          { kind: 'ref', identifier: 'editor' },
+        ],
+      });
+    });
   });
 
   describe('colon-prefix field types (cross-contract-space)', () => {
