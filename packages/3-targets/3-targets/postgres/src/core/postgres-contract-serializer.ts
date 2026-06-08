@@ -20,6 +20,8 @@ import type { JsonObject } from '@prisma-next/utils/json';
 import type { Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
 import type { PostgresEnumType } from './postgres-enum-type';
+import type { PostgresRlsPolicy } from './postgres-rls-policy';
+import type { PostgresRole } from './postgres-role';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
@@ -92,13 +94,18 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
-    // Extract the postgres-specific `type` slot directly from raw input.
-    // The family base handles the `table` slot; the postgres target owns `type`.
+    // Extract postgres-specific slots directly from raw input.
+    // The family base handles `table`; the postgres target owns `type`, `role`, `rlsPolicy`.
     const rawRecord = raw as Record<string, unknown>;
     const rawEntries = rawRecord['entries'];
     let typeSlot: Record<string, PostgresEnumType> | undefined;
+    let roleSlot: Record<string, PostgresRole> | undefined;
+    let rlsPolicySlot: Record<string, PostgresRlsPolicy> | undefined;
+
     if (rawEntries !== null && typeof rawEntries === 'object' && !Array.isArray(rawEntries)) {
-      const rawTypeSlot = (rawEntries as Record<string, unknown>)['type'];
+      const entriesRecord = rawEntries as Record<string, unknown>;
+
+      const rawTypeSlot = entriesRecord['type'];
       if (rawTypeSlot !== null && typeof rawTypeSlot === 'object' && !Array.isArray(rawTypeSlot)) {
         const enumFactory = this.entityTypeRegistry.get('postgres-enum');
         typeSlot = Object.fromEntries(
@@ -110,11 +117,43 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
           ]),
         );
       }
+
+      const rawRoleSlot = entriesRecord['role'];
+      if (rawRoleSlot !== null && typeof rawRoleSlot === 'object' && !Array.isArray(rawRoleSlot)) {
+        const roleFactory = this.entityTypeRegistry.get('postgres-role');
+        roleSlot = Object.fromEntries(
+          Object.entries(rawRoleSlot as Record<string, unknown>).map(([name, entry]) => [
+            name,
+            blindCast<PostgresRole, 'postgres-role factory returns PostgresRole'>(
+              roleFactory !== undefined ? roleFactory(entry) : entry,
+            ),
+          ]),
+        );
+      }
+
+      const rawRlsPolicySlot = entriesRecord['rlsPolicy'];
+      if (
+        rawRlsPolicySlot !== null &&
+        typeof rawRlsPolicySlot === 'object' &&
+        !Array.isArray(rawRlsPolicySlot)
+      ) {
+        const rlsPolicyFactory = this.entityTypeRegistry.get('postgres-rls-policy');
+        rlsPolicySlot = Object.fromEntries(
+          Object.entries(rawRlsPolicySlot as Record<string, unknown>).map(([name, entry]) => [
+            name,
+            blindCast<PostgresRlsPolicy, 'postgres-rls-policy factory returns PostgresRlsPolicy'>(
+              rlsPolicyFactory !== undefined ? rlsPolicyFactory(entry) : entry,
+            ),
+          ]),
+        );
+      }
     }
 
     const emptyTables = Object.keys(entries.table).length === 0;
     const emptyTypes = !typeSlot || Object.keys(typeSlot).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes) {
+    const emptyRoles = !roleSlot || Object.keys(roleSlot).length === 0;
+    const emptyPolicies = !rlsPolicySlot || Object.keys(rlsPolicySlot).length === 0;
+    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes && emptyRoles && emptyPolicies) {
       return PostgresSchema.unbound;
     }
     return new PostgresSchema({
@@ -122,6 +161,8 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       entries: {
         table: entries.table,
         type: typeSlot ?? {},
+        role: roleSlot ?? {},
+        rlsPolicy: rlsPolicySlot ?? {},
       },
     });
   }
@@ -174,12 +215,22 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     for (const [typeName, ty] of Object.entries(ns.entries.type)) {
       typeOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
     }
+    const roleOut: Record<string, JsonObject> = {};
+    for (const [roleName, role] of Object.entries(ns.entries.role)) {
+      roleOut[roleName] = this.serializeJsonValue(role) as JsonObject;
+    }
+    const rlsPolicyOut: Record<string, JsonObject> = {};
+    for (const [policyName, policy] of Object.entries(ns.entries.rlsPolicy)) {
+      rlsPolicyOut[policyName] = this.serializeJsonValue(policy) as JsonObject;
+    }
     return {
       id: ns.id,
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
       entries: {
         table: tablesOut,
         type: typeOut,
+        role: roleOut,
+        rlsPolicy: rlsPolicyOut,
       },
     };
   }

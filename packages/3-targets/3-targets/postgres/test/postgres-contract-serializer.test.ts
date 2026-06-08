@@ -17,6 +17,9 @@ import {
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
+import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
+import { PostgresRole } from '../src/core/postgres-role';
+import { PostgresSchema } from '../src/core/postgres-schema';
 import postgresTargetDescriptor from '../src/exports/control';
 
 function makeValidContractJson() {
@@ -279,5 +282,234 @@ describe('postgresTargetDescriptor', () => {
   it('exposes a schemaVerifier property next to migrations', () => {
     expect(postgresTargetDescriptor.schemaVerifier).toBeDefined();
     expect(postgresTargetDescriptor.migrations).toBeDefined();
+  });
+});
+
+describe('role + rlsPolicy round-trip', () => {
+  function makeContractWithRolesAndPolicies() {
+    const base = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {
+                posts: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                  rls: 'enabled',
+                },
+                logs: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                  // no rls: defaults to 'auto' — should be omitted in JSON
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return {
+      ...base,
+      storage: {
+        ...base.storage,
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            ...base.storage.namespaces[UNBOUND_NAMESPACE_ID]!,
+            entries: {
+              ...base.storage.namespaces[UNBOUND_NAMESPACE_ID]!.entries,
+              role: {
+                app_user: {
+                  kind: 'postgres-role',
+                  name: 'app_user',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                },
+              },
+              rlsPolicy: {
+                posts_select_own_a1b2c3d4: {
+                  kind: 'postgres-rls-policy',
+                  name: 'posts_select_own_a1b2c3d4',
+                  prefix: 'posts_select_own',
+                  tableName: 'posts',
+                  operation: 'select',
+                  roles: ['app_user'],
+                  using: 'user_id = current_user_id()',
+                  permissive: true,
+                },
+                posts_insert_restrictive_b5c6d7e8: {
+                  kind: 'postgres-rls-policy',
+                  name: 'posts_insert_restrictive_b5c6d7e8',
+                  prefix: 'posts_insert_restrictive',
+                  tableName: 'posts',
+                  operation: 'insert',
+                  roles: ['app_user', 'admin'],
+                  using: 'user_id = current_user_id()',
+                  withCheck: 'user_id = current_user_id()',
+                  permissive: false,
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  it('preserves role + rlsPolicy entries through serialize → deserialize', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithRolesAndPolicies();
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+    const roundTripped = serializer.deserializeContract(reparsed);
+
+    const ns = roundTripped.storage.namespaces[UNBOUND_NAMESPACE_ID] as PostgresSchema;
+    expect(ns).toBeInstanceOf(PostgresSchema);
+
+    // Role slot preserved
+    expect(Object.keys(ns.entries.role)).toHaveLength(1);
+    const role = ns.entries.role['app_user'];
+    expect(role).toBeInstanceOf(PostgresRole);
+    expect(role?.name).toBe('app_user');
+    expect(role?.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+
+    // RLS policies preserved with prefix + full name both distinct
+    expect(Object.keys(ns.entries.rlsPolicy)).toHaveLength(2);
+
+    const selectPolicy = ns.entries.rlsPolicy['posts_select_own_a1b2c3d4'];
+    expect(selectPolicy).toBeInstanceOf(PostgresRlsPolicy);
+    expect(selectPolicy?.name).toBe('posts_select_own_a1b2c3d4');
+    expect(selectPolicy?.prefix).toBe('posts_select_own');
+    expect(selectPolicy?.tableName).toBe('posts');
+    expect(selectPolicy?.operation).toBe('select');
+    expect(selectPolicy?.roles).toEqual(['app_user']);
+    expect(selectPolicy?.using).toBe('user_id = current_user_id()');
+    expect(selectPolicy?.withCheck).toBeUndefined();
+    expect(selectPolicy?.permissive).toBe(true);
+
+    const insertPolicy = ns.entries.rlsPolicy['posts_insert_restrictive_b5c6d7e8'];
+    expect(insertPolicy).toBeInstanceOf(PostgresRlsPolicy);
+    expect(insertPolicy?.name).toBe('posts_insert_restrictive_b5c6d7e8');
+    expect(insertPolicy?.prefix).toBe('posts_insert_restrictive');
+    expect(insertPolicy?.roles).toEqual(['app_user', 'admin']);
+    expect(insertPolicy?.withCheck).toBe('user_id = current_user_id()');
+    expect(insertPolicy?.permissive).toBe(false);
+  });
+
+  it('preserves rls field on tables when non-default, omits when auto', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithRolesAndPolicies();
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+
+    const ns = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    // 'enabled' persists in JSON
+    expect(ns.entries.table.posts.rls).toBe('enabled');
+    // 'auto' is omitted (absent-when-default)
+    expect(ns.entries.table.logs).not.toHaveProperty('rls');
+  });
+
+  it('produces frozen PostgresRlsPolicy and PostgresRole instances after round-trip', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithRolesAndPolicies();
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const roundTripped = serializer.deserializeContract(JSON.parse(JSON.stringify(json)));
+
+    const ns = roundTripped.storage.namespaces[UNBOUND_NAMESPACE_ID] as PostgresSchema;
+    const role = ns.entries.role['app_user']!;
+    const policy = ns.entries.rlsPolicy['posts_select_own_a1b2c3d4']!;
+
+    expect(Object.isFrozen(role)).toBe(true);
+    expect(Object.isFrozen(policy)).toBe(true);
+  });
+
+  it('returns PostgresSchema.unbound when all slots are empty', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { table: {} } },
+        },
+      },
+    });
+
+    const contract = serializer.deserializeContract(input);
+    const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns).toBe(PostgresSchema.unbound);
+  });
+
+  it('rejects a malformed rlsPolicy entry (bad operation literal)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {},
+              rlsPolicy: {
+                bad_policy: {
+                  kind: 'postgres-rls-policy',
+                  name: 'bad_policy_a1b2c3d4',
+                  prefix: 'bad_policy',
+                  tableName: 'posts',
+                  operation: 'truncate', // invalid — not in the closed set
+                  roles: ['app_user'],
+                  permissive: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => serializer.deserializeContract(input)).toThrow();
+  });
+
+  it('rejects a malformed rlsPolicy entry (missing permissive)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {},
+              rlsPolicy: {
+                bad_policy: {
+                  kind: 'postgres-rls-policy',
+                  name: 'bad_policy_a1b2c3d4',
+                  prefix: 'bad_policy',
+                  tableName: 'posts',
+                  operation: 'select',
+                  roles: ['app_user'],
+                  // permissive missing
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => serializer.deserializeContract(input)).toThrow();
   });
 });
