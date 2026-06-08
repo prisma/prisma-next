@@ -52,16 +52,21 @@ import {
   refuseContractSpaceIntegrity,
 } from '../utils/contract-space-aggregate-loader';
 import { toDeclaredExtensionsFromRaw } from '../utils/extension-pack-inputs';
-import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
-import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
-import { indentMigrationGraphTreeBlock } from '../utils/formatters/migration-graph-space-render';
-import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
 import {
-  computeMaxDirNameLengthForLayout,
-  computeMaxEdgeTreePrefixWidthForLayout,
+  computeLabelColumn,
+  computeMaxDirNameWidth,
+  renderMigrationGraphCommand,
+} from '../utils/formatters/migration-graph-command-render';
+import { buildGrid } from '../utils/formatters/migration-graph-grid-layout';
+import {
   formatOnPathMigrationRow,
-  renderMigrationGraphTree,
-} from '../utils/formatters/migration-graph-tree-render';
+  type MigrationEdgeAnnotation,
+} from '../utils/formatters/migration-graph-labels';
+import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
+import {
+  highlightFromEdgeAnnotations,
+  indentMigrationGraphTreeBlock,
+} from '../utils/formatters/migration-graph-space-render';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -444,20 +449,27 @@ async function executeMigrateShowCommand(
       const isApp = member.spaceId === aggregate.app.spaceId;
       const memberGraph = member.graph();
       const rowModel = buildMigrationGraphRows(memberGraph, isApp ? { contractHash } : {});
-      const layout = buildMigrationGraphLayout(rowModel);
-      return { member, isApp, memberGraph, layout };
+      const edgeAnnotations = new Map<string, MigrationEdgeAnnotation>();
+      for (const edge of memberGraph.migrationByHash.values()) {
+        edgeAnnotations.set(edge.migrationHash, {
+          pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
+        });
+      }
+      // The on-path migration set lifts to focus mode so the chosen route draws
+      // green/continuous; off-path lanes dim. Rows, gutter, and labels all come
+      // from this one grid.
+      const grid = buildGrid(rowModel, {}, highlightFromEdgeAnnotations(edgeAnnotations));
+      return { member, isApp, memberGraph, rowModel, grid, edgeAnnotations };
     });
 
-    // Global max across all space layouts.
-    const globalMaxEdgeTreePrefixWidth =
+    // Global max across all space grids so every section's labels share columns.
+    const globalLabelColumn =
       memberLayouts.length > 1
-        ? Math.max(
-            ...memberLayouts.map(({ layout }) => computeMaxEdgeTreePrefixWidthForLayout(layout)),
-          )
+        ? Math.max(...memberLayouts.map(({ grid }) => computeLabelColumn(grid, 'unicode')))
         : undefined;
     const globalMaxDirNameWidthFromLayouts =
       memberLayouts.length > 1
-        ? Math.max(...memberLayouts.map(({ layout }) => computeMaxDirNameLengthForLayout(layout)))
+        ? Math.max(...memberLayouts.map(({ rowModel }) => computeMaxDirNameWidth(rowModel)))
         : undefined;
     // The run-list name column width must be at least as wide as the global tree dirName
     // width so that tree sections and the list align at the hash column.
@@ -470,28 +482,25 @@ async function executeMigrateShowCommand(
         ? Math.max(globalMaxDirNameWidthFromLayouts, runListMaxFromMigrations)
         : undefined;
     runListDirNameWidth = globalMaxDirNameWidth ?? runListMaxFromMigrations;
-    runListLeftPad = globalMaxEdgeTreePrefixWidth;
+    runListLeftPad = globalLabelColumn;
 
     // Render each space section with globally computed widths.
     const showSpaceHeadings = allMembers.length > 1;
     const sections: string[] = [];
-    for (const { member, isApp, memberGraph, layout } of memberLayouts) {
-      const edgeAnnotations = new Map<string, MigrationEdgeAnnotation>();
-      for (const edge of memberGraph.migrationByHash.values()) {
-        edgeAnnotations.set(edge.migrationHash, {
-          pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
-        });
-      }
+    for (const { member, isApp, rowModel, grid, edgeAnnotations } of memberLayouts) {
       const liveMarker = markerBySpace.get(member.spaceId) ?? null;
       const liveMarkerHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
-      const tree = renderMigrationGraphTree(layout, {
+      const tree = renderMigrationGraphCommand({
+        grid,
+        rowModel,
         contractHash,
         isAppSpace: isApp,
         ...(needsLiveMarker ? { dbHash: liveMarkerHash } : {}),
         refsByHash: listRefsByContractHash(member),
         edgeAnnotationsByHash: edgeAnnotations,
         colorize,
-        ...(globalMaxEdgeTreePrefixWidth !== undefined ? { globalMaxEdgeTreePrefixWidth } : {}),
+        glyphMode: 'unicode',
+        ...(globalLabelColumn !== undefined ? { globalLabelColumn } : {}),
         ...(globalMaxDirNameWidth !== undefined ? { globalMaxDirNameWidth } : {}),
       });
       if (tree.length === 0) continue;

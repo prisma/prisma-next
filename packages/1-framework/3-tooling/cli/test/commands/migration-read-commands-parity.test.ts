@@ -297,7 +297,7 @@ describe('migration read commands pretty parity', () => {
     const listHuman = stripCommandFooter(
       renderMigrationListHumanOutput(listResult.value, {
         glyphMode: 'unicode',
-        useColor: false,
+        useColor: true,
         liveContractHash: LIVE_CONTRACT_HASH,
         graphForSpace,
       }),
@@ -326,7 +326,7 @@ describe('migration read commands pretty parity', () => {
                   migrations: spaceEntry.migrations,
                   liveContractHash: LIVE_CONTRACT_HASH,
                   glyphMode: 'unicode',
-                  colorize: false,
+                  colorize: true,
                   refsByHash: listRefsByContractHash(member),
                   ...globalWidths,
                 });
@@ -346,6 +346,9 @@ describe('migration read commands pretty parity', () => {
     expect(graphHuman).toBe(listHuman);
     expect(graphHuman).toContain('postgis:');
     expect(graphHuman).toContain('20260601T0000_install_postgis_extension');
+    // Colour parity: both sections are rendered with colour forced on, so the
+    // corner-renderer gutter must carry verbatim ANSI SGR codes.
+    expect(graphHuman).toContain('\x1b[');
     assertIndentedTreesUnderSpaceHeadings(listHuman);
   });
 
@@ -360,7 +363,7 @@ describe('migration read commands pretty parity', () => {
     const listHuman = stripCommandFooter(
       renderMigrationListHumanOutput(listResult.value, {
         glyphMode: 'unicode',
-        useColor: false,
+        useColor: true,
         liveContractHash: LIVE_CONTRACT_HASH,
         graphForSpace,
       }),
@@ -397,7 +400,7 @@ describe('migration read commands pretty parity', () => {
               migrations: spaceEntry.migrations,
               liveContractHash: LIVE_CONTRACT_HASH,
               glyphMode: 'unicode',
-              colorize: false,
+              colorize: true,
               refsByHash: listRefsByContractHash(member),
               statusOverlayByHash: statusOverlay,
               ...globalWidths,
@@ -423,6 +426,8 @@ describe('migration read commands pretty parity', () => {
     );
 
     expect(statusHuman).toBe(listHuman);
+    // Colour parity: the corner-renderer gutter carries verbatim ANSI on both sides.
+    expect(statusHuman).toContain('\x1b[');
     assertIndentedTreesUnderSpaceHeadings(statusHuman);
   });
 

@@ -27,7 +27,7 @@ import {
   setCommandSeeAlso,
 } from '../utils/command-helpers';
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
-import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-tree-render';
+import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-labels';
 import { renderMigrationListWithStyle } from '../utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
 import type {

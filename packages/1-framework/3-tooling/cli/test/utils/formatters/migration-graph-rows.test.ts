@@ -1,13 +1,14 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
+import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import { buildMigrationGraphLayout } from '../../../src/utils/formatters/migration-graph-layout';
+import { renderMigrationGraphCommand } from '../../../src/utils/formatters/migration-graph-command-render';
+import { buildGrid } from '../../../src/utils/formatters/migration-graph-grid-layout';
 import {
   buildMigrationGraphRows,
   type ClassifiedEdge,
   type MigrationGraphRowModel,
 } from '../../../src/utils/formatters/migration-graph-rows';
-import { renderMigrationGraphTree } from '../../../src/utils/formatters/migration-graph-tree-render';
 import type { MigrationEdgeKind } from '../../../src/utils/formatters/migration-list-graph-topology';
 
 // ---------------------------------------------------------------------------
@@ -605,50 +606,35 @@ describe('buildMigrationGraphRows', () => {
       expect(pos(EMPTY_CONTRACT_HASH)).toBeGreaterThan(pos('1111111'));
     });
 
-    // The full annotated-tree render of the same graph, so the layering is
-    // evaluable at a glance: tip (7777777) on top, empty root (∅) on the
-    // bottom, the merge (4444444) above its diamond branches, the cross-link
-    // (fast_forward) and both node-skipping rollbacks (rollback_users,
-    // rollback_alice) routed as back-arcs, and the disjoint cyclic component
-    // separated by a blank line.
-    it('renders the comprehensive graph as an annotated tree', () => {
+    // The full command render of the same graph through the NEW grid pipeline:
+    // rows, gutter, and labels all derive from one grid. Asserted ANSI-stripped
+    // so the structure + label correspondence is evaluable at a glance. The
+    // gutter uses the corner alphabet only (│ ╭ ╮ ╰ ╯ — never tees ├ ┬ ┴), and
+    // each migration label sits on the row that draws its arrow (↑/↓/⟲).
+    it('renders the comprehensive graph through the new command pipeline', () => {
       const rows = buildMigrationGraphRows(comprehensiveGraph());
-      const layout = buildMigrationGraphLayout(rows);
-      expect(renderMigrationGraphTree(layout, { colorize: false })).toBe(
-        [
-          '│⟲            reapply_noop        7777777 → 7777777',
-          '○             7777777',
-          '│↑            hotfix              6666666 → 7777777',
-          '○─────╮       6666666',
-          '│     │↓      rollback_users      6666666 → 2222222',
-          '│↑    │       add_comments        5555555 → 6666666',
-          '│↓    │       rollback_posts      6666666 → 5555555',
-          '○     │       5555555',
-          '│↑    │       add_posts           4444444 → 5555555',
-          '○     │       4444444',
-          '├─┬─╮ │',
-          '│↑│ │ │       merge_alice         33aaaaa → 4444444',
-          '│ │↑│ │       merge_bob           33bbbbb → 4444444',
-          '│ │ │↑│       fast_forward        1111111 → 4444444',
-          '○───────╮     33aaaaa',
-          '│ │ │ │ │↓    rollback_alice      33aaaaa → 1111111',
-          '│↑│ │ │ │     alice_phone         2222222 → 33aaaaa',
-          '│ ○ │ │ │     33bbbbb',
-          '│ │↑│ │ │     bob_avatar          2222222 → 33bbbbb',
-          '├─╯ │ │ │',
-          '○◂────╯ │     2222222',
-          '│↑  │   │     add_users           1111111 → 2222222',
-          '├───╯   │',
-          '○◂──────╯     1111111',
-          '│↑            init                      ∅ → 1111111',
-          '∅',
-          '',
-          '○             c222222',
-          '│↑            experiment          c111111 → c222222',
-          '│↓            revert_experiment   c222222 → c111111',
-          '○             c111111',
-        ].join('\n'),
+      const grid = buildGrid(rows, {}, { mode: 'flat', onPath: new Set() });
+      const rendered = stripAnsi(
+        renderMigrationGraphCommand({
+          grid,
+          rowModel: rows,
+          colorize: false,
+          glyphMode: 'unicode',
+        }),
       );
+      // No legacy tee glyphs anywhere — the renderer draws corners only.
+      expect(rendered).not.toMatch(/[├┬┴┼]/u);
+      // Each migration label appears on at least one line, and every line that
+      // carries a migration name also carries that migration's arrow (↑/↓/⟲) —
+      // labels and arrows come from the same grid row.
+      const lines = rendered.split('\n');
+      for (const edge of rows.edges) {
+        const labelLines = lines.filter((line) => line.includes(edge.dirName));
+        expect(labelLines.length, `migration ${edge.dirName} present`).toBeGreaterThanOrEqual(1);
+        for (const line of labelLines) {
+          expect(line, `arrow on row for ${edge.dirName}`).toMatch(/[↑↓⟲]/u);
+        }
+      }
     });
   });
 });

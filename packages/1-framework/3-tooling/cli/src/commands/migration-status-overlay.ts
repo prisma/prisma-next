@@ -1,6 +1,6 @@
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { findPath } from '@prisma-next/migration-tools/migration-graph';
-import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-tree-render';
+import type { MigrationEdgeAnnotation } from '../utils/formatters/migration-graph-labels';
 
 export interface DeriveStatusEdgeAnnotationsInput {
   readonly graph: MigrationGraph;
