@@ -90,7 +90,8 @@ describe('StorageTable with optional checks', () => {
       foreignKeys: [],
       checks: [cc],
     });
-    expect(table.checks![0]).toBe(cc);
+    expect(table.checks![0]).toBeInstanceOf(CheckConstraint);
+    expect(table.checks![0]).toEqual(cc);
   });
 
   it('table with checks is frozen', () => {
