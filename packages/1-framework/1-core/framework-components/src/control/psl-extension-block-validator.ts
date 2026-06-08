@@ -307,16 +307,9 @@ function validateRef(
 }
 
 /**
- * Returns true when an entity named `name` of kind `refKind` exists in at
- * least one of the given namespaces.
- *
- * Resolution reads from `ns.entries` (the canonical ADR 224 container):
- * - `'model'`, `'enum'`, `'compositeType'` → look up in the matching kind map.
- * - Any other `refKind` → look up in the extension-contributed kind map for
- *   that discriminator (e.g. `'policy_select'`, `'rls_role'`).
- *
- * This covers extension-contributed entity kinds that reference other
- * extension-contributed blocks (e.g. a policy referencing a role block).
+ * True if an entity named `name` of kind `refKind` exists in any of the given
+ * namespaces. Built-in and extension kinds resolve the same way, through
+ * `entries[refKind]`.
  */
 function resolveEntityInNamespaces(
   name: string,
