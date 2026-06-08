@@ -16,7 +16,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
 
         CREATE TABLE "public"."comment" (
           "content" text NOT NULL,
-          "created_at" timestamptz DEFAULT (now()) NOT NULL,
+          "created_at" timestamptz NOT NULL DEFAULT (now()),
           "id" SERIAL NOT NULL,
           "postId" int4 NOT NULL,
           "update_at" timestamptz,
@@ -31,22 +31,22 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
         );
 
         CREATE TABLE "public"."event" (
-          "created_at" timestamptz DEFAULT (now()) NOT NULL,
+          "created_at" timestamptz NOT NULL DEFAULT (now()),
           "id" character(36) NOT NULL,
           "name" text NOT NULL,
-          "scheduled_at" timestamptz DEFAULT '2024-01-15T10:30:00.000Z' NOT NULL,
+          "scheduled_at" timestamptz NOT NULL DEFAULT '2024-01-15T10:30:00.000Z',
           PRIMARY KEY ("id")
         );
 
         CREATE TABLE "public"."literal_defaults" (
-          "active" bool DEFAULT true NOT NULL,
-          "big_count" int8 DEFAULT 9007199254740991 NOT NULL,
+          "active" bool NOT NULL DEFAULT true,
+          "big_count" int8 NOT NULL DEFAULT 9007199254740991,
           "id" SERIAL NOT NULL,
-          "label" text DEFAULT 'draft' NOT NULL,
-          "metadata" jsonb DEFAULT '{"key":"default"}'::jsonb NOT NULL,
-          "rating" float8 DEFAULT 3.14 NOT NULL,
-          "score" int4 DEFAULT 0 NOT NULL,
-          "tags" jsonb DEFAULT '["alpha","beta"]'::jsonb NOT NULL,
+          "label" text NOT NULL DEFAULT 'draft',
+          "metadata" jsonb NOT NULL DEFAULT '{"key":"default"}',
+          "rating" float8 NOT NULL DEFAULT 3.14,
+          "score" int4 NOT NULL DEFAULT 0,
+          "tags" jsonb NOT NULL DEFAULT '["alpha","beta"]',
           PRIMARY KEY ("id")
         );
 
@@ -65,7 +65,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
         );
 
         CREATE TABLE "public"."post" (
-          "created_at" timestamptz DEFAULT (now()) NOT NULL,
+          "created_at" timestamptz NOT NULL DEFAULT (now()),
           "id" SERIAL NOT NULL,
           "meta" json,
           "published" bool NOT NULL,
@@ -76,7 +76,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
         );
 
         CREATE TABLE "public"."user" (
-          "created_at" timestamptz DEFAULT (now()) NOT NULL,
+          "created_at" timestamptz NOT NULL DEFAULT (now()),
           "email" character varying(255) NOT NULL,
           "id" SERIAL NOT NULL,
           "profile" jsonb,

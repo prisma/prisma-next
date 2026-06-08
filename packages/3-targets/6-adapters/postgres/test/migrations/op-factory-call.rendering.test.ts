@@ -122,7 +122,7 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
       'this.createTable({ schema: "public", table: "user", columns: [col("id", "text", { notNull: true })] })',
     );
     expect(withoutConstraints.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/sql-relational-core/contract-free', symbol: 'col' },
+      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'col' },
     ]);
 
     const withPk = new CreateTableCall(
@@ -135,8 +135,8 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
       'this.createTable({ schema: "public", table: "user", columns: [col("id", "text", { notNull: true })], constraints: [primaryKey(["id"])] })',
     );
     expect(withPk.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/sql-relational-core/contract-free', symbol: 'col' },
-      { moduleSpecifier: '@prisma-next/sql-relational-core/contract-free', symbol: 'primaryKey' },
+      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'col' },
+      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'primaryKey' },
     ]);
   });
 
@@ -152,8 +152,8 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
       col('id', 'integer', { notNull: true, default: lit(0) }),
     ]);
     expect(call.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/sql-relational-core/contract-free', symbol: 'col' },
-      { moduleSpecifier: '@prisma-next/sql-relational-core/contract-free', symbol: 'lit' },
+      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'col' },
+      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'lit' },
     ]);
   });
 
@@ -370,13 +370,17 @@ describe('renderCallsToTypeScript', () => {
     const source = renderCallsToTypeScript(calls, META);
 
     // CreateTableCall now uses this.createTable (a method), so createTable is
-    // no longer imported from the migration module. The import line contains only
-    // the factories actually used as free functions.
+    // no longer imported from the migration module. The import line contains
+    // the factories actually used as free functions PLUS the contract-free
+    // DDL builders (`col`, `primaryKey`, etc.) that `this.createTable({...})`
+    // takes as arguments — those re-export from `@prisma-next/postgres/migration`
+    // (the user-facing facade) so users only need one import line, not two
+    // (and one runtime dep, not two).
     const targetPostgresImports = source
       .split('\n')
       .filter((line) => line.includes("from '@prisma-next/postgres/migration';"));
     expect(targetPostgresImports).toEqual([
-      "import { Migration, MigrationCLI, addColumn, createIndex, dropTable } from '@prisma-next/postgres/migration';",
+      "import { Migration, MigrationCLI, addColumn, col, createIndex, dropTable } from '@prisma-next/postgres/migration';",
     ]);
     // CreateTableCall emits as this.createTable(...) (method call), not free function.
     expect(source).toContain('this.createTable(');
