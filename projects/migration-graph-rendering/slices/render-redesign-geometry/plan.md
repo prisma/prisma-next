@@ -19,27 +19,52 @@ Supersedes the obsolete `../converging-back-arcs/` slice (it targeted the delete
   no renderer edit. Remaining hard-coded geometry is label-side: `hashLength` and
   `dirNameWidth` in `migration-graph-labels.ts`.
 - **Test harness:** `test/utils/formatters/migration-graph-scenario-gallery.ts`
-  (hand-authored oracle + `pnpm gallery`) and `migration-graph-gallery-snapshots.test.ts`.
-  Existing rollback scenarios: `rollback-adjacent`, `rollback-arc`, `rollback-merge`,
-  `rollback-cross`. **No converging scenario** (≥2 skipping rollbacks → same target).
+  (scenarios + `pnpm gallery`) and `migration-graph-gallery-snapshots.test.ts`
+  (vitest `toMatchSnapshot()` for verbatim ANSI, plus structural invariants: no-tee
+  alphabet, focus colours present). Existing rollback scenarios: `rollback-adjacent`,
+  `rollback-arc`, `rollback-merge` (co-**sourced** — same source, different targets,
+  NOT convergence), `rollback-cross`. **No converging scenario** (≥2 skipping rollbacks
+  → the *same* target).
+
+### Pinned definition of "converged" (structural, design decision)
+
+The design doc states the convergence *rule* but has no worked example in the new
+corner model (the old `converging-back-arcs` ASCII used now-forbidden tees). Because
+the harness snapshots bytes automatically, the meaningful RED/GREEN signal is a
+**structural assertion**, not a hand-drawn glyph golden. "Converged" means:
+
+1. Skipping rollbacks that land on the **same target node** share **one** back-lane
+   column. Total grid width = `(numForwardLanes + numTargetGroups) * colsPerLane`
+   (today it is `(numForwardLanes + numSkippingArcs) * colsPerLane`).
+2. Each source tees into the shared rail (corner, never a tee — occlusion arbitrates
+   the shared vertical's colour per the existing line/plane model).
+3. A single landing closes at the target (one drawn `◂`/corner; others occluded).
+4. Display order is unchanged — the tip stays topmost (convergence is a back-lane
+   routing change only; `computeDisplayOrder` is not touched).
+
+Exact glyphs are not pinned: they fall out of the renderer + occlusion in D2 and are
+recorded in the auto-captured snapshot. The structural width/lane-count assertion is
+what proves convergence.
 
 ## Dispatches
 
-### Dispatch 1: Convergence oracle (RED)
+### Dispatch 1: Convergence scenario + RED structural assertion
 
 - **Outcome:** A `rollback-converge` scenario (two node-skipping rollbacks landing on
-  one target, plus a three-arc variant) is added to the scenario gallery with
-  hand-authored expected output showing **one shared back-lane** + a single landing
-  (per the design doc's converged before/after) and the tip staying topmost. Wired as
-  a gallery assertion that **fails** against today's per-arc layout. Red confirmed.
+  the *same* target, e.g. `∅→a→b→c→d` trunk + `d→a` + `c→a`; plus a three-arc variant
+  `d→a` + `c→a` + `b→a`) is added to the scenario gallery. A **structural convergence
+  assertion** (arcs sharing a target occupy exactly one back-lane column → grid width
+  per the pinned formula; tip stays topmost) is added, marked expected-fail (`it.fails`,
+  the core slice's RED convention) against today's per-arc layout. Red confirmed.
 - **Builds on:** the merged `render-redesign-core` scenario gallery + occlusion pipeline.
-- **Hands to:** a failing convergence oracle pinning the narrowed converged shape
-  (current layout renders N rails; the golden expects 1).
-- **Focus:** `migration-graph-scenario-gallery.ts` + the gallery snapshot test only.
-  No `src/` change.
-- **Completed when:** `pnpm test:packages -- cli` shows the new `rollback-converge`
-  case failing for the expected reason (extra back-lane columns); all other gallery
-  cases still green.
+- **Hands to:** a failing structural assertion pinning the narrowed converged shape, plus
+  the new scenario whose verbatim snapshot is auto-captured (per-arc bytes for now; D2
+  re-records it converged).
+- **Focus:** `migration-graph-scenario-gallery.ts` + `migration-graph-gallery-snapshots.test.ts`
+  only. No `src/` change.
+- **Completed when:** the new structural assertion is RED for the expected reason (more
+  than one back-lane column for same-target arcs); `it.fails` passes (i.e. it genuinely
+  fails); every other gallery case still green; `pnpm test:packages -- @prisma-next/cli`.
 
 ### Dispatch 2: Convergence layout (GREEN)
 
@@ -53,9 +78,12 @@ Supersedes the obsolete `../converging-back-arcs/` slice (it targeted the delete
   all non-converging rollback scenarios are unchanged.
 - **Focus:** back-arc planning + tee/landing emission + width computation in
   `grid-layout.ts`. No colour-semantics change; no geometry-constant refactor.
-- **Completed when:** D1's `rollback-converge` cases pass (revert-to-red verified by
-  reverting the layout change); `rollback-arc` / `rollback-cross` / `rollback-merge`
-  snapshots byte-identical; `pnpm test:packages -- cli` green.
+- **Completed when:** D1's structural convergence assertion passes (flip `it.fails` →
+  `it`; revert-to-red verified by reverting the layout change); the `rollback-converge`
+  snapshot is re-recorded to the converged output via `pnpm gallery` then
+  `--update-snapshots`; `rollback-arc` / `rollback-cross` / `rollback-merge` /
+  `rollback-adjacent` snapshots byte-identical (non-converging cases untouched);
+  `pnpm test:packages -- @prisma-next/cli` green.
 
 ### Dispatch 3: Configurable geometry
 
