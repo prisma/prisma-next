@@ -34,7 +34,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           "created_at" timestamptz NOT NULL DEFAULT (now()),
           "id" character(36) NOT NULL,
           "name" text NOT NULL,
-          "scheduled_at" timestamptz NOT NULL DEFAULT '2024-01-15T10:30:00.000Z',
+          "scheduled_at" timestamptz NOT NULL DEFAULT '2024-01-15T10:30:00.000Z'::timestamptz,
           PRIMARY KEY ("id")
         );
 
@@ -43,10 +43,10 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           "big_count" int8 NOT NULL DEFAULT 9007199254740991,
           "id" SERIAL NOT NULL,
           "label" text NOT NULL DEFAULT 'draft',
-          "metadata" jsonb NOT NULL DEFAULT '{"key":"default"}',
+          "metadata" jsonb NOT NULL DEFAULT '{"key":"default"}'::jsonb,
           "rating" float8 NOT NULL DEFAULT 3.14,
           "score" int4 NOT NULL DEFAULT 0,
-          "tags" jsonb NOT NULL DEFAULT '["alpha","beta"]',
+          "tags" jsonb NOT NULL DEFAULT '["alpha","beta"]'::jsonb,
           PRIMARY KEY ("id")
         );
 

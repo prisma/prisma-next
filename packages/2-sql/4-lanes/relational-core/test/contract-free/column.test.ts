@@ -33,10 +33,13 @@ describe('contract-free column helpers', () => {
   });
 
   it('default dispatches through the visitor', () => {
-    const kind = lit('app').accept({
-      literal: (node) => node.kind,
-      function: (node) => node.kind,
-    });
+    const kind = lit('app').accept(
+      {
+        literal: (node) => node.kind,
+        function: (node) => node.kind,
+      },
+      { nativeType: 'text' },
+    );
     expect(kind).toBe('literal');
   });
 
