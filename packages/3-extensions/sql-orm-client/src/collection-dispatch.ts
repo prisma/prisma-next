@@ -212,7 +212,13 @@ export function reloadMutationRowsByIdentities<Row>(options: {
     );
   }
 
-  const identityFilter = buildIdentityInFilter(contract, tableName, identityColumns, identityRows);
+  const identityFilter = buildIdentityInFilter(
+    contract,
+    namespaceId,
+    tableName,
+    identityColumns,
+    identityRows,
+  );
   if (!identityFilter) {
     return emptyResult<Row>();
   }
@@ -241,6 +247,7 @@ function emptyResult<Row>(): AsyncIterableResult<Row> {
 // the `IN` list (or the composite-key `OR` of equality tuples) directly.
 function buildIdentityInFilter(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   identityColumns: readonly string[],
   identityRows: readonly Record<string, unknown>[],
@@ -256,6 +263,7 @@ function buildIdentityInFilter(
     return bindWhereExpr(
       contract,
       BinaryExpr.in(ColumnRef.of(tableName, singleColumn), ListExpression.fromValues(values)),
+      namespaceId,
     );
   }
 
@@ -269,7 +277,7 @@ function buildIdentityInFilter(
       ),
     ),
   );
-  return bindWhereExpr(contract, OrExpr.of(tuples));
+  return bindWhereExpr(contract, OrExpr.of(tuples), namespaceId);
 }
 
 /**
