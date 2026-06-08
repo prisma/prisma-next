@@ -34,7 +34,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           "created_at" timestamptz NOT NULL DEFAULT (now()),
           "id" character(36) NOT NULL,
           "name" text NOT NULL,
-          "scheduled_at" timestamptz NOT NULL DEFAULT '2024-01-15T10:30:00.000Z',
+          "scheduled_at" timestamptz NOT NULL DEFAULT '2024-01-15T10:30:00.000Z'::timestamptz,
           PRIMARY KEY ("id")
         );
 

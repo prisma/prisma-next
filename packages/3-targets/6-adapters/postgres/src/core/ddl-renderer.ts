@@ -84,30 +84,45 @@ class PostgresDdlVisitorImpl implements PostgresDdlVisitor<string> {
   }
 }
 
+// Postgres infers a quoted-literal default's type as `text` at parse time
+// and applies an implicit text → target coercion at default-evaluation
+// time. That coercion exists for some target types (text, jsonb, json)
+// and not others (uuid, inet, timestamptz, citext, enums, user-defined
+// types, geometry/geography from PostGIS, array types). Quoted-literal
+// defaults on any non-text column therefore need an explicit
+// `::<nativeType>` cast in the emitted DDL — both to state the default's
+// intent (the literal IS that type, not text that happens to coerce) and
+// to keep emitted migrations correct for types where no implicit cast
+// exists. Numeric, boolean, and null literals are typed by Postgres
+// directly (no `text` indirection) so they need no cast.
+function isTextLikeNativeType(nativeType: string): boolean {
+  return (
+    nativeType === 'text' ||
+    nativeType === 'varchar' ||
+    nativeType.startsWith('varchar(') ||
+    nativeType === 'character varying' ||
+    nativeType.startsWith('character varying(') ||
+    nativeType === 'char' ||
+    nativeType.startsWith('char(') ||
+    nativeType === 'character' ||
+    nativeType.startsWith('character(')
+  );
+}
+
 const defaultVisitor: DdlColumnDefaultVisitor<string> = {
   literal(node: LiteralColumnDefault, ctx): string {
     const { value } = node;
-    if (typeof value === 'string') {
-      return `DEFAULT '${escapeLiteral(value)}'`;
-    }
     if (typeof value === 'number' || typeof value === 'boolean') {
       return `DEFAULT ${String(value)}`;
     }
     if (value === null) {
       return 'DEFAULT NULL';
     }
-    // JSON object/array literal → explicit `::<jsonb|json>` cast so the
-    // emitted DDL matches the column type without relying on Postgres's
-    // implicit text → jsonb coercion at default-evaluation time. Matches
-    // the pre-#751 planner-side `renderDefaultLiteral` behaviour for
-    // jsonb / json columns. For other columns whose underlying value is
-    // an object/array, fall back to a quoted literal — the column type
-    // decides.
-    const json = `'${escapeLiteral(JSON.stringify(value))}'`;
-    if (ctx.nativeType === 'jsonb' || ctx.nativeType === 'json') {
-      return `DEFAULT ${json}::${ctx.nativeType}`;
-    }
-    return `DEFAULT ${json}`;
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    const literal = `'${escapeLiteral(serialized)}'`;
+    return isTextLikeNativeType(ctx.nativeType)
+      ? `DEFAULT ${literal}`
+      : `DEFAULT ${literal}::${ctx.nativeType}`;
   },
   function(node: FunctionColumnDefault, _ctx): string {
     if (node.expression === 'autoincrement()') {
