@@ -96,24 +96,23 @@ const UserRole = model('UserRole', {
   }))
   .sql({ table: 'user_roles' });
 
-const Project = model('Project', {
+const ProjectBase = model('Project', {
   fields: {
     tenantId: field.column(int4Column).column('tenant_id'),
     id: field.column(int4Column),
     name: field.column(textColumn),
   },
-})
-  .attributes(({ fields, constraints }) => ({
-    id: constraints.id([fields.tenantId, fields.id]),
-  }))
-  .relations({
-    related: rel.manyToMany(() => Project, {
-      through: () => ProjectLink,
-      from: ['srcTenantId', 'srcId'],
-      to: ['dstTenantId', 'dstId'],
-    }),
-  })
-  .sql({ table: 'projects' });
+}).attributes(({ fields, constraints }) => ({
+  id: constraints.id([fields.tenantId, fields.id]),
+}));
+
+const Project = ProjectBase.relations({
+  related: rel.manyToMany(() => ProjectBase, {
+    through: () => ProjectLink,
+    from: ['srcTenantId', 'srcId'],
+    to: ['dstTenantId', 'dstId'],
+  }),
+}).sql({ table: 'projects' });
 
 const ProjectLink = model('ProjectLink', {
   fields: {
