@@ -10,6 +10,8 @@ Working ledger of patterns surfaced during this run. Reviewed at close-out; cros
 
 ## Examples (post-slice scope expansion)
 
+- **An example must demonstrate why a primitive exists, not just that it works.** The first transaction demo (create user + N posts atomically) was a textbook single nested-write — it exercised `db.transaction()` but taught the anti-pattern of reaching for a transaction when one statement suffices. Reviewer (repo owner) rejected it: examples are training data for users AND AI agents, so a contrived example actively propagates bad patterns. Redesigned as a per-user post quota (read count → app-decision → conditional insert): an interactive transaction is genuinely necessary because the check-then-act must be atomic against TOCTOU. Add-on requirement: use ORM and SQL-builder lanes where each is genuinely warranted (SQL builder for the aggregate COUNT, ORM for the typed entity create) — not just "both appear." Directly relevant to the Mongo slices' examples/e2e: pick scenarios where the transaction is load-bearing.
+
 - **Codec branding is target-asymmetric.** Postgres codecs brand row scalar types (opaque UUID/datetime brands); SQLite codecs map to plain `string`/`Date`. The transaction-demo implementer cargo-culted `blindCast` calls from `orm-client/create-user.ts` and invented a brand rationale; in the SQLite demo they were no-ops (removed in `e16e4a973`). The `create-user.ts` casts themselves are NOT vestigial — they keep the file symmetric with its Postgres-demo twin where the brand is real (operator clarification). Relevance for Mongo slices: check what the Mongo codecs brand before writing example/e2e input literals; don't assume either target's behavior.
 
 ## PR review iteration (post-slice)
