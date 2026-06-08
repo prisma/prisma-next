@@ -23,8 +23,8 @@ export function resolveTableInNamespace(
   tableName: string,
 ): StorageTable | undefined {
   const namespace = storage.namespaces[namespaceId];
-  if (namespace === undefined || !Object.hasOwn(namespace.tables, tableName)) {
+  if (namespace === undefined || !Object.hasOwn(namespace.entries.table, tableName)) {
     return undefined;
   }
-  return namespace.tables[tableName];
+  return namespace.entries.table[tableName];
 }

@@ -100,10 +100,9 @@ const runtime = createMockRuntime();
 // Widen to a Collection type that uses the synthetic contract — use
 // `as unknown as` only to satisfy the constructor's runtime requirements;
 // the TYPE is what we are testing.
-const profileCollection = new Collection(
-  { runtime, context: {} as never },
-  'Profile',
-) as unknown as Collection<CrossSpaceTestContract, 'Profile'>;
+const profileCollection = new Collection({ runtime, context: {} as never }, 'Profile', {
+  namespaceId: 'public',
+}) as unknown as Collection<CrossSpaceTestContract, 'Profile'>;
 
 // Positive: a local relation can be included — must compile
 void profileCollection.include('posts');

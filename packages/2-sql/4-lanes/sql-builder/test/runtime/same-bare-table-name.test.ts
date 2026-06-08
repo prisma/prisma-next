@@ -29,11 +29,15 @@ const twoNamespaceContract = {
     namespaces: {
       public: {
         id: 'public',
-        tables: { users: table({ id: column('pg/int4@1'), email_addr: column('pg/text@1') }) },
+        entries: {
+          table: { users: table({ id: column('pg/int4@1'), email_addr: column('pg/text@1') }) },
+        },
       },
       auth: {
         id: 'auth',
-        tables: { users: table({ id: column('pg/int4@1'), token_col: column('pg/varchar@1') }) },
+        entries: {
+          table: { users: table({ id: column('pg/int4@1'), token_col: column('pg/varchar@1') }) },
+        },
       },
     },
   },

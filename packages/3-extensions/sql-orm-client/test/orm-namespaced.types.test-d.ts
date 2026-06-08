@@ -22,6 +22,12 @@ test('an undeclared namespace id is not a key on the typed surface', () => {
 
 type DomainNamespaceIds<C extends Contract<SqlStorage>> = keyof C['domain']['namespaces'];
 type StorageNamespaceIds<C extends Contract<SqlStorage>> = keyof C['storage']['namespaces'];
+// Top-level enums (no domain model) land in the storage-only `__unbound__`
+// schema, so domain namespace ids are the storage namespace ids minus it.
+type ModelBearingStorageNamespaceIds<C extends Contract<SqlStorage>> = Exclude<
+  StorageNamespaceIds<C>,
+  '__unbound__'
+>;
 
 // A two-namespace shape reusing the generated fixture's namespace content, so
 // the alignment assertion below exercises more than a single namespace id.
@@ -40,11 +46,11 @@ interface TwoNamespaceContract extends Omit<TestContract, 'domain' | 'storage'> 
   };
 }
 
-test('the namespaced orm keys equal the namespaced sql keys', () => {
+test('the namespaced orm keys equal the model-bearing namespaced sql keys', () => {
   expectTypeOf<DomainNamespaceIds<TestContract>>().toEqualTypeOf<
-    StorageNamespaceIds<TestContract>
+    ModelBearingStorageNamespaceIds<TestContract>
   >();
   expectTypeOf<DomainNamespaceIds<TwoNamespaceContract>>().toEqualTypeOf<
-    StorageNamespaceIds<TwoNamespaceContract>
+    ModelBearingStorageNamespaceIds<TwoNamespaceContract>
   >();
 });

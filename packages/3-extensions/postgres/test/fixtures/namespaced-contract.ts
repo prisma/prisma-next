@@ -37,24 +37,26 @@ type Storage = {
     readonly public: {
       readonly id: 'public';
       readonly kind: 'sql-namespace';
-      readonly tables: {
-        readonly users: {
-          columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              readonly nullable: false;
+      readonly entries: {
+        readonly table: {
+          readonly users: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                readonly nullable: false;
+              };
+              readonly name: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
             };
-            readonly name: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              readonly nullable: false;
-            };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
-          primaryKey: { readonly columns: readonly ['id'] };
-          uniques: readonly [];
-          indexes: readonly [];
-          foreignKeys: readonly [];
         };
       };
     };

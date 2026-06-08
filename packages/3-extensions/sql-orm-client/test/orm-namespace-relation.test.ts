@@ -78,12 +78,14 @@ const twoNamespaceContract = blindCast<Contract<SqlStorage>, 'hand-built multi-n
     namespaces: {
       public: {
         id: 'public',
-        tables: {
-          profiles: storageTable(['id', 'bio_col', 'user_id']),
-          users: storageTable(['id', 'email_addr']),
+        entries: {
+          table: {
+            profiles: storageTable(['id', 'bio_col', 'user_id']),
+            users: storageTable(['id', 'email_addr']),
+          },
         },
       },
-      auth: { id: 'auth', tables: { auth_users: storageTable(['id', 'token_col']) } },
+      auth: { id: 'auth', entries: { table: { auth_users: storageTable(['id', 'token_col']) } } },
     },
   },
 });

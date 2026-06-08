@@ -45,7 +45,8 @@ export type Namespace<
   C extends TableProxyContract,
   NsId extends keyof C['storage']['namespaces'],
 > = {
-  readonly [Name in keyof C['storage']['namespaces'][NsId]['tables'] & string]: TableProxy<C, Name>;
+  readonly [Name in keyof C['storage']['namespaces'][NsId]['entries']['table'] &
+    string]: TableProxy<C, Name>;
 };
 
 // Additive intersection: the flat by-bare-name surface retained alongside a

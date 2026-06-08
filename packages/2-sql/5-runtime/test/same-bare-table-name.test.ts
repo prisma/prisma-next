@@ -40,11 +40,11 @@ function twoNamespaceContract(): Contract<SqlStorage> {
       namespaces: {
         public: buildSqlNamespace({
           id: 'public',
-          tables: { users: table({ id: 'pg/int4@1', email: 'pg/text@1' }) },
+          entries: { table: { users: table({ id: 'pg/int4@1', email: 'pg/text@1' }) } },
         }),
         auth: buildSqlNamespace({
           id: 'auth',
-          tables: { users: table({ id: 'pg/int4@1', token: 'sql/varchar@1' }) },
+          entries: { table: { users: table({ id: 'pg/int4@1', token: 'sql/varchar@1' }) } },
         }),
       },
     }),

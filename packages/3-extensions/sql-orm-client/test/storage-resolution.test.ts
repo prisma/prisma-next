@@ -42,8 +42,14 @@ function twoNamespaceSameTableName(): Contract<SqlStorageType> {
     new SqlStorage({
       storageHash: STORAGE_HASH,
       namespaces: {
-        public: buildSqlNamespace({ id: 'public', tables: { users: usersTable('email_addr') } }),
-        auth: buildSqlNamespace({ id: 'auth', tables: { users: usersTable('token_col') } }),
+        public: buildSqlNamespace({
+          id: 'public',
+          entries: { table: { users: usersTable('email_addr') } },
+        }),
+        auth: buildSqlNamespace({
+          id: 'auth',
+          entries: { table: { users: usersTable('token_col') } },
+        }),
       },
     }),
   );
@@ -75,7 +81,10 @@ describe('storage-resolution coordinate-aware lookups', () => {
       new SqlStorage({
         storageHash: STORAGE_HASH,
         namespaces: {
-          public: buildSqlNamespace({ id: 'public', tables: { users: usersTable('email_addr') } }),
+          public: buildSqlNamespace({
+            id: 'public',
+            entries: { table: { users: usersTable('email_addr') } },
+          }),
         },
       }),
     );

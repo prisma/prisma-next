@@ -516,7 +516,12 @@ describe('createModelAccessor', () => {
     type FieldBag = Record<string, FieldOps | undefined>;
 
     it('resolves an MTI variant column against the joined variant table', () => {
-      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      const feature = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Feature',
+      ) as unknown as FieldBag;
       // `priority` lives on the joined `features` table, not the base `tasks`.
       expect(feature['priority']!.gte(3)).toEqual(
         new BinaryExpr(
@@ -528,7 +533,12 @@ describe('createModelAccessor', () => {
     });
 
     it('keeps base columns qualified against the base table when a variant is selected', () => {
-      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      const feature = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Feature',
+      ) as unknown as FieldBag;
       expect(feature['title']!.eq('Dark mode')).toEqual(
         new BinaryExpr(
           'eq',
@@ -539,9 +549,14 @@ describe('createModelAccessor', () => {
     });
 
     it('does not expose another variant column for the selected variant', () => {
-      const feature = createModelAccessor(polyContext, 'Task', 'Feature') as unknown as FieldBag;
+      const feature = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Feature',
+      ) as unknown as FieldBag;
       expect(feature['priority']).toBeDefined();
-      const bug = createModelAccessor(polyContext, 'Task', 'Bug') as unknown as FieldBag;
+      const bug = createModelAccessor(polyContext, 'public', 'Task', 'Bug') as unknown as FieldBag;
       // Bug is STI — its `severity` rides the base table, never the features join.
       expect(bug['severity']!.eq('critical')).toEqual(
         new BinaryExpr(
@@ -555,7 +570,7 @@ describe('createModelAccessor', () => {
     });
 
     it('leaves base resolution untouched when no variant is selected', () => {
-      const task = createModelAccessor(polyContext, 'Task') as unknown as FieldBag;
+      const task = createModelAccessor(polyContext, 'public', 'Task') as unknown as FieldBag;
       expect(task['title']!.eq('x')).toEqual(
         new BinaryExpr('eq', ColumnRef.of('tasks', 'title'), polyParam('tasks', 'title', 'x')),
       );

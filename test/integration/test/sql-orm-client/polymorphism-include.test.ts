@@ -183,13 +183,17 @@ function buildMtiIncludeContract(): TestContract {
 function createAccountCollection(runtime: PgIntegrationRuntime): PolyIncludeParent {
   const contract = buildStiIncludeContract();
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'Account' as never) as unknown as PolyIncludeParent;
+  return new Collection({ runtime, context }, 'Account' as never, {
+    namespaceId: 'public',
+  }) as unknown as PolyIncludeParent;
 }
 
 function createProjectCollection(runtime: PgIntegrationRuntime): PolyIncludeParent {
   const contract = buildMtiIncludeContract();
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'Project' as never) as unknown as PolyIncludeParent;
+  return new Collection({ runtime, context }, 'Project' as never, {
+    namespaceId: 'public',
+  }) as unknown as PolyIncludeParent;
 }
 
 async function setupStiIncludeSchema(runtime: PgIntegrationRuntime): Promise<void> {

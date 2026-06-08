@@ -40,8 +40,8 @@ function twoNamespaceSameTableName(): {
   const storage = new SqlStorage({
     storageHash: 'sha256:test',
     namespaces: {
-      public: buildSqlNamespace({ id: 'public', tables: { users: publicUsers } }),
-      auth: buildSqlNamespace({ id: 'auth', tables: { users: authUsers } }),
+      public: buildSqlNamespace({ id: 'public', entries: { table: { users: publicUsers } } }),
+      auth: buildSqlNamespace({ id: 'auth', entries: { table: { users: authUsers } } }),
     },
   });
   return { storage, publicUsers, authUsers };

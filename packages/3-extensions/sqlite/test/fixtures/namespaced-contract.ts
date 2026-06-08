@@ -37,24 +37,26 @@ type Storage = {
     readonly main: {
       readonly id: 'main';
       readonly kind: 'sql-namespace';
-      readonly tables: {
-        readonly users: {
-          columns: {
-            readonly id: {
-              readonly nativeType: 'integer';
-              readonly codecId: 'sqlite/integer@1';
-              readonly nullable: false;
+      readonly entries: {
+        readonly table: {
+          readonly users: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'integer';
+                readonly codecId: 'sqlite/integer@1';
+                readonly nullable: false;
+              };
+              readonly name: {
+                readonly nativeType: 'text';
+                readonly codecId: 'sqlite/text@1';
+                readonly nullable: false;
+              };
             };
-            readonly name: {
-              readonly nativeType: 'text';
-              readonly codecId: 'sqlite/text@1';
-              readonly nullable: false;
-            };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
-          primaryKey: { readonly columns: readonly ['id'] };
-          uniques: readonly [];
-          indexes: readonly [];
-          foreignKeys: readonly [];
         };
       };
     };

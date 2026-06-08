@@ -267,7 +267,9 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const contract = buildMixedPolyContract();
     const context = { ...getTestContext(), contract };
     const runtime = createMockRuntime();
-    const projects = new Collection({ runtime, context }, 'Project') as unknown as PolyParent;
+    const projects = new Collection({ runtime, context }, 'Project', {
+      namespaceId: 'public',
+    }) as unknown as PolyParent;
 
     const refined = projects.include('tasks', (tasks) => tasks.variant('Bug'));
 
@@ -278,7 +280,9 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const contract = buildMixedPolyContract();
     const context = { ...getTestContext(), contract };
     const runtime = createMockRuntime();
-    const projects = new Collection({ runtime, context }, 'Project') as unknown as PolyParent;
+    const projects = new Collection({ runtime, context }, 'Project', {
+      namespaceId: 'public',
+    }) as unknown as PolyParent;
 
     const included = projects.include('tasks');
 

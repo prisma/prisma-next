@@ -31,11 +31,11 @@ function twoNamespaceSameTableName(): SqlStorage {
     namespaces: {
       public: buildSqlNamespace({
         id: 'public',
-        tables: { users: usersTable('email_addr', 'pg/text@1') },
+        entries: { table: { users: usersTable('email_addr', 'pg/text@1') } },
       }),
       auth: buildSqlNamespace({
         id: 'auth',
-        tables: { users: usersTable('token_col', 'pg/int4@1') },
+        entries: { table: { users: usersTable('token_col', 'pg/int4@1') } },
       }),
     },
   });
@@ -66,7 +66,7 @@ describe('codecRefForStorageColumn', () => {
       namespaces: {
         public: buildSqlNamespace({
           id: 'public',
-          tables: { users: usersTable('email_addr', 'pg/text@1') },
+          entries: { table: { users: usersTable('email_addr', 'pg/text@1') } },
         }),
       },
     });

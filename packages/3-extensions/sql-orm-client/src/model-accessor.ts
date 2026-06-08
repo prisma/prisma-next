@@ -61,7 +61,7 @@ export function createModelAccessor<
   // added: an empty `variantFieldColumns`, so every field falls through to the
   // base-table column resolution below.
   const variantFieldColumns: Record<string, VariantColumnRef> = variantName
-    ? resolveVariantFieldColumns(contract, modelName, variantName)
+    ? resolveVariantFieldColumns(contract, namespaceId, modelName, variantName)
     : {};
 
   const opsByCodecId = new Map<string, NamedOp[]>();

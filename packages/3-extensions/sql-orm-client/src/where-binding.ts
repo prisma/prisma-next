@@ -158,9 +158,7 @@ function createParamRef(
   if (resolvedNamespaceId === undefined) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
-  const tableInAnyNs = namespaces[resolvedNamespaceId]?.entries.table[columnRef.table] as
-    | StorageTable
-    | undefined;
+  const tableInAnyNs = namespaces[resolvedNamespaceId]?.entries.table[columnRef.table];
   if (!tableInAnyNs?.columns[columnRef.column]) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }

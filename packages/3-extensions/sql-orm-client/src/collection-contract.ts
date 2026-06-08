@@ -178,15 +178,16 @@ export interface VariantColumnRef {
  */
 export function resolveVariantFieldColumns(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   baseModelName: string,
   variantName: string,
 ): Record<string, VariantColumnRef> {
-  const polyInfo = resolvePolymorphismInfo(contract, baseModelName);
+  const polyInfo = resolvePolymorphismInfo(contract, namespaceId, baseModelName);
   const variant = polyInfo?.variants.get(variantName);
   const result: Record<string, VariantColumnRef> = {};
 
   if (variant && variant.strategy === 'mti') {
-    const variantFieldToColumn = getFieldToColumnMap(contract, variant.modelName);
+    const variantFieldToColumn = getFieldToColumnMap(contract, namespaceId, variant.modelName);
     for (const [field, column] of Object.entries(variantFieldToColumn)) {
       result[field] = { table: variant.table, column };
     }

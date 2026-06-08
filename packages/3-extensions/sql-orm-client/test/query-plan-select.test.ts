@@ -767,12 +767,14 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
     parentModel: string,
     relationName: string,
     nested: CollectionState = emptyState(),
+    namespaceId = 'public',
   ): IncludeExpr {
-    const relation = resolveIncludeRelation(contract, parentModel, relationName);
+    const relation = resolveIncludeRelation(contract, namespaceId, parentModel, relationName);
     return {
       relationName,
       relatedModelName: relation.relatedModelName,
       relatedTableName: relation.relatedTableName,
+      relatedNamespaceId: relation.relatedNamespaceId,
       targetColumn: relation.targetColumn,
       localColumn: relation.localColumn,
       cardinality: relation.cardinality,
@@ -803,7 +805,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
     const contract = buildStiPolyContract();
     const state = stateWithInclude(includeFor(contract, 'Account', 'members'));
 
-    const plan = compileSelectWithIncludes(contract, 'accounts', state, 'Account');
+    const plan = compileSelectWithIncludes(contract, 'public', 'accounts', state, 'Account');
     const childRows = childRowsSelectFor(plan, 'members');
 
     expect(childRows.joins ?? []).toHaveLength(0);
@@ -817,7 +819,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
     const contract = buildMixedPolyContract();
     const state = stateWithInclude(includeFor(contract, 'Project', 'tasks'));
 
-    const plan = compileSelectWithIncludes(contract, 'projects_tbl', state, 'Project');
+    const plan = compileSelectWithIncludes(contract, 'public', 'projects_tbl', state, 'Project');
     const childRows = childRowsSelectFor(plan, 'tasks');
 
     expect(childRows.joins).toEqual([
@@ -841,7 +843,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
     });
     const state = stateWithInclude(include);
 
-    const plan = compileSelectWithIncludes(contract, 'projects_tbl', state, 'Project');
+    const plan = compileSelectWithIncludes(contract, 'public', 'projects_tbl', state, 'Project');
     const childRows = childRowsSelectFor(plan, 'tasks');
 
     expect(childRows.joins).toEqual([
@@ -860,7 +862,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
     // than the unaliased base table name.
     const state = stateWithInclude(includeFor(contract, 'Task', 'subtasks'));
 
-    const plan = compileSelectWithIncludes(contract, 'tasks', state, 'Task');
+    const plan = compileSelectWithIncludes(contract, 'public', 'tasks', state, 'Task');
     const childRows = childRowsSelectFor(plan, 'subtasks');
 
     expect(childRows.joins).toEqual([

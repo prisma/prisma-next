@@ -315,12 +315,21 @@ function buildChildPolymorphismJoinsAndProjection(
   childTableAlias: string | undefined,
   childTableRef: string,
 ): { joins: ReadonlyArray<JoinAst>; projection: ReadonlyArray<ProjectionItem> } {
-  const polyInfo = resolvePolymorphismInfo(contract, include.relatedModelName);
+  const polyInfo = resolvePolymorphismInfo(
+    contract,
+    include.relatedNamespaceId,
+    include.relatedModelName,
+  );
   if (!polyInfo || polyInfo.mtiVariants.length === 0) {
     return { joins: [], projection: [] };
   }
 
-  const { joins, projection } = buildMtiJoins(contract, polyInfo, include.nested.variantName);
+  const { joins, projection } = buildMtiJoins(
+    contract,
+    include.relatedNamespaceId,
+    polyInfo,
+    include.nested.variantName,
+  );
   if (!childTableAlias) {
     return { joins, projection };
   }

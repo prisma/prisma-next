@@ -37,8 +37,14 @@ const twoNamespaceContract = {
   storage: {
     storageHash: 'stub',
     namespaces: {
-      public: { id: 'public', tables: { users: storageTable(), posts: storageTable() } },
-      auth: { id: 'auth', tables: { auth_users: storageTable(), sessions: storageTable() } },
+      public: {
+        id: 'public',
+        entries: { table: { users: storageTable(), posts: storageTable() } },
+      },
+      auth: {
+        id: 'auth',
+        entries: { table: { auth_users: storageTable(), sessions: storageTable() } },
+      },
     },
   },
 };

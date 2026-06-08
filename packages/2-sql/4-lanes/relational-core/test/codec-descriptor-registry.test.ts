@@ -259,11 +259,11 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn namespace coordinat
       namespaces: {
         public: buildSqlNamespace({
           id: 'public',
-          tables: { users: table({ id: 'pg/int4@1', email: 'pg/text@1' }) },
+          entries: { table: { users: table({ id: 'pg/int4@1', email: 'pg/text@1' }) } },
         }),
         auth: buildSqlNamespace({
           id: 'auth',
-          tables: { users: table({ id: 'pg/int4@1', token: 'pg/varchar@1' }) },
+          entries: { table: { users: table({ id: 'pg/int4@1', token: 'pg/varchar@1' }) } },
         }),
       },
     });

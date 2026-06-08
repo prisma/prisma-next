@@ -19,12 +19,14 @@ function includeFor(
   parentModel: string,
   relationName: string,
   nested: CollectionState = emptyState(),
+  namespaceId = 'public',
 ): IncludeExpr {
-  const relation = resolveIncludeRelation(contract, parentModel, relationName);
+  const relation = resolveIncludeRelation(contract, namespaceId, parentModel, relationName);
   return {
     relationName,
     relatedModelName: relation.relatedModelName,
     relatedTableName: relation.relatedTableName,
+    relatedNamespaceId: relation.relatedNamespaceId,
     targetColumn: relation.targetColumn,
     localColumn: relation.localColumn,
     cardinality: relation.cardinality,
@@ -401,6 +403,7 @@ describe('collection-dispatch', () => {
       state,
       tableName: 'accounts',
       modelName: 'Account',
+      namespaceId: 'public',
     });
 
     const members = (rows[0] as { members: Record<string, unknown>[] }).members;
@@ -441,6 +444,7 @@ describe('collection-dispatch', () => {
       state,
       tableName: 'projects_tbl',
       modelName: 'Project',
+      namespaceId: 'public',
     }).toArray();
 
     const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
@@ -518,6 +522,7 @@ describe('collection-dispatch', () => {
       state,
       tableName: 'projects_tbl',
       modelName: 'Project',
+      namespaceId: 'public',
     }).toArray();
 
     const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
@@ -573,6 +578,7 @@ describe('collection-dispatch', () => {
       state,
       tableName: 'projects_tbl',
       modelName: 'Project',
+      namespaceId: 'public',
     }).toArray();
 
     const tasks = (rows[0] as { tasks: Record<string, unknown>[] }).tasks;
