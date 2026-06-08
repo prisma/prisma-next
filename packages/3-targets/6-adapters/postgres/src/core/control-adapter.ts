@@ -1315,8 +1315,10 @@ export function parseCheckConstraintDef(
 
   // Shape 1: col = ANY (ARRAY['a'::text, 'b'::text])
   // Accepts both plain identifiers and double-quoted identifiers for the column.
+  // Anchored at the end so a composite predicate (e.g. `col = ANY (...) AND x > 0`)
+  // does not partial-match.
   const anyArrayMatch = inner.match(
-    /^(?:"((?:[^"]|"")*)"|(\w+))\s*=\s*ANY\s*\(\s*ARRAY\s*\[(.+)\]\s*\)/i,
+    /^(?:"((?:[^"]|"")*)"|(\w+))\s*=\s*ANY\s*\(\s*ARRAY\s*\[(.+)\]\s*\)\s*$/i,
   );
   if (anyArrayMatch) {
     const column =
@@ -1329,7 +1331,9 @@ export function parseCheckConstraintDef(
 
   // Shape 2: col IN ('a', 'b')
   // Accepts both plain identifiers and double-quoted identifiers for the column.
-  const inMatch = inner.match(/^(?:"((?:[^"]|"")*)"|(\w+))\s+IN\s*\((.+)\)/i);
+  // Anchored at the end so a composite predicate (e.g. `col IN (...) AND x > 0`)
+  // does not partial-match.
+  const inMatch = inner.match(/^(?:"((?:[^"]|"")*)"|(\w+))\s+IN\s*\((.+)\)\s*$/i);
   if (inMatch) {
     const column = inMatch[1] !== undefined ? inMatch[1].replace(/""/g, '"') : inMatch[2];
     const listBody = inMatch[3];

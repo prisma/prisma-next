@@ -66,6 +66,21 @@ describe('parseCheckConstraintDef', () => {
     const result = parseCheckConstraintDef("CHECK ((\"my-col\" IN ('a', 'b')))");
     expect(result).toEqual({ column: 'my-col', permittedValues: ['a', 'b'] });
   });
+
+  // Composite predicates: must NOT match either shape
+  it('returns undefined for a composite predicate with IN and AND (= ANY shape)', () => {
+    const result = parseCheckConstraintDef(
+      "CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text]) AND amount > 0))",
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it('returns undefined for a composite predicate with IN and AND (IN shape)', () => {
+    const result = parseCheckConstraintDef(
+      "CHECK ((status IN ('draft', 'published') AND amount > 0))",
+    );
+    expect(result).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
