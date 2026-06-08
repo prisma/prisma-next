@@ -5,8 +5,8 @@ dispatches. Design-of-record: [`../../design/graph-render-redesign.md`](../../de
 (§ Planes → convergence; § Geometry is configurable). Builds on the merged
 `render-redesign-core` line/plane/occlusion pipeline.
 
-Supersedes the obsolete `../converging-back-arcs/` slice (it targeted the deleted
-`migration-graph-layout.ts` / tee glyphs); its convergence outcome lives here.
+Absorbs convergence (once drafted as a separate bug-slice against the old
+`migration-graph-layout.ts` / tee renderer that #762 removed — that draft is deleted).
 
 ## Grounding (current code)
 
@@ -29,7 +29,7 @@ Supersedes the obsolete `../converging-back-arcs/` slice (it targeted the delete
 ### Pinned definition of "converged" (structural, design decision)
 
 The design doc states the convergence *rule* but has no worked example in the new
-corner model (the old `converging-back-arcs` ASCII used now-forbidden tees). Because
+corner model (the old tee-based draft used now-forbidden tees). Because
 the harness snapshots bytes automatically, the meaningful RED/GREEN signal is a
 **structural assertion**, not a hand-drawn glyph golden. "Converged" means:
 

@@ -12,6 +12,12 @@ ContractSpace aggregate and holds a multi-root / multi-tip / cyclic-tolerant
 golden-path mapper + dagre renderer on top of that source; it is related to,
 but not blocked by, the consolidation project (TML-2739).
 
+> **Current status & authoritative roadmap: [`plan.md`](./plan.md).** The renderer
+> was rebuilt on a line/plane/occlusion model (`render-redesign-core`, merged #762;
+> `render-redesign-geometry`, in progress). The numbered slices below are the older,
+> mostly-merged read-command-family track. Several fine-grained glyph-bug slices that
+> predated the rewrite have been deleted as obsolete — see `plan.md`.
+
 ## Slices
 
 1. **Redesign the Tier-3 renderer** — [`spec.md`](./spec.md). The condensed
