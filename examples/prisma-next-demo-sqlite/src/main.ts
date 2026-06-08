@@ -118,10 +118,10 @@ async function main() {
           'Transaction rolled back:',
           txError instanceof Error ? txError.message : txError,
         );
-        const leftoverUser = await db.runtime().execute(
+        const leftoverUser = await runtime.execute(
           db.sql.user
             .select('id', 'email')
-            .where((f, fns) => fns.eq(f.email, email))
+            .where((f, fns) => fns.eq(f.id, id))
             .limit(1)
             .build(),
         );
