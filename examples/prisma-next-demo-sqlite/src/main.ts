@@ -13,6 +13,14 @@
  *                                          Build a `PreparedStatement` once and reuse it for
  *                                          each email — single lower(), single beforeCompile(),
  *                                          repeated execute()
+ * - add-posts <userId> <title> [...moreTitles]
+ *                                          Add posts to an existing user atomically via
+ *                                          db.transaction(). The transaction reads the current post
+ *                                          count (SQL builder aggregate) and only inserts (ORM
+ *                                          create) if the quota allows — otherwise throws
+ *                                          QuotaExceededError and rolls back. Prints created posts
+ *                                          on success; prints the rollback reason and the unchanged
+ *                                          count on quota violation.
  *
  * Each command opens a connection, runs the operation, prints the result as
  * JSON, and closes. Exits non-zero on usage errors or runtime failures.
@@ -26,6 +34,7 @@ import { db } from './prisma/db';
 import { insertUser } from './queries/dml-operations';
 import { getUserByEmailPrepared } from './queries/get-user-by-email-prepared';
 import { getUsers } from './queries/get-users';
+import { addPostsWithinQuota, QuotaExceededError } from './transactions/add-posts-within-quota';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
@@ -87,11 +96,37 @@ async function main() {
       }
       const results = await getUserByEmailPrepared(args);
       console.log(JSON.stringify(results, null, 2));
+    } else if (cmd === 'add-posts') {
+      const [userId, ...titles] = args;
+      if (!userId || titles.length === 0) {
+        console.error('Usage: pnpm start -- add-posts <userId> <title> [...moreTitles]');
+        process.exitCode = 1;
+        return;
+      }
+      try {
+        const result = await addPostsWithinQuota({ userId, titles });
+        console.log(JSON.stringify(result, null, 2));
+      } catch (txError) {
+        if (txError instanceof QuotaExceededError) {
+          console.error('Transaction rolled back:', txError.message);
+          const countRows = await runtime.execute(
+            db.sql.post
+              .select('postCount', (_f, fns) => fns.count())
+              .where((f, fns) => fns.eq(f.userId, userId))
+              .build(),
+          );
+          console.log('Post count after rollback:', countRows[0]?.postCount);
+          process.exitCode = 1;
+          return;
+        }
+        throw txError;
+      }
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | repo-user <id> | repo-user-posts <id> [limit] | ' +
           'repo-create-user <id> <email> <displayName> | insert-user <email> <displayName> | ' +
-          'user-by-email-prepared <email> [<email> ...]]',
+          'user-by-email-prepared <email> [<email> ...] | ' +
+          'add-posts <userId> <title> [...moreTitles]]',
       );
       process.exitCode = 1;
       return;

@@ -57,6 +57,11 @@ the removed standalone createTable function to this.createTable({...})
 (the base-class method introduced by the planner-create-table-adopts-ddl-ast
 refactor). The ops.json snapshots are regenerated accordingly. No
 user-side action required.
+
+TML-2843: `@prisma-next/sqlite` gained an additive facade transaction
+API (`db.transaction(async (tx) => …)`) demonstrated in
+`examples/prisma-next-demo-sqlite`. No user action required; incidental
+substrate diff.
 -->
 
 # 0.12 → 0.13 — User upgrade instructions

@@ -790,6 +790,53 @@ describe('withTransaction', () => {
     );
   });
 
+  it('rejects escaped result with TRANSACTION_CLOSED without consulting the driver', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    let driverBodyEntered = false;
+    driver.__spies.transactionExecute.mockImplementationOnce(async function* () {
+      driverBodyEntered = true;
+      yield { id: 99 };
+    });
+
+    const escaped = await withTransaction(runtime, async (tx) => {
+      return { result: tx.execute(createRawExecutionPlan()) };
+    });
+
+    await expect(escaped.result.toArray()).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_CLOSED',
+    });
+    expect(driverBodyEntered).toBe(false);
+  });
+
+  it('rejects partially-consumed escaped iterator on resume without consulting the driver', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    let driverNextCallCount = 0;
+    driver.__spies.transactionExecute.mockImplementationOnce(async function* () {
+      driverNextCallCount++;
+      yield { id: 1 };
+      driverNextCallCount++;
+      yield { id: 2 };
+    });
+
+    // Escape a partially-consumed iterator: pull the first row inside the transaction, then let it commit.
+    const escapedIterator = await withTransaction(runtime, async (tx) => {
+      const iter = tx.execute(createRawExecutionPlan())[Symbol.asyncIterator]();
+      await iter.next(); // pulls row 1 — driver body entered, driverNextCallCount === 1
+      return iter;
+    });
+
+    const countAfterPartialConsumption = driverNextCallCount;
+
+    // Now the transaction is committed (invalidated). Calling next() must throw TRANSACTION_CLOSED,
+    // not advance into the driver for the second row.
+    await expect(escapedIterator.next()).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_CLOSED',
+    });
+    expect(driverNextCallCount).toBe(countAfterPartialConsumption);
+  });
+
   it('sets invalidated flag after commit', async () => {
     const { runtime } = createRuntimeForTransaction();
     let txRef: { invalidated: boolean } | undefined;
