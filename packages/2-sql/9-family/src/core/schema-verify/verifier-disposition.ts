@@ -47,7 +47,7 @@ export function classifySqlVerifierIssueKind(kind: SchemaIssue['kind']): Verifie
       return 'declaredMissing';
     case 'check_removed':
       return 'extraAuxiliary';
-    // Provisional classifications for slice 4 to confirm when the verifier emits these kinds.
+    // Provisional classifications; confirm once the verifier emits these RLS issue kinds.
     case 'rls_policy_tampered':
       return 'valueDrift';
     case 'rls_policy_renamed':
