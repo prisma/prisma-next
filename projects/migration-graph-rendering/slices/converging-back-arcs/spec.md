@@ -1,5 +1,14 @@
 # Slice: Converging back-arcs (multiple rollbacks to one target)
 
+> **Superseded by `render-redesign-geometry`.** This spec targets the old
+> `renderMigrationGraphTree` / `applySkipRollbackRouting` layout in
+> `migration-graph-layout.ts` and tee glyphs (`┬ ┴ ┼`) — all removed by the
+> line/plane/occlusion rewrite in `render-redesign-core`. The user-facing
+> outcome (N rollbacks to one target collapse into one shared back-lane) is
+> carried forward as the convergence scope of
+> [`../render-redesign-geometry/spec.md`](../render-redesign-geometry/spec.md).
+> Retained for the repro and root-cause history below.
+
 Tracking ticket: **[TML-2793](https://linear.app/prisma-company/issue/TML-2793)**.
 Follow-up to [TML-2773](https://linear.app/prisma-company/issue/TML-2773).
 
