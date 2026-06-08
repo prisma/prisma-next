@@ -389,7 +389,7 @@ function assertGreenOnlyOnPath(golden: ScenarioGolden, rendered: string): void {
 
 const ALL_GOLDENS: readonly ScenarioGolden[] = [...GOLDENS, ...BACKLINK_GOLDENS];
 
-describe('golden-pipeline: render(input) === golden (RED baseline — expected to fail on current renderer)', () => {
+describe('golden-pipeline: render(input) === golden (structure + colour, labels stripped)', () => {
   for (const golden of ALL_GOLDENS) {
     const id = goldenId(golden);
     describe(id, () => {
