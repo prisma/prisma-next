@@ -379,6 +379,83 @@ describe('generic extension-block printer (P2)', () => {
     });
   });
 
+  describe('value parameter rendering edges', () => {
+    function astWith(parameters: PslExtensionBlock['parameters']) {
+      const block: PslExtensionBlock = {
+        kind: 'fixture-policy-select',
+        name: 'EdgeCase',
+        parameters,
+        span: STUB_SPAN,
+      };
+      return {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [
+          {
+            kind: 'namespace' as const,
+            name: UNSPECIFIED_PSL_NAMESPACE_ID,
+            models: [],
+            enums: [],
+            compositeTypes: [],
+            extensionBlocks: [block],
+            span: STUB_SPAN,
+          },
+        ],
+        span: STUB_SPAN,
+      };
+    }
+
+    it('passes a value literal through verbatim when no codecLookup is supplied', () => {
+      const output = printPslFromAst(
+        astWith({ target: refParam('Post'), using: valueParam('"unverified"') }),
+        { pslBlockDescriptors: assembled.pslBlockDescriptors },
+      );
+      expect(output).toContain('using = "unverified"');
+    });
+
+    it('throws when a value literal is not valid JSON', () => {
+      expect(() =>
+        printPslFromAst(astWith({ target: refParam('Post'), using: valueParam('not json {') }), {
+          pslBlockDescriptors: assembled.pslBlockDescriptors,
+          codecLookup,
+        }),
+      ).toThrow('not valid JSON');
+    });
+
+    it('throws when an AST parameter kind does not match its descriptor kind', () => {
+      const cases: Array<{ params: PslExtensionBlock['parameters']; expected: string }> = [
+        { params: { target: optionParam('Post'), using: valueParam('"x"') }, expected: 'ref' },
+        { params: { target: refParam('Post'), using: refParam('x') }, expected: 'value' },
+        {
+          params: { target: refParam('Post'), as: refParam('x'), using: valueParam('"x"') },
+          expected: 'option',
+        },
+        {
+          params: { target: refParam('Post'), roles: refParam('x'), using: valueParam('"x"') },
+          expected: 'list',
+        },
+      ];
+      for (const { params, expected } of cases) {
+        expect(() =>
+          printPslFromAst(astWith(params), {
+            pslBlockDescriptors: assembled.pslBlockDescriptors,
+            codecLookup,
+          }),
+        ).toThrow(`descriptor is "${expected}"`);
+      }
+    });
+
+    it('resolves descriptors registered under a nested namespace', () => {
+      const nested = { authNs: assembled.pslBlockDescriptors };
+      const output = printPslFromAst(
+        astWith({ target: refParam('Post'), using: valueParam('"true"') }),
+        { pslBlockDescriptors: nested, codecLookup },
+      );
+      expect(output).toContain('policy_select EdgeCase {');
+      expect(output).toContain('target = Post');
+    });
+  });
+
   describe('block with unregistered discriminator', () => {
     it('throws naming the unrecognised discriminator', () => {
       const block: PslExtensionBlock = {
