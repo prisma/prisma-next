@@ -1,5 +1,11 @@
 export { PostgresEnumType, type PostgresEnumTypeInput } from '../core/postgres-enum-type';
 export {
+  PostgresRlsPolicy,
+  type PostgresRlsPolicyInput,
+  type RlsPolicyOperation,
+} from '../core/postgres-rls-policy';
+export { PostgresRole, type PostgresRoleInput } from '../core/postgres-role';
+export {
   PostgresSchema,
   PostgresUnboundSchema,
   postgresCreateNamespace,

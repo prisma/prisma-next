@@ -11,6 +11,8 @@ import {
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
+import { PostgresRlsPolicy, type PostgresRlsPolicyInput } from './postgres-rls-policy';
+import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import { escapeLiteral } from './sql-utils';
 
 export interface PostgresSchemaInput {
@@ -18,6 +20,8 @@ export interface PostgresSchemaInput {
   readonly entries: {
     readonly table: Record<string, StorageTable | StorageTableInput>;
     readonly type: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
+    readonly role?: Record<string, PostgresRole | PostgresRoleInput>;
+    readonly rlsPolicy?: Record<string, PostgresRlsPolicy | PostgresRlsPolicyInput>;
   };
 }
 
@@ -50,6 +54,8 @@ export class PostgresSchema extends NamespaceBase {
   readonly entries: Readonly<{
     readonly table: Readonly<Record<string, StorageTable>>;
     readonly type: Readonly<Record<string, PostgresEnumType>>;
+    readonly role: Readonly<Record<string, PostgresRole>>;
+    readonly rlsPolicy: Readonly<Record<string, PostgresRlsPolicy>>;
   }>;
 
   constructor(input: PostgresSchemaInput) {
@@ -69,6 +75,22 @@ export class PostgresSchema extends NamespaceBase {
           Object.entries(input.entries.type).map(([k, v]) => [
             k,
             v instanceof PostgresEnumType ? v : new PostgresEnumType(v as PostgresEnumTypeInput),
+          ]),
+        ),
+      ),
+      role: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.role ?? {}).map(([k, v]) => [
+            k,
+            v instanceof PostgresRole ? v : new PostgresRole(v as PostgresRoleInput),
+          ]),
+        ),
+      ),
+      rlsPolicy: Object.freeze(
+        Object.fromEntries(
+          Object.entries(input.entries.rlsPolicy ?? {}).map(([k, v]) => [
+            k,
+            v instanceof PostgresRlsPolicy ? v : new PostgresRlsPolicy(v as PostgresRlsPolicyInput),
           ]),
         ),
       ),
