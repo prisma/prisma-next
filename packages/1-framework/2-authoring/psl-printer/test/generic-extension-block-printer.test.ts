@@ -203,6 +203,132 @@ describe('generic extension-block printer (P2)', () => {
     });
   });
 
+  // The codec — not the captured raw text — owns the serialized form of a value
+  // parameter. This is the print-back mirror of Slice 1's parse-side validator
+  // (`decodeJson(JSON.parse(raw))`): printing runs the value through the codec's
+  // JSON medium, `JSON.stringify(encodeJson(decodeJson(JSON.parse(raw))))`. The
+  // identity stub codec above can't distinguish "echo the raw" from "round-trip
+  // through the codec", so this block uses a codec whose encodeJson produces a
+  // different JSON shape than the raw input — a value that came from an IR/value
+  // source rather than parsed text would be serialized the same way.
+  describe('value parameter serialized through the codec (not echoed from raw)', () => {
+    class NumericExpressionCodec extends CodecImpl<
+      typeof FIXTURE_POLICY_CODEC_ID,
+      readonly ['numeric'],
+      number,
+      number
+    > {
+      async encode(value: number, _ctx: CodecCallContext): Promise<number> {
+        return value;
+      }
+      async decode(wire: number, _ctx: CodecCallContext): Promise<number> {
+        return wire;
+      }
+      // A quoted "42" or a bare 42 both decode to the number 42 …
+      decodeJson(json: JsonValue): number {
+        return typeof json === 'number' ? json : Number(json);
+      }
+      // … and re-encode to a bare JSON number, which prints unquoted.
+      encodeJson(value: number): JsonValue {
+        return value;
+      }
+    }
+
+    class NumericExpressionDescriptor extends CodecDescriptorImpl<void> {
+      override readonly codecId = FIXTURE_POLICY_CODEC_ID as typeof FIXTURE_POLICY_CODEC_ID;
+      override readonly traits = ['numeric'] as const;
+      override readonly targetTypes = ['numeric'] as const;
+      override readonly paramsSchema = voidParamsSchema;
+      override factory(): (ctx: CodecInstanceContext) => NumericExpressionCodec {
+        return () => new NumericExpressionCodec(this);
+      }
+    }
+
+    const numericCodecLookup = extractCodecLookup([
+      {
+        id: 'fixture-policy-ext',
+        types: { codecTypes: { codecDescriptors: [new NumericExpressionDescriptor()] } },
+      },
+    ]);
+
+    function printUsing(raw: string): string {
+      const block: PslExtensionBlock = {
+        kind: 'fixture-policy-select',
+        name: 'NumericPolicy',
+        parameters: {
+          target: refParam('Post'),
+          using: valueParam(raw),
+        },
+        span: STUB_SPAN,
+      };
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [
+          {
+            kind: 'namespace' as const,
+            name: UNSPECIFIED_PSL_NAMESPACE_ID,
+            models: [],
+            enums: [],
+            compositeTypes: [],
+            extensionBlocks: [block],
+            span: STUB_SPAN,
+          },
+        ],
+        span: STUB_SPAN,
+      };
+      return printPslFromAst(ast, {
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
+        codecLookup: numericCodecLookup,
+      });
+    }
+
+    it('renders the codec-encoded literal, dropping quotes the codec strips', () => {
+      // raw captured as a quoted string; the codec decodes it to a number and
+      // re-encodes to a bare number — so the printed literal is unquoted.
+      const output = printUsing('"42"');
+      expect(output).toContain('using = 42');
+      expect(output).not.toContain('using = "42"');
+    });
+
+    it('renders a value whose JSON form is already canonical unchanged', () => {
+      const output = printUsing('42');
+      expect(output).toContain('using = 42');
+    });
+
+    it('throws when the value parameter references an unregistered codec', () => {
+      const block: PslExtensionBlock = {
+        kind: 'fixture-policy-select',
+        name: 'NumericPolicy',
+        parameters: { target: refParam('Post'), using: valueParam('42') },
+        span: STUB_SPAN,
+      };
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [
+          {
+            kind: 'namespace' as const,
+            name: UNSPECIFIED_PSL_NAMESPACE_ID,
+            models: [],
+            enums: [],
+            compositeTypes: [],
+            extensionBlocks: [block],
+            span: STUB_SPAN,
+          },
+        ],
+        span: STUB_SPAN,
+      };
+      const emptyCodecLookup = extractCodecLookup([]);
+      expect(() =>
+        printPslFromAst(ast, {
+          pslBlockDescriptors: assembled.pslBlockDescriptors,
+          codecLookup: emptyCodecLookup,
+        }),
+      ).toThrow(FIXTURE_POLICY_CODEC_ID);
+    });
+  });
+
   describe('block with unregistered discriminator', () => {
     it('throws naming the unrecognised discriminator', () => {
       const block: PslExtensionBlock = {
