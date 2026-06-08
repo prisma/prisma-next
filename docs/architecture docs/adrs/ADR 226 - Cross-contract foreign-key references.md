@@ -84,7 +84,7 @@ The signal that a reference crosses a space boundary lives at the **import state
 
 In PSL, where there are no imports, the same distinction is carried by a colon prefix on the type:
 
-```
+```text
 type_ref ::= [ <space>: ] <namespace>. <name>
            | [ <space>: ] <name>
            | <name>
