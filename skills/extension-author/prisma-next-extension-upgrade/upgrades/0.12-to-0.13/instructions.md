@@ -28,6 +28,11 @@ TML-2838: vitest configs in `packages/3-extensions/postgres` and
 to the test worker forks to stop a V8 WASM-teardown crash on Linux CI.
 Test-harness only — no runtime, contract, or public-API change.
 Incidental substrate diff only.
+
+TML-2500 M4: `packages/3-extensions/supabase/README.md` link updated
+from the old project spec to the canonical ecosystem-extensions doc and
+ADR 226. Docs-only; no runtime, contract, or public-API change.
+Incidental substrate diff only.
 -->
 
 # 0.12 → 0.13 — Extension-author upgrade instructions
