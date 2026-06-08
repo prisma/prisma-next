@@ -25,12 +25,12 @@ function assertPostgresOp(
   }
 }
 
-export function renderOps(calls: readonly OpFactoryCall[], lower?: Lowerer): Op[] {
+export function renderOps(calls: readonly OpFactoryCall[], lowerer?: Lowerer): Op[] {
   return calls.map((c) => {
     const op = blindCast<
-      { toOp(lower?: Lowerer): ReturnType<OpFactoryCall['toOp']> },
+      { toOp(lowerer?: Lowerer): ReturnType<OpFactoryCall['toOp']> },
       'PG OpFactoryCall.toOp accepts an optional Lowerer; the framework interface omits it because not all targets need a lowerer — the PG target overrides with this extended signature'
-    >(c).toOp(lower);
+    >(c).toOp(lowerer);
     assertPostgresOp(op, c.factoryName);
     return op;
   });

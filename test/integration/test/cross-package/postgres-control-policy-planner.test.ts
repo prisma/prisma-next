@@ -3,9 +3,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -44,14 +42,7 @@ const RECONCILIATION_POLICY: MigrationOperationPolicy = {
 };
 
 const testAdapter = createPostgresAdapter();
-const planner = createPostgresMigrationPlanner({
-  lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
-    return testAdapter.lower(
-      ast as AnyQueryAst | PostgresDdlNode,
-      ctx as Parameters<typeof testAdapter.lower>[1],
-    );
-  },
-});
+const planner = createPostgresMigrationPlanner(testAdapter);
 
 const emptySchema: SqlSchemaIR = { tables: {} };
 

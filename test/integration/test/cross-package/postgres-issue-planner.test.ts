@@ -8,9 +8,7 @@ import {
   type SqlStorageInput,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { enumStorageCompoundKey } from '@prisma-next/target-postgres/enum-planning';
 import { planIssues } from '@prisma-next/target-postgres/issue-planner';
 import type { CreateTableCall } from '@prisma-next/target-postgres/op-factory-call';
@@ -25,14 +23,6 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
 const testAdapter = createPostgresAdapter();
-const testLower: Parameters<CreateTableCall['toOp']>[0] = {
-  lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
-    return testAdapter.lower(
-      ast as AnyQueryAst | PostgresDdlNode,
-      ctx as Parameters<typeof testAdapter.lower>[1],
-    );
-  },
-};
 
 function makeContract(
   overrides: {
@@ -932,7 +922,7 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
       const call = result.value.calls[0]!;
       expect(call.factoryName).toBe('createSchema');
-      const op = call.toOp(testLower);
+      const op = call.toOp(testAdapter);
       expect(op.execute?.[0]?.sql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
     });
   });

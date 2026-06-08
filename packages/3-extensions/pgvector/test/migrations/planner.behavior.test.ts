@@ -27,14 +27,7 @@ import pgvectorDescriptor from '../../src/exports/control';
 const testAdapter = createPostgresAdapter();
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
-  const planner = createPostgresMigrationPlanner({
-    lower(ast, ctx) {
-      return testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      );
-    },
-  });
+  const planner = createPostgresMigrationPlanner(testAdapter);
   const contract = createTestContract();
 
   it('returns empty plan when schema already satisfies contract (superset)', () => {
@@ -701,14 +694,7 @@ function planUserTableOperations(
     extraSchemaTables?: SqlSchemaIR['tables'];
   },
 ) {
-  const planner = createPostgresMigrationPlanner({
-    lower(ast, ctx) {
-      return testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      );
-    },
-  });
+  const planner = createPostgresMigrationPlanner(testAdapter);
   const contract = createTestContract({
     storage: {
       namespaces: {

@@ -44,23 +44,23 @@ export class TypeScriptRenderablePostgresMigration
   readonly #calls: readonly OpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #spaceId: string;
-  readonly #lower: Lowerer | undefined;
+  readonly #lowerer: Lowerer | undefined;
 
   constructor(
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
-    lower?: Lowerer,
+    lowerer?: Lowerer,
   ) {
     super();
     this.#calls = calls;
     this.#meta = meta;
     this.#spaceId = spaceId;
-    this.#lower = lower;
+    this.#lowerer = lowerer;
   }
 
   override get operations(): readonly Op[] {
-    return renderOps(this.#calls, this.#lower);
+    return renderOps(this.#calls, this.#lowerer);
   }
 
   override describe(): MigrationMeta {

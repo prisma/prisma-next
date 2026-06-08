@@ -49,14 +49,6 @@ import { createPostgresAdapter } from '../../src/core/adapter';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 const testAdapter = createPostgresAdapter();
-const testLower = {
-  lower(
-    ast: Parameters<typeof testAdapter.lower>[0],
-    ctx: Parameters<typeof testAdapter.lower>[1],
-  ) {
-    return testAdapter.lower(ast, ctx);
-  },
-};
 
 describe('renderOps', () => {
   it('lowers each variant via its pure factory, pinning id/operationClass/target.details', () => {
@@ -109,7 +101,7 @@ describe('renderOps', () => {
       new CreateSchemaCall('app'),
     ];
 
-    const ops = renderOps(calls, testLower);
+    const ops = renderOps(calls, testAdapter);
 
     const schemaObject = (objectType: string, name: string, table?: string) => ({
       schema: 'public',

@@ -3,7 +3,6 @@ import { contractToSchemaIR, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sq
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -85,14 +84,7 @@ const MIGRATION_PLAN_POLICY = {
 
 describe('PostgresMigrationPlanner - per-FK config combinations', () => {
   const testAdapter = createPostgresAdapter();
-  const planner = createPostgresMigrationPlanner({
-    lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
-      return testAdapter.lower(
-        ast as Parameters<typeof testAdapter.lower>[0],
-        ctx as Parameters<typeof testAdapter.lower>[1],
-      );
-    },
-  });
+  const planner = createPostgresMigrationPlanner(testAdapter);
 
   it('emits both FK constraints and FK indexes when constraint=true, index=true', () => {
     const contract = createFkTestContract({ constraint: true, index: true });

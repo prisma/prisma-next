@@ -10,7 +10,6 @@ import {
   type StorageColumn,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -88,14 +87,7 @@ function makeFrameworkComponents(
 
 describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
   it('inlines ops emitted by onFieldEvent after structural DDL', () => {
-    const planner = createPostgresMigrationPlanner({
-      lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
-        return testAdapter.lower(
-          ast as Parameters<typeof testAdapter.lower>[0],
-          ctx as Parameters<typeof testAdapter.lower>[1],
-        );
-      },
-    });
+    const planner = createPostgresMigrationPlanner(testAdapter);
 
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [
@@ -138,14 +130,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
   });
 
   it('does not fire when no codec has an onFieldEvent hook', () => {
-    const planner = createPostgresMigrationPlanner({
-      lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
-        return testAdapter.lower(
-          ast as Parameters<typeof testAdapter.lower>[0],
-          ctx as Parameters<typeof testAdapter.lower>[1],
-        );
-      },
-    });
+    const planner = createPostgresMigrationPlanner(testAdapter);
 
     const frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>> = [];
 
@@ -168,14 +153,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
   });
 
   it('produces byte-identical operations across re-emits (deterministic)', () => {
-    const planner = createPostgresMigrationPlanner({
-      lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
-        return testAdapter.lower(
-          ast as Parameters<typeof testAdapter.lower>[0],
-          ctx as Parameters<typeof testAdapter.lower>[1],
-        );
-      },
-    });
+    const planner = createPostgresMigrationPlanner(testAdapter);
 
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [

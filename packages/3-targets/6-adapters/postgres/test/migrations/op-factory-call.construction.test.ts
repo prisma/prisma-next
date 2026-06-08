@@ -6,7 +6,6 @@
  * lowering is covered in op-factory-call.lowering.test.ts.
  */
 
-import type { AnyQueryAst, DdlNode, LowererContext } from '@prisma-next/sql-relational-core/ast';
 import { col, fn, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   CreateSchemaCall,
@@ -17,14 +16,6 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../../src/core/adapter';
 
 const testAdapter = createPostgresAdapter();
-const testLower = {
-  lower(ast: AnyQueryAst | DdlNode, ctx: LowererContext<unknown>) {
-    return testAdapter.lower(
-      ast as Parameters<typeof testAdapter.lower>[0],
-      ctx as Parameters<typeof testAdapter.lower>[1],
-    );
-  },
-};
 
 describe('Postgres call classes - construction + toOp parity', () => {
   it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', () => {
@@ -35,7 +26,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     expect(call.operationClass).toBe('additive');
     expect(call.label).toBe('Create table "user"');
 
-    expect(call.toOp(testLower)).toMatchObject({
+    expect(call.toOp(testAdapter)).toMatchObject({
       id: 'table.user',
       operationClass: 'additive',
       target: {
@@ -67,7 +58,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
       [primaryKey(['tenant_id', 'id'])],
     );
 
-    const op = call.toOp(testLower);
+    const op = call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "public"."item" (\n' +
         '  "tenant_id" uuid NOT NULL,\n' +
@@ -81,7 +72,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
   it('CreateSchemaCall.toOp produces byte-identical SQL', () => {
     const call = new CreateSchemaCall('app');
 
-    const op = call.toOp(testLower);
+    const op = call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('CREATE SCHEMA IF NOT EXISTS "app"');
   });
 
@@ -90,7 +81,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
       col('id', 'bigint', { notNull: true, default: fn(`nextval('"user_id_seq"'::regclass)`) }),
     ]);
 
-    const op = call.toOp(testLower);
+    const op = call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "public"."user" (\n' +
         `  "id" bigint NOT NULL DEFAULT (nextval('"user_id_seq"'::regclass))\n` +
@@ -106,7 +97,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
       [primaryKey(['id'])],
     );
 
-    const op = call.toOp(testLower);
+    const op = call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "item" (\n' + '  "id" text NOT NULL,\n' + '  PRIMARY KEY ("id")\n' + ')',
     );

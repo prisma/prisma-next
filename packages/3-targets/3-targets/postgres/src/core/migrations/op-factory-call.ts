@@ -67,7 +67,7 @@ abstract class PostgresOpFactoryCallNode extends TsExpression implements Framewo
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract toOp(lower?: Lowerer): Op;
+  abstract toOp(lowerer?: Lowerer): Op;
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
@@ -195,10 +195,10 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(lower?: Lowerer): Op {
-    if (lower === undefined) {
+  toOp(lowerer?: Lowerer): Op {
+    if (lowerer === undefined) {
       throw new Error(
-        `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass a SqlControlFamilyInstance to createPostgresMigrationPlanner.`,
+        `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     const ddlNode = contractFreeDdl.createTable({
@@ -207,7 +207,7 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
       columns: this.columns,
       ...(this.constraints ? { constraints: this.constraints } : {}),
     });
-    const { sql } = lower.lower(ddlNode, { contract: {} });
+    const { sql } = lowerer.lower(ddlNode, { contract: {} });
     const schemaName = this.schemaName;
     const tableName = this.tableName;
     return {
@@ -930,14 +930,14 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(lower?: Lowerer): Op {
-    if (lower === undefined) {
+  toOp(lowerer?: Lowerer): Op {
+    if (lowerer === undefined) {
       throw new Error(
-        `CreateSchemaCall.toOp: a DDL lowerer is required on the Postgres planner path (schema "${this.schemaName}"). Pass a SqlControlFamilyInstance to createPostgresMigrationPlanner.`,
+        `CreateSchemaCall.toOp: a DDL lowerer is required on the Postgres planner path (schema "${this.schemaName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     const ddlNode = contractFreeDdl.createSchema({ schema: this.schemaName, ifNotExists: true });
-    const { sql } = lower.lower(ddlNode, { contract: {} });
+    const { sql } = lowerer.lower(ddlNode, { contract: {} });
     const schemaName = this.schemaName;
     return {
       id: `schema.${schemaName}`,

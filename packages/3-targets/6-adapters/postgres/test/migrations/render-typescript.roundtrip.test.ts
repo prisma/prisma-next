@@ -36,14 +36,6 @@ import { createPostgresAdapter } from '../../src/core/adapter';
 
 const execFileAsync = promisify(execFile);
 const testAdapter = createPostgresAdapter();
-const testLower = {
-  lower(
-    ast: Parameters<typeof testAdapter.lower>[0],
-    ctx: Parameters<typeof testAdapter.lower>[1],
-  ) {
-    return testAdapter.lower(ast, ctx);
-  },
-};
 const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const targetPostgresRoot = resolve(repoRoot, 'packages/3-targets/3-targets/postgres');
@@ -150,7 +142,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
       calls,
       META,
       APP_SPACE_ID,
-      testLower,
+      testAdapter,
     );
 
     const tsSource = rewriteImports(migration.renderTypeScript());
@@ -165,7 +157,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
     const ops = JSON.parse(opsJson);
 
-    const expected = JSON.parse(JSON.stringify(renderOps(calls, testLower)));
+    const expected = JSON.parse(JSON.stringify(renderOps(calls, testAdapter)));
     expect(ops).toEqual(expected);
   });
 
