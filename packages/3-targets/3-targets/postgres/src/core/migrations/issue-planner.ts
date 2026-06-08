@@ -151,7 +151,13 @@ function issueConflict(
 }
 
 function isMissing(issue: SchemaIssue): boolean {
-  if (issue.kind === 'enum_values_changed') return false;
+  if (
+    issue.kind === 'enum_values_changed' ||
+    issue.kind === 'rls_policy_renamed' ||
+    issue.kind === 'rls_policy_tampered' ||
+    issue.kind === 'rls_not_enabled'
+  )
+    return false;
   return issue.actual === undefined;
 }
 

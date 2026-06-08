@@ -144,7 +144,13 @@ function conflictKindForIssue(issue: SchemaIssue): SqlPlannerConflict['kind'] {
 }
 
 function issueLocation(issue: SchemaIssue): SqlPlannerConflictLocation | undefined {
-  if (issue.kind === 'enum_values_changed') return undefined;
+  if (
+    issue.kind === 'enum_values_changed' ||
+    issue.kind === 'rls_policy_renamed' ||
+    issue.kind === 'rls_policy_tampered' ||
+    issue.kind === 'rls_not_enabled'
+  )
+    return undefined;
   const location: {
     table?: string;
     column?: string;
@@ -189,7 +195,13 @@ function locationForCall(call: SqliteOpFactoryCall): SqlPlannerConflictLocation 
 }
 
 function isMissing(issue: SchemaIssue): boolean {
-  if (issue.kind === 'enum_values_changed') return false;
+  if (
+    issue.kind === 'enum_values_changed' ||
+    issue.kind === 'rls_policy_renamed' ||
+    issue.kind === 'rls_policy_tampered' ||
+    issue.kind === 'rls_not_enabled'
+  )
+    return false;
   return issue.actual === undefined;
 }
 
