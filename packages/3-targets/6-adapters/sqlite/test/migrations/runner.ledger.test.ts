@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { SqliteControlAdapter } from '../../src/core/control-adapter';
 import {
   contract,
+  controlAdapter,
   createLedgerTestPlan,
   createTestDatabase,
   emptySchema,
@@ -381,7 +382,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
   it('writes one synthesised ledger row with space for synth apply with a single synth edge', async () => {
     testDb = createTestDatabase();
     const { driver } = testDb;
-    const planner = sqliteTargetDescriptor.createPlanner(familyInstance);
+    const planner = sqliteTargetDescriptor.createPlanner(controlAdapter);
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
 
     const result = planner.plan({

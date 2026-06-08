@@ -60,8 +60,19 @@ import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
-const TARGET_MIGRATION_MODULE = '@prisma-next/postgres/migration';
-const RELATIONAL_CORE_CONTRACT_FREE = '@prisma-next/sql-relational-core/contract-free';
+// Single module specifier emitted in user-edited `migration.ts` imports. The
+// Postgres migration facade re-exports both the `*Call` factory names
+// (createTable / addColumn / …) and the contract-free DDL builders
+// (col / lit / fn / primaryKey / foreignKey / unique) from
+// sql-relational-core/contract-free. We emit imports against the facade,
+// not against the underlying sql-relational-core subpath, because user
+// projects depend on `@prisma-next/postgres` (a runtime dep of every
+// init-scaffolded project) — they do not depend on the internal
+// `@prisma-next/sql-relational-core` package, so an emitted
+// `import … from '@prisma-next/sql-relational-core/contract-free'` fails
+// ESM resolution at runtime in user migrations even though pnpm has the
+// transitive package on disk.
+const POSTGRES_MIGRATION_FACADE = '@prisma-next/postgres/migration';
 
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;
@@ -70,7 +81,7 @@ abstract class PostgresOpFactoryCallNode extends TsExpression implements Framewo
   abstract toOp(lowerer?: Lowerer): Op;
 
   importRequirements(): readonly ImportRequirement[] {
-    return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
+    return [{ moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: this.factoryName }];
   }
 
   protected freeze(): void {
@@ -252,13 +263,13 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
   override importRequirements(): readonly ImportRequirement[] {
     const req: ImportRequirement[] = [];
     if (needsColOrConstraintImport(this.columns)) {
-      req.push({ moduleSpecifier: RELATIONAL_CORE_CONTRACT_FREE, symbol: 'col' });
+      req.push({ moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: 'col' });
       for (const sym of defaultImportSymbols(this.columns)) {
-        req.push({ moduleSpecifier: RELATIONAL_CORE_CONTRACT_FREE, symbol: sym });
+        req.push({ moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: sym });
       }
     }
     for (const sym of constraintImportSymbols(this.constraints)) {
-      req.push({ moduleSpecifier: RELATIONAL_CORE_CONTRACT_FREE, symbol: sym });
+      req.push({ moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: sym });
     }
     return req;
   }
@@ -1006,7 +1017,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   override importRequirements(): readonly ImportRequirement[] {
     return [
-      { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: 'placeholder' },
+      { moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: 'placeholder' },
       {
         moduleSpecifier: './end-contract.json',
         symbol: 'endContract',

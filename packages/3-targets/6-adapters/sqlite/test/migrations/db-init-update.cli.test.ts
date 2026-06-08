@@ -21,6 +21,7 @@ import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   contract as appContract,
+  controlAdapter,
   createTestDatabase,
   familyInstance,
   frameworkComponents,
@@ -275,6 +276,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     const result = await executeDbInit({
       driver: testDb!.driver,
+      adapter: controlAdapter,
       familyInstance,
       contract: appContract,
       mode: 'apply',
@@ -323,6 +325,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     const initResult = await executeDbInit({
       driver: testDb!.driver,
+      adapter: controlAdapter,
       familyInstance,
       contract: appContract,
       mode: 'apply',
@@ -365,6 +368,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     const updateResult = await executeDbUpdate({
       driver: testDb!.driver,
+      adapter: controlAdapter,
       familyInstance,
       contract: appContract,
       mode: 'apply',
@@ -485,6 +489,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     const result = await executeDbInit({
       driver: testDb!.driver,
+      adapter: controlAdapter,
       familyInstance,
       contract: hookedAppContract,
       mode: 'apply',
@@ -526,6 +531,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     const initResult = await executeDbInit({
       driver: testDb!.driver,
+      adapter: controlAdapter,
       familyInstance,
       contract: appContract,
       mode: 'apply',
@@ -564,6 +570,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
     // short-circuits when n=1.
     const updateResult = await executeDbUpdate({
       driver: testDb!.driver,
+      adapter: controlAdapter,
       familyInstance,
       contract: appContract,
       mode: 'apply',
@@ -594,6 +601,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     const initResult = await executeDbInit({
       driver: testDb!.driver,
+      adapter: controlAdapter,
       familyInstance,
       contract: appContract,
       mode: 'apply',
@@ -639,6 +647,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     const updateResult = await executeDbUpdate({
       driver: testDb!.driver,
+      adapter: controlAdapter,
       familyInstance,
       contract: appContract,
       mode: 'apply',

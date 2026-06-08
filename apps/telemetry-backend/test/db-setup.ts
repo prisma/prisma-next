@@ -15,16 +15,14 @@ const frameworkComponents = [
   postgresDriverDescriptor,
 ] as const;
 
-function createFamilyInstance() {
-  return sqlFamilyDescriptor.create(
-    createControlStack({
-      family: sqlFamilyDescriptor,
-      target: postgresTargetDescriptor,
-      adapter: postgresAdapterDescriptor,
-      driver: postgresDriverDescriptor,
-      extensionPacks: [],
-    }),
-  );
+function createTestControlStack() {
+  return createControlStack({
+    family: sqlFamilyDescriptor,
+    target: postgresTargetDescriptor,
+    adapter: postgresAdapterDescriptor,
+    driver: postgresDriverDescriptor,
+    extensionPacks: [],
+  });
 }
 
 export async function resetTelemetrySchema(connectionString: string): Promise<void> {
@@ -39,9 +37,12 @@ export async function resetTelemetrySchema(connectionString: string): Promise<vo
     await driver.query('drop schema if exists prisma_contract cascade');
     await driver.query('create schema public');
 
-    const familyInstance = createFamilyInstance();
+    const controlStack = createTestControlStack();
+    const familyInstance = sqlFamilyDescriptor.create(controlStack);
+    const adapter = postgresAdapterDescriptor.create(controlStack);
     const result = await executeDbInit({
       driver,
+      adapter,
       familyInstance,
       contract: familyInstance.deserializeContract(contractJson),
       mode: 'apply',
