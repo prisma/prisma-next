@@ -4,7 +4,7 @@
 
 - **M1: ✅ MERGED (PR #745).** Storage IR carrier + aggregate-load checks.
 - **M2: ✅ MERGED (PR #752).** TS brands + PSL grammar + non-navigable cross-space relation + supabase `/contract` handles + CodeRabbit hardening.
-- **M3a: ✅ COMPLETE (branch `tml-2500-m3-planner-verifier`, PR opening).** All 4 dispatches
+- **M3a: ✅ MERGED (PR #756).** All 4 dispatches
   SATISFIED, trace backstop green (13 cumulative dispatches across M1+M2+M3a), full gate clean.
   Delivered:
   - **M3a.1** PSL aggregate resolution at the CLI loader (resolves cross-space FK `tableName` from
@@ -20,7 +20,7 @@
     cross-schema FK, asserts `confdeltype='c'`, runs `dbVerify` zero issues. Plus a 6-line
     `validate-domain.ts` fix for a pre-existing M2.2 gap (cross-space relations were tripping
     `validateRelationTargets` because no prior test deserialized a cross-space contract).
-- **NEXT — M3b (separate PR, opens after M3a merges).** Walking-skeleton FK wiring +
+- **M3b: ✅ MERGED (PR #765).** Walking-skeleton FK wiring +
   cascade-delete hermetic test + `BuiltStorageTables.spaceId` type-surface cleanup. Scope is
   recorded in `slices/M3a/plan.md` § Open items.
 
