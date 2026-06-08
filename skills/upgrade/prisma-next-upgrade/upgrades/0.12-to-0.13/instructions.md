@@ -50,6 +50,13 @@ dependabot/runtime-deps (PR #761): bumps react 19.2.6→19.2.7, vitest
 8.0.15→8.0.16, lucide-react 1.16.0→1.17.0, @prisma/dev 0.24.8→0.24.9,
 mongodb-memory-server 11.1.0→11.2.0. Touches examples/ only via
 package.json version fields; no runtime, contract, or public-API change.
+
+TML-2838: regenerates example-app migration snapshots via pnpm
+fixtures:emit. The prisma-next-demo initial migration was updated from
+the removed standalone createTable function to this.createTable({...})
+(the base-class method introduced by the planner-create-table-adopts-ddl-ast
+refactor). The ops.json snapshots are regenerated accordingly. No
+user-side action required.
 -->
 
 # 0.12 → 0.13 — User upgrade instructions

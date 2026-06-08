@@ -1,10 +1,13 @@
 #!/usr/bin/env -S node
 import {
   addForeignKey,
+  col,
   createIndex,
-  createTable,
+  fn,
+  lit,
   Migration,
   MigrationCLI,
+  primaryKey,
   rawSql,
 } from '@prisma-next/target-postgres/migration';
 
@@ -71,72 +74,54 @@ export default class M extends Migration {
           },
         ],
       }),
-      createTable('public', 'bug', [
-        { name: 'severity', typeSql: 'text', defaultSql: '', nullable: false },
-        { name: 'stepsToRepro', typeSql: 'text', defaultSql: '', nullable: true },
-      ]),
-      createTable('public', 'feature', [
-        { name: 'priority', typeSql: 'text', defaultSql: '', nullable: false },
-        { name: 'targetRelease', typeSql: 'text', defaultSql: '', nullable: true },
-      ]),
-      createTable(
-        'public',
-        'post',
-        [
-          {
-            name: 'createdAt',
-            typeSql: 'timestamptz',
-            defaultSql: 'DEFAULT (now())',
-            nullable: false,
-          },
-          { name: 'embedding', typeSql: 'vector(1536)', defaultSql: '', nullable: true },
-          { name: 'id', typeSql: 'character(36)', defaultSql: '', nullable: false },
-          { name: 'title', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'userId', typeSql: 'text', defaultSql: '', nullable: false },
+      this.createTable({
+        schema: 'public',
+        table: 'bug',
+        columns: [col('severity', 'text', { notNull: true }), col('stepsToRepro', 'text')],
+      }),
+      this.createTable({
+        schema: 'public',
+        table: 'feature',
+        columns: [col('priority', 'text', { notNull: true }), col('targetRelease', 'text')],
+      }),
+      this.createTable({
+        schema: 'public',
+        table: 'post',
+        columns: [
+          col('createdAt', 'timestamptz', { notNull: true, default: fn('now()') }),
+          col('embedding', 'vector(1536)'),
+          col('id', 'character(36)', { notNull: true }),
+          col('title', 'text', { notNull: true }),
+          col('userId', 'text', { notNull: true }),
         ],
-        { columns: ['id'] },
-      ),
-      createTable(
-        'public',
-        'task',
-        [
-          {
-            name: 'createdAt',
-            typeSql: 'timestamptz',
-            defaultSql: 'DEFAULT (now())',
-            nullable: false,
-          },
-          { name: 'description', typeSql: 'text', defaultSql: '', nullable: true },
-          { name: 'id', typeSql: 'character(36)', defaultSql: '', nullable: false },
-          {
-            name: 'status',
-            typeSql: 'text',
-            defaultSql: "DEFAULT 'open'",
-            nullable: false,
-          },
-          { name: 'title', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'type', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'userId', typeSql: 'text', defaultSql: '', nullable: false },
+        constraints: [primaryKey(['id'])],
+      }),
+      this.createTable({
+        schema: 'public',
+        table: 'task',
+        columns: [
+          col('createdAt', 'timestamptz', { notNull: true, default: fn('now()') }),
+          col('description', 'text'),
+          col('id', 'character(36)', { notNull: true }),
+          col('status', 'text', { notNull: true, default: lit('open') }),
+          col('title', 'text', { notNull: true }),
+          col('type', 'text', { notNull: true }),
+          col('userId', 'text', { notNull: true }),
         ],
-        { columns: ['id'] },
-      ),
-      createTable(
-        'public',
-        'user',
-        [
-          { name: 'address', typeSql: 'jsonb', defaultSql: '', nullable: true },
-          {
-            name: 'createdAt',
-            typeSql: 'timestamptz',
-            defaultSql: 'DEFAULT (now())',
-            nullable: false,
-          },
-          { name: 'email', typeSql: 'text', defaultSql: '', nullable: false },
-          { name: 'id', typeSql: 'character(36)', defaultSql: '', nullable: false },
-          { name: 'kind', typeSql: '"user_type"', defaultSql: '', nullable: false },
+        constraints: [primaryKey(['id'])],
+      }),
+      this.createTable({
+        schema: 'public',
+        table: 'user',
+        columns: [
+          col('address', 'jsonb'),
+          col('createdAt', 'timestamptz', { notNull: true, default: fn('now()') }),
+          col('email', 'text', { notNull: true }),
+          col('id', 'character(36)', { notNull: true }),
+          col('kind', '"user_type"', { notNull: true }),
         ],
-        { columns: ['id'] },
-      ),
+        constraints: [primaryKey(['id'])],
+      }),
       addForeignKey('public', 'post', {
         name: 'post_userId_fkey',
         columns: ['userId'],
