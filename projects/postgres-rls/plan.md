@@ -1,7 +1,7 @@
 # postgres-rls — Plan
 
 **Spec:** `projects/postgres-rls/spec.md`
-**Linear Project:** [Supabase Integration](https://linear.app/prisma-company/issue/TML-2503) · project issue [TML-2501](https://linear.app/prisma-company/issue/TML-2501)
+**Linear Project:** [Postgres RLS](https://linear.app/prisma-company/project/postgres-rls-b7329340dbb2) · project issue [TML-2501](https://linear.app/prisma-company/issue/TML-2501) · parent umbrella [Supabase Integration](https://linear.app/prisma-company/project/supabase-integration-08e7667f5de4)
 
 ## At a glance
 
@@ -64,4 +64,4 @@ The only hard constraint is **IR-first** (spec transitional-shape): every other 
 
 **Roles as references (cross-cutting through slices 1–2 and 4).** `roles = [anon, …]` are static refs to declared `role` entities, not strings — so slice 1 must register `PostgresRole` as a `role` entity kind (not just an IR class) for refs to bind, slice 2 must wire cross-space role-ref resolution (the substrate defers cross-space enforcement to its first consumer — us), and slice 4's verifier carries the runtime `pg_roles` existence check (`missing_role`). The authoring-time resolution (does `anon` name a declared role?) and the verify-time check (does it exist in the database?) are distinct; both are in scope, in different slices. This does not change the diamond — it sharpens slice 1 and slice 2 scope.
 
-**Linear sync:** the four slice issues (TML-2868 → TML-2869 ∥ TML-2870 → TML-2871) are created under the Supabase Integration project, related to TML-2501, with blocking relations matching the diamond (2 & 3 blocked by 1; 4 blocked by 2 & 3). Created 2026-06-08 after operator plan validation.
+**Linear sync:** the project issue TML-2501 and the four slice issues (TML-2868 → TML-2869 ∥ TML-2870 → TML-2871) live in the dedicated [Postgres RLS](https://linear.app/prisma-company/project/postgres-rls-b7329340dbb2) Linear project (decomposed from the Supabase Integration umbrella), with blocking relations matching the diamond (2 & 3 blocked by 1; 4 blocked by 2 & 3). Slice issues created 2026-06-08 after operator plan validation; moved into the dedicated project 2026-06-08.

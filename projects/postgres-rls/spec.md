@@ -113,7 +113,7 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 
 ## References
 
-- Linear: [TML-2501](https://linear.app/prisma-company/issue/TML-2501) (Backlog → starting). Umbrella project: [Supabase Integration](https://linear.app/prisma-company/issue/TML-2503).
+- Linear project: [Postgres RLS](https://linear.app/prisma-company/project/postgres-rls-b7329340dbb2) — dedicated project holding the project issue [TML-2501](https://linear.app/prisma-company/issue/TML-2501) and the four slice issues (TML-2868–2871). Decomposed from the parent umbrella project [Supabase Integration](https://linear.app/prisma-company/project/supabase-integration-08e7667f5de4).
 - Reconciliation (stale-spec → landed-code map): [`specs/reconciliation-2026-06-08.md`](specs/reconciliation-2026-06-08.md).
 - Project ADR: [`specs/adr-content-addressed-policy-names.md`](specs/adr-content-addressed-policy-names.md) (promote at close-out).
 - Umbrella decisions consumed: A1–A5/A8 (TS surface), B1–B6 (PSL surface), C3/C4/C5/C9–C11, offcuts OC1–OC4 — [`../supabase-integration/decisions.md`](../supabase-integration/decisions.md).
