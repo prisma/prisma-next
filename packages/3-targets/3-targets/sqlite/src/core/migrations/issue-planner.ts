@@ -277,6 +277,10 @@ function sqliteDefaultToDdlColumnDefault(
     case 'literal':
       return new LiteralColumnDefault(columnDefault.value);
     case 'function':
+      // `autoincrement()` is not a DEFAULT clause — SQLite encodes it as
+      // `INTEGER PRIMARY KEY AUTOINCREMENT` inline on the column. Skip it
+      // here; the renderer also has a defensive guard for the same case.
+      if (columnDefault.expression === 'autoincrement()') return undefined;
       return new FunctionColumnDefault(columnDefault.expression);
   }
 }
@@ -298,6 +302,12 @@ export function tableToDdlParts(
       storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
     );
     if (inlineAutoincrement) {
+      // `DdlColumn` has no SQLite-specific autoincrement flag, so the full
+      // `PRIMARY KEY AUTOINCREMENT` clause is embedded in the `type` string.
+      // The DDL renderer (`ddl-renderer.ts`) substring-detects `AUTOINCREMENT`
+      // to suppress the normal NOT NULL / PRIMARY KEY / DEFAULT clause rendering
+      // and emit the entire type string verbatim. Both sites must stay in sync.
+      // The structural fix (a SQLite-specific column option) is tracked in TML-2866.
       return new DdlColumn({ name, type: `${typeSql} PRIMARY KEY AUTOINCREMENT` });
     }
     const colDefault = sqliteDefaultToDdlColumnDefault(column.default);

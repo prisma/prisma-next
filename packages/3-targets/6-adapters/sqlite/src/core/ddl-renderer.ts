@@ -82,16 +82,28 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
   // Postgres renderer, which uses ctx.nativeType to emit JSON casts.
   literal(node: LiteralColumnDefault, _ctx): string {
     const { value } = node;
+    if (value instanceof Date) {
+      return `DEFAULT '${escapeLiteral(value.toISOString())}'`;
+    }
     if (typeof value === 'string') {
       return `DEFAULT '${escapeLiteral(value)}'`;
     }
-    if (typeof value === 'number' || typeof value === 'boolean') {
+    if (typeof value === 'number') {
+      return `DEFAULT ${String(value)}`;
+    }
+    if (typeof value === 'boolean') {
+      // SQLite has no boolean type; store as 0/1 to match the pre-slice format.
+      return `DEFAULT ${value ? '1' : '0'}`;
+    }
+    if (typeof value === 'bigint') {
+      // Defensive: bigint is not in ColumnDefaultLiteralInputValue but guard
+      // against JSON.stringify throwing if one ever reaches this path.
       return `DEFAULT ${String(value)}`;
     }
     if (value === null) {
       return 'DEFAULT NULL';
     }
-    return `DEFAULT '${JSON.stringify(value)}'`;
+    return `DEFAULT '${escapeLiteral(JSON.stringify(value))}'`;
   },
   function(node: FunctionColumnDefault, _ctx): string {
     if (node.expression === 'autoincrement()') {
@@ -102,6 +114,12 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
 };
 
 function renderColumn(column: DdlColumn): string {
+  // The `tableToDdlParts` helper in issue-planner.ts encodes the
+  // `INTEGER PRIMARY KEY AUTOINCREMENT` inline column definition directly into
+  // `DdlColumn.type` (rather than setting a column-level flag) because
+  // `DdlColumn` has no SQLite-specific autoincrement field. Both sites must
+  // stay in sync: when one changes the encoded string the other must change
+  // the detection. The structural fix is tracked in TML-2866.
   if (column.type.includes('AUTOINCREMENT')) {
     return `${quoteIdentifier(column.name)} ${column.type}`;
   }
