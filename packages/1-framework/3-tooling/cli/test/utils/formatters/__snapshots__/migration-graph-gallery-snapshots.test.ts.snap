@@ -255,6 +255,82 @@ exports[`migration-graph scenario gallery > verbatim ANSI snapshots > rollback-a
 [92m○[39m     ∅"
 `;
 
+exports[`migration-graph scenario gallery > verbatim ANSI snapshots > rollback-converge-2 > rollback-converge-2:arc-1 1`] = `
+"[92m○[39m[92m─[39m[92m─[39m[92m─[39m[92m╮[39m   rcv2_d
+[2m│[22m   [92m│[39m[92m↓[39m  20260606T1752_rollback_d_to_a   rcv2_d → rcv2_a  ↑ will run
+[2m│[22m[2m↑[22m  [92m│[39m   [2m20260606T1751_step3[22m             [2mrcv2_c[22m [2m→[22m [2mrcv2_d[22m
+[2m○[22m[2m─[22m[2m╮[22m [92m│[39m   [2mrcv2_c[22m
+[2m│[22m [2m│[22m[2m↓[22m[92m│[39m   [2m20260606T1753_rollback_c_to_a[22m   [2mrcv2_c[22m [2m→[22m [2mrcv2_a[22m
+[2m│[22m[2m↑[22m[2m│[22m [92m│[39m   [2m20260606T1750_step2[22m             [2mrcv2_b[22m [2m→[22m [2mrcv2_c[22m
+[2m○[22m [2m│[22m [92m│[39m   [2mrcv2_b[22m
+[2m│[22m[2m↑[22m[2m│[22m [92m│[39m   [2m20260606T1749_step1[22m             [2mrcv2_a[22m [2m→[22m [2mrcv2_b[22m
+[92m○[39m[92m◂[39m[92m─[39m[92m─[39m[92m╯[39m   rcv2_a
+[2m│[22m[2m↑[22m      [2m20260606T1748_init[22m                   [2m∅[22m [2m→[22m [2mrcv2_a[22m
+[2m○[22m       ∅"
+`;
+
+exports[`migration-graph scenario gallery > verbatim ANSI snapshots > rollback-converge-2 > rollback-converge-2:arc-2 1`] = `
+"[2m○[22m[2m─[22m[2m─[22m[2m─[22m[2m╮[22m   [2mrcv2_d[22m
+[2m│[22m   [2m│[22m[2m↓[22m  [2m20260606T1752_rollback_d_to_a[22m   [2mrcv2_d[22m [2m→[22m [2mrcv2_a[22m
+[2m│[22m[2m↑[22m  [2m│[22m   [2m20260606T1751_step3[22m             [2mrcv2_c[22m [2m→[22m [2mrcv2_d[22m
+[92m○[39m[92m─[39m[92m╮[39m [2m│[22m   rcv2_c
+[2m│[22m [92m│[39m[92m↓[39m[2m│[22m   20260606T1753_rollback_c_to_a   rcv2_c → rcv2_a  ↑ will run
+[2m│[22m[2m↑[22m[92m│[39m [2m│[22m   [2m20260606T1750_step2[22m             [2mrcv2_b[22m [2m→[22m [2mrcv2_c[22m
+[2m○[22m [92m│[39m [2m│[22m   [2mrcv2_b[22m
+[2m│[22m[2m↑[22m[92m│[39m [2m│[22m   [2m20260606T1749_step1[22m             [2mrcv2_a[22m [2m→[22m [2mrcv2_b[22m
+[92m○[39m[92m◂[39m[92m╯[39m[2m─[22m[2m╯[22m   rcv2_a
+[2m│[22m[2m↑[22m      [2m20260606T1748_init[22m                   [2m∅[22m [2m→[22m [2mrcv2_a[22m
+[2m○[22m       ∅"
+`;
+
+exports[`migration-graph scenario gallery > verbatim ANSI snapshots > rollback-converge-2 > rollback-converge-2:rotating 1`] = `
+"[37m○[39m[36m─[39m[36m─[39m[36m─[39m[36m╮[39m   rcv2_d
+[37m│[39m   [36m│[39m[36m↓[39m  [1m[36m20260606T1752_rollback_d_to_a[39m[22m   rcv2_d → rcv2_a
+[37m│[39m[37m↑[39m  [36m│[39m   [1m[37m20260606T1751_step3[39m[22m             rcv2_c → rcv2_d
+[37m○[39m[33m─[39m[33m╮[39m [36m│[39m   rcv2_c
+[37m│[39m [33m│[39m[33m↓[39m[36m│[39m   [1m[33m20260606T1753_rollback_c_to_a[39m[22m   rcv2_c → rcv2_a
+[37m│[39m[37m↑[39m[33m│[39m [36m│[39m   [1m[37m20260606T1750_step2[39m[22m             rcv2_b → rcv2_c
+[37m○[39m [33m│[39m [36m│[39m   rcv2_b
+[37m│[39m[37m↑[39m[33m│[39m [36m│[39m   [1m[37m20260606T1749_step1[39m[22m             rcv2_a → rcv2_b
+[37m○[39m[36m◂[39m[36m─[39m[36m─[39m[36m╯[39m   rcv2_a
+[37m│[39m[37m↑[39m      [1m[37m20260606T1748_init[39m[22m                   ∅ → rcv2_a
+[37m○[39m       ∅"
+`;
+
+exports[`migration-graph scenario gallery > verbatim ANSI snapshots > rollback-converge-3 > rollback-converge-3:arc-1 1`] = `
+"[92m○[39m[92m─[39m[92m─[39m[92m─[39m[92m─[39m[92m─[39m[92m╮[39m   rcv3_e
+[2m│[22m     [92m│[39m[92m↓[39m  20260606T1759_rollback_e_to_a   rcv3_e → rcv3_a  ↑ will run
+[2m│[22m[2m↑[22m    [92m│[39m   [2m20260606T1758_step4[22m             [2mrcv3_d[22m [2m→[22m [2mrcv3_e[22m
+[2m○[22m[2m─[22m[2m─[22m[2m─[22m[2m╮[22m [92m│[39m   [2mrcv3_d[22m
+[2m│[22m   [2m│[22m[2m↓[22m[92m│[39m   [2m20260606T1760_rollback_d_to_a[22m   [2mrcv3_d[22m [2m→[22m [2mrcv3_a[22m
+[2m│[22m[2m↑[22m  [2m│[22m [92m│[39m   [2m20260606T1757_step3[22m             [2mrcv3_c[22m [2m→[22m [2mrcv3_d[22m
+[2m○[22m[2m─[22m[2m╮[22m [2m│[22m [92m│[39m   [2mrcv3_c[22m
+[2m│[22m [2m│[22m[2m↓[22m[2m│[22m [92m│[39m   [2m20260606T1761_rollback_c_to_a[22m   [2mrcv3_c[22m [2m→[22m [2mrcv3_a[22m
+[2m│[22m[2m↑[22m[2m│[22m [2m│[22m [92m│[39m   [2m20260606T1756_step2[22m             [2mrcv3_b[22m [2m→[22m [2mrcv3_c[22m
+[2m○[22m [2m│[22m [2m│[22m [92m│[39m   [2mrcv3_b[22m
+[2m│[22m[2m↑[22m[2m│[22m [2m│[22m [92m│[39m   [2m20260606T1755_step1[22m             [2mrcv3_a[22m [2m→[22m [2mrcv3_b[22m
+[92m○[39m[92m◂[39m[92m─[39m[92m─[39m[92m─[39m[92m─[39m[92m╯[39m   rcv3_a
+[2m│[22m[2m↑[22m        [2m20260606T1754_init[22m                   [2m∅[22m [2m→[22m [2mrcv3_a[22m
+[2m○[22m         ∅"
+`;
+
+exports[`migration-graph scenario gallery > verbatim ANSI snapshots > rollback-converge-3 > rollback-converge-3:rotating 1`] = `
+"[37m○[39m[36m─[39m[36m─[39m[36m─[39m[36m─[39m[36m─[39m[36m╮[39m   rcv3_e
+[37m│[39m     [36m│[39m[36m↓[39m  [1m[36m20260606T1759_rollback_e_to_a[39m[22m   rcv3_e → rcv3_a
+[37m│[39m[37m↑[39m    [36m│[39m   [1m[37m20260606T1758_step4[39m[22m             rcv3_d → rcv3_e
+[37m○[39m[33m─[39m[33m─[39m[33m─[39m[33m╮[39m [36m│[39m   rcv3_d
+[37m│[39m   [33m│[39m[33m↓[39m[36m│[39m   [1m[33m20260606T1760_rollback_d_to_a[39m[22m   rcv3_d → rcv3_a
+[37m│[39m[37m↑[39m  [33m│[39m [36m│[39m   [1m[37m20260606T1757_step3[39m[22m             rcv3_c → rcv3_d
+[37m○[39m[94m─[39m[94m╮[39m [33m│[39m [36m│[39m   rcv3_c
+[37m│[39m [94m│[39m[94m↓[39m[33m│[39m [36m│[39m   [1m[94m20260606T1761_rollback_c_to_a[39m[22m   rcv3_c → rcv3_a
+[37m│[39m[37m↑[39m[94m│[39m [33m│[39m [36m│[39m   [1m[37m20260606T1756_step2[39m[22m             rcv3_b → rcv3_c
+[37m○[39m [94m│[39m [33m│[39m [36m│[39m   rcv3_b
+[37m│[39m[37m↑[39m[94m│[39m [33m│[39m [36m│[39m   [1m[37m20260606T1755_step1[39m[22m             rcv3_a → rcv3_b
+[37m○[39m[36m◂[39m[36m─[39m[36m─[39m[36m─[39m[36m─[39m[36m╯[39m   rcv3_a
+[37m│[39m[37m↑[39m        [1m[37m20260606T1754_init[39m[22m                   ∅ → rcv3_a
+[37m○[39m         ∅"
+`;
+
 exports[`migration-graph scenario gallery > verbatim ANSI snapshots > rollback-cross > rollback-cross:arc-1 1`] = `
 "[92m○[39m[92m─[39m[92m╮[39m   rbc_d
 [2m│[22m [92m│[39m[92m↓[39m  20260606T1742_rollback_long     rbc_d → rbc_a  ↑ will run

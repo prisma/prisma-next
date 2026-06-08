@@ -467,6 +467,88 @@ function buildRollbackCross(): Scenario {
 }
 
 // ---------------------------------------------------------------------------
+// Scenario: rollback-converge-2   two skipping rollbacks landing on ONE target
+//
+// Trunk: ∅→a→b→c→d
+// Display order (rank desc): d(0), c(1), b(2), a(3), ∅(4)
+//   d→a: si=0, ti=3 → not adjacent (3≠1) → node-skipping ✓
+//   c→a: si=1, ti=3 → not adjacent (3≠2) → node-skipping ✓
+//
+// Today: 2 skipping rollbacks → numBackLanes=2, totalCols=(1+2)*2=6
+// Converged: 1 target group → numBackLanes=1, totalCols=(1+1)*2=4
+// ---------------------------------------------------------------------------
+function buildRollbackConverge2(): Scenario {
+  const init = edge(EMPTY_CONTRACT_HASH, 'rcv2_a', '20260606T1748_init');
+  const step1 = edge('rcv2_a', 'rcv2_b', '20260606T1749_step1');
+  const step2 = edge('rcv2_b', 'rcv2_c', '20260606T1750_step2');
+  const step3 = edge('rcv2_c', 'rcv2_d', '20260606T1751_step3');
+  const arc1 = edge('rcv2_d', 'rcv2_a', '20260606T1752_rollback_d_to_a');
+  const arc2 = edge('rcv2_c', 'rcv2_a', '20260606T1753_rollback_c_to_a');
+  const edges = [init, step1, step2, step3, arc1, arc2];
+  return {
+    name: 'rollback-converge-2',
+    edges,
+    variants: [
+      {
+        name: 'rotating',
+        description: 'two skipping rollbacks to same target, normal rotation',
+        onPathHashes: undefined,
+      },
+      {
+        name: 'arc-1',
+        description: 'highlight d→a rollback',
+        onPathHashes: new Set([arc1.migrationHash]),
+      },
+      {
+        name: 'arc-2',
+        description: 'highlight c→a rollback',
+        onPathHashes: new Set([arc2.migrationHash]),
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: rollback-converge-3   three skipping rollbacks landing on ONE target
+//
+// Trunk: ∅→a→b→c→d→e
+// Display order (rank desc): e(0), d(1), c(2), b(3), a(4), ∅(5)
+//   e→a: si=0, ti=4 → not adjacent (4≠1) → node-skipping ✓
+//   d→a: si=1, ti=4 → not adjacent (4≠2) → node-skipping ✓
+//   c→a: si=2, ti=4 → not adjacent (4≠3) → node-skipping ✓
+//
+// Today: 3 skipping rollbacks → numBackLanes=3, totalCols=(1+3)*2=8
+// Converged: 1 target group → numBackLanes=1, totalCols=(1+1)*2=4
+// ---------------------------------------------------------------------------
+function buildRollbackConverge3(): Scenario {
+  const init = edge(EMPTY_CONTRACT_HASH, 'rcv3_a', '20260606T1754_init');
+  const step1 = edge('rcv3_a', 'rcv3_b', '20260606T1755_step1');
+  const step2 = edge('rcv3_b', 'rcv3_c', '20260606T1756_step2');
+  const step3 = edge('rcv3_c', 'rcv3_d', '20260606T1757_step3');
+  const step4 = edge('rcv3_d', 'rcv3_e', '20260606T1758_step4');
+  const arc1 = edge('rcv3_e', 'rcv3_a', '20260606T1759_rollback_e_to_a');
+  const arc2 = edge('rcv3_d', 'rcv3_a', '20260606T1760_rollback_d_to_a');
+  const arc3 = edge('rcv3_c', 'rcv3_a', '20260606T1761_rollback_c_to_a');
+  const edges = [init, step1, step2, step3, step4, arc1, arc2, arc3];
+  return {
+    name: 'rollback-converge-3',
+    edges,
+    variants: [
+      {
+        name: 'rotating',
+        description: 'three skipping rollbacks to same target, normal rotation',
+        onPathHashes: undefined,
+      },
+      {
+        name: 'arc-1',
+        description: 'highlight e→a rollback',
+        onPathHashes: new Set([arc1.migrationHash]),
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Scenario: self-loop
 //   ∅ → a → b (trunk)
 //   b → b (self-loop)
@@ -586,6 +668,8 @@ export const SCENARIOS: readonly Scenario[] = [
   buildRollbackArc(),
   buildRollbackMerge(),
   buildRollbackCross(),
+  buildRollbackConverge2(),
+  buildRollbackConverge3(),
   buildSelfLoop(),
   buildShowcase(),
 ];
