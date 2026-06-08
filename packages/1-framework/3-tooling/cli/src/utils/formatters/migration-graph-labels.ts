@@ -73,7 +73,7 @@ export interface MigrationGraphLabelOptions {
  * environment (NO_COLOR, piped output). Used so on-path green / off-path dim are
  * deterministically emitted in tests that request colour while NO_COLOR is set.
  */
-const { dim: forcedDim, bold: forcedBold } = createColors({ useColor: true });
+const { dim: forcedDim } = createColors({ useColor: true });
 const { greenBright: forcedGreen } = createColors({ useColor: true });
 
 /**
@@ -291,15 +291,17 @@ export function formatMigrationLabel(
   let dirNameStyler: (text: string) => string;
   let hashOverride: ((text: string) => string) | undefined;
   if (highlight === 'on-path') {
-    dirNameStyler = (text) => bold(text);
+    // On-path: tint the name with the on-path green (matching the route's green
+    // glyphs in the gutter), not bolded.
+    dirNameStyler = opts.colorize ? forcedGreen : (text) => text;
     hashOverride = undefined;
   } else if (highlight === 'off-path') {
     dirNameStyler = opts.colorize ? forcedDim : style.dirName;
     hashOverride = opts.colorize ? forcedDim : undefined;
   } else if (opts.colorize && lane !== undefined) {
-    // Flat mode: tint the name with the lane hue, bolded, so it matches the
-    // lane's node/edge/arrow colour in the gutter.
-    dirNameStyler = (text) => forcedBold(laneColorizer(lane)(text));
+    // Flat mode: tint the name with the lane hue (matching the lane's
+    // node/edge/arrow colour in the gutter), not bolded.
+    dirNameStyler = (text) => laneColorizer(lane)(text);
     hashOverride = undefined;
   } else {
     dirNameStyler = style.dirName;
