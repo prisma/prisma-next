@@ -191,10 +191,11 @@ function renderSelect(ast: SelectAst, contract: PostgresContract, pim: ParamInde
     ? `GROUP BY ${ast.groupBy.map((expr) => renderExpr(expr, contract, pim)).join(', ')}`
     : '';
   const havingClause = ast.having ? `HAVING ${renderWhere(ast.having, contract, pim)}` : '';
+  const sourcesByRef = collectTableSources(ast);
   const orderClause = ast.orderBy?.length
     ? `ORDER BY ${ast.orderBy
         .map((order) => {
-          const expr = renderExpr(order.expr, contract, pim);
+          const expr = renderOrderByExpr(order.expr, sourcesByRef, contract, pim);
           return `${expr} ${order.dir.toUpperCase()}`;
         })
         .join(', ')}`
@@ -216,6 +217,76 @@ function renderSelect(ast: SelectAst, contract: PostgresContract, pim: ParamInde
     .filter((part) => part.length > 0)
     .join(' ');
   return clauses.trim();
+}
+
+/**
+ * Storage coordinate a query-level table reference (alias or bare name) resolves to. The ORDER BY enum hook uses this to look a column-ref's storage column up and read its value-set.
+ */
+interface TableSourceCoordinate {
+  readonly name: string;
+  readonly namespaceId: string | undefined;
+}
+
+/**
+ * Map a SELECT's table references (the FROM source and any JOIN sources) to their storage coordinate, keyed by the name a `ColumnRef.table` would carry (the alias when present, otherwise the table name). Derived-table sources are skipped — their columns are projected through a sub-select, not a base storage column, so the enum hook does not apply.
+ */
+function collectTableSources(ast: SelectAst): ReadonlyMap<string, TableSourceCoordinate> {
+  const sources = new Map<string, TableSourceCoordinate>();
+  const add = (source: AnyFromSource): void => {
+    if (source.kind !== 'table-source') {
+      return;
+    }
+    const ref = source.alias ?? source.name;
+    sources.set(ref, { name: source.name, namespaceId: source.namespaceId });
+  };
+  add(ast.from);
+  for (const join of ast.joins ?? []) {
+    add(join.source);
+  }
+  return sources;
+}
+
+/**
+ * Ordered, codec-encoded values of the value-set a storage column restricts to, or `undefined` when the referenced column carries no value-set (the common, non-enum case). Resolves the column's storage coordinate from the SELECT's table sources, then the column's `valueSet` ref to the value-set's `values`.
+ */
+function resolveEnumOrderValues(
+  ref: ColumnRef,
+  sourcesByRef: ReadonlyMap<string, TableSourceCoordinate>,
+  contract: PostgresContract,
+): readonly string[] | undefined {
+  const source = sourcesByRef.get(ref.table);
+  if (source === undefined || source.namespaceId === undefined) {
+    return undefined;
+  }
+  const column =
+    contract.storage.namespaces[source.namespaceId]?.entries.table[source.name]?.columns[
+      ref.column
+    ];
+  const valueSet = column?.valueSet;
+  if (valueSet === undefined) {
+    return undefined;
+  }
+  return contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.name]
+    ?.values;
+}
+
+/**
+ * Render an ORDER BY expression. A column-ref onto an enum-restricted column sorts by declaration order via `array_position(ARRAY[…]::text[], <col>)` over the value-set's ordered values (NULLs return `NULL` from `array_position`, sorting per the clause's default NULL handling). Every other expression renders unchanged.
+ */
+function renderOrderByExpr(
+  expr: AnyExpression,
+  sourcesByRef: ReadonlyMap<string, TableSourceCoordinate>,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
+): string {
+  if (expr.kind === 'column-ref') {
+    const orderValues = resolveEnumOrderValues(expr, sourcesByRef, contract);
+    if (orderValues !== undefined) {
+      const array = orderValues.map((value) => `'${escapeLiteral(value)}'`).join(', ');
+      return `array_position(ARRAY[${array}]::text[], ${renderColumn(expr)})`;
+    }
+  }
+  return renderExpr(expr, contract, pim);
 }
 
 function renderProjection(
