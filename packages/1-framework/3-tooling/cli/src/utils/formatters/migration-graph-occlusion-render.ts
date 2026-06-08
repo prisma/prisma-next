@@ -201,12 +201,17 @@ export interface RenderGridOptions {
  * Render a single grid row to a coloured string. A completely empty row returns
  * the empty string (the row is NOT dropped) so callers that pair grid rows with
  * an external per-row label list keep a 1:1 index correspondence. `renderGrid`
- * itself drops empty rows for its standalone output.
+ * itself drops empty rows for its standalone output (but preserves separator rows).
  */
 export function renderGridRow(
   row: readonly (Cell | undefined)[],
   opts: RenderGridOptions = {},
 ): string {
+  // Inter-component separator row — always renders as an empty line.
+  if (row[0]?.separator === true) {
+    return '';
+  }
+
   // Find the last non-empty cell index
   let lastNonEmpty = -1;
   for (let i = row.length - 1; i >= 0; i--) {
@@ -241,9 +246,10 @@ export function renderGridRow(
 export function renderGrid(grid: Grid, opts: RenderGridOptions = {}): string {
   const lines: string[] = [];
   for (const row of grid) {
+    const isSeparator = row[0]?.separator === true;
     const rendered = renderGridRow(row, opts);
-    if (rendered === '') {
-      // Completely empty row — skip in standalone output.
+    if (rendered === '' && !isSeparator) {
+      // Completely empty non-separator row — skip in standalone output.
       continue;
     }
     lines.push(rendered);

@@ -1,27 +1,29 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`verbatim-coloured command output > ascii glyph mode renders corners in ASCII 1`] = `
-"*       fork_tr
-|^      20260606T1701_trunk_feature  fork_ro -> fork_tr  1 ops
-|   *   fork_al
-|   |^  20260606T1702_alt_feature    fork_ro -> fork_al  1 ops
-|---/
-*       fork_ro
-|^      20260606T1700_init                 - -> fork_ro  1 ops
-*       -
-  *     c0ffee0  @contract"
+"*     c0ffee0  @contract
+
+*     fork_tr
+|^    20260606T1701_trunk_feature  fork_ro -> fork_tr  1 ops
+| *   fork_al
+| |^  20260606T1702_alt_feature    fork_ro -> fork_al  1 ops
+|-/
+*     fork_ro
+|^    20260606T1700_init                 - -> fork_ro  1 ops
+*     -"
 `;
 
 exports[`verbatim-coloured command output > flat graph with multiple lanes (renderMigrationGraphSpaceTree) 1`] = `
-"[37m○[39m       fork_tr
-[37m│[39m[37m↑[39m      [1m[37m20260606T1701_trunk_feature[39m[22m  fork_ro → fork_tr  1 ops
-[37m│[39m   [33m○[39m   fork_al
-[37m│[39m   [33m│[39m[33m↑[39m  [1m[33m20260606T1702_alt_feature[39m[22m    fork_ro → fork_al  1 ops
-[37m│[39m[33m─[39m[33m─[39m[33m─[39m[33m╯[39m
-[37m○[39m       fork_ro
-[37m│[39m[37m↑[39m      [1m[37m20260606T1700_init[39m[22m                 ∅ → fork_ro  1 ops
-[37m○[39m       ∅
-  [36m○[39m     c0ffee0  @contract"
+"[37m○[39m     c0ffee0  @contract
+
+[37m○[39m     fork_tr
+[37m│[39m[37m↑[39m    [1m[37m20260606T1701_trunk_feature[39m[22m  fork_ro → fork_tr  1 ops
+[37m│[39m [36m○[39m   fork_al
+[37m│[39m [36m│[39m[36m↑[39m  [1m[36m20260606T1702_alt_feature[39m[22m    fork_ro → fork_al  1 ops
+[37m│[39m[36m─[39m[36m╯[39m
+[37m○[39m     fork_ro
+[37m│[39m[37m↑[39m    [1m[37m20260606T1700_init[39m[22m                 ∅ → fork_ro  1 ops
+[37m○[39m     ∅"
 `;
 
 exports[`verbatim-coloured command output > graph with @db/@contract markers and user refs (renderMigrationGraphSpaceTree) 1`] = `
@@ -45,15 +47,16 @@ exports[`verbatim-coloured command output > migrate --show focus: on-path green,
 
 exports[`verbatim-coloured command output > multi-space graph with per-space headings (formatMigrationGraphHumanOutput) 1`] = `
 "app:
-[37m○[39m       fork_tr
-[37m│[39m[37m↑[39m      [1m[37m20260606T1701_trunk_feature[39m[22m  fork_ro → fork_tr  1 ops
-[37m│[39m   [33m○[39m   fork_al
-[37m│[39m   [33m│[39m[33m↑[39m  [1m[33m20260606T1702_alt_feature[39m[22m    fork_ro → fork_al  1 ops
-[37m│[39m[33m─[39m[33m─[39m[33m─[39m[33m╯[39m
-[37m○[39m       fork_ro
-[37m│[39m[37m↑[39m      [1m[37m20260606T1700_init[39m[22m                 ∅ → fork_ro  1 ops
-[37m○[39m       ∅
-  [36m○[39m     c0ffee0  @contract
+[37m○[39m     c0ffee0  @contract
+
+[37m○[39m     fork_tr
+[37m│[39m[37m↑[39m    [1m[37m20260606T1701_trunk_feature[39m[22m  fork_ro → fork_tr  1 ops
+[37m│[39m [36m○[39m   fork_al
+[37m│[39m [36m│[39m[36m↑[39m  [1m[36m20260606T1702_alt_feature[39m[22m    fork_ro → fork_al  1 ops
+[37m│[39m[36m─[39m[36m╯[39m
+[37m○[39m     fork_ro
+[37m│[39m[37m↑[39m    [1m[37m20260606T1700_init[39m[22m                 ∅ → fork_ro  1 ops
+[37m○[39m     ∅
 
 pgvector:
 [37m○[39m   ext_hea

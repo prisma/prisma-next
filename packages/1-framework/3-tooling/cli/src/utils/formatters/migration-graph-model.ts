@@ -62,10 +62,15 @@ export interface CellLine {
 
 // ---------------------------------------------------------------------------
 // Cell — one position in the grid.
+//
+// `separator` marks an inter-component blank-line row. When the first cell in
+// a row has `separator: true`, the row renders as an empty line (the renderGrid
+// blank-separator pass-through).
 // ---------------------------------------------------------------------------
 export interface Cell {
   readonly node?: NodeRef;
   readonly lines: readonly CellLine[];
+  readonly separator?: boolean;
 }
 
 // ---------------------------------------------------------------------------

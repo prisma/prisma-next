@@ -28,6 +28,14 @@ import type { ClassifiedEdge, MigrationGraphRowModel } from './migration-graph-r
 interface LaneAssignment {
   nodeLane: Map<string, number>;
   nodeRank: Map<string, number>;
+  /**
+   * Per-edge lane override. Set for "direct fork-to-merge" branch edges whose
+   * endpoints both land on lane 0 after merge reconciliation, but whose BFS
+   * traversal allocated them a non-zero branch lane. Using this override lets
+   * the branch edge render in its branch column even when the merge tip was
+   * pulled back to the trunk lane.
+   */
+  edgeLane: Map<string, number>;
   /** Total number of lanes allocated. */
   numLanes: number;
 }
@@ -36,15 +44,10 @@ function buildLaneAssignment(
   nodes: readonly (string | null)[],
   edges: readonly ClassifiedEdge[],
 ): LaneAssignment {
-  const allNodes = new Set<string>();
-  for (const n of nodes) {
-    if (n !== null) allNodes.add(n);
-  }
-
   // Separate forward (non-self) edges
   const fwdEdges = edges.filter((e) => e.kind === 'forward' && e.from !== e.to);
 
-  // Build adjacency: outbound forward edges per node, sorted lex by migrationHash
+  // Build outbound/inbound adjacency sorted by dirName
   const outbound = new Map<string, ClassifiedEdge[]>();
   const inbound = new Map<string, ClassifiedEdge[]>();
   for (const edge of fwdEdges) {
@@ -59,14 +62,32 @@ function buildLaneAssignment(
   for (const list of outbound.values()) list.sort((a, b) => a.dirName.localeCompare(b.dirName));
   for (const list of inbound.values()) list.sort((a, b) => a.dirName.localeCompare(b.dirName));
 
-  // Compute longest-forward-path rank from roots (tips get highest rank)
+  // Split nodes into per-component groups (null sentinels separate components)
+  const components: string[][] = [];
+  let current: string[] = [];
+  for (const n of nodes) {
+    if (n === null) {
+      if (current.length > 0) components.push(current);
+      current = [];
+    } else {
+      current.push(n);
+    }
+  }
+  if (current.length > 0) components.push(current);
+
+  // Global rank map (longest-forward-path; computed across all nodes together
+  // so rollback edges crossing components don't interfere with rank within each)
+  const allNodes = new Set<string>();
+  for (const n of nodes) {
+    if (n !== null) allNodes.add(n);
+  }
   const nodeRank = new Map<string, number>();
   for (const n of allNodes) nodeRank.set(n, 0);
   for (let pass = 0; pass < allNodes.size; pass++) {
     let changed = false;
-    for (const [from, edges] of outbound) {
+    for (const [from, es] of outbound) {
       const base = nodeRank.get(from) ?? 0;
-      for (const e of edges) {
+      for (const e of es) {
         const next = base + 1;
         if (next > (nodeRank.get(e.to) ?? 0)) {
           nodeRank.set(e.to, next);
@@ -77,53 +98,115 @@ function buildLaneAssignment(
     if (!changed) break;
   }
 
-  // Lane assignment: BFS from roots, trunk keeps parent's lane
+  // Lane assignment: BFS per component, resetting nextLane to 0 for each.
+  // Each component's roots start at lane 0, so disconnected components never
+  // interleave lanes.
   const nodeLane = new Map<string, number>();
-  let nextLane = 0;
+  // Per-edge lane: records the BFS-allocated branch lane for each edge. Used
+  // to preserve branch-column rendering even after merge-tip reconciliation.
+  const edgeLane = new Map<string, number>();
+  let totalLanes = 0;
 
-  // Roots: nodes with no inbound forward edges
-  const roots: string[] = [];
-  for (const n of allNodes) {
-    if ((inbound.get(n) ?? []).length === 0) roots.push(n);
-  }
-  roots.sort((a, b) => {
-    if (a === EMPTY_CONTRACT_HASH) return -1;
-    if (b === EMPTY_CONTRACT_HASH) return 1;
-    return a.localeCompare(b);
-  });
+  for (const componentNodes of components) {
+    const componentSet = new Set(componentNodes);
+    let nextLane = 0;
 
-  const bfsQueue: Array<{ node: string; lane: number }> = [];
-  for (const root of roots) {
-    if (!nodeLane.has(root)) {
-      nodeLane.set(root, nextLane++);
-      bfsQueue.push({ node: root, lane: nodeLane.get(root)! });
+    const roots: string[] = [];
+    for (const n of componentNodes) {
+      if ((inbound.get(n) ?? []).length === 0) roots.push(n);
     }
-  }
+    roots.sort((a, b) => {
+      if (a === EMPTY_CONTRACT_HASH) return -1;
+      if (b === EMPTY_CONTRACT_HASH) return 1;
+      return a.localeCompare(b);
+    });
 
-  // BFS expansion
-  let head = 0;
-  while (head < bfsQueue.length) {
-    const item = bfsQueue[head++]!;
-    const { node, lane } = item;
-    const children = outbound.get(node) ?? [];
-    let first = true;
-    for (const childEdge of children) {
-      const child = childEdge.to;
-      if (!nodeLane.has(child)) {
-        const childLane = first ? lane : nextLane++;
-        nodeLane.set(child, childLane);
-        bfsQueue.push({ node: child, lane: childLane });
+    const bfsQueue: Array<{ node: string; lane: number }> = [];
+    for (const root of roots) {
+      if (!nodeLane.has(root)) {
+        nodeLane.set(root, nextLane++);
+        bfsQueue.push({ node: root, lane: nodeLane.get(root)! });
       }
-      first = false;
     }
+
+    let head = 0;
+    while (head < bfsQueue.length) {
+      const item = bfsQueue[head++]!;
+      const { node, lane } = item;
+      const children = outbound.get(node) ?? [];
+      let first = true;
+      for (const childEdge of children) {
+        const child = childEdge.to;
+        if (!componentSet.has(child)) continue;
+        if (!nodeLane.has(child)) {
+          const childLane = first ? lane : nextLane++;
+          nodeLane.set(child, childLane);
+          bfsQueue.push({ node: child, lane: childLane });
+          edgeLane.set(childEdge.migrationHash, childLane);
+        } else {
+          // Child already assigned — record this edge's lane as the max of the
+          // parent's lane and the child's current lane (same as the original
+          // Math.max formula). May be updated by reconciliation below for trunk
+          // edges into reconciled merge nodes.
+          edgeLane.set(childEdge.migrationHash, Math.max(lane, nodeLane.get(child)!));
+        }
+        first = false;
+      }
+    }
+
+    // Isolated nodes within the component
+    for (const n of componentNodes) {
+      if (!nodeLane.has(n)) nodeLane.set(n, nextLane++);
+    }
+
+    // Merge-node lane reconciliation: a node with multiple inbound forward edges
+    // should sit on the lane of its highest-rank parent (furthest along the
+    // longest path). When a short arm and a long arm converge, the merge node
+    // follows the long arm's lane.
+    //
+    // When a merge node's lane changes, update the edgeLane for all edges
+    // pointing TO that node so they reflect the reconciled column. Edges from
+    // nodes that were on a BRANCH (non-trunk) lane keep their original branch
+    // lane so the branch column renders correctly.
+    for (const n of componentNodes) {
+      const parents = inbound.get(n);
+      if (!parents || parents.length <= 1) continue;
+      let trunkParent = parents[0]!.from;
+      let trunkRank = nodeRank.get(trunkParent) ?? 0;
+      let trunkLane = nodeLane.get(trunkParent) ?? 0;
+      for (let i = 1; i < parents.length; i++) {
+        const parent = parents[i]!.from;
+        const rank = nodeRank.get(parent) ?? 0;
+        const lane = nodeLane.get(parent) ?? 0;
+        if (rank > trunkRank || (rank === trunkRank && lane < trunkLane)) {
+          trunkParent = parent;
+          trunkRank = rank;
+          trunkLane = lane;
+        }
+      }
+      const trunkParentLane = nodeLane.get(trunkParent) ?? 0;
+      const currentNodeLane = nodeLane.get(n) ?? 0;
+      if (currentNodeLane === trunkParentLane) continue;
+
+      nodeLane.set(n, trunkParentLane);
+
+      // Update edgeLane for each inbound edge:
+      // - Trunk edge (from the highest-rank parent): use the trunk lane
+      // - Branch edges: keep the ORIGINAL edgeLane (the branch column), so
+      //   the branch edge still renders in its allocated branch column.
+      for (const parentEdge of parents) {
+        const isFromTrunkParent = parentEdge.from === trunkParent;
+        if (isFromTrunkParent) {
+          edgeLane.set(parentEdge.migrationHash, trunkParentLane);
+        }
+        // Branch edges keep whatever lane they were assigned during BFS.
+      }
+    }
+
+    if (nextLane > totalLanes) totalLanes = nextLane;
   }
 
-  // Isolated nodes (no edges) get their own lane
-  for (const n of allNodes) {
-    if (!nodeLane.has(n)) nodeLane.set(n, nextLane++);
-  }
-
-  return { nodeLane, nodeRank, numLanes: nextLane };
+  return { nodeLane, nodeRank, edgeLane, numLanes: totalLanes };
 }
 
 // ---------------------------------------------------------------------------
@@ -136,20 +219,42 @@ interface NodeDisplay {
   rank: number;
 }
 
+/**
+ * A `null` sentinel in the display order marks a component boundary.
+ * The grid builder emits a separator row at each boundary.
+ */
+type NodeDisplayOrSeparator = NodeDisplay | null;
+
 function computeDisplayOrder(
   nodes: readonly (string | null)[],
   nodeLane: Map<string, number>,
   nodeRank: Map<string, number>,
-): NodeDisplay[] {
+): NodeDisplayOrSeparator[] {
   const seen = new Set<string>();
-  const result: NodeDisplay[] = [];
-  for (const n of nodes) {
-    if (n === null || seen.has(n)) continue;
-    seen.add(n);
-    result.push({ hash: n, lane: nodeLane.get(n) ?? 0, rank: nodeRank.get(n) ?? 0 });
+  const result: NodeDisplayOrSeparator[] = [];
+
+  // Collect each component's nodes then sort within it (rank desc, lane asc).
+  // null sentinels mark component boundaries; they become separator entries.
+  let componentBuffer: NodeDisplay[] = [];
+
+  function flushComponent(): void {
+    componentBuffer.sort((a, b) => b.rank - a.rank || a.lane - b.lane);
+    for (const d of componentBuffer) result.push(d);
+    componentBuffer = [];
   }
-  // Tips first (rank desc), within same rank lane asc
-  result.sort((a, b) => b.rank - a.rank || a.lane - b.lane);
+
+  for (const n of nodes) {
+    if (n === null) {
+      flushComponent();
+      result.push(null);
+      continue;
+    }
+    if (seen.has(n)) continue;
+    seen.add(n);
+    componentBuffer.push({ hash: n, lane: nodeLane.get(n) ?? 0, rank: nodeRank.get(n) ?? 0 });
+  }
+  flushComponent();
+
   return result;
 }
 
@@ -176,15 +281,21 @@ export function buildGrid(
   const colsPerLane = opts.colsPerLane ?? DEFAULT_COLS_PER_LANE;
   const isFocus = highlight.mode === 'focus';
 
-  const { nodeLane, nodeRank, numLanes } = buildLaneAssignment(rowModel.nodes, rowModel.edges);
+  const { nodeLane, nodeRank, edgeLane, numLanes } = buildLaneAssignment(
+    rowModel.nodes,
+    rowModel.edges,
+  );
 
   const displayOrder = computeDisplayOrder(rowModel.nodes, nodeLane, nodeRank);
 
-  // Display index per node (0 = topmost row).
+  // Display index per node (0 = topmost position; nulls skipped).
   const displayIndex = new Map<string, number>();
-  displayOrder.forEach((d, i) => {
-    displayIndex.set(d.hash, i);
-  });
+  let nodeIdx = 0;
+  for (const d of displayOrder) {
+    if (d !== null) {
+      displayIndex.set(d.hash, nodeIdx++);
+    }
+  }
 
   // ── Back-arc planning ────────────────────────────────────────────────────
   // Each rollback edge runs against the forward grain. An *adjacent* rollback
@@ -652,8 +763,16 @@ export function buildGrid(
     return row;
   }
 
-  // Process each node in display order
+  // Process each node in display order; null = component boundary → separator row
   for (const nodeDisplay of displayOrder) {
+    if (nodeDisplay === null) {
+      // Emit one blank separator row between disconnected components.
+      const sepRow = makeRow();
+      sepRow[0] = { lines: [], separator: true };
+      grid.push(sepRow);
+      continue;
+    }
+
     const { hash: nodeHash } = nodeDisplay;
     const nodeLaneNum = nodeLane.get(nodeHash) ?? 0;
 
@@ -662,10 +781,17 @@ export function buildGrid(
     // ── 1. Fork connector (BEFORE the node row) ──────────────────────────
     const outEdges = outboundFwd.get(nodeHash) ?? [];
     if (outEdges.length > 1) {
-      const trunkChildLane = nodeLane.get(outEdges[0]!.to) ?? nodeLaneNum;
+      // Use the per-edge lane for branch children so that "direct fork-to-merge"
+      // edges (whose target was reconciled back to trunk lane) still appear in
+      // their allocated branch column.
+      const trunkEdgeForFork = outEdges[0]!;
+      const trunkChildLane =
+        edgeLane.get(trunkEdgeForFork.migrationHash) ??
+        nodeLane.get(trunkEdgeForFork.to) ??
+        nodeLaneNum;
       const branchEntries = outEdges
         .slice(1)
-        .map((e) => ({ lane: nodeLane.get(e.to) ?? 0, edge: e }))
+        .map((e) => ({ lane: edgeLane.get(e.migrationHash) ?? nodeLane.get(e.to) ?? 0, edge: e }))
         .filter((b) => b.lane !== trunkChildLane && activeLanes.has(b.lane));
 
       if (branchEntries.length > 0) {
@@ -756,11 +882,28 @@ export function buildGrid(
     // its lane's current edge NOW (before emitting the back-arc arrow rows, merge
     // connector, and migration rows) so pass-through verticals colour from the
     // forward edge actually occupying the trunk below this node.
+    //
+    // edgeLaneFor: resolve the lane for an inbound forward edge. Uses the
+    // per-edge override from edgeLane (set during BFS for branch edges) when
+    // available; falls back to Max(fromLane, toLane) for edges not in the map.
+    function edgeLaneFor(edge: ClassifiedEdge): number {
+      const override = edgeLane.get(edge.migrationHash);
+      if (override !== undefined) return override;
+      return Math.max(nodeLane.get(edge.from) ?? 0, nodeLane.get(edge.to) ?? 0);
+    }
+
+    // Sort inEdges so the trunk edge (lowest edgeLane = trunk column) comes
+    // first. Ties broken by dirName. This ensures the merge connector treats
+    // the trunk-column edge as the trunk regardless of alphabetical order.
     const inEdges = inboundFwd.get(nodeHash) ?? [];
-    inEdges.sort((a, b) => a.dirName.localeCompare(b.dirName));
+    inEdges.sort((a, b) => {
+      const aLane = edgeLaneFor(a);
+      const bLane = edgeLaneFor(b);
+      if (aLane !== bLane) return aLane - bLane;
+      return a.dirName.localeCompare(b.dirName);
+    });
     for (const edge of inEdges) {
-      const edgeLane = Math.max(nodeLane.get(edge.from) ?? 0, nodeLane.get(edge.to) ?? 0);
-      laneCurrentEdge.set(edgeLane, edge);
+      laneCurrentEdge.set(edgeLaneFor(edge), edge);
     }
 
     // ── 3b. Back-arc arrow rows ──────────────────────────────────────────────
@@ -785,9 +928,7 @@ export function buildGrid(
 
     // ── 4. Merge connector (AFTER the node row) ────────────────────────────
     if (inEdges.length > 1) {
-      const branchEntries = inEdges
-        .slice(1)
-        .map((e) => ({ lane: nodeLane.get(e.from) ?? 0, edge: e }));
+      const branchEntries = inEdges.slice(1).map((e) => ({ lane: edgeLaneFor(e), edge: e }));
 
       const trunkEdge = inEdges[0];
       const connRow = emitConnectorRow(nodeLaneNum, branchEntries, 'merge', trunkEdge);
@@ -797,20 +938,18 @@ export function buildGrid(
       for (const b of branchEntries) activeLanes.add(b.lane);
     }
 
-    // ── 5. Migration rows (one per inbound edge, ordered by migration hash) ─
+    // ── 5. Migration rows (one per inbound edge, ordered by edge lane) ─────
     for (const edge of inEdges) {
-      const fromLane = nodeLane.get(edge.from) ?? 0;
-      const toLane = nodeLane.get(edge.to) ?? 0;
-      const edgeLane = Math.max(fromLane, toLane);
+      const eLane = edgeLaneFor(edge);
       const row = makeRow();
-      const railCol = edgeLane * colsPerLane;
-      const connCol = edgeLane * colsPerLane + 1;
-      const line = lineRefFor(edge, edgeLane);
+      const railCol = eLane * colsPerLane;
+      const connCol = eLane * colsPerLane + 1;
+      const line = lineRefFor(edge, eLane);
 
       row[railCol] = vertCell(line);
       row[connCol] = dirCell(line, new Set<Direction>(['up']));
 
-      placeVerticals(row, new Set([edgeLane]));
+      placeVerticals(row, new Set([eLane]));
       placeBackVerticals(row);
       grid.push(row);
     }
