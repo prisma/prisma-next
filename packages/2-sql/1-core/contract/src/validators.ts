@@ -114,7 +114,7 @@ const StorageTypeInstanceSchema = type
     kind: "'codec-instance'",
     codecId: 'string',
     nativeType: 'string',
-    typeParams: 'Record<string, unknown>',
+    'typeParams?': 'Record<string, unknown>',
   });
 
 /**

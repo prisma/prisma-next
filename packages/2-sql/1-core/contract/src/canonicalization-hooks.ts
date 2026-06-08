@@ -11,7 +11,6 @@ const preserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'entries', 'table', '*'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
-  ['storage', 'types', '*', 'typeParams'],
 ] as const satisfies readonly PathPattern[];
 
 const sortTargets = [
