@@ -12,7 +12,7 @@ import {
   migrationGraphJsonResultSchema,
 } from '../../src/commands/json/schemas';
 import { createMigrationGraphCommand } from '../../src/commands/migration-graph';
-import { renderMigrationGraphLegend } from '../../src/utils/formatters/migration-graph-tree-render';
+import { renderMigrationGraphLegend } from '../../src/utils/formatters/migration-graph-labels';
 import type { GlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
 import {

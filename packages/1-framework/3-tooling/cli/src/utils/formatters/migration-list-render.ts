@@ -1,13 +1,13 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import type { GlyphMode } from '../glyph-mode';
+import type { MigrationEdgeAnnotation } from './migration-graph-labels';
 import {
   computeGlobalMaxDirNameWidth,
   computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
 } from './migration-graph-space-render';
-import type { MigrationEdgeAnnotation } from './migration-graph-tree-render';
 import type { MigrationListEntry, MigrationListResult } from './migration-list-types';
 
 export type { GlyphMode } from '../glyph-mode';

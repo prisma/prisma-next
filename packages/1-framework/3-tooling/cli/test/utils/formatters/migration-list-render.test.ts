@@ -141,7 +141,7 @@ describe('renderMigrationList', () => {
     expect(output).toMatchInlineSnapshot(`
       "○   4cb4256
       │↑  20260422T0720_initial        ∅ → 4cb4256  1 ops
-      ∅
+      ○   ∅
 
       1 migration(s) on disk"
     `);
@@ -214,7 +214,10 @@ describe('renderMigrationList', () => {
     );
     expect(output).toContain('branch_a');
     expect(output).toContain('branch_b');
-    expect(output).toMatch(/├─[╮╯]/);
+    // Corner renderer: the merge/fork connector is a continuous trunk + a yielding
+    // corner (│─╮ / │─╯), never a tee (├─). No ├ ┬ ┴ ┼ in the corner alphabet.
+    expect(output).toMatch(/[│─]─[╮╯]/);
+    expect(output).not.toContain('├');
   });
 
   it('renders skip-rollback with a down arrow in the tree gutter', () => {
