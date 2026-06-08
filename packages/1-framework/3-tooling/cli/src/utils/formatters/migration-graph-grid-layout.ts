@@ -201,6 +201,30 @@ function buildLaneAssignment(
         }
         // Branch edges keep whatever lane they were assigned during BFS.
       }
+
+      // Propagate the lane change to forward descendants that inherited the
+      // old lane. BFS from this merge node through outbound edges: any
+      // descendant still on oldLane moves to the new (trunk) lane. Stop the
+      // traversal at nodes that are already on a different lane — they belong
+      // to branches that forked independently and must not move.
+      const bfsDescendants: string[] = [n];
+      let descHead = 0;
+      while (descHead < bfsDescendants.length) {
+        const current = bfsDescendants[descHead++]!;
+        const children = outbound.get(current) ?? [];
+        for (const childEdge of children) {
+          const child = childEdge.to;
+          if (!componentSet.has(child)) continue;
+          if ((nodeLane.get(child) ?? 0) !== currentNodeLane) continue;
+          nodeLane.set(child, trunkParentLane);
+          // Update the edge lane for the edge from current→child
+          const existingEdgeLane = edgeLane.get(childEdge.migrationHash);
+          if (existingEdgeLane !== undefined && existingEdgeLane === currentNodeLane) {
+            edgeLane.set(childEdge.migrationHash, trunkParentLane);
+          }
+          bfsDescendants.push(child);
+        }
+      }
     }
 
     if (nextLane > totalLanes) totalLanes = nextLane;
