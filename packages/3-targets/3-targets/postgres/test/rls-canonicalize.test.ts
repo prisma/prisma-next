@@ -264,7 +264,7 @@ describe('computeContentHash', () => {
       };
       const hash = computeContentHash(parts);
       const canonical = normalizePredicate('user_id = auth.uid()');
-      const tuple = JSON.stringify(['', canonical, '', ['authenticated'], 'select', 'permissive']);
+      const tuple = JSON.stringify([canonical, '', ['authenticated'], 'select', 'permissive']);
       const expected = createHash('sha256').update(tuple).digest('hex').slice(0, 8);
       expect(hash).toBe(expected);
     });
