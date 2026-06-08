@@ -1,3 +1,5 @@
+import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import { describe, expect, it } from 'vitest';
 import {
   AddColumnCall,
@@ -13,6 +15,12 @@ import type {
   SqliteColumnSpec,
   SqliteTableSpec,
 } from '../../src/core/migrations/operations/shared';
+
+function stubLowerer(sql: string): Lowerer {
+  return {
+    lower: () => Object.freeze({ sql, params: Object.freeze([]) }),
+  };
+}
 
 function colSpec(overrides: Partial<SqliteColumnSpec> = {}): SqliteColumnSpec {
   return {
@@ -37,22 +45,20 @@ function tableSpec(
 }
 
 describe('CreateTableCall', () => {
-  it('produces an additive op with correct id, label, and CREATE TABLE SQL', () => {
+  it('produces an additive op with correct id, label, and execute/pre/postcheck SQL', () => {
+    const lowerer = stubLowerer(
+      'CREATE TABLE "user" (\n  "id" INTEGER NOT NULL,\n  "email" TEXT NOT NULL,\n  PRIMARY KEY ("id")\n)',
+    );
     const call = new CreateTableCall(
       'user',
-      tableSpec(
-        [
-          colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false }),
-          colSpec({ name: 'email', typeSql: 'TEXT', nullable: false }),
-        ],
-        { primaryKey: { columns: ['id'] } },
-      ),
+      [col('id', 'INTEGER', { notNull: true }), col('email', 'TEXT', { notNull: true })],
+      [primaryKey(['id'])],
     );
     expect(call.factoryName).toBe('createTable');
     expect(call.operationClass).toBe('additive');
     expect(call.label).toBe('Create table user');
 
-    const op = call.toOp();
+    const op = call.toOp(lowerer);
     expect(op.id).toBe('table.user');
     expect(op.label).toBe('Create table user');
     expect(op.execute[0]?.sql).toContain('CREATE TABLE "user"');
@@ -62,42 +68,41 @@ describe('CreateTableCall', () => {
     expect(op.postcheck[0]?.sql).toContain("name = 'user'");
   });
 
-  it('emits INTEGER PRIMARY KEY AUTOINCREMENT inline when the column carries the flag', () => {
-    const call = new CreateTableCall(
-      'user',
-      tableSpec(
-        [
-          colSpec({
-            name: 'id',
-            typeSql: 'INTEGER',
-            nullable: false,
-            inlineAutoincrementPrimaryKey: true,
-          }),
-        ],
-        { primaryKey: { columns: ['id'] } },
-      ),
-    );
-    const sql = call.toOp().execute[0]?.sql ?? '';
-    expect(sql).toContain('"id" INTEGER PRIMARY KEY AUTOINCREMENT');
-    // The table-level PK clause must be suppressed when an inline PK is present.
-    expect(sql).not.toMatch(/PRIMARY KEY \("id"\)/);
+  it('passes columns and constraints to the lowerer', () => {
+    const received: unknown[] = [];
+    const capturingLowerer: Lowerer = {
+      lower: (ast) => {
+        received.push(ast);
+        return Object.freeze({
+          sql: 'CREATE TABLE "user" (\n  "id" INTEGER PRIMARY KEY AUTOINCREMENT\n)',
+          params: Object.freeze([]),
+        });
+      },
+    };
+    const call = new CreateTableCall('user', [col('id', 'INTEGER PRIMARY KEY AUTOINCREMENT')]);
+    call.toOp(capturingLowerer);
+    expect(received).toHaveLength(1);
   });
 
-  it('renderTypeScript() emits a createTable(...) expression with the embedded spec', () => {
-    const call = new CreateTableCall(
-      'user',
-      tableSpec([colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false })]),
-    );
+  it('toOp() throws when no lowerer is provided', () => {
+    const call = new CreateTableCall('user', [col('id', 'INTEGER', { notNull: true })]);
+    expect(() => call.toOp()).toThrow('createSqliteMigrationPlanner');
+  });
+
+  it('renderTypeScript() emits a this.createTable({...}) expression with col() calls', () => {
+    const call = new CreateTableCall('user', [col('id', 'INTEGER', { notNull: true })]);
     const ts = call.renderTypeScript();
-    expect(ts).toMatch(/^createTable\("user", /);
-    expect(ts).toContain('typeSql:');
+    expect(ts).toMatch(/^this\.createTable\(/);
+    expect(ts).toContain('col("id", "INTEGER"');
   });
 
-  it('importRequirements() points at @prisma-next/sqlite/migration', () => {
-    const call = new CreateTableCall('user', tableSpec([colSpec()]));
-    expect(call.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/sqlite/migration', symbol: 'createTable' },
-    ]);
+  it('importRequirements() includes col from the migration module', () => {
+    const call = new CreateTableCall('user', [col('id', 'INTEGER')]);
+    const reqs = call.importRequirements();
+    expect(reqs).toContainEqual({
+      moduleSpecifier: '@prisma-next/sqlite/migration',
+      symbol: 'col',
+    });
   });
 });
 

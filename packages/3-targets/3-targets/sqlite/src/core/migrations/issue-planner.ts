@@ -24,6 +24,15 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import type { DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
+import {
+  DdlColumn,
+  ForeignKeyConstraint,
+  FunctionColumnDefault,
+  LiteralColumnDefault,
+  PrimaryKeyConstraint,
+  UniqueConstraint,
+} from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
@@ -257,6 +266,85 @@ export function toTableSpec(
 }
 
 // ============================================================================
+// StorageTable / StorageColumn → DdlColumn[] + DdlTableConstraint[] (for CreateTableCall)
+// ============================================================================
+
+function sqliteDefaultToDdlColumnDefault(
+  columnDefault: StorageColumn['default'],
+): DdlColumn['default'] {
+  if (!columnDefault) return undefined;
+  switch (columnDefault.kind) {
+    case 'literal':
+      return new LiteralColumnDefault(columnDefault.value);
+    case 'function':
+      return new FunctionColumnDefault(columnDefault.expression);
+  }
+}
+
+/**
+ * Converts a `StorageTable` to the `DdlColumn[]` + `DdlTableConstraint[]`
+ * pair used by `CreateTableCall`. This is the structured form consumed by
+ * the DDL lowering path; `toTableSpec` / `toColumnSpec` remain in use for
+ * `RecreateTableCall` and `AddColumnCall` (Phase 2).
+ */
+export function tableToDdlParts(
+  table: StorageTable,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+): { columns: DdlColumn[]; constraints: DdlTableConstraint[] } {
+  const columns: DdlColumn[] = Object.entries(table.columns).map(([name, column]) => {
+    const inlineAutoincrement = isInlineAutoincrementPrimaryKey(table, name);
+    const typeSql = buildColumnTypeSql(
+      column,
+      storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+    );
+    if (inlineAutoincrement) {
+      return new DdlColumn({ name, type: `${typeSql} PRIMARY KEY AUTOINCREMENT` });
+    }
+    const colDefault = sqliteDefaultToDdlColumnDefault(column.default);
+    return new DdlColumn({
+      name,
+      type: typeSql,
+      ...(!column.nullable ? { notNull: true } : {}),
+      ...(colDefault !== undefined ? { default: colDefault } : {}),
+    });
+  });
+
+  const constraints: DdlTableConstraint[] = [];
+
+  const hasInlinePk = Object.entries(table.columns).some(([name]) =>
+    isInlineAutoincrementPrimaryKey(table, name),
+  );
+  if (table.primaryKey && !hasInlinePk) {
+    constraints.push(new PrimaryKeyConstraint({ columns: table.primaryKey.columns }));
+  }
+
+  for (const u of table.uniques) {
+    constraints.push(
+      new UniqueConstraint({
+        columns: u.columns,
+        ...(u.name !== undefined ? { name: u.name } : {}),
+      }),
+    );
+  }
+
+  for (const fk of table.foreignKeys) {
+    if (fk.constraint === false) continue;
+    constraints.push(
+      new ForeignKeyConstraint({
+        columns: fk.source.columns,
+        refTable: fk.target.tableName,
+        refColumns: fk.target.columns,
+        ...(fk.name !== undefined ? { name: fk.name } : {}),
+        ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
+        ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
+      }),
+    );
+  }
+
+  return { columns, constraints };
+}
+
+// ============================================================================
 // Issue planner
 // ============================================================================
 
@@ -309,8 +397,17 @@ function mapIssueToCall(
           ),
         );
       }
-      const tableSpec = toTableSpec(contractTable, ctx.storageTypes);
-      const calls: SqliteOpFactoryCall[] = [new CreateTableCall(issue.table, tableSpec)];
+      const { columns: ddlColumns, constraints: ddlConstraints } = tableToDdlParts(
+        contractTable,
+        ctx.storageTypes,
+      );
+      const calls: SqliteOpFactoryCall[] = [
+        new CreateTableCall(
+          issue.table,
+          ddlColumns,
+          ddlConstraints.length > 0 ? ddlConstraints : undefined,
+        ),
+      ];
       const declaredIndexColumnKeys = new Set<string>();
       for (const index of contractTable.indexes) {
         const indexName = index.name ?? defaultIndexName(issue.table, index.columns);
