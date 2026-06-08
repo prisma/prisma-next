@@ -5,21 +5,22 @@
 
 ---
 
-## Context
-
-PSL has a fixed set of top-level block keywords (`model`, `type`, `types`, `namespace`, `enum`). Extensions that want to introduce new top-level constructs — Postgres RLS policies, roles, views — had no mechanism to do so. Every new construct required a core change, which conflicts with the thin-core, fat-targets principle (see [ADR 005](ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md)).
-
-## Problem
-
-- PSL syntax is closed to extension; packs can only decorate core entities via attributes.
-- An earlier implementation (PR #718) gave each extension an imperative `parseFn` / `validateFn` / `emitFn` triple. That approach re-implements parsing the framework already does, is opaque to inspection and analysis, and forces defensive machinery to handle arbitrary extension-supplied code paths.
-- PSL's grammar is closed and uniform: a top-level block is a keyword + name + body of `x = y` assignments and double-quoted values. The framework already handles all of that for built-in block types. Contributed parser functions that re-implement a subset of that are unnecessary.
-
 ## Decision
 
-An extension registers an **`AuthoringPslBlockDescriptor`** — a data descriptor, not code — for each top-level keyword it contributes. The descriptor declares: the keyword, a `discriminator` string, whether the block has a name, and a `parameters` map of typed value-kind descriptors.
+An extension contributes a new top-level PSL keyword by **describing the block as data**, not by shipping code. It registers an `AuthoringPslBlockDescriptor` — the keyword, whether the block is named, and a map of typed parameters — and the framework owns the single generic parser, validator, and printer that interpret any declared block.
 
-The framework owns **one generic parser, one generic validator, and one generic printer** that interpret any declared block from its descriptor. No parsing or printing code runs from the extension.
+A Postgres RLS policy, for example, is authored like any other PSL block:
+
+```prisma
+policy_select ReadPosts {
+  target = Post                      // ref → a declared model
+  as     = permissive                // option → one of a fixed token set
+  roles  = [admin, editor]           // list of refs
+  using  = "auth.uid() = author_id"  // value → a codec-typed literal
+}
+```
+
+and the extension registers exactly this descriptor to make that block parseable, validatable, printable, and round-trippable:
 
 ```ts
 import type { AuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
@@ -30,72 +31,63 @@ const policySelectDescriptor: AuthoringPslBlockDescriptor = {
   discriminator: 'postgres-policy-select',
   name: { required: true },
   parameters: {
-    target: { kind: 'ref',    refKind: 'model',             scope: 'same-namespace', required: true },
-    as:     { kind: 'option', values: ['permissive', 'restrictive'],                 required: false },
-    roles:  { kind: 'list',   of: { kind: 'ref', refKind: 'role', scope: 'cross-space' },           required: false },
-    using:  { kind: 'value',  codecId: 'String',                                     required: true },
+    target: { kind: 'ref',    refKind: 'model',                       scope: 'same-namespace', required: true },
+    as:     { kind: 'option', values: ['permissive', 'restrictive'],                           required: false },
+    roles:  { kind: 'list',   of: { kind: 'ref', refKind: 'role', scope: 'cross-space' },       required: false },
+    using:  { kind: 'value',  codecId: 'String',                                               required: true },
   },
 };
 ```
 
-The descriptor is registered on `AuthoringContributions.pslBlockDescriptors`. Each descriptor must have a matching `AuthoringContributions.entityTypes` factory with the same discriminator — the parsed AST node lowers to an IR class instance through that factory.
+No parsing or printing code runs from the extension. The descriptor is registered on `AuthoringContributions.pslBlockDescriptors`, paired with a matching `AuthoringContributions.entityTypes` factory under the same `discriminator`; the parsed block lowers to an IR class instance through that factory.
 
-## Details
+## Why describe blocks as data
 
-### Parameter value-kind vocabulary
+PSL's grammar is closed and uniform: a top-level block is a keyword, an optional name, and a body of `x = y` assignments and double-quoted values. The framework already parses exactly this shape for the built-in keywords (`model`, `type`, `types`, `namespace`, `enum`). A contributed block has the same shape, so its structure can be *described* — keyword, parameters, parameter types — and interpreted by the same generic machinery. Nothing about a new block requires the extension to re-implement parsing.
 
-Four kinds; the split is principled, not incidental:
+The constraint this addresses: PSL's keyword set was closed, so an extension that wanted a new top-level construct (an RLS policy, a role, a view) had no way to add one without a core change — which conflicts with the thin-core, fat-targets principle ([ADR 005](ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md)). Describing blocks as data opens the keyword set to extensions while keeping all parsing in the framework.
+
+## Parameter value-kinds
+
+A parameter is one of four kinds. The split is principled, not incidental:
 
 | Kind | What it is | Backing machinery |
 |---|---|---|
 | **`ref`** | an identifier that resolves to a declared entity | resolved against the `(spaceId, namespaceId, entityKind, entityName)` coordinate model; `scope` ∈ `same-namespace` / `same-space` / `cross-space` |
-| **`value`** | a codec-typed value — the codec owns PSL parse and print | the existing codec/type system, same as field types and `@default` literals; opaque content (SQL predicates, JSON blobs) stays opaque to the framework |
-| **`option`** | one of a fixed set of literal tokens | an inline closed token list on the descriptor — authoring-time constraint only; not a codec, not persisted data, not a domain enum |
+| **`value`** | a codec-typed value — the codec owns its representation | the existing codec/type system, same as field types and `@default` literals; opaque content (SQL predicates, JSON blobs) stays opaque to the framework |
+| **`option`** | one of a fixed set of literal tokens | an inline closed token list on the descriptor — an authoring-time constraint only |
 | **`list`** | a bracketed list of any of the above | combinator |
 
-### `value` rides the codec JSON medium
+**`value` rides the codec JSON medium.** A `value` parameter names a `codecId`, exactly as a field's type and a `@default` literal's type do. The codec's `encodeJson` / `decodeJson` (with `JSON.parse` / `JSON.stringify`) carry the value through the PSL-text ↔ literal ↔ encoded-form pipeline. This gives structural parity across the three places PSL carries a typed value — field types, defaults, and block parameters — and makes any custom type usable as a parameter value with no extra work.
 
-A `value` parameter uses a `codecId`, exactly as a field's type and a `@default` literal's type do. The codec's `encodeJson` / `decodeJson` hooks (combined with `JSON.parse` / `JSON.stringify`) carry the value through the PSL text ↔ literal ↔ encoded form pipeline. This gives structural parity across the three places PSL carries a typed value (field types, defaults, block parameters) and makes custom types available as parameter values with no additional work.
+**`option` is not a domain enum.** `as = permissive` is configuration of the policy node, not user data; it is never realised as a stored value-set or check constraint. It is a closed list of authoring tokens that constrains what the author may write — a lightweight inline constraint, deliberately not coupled to the domain-enum machinery.
 
-### `option` is not a domain enum
+**Per-block-kind schemas, no conditional logic.** Where a parameter's validity depends on context, the answer is separate keywords with fixed parameter sets — not conditional rules inside one descriptor. Postgres RLS uses `policy_select` / `policy_insert` / `policy_update` / `policy_delete` rather than one `policy` block with an `operation` parameter. The command is encoded in the keyword, so an invalid parameter combination is structurally impossible.
 
-`as = permissive` is configuration of the policy node, not user data. It is never realised as a stored value-set or check constraint. Modelling it as an enum would couple it to the enums-as-domain machinery (see [PR #748](https://github.com/prisma/prisma-next/pull/748)); it stays a lightweight inline authoring constraint.
+## How the framework interprets a block
 
-### Per-block-kind schemas, no conditional logic
+**Parse.** On an unknown top-level keyword, the framework looks it up in the `pslBlockDescriptors` registry. If a descriptor claims it, the generic parser reads the block into a `PslExtensionBlock` node — a name plus a `parameters` map keyed by parameter name. No extension code runs.
 
-Where a parameter's validity depends on context, the answer is separate block keywords with fixed parameter sets — not conditional rules inside a descriptor. Postgres RLS uses `policy_select` / `policy_insert` / `policy_update` / `policy_delete` rather than one `policy` block with an `operation` parameter. The command is encoded in the keyword; an invalid parameter combination is structurally impossible.
+**Validate.** The validator checks, at parse time and with source spans: unknown parameters; missing required parameters; an `option` value outside the declared set; a `value` the codec's `decodeJson` rejects; and a `ref` that doesn't resolve within its declared scope.
 
-### Framework behaviour at parse time
+**Lower.** The `PslExtensionBlock` lowers to a Contract IR class instance via the matching `entityTypes` factory, keyed by the shared `discriminator`. Every contributed block requires a matching factory; the framework enforces this at load time (`assertPslBlocksHaveFactories`), alongside checks for duplicate keywords, duplicate discriminators, and malformed descriptors — each diagnostic naming the contributing extension.
 
-On encountering an unknown top-level keyword, the framework looks it up in the `pslBlockDescriptors` registry. If a descriptor claims the keyword, the generic parser reads the block into a `PslExtensionBlock` node — name plus a `parameters` map of `PslExtensionBlockParamValue` values keyed by parameter name. No extension code runs.
+**Print.** The generic printer reconstructs any declared block from its descriptor and AST node, so an inferred contract round-trips back to PSL source.
 
-The validator then checks (at load/parse time, with spans):
-- unknown parameters (keys not in the descriptor's `parameters` map)
-- missing required parameters
-- `option` value outside the declared `values` array
-- `value` text rejected by the codec's `decodeJson` / `JSON.parse`
-- `ref` identifier that does not resolve within the declared scope
-
-The printer reconstructs any declared block from its descriptor + AST node.
-
-### The parsed node lowers to IR
-
-The `PslExtensionBlock` node lowers to a Contract IR class instance via the matching `entityTypes` factory, keyed by the shared `discriminator`. Every extension-contributed PSL block requires a matching factory; the framework enforces this at load time (`assertPslBlocksHaveFactories`).
-
-### Load-time validation
-
-Duplicate keywords, duplicate discriminators, a block registered without a matching `entityTypes` factory, and malformed descriptors all fail at load time with clear diagnostics naming the contributing extension.
-
-### Parsed extension blocks in the AST
-
-Parsed extension blocks are stored in `PslNamespace.entries[discriminator][name]` — the same ADR 224 coordinate structure the IR uses. The built-in accessor helpers (`models`, `enums`, `compositeTypes`) derive from `entries`; extension kinds are reached via `entries[discriminator]` or the `namespacePslExtensionBlocks` helper.
+Parsed blocks are stored at `PslNamespace.entries[discriminator][name]` — the same coordinate structure the IR uses ([ADR 224](ADR%20224%20-%20Namespace%20concretions%20address%20entities%20by%20coordinate.md)). Built-in accessors (`models`, `enums`, `compositeTypes`) derive from `entries`; extension kinds are reached via `entries[discriminator]` or the `namespacePslExtensionBlocks` helper.
 
 ## Consequences
 
-- The extension ships zero parse/print code. A descriptor that correctly declares its parameters is fully parseable, validatable, printable, and round-trippable without any additional implementation.
-- The framework's single generic parser/validator/printer handles all declared blocks. New block shapes are additive: a new `parameters` entry with a new kind cannot break existing blocks.
-- Extensibility at the PSL layer aligns with the IR: the three architectural layers (IR class, lowering factory, PSL parse/print) are all addressed by the shared `discriminator`. See [ADR 225 — Three-layer extensibility for pack-contributed entity kinds](ADR%20225%20-%20Three-layer%20extensibility%20for%20pack-contributed%20entity%20kinds.md).
+- A descriptor that correctly declares its parameters is fully parseable, validatable, printable, and round-trippable with zero extension parse/print code.
+- New block shapes are additive — a new parameter entry cannot break existing blocks, and the single generic parser/validator/printer handles every declared block.
 - Descriptors are inspectable data: they can be validated, documented, and reasoned about without executing extension code.
+- Extensibility at the PSL layer aligns with the IR: the IR class, the lowering factory, and the PSL parse/print path are all addressed by the shared `discriminator` ([ADR 225](ADR%20225%20-%20Three-layer%20extensibility%20for%20pack-contributed%20entity%20kinds.md)).
+
+## Alternatives considered
+
+**A function SPI** — each extension ships an imperative `parseFn` / `validateFn` / `emitFn` triple. Rejected: it re-implements parsing the framework already does for built-in blocks, the parser logic is opaque to inspection and analysis (you cannot reason about a block's shape without running its code), and it forces defensive machinery to contain arbitrary extension-supplied code paths. A descriptor is inspectable data and needs none of that. The closed, uniform grammar is what makes the data description sufficient — there is no block shape expressible through a function SPI that a descriptor cannot describe.
+
+**Modelling `option` as a domain enum** — reusing the enum machinery for the fixed token set. Rejected: an `option` is authoring-time configuration, never persisted data, so coupling it to domain enums would wrongly drag in value-set storage and validation semantics it never needs.
 
 ## References
 
