@@ -220,6 +220,32 @@ const StorageTableSchema = type({
   foreignKeys: ForeignKeySchema.array().readonly(),
   'control?': ControlPolicySchema,
   'checks?': CheckConstraintSchema.array().readonly(),
+  'rls?': "'enabled' | 'disabled'",
+});
+
+/**
+ * Postgres database role entry under `storage.namespaces[id].entries.role[name]`.
+ */
+export const PostgresRoleSchema = type({
+  kind: "'postgres-role'",
+  name: 'string',
+  namespaceId: 'string',
+});
+
+/**
+ * Postgres row-level security policy entry under
+ * `storage.namespaces[id].entries.rlsPolicy[name]`.
+ */
+export const PostgresRlsPolicySchema = type({
+  kind: "'postgres-rls-policy'",
+  name: 'string',
+  prefix: 'string',
+  tableName: 'string',
+  operation: "'select' | 'insert' | 'update' | 'delete' | 'all'",
+  roles: type.string.array().readonly(),
+  'using?': 'string',
+  'withCheck?': 'string',
+  permissive: 'boolean',
 });
 
 /**
@@ -287,10 +313,26 @@ function namespaceSlotEntrySchema(
 }
 
 /**
+ * Builds a record schema that validates each entry by matching the
+ * entry's `kind` discriminator against the provided fragments map.
+ * Entries with an unrecognized `kind` are validated by `fallback`.
+ */
+function slotMapSchema(
+  fallback: Type<unknown>,
+  fallbackKind: string,
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  return type({
+    '[string]': namespaceSlotEntrySchema(fallback, fallbackKind, fragments),
+  });
+}
+
+/**
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
  * Pack-contributed `validatorSchema` fragments — keyed by the
  * descriptor's `discriminator` — validate each entry by matching the
- * entry's `kind` field on the `'entries.type'` slot.
+ * entry's `kind` field on the `'entries.type'`, `'entries.role'`, and
+ * `'entries.rlsPolicy'` slots.
  */
 export function createNamespaceEntrySchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
@@ -302,9 +344,9 @@ export function createNamespaceEntrySchema(
     entries: type({
       '+': 'reject',
       'table?': type({ '[string]': StorageTableSchema }),
-      'type?': type({
-        '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
-      }),
+      'type?': slotMapSchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
+      'role?': slotMapSchema(PostgresRoleSchema, 'postgres-role', fragments),
+      'rlsPolicy?': slotMapSchema(PostgresRlsPolicySchema, 'postgres-rls-policy', fragments),
       'valueSet?': type({ '[string]': StorageValueSetSchema }),
     }),
   }) as Type<unknown>;
