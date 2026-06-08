@@ -428,7 +428,7 @@ function enumRebuildCallRecipe(
   const nativeType = toType.nativeType;
   const desiredValues: readonly string[] = isEnum
     ? toType.values
-    : (((toType as StorageTypeInstance).typeParams?.['values'] ?? []) as readonly string[]);
+    : (((toType as StorageTypeInstance).typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
   // Type DDL targets the enum's real schema — the unbound coordinate resolves
   // to the introspected `current_schema()`, never the `__unbound__` sentinel.

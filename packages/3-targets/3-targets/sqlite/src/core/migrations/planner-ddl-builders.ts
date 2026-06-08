@@ -15,7 +15,6 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 
 type SqliteColumnDefault = StorageColumn['default'];
@@ -147,6 +146,6 @@ function resolveColumnTypeMetadata(
   return {
     codecId: referencedType.codecId,
     nativeType: referencedType.nativeType,
-    ...ifDefined('typeParams', referencedType.typeParams),
+    typeParams: referencedType.typeParams,
   };
 }

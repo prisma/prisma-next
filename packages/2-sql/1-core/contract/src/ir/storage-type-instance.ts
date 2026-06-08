@@ -21,13 +21,15 @@ export interface StorageTypeInstance extends StorageType {
   readonly kind: typeof CODEC_INSTANCE_KIND;
   readonly codecId: string;
   readonly nativeType: string;
-  readonly typeParams?: Record<string, unknown>;
+  readonly typeParams: Record<string, unknown>;
 }
 
 /**
  * Construction-time input for a codec-triple entry. Symmetric with the
  * structural runtime shape minus the `kind` discriminator — callers may
  * omit `kind`; the helper {@link toStorageTypeInstance} stamps it on.
+ * `typeParams` may be omitted on input; the constructor normalises a
+ * missing value to `{}` so the in-memory shape is always present.
  */
 export interface StorageTypeInstanceInput {
   readonly codecId: string;
@@ -38,14 +40,14 @@ export interface StorageTypeInstanceInput {
 /**
  * Stamp the codec-instance `kind` discriminator on a caller-supplied
  * codec triple. Idempotent: input that already carries the discriminator
- * passes through unchanged.
+ * passes through unchanged. Missing `typeParams` is normalised to `{}`.
  */
 export function toStorageTypeInstance(input: StorageTypeInstanceInput): StorageTypeInstance {
   return {
     kind: CODEC_INSTANCE_KIND,
     codecId: input.codecId,
     nativeType: input.nativeType,
-    ...(input.typeParams !== undefined ? { typeParams: input.typeParams } : {}),
+    typeParams: input.typeParams ?? {},
   };
 }
 

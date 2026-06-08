@@ -6,6 +6,7 @@ import {
   isStorageTypeInstance,
   type StorageTypeInstance,
   type StorageTypeInstanceInput,
+  toStorageTypeInstance,
 } from './storage-type-instance';
 import type { StorageValueSet, StorageValueSetInput } from './storage-value-set';
 
@@ -119,7 +120,15 @@ export function storageTableAt(
  */
 function normaliseTypeEntry(name: string, entry: SqlStorageTypeEntry): StorageTypeInstance {
   if (isStorageTypeInstance(entry)) {
-    return entry;
+    // Normalise on-disk objects that omit `typeParams` (the canonical on-disk
+    // form strips empty typeParams to keep JSON compact). The in-memory invariant
+    // is always `typeParams: {}` when empty — never `undefined`. Only create a
+    // new object when necessary to preserve identity-equality for callers that
+    // hold a reference to an already-correct in-memory entry.
+    if ('typeParams' in entry) {
+      return entry;
+    }
+    return toStorageTypeInstance(entry);
   }
   const rawKind = (entry as { kind?: unknown }).kind;
   const kindDescription =
