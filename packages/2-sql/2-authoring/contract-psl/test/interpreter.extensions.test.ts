@@ -13,6 +13,7 @@ import {
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  composedExtensionContracts: new Map(),
 } as const;
 
 describe('interpretPslDocumentToSqlContract extensions', () => {

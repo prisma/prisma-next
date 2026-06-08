@@ -965,7 +965,7 @@ namespace auth {
     });
   });
 
-  describe('qualified field-type rendering (TML-2500 M2.5 + TML-2459 gap fix)', () => {
+  describe('qualified field-type rendering', () => {
     // Helper: build a minimal AST with a single model containing one field.
     function astWithField(field: {
       name: string;

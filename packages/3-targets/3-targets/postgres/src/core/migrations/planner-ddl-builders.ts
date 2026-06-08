@@ -1,15 +1,42 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type {
-  ForeignKey,
   PostgresEnumStorageEntry,
   StorageColumn,
+  StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
-import { qualifyTableName } from './planner-sql-checks';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
+
+export function buildCreateTableSql(
+  qualifiedTableName: string,
+  table: StorageTable,
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
+  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
+): string {
+  const columnDefinitions = Object.entries(table.columns).map(
+    ([columnName, column]: [string, StorageColumn]) => {
+      const parts = [
+        quoteIdentifier(columnName),
+        buildColumnTypeSql(column, codecHooks, storageTypes),
+        buildColumnDefaultSql(column.default, column),
+        column.nullable ? '' : 'NOT NULL',
+      ].filter(Boolean);
+      return parts.join(' ');
+    },
+  );
+
+  const constraintDefinitions: string[] = [];
+  if (table.primaryKey) {
+    constraintDefinitions.push(
+      `PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
+    );
+  }
+
+  const allDefinitions = [...columnDefinitions, ...constraintDefinitions];
+  return `CREATE TABLE ${qualifiedTableName} (\n  ${allDefinitions.join(',\n  ')}\n)`;
+}
 
 /**
  * Pattern for safe PostgreSQL type names.
@@ -185,35 +212,4 @@ export function buildAddColumnSql(
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
   return parts.join(' ');
-}
-
-export function buildForeignKeySql(
-  schemaName: string,
-  tableName: string,
-  fkName: string,
-  foreignKey: ForeignKey,
-): string {
-  let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(fkName)}
-FOREIGN KEY (${foreignKey.source.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, foreignKey.target.tableName)} (${foreignKey.target.columns
-    .map(quoteIdentifier)
-    .join(', ')})`;
-
-  if (foreignKey.onDelete !== undefined) {
-    const action = REFERENTIAL_ACTION_SQL[foreignKey.onDelete];
-    if (!action) {
-      throw new Error(`Unknown referential action for onDelete: ${String(foreignKey.onDelete)}`);
-    }
-    sql += `\nON DELETE ${action}`;
-  }
-  if (foreignKey.onUpdate !== undefined) {
-    const action = REFERENTIAL_ACTION_SQL[foreignKey.onUpdate];
-    if (!action) {
-      throw new Error(`Unknown referential action for onUpdate: ${String(foreignKey.onUpdate)}`);
-    }
-    sql += `\nON UPDATE ${action}`;
-  }
-
-  return sql;
 }

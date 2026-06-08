@@ -1,5 +1,5 @@
 /**
- * M2.2 — TS cross-space relation (Option B, non-navigable) + emitter
+ * TS cross-space relation (Option B, non-navigable) + emitter
  *
  * Tests for cross-contract relation lowering:
  * - A cross-space `rel.belongsTo(ExtModel, …)` produces a domain relation whose
@@ -46,10 +46,7 @@ const supabasePack: ExtensionPackRef<'sql', 'postgres'> = {
   version: '0.0.1',
 };
 
-/**
- * Synthetic supabase AuthUser handle — same pattern as M2.1 cross-space FK tests.
- * M2.3 will produce this from the real extension package.
- */
+/** Synthetic supabase AuthUser handle for in-test use. */
 function buildSyntheticSupabaseAuthUser() {
   return new ContractModelBuilder(
     {
@@ -311,7 +308,7 @@ describe('F-relfk: cross-space belongsTo().sql({ fk }) produces a cross-space FK
 // ---------------------------------------------------------------------------
 
 describe('local belongsTo relation regression (AC9)', () => {
-  it('a local belongsTo relation has no to.space (byte-identical to pre-M2.2)', () => {
+  it('a local belongsTo relation has no to.space', () => {
     const User = model('User', {
       fields: {
         id: field.column(int4Column).id(),

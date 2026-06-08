@@ -40,6 +40,7 @@ function interpretWithRealPacks(schema: string) {
     scalarTypeDescriptors: buildColumnDescriptorMap(),
     controlMutationDefaults: stack.controlMutationDefaults,
     authoringContributions: stack.authoringContributions,
+    composedExtensionContracts: new Map(),
     composedExtensionPacks: [pgvectorControl.id],
     composedExtensionPackRefs: [pgvectorPack],
     createNamespace: postgresCreateNamespace,

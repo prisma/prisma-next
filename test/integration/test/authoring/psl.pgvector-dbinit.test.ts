@@ -85,6 +85,7 @@ describe(
 
       const pslResult = await contractConfig.source.load({
         composedExtensionPacks: [pgvector.id],
+        composedExtensionContracts: new Map(),
         scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,
         codecLookup: stack.codecLookup,

@@ -1,12 +1,10 @@
-import { asNamespaceId } from '@prisma-next/contract/types';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { ForeignKey, StorageColumn } from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import {
   buildAddColumnSql,
   buildColumnDefaultSql,
   buildColumnTypeSql,
-  buildForeignKeySql,
+  buildCreateTableSql,
   renderDefaultLiteral,
 } from '@prisma-next/target-postgres/planner-ddl-builders';
 import { describe, expect, it } from 'vitest';
@@ -206,63 +204,38 @@ describe('buildAddColumnSql', () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildForeignKeySql
+// buildCreateTableSql
 // ---------------------------------------------------------------------------
 
-describe('buildForeignKeySql', () => {
-  const baseFk: ForeignKey = {
-    source: {
-      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-      tableName: 'post',
-      columns: ['author_id'],
-    },
-    target: {
-      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-      tableName: 'user',
-      columns: ['id'],
-    },
-    constraint: true,
-    index: true,
-  };
-
-  it('builds basic FK without referential actions', () => {
-    const sql = buildForeignKeySql('public', 'post', 'post_author_id_fkey', baseFk);
-    expect(sql).toContain('ALTER TABLE "public"."post"');
-    expect(sql).toContain('ADD CONSTRAINT "post_author_id_fkey"');
-    expect(sql).toContain('FOREIGN KEY ("author_id")');
-    expect(sql).toContain('REFERENCES "public"."user" ("id")');
-    expect(sql).not.toContain('ON DELETE');
-    expect(sql).not.toContain('ON UPDATE');
+describe('buildCreateTableSql', () => {
+  it('builds CREATE TABLE with columns and primary key', () => {
+    const table: StorageTable = {
+      columns: {
+        id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+        name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+      },
+      primaryKey: { columns: ['id'] },
+      uniques: [],
+      foreignKeys: [],
+      indexes: [],
+    };
+    const sql = buildCreateTableSql('"public"."user"', table, noHooks);
+    expect(sql).toContain('CREATE TABLE "public"."user"');
+    expect(sql).toContain('"id" int4 NOT NULL');
+    expect(sql).toContain('"name" text');
+    expect(sql).toContain('PRIMARY KEY ("id")');
   });
 
-  it.each([
-    ['cascade', 'CASCADE'],
-    ['restrict', 'RESTRICT'],
-    ['noAction', 'NO ACTION'],
-    ['setNull', 'SET NULL'],
-    ['setDefault', 'SET DEFAULT'],
-  ] as const)('renders ON DELETE %s', (action, expected) => {
-    const fk: ForeignKey = { ...baseFk, onDelete: action };
-    const sql = buildForeignKeySql('public', 'post', 'fk', fk);
-    expect(sql).toContain(`ON DELETE ${expected}`);
-  });
-
-  it.each([
-    ['cascade', 'CASCADE'],
-    ['restrict', 'RESTRICT'],
-    ['noAction', 'NO ACTION'],
-    ['setNull', 'SET NULL'],
-    ['setDefault', 'SET DEFAULT'],
-  ] as const)('renders ON UPDATE %s', (action, expected) => {
-    const fk: ForeignKey = { ...baseFk, onUpdate: action };
-    const sql = buildForeignKeySql('public', 'post', 'fk', fk);
-    expect(sql).toContain(`ON UPDATE ${expected}`);
-  });
-
-  it('renders both ON DELETE and ON UPDATE', () => {
-    const fk: ForeignKey = { ...baseFk, onDelete: 'cascade', onUpdate: 'restrict' };
-    const sql = buildForeignKeySql('public', 'post', 'fk', fk);
-    expect(sql).toContain('ON DELETE CASCADE');
-    expect(sql).toContain('ON UPDATE RESTRICT');
+  it('omits PRIMARY KEY when not defined', () => {
+    const table: StorageTable = {
+      columns: {
+        value: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+      },
+      uniques: [],
+      foreignKeys: [],
+      indexes: [],
+    };
+    const sql = buildCreateTableSql('"public"."kv"', table, noHooks);
+    expect(sql).not.toContain('PRIMARY KEY');
   });
 });

@@ -1,5 +1,5 @@
 /**
- * M2.2 — Option B non-navigable cross-space relation: negative type test
+ * Option B non-navigable cross-space relation: negative type test
  *
  * Verifies that:
  * 1. A local relation can be used with `include('relName')` (positive case)

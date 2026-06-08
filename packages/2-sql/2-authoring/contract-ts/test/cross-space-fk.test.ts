@@ -1,9 +1,9 @@
 /**
- * M2.1 — TS brand foundation + cross-space FK (storage plane)
+ * TS brand foundation + cross-space FK (storage plane)
  *
  * Tests for cross-contract foreign key lowering: model-handle branding,
  * cross-space FK lowering (including chained handles), missing-pack diagnostics,
- * cascade-action passthrough, and NFR2 local-FK regression.
+ * cascade-action passthrough, and local-FK regression.
  */
 import type {
   ExtensionPackRef,
@@ -36,10 +36,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 
-/**
- * A synthetic supabase extension pack ref — the kind that M2.3 will produce
- * from the real extension, but defined in-test for M2.1.
- */
+/** A synthetic supabase extension pack ref for in-test use. */
 const supabasePack: ExtensionPackRef<'sql', 'postgres'> = {
   kind: 'extension',
   id: 'supabase',
@@ -50,11 +47,10 @@ const supabasePack: ExtensionPackRef<'sql', 'postgres'> = {
 
 /**
  * A synthetic branded extension model handle representing `auth.User` in the
- * `supabase` contract space. M2.3 will produce this from the real extension
- * package; for M2.1 we build it directly in the test.
+ * `supabase` contract space, built directly in the test.
  *
  * The handle is a `ContractModelBuilder` branded with `spaceId: 'supabase'`,
- * then chained with `.sql({ table: 'users' })` — exactly how M2.3 will build it.
+ * then chained with `.sql({ table: 'users' })`.
  * The table name `users` differs from `modelName.toLowerCase()` (`user`), making
  * the `tableName` assertion non-coincidental.
  */
@@ -115,8 +111,8 @@ describe('TargetFieldRef brand (type-level)', () => {
     expectTypeOf(ExtUser.refs.id).toEqualTypeOf<TargetFieldRef<'User', 'id', 'supabase'>>();
   });
 
-  it('brand survives .sql() chaining — chained handle still carries the spaceId (F1)', () => {
-    // Build the handle using the staged pattern, exactly as M2.3 will.
+  it('brand survives .sql() chaining — chained handle still carries the spaceId', () => {
+    // Build the handle using the staged pattern.
     const ExtUser = new ContractModelBuilder(
       {
         modelName: 'User' as const,

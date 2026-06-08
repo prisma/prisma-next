@@ -128,3 +128,8 @@ M2.5 → AC2(round-trip). AC9 regression + AC10 guarded every dispatch.
   default; revisit on user feedback (project-spec open question).
 - `<self>` branding mechanism choice (closure-captured contract id vs post-hoc tagging) — implementer's
   call in M2.1; both satisfy AC behaviour (project-spec open question).
+- **FK-target `spaceId` type-surface gap** (surfaced by the M2.3 reviewer). The lowered
+  `BuiltStorageTables<Definition>` type omits `spaceId` on the FK target, though the runtime
+  `ForeignKeyReference` carries it (a test needed a record cast to read it). Runtime is correct, so M3's
+  planner reads it fine; this is a type-level completeness cleanup in `contract-ts`/`sql-contract` —
+  candidate for a small follow-up (M3 or a dedicated cleanup), not an M2 blocker.

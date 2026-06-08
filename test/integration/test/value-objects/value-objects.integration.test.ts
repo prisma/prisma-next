@@ -83,6 +83,7 @@ function interpretSqlPsl(schema: string) {
     document,
     target: postgresTarget,
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    composedExtensionContracts: new Map(),
   });
 }
 

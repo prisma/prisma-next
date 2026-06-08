@@ -105,6 +105,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
               ? [...context.composedExtensionPacks]
               : undefined,
           ),
+          composedExtensionContracts: context.composedExtensionContracts,
           ...ifDefined(
             'composedExtensionPackRefs',
             options.composedExtensionPackRefs?.length

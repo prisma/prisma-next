@@ -103,6 +103,16 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
   /**
+   * Extension contracts keyed by space ID. Required for cross-space FK
+   * resolution. A composed space must have an entry here; if the space ID
+   * appears in `composedExtensionPacks` but is absent from this map, the
+   * interpreter emits `PSL_UNKNOWN_CONTRACT_SPACE` and fails fast — there
+   * is no silent fallback. If a space's contract is present but the
+   * referenced model or namespace is not found in it, the interpreter
+   * emits `PSL_UNKNOWN_CROSS_SPACE_TARGET`.
+   */
+  readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
+  /**
    * Target-supplied `Namespace` factory threaded into
    * `buildSqlContractFromDefinition` for the contract's
    * `SqlStorage.namespaces` population. Required when the document
@@ -589,6 +599,8 @@ interface BuildModelNodeInput {
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly composedExtensions: Set<string>;
+  /** Extension contracts keyed by space ID for cross-space FK table-name resolution. */
+  readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
   readonly familyId: string;
   readonly targetId: string;
   readonly authoringContributions: AuthoringContributions | undefined;
@@ -989,8 +1001,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     // Cross-contract-space relation: the target model lives in a different contract space
     // identified by `typeContractSpaceId` (e.g. `supabase:auth.User`).
     if (fieldTypeContractSpaceId !== undefined) {
-      // Fail fast if the space is not in the composed extension packs (AC5 PSL half).
-      if (!input.composedExtensions.has(fieldTypeContractSpaceId)) {
+      // Fail fast if the space has no entry in composedExtensionContracts (AC5 PSL half).
+      const extContractForSpace = input.composedExtensionContracts.get(fieldTypeContractSpaceId);
+      if (extContractForSpace === undefined) {
         diagnostics.push({
           code: 'PSL_UNKNOWN_CONTRACT_SPACE',
           message: `Relation field "${model.name}.${relationAttribute.field.name}" references contract space "${fieldTypeContractSpaceId}" which is not declared in extensionPacks. Add "${fieldTypeContractSpaceId}" to extensionPacks in prisma-next.config.ts.`,
@@ -1076,13 +1089,33 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       // no-namespace form is used (e.g. `supabase:User` → AC3).
       const crossTargetNamespaceId = fieldTypeNamespaceId ?? '__unbound__';
 
-      // Target table name: the interpreter cannot resolve `User → users` because it has no
-      // access to the extension contract (only a Set<string> of space names is available).
-      // Use `fieldTypeName.toLowerCase()` as a symbolic fallback — the same convention the TS
-      // builder uses (`targetModelName.toLowerCase()`) when `targetTableName` is absent.
-      // Physical table resolution against the extension contract is deferred to the aggregate
-      // stage (M3), which has access to the full extension contract.
-      const crossTargetTableName = fieldTypeName.toLowerCase();
+      // Target table name: resolved from the extension contract. The get() check above
+      // guarantees extContractForSpace is defined here; if the model or namespace is not
+      // found in it, emit PSL_UNKNOWN_CROSS_SPACE_TARGET (user typo).
+      const extContract = extContractForSpace;
+      const resolvedTable =
+        extContract.domain.namespaces[crossTargetNamespaceId]?.models[fieldTypeName]?.storage[
+          'table'
+        ];
+      if (typeof resolvedTable !== 'string') {
+        const availableModels =
+          Object.keys(extContract.domain.namespaces[crossTargetNamespaceId]?.models ?? {}).join(
+            ', ',
+          ) || '(none)';
+        diagnostics.push({
+          code: 'PSL_UNKNOWN_CROSS_SPACE_TARGET',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" references model "${fieldTypeName}" in namespace "${crossTargetNamespaceId}" of space "${fieldTypeContractSpaceId}", but that model was not found in the extension contract. Available models: ${availableModels}`,
+          sourceId,
+          span: relationAttribute.field.span,
+          data: {
+            space: fieldTypeContractSpaceId,
+            namespace: crossTargetNamespaceId,
+            model: fieldTypeName,
+          },
+        });
+        continue;
+      }
+      const crossTargetTableName = resolvedTable;
 
       foreignKeyNodes.push({
         columns: localColumns,
@@ -1895,6 +1928,8 @@ export function interpretPslDocumentToSqlContract(
   const modelNames = new Set(models.map((model) => model.name));
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
+  const composedExtensionContracts: ReadonlyMap<string, Contract> =
+    input.composedExtensionContracts;
   const defaultFunctionRegistry: ControlMutationDefaultRegistry =
     input.controlMutationDefaults?.defaultFunctionRegistry ?? new Map();
   const generatorDescriptors = input.controlMutationDefaults?.generatorDescriptors ?? [];
@@ -1980,6 +2015,7 @@ export function interpretPslDocumentToSqlContract(
       enumTypeDescriptors: allEnumTypeDescriptors,
       namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
       composedExtensions,
+      composedExtensionContracts,
       familyId: input.target.familyId,
       targetId: input.target.targetId,
       authoringContributions: input.authoringContributions,

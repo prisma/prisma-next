@@ -31,12 +31,17 @@ const testIndexPack = {
 describe('interpretPslDocumentToSqlContract', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
   const interpretPslDocumentToSqlContract = (
-    input: Omit<InterpretPslDocumentToSqlContractInput, 'target' | 'scalarTypeDescriptors'>,
+    input: Omit<
+      InterpretPslDocumentToSqlContractInput,
+      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts'
+    > &
+      Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
+      composedExtensionContracts: new Map(),
       ...input,
     });
 
@@ -56,6 +61,7 @@ describe('interpretPslDocumentToSqlContract', () => {
         ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
         ['String', { codecId: 'custom/text@1', nativeType: 'custom_text' }],
       ]),
+      composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -121,6 +127,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       target: targetWithCapabilities,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
+      composedExtensionContracts: new Map(),
     });
 
     expect(result.ok).toBe(true);
@@ -144,6 +151,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       document,
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      composedExtensionContracts: new Map(),
       controlMutationDefaults: {
         defaultFunctionRegistry: new Map([
           [

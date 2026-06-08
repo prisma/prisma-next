@@ -93,6 +93,185 @@ describe('verifySqlSchema - constraints', () => {
         }),
       );
     });
+
+    describe('cross-space FK (public.profile.user_id -> auth.users.id)', () => {
+      it('returns zero issues when cross-space FK matches introspected pg_constraint row', () => {
+        const contract = createTestContract({
+          profile: createContractTable(
+            {
+              id: { nativeType: 'int4', nullable: false },
+              user_id: { nativeType: 'uuid', nullable: false },
+            },
+            {
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'profile',
+                    columns: ['user_id'],
+                  },
+                  target: { namespaceId: 'auth', tableName: 'users', columns: ['id'] },
+                  constraint: true,
+                  index: false,
+                },
+              ],
+            },
+          ),
+        });
+
+        const schema = createTestSchemaIR({
+          profile: createSchemaTable(
+            'profile',
+            {
+              id: { nativeType: 'int4', nullable: false },
+              user_id: { nativeType: 'uuid', nullable: false },
+            },
+            {
+              foreignKeys: [
+                {
+                  columns: ['user_id'],
+                  referencedTable: 'users',
+                  referencedSchema: 'auth',
+                  referencedColumns: ['id'],
+                },
+              ],
+            },
+          ),
+        });
+
+        const result = verifySqlSchema({
+          contract,
+          schema,
+          strict: false,
+          typeMetadataRegistry: emptyTypeMetadataRegistry,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(true);
+        expect(result.schema.issues).toHaveLength(0);
+      });
+
+      it('returns foreign_key_mismatch when introspected FK has wrong referencedColumns', () => {
+        const contract = createTestContract({
+          profile: createContractTable(
+            {
+              id: { nativeType: 'int4', nullable: false },
+              user_id: { nativeType: 'uuid', nullable: false },
+            },
+            {
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'profile',
+                    columns: ['user_id'],
+                  },
+                  target: { namespaceId: 'auth', tableName: 'users', columns: ['id'] },
+                  constraint: true,
+                  index: false,
+                },
+              ],
+            },
+          ),
+        });
+
+        const schema = createTestSchemaIR({
+          profile: createSchemaTable(
+            'profile',
+            {
+              id: { nativeType: 'int4', nullable: false },
+              user_id: { nativeType: 'uuid', nullable: false },
+            },
+            {
+              foreignKeys: [
+                {
+                  columns: ['user_id'],
+                  referencedTable: 'users',
+                  referencedSchema: 'auth',
+                  // Wrong column — should be 'id'
+                  referencedColumns: ['email'],
+                },
+              ],
+            },
+          ),
+        });
+
+        const result = verifySqlSchema({
+          contract,
+          schema,
+          strict: false,
+          typeMetadataRegistry: emptyTypeMetadataRegistry,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(false);
+        expect(result.schema.issues).toContainEqual(
+          expect.objectContaining({
+            kind: 'foreign_key_mismatch',
+            table: 'profile',
+          }),
+        );
+      });
+
+      it('emits no missing_table issue for auth.users because the app verifier never inspects auth', () => {
+        const contract = createTestContract({
+          profile: createContractTable(
+            {
+              id: { nativeType: 'int4', nullable: false },
+              user_id: { nativeType: 'uuid', nullable: false },
+            },
+            {
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'profile',
+                    columns: ['user_id'],
+                  },
+                  target: { namespaceId: 'auth', tableName: 'users', columns: ['id'] },
+                  constraint: true,
+                  index: false,
+                },
+              ],
+            },
+          ),
+        });
+
+        // Schema has no entry for auth.users — it is outside the app's SqlSchemaIR
+        const schema = createTestSchemaIR({
+          profile: createSchemaTable(
+            'profile',
+            {
+              id: { nativeType: 'int4', nullable: false },
+              user_id: { nativeType: 'uuid', nullable: false },
+            },
+            {
+              foreignKeys: [
+                {
+                  columns: ['user_id'],
+                  referencedTable: 'users',
+                  referencedSchema: 'auth',
+                  referencedColumns: ['id'],
+                },
+              ],
+            },
+          ),
+        });
+
+        const result = verifySqlSchema({
+          contract,
+          schema,
+          strict: false,
+          typeMetadataRegistry: emptyTypeMetadataRegistry,
+          frameworkComponents: [],
+        });
+
+        const missingAuthUsers = result.schema.issues.filter(
+          (i) => i.kind === 'missing_table' && i.table === 'users' && i.namespaceId === 'auth',
+        );
+        expect(missingAuthUsers).toHaveLength(0);
+      });
+    });
   });
 
   describe('unique constraint mismatch', () => {

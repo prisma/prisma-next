@@ -38,6 +38,8 @@ export interface ContractSourceDiagnostics {
 
 export interface ContractSourceContext {
   readonly composedExtensionPacks: readonly string[];
+  /** Extension contracts keyed by space ID, required for cross-space FK resolution. */
+  readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly codecLookup: CodecLookup;

@@ -2,6 +2,6 @@ export {
   buildAddColumnSql,
   buildColumnDefaultSql,
   buildColumnTypeSql,
-  buildForeignKeySql,
+  buildCreateTableSql,
   renderDefaultLiteral,
 } from '../core/migrations/planner-ddl-builders';
