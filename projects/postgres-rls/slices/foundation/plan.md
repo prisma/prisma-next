@@ -25,6 +25,8 @@ Four dispatches. D1→D3 stack (serializer needs the IR classes); D2 and D4 are 
 - **Hands to:** a serializer that preserves the full RLS IR — the round-trip fidelity slices 3–4 rely on.
 - **Focus:** serializer hydration/serialization for the new slots only. Gates: package test + `pnpm fixtures:check` (no unintended drift); SQLite/Mongo suites green.
 
+> **Carry-forward note from D1 review (orchestrator).** D1 registered the `role`/`rlsPolicy` entity kinds **without** a `validatorSchema` (the `enum` registration has one). Harmless in D1 (nothing hydrates/validates these kinds yet). **D3 (and slice 2's hydration wiring) must** either add arktype validator schemas for these kinds or consciously accept unvalidated hydration — decide explicitly, don't let it slip.
+
 ### Dispatch 4: `SchemaIssue` union widening
 
 - **Outcome:** `rls_policy_renamed | rls_policy_tampered | rls_not_enabled` added to the framework `SchemaIssue` union (`packages/1-framework/1-core/framework-components/src/control/control-result-types.ts`) as payload interfaces in the union, following the additive `EnumValuesChangedIssue` precedent. Exhaustive `kind` consumers compile (minimal default/no-op cases where required).
