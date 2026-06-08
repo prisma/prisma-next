@@ -9,7 +9,14 @@
  */
 
 import { createColors } from 'colorette';
-import type { Cell, CellLine, Direction, Grid, PathRole } from './migration-graph-model';
+import {
+  type Cell,
+  type CellLine,
+  DEFAULT_COLS_PER_LANE,
+  type Direction,
+  type Grid,
+  type PathRole,
+} from './migration-graph-model';
 
 // ---------------------------------------------------------------------------
 // Force-colour seam — always emits ANSI regardless of NO_COLOR.
@@ -216,7 +223,7 @@ export function renderGridRow(
 
   // Extend to the next even column boundary (connector col of the current lane)
   // so that connector columns are always present for active lane ranges.
-  const colsPerLane = opts.colsPerLane ?? 2;
+  const colsPerLane = opts.colsPerLane ?? DEFAULT_COLS_PER_LANE;
   const colorEnabled = opts.colorize ?? true;
   const alphabet = alphabetFor(opts.glyphMode ?? 'unicode');
   const lastLane = Math.floor(lastNonEmpty / colsPerLane);

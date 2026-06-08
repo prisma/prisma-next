@@ -76,6 +76,10 @@ export type Grid = readonly (readonly Cell[])[];
 // ---------------------------------------------------------------------------
 // GridOptions — configurable geometry.
 // ---------------------------------------------------------------------------
+
+/** Default number of grid columns allocated per lane (one rail + one connector). */
+export const DEFAULT_COLS_PER_LANE = 2;
+
 export interface GridOptions {
   readonly colsPerLane?: number;
 }

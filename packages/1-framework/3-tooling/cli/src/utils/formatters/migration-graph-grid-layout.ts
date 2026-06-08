@@ -7,16 +7,17 @@
  */
 
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import type {
-  Cell,
-  CellLine,
-  Direction,
-  Grid,
-  GridOptions,
-  Highlight,
-  LineRef,
-  NodeRef,
-  PathRole,
+import {
+  type Cell,
+  type CellLine,
+  DEFAULT_COLS_PER_LANE,
+  type Direction,
+  type Grid,
+  type GridOptions,
+  type Highlight,
+  type LineRef,
+  type NodeRef,
+  type PathRole,
 } from './migration-graph-model';
 import type { ClassifiedEdge, MigrationGraphRowModel } from './migration-graph-rows';
 
@@ -172,7 +173,7 @@ export function buildGrid(
   opts: GridOptions = {},
   highlight: Highlight = { mode: 'flat', onPath: new Set() },
 ): Grid {
-  const colsPerLane = opts.colsPerLane ?? 2;
+  const colsPerLane = opts.colsPerLane ?? DEFAULT_COLS_PER_LANE;
   const isFocus = highlight.mode === 'focus';
 
   const { nodeLane, nodeRank, numLanes } = buildLaneAssignment(rowModel.nodes, rowModel.edges);
