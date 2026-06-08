@@ -323,9 +323,25 @@ ladder). A general value-set iteration helper is a future want, not built here.
 Numbered requirements the design satisfies; each is the acceptance check for its
 behavior.
 
-- **R1 — Declare (both surfaces).** PSL `enum Role { … }` with an explicit codec
-  annotation and per-member `@map` setting the value independently of the name; the TS
-  equivalent via `enumType(name, codec, …members)`. The static type carries the ordered
+- **R1 — Declare (both surfaces).** PSL declares the codec as a required block attribute
+  and each member's value with `=`:
+
+  ```prisma
+  enum Role {
+    @@type("pg/text@1")
+    User  = "user"
+    Admin = "admin"
+  }
+  ```
+
+  `@@type(<codecId>)` is required (validation error if absent — never inferred). Each
+  member's right-hand side is the codec's **JSON-encoded value** (`encodeJson`): the
+  literal is `JSON.parse`d and validated with `codec.decodeJson`, reusing the existing
+  PSL-extension `value`-parameter path (`PSL_EXTENSION_INVALID_VALUE` on a non-JSON
+  literal or a codec-rejected value). The value defaults to the member name for
+  string-input codecs (`{ User Admin }` → `"User"`/`"Admin"`) and is required for other
+  codecs; `=` carries any codec-input type (`Low = 1` for an int codec). The TS
+  equivalent is `enumType(name, codec, …members)`. The static type carries the ordered
   literal tuple (`expectTypeOf(Role.values).toEqualTypeOf<readonly ['user','member','guest']>()`);
   `EnumValues<typeof Role>` is the value union. Malformed declarations (empty, duplicate
   name, duplicate value) throw at construction.
@@ -417,7 +433,6 @@ served.
 - Whether the value-set + check realization is implemented at the SQL-family layer
   (MySQL/SQLite inherit it) or Postgres-only now with a lift later. Leaning family-layer;
   the structured check is dialect-agnostic.
-- The exact PSL surface for declaring an enum's codec and per-member values.
 - Whether `db.enums` is scoped here or is the first instance of a broader domain-client
   surface for IR-modelled entities.
 - Tracking dependency: the `valueSet` and default reference shapes follow TML-2500 /

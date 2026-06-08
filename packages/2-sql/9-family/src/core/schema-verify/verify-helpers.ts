@@ -15,7 +15,12 @@ import type {
   PrimaryKey,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import type { SqlForeignKeyIR, SqlIndexIR, SqlUniqueIR } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlCheckConstraintIR,
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
 import {
   emitIssueAndNodeUnderControlPolicy,
   emitIssueUnderControlPolicy,
@@ -659,4 +664,157 @@ function getReferentialActionMismatches(
  */
 function normalizeReferentialAction(action: string | undefined): string | undefined {
   return action === 'noAction' ? undefined : action;
+}
+
+/**
+ * Compares two value arrays as unordered sets.
+ * Returns true when both sides contain exactly the same values.
+ */
+function valueSetsEqual(a: readonly string[], b: readonly string[]): boolean {
+  const aSet = new Set(a);
+  const bSet = new Set(b);
+  if (aSet.size !== bSet.size) return false;
+  return [...aSet].every((v) => bSet.has(v));
+}
+
+/**
+ * Verifies check constraints match between contract-projected checks and
+ * introspected live checks.
+ *
+ * Comparison is value-set-based, not SQL-string-based. Postgres rewrites
+ * `col IN ('a','b')` as `col = ANY (ARRAY['a','b'])` in
+ * `pg_get_constraintdef`, so comparing the extracted value sets (after
+ * the introspection adapter parses the predicate) avoids false mismatches
+ * from the `IN`-vs-`= ANY (ARRAY…)` rendering difference.
+ *
+ * Issues emitted:
+ * - `check_missing` — check expected by contract but absent from live DB
+ * - `check_removed` — check present in live DB but not in contract
+ * - `check_mismatch` — check present on both sides but permitted values differ
+ *
+ * `check_removed` is emitted only when `strict` is true so non-strict
+ * verification (the normal path) does not complain about extra constraints.
+ */
+export function verifyCheckConstraints(
+  contractChecks: ReadonlyArray<{
+    readonly name: string;
+    readonly column: string;
+    readonly permittedValues: readonly string[];
+  }>,
+  schemaChecks: ReadonlyArray<SqlCheckConstraintIR>,
+  tableName: string,
+  namespaceId: string,
+  tablePath: string,
+  tableControlPolicy: ControlPolicy,
+  issues: SchemaIssue[],
+  strict: boolean,
+): SchemaVerificationNode[] {
+  const nodes: SchemaVerificationNode[] = [];
+
+  for (const contractCheck of contractChecks) {
+    const checkPath = `${tablePath}.checks[${contractCheck.name}]`;
+    const liveCheck = schemaChecks.find((c) => c.name === contractCheck.name);
+
+    if (!liveCheck) {
+      const issue: SchemaIssue = {
+        kind: 'check_missing',
+        table: tableName,
+        namespaceId,
+        indexOrConstraint: contractCheck.name,
+        expected: contractCheck.permittedValues.join(', '),
+        message: `Table "${tableName}" is missing check constraint "${contractCheck.name}" (column "${contractCheck.column}" IN (${contractCheck.permittedValues.join(', ')}))`,
+      };
+      emitIssueAndNodeUnderControlPolicy(
+        tableControlPolicy,
+        issue,
+        {
+          status: 'fail',
+          kind: 'checkConstraint',
+          name: `check(${contractCheck.name})`,
+          contractPath: checkPath,
+          code: 'check_missing',
+          message: `Check constraint "${contractCheck.name}" missing`,
+          expected: contractCheck,
+          actual: undefined,
+          children: [],
+        },
+        issues,
+        nodes,
+      );
+    } else if (!valueSetsEqual(contractCheck.permittedValues, liveCheck.permittedValues)) {
+      const issue: SchemaIssue = {
+        kind: 'check_mismatch',
+        table: tableName,
+        namespaceId,
+        indexOrConstraint: contractCheck.name,
+        expected: contractCheck.permittedValues.join(', '),
+        actual: liveCheck.permittedValues.join(', '),
+        message: `Table "${tableName}" check constraint "${contractCheck.name}" has different permitted values: expected [${contractCheck.permittedValues.join(', ')}], got [${liveCheck.permittedValues.join(', ')}]`,
+      };
+      emitIssueAndNodeUnderControlPolicy(
+        tableControlPolicy,
+        issue,
+        {
+          status: 'fail',
+          kind: 'checkConstraint',
+          name: `check(${contractCheck.name})`,
+          contractPath: checkPath,
+          code: 'check_mismatch',
+          message: `Check constraint "${contractCheck.name}" values mismatch`,
+          expected: contractCheck,
+          actual: liveCheck,
+          children: [],
+        },
+        issues,
+        nodes,
+      );
+    } else {
+      nodes.push({
+        status: 'pass',
+        kind: 'checkConstraint',
+        name: `check(${contractCheck.name})`,
+        contractPath: checkPath,
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
+    }
+  }
+
+  if (strict) {
+    for (const liveCheck of schemaChecks) {
+      const matchingContract = contractChecks.find((c) => c.name === liveCheck.name);
+      if (!matchingContract) {
+        const issue: SchemaIssue = {
+          kind: 'check_removed',
+          table: tableName,
+          namespaceId,
+          indexOrConstraint: liveCheck.name,
+          actual: liveCheck.permittedValues.join(', '),
+          message: `Table "${tableName}" has extra check constraint "${liveCheck.name}" in database (not in contract)`,
+        };
+        emitIssueAndNodeUnderControlPolicy(
+          tableControlPolicy,
+          issue,
+          {
+            status: 'fail',
+            kind: 'checkConstraint',
+            name: `check(${liveCheck.name})`,
+            contractPath: `${tablePath}.checks[${liveCheck.name}]`,
+            code: 'check_removed',
+            message: `Extra check constraint "${liveCheck.name}" found`,
+            expected: undefined,
+            actual: liveCheck,
+            children: [],
+          },
+          issues,
+          nodes,
+        );
+      }
+    }
+  }
+
+  return nodes;
 }

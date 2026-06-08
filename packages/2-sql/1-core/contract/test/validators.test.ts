@@ -3,10 +3,13 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
+import { CheckConstraint } from '../src/ir/check-constraint';
+import { StorageTable } from '../src/ir/storage-table';
 import type { ReferentialAction, SqlStorage } from '../src/types';
 import {
   validateModel,
   validateSqlContractFully,
+  validateSqlStorageConsistency,
   validateStorage,
   validateStorageSemantics,
 } from '../src/validators';
@@ -1050,6 +1053,157 @@ describe('SQL contract validators', () => {
       }).storage;
       const errors = validateStorageSemantics(s);
       expect(errors).toHaveLength(0);
+    });
+
+    it('returns no errors for a table with a valid check constraint', () => {
+      const s = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: new StorageTable({
+            columns: { role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false } },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+            checks: [
+              new CheckConstraint({
+                name: 'user_role_check',
+                column: 'role',
+                valueSet: {
+                  plane: 'storage',
+                  entityKind: 'value-set',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  name: 'Role',
+                },
+              }),
+            ],
+          }),
+        }),
+      }).storage;
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('rejects a check constraint whose name collides with another named object', () => {
+      const s = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: new StorageTable({
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [{ columns: ['id'], name: 'shared_name' }],
+            foreignKeys: [],
+            checks: [
+              new CheckConstraint({
+                name: 'shared_name',
+                column: 'role',
+                valueSet: {
+                  plane: 'storage',
+                  entityKind: 'value-set',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  name: 'Role',
+                },
+              }),
+            ],
+          }),
+        }),
+      }).storage;
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('shared_name');
+      expect(errors[0]).toContain('check constraint');
+      expect(errors[0]).toContain('index');
+    });
+
+    it('rejects duplicate check constraint definitions (same column + valueSet)', () => {
+      const valueSetRef = {
+        plane: 'storage' as const,
+        entityKind: 'value-set' as const,
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        name: 'Role',
+      };
+      const s = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: new StorageTable({
+            columns: { role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false } },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+            checks: [
+              new CheckConstraint({
+                name: 'user_role_check_a',
+                column: 'role',
+                valueSet: valueSetRef,
+              }),
+              new CheckConstraint({
+                name: 'user_role_check_b',
+                column: 'role',
+                valueSet: valueSetRef,
+              }),
+            ],
+          }),
+        }),
+      }).storage;
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('duplicate check constraint definition');
+      expect(errors[0]).toContain('role');
+    });
+  });
+
+  describe('validateSqlStorageConsistency', () => {
+    it('throws when a check constraint references a non-existent column', () => {
+      const rawContract = createContract({
+        storage: unboundTables({
+          user: new StorageTable({
+            columns: { role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false } },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+            checks: [
+              new CheckConstraint({
+                name: 'user_status_check',
+                column: 'status',
+                valueSet: {
+                  plane: 'storage',
+                  entityKind: 'value-set',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  name: 'Status',
+                },
+              }),
+            ],
+          }),
+        }),
+      });
+      expect(() => validateSqlStorageConsistency(rawContract as never)).toThrow(
+        /non-existent column "status"/,
+      );
+    });
+
+    it('does not throw when all check constraint columns exist', () => {
+      const rawContract = createContract({
+        storage: unboundTables({
+          user: new StorageTable({
+            columns: { status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false } },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+            checks: [
+              new CheckConstraint({
+                name: 'user_status_check',
+                column: 'status',
+                valueSet: {
+                  plane: 'storage',
+                  entityKind: 'value-set',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  name: 'Status',
+                },
+              }),
+            ],
+          }),
+        }),
+      });
+      expect(() => validateSqlStorageConsistency(rawContract as never)).not.toThrow();
     });
   });
 

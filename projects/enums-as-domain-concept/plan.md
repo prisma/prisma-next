@@ -5,11 +5,12 @@
 
 ## At a glance
 
-Four slices in a substrate-then-parallel-realization-then-cleanup shape: a contract
-substrate slice lands the two-plane enum shape; two independent realization slices then
-run in parallel — one delivering the Postgres server-side realization (checks +
-defaults + verification), the other the application read surface (typing + `db.enums` +
-ordering); a final cutover slice flips PSL `enum` + authoring to the new shape and
+Five slices in a substrate-then-parallel-realization-then-cleanup shape: a contract
+substrate slice lands the two-plane enum shape; three independent slices then run in
+parallel — the Postgres check-constraint **enforcement** (TML-2851), the enum **member
+defaults** (TML-2855, split out of the realization slice for review coherence), and the
+application **read surface** (TML-2852, typing + `db.enums` + ordering); a final cutover
+slice flips PSL `enum` + authoring to the new shape and
 deletes the native machinery. The substrate slice is purely **additive** (the new
 representation lands *dark*; native stays the default), so every intermediate merge stays
 green. One stack thread (additive substrate → cutover) with a parallel pair in the
@@ -93,7 +94,21 @@ middle.
     lanes (R4 / R5); the `db.enums` runtime surface (R6); declaration-order `ORDER BY`
     rendering (R8). Touches the SQL lanes (`packages/2-sql/4-lanes/**`) and the runtime
     client — disjoint from group A's migration/planner surface. Out of scope: server-side
-    enforcement and defaults (slice 2).
+    enforcement and defaults (now TML-2855, parallel group C).
+
+### Parallel group C — enum member defaults (split from group A; independent; builds on slice 1)
+
+- **Slice `enum-member-defaults`** — Linear: [TML-2855](https://linear.app/prisma-company/issue/TML-2855)
+  - **Outcome:** `@default(Role.member)` works end-to-end — an `enumMember` `ColumnDefault`
+    variant, the TS `.default(Role.members.x)` + PSL `@default(member)` surfaces, and the
+    Postgres `DEFAULT '<value>'` rendering. Member-only-ness enforced at authoring/lowering.
+  - **Builds on:** Slice 1's `domain…enum` + members. Independent of enforcement (TML-2851) —
+    a default renders a literal; it doesn't need the check.
+  - **Hands to:** Member-default capability, consumed by the cutover (TML-2853).
+  - **Focus:** the `ColumnDefault` `enumMember` variant + validator; TS-DSL `.default(member)`;
+    PSL `@default(member)` lowering; `buildColumnDefaultSql` rendering. Additive/dark (a union
+    extension; opt-in via `enumType` + `.default`). Split from TML-2851 so each is one
+    coherent review. Out: the check (TML-2851), reads (TML-2852), the cutover (TML-2853).
 
 ## Dependencies (external)
 

@@ -1,5 +1,5 @@
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
-import { quoteIdentifier } from '../../sql-utils';
+import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
 import { constraintExistsCheck, qualifyTableName } from '../planner-sql-checks';
 import { type ForeignKeySpec, type Op, step, targetDetails } from './shared';
 
@@ -131,6 +131,83 @@ export function addForeignKey(schemaName: string, tableName: string, fk: Foreign
           constraintName: fk.name,
           schema: schemaName,
           table: tableName,
+        }),
+      ),
+    ],
+  };
+}
+
+export function addCheckConstraint(
+  schemaName: string,
+  tableName: string,
+  constraintName: string,
+  column: string,
+  values: readonly string[],
+): Op {
+  const qualified = qualifyTableName(schemaName, tableName);
+  const valueList = values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
+  return {
+    id: `checkConstraint.${tableName}.${constraintName}`,
+    label: `Add check constraint "${constraintName}" on "${tableName}"."${column}"`,
+    operationClass: 'additive',
+    target: targetDetails('checkConstraint', constraintName, schemaName, tableName),
+    precheck: [
+      step(
+        `ensure constraint "${constraintName}" does not exist`,
+        constraintExistsCheck({
+          constraintName,
+          schema: schemaName,
+          table: tableName,
+          exists: false,
+        }),
+      ),
+    ],
+    execute: [
+      step(
+        `add check constraint "${constraintName}"`,
+        `ALTER TABLE ${qualified} ADD CONSTRAINT ${quoteIdentifier(constraintName)} CHECK (${quoteIdentifier(column)} IN (${valueList}))`,
+      ),
+    ],
+    postcheck: [
+      step(
+        `verify constraint "${constraintName}" exists`,
+        constraintExistsCheck({ constraintName, schema: schemaName, table: tableName }),
+      ),
+    ],
+  };
+}
+
+export function dropCheckConstraint(
+  schemaName: string,
+  tableName: string,
+  constraintName: string,
+): Op {
+  const qualified = qualifyTableName(schemaName, tableName);
+  return {
+    id: `dropCheckConstraint.${tableName}.${constraintName}`,
+    label: `Drop check constraint "${constraintName}" on "${tableName}"`,
+    operationClass: 'destructive',
+    target: targetDetails('checkConstraint', constraintName, schemaName, tableName),
+    precheck: [
+      step(
+        `ensure constraint "${constraintName}" exists`,
+        constraintExistsCheck({ constraintName, schema: schemaName, table: tableName }),
+      ),
+    ],
+    execute: [
+      step(
+        `drop check constraint "${constraintName}"`,
+        `ALTER TABLE ${qualified} DROP CONSTRAINT ${quoteIdentifier(constraintName)}`,
+      ),
+    ],
+    postcheck: [
+      step(
+        `verify constraint "${constraintName}" does not exist`,
+        constraintExistsCheck({
+          constraintName,
+          schema: schemaName,
+          table: tableName,
+          exists: false,
         }),
       ),
     ],

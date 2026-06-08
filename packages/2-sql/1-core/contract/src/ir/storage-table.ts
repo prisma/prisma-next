@@ -1,5 +1,6 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
+import { CheckConstraint, type CheckConstraintInput } from './check-constraint';
 import { ForeignKey, type ForeignKeyInput } from './foreign-key';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
 import { Index, type IndexInput } from './sql-index';
@@ -14,6 +15,7 @@ export interface StorageTableInput {
   readonly indexes: ReadonlyArray<Index | IndexInput>;
   readonly foreignKeys: ReadonlyArray<ForeignKey | ForeignKeyInput>;
   readonly control?: ControlPolicy;
+  readonly checks?: ReadonlyArray<CheckConstraint | CheckConstraintInput>;
 }
 
 /**
@@ -35,6 +37,7 @@ export class StorageTable extends SqlNode {
   readonly foreignKeys: ReadonlyArray<ForeignKey>;
   declare readonly primaryKey?: PrimaryKey;
   declare readonly control?: ControlPolicy;
+  declare readonly checks?: ReadonlyArray<CheckConstraint>;
 
   constructor(input: StorageTableInput) {
     super();
@@ -60,6 +63,9 @@ export class StorageTable extends SqlNode {
       input.foreignKeys.map((fk) => (fk instanceof ForeignKey ? fk : new ForeignKey(fk))),
     );
     if (input.control !== undefined) this.control = input.control;
+    if (input.checks !== undefined && input.checks.length > 0) {
+      this.checks = Object.freeze(input.checks.map((cc) => new CheckConstraint(cc)));
+    }
     freezeNode(this);
   }
 }

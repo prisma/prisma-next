@@ -24,6 +24,7 @@ export type {
 export {
   contractToSchemaIR,
   detectDestructiveChanges,
+  resolveValueSetValues,
 } from '../core/migrations/contract-to-schema-ir';
 export type { ControlPolicySubject } from '../core/migrations/control-policy';
 export {

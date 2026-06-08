@@ -48,7 +48,14 @@ import {
   setDefault,
   setNotNull,
 } from './operations/columns';
-import { addForeignKey, addPrimaryKey, addUnique, dropConstraint } from './operations/constraints';
+import {
+  addCheckConstraint,
+  addForeignKey,
+  addPrimaryKey,
+  addUnique,
+  dropCheckConstraint,
+  dropConstraint,
+} from './operations/constraints';
 import { createExtension } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
@@ -660,6 +667,74 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
   }
 }
 
+export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'addCheckConstraint' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly constraintName: string;
+  readonly column: string;
+  readonly values: readonly string[];
+  readonly label: string;
+
+  constructor(
+    schemaName: string,
+    tableName: string,
+    constraintName: string,
+    column: string,
+    values: readonly string[],
+  ) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.constraintName = constraintName;
+    this.column = column;
+    this.values = values;
+    this.label = `Add check constraint "${constraintName}" on "${tableName}"."${column}"`;
+    this.freeze();
+  }
+
+  toOp(): Op {
+    return addCheckConstraint(
+      this.schemaName,
+      this.tableName,
+      this.constraintName,
+      this.column,
+      this.values,
+    );
+  }
+
+  renderTypeScript(): string {
+    return `addCheckConstraint(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.constraintName)}, ${jsonToTsSource(this.column)}, ${jsonToTsSource(this.values)})`;
+  }
+}
+
+export class DropCheckConstraintCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'dropCheckConstraint' as const;
+  readonly operationClass = 'destructive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly constraintName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string, constraintName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.constraintName = constraintName;
+    this.label = `Drop check constraint "${constraintName}" on "${tableName}"`;
+    this.freeze();
+  }
+
+  toOp(): Op {
+    return dropCheckConstraint(this.schemaName, this.tableName, this.constraintName);
+  }
+
+  renderTypeScript(): string {
+    return `dropCheckConstraint(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.constraintName)})`;
+  }
+}
+
 // ============================================================================
 // Indexes
 // ============================================================================
@@ -1041,6 +1116,8 @@ export type PostgresOpFactoryCall =
   | AddPrimaryKeyCall
   | AddForeignKeyCall
   | AddUniqueCall
+  | AddCheckConstraintCall
+  | DropCheckConstraintCall
   | CreateIndexCall
   | DropIndexCall
   | DropConstraintCall

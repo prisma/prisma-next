@@ -31,12 +31,14 @@ import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
+import { resolveValueSetValues } from '../migrations/contract-to-schema-ir';
 import type { CodecControlHooks } from '../migrations/types';
 import { emitIssueAndNodeUnderControlPolicy } from './control-verify-emit';
 import { verifierDisposition } from './verifier-disposition';
 import {
   arraysEqual,
   computeCounts,
+  verifyCheckConstraints,
   verifyForeignKeys,
   verifyIndexes,
   verifyPrimaryKey,
@@ -475,6 +477,7 @@ function verifySchemaTables(options: {
         typeMetadataRegistry,
         codecHooks,
         storageTypes,
+        contractStorage: contract.storage,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
       });
@@ -533,6 +536,7 @@ function verifyTableChildren(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  contractStorage: SqlStorage;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -548,6 +552,7 @@ function verifyTableChildren(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    contractStorage,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
@@ -708,6 +713,29 @@ function verifyTableChildren(options: {
     strict,
   );
   tableChildren.push(...indexStatuses);
+
+  // Verify check constraints when the contract declares checks for this table OR
+  // when strict mode is on (so extra live checks on zero-check tables are detected).
+  // schemaTable.checks carries the introspected live checks (parsed value sets).
+  // This call is additive: verifyEnumType (the native enum path) is untouched.
+  const contractCheckIRs = (contractTable.checks ?? []).map((c) => ({
+    name: c.name,
+    column: c.column,
+    permittedValues: resolveValueSetValues(c.valueSet, contractStorage, `check "${c.name}"`),
+  }));
+  if (strict || contractCheckIRs.length > 0) {
+    const checkStatuses = verifyCheckConstraints(
+      contractCheckIRs,
+      schemaTable.checks ?? [],
+      tableName,
+      namespaceId,
+      tablePath,
+      tableControlPolicy,
+      issues,
+      strict,
+    );
+    tableChildren.push(...checkStatuses);
+  }
 
   return tableChildren;
 }

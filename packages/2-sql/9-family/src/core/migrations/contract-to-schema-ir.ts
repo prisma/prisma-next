@@ -2,6 +2,7 @@ import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  type CheckConstraint,
   type ForeignKey,
   type Index,
   isPostgresEnumStorageEntry,
@@ -17,6 +18,7 @@ import {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type {
   SqlAnnotations,
+  SqlCheckConstraintIRInput,
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
@@ -152,6 +154,58 @@ function resolveColumnTypeMetadata(
   );
 }
 
+/**
+ * Resolves a `ValueSetRef` to its permitted values from the contract storage.
+ *
+ * Throws when the referenced namespace or value-set is absent — this indicates
+ * the contract was built incorrectly (the check and the value-set must be
+ * co-emitted by the lowering step). Used by `convertCheck` (schema-IR
+ * projection), `verifyCheckConstraints` (verification), and
+ * `checkConstraintPlanCallStrategy` (migration planning) so all three agree on
+ * the resolved values and the error behavior on a missing reference.
+ */
+export function resolveValueSetValues(
+  ref: { readonly namespaceId: string; readonly name: string },
+  storage: SqlStorage,
+  contextLabel: string,
+): readonly string[] {
+  const ns = storage.namespaces[ref.namespaceId];
+  if (!ns) {
+    throw new Error(
+      `resolveValueSetValues: namespace "${ref.namespaceId}" not found in storage (${contextLabel})`,
+    );
+  }
+  const valueSet = ns.entries.valueSet?.[ref.name];
+  if (!valueSet) {
+    throw new Error(
+      `resolveValueSetValues: value-set "${ref.name}" not found in namespace "${ref.namespaceId}" (${contextLabel})`,
+    );
+  }
+  return valueSet.values;
+}
+
+/**
+ * Projects a `CheckConstraint` IR into an `SqlCheckConstraintIRInput` by
+ * resolving the permitted values from the storage value-set it references.
+ *
+ * The `CheckConstraint.valueSet` ref points to
+ * `storage.namespaces[namespaceId].entries.valueSet[name]`. The resolved
+ * values are lifted directly from `StorageValueSet.values` so verification
+ * compares value sets, not SQL predicate strings.
+ *
+ * Throws if the referenced namespace or value-set is absent — this
+ * indicates the contract was built incorrectly (the check and the
+ * value-set must be co-emitted by the lowering step).
+ */
+function convertCheck(check: CheckConstraint, storage: SqlStorage): SqlCheckConstraintIRInput {
+  const permittedValues = resolveValueSetValues(check.valueSet, storage, `check "${check.name}"`);
+  return {
+    name: check.name,
+    column: check.column,
+    permittedValues,
+  };
+}
+
 function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
   return {
     columns: unique.columns,
@@ -185,6 +239,7 @@ function convertTable(
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
+  storage: SqlStorage,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
@@ -215,6 +270,11 @@ function convertTable(
     satisfiedIndexColumns.add(key);
   }
 
+  const checks: SqlCheckConstraintIRInput[] | undefined =
+    table.checks && table.checks.length > 0
+      ? table.checks.map((c) => convertCheck(c, storage))
+      : undefined;
+
   return {
     name,
     columns,
@@ -222,6 +282,7 @@ function convertTable(
     foreignKeys: table.foreignKeys.filter((fk) => fk.constraint !== false).map(convertForeignKey),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
+    ...ifDefined('checks', checks),
   };
 }
 
@@ -359,6 +420,7 @@ export function contractToSchemaIR(
         storageTypes,
         options.expandNativeType,
         options.renderDefault,
+        storage,
       );
     }
   }

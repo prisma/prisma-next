@@ -1,6 +1,7 @@
 export type {
   PrimaryKeyInput,
   SqlAnnotations,
+  SqlCheckConstraintIRInput,
   SqlColumnIRInput,
   SqlForeignKeyIRInput,
   SqlIndexIRInput,
@@ -14,6 +15,7 @@ export type {
 
 export {
   PrimaryKey,
+  SqlCheckConstraintIR,
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
