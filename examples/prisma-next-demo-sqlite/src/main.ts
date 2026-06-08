@@ -13,11 +13,14 @@
  *                                          Build a `PreparedStatement` once and reuse it for
  *                                          each email — single lower(), single beforeCompile(),
  *                                          repeated execute()
- * - create-user-with-posts <id> <email> <displayName> <postTitle> [...moreTitles] [--fail]
- *                                          Create a user and one or more posts atomically via
- *                                          db.transaction(). Pass --fail as the last argument to
- *                                          trigger a deliberate rollback and prove the database
- *                                          is left untouched.
+ * - add-posts <userId> <title> [...moreTitles]
+ *                                          Add posts to an existing user atomically via
+ *                                          db.transaction(). The transaction reads the current post
+ *                                          count (SQL builder aggregate) and only inserts (ORM
+ *                                          create) if the quota allows — otherwise throws
+ *                                          QuotaExceededError and rolls back. Prints created posts
+ *                                          on success; prints the rollback reason and the unchanged
+ *                                          count on quota violation.
  *
  * Each command opens a connection, runs the operation, prints the result as
  * JSON, and closes. Exits non-zero on usage errors or runtime failures.
@@ -31,7 +34,7 @@ import { db } from './prisma/db';
 import { insertUser } from './queries/dml-operations';
 import { getUserByEmailPrepared } from './queries/get-user-by-email-prepared';
 import { getUsers } from './queries/get-users';
-import { createUserWithPosts } from './transactions/create-user-with-posts';
+import { addPostsWithinQuota, QuotaExceededError } from './transactions/add-posts-within-quota';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
@@ -93,47 +96,37 @@ async function main() {
       }
       const results = await getUserByEmailPrepared(args);
       console.log(JSON.stringify(results, null, 2));
-    } else if (cmd === 'create-user-with-posts') {
-      const failFlag = args[args.length - 1] === '--fail';
-      const positional = failFlag ? args.slice(0, -1) : args;
-      const [id, email, displayName, ...postTitles] = positional;
-      if (!id || !email || !displayName || postTitles.length === 0) {
-        console.error(
-          'Usage: pnpm start -- create-user-with-posts <id> <email> <displayName> <postTitle> [...moreTitles] [--fail]',
-        );
+    } else if (cmd === 'add-posts') {
+      const [userId, ...titles] = args;
+      if (!userId || titles.length === 0) {
+        console.error('Usage: pnpm start -- add-posts <userId> <title> [...moreTitles]');
         process.exitCode = 1;
         return;
       }
       try {
-        const result = await createUserWithPosts({
-          id,
-          email,
-          displayName,
-          postTitles,
-          failAfterWrites: failFlag,
-        });
+        const result = await addPostsWithinQuota({ userId, titles });
         console.log(JSON.stringify(result, null, 2));
       } catch (txError) {
-        console.error(
-          'Transaction rolled back:',
-          txError instanceof Error ? txError.message : txError,
-        );
-        const leftoverUser = await runtime.execute(
-          db.sql.user
-            .select('id', 'email')
-            .where((f, fns) => fns.eq(f.id, id))
-            .limit(1)
-            .build(),
-        );
-        console.log('User rows after rollback:', JSON.stringify(leftoverUser));
-        process.exitCode = 1;
+        if (txError instanceof QuotaExceededError) {
+          console.error('Transaction rolled back:', txError.message);
+          const countRows = await runtime.execute(
+            db.sql.post
+              .select('postCount', (_f, fns) => fns.count())
+              .where((f, fns) => fns.eq(f.userId, userId))
+              .build(),
+          );
+          console.log('Post count after rollback:', countRows[0]?.postCount);
+          process.exitCode = 1;
+          return;
+        }
+        throw txError;
       }
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | repo-user <id> | repo-user-posts <id> [limit] | ' +
           'repo-create-user <id> <email> <displayName> | insert-user <email> <displayName> | ' +
           'user-by-email-prepared <email> [<email> ...] | ' +
-          'create-user-with-posts <id> <email> <displayName> <postTitle> [...moreTitles] [--fail]]',
+          'add-posts <userId> <title> [...moreTitles]]',
       );
       process.exitCode = 1;
       return;
