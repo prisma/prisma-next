@@ -30,8 +30,8 @@
     "@prisma-next/mongo-runtime": "workspace:0.12.0",
     "@prisma-next/utils": "workspace:0.12.0",
     "mongodb": "catalog:",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:0.12.0",
@@ -40,7 +40,7 @@
     "@prisma-next/test-utils": "workspace:0.12.0",
     "@prisma-next/tsconfig": "workspace:0.12.0",
     "@types/node": "catalog:",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.16",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react-swc": "^4.3.1",
     "mongodb-memory-server": "catalog:",

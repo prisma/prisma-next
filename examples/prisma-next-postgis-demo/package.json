@@ -38,10 +38,10 @@
     "arktype": "^2.2.0",
     "dotenv": "^17.4.2",
     "leaflet": "^1.9.4",
-    "next": "^16.2.6",
+    "next": "^16.2.7",
     "pg": "catalog:",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
@@ -51,7 +51,7 @@
     "@types/leaflet": "^1.9.12",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.16",
     "@types/react-dom": "^19.2.3",
     "tsx": "catalog:",
     "typescript": "catalog:",
