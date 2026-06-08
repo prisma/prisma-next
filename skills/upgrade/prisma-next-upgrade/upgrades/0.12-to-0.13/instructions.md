@@ -44,6 +44,12 @@ TML-2754: points stale migration tests at the post-#751
 `examples/multi-extension-monorepo/test/` only — a test-only diff with
 no runtime, contract, or public-API change; incidental to examples, no
 user-side action required.
+
+dependabot/runtime-deps (PR #761): bumps react 19.2.6→19.2.7, vitest
+4.1.7→4.1.8, next 16.2.6→16.2.7, react-router 7.15.1→7.16.0, vite
+8.0.15→8.0.16, lucide-react 1.16.0→1.17.0, @prisma/dev 0.24.8→0.24.9,
+mongodb-memory-server 11.1.0→11.2.0. Touches examples/ only via
+package.json version fields; no runtime, contract, or public-API change.
 -->
 
 # 0.12 → 0.13 — User upgrade instructions
