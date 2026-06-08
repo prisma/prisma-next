@@ -54,7 +54,7 @@ Slice 4 already proved Postgres on `CREATE TABLE` / `CREATE SCHEMA`. Phase 1 add
 
 All three are independent and can run in parallel.
 
-- **Slice 5 — `sqlite-create-table-adoption`.** Linear: _TBD (create at pickup)_.
+- **Slice 5 — `sqlite-create-table-adoption`.** Linear: TML-2859.
   - **Outcome:** SQLite `CreateTableCall.toOp()` builds the slice-1 `CreateTable` DDL-AST node via the contract-free constructors and lowers it through `SqlControlAdapter.lower()`, replacing SQLite's `renderCreateTableSql`. Shared substrate (constraint node + `createTable(constraints)` constructor + SQLite adapter constraint-rendering) already landed in slice 4's D1/D2; this slice does the SQLite adapter byte-parity reconciliation + the planner-side migration. Mirror of the proven Postgres pattern.
   - **Builds on:** Slice 4 (substrate complete).
   - **Focus:** SQLite only. Smallest, lowest-risk, most-grounded slice in Phase 1.
