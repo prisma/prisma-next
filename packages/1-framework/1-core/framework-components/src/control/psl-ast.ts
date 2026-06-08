@@ -507,8 +507,9 @@ export interface ParsePslDocumentInput {
    * blocks are registered and any unknown keyword yields
    * `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`.
    *
-   * Contrast with {@link PslNamespace.extensionBlocks}: that field holds the
-   * parsed block nodes in a namespace; this field holds the registry of
+   * Contrast with the parsed block nodes themselves, which live in
+   * {@link PslNamespace.entries} under their discriminator key (read them with
+   * {@link namespacePslExtensionBlocks}); this field holds the registry of
    * descriptors that teach the parser how to read those blocks.
    */
   readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;

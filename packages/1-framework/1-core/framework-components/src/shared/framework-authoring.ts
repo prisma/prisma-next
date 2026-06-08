@@ -203,9 +203,9 @@ export interface AuthoringContributions {
    * The framework owns the generic parser, validator, and printer; the
    * contribution supplies only these declarative descriptors.
    *
-   * Contrast with {@link PslNamespace.extensionBlocks}: that field holds
-   * the parsed block nodes in a namespace; this field holds the registry
-   * of descriptors that teach the parser how to read those blocks.
+   * Contrast with the parsed block nodes themselves, which live in a
+   * namespace's `entries` under their discriminator key; this field holds the
+   * registry of descriptors that teach the parser how to read those blocks.
    */
   readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
 }
