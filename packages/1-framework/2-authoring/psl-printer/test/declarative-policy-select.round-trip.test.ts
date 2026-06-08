@@ -384,19 +384,16 @@ policy_select ProfilesSelect {
 
       const original = originalNs?.extensionBlocks?.[0];
       const reParsedBlock = reParsedNs?.extensionBlocks?.[0];
+      if (!original || !reParsedBlock) throw new Error('expected one extension block each');
 
-      // Structural equivalence: same kind, name, and parameters (spans excluded).
-      expect(reParsedBlock?.kind).toBe(original?.kind);
-      expect(reParsedBlock?.name).toBe(original?.name);
-      expect(reParsedBlock?.parameters).toEqual(
-        expect.objectContaining({
-          target: expect.objectContaining({ kind: 'ref', identifier: 'Post' }),
-          using: expect.objectContaining({
-            kind: 'value',
-            raw: '"auth.uid() = author_id"',
-          }),
-        }),
-      );
+      // Semantic equivalence: lower both blocks to their IR and compare. The IR
+      // is the contract-bound artifact, so identical IR after print → re-parse is
+      // the round-trip guarantee that matters — the equivalent of the two
+      // documents hashing the same, and stronger than matching a few AST fields.
+      const lower = getFactory();
+      const originalIr = lower(original, { family: 'fixture', target: 'fixture' });
+      const reParsedIr = lower(reParsedBlock, { family: 'fixture', target: 'fixture' });
+      expect(JSON.stringify(reParsedIr)).toBe(JSON.stringify(originalIr));
     });
   });
 });

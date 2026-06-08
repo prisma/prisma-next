@@ -572,7 +572,7 @@ class ControlClientImpl implements ControlClient {
     return undefined;
   }
 
-  getPslBlocksNamespace(): AuthoringPslBlockDescriptorNamespace {
+  getPslBlockDescriptors(): AuthoringPslBlockDescriptorNamespace {
     this.init();
     return this.stack!.authoringContributions.pslBlockDescriptors;
   }

@@ -329,6 +329,56 @@ describe('generic extension-block printer (P2)', () => {
     });
   });
 
+  // Output ordering is deterministic: the printer emits parameters in the
+  // descriptor's declared order, not the order they happen to sit in the AST
+  // node. Keeps printed/inferred output stable for fixtures:check and diffs.
+  describe('parameter ordering follows the descriptor, not AST insertion order', () => {
+    it('emits target, as, roles, using even when the node lists them reversed', () => {
+      const block: PslExtensionBlock = {
+        kind: 'fixture-policy-select',
+        name: 'ScrambledOrder',
+        // Deliberately reversed relative to the descriptor's declared order.
+        parameters: {
+          using: valueParam('"true"'),
+          roles: listParam([refParam('AdminRole')]),
+          as: optionParam('permissive'),
+          target: refParam('Post'),
+        },
+        span: STUB_SPAN,
+      };
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [
+          {
+            kind: 'namespace' as const,
+            name: UNSPECIFIED_PSL_NAMESPACE_ID,
+            models: [],
+            enums: [],
+            compositeTypes: [],
+            extensionBlocks: [block],
+            span: STUB_SPAN,
+          },
+        ],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, {
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
+        codecLookup,
+      });
+
+      const targetAt = output.indexOf('target = Post');
+      const asAt = output.indexOf('as = permissive');
+      const rolesAt = output.indexOf('roles = [AdminRole]');
+      const usingAt = output.indexOf('using = "true"');
+      expect(targetAt).toBeGreaterThan(-1);
+      expect(targetAt).toBeLessThan(asAt);
+      expect(asAt).toBeLessThan(rolesAt);
+      expect(rolesAt).toBeLessThan(usingAt);
+    });
+  });
+
   describe('block with unregistered discriminator', () => {
     it('throws naming the unrecognised discriminator', () => {
       const block: PslExtensionBlock = {

@@ -77,13 +77,13 @@ const mocks = vi.hoisted(() => {
   const introspectMock = vi.fn();
   const toSchemaViewMock = vi.fn();
   const inferPslContractMock = vi.fn();
-  const getPslBlocksNamespaceMock = vi.fn();
+  const getPslBlockDescriptorsMock = vi.fn();
   const closeMock = vi.fn();
   const createControlClientMock = vi.fn(() => ({
     introspect: introspectMock,
     toSchemaView: toSchemaViewMock,
     inferPslContract: inferPslContractMock,
-    getPslBlocksNamespace: getPslBlocksNamespaceMock,
+    getPslBlockDescriptors: getPslBlockDescriptorsMock,
     close: closeMock,
   }));
 
@@ -92,7 +92,7 @@ const mocks = vi.hoisted(() => {
     introspectMock,
     toSchemaViewMock,
     inferPslContractMock,
-    getPslBlocksNamespaceMock,
+    getPslBlockDescriptorsMock,
     closeMock,
     createControlClientMock,
   };
@@ -168,7 +168,7 @@ describe('createContractInferCommand', () => {
     mocks.introspectMock.mockResolvedValue(schemaIR);
     mocks.toSchemaViewMock.mockReturnValue(undefined);
     mocks.inferPslContractMock.mockReturnValue(buildSyntheticUserAst());
-    mocks.getPslBlocksNamespaceMock.mockReturnValue({});
+    mocks.getPslBlockDescriptorsMock.mockReturnValue({});
     mocks.closeMock.mockResolvedValue(undefined);
     mocks.createControlClientMock.mockClear();
   }, timeouts.typeScriptCompilation);
@@ -338,7 +338,7 @@ describe('createContractInferCommand', () => {
         },
       },
     };
-    mocks.getPslBlocksNamespaceMock.mockReturnValue(policySelectPslBlocks);
+    mocks.getPslBlockDescriptorsMock.mockReturnValue(policySelectPslBlocks);
 
     // Build an AST whose namespace contains a policy_select extension block.
     // The `using` value param stores the raw PSL literal (including quotes);

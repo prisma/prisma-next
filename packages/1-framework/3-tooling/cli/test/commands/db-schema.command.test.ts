@@ -9,13 +9,13 @@ const mocks = vi.hoisted(() => {
   const introspectMock = vi.fn();
   const toSchemaViewMock = vi.fn();
   const inferPslContractMock = vi.fn();
-  const getPslBlocksNamespaceMock = vi.fn();
+  const getPslBlockDescriptorsMock = vi.fn();
   const closeMock = vi.fn();
   const createControlClientMock = vi.fn(() => ({
     introspect: introspectMock,
     toSchemaView: toSchemaViewMock,
     inferPslContract: inferPslContractMock,
-    getPslBlocksNamespace: getPslBlocksNamespaceMock,
+    getPslBlockDescriptors: getPslBlockDescriptorsMock,
     close: closeMock,
   }));
 
@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => {
     introspectMock,
     toSchemaViewMock,
     inferPslContractMock,
-    getPslBlocksNamespaceMock,
+    getPslBlockDescriptorsMock,
     closeMock,
     createControlClientMock,
   };
@@ -128,7 +128,7 @@ describe('createDbSchemaCommand', () => {
     mocks.introspectMock.mockResolvedValue(schemaIR);
     mocks.toSchemaViewMock.mockReturnValue(schemaView);
     mocks.inferPslContractMock.mockReturnValue(undefined);
-    mocks.getPslBlocksNamespaceMock.mockReturnValue({});
+    mocks.getPslBlockDescriptorsMock.mockReturnValue({});
     mocks.closeMock.mockResolvedValue(undefined);
     mocks.createControlClientMock.mockClear();
   }, timeouts.typeScriptCompilation);

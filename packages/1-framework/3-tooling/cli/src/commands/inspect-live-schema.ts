@@ -41,11 +41,12 @@ export interface InspectLiveSchemaResult {
    */
   readonly pslContractAst: PslDocumentAst | undefined;
   /**
-   * Assembled `pslBlockDescriptors` namespace from the control stack. Extension-contributed
-   * PSL block descriptors register here; downstream commands pass this through to
-   * `printPsl` so contributed-block AST nodes round-trip back to source.
+   * The assembled PSL block descriptors from the control stack — the full set of
+   * extension-contributed top-level block descriptors. Downstream commands pass
+   * this through to `printPsl` so contributed-block AST nodes round-trip back to
+   * source.
    */
-  readonly pslBlocksNamespace: AuthoringPslBlockDescriptorNamespace;
+  readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
   readonly target: {
     readonly familyId: string;
     readonly id: string;
@@ -141,7 +142,7 @@ export async function inspectLiveSchema(
     });
     const schemaView = client.toSchemaView(schema);
     const pslContractAst = client.inferPslContract(schema);
-    const pslBlocksNamespace = client.getPslBlocksNamespace();
+    const pslBlockDescriptors = client.getPslBlockDescriptors();
 
     const dbUrl = typeof dbConnection === 'string' ? maskConnectionUrl(dbConnection) : undefined;
 
@@ -150,7 +151,7 @@ export async function inspectLiveSchema(
       schema,
       schemaView,
       pslContractAst,
-      pslBlocksNamespace,
+      pslBlockDescriptors,
       target: {
         familyId: config.family.familyId,
         id: config.target.targetId,
