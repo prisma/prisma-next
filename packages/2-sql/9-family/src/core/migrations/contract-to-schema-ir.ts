@@ -146,7 +146,7 @@ function resolveColumnTypeMetadata(
     return {
       codecId: referenced.codecId,
       nativeType: referenced.nativeType,
-      typeParams: referenced.typeParams,
+      ...ifDefined('typeParams', referenced.typeParams),
     };
   }
   throw new Error(

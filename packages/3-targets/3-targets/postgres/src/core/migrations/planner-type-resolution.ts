@@ -4,6 +4,7 @@ import {
   type StorageColumn,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 export type ResolvedColumnTypeMetadata = Pick<
   StorageColumn,
@@ -39,6 +40,6 @@ export function resolveColumnTypeMetadata(
   return {
     codecId: referencedType.codecId,
     nativeType: referencedType.nativeType,
-    typeParams: referencedType.typeParams,
+    ...ifDefined('typeParams', referencedType.typeParams),
   };
 }
