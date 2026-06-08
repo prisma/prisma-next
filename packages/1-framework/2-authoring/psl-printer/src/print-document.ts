@@ -18,7 +18,7 @@ export type PrintEnumSection = {
  * `extensionBlocks` carries extension-contributed top-level blocks verbatim from the
  * input AST. Phase 1 (`astDocumentToPrintDocument`) does no transformation
  * here — phase 2 (`serializePrintDocument`) consults the registered
- * `pslBlocks` contribution by `kind` discriminator and renders each entry
+ * `pslBlockDescriptors` contribution by `kind` discriminator and renders each entry
  * generically from the descriptor's `parameters` map. The slot is always
  * present; an empty array means no extension-contributed blocks landed in
  * this namespace.

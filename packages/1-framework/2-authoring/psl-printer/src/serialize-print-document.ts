@@ -1,6 +1,6 @@
 import type {
   AuthoringPslBlockDescriptor,
-  AuthoringPslBlockNamespace,
+  AuthoringPslBlockDescriptorNamespace,
 } from '@prisma-next/framework-components/authoring';
 import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -20,7 +20,7 @@ import type { PrinterEnumValue, PrinterField, PrinterNamedType } from './types';
 const PSL_INDENT_UNIT = '  ';
 
 /**
- * Discriminator-keyed map from a registered `pslBlocks` namespace to the
+ * Discriminator-keyed map from a registered `pslBlockDescriptors` namespace to the
  * descriptor that declares how each AST node `kind` renders. Built once per
  * `serializePrintDocument` call so the per-block dispatch in
  * `serializeNamespaceContents` is O(1). Parser and printer live on the same
@@ -29,7 +29,7 @@ const PSL_INDENT_UNIT = '  ';
 type PslBlockDispatchMap = ReadonlyMap<string, AuthoringPslBlockDescriptor>;
 
 function buildPslBlockDispatchMap(
-  namespace: AuthoringPslBlockNamespace | undefined,
+  namespace: AuthoringPslBlockDescriptorNamespace | undefined,
 ): PslBlockDispatchMap {
   const entries = new Map<string, AuthoringPslBlockDescriptor>();
   if (!namespace) {
@@ -40,7 +40,7 @@ function buildPslBlockDispatchMap(
 }
 
 function collectBlockDescriptors(
-  namespace: AuthoringPslBlockNamespace,
+  namespace: AuthoringPslBlockDescriptorNamespace,
   out: Map<string, AuthoringPslBlockDescriptor>,
 ): void {
   for (const value of Object.values(namespace)) {
@@ -51,7 +51,7 @@ function collectBlockDescriptors(
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       collectBlockDescriptors(
         blindCast<
-          AuthoringPslBlockNamespace,
+          AuthoringPslBlockDescriptorNamespace,
           'recursive descent into a sub-namespace whose leaves are still walked by isAuthoringPslBlockDescriptor'
         >(value),
         out,
@@ -80,7 +80,7 @@ export function escapePslString(value: string): string {
 }
 
 export interface SerializePrintDocumentOptions {
-  readonly pslBlocks?: AuthoringPslBlockNamespace;
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
   readonly codecLookup?: CodecLookup;
 }
 
@@ -97,7 +97,7 @@ export function serializePrintDocument(
     sections.push(serializeTypesBlock(namedTypeEntries));
   }
 
-  const blockDispatchMap = buildPslBlockDispatchMap(options.pslBlocks);
+  const blockDispatchMap = buildPslBlockDispatchMap(options.pslBlockDescriptors);
 
   for (const namespace of doc.namespaces) {
     const namespaceSections = serializeNamespaceContents(
@@ -148,7 +148,7 @@ function serializeExtensionBlock(
   const descriptor = blockDispatchMap.get(extensionBlock.kind);
   if (!descriptor) {
     throw new Error(
-      `No pslBlocks contribution registered for extension-contributed block discriminator "${extensionBlock.kind}". Provide a matching pslBlocks contribution to serializePrintDocument, or remove the block from the input AST.`,
+      `No pslBlockDescriptors contribution registered for extension-contributed block discriminator "${extensionBlock.kind}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
     );
   }
   const lines: string[] = [`${descriptor.keyword} ${extensionBlock.name} {`];
@@ -218,19 +218,29 @@ function renderValueParam(
   if (!codecLookup) {
     return raw;
   }
-  const parseResult = codecLookup.parsePslLiteralFor(codecId, raw);
-  if (!parseResult.ok) {
+  const codec = codecLookup.get(codecId);
+  if (!codec) {
     throw new Error(
-      `Extension block parameter "${paramName}": codec "${codecId}" rejected the raw literal during print-back parse phase: ${parseResult.error}`,
+      `Extension block parameter "${paramName}": no codec registered for id "${codecId}"`,
     );
   }
-  const printResult = codecLookup.printPslLiteralFor(codecId, parseResult.value);
-  if (!printResult.ok) {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch (e) {
     throw new Error(
-      `Extension block parameter "${paramName}": codec "${codecId}" rejected the value during print-back: ${printResult.error}`,
+      `Extension block parameter "${paramName}": codec "${codecId}" — raw literal is not valid JSON: ${String(e)}`,
     );
   }
-  return printResult.raw;
+  return JSON.stringify(
+    codec.encodeJson(
+      codec.decodeJson(
+        blindCast<Parameters<typeof codec.decodeJson>[0], 'JSON.parse output is JsonValue'>(
+          parsedJson,
+        ),
+      ),
+    ),
+  );
 }
 
 function wrapNamespaceBlock(name: string, innerSections: readonly string[]): string {

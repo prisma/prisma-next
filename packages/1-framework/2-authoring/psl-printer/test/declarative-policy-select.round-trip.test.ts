@@ -334,13 +334,13 @@ policy_select ProfilesSelect {
       const parsed = parsePslDocument({
         schema: source,
         sourceId: 'rt1',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
       expect(parsed.diagnostics).toEqual([]);
       const printed = printPslFromAst(parsed.ast, {
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -353,21 +353,21 @@ policy_select ProfilesSelect {
       const firstParsed = parsePslDocument({
         schema: source,
         sourceId: 'rt2',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
       expect(firstParsed.diagnostics).toEqual([]);
 
       const printed = printPslFromAst(firstParsed.ast, {
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
       const reParsed = parsePslDocument({
         schema: printed,
         sourceId: 'rt2-reparse',
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 

@@ -1,4 +1,4 @@
-import type { AuthoringPslBlockNamespace } from '@prisma-next/framework-components/authoring';
+import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import type { CoreSchemaView } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -41,11 +41,11 @@ export interface InspectLiveSchemaResult {
    */
   readonly pslContractAst: PslDocumentAst | undefined;
   /**
-   * Assembled `pslBlocks` namespace from the control stack. Extension-contributed
+   * Assembled `pslBlockDescriptors` namespace from the control stack. Extension-contributed
    * PSL block descriptors register here; downstream commands pass this through to
    * `printPsl` so contributed-block AST nodes round-trip back to source.
    */
-  readonly pslBlocksNamespace: AuthoringPslBlockNamespace;
+  readonly pslBlocksNamespace: AuthoringPslBlockDescriptorNamespace;
   readonly target: {
     readonly familyId: string;
     readonly id: string;

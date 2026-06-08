@@ -317,7 +317,7 @@ describe('createContractInferCommand', () => {
   it('renders a declarative policy_select extension block in the written PSL', async () => {
     process.chdir(testDir);
 
-    // A minimal declarative pslBlocks namespace for a `policy_select` block.
+    // A minimal declarative pslBlockDescriptors namespace for a `policy_select` block.
     // The generic printer (P2) reads the descriptor's `parameters` map and renders
     // each parameter by kind — no contributed printer function needed.
     const policySelectDiscriminator = 'cmd-test-policy-select';

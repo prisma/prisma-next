@@ -4,7 +4,7 @@
  * The printer reads the descriptor's `parameters` map and renders each block
  * generically — no contributed `printer` function. Four parameter kinds:
  *   - `ref`    → identifier token
- *   - `value`  → codec print-back via `printPslLiteralFor`
+ *   - `value`  → codec JSON medium round-trip via `encodeJson(decodeJson(JSON.parse(raw)))`
  *   - `option` → literal token
  *   - `list`   → bracketed comma-separated rendered elements
  *
@@ -20,8 +20,6 @@ import {
   CodecDescriptorImpl,
   CodecImpl,
   type CodecInstanceContext,
-  type PslLiteralParseResult,
-  type PslLiteralPrintResult,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
@@ -72,18 +70,6 @@ class StubPolicyTextDescriptor extends CodecDescriptorImpl<void> {
   override readonly traits = ['textual'] as const;
   override readonly targetTypes = ['text'] as const;
   override readonly paramsSchema = voidParamsSchema;
-  override parsePslLiteral(raw: string): PslLiteralParseResult {
-    if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-      return { ok: true, value: raw.slice(1, -1) };
-    }
-    return { ok: false, error: `expected double-quoted string, got: ${raw}` };
-  }
-  override printPslLiteral(value: JsonValue): PslLiteralPrintResult {
-    if (typeof value !== 'string') {
-      return { ok: false, error: `expected string value, got: ${typeof value}` };
-    }
-    return { ok: true, raw: `"${value}"` };
-  }
   override factory(): (ctx: CodecInstanceContext) => StubPolicyTextCodec {
     return () => new StubPolicyTextCodec(this);
   }
@@ -164,7 +150,7 @@ describe('generic extension-block printer (P2)', () => {
       };
 
       const output = printPslFromAst(ast, {
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -205,7 +191,7 @@ describe('generic extension-block printer (P2)', () => {
       };
 
       const output = printPslFromAst(ast, {
-        pslBlocks: assembled.pslBlocks,
+        pslBlockDescriptors: assembled.pslBlockDescriptors,
         codecLookup,
       });
 
@@ -245,7 +231,7 @@ describe('generic extension-block printer (P2)', () => {
 
       expect(() =>
         printPslFromAst(ast, {
-          pslBlocks: assembled.pslBlocks,
+          pslBlockDescriptors: assembled.pslBlockDescriptors,
           codecLookup,
         }),
       ).toThrow('no-such-discriminator');
