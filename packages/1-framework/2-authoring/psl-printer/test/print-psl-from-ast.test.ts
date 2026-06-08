@@ -860,10 +860,9 @@ namespace auth {
         kind: 'document',
         sourceId: 't',
         namespaces: [
-          {
-            kind: 'namespace',
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [
+          makeNs(
+            UNSPECIFIED_PSL_NAMESPACE_ID,
+            [
               {
                 kind: 'model',
                 name: 'Profile',
@@ -884,10 +883,10 @@ namespace auth {
                 span: span(0),
               },
             ],
-            enums: [],
-            compositeTypes: [],
-            span: span(0),
-          },
+            [],
+            [],
+            0,
+          ),
         ],
         span: span(0),
       };
@@ -934,10 +933,9 @@ namespace auth {
         kind: 'document',
         sourceId: 't',
         namespaces: [
-          {
-            kind: 'namespace',
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [
+          makeNs(
+            UNSPECIFIED_PSL_NAMESPACE_ID,
+            [
               {
                 kind: 'model',
                 name: 'Account',
@@ -962,10 +960,10 @@ namespace auth {
                 span: span(0),
               },
             ],
-            enums: [],
-            compositeTypes: [],
-            span: span(0),
-          },
+            [],
+            [],
+            0,
+          ),
         ],
         span: span(0),
       };

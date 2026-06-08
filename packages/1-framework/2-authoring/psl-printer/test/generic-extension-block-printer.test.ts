@@ -259,17 +259,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [],
-            enums: [],
-            compositeTypes: [],
-            extensionBlocks: [block],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs([], [], [block])],
         span: STUB_SPAN,
       };
       return printPslFromAst(ast, {
@@ -301,17 +291,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [],
-            enums: [],
-            compositeTypes: [],
-            extensionBlocks: [block],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs([], [], [block])],
         span: STUB_SPAN,
       };
       const emptyCodecLookup = extractCodecLookup([]);
@@ -344,17 +324,7 @@ describe('generic extension-block printer (P2)', () => {
       const ast = {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [],
-            enums: [],
-            compositeTypes: [],
-            extensionBlocks: [block],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs([], [], [block])],
         span: STUB_SPAN,
       };
 
@@ -385,17 +355,7 @@ describe('generic extension-block printer (P2)', () => {
       return {
         kind: 'document' as const,
         sourceId: 'test',
-        namespaces: [
-          {
-            kind: 'namespace' as const,
-            name: UNSPECIFIED_PSL_NAMESPACE_ID,
-            models: [],
-            enums: [],
-            compositeTypes: [],
-            extensionBlocks: [block],
-            span: STUB_SPAN,
-          },
-        ],
+        namespaces: [makeNs([], [], [block])],
         span: STUB_SPAN,
       };
     }

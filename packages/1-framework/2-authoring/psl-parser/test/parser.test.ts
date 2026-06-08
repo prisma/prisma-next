@@ -1541,7 +1541,7 @@ policy_select ReadPosts {
 
       expect(result.ok).toBe(true);
       expect(result.diagnostics).toEqual([]);
-      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      const block = namespacePslExtensionBlocks(result.ast.namespaces[0]!)[0];
       expect(Object.keys(block?.parameters ?? {})).toEqual(['target', 'as', 'roles', 'using']);
     });
 
@@ -1568,7 +1568,7 @@ policy_select ReadPosts {
       expect(result.ok).toBe(false);
       expect(result.diagnostics).toMatchObject([{ code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER' }]);
       expect(result.diagnostics[0]?.message).toContain('bracketed list');
-      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      const block = namespacePslExtensionBlocks(result.ast.namespaces[0]!)[0];
       expect(block?.parameters['roles']).toBeUndefined();
     });
 
@@ -1593,7 +1593,7 @@ policy_select ReadPosts {
       });
 
       expect(result.ok).toBe(true);
-      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      const block = namespacePslExtensionBlocks(result.ast.namespaces[0]!)[0];
       expect(block?.parameters['roles']).toMatchObject({
         kind: 'list',
         items: [
