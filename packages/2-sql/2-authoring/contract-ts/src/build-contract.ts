@@ -500,13 +500,14 @@ export function buildSqlContractFromDefinition(
       }
       tableNameToNamespaceId.set(tableName, namespaceId);
 
-      const checksForTable: CheckConstraintInput[] = Object.entries(columns)
-        .filter(([, col]) => col.valueSet !== undefined)
-        .map(([columnName, col]) => ({
-          name: `${tableName}_${columnName}_check`,
-          column: columnName,
-          valueSet: col.valueSet!,
-        }));
+      const checksForTable: CheckConstraintInput[] = Object.entries(columns).flatMap(
+        ([columnName, col]) => {
+          const valueSet = col.valueSet;
+          return valueSet === undefined
+            ? []
+            : [{ name: `${tableName}_${columnName}_check`, column: columnName, valueSet }];
+        },
+      );
 
       const tableInput: StorageTableInput = {
         columns,
