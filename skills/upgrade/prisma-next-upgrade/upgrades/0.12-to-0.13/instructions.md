@@ -37,6 +37,13 @@ output and introspect through the same path as before. The new
 extension package is purely additive (consumers opt in by adding
 `extensionPacks: [supabasePack]`). No codemod or user-side action
 required.
+
+TML-2754: points stale migration tests at the post-#751
+`SqlControlAdapter` API (`createPlanner(controlAdapter)` and the
+`adapter` option on `executeDbInit`/`executeDbUpdate`). Touches
+`examples/multi-extension-monorepo/test/` only — a test-only diff with
+no runtime, contract, or public-API change; incidental to examples, no
+user-side action required.
 -->
 
 # 0.12 → 0.13 — User upgrade instructions

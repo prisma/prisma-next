@@ -73,7 +73,10 @@ class SqliteDdlVisitorImpl implements SqliteDdlVisitor<string> {
 }
 
 const defaultVisitor: DdlColumnDefaultVisitor<string> = {
-  literal(node: LiteralColumnDefault): string {
+  // SQLite has no `jsonb` / `json` column type, so the ctx is unused — but
+  // the visitor interface requires it for cross-dialect symmetry with the
+  // Postgres renderer, which uses ctx.nativeType to emit JSON casts.
+  literal(node: LiteralColumnDefault, _ctx): string {
     const { value } = node;
     if (typeof value === 'string') {
       return `DEFAULT '${escapeLiteral(value)}'`;
@@ -86,7 +89,7 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
     }
     return `DEFAULT '${JSON.stringify(value)}'`;
   },
-  function(node: FunctionColumnDefault): string {
+  function(node: FunctionColumnDefault, _ctx): string {
     if (node.expression === 'autoincrement()') {
       return '';
     }
@@ -105,7 +108,9 @@ function renderColumn(column: DdlColumn): string {
   if (column.primaryKey) {
     parts.push('PRIMARY KEY');
   }
-  const defaultClause = column.default ? column.default.accept(defaultVisitor) : '';
+  const defaultClause = column.default
+    ? column.default.accept(defaultVisitor, { nativeType: column.type })
+    : '';
   if (defaultClause.length > 0) {
     parts.push(defaultClause);
   }
