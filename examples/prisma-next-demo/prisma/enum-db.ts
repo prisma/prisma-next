@@ -12,7 +12,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
-import { contract } from './contract';
+import { enumContract } from './enum-contract';
 
 export const stack = createSqlExecutionStack({
   target: postgresTarget,
@@ -20,25 +20,24 @@ export const stack = createSqlExecutionStack({
   driver: postgresDriver,
 });
 
-// Pass the TS-authored contract directly. The deserializer's method-level type
-// parameter recovers the literal-typed contract shape (including enum value
-// unions) so downstream DSL calls keep their precise types.
-const validatedContract = new SqlContractSerializer().deserializeContract<typeof contract>(
-  contract,
+// The TS-authored contract is passed directly; the deserializer's method-level
+// type parameter recovers the literal-typed shape (including enum value unions).
+const validatedContract = new SqlContractSerializer().deserializeContract<typeof enumContract>(
+  enumContract,
 );
 
 export const context = createExecutionContext({ contract: validatedContract, stack });
 
-export const queries = sql<typeof contract>({
+export const queries = sql<typeof enumContract>({
   context,
   rawCodecInferer: { inferCodec: () => 'pg/text' },
 });
 
-export function createOrmClient(runtime: Runtime) {
+export function createEnumOrmClient(runtime: Runtime) {
   return orm({ runtime, context });
 }
 
-export async function getRuntime(
+export async function getEnumRuntime(
   databaseUrl: string,
 ): Promise<{ runtime: Runtime; close: () => Promise<void> }> {
   const pool = new Pool({ connectionString: databaseUrl });

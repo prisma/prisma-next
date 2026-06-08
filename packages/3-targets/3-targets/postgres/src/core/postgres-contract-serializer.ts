@@ -112,9 +112,11 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       }
     }
 
+    const valueSetSlot = entries.valueSet;
+    const hasValueSets = valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0;
     const emptyTables = Object.keys(entries.table).length === 0;
     const emptyTypes = !typeSlot || Object.keys(typeSlot).length === 0;
-    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes) {
+    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes && !hasValueSets) {
       return PostgresSchema.unbound;
     }
     return new PostgresSchema({
@@ -122,6 +124,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       entries: {
         table: entries.table,
         type: typeSlot ?? {},
+        ...(hasValueSets ? { valueSet: valueSetSlot } : {}),
       },
     });
   }
@@ -174,12 +177,23 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     for (const [typeName, ty] of Object.entries(ns.entries.type)) {
       typeOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
     }
+    const valueSetEntries = ns.entries.valueSet;
+    const valueSetOut: Record<string, JsonObject> = {};
+    if (valueSetEntries !== undefined) {
+      for (const [valueSetName, valueSet] of Object.entries(valueSetEntries)) {
+        valueSetOut[valueSetName] = blindCast<
+          JsonObject,
+          'serializeJsonValue round-trips the value-set node through JSON, yielding a JsonObject'
+        >(this.serializeJsonValue(valueSet));
+      }
+    }
     return {
       id: ns.id,
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
       entries: {
         table: tablesOut,
         type: typeOut,
+        ...(Object.keys(valueSetOut).length > 0 ? { valueSet: valueSetOut } : {}),
       },
     };
   }

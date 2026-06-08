@@ -3,6 +3,8 @@ export type {
   ContractDefinition,
   ContractInput,
   ContractModelBuilder,
+  EnumMember,
+  EnumTypeHandle,
   FieldNode,
   ForeignKeyNode,
   IndexNode,
@@ -14,7 +16,9 @@ export type {
 } from '@prisma-next/sql-contract-ts/contract-builder';
 export {
   buildSqlContractFromDefinition,
+  enumType,
   field,
+  member,
   model,
   rel,
 } from '@prisma-next/sql-contract-ts/contract-builder';
