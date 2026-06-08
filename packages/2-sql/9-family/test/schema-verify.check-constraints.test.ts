@@ -133,6 +133,25 @@ describe('verifyCheckConstraints', () => {
     expect(issues).toHaveLength(0);
   });
 
+  it('emits check_mismatch when duplicate live values mask a missing contract value', () => {
+    // Live schema: ['a','a'] — after deduplication that's just {'a'}.
+    // Contract:    ['a','b'] — that's {'a','b'}.
+    // The two sets differ, so this must mismatch.
+    const issues: SchemaIssue[] = [];
+    verifyCheckConstraints(
+      [makeContractCheck('col_check', 'col', ['a', 'b'])],
+      [makeSchemaCheck('col_check', 'col', ['a', 'a'])],
+      'item',
+      UNBOUND_NAMESPACE_ID,
+      'namespaces[__unbound__].tables[item]',
+      'managed',
+      issues,
+      false,
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ kind: 'check_mismatch', table: 'item' });
+  });
+
   it('normalization: IN ("a","b") vs = ANY (ARRAY["a","b"]) compare equal at the value-set level', () => {
     // Contract carries resolved string values; adapter parses Postgres-rewritten
     // predicate into the same values. Comparison is on sets, not SQL strings.

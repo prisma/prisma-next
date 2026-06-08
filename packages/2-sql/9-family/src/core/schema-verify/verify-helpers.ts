@@ -671,9 +671,10 @@ function normalizeReferentialAction(action: string | undefined): string | undefi
  * Returns true when both sides contain exactly the same values.
  */
 function valueSetsEqual(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) return false;
+  const aSet = new Set(a);
   const bSet = new Set(b);
-  return a.every((v) => bSet.has(v));
+  if (aSet.size !== bSet.size) return false;
+  return [...aSet].every((v) => bSet.has(v));
 }
 
 /**
