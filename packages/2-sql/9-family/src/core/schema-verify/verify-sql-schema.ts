@@ -1321,7 +1321,7 @@ function resolveContractColumnTypeMetadata(
     return {
       codecId: referencedType.codecId,
       nativeType: referencedType.nativeType,
-      ...ifDefined('typeParams', referencedType.typeParams),
+      typeParams: referencedType.typeParams,
     };
   }
   throw new Error(

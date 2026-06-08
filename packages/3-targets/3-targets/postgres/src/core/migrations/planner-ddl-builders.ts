@@ -116,7 +116,7 @@ function expandParameterizedTypeSql(
   column: Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): string | null {
-  if (!column.typeParams) {
+  if (!column.typeParams || Object.keys(column.typeParams).length === 0) {
     return null;
   }
 

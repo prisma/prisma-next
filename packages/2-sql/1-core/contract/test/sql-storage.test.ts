@@ -112,6 +112,21 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
     ).toThrow(/Mystery.*mystery-kind/);
   });
 
+  it('normalises a tagged codec-instance that omits typeParams to typeParams: {}', () => {
+    const onDiskShape = {
+      kind: 'codec-instance',
+      codecId: 'pg/int4@1',
+      nativeType: 'int4',
+      // typeParams omitted — the on-disk canonical form strips empty typeParams
+    } as unknown as SqlStorageTypeEntry;
+    const storage = new SqlStorage({
+      storageHash: 'sha256:abc',
+      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
+      types: { Score: onDiskShape },
+    });
+    expect(storage.types?.Score?.typeParams).toEqual({});
+  });
+
   it('rejects a raw postgres-enum JSON envelope when no serializer hydrated it (pre-existing strict path)', () => {
     const rawPostgresEnum = {
       kind: 'postgres-enum',
