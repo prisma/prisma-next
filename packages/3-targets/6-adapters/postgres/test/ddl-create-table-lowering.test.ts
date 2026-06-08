@@ -64,7 +64,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     expect(lowered.sql).toContain(`"name" text DEFAULT 'O''Reilly'`);
   });
 
-  it('escapes single quotes in JSON-object literal defaults', () => {
+  it('escapes single quotes in JSON-object literal defaults on jsonb columns and adds the ::jsonb cast', () => {
     const ast = new PostgresCreateTable({
       table: 'defaults',
       columns: [col('meta', 'jsonb', { default: lit({ a: "x'y" }) })],
@@ -73,6 +73,74 @@ describe('PostgresCreateTable DDL lowering', () => {
     const adapter = createPostgresAdapter();
     const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
 
-    expect(lowered.sql).toContain(`"meta" jsonb DEFAULT '{"a":"x''y"}'`);
+    expect(lowered.sql).toContain(`"meta" jsonb DEFAULT '{"a":"x''y"}'::jsonb`);
+  });
+
+  // TML-2861: the renderer must emit `::jsonb` / `::json` casts on JSON
+  // literal defaults so the emitted DDL matches the column type without
+  // relying on Postgres's implicit text → jsonb coercion at
+  // default-evaluation time. Matches the pre-#751 planner-side
+  // `renderDefaultLiteral` behaviour. The visitor takes a
+  // `DdlColumnRenderContext` carrying the parent column's nativeType so
+  // the literal renderer can decide; non-JSON column types stay
+  // cast-free.
+  it('emits ::jsonb cast on jsonb-column literal defaults (TML-2861)', () => {
+    const ast = new PostgresCreateTable({
+      table: 'casts',
+      columns: [col('meta', 'jsonb', { default: lit({ key: 'default' }) })],
+    });
+    const adapter = createPostgresAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    expect(lowered.sql).toContain(`"meta" jsonb DEFAULT '{"key":"default"}'::jsonb`);
+  });
+
+  it('emits ::json cast on json-column literal defaults (TML-2861)', () => {
+    const ast = new PostgresCreateTable({
+      table: 'casts',
+      columns: [col('payload', 'json', { default: lit({ a: 1 }) })],
+    });
+    const adapter = createPostgresAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    expect(lowered.sql).toContain(`"payload" json DEFAULT '{"a":1}'::json`);
+  });
+
+  it('does NOT add a cast on non-JSON column types — only jsonb/json get the cast (TML-2861)', () => {
+    const ast = new PostgresCreateTable({
+      table: 'no_cast',
+      columns: [
+        // text/int/bool/null stay cast-free
+        col('a_text', 'text', { default: lit('hello') }),
+        col('a_int', 'int', { default: lit(42) }),
+        col('a_bool', 'boolean', { default: lit(true) }),
+        col('a_null', 'text', { default: lit(null) }),
+        // an array-shaped value on a non-JSON column also stays
+        // cast-free — the renderer keys off the column's nativeType,
+        // not the value shape; if the user picked a non-JSON column
+        // type, that's the type they get.
+        col('a_array_on_text', 'text', { default: lit([1, 2, 3]) }),
+      ],
+    });
+    const adapter = createPostgresAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    expect(lowered.sql).not.toContain('::jsonb');
+    expect(lowered.sql).not.toContain('::json');
+    expect(lowered.sql).toContain(`"a_text" text DEFAULT 'hello'`);
+    expect(lowered.sql).toContain('"a_int" int DEFAULT 42');
+    expect(lowered.sql).toContain('"a_bool" boolean DEFAULT true');
+    expect(lowered.sql).toContain('"a_null" text DEFAULT NULL');
+    expect(lowered.sql).toContain(`"a_array_on_text" text DEFAULT '[1,2,3]'`);
+  });
+
+  it('does NOT add a cast on jsonb-column FUNCTION defaults — only literal defaults get the cast (TML-2861)', () => {
+    // `DEFAULT (jsonb_build_object(...))` already returns a jsonb value;
+    // the cast is only relevant for string-shaped JSON literals.
+    const ast = new PostgresCreateTable({
+      table: 'fn_default',
+      columns: [col('meta', 'jsonb', { default: fn(`jsonb_build_object('k', 1)`) })],
+    });
+    const adapter = createPostgresAdapter();
+    const lowered = adapter.lower(ast, { contract: {} as PostgresContract });
+    expect(lowered.sql).toContain(`"meta" jsonb DEFAULT (jsonb_build_object('k', 1))`);
+    expect(lowered.sql).not.toContain('::jsonb');
   });
 });

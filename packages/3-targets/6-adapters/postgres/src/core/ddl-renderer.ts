@@ -85,7 +85,7 @@ class PostgresDdlVisitorImpl implements PostgresDdlVisitor<string> {
 }
 
 const defaultVisitor: DdlColumnDefaultVisitor<string> = {
-  literal(node: LiteralColumnDefault): string {
+  literal(node: LiteralColumnDefault, ctx): string {
     const { value } = node;
     if (typeof value === 'string') {
       return `DEFAULT '${escapeLiteral(value)}'`;
@@ -96,9 +96,20 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
     if (value === null) {
       return 'DEFAULT NULL';
     }
-    return `DEFAULT '${escapeLiteral(JSON.stringify(value))}'`;
+    // JSON object/array literal → explicit `::<jsonb|json>` cast so the
+    // emitted DDL matches the column type without relying on Postgres's
+    // implicit text → jsonb coercion at default-evaluation time. Matches
+    // the pre-#751 planner-side `renderDefaultLiteral` behaviour for
+    // jsonb / json columns. For other columns whose underlying value is
+    // an object/array, fall back to a quoted literal — the column type
+    // decides.
+    const json = `'${escapeLiteral(JSON.stringify(value))}'`;
+    if (ctx.nativeType === 'jsonb' || ctx.nativeType === 'json') {
+      return `DEFAULT ${json}::${ctx.nativeType}`;
+    }
+    return `DEFAULT ${json}`;
   },
-  function(node: FunctionColumnDefault): string {
+  function(node: FunctionColumnDefault, _ctx): string {
     if (node.expression === 'autoincrement()') {
       return '';
     }
@@ -114,7 +125,9 @@ function renderColumn(column: DdlColumn): string {
   if (column.primaryKey) {
     parts.push('PRIMARY KEY');
   }
-  const defaultClause = column.default ? column.default.accept(defaultVisitor) : '';
+  const defaultClause = column.default
+    ? column.default.accept(defaultVisitor, { nativeType: column.type })
+    : '';
   if (defaultClause.length > 0) {
     parts.push(defaultClause);
   }
