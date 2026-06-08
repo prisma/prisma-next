@@ -1,4 +1,4 @@
-import { timeouts } from '@prisma-next/test-utils';
+import { pgliteWorkerExecArgv, timeouts } from '@prisma-next/test-utils';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -8,6 +8,9 @@ export default defineConfig({
     include: ['test/**/*.test.ts', 'test/**/*.test-d.ts'],
     fileParallelism: false,
     maxConcurrency: 1,
+    // Disable the V8 PKU JIT hardening that crashes PGlite WASM teardown on
+    // Linux CI; see pgliteWorkerExecArgv in @prisma-next/test-utils.
+    execArgv: pgliteWorkerExecArgv,
     testTimeout: timeouts.databaseOperation,
     hookTimeout: timeouts.databaseOperation,
     coverage: {
