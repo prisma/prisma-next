@@ -271,13 +271,14 @@ function resolveEnumOrderValues(
 }
 
 /**
- * Ordered values for an unqualified ORDER BY column (an `identifier-ref`, the shape the sql-builder emits for `.orderBy('col')`). Scans every FROM/JOIN source for a column of that name carrying a value-set; resolves only when exactly one source matches, so an ambiguous name across joined tables falls through to the bare column rendering.
+ * Ordered values for an unqualified ORDER BY column (an `identifier-ref`, the shape the sql-builder emits for `.orderBy('col')`). Scans every FROM/JOIN source for a column of that name. Resolves only when exactly one source has a column of that name and it carries a value-set; if more than one source has such a column the bare identifier is ambiguous (regardless of which are enum-backed), so it falls through to the plain column rendering.
  */
 function resolveEnumOrderValuesForIdentifier(
   name: string,
   sourcesByRef: ReadonlyMap<string, TableSourceCoordinate>,
   contract: PostgresContract,
 ): readonly string[] | undefined {
+  let matchedColumns = 0;
   let resolved: readonly string[] | undefined;
   for (const source of sourcesByRef.values()) {
     if (source.namespaceId === undefined) {
@@ -285,11 +286,15 @@ function resolveEnumOrderValuesForIdentifier(
     }
     const column =
       contract.storage.namespaces[source.namespaceId]?.entries.table[source.name]?.columns[name];
-    const valueSet = column?.valueSet;
-    if (valueSet === undefined) {
+    if (column === undefined) {
       continue;
     }
-    if (resolved !== undefined) {
+    matchedColumns += 1;
+    if (matchedColumns > 1) {
+      return undefined;
+    }
+    const valueSet = column.valueSet;
+    if (valueSet === undefined) {
       return undefined;
     }
     resolved =

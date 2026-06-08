@@ -10,7 +10,9 @@ import {
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   ColumnRef,
+  EqColJoinOn,
   IdentifierRef,
+  JoinAst,
   OrderByItem,
   ProjectionItem,
   SelectAst,
@@ -57,6 +59,32 @@ function makeTaskContract(): PostgresContract {
           fields: {
             id: f.text().id(),
             priority: f.namedType(Priority).optional(),
+          },
+        }),
+      },
+    }),
+  ) as Contract<SqlStorage> as PostgresContract;
+}
+
+// `Task.priority` is enum-backed; `Note.priority` is plain text. A bare `ORDER BY priority`
+// across a Task⋈Note join is ambiguous, so it must NOT be rewritten to `array_position`.
+function makeTaskNoteContract(): PostgresContract {
+  return buildBoundContract(
+    sqlFamilyPack,
+    postgresPack,
+    { enums: { Priority } },
+    ({ field: f, model: m }) => ({
+      models: {
+        Task: m('Task', {
+          fields: {
+            id: f.text().id(),
+            priority: f.namedType(Priority).optional(),
+          },
+        }),
+        Note: m('Note', {
+          fields: {
+            id: f.text().id(),
+            priority: f.text().optional(),
           },
         }),
       },
@@ -180,6 +208,29 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
     const rows = await driver!.query<{ id: string; priority: string }>(lowered.sql);
     expect(rows.rows.map((r) => r.priority)).toEqual(['low', 'low', 'high', 'medium']);
     expect(rows.rows.map((r) => r.id)).toEqual(['b', 'd', 'a', 'c']);
+  });
+
+  it('leaves an ambiguous unqualified order column unrewritten across a join', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = makeTaskNoteContract();
+
+    // Task ⋈ Note where both have a `priority` column (only Task's is enum-backed).
+    const ast = SelectAst.from(TableSource.named('Task', undefined, 'public'))
+      .withJoins([
+        JoinAst.inner(
+          TableSource.named('Note', undefined, 'public'),
+          EqColJoinOn.of(ColumnRef.of('Task', 'id'), ColumnRef.of('Note', 'id')),
+        ),
+      ])
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('Task', 'id'))])
+      .withOrderBy([OrderByItem.asc(IdentifierRef.of('priority'))]);
+
+    const lowered = createPostgresAdapter().lower(ast, { contract });
+
+    // Bare `priority` is ambiguous across the join → falls through to the plain column.
+    expect(lowered.sql).not.toContain('array_position');
+    expect(lowered.sql).toContain('"priority"');
   });
 
   it('sorts NULLs last (ASC) alongside declaration-ordered non-null values', {
