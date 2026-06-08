@@ -630,38 +630,40 @@ export function buildSqlContractFromDefinition(
       );
       assertTargetTableMatches(semanticModel.modelName, targetModel, relation.toTable, 'Relation');
 
-      if (relation.cardinality === 'N:M' && !relation.through) {
-        throw new Error(
-          `Relation "${semanticModel.modelName}.${relation.fieldName}" with cardinality "N:M" requires through metadata`,
-        );
-      }
-
       const targetColumnToField = new Map(
         targetModel.fields.map((f) => [f.columnName, f.fieldName]),
       );
 
-      modelRelations[relation.fieldName] = {
-        to: crossRef(
-          relation.toModel,
-          resolveModelNamespaceId(targetModel, modelNameToNamespaceId, defaultNamespaceId),
-        ),
-        cardinality: relation.cardinality,
-        on: {
-          localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
-          targetFields: relation.on.childColumns.map((col) => targetColumnToField.get(col) ?? col),
-        },
-        ...(relation.through
-          ? {
-              through: buildThroughDescriptor(
-                relation.through,
-                tableNamespaceByName,
-                targetModel,
-                semanticModel.modelName,
-                relation.fieldName,
-              ),
-            }
-          : undefined),
+      const to = crossRef(
+        relation.toModel,
+        resolveModelNamespaceId(targetModel, modelNameToNamespaceId, defaultNamespaceId),
+      );
+      const on = {
+        localFields: relation.on.parentColumns.map((col) => columnToField.get(col) ?? col),
+        targetFields: relation.on.childColumns.map((col) => targetColumnToField.get(col) ?? col),
       };
+
+      if (relation.cardinality === 'N:M') {
+        if (!relation.through) {
+          throw new Error(
+            `Relation "${semanticModel.modelName}.${relation.fieldName}" with cardinality "N:M" requires through metadata`,
+          );
+        }
+        modelRelations[relation.fieldName] = {
+          to,
+          cardinality: 'N:M',
+          on,
+          through: buildThroughDescriptor(
+            relation.through,
+            tableNamespaceByName,
+            targetModel,
+            semanticModel.modelName,
+            relation.fieldName,
+          ),
+        };
+      } else {
+        modelRelations[relation.fieldName] = { to, cardinality: relation.cardinality, on };
+      }
     }
 
     let namespaceModels = modelsByNamespace[namespaceId];

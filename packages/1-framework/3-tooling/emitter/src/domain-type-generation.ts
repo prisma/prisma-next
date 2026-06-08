@@ -8,7 +8,7 @@ import type {
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { type ImportRequirement, renderImports } from '@prisma-next/ts-render';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { blindCast } from '@prisma-next/utils/casts';
 import { isSafeTypeExpression } from './type-expression-safety';
 
 export function serializeValue(value: unknown): string {
@@ -150,7 +150,10 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
     }
 
     if (relObj['cardinality'] === 'N:M') {
-      const { through } = castAs<ContractManyToManyRelation>(relObj);
+      const { through } = blindCast<
+        ContractManyToManyRelation,
+        'contract JSON schema-validated before serialization; cardinality N:M check above confirms the junction variant carries through'
+      >(relObj);
       const table = serializeValue(through.table);
       const namespaceId = serializeValue(through.namespaceId);
       const parentColumns = through.parentColumns.map((c) => serializeValue(c)).join(', ');
