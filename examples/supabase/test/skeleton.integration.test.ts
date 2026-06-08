@@ -259,4 +259,80 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
     // 4× the spin-up budget gives cold CI workers headroom.
     timeouts.spinUpPpgDev * 4,
   );
+
+  it(
+    'cross-schema FK from public.profile.userId to auth.users.id cascades on auth.users delete',
+    async () => {
+      const { connectionString } = database;
+
+      // Seed external schemas + tables.
+      await withClient(connectionString, async (client) => {
+        await bootstrapSupabaseShim(client);
+      });
+
+      // Materialise the supabase extension space on disk so dbInit can read it.
+      const space = supabasePack.contractSpace;
+      if (!space) {
+        throw new Error('supabasePack must declare a contractSpace');
+      }
+      await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+        contract: space.contractJson,
+        contractDts: '// supabase extension contract space\n',
+        headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
+      });
+
+      // dbInit apply — creates public.profile with the cross-schema FK.
+      const client = createControlClient({
+        family: sql,
+        target: postgres,
+        adapter: postgresAdapter,
+        driver: postgresDriver,
+        extensionPacks: [supabasePack],
+      });
+      try {
+        await client.connect(connectionString);
+        const applyResult = await client.dbInit({
+          contract: contractJson,
+          mode: 'apply',
+          migrationsDir,
+        });
+        if (!applyResult.ok) {
+          throw new Error(`dbInit apply failed: ${applyResult.failure.summary}`);
+        }
+      } finally {
+        await client.close();
+      }
+
+      // Exercise the cascade.
+      await withClient(connectionString, async (pg) => {
+        const userId = crypto.randomUUID();
+        const now = new Date().toISOString();
+
+        await pg.query(
+          'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3)',
+          [userId, 'bob@example.com', now],
+        );
+        await pg.query('INSERT INTO public.profile (id, username, "userId") VALUES ($1, $2, $3)', [
+          crypto.randomUUID(),
+          'bob',
+          userId,
+        ]);
+
+        const beforeDelete = await pg.query<{ count: string }>(
+          'SELECT COUNT(*)::text AS count FROM public.profile WHERE "userId" = $1',
+          [userId],
+        );
+        expect(beforeDelete.rows[0]?.count).toBe('1');
+
+        await pg.query('DELETE FROM auth.users WHERE id = $1', [userId]);
+
+        const afterDelete = await pg.query<{ count: string }>(
+          'SELECT COUNT(*)::text AS count FROM public.profile WHERE "userId" = $1',
+          [userId],
+        );
+        expect(afterDelete.rows[0]?.count).toBe('0');
+      });
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
 });
