@@ -300,6 +300,65 @@ describe('verifySqlSchema — check constraints', () => {
     );
   });
 
+  it('emits check_removed in strict mode when the contract declares no checks but the live schema has one', () => {
+    // Contract has zero checks for the table. In strict mode the extra live
+    // CHECK must be flagged as check_removed. The old guard
+    // `if (contractTable.checks && contractTable.checks.length > 0)` skipped
+    // verifyCheckConstraints entirely in this case, so the issue was never emitted.
+    const ns = buildSqlNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: {
+          post: new StorageTable({
+            columns: { status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false } },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        valueSet: {},
+      },
+    });
+    const contract = {
+      target: 'postgres' as const,
+      targetFamily: 'sql' as const,
+      roots: {},
+      profileHash: profileHash('sha256:test'),
+      storage: new SqlStorage({
+        storageHash: 'sha256:test' as StorageHashBase<string>,
+        namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
+      }),
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      meta: {},
+      extensionPacks: {},
+    };
+    const schema = createTestSchemaIR({
+      post: {
+        ...createSchemaTable('post', { status: { nativeType: 'text', nullable: false } }),
+        checks: [
+          new SqlCheckConstraintIR({
+            name: 'post_status_check',
+            column: 'status',
+            permittedValues: ['draft', 'published'],
+          }),
+        ],
+      },
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: true,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+    });
+
+    expect(result.schema.issues).toContainEqual(
+      expect.objectContaining({ kind: 'check_removed', table: 'post' }),
+    );
+  });
+
   it('throws when a check references a value-set that is absent from the contract (malformed contract)', () => {
     // Build a contract where the check's valueSet ref points to a name that
     // does not exist in the namespace. A well-formed contract always

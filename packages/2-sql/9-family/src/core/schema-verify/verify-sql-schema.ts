@@ -714,15 +714,16 @@ function verifyTableChildren(options: {
   );
   tableChildren.push(...indexStatuses);
 
-  // Verify check constraints when the contract declares checks for this table.
+  // Verify check constraints when the contract declares checks for this table OR
+  // when strict mode is on (so extra live checks on zero-check tables are detected).
   // schemaTable.checks carries the introspected live checks (parsed value sets).
   // This call is additive: verifyEnumType (the native enum path) is untouched.
-  if (contractTable.checks && contractTable.checks.length > 0) {
-    const contractCheckIRs = contractTable.checks.map((c) => ({
-      name: c.name,
-      column: c.column,
-      permittedValues: resolveValueSetValues(c.valueSet, contractStorage, `check "${c.name}"`),
-    }));
+  const contractCheckIRs = (contractTable.checks ?? []).map((c) => ({
+    name: c.name,
+    column: c.column,
+    permittedValues: resolveValueSetValues(c.valueSet, contractStorage, `check "${c.name}"`),
+  }));
+  if (strict || contractCheckIRs.length > 0) {
     const checkStatuses = verifyCheckConstraints(
       contractCheckIRs,
       schemaTable.checks ?? [],
