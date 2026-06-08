@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { resolveStorageTable } from '@prisma-next/sql-contract/resolve-storage-table';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
@@ -21,6 +22,10 @@ import {
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
+
+function namespaceCoordinateForSource(source: AnyFromSource): string | undefined {
+  return source.kind === 'table-source' ? source.namespaceId : undefined;
+}
 
 export function bindWhereExpr(
   contract: Contract<SqlStorage>,
@@ -144,27 +149,17 @@ function createParamRef(
   value: unknown,
   namespaceId?: string,
 ): ParamRef {
-  // `bindWhereExpr` binds AST that can reach into nested subqueries spanning
-  // namespaces, so the namespace coordinate is genuinely absent on the deep
-  // recursion. Resolve the column's owning namespace here — directly when the
-  // coordinate is supplied, otherwise by scanning storage — and feed that
-  // resolved id to the namespace-leading `codecRefForStorageColumn`.
-  const namespaces = contract.storage.namespaces;
-  const resolvedNamespaceId =
-    namespaceId ??
-    Object.keys(namespaces).find(
-      (ns) => namespaces[ns]?.entries.table[columnRef.table] !== undefined,
-    );
-  if (resolvedNamespaceId === undefined) {
-    throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
-  }
-  const tableInAnyNs = namespaces[resolvedNamespaceId]?.entries.table[columnRef.table];
-  if (!tableInAnyNs?.columns[columnRef.column]) {
+  // `resolveStorageTable` resolves the column's owning namespace directly when
+  // the coordinate is supplied, and otherwise by scanning storage — failing
+  // fast when a bare table name is ambiguous across namespaces rather than
+  // silently first-matching.
+  const resolved = resolveStorageTable(contract.storage, columnRef.table, namespaceId);
+  if (resolved === undefined || !resolved.table.columns[columnRef.column]) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
   const codec = codecRefForStorageColumn(
     contract.storage,
-    resolvedNamespaceId,
+    resolved.namespaceId,
     columnRef.table,
     columnRef.column,
   );
@@ -190,10 +185,11 @@ function bindOrderByItem(contract: Contract<SqlStorage>, orderItem: OrderByItem)
 }
 
 function bindJoin(contract: Contract<SqlStorage>, join: JoinAst): JoinAst {
+  const namespaceId = namespaceCoordinateForSource(join.source);
   return new JoinAst(
     join.joinType,
     bindFromSource(contract, join.source),
-    join.on.kind === 'eq-col-join-on' ? join.on : bindWhereExprNode(contract, join.on),
+    join.on.kind === 'eq-col-join-on' ? join.on : bindWhereExprNode(contract, join.on, namespaceId),
     join.lateral,
   );
 }
@@ -211,6 +207,7 @@ function bindFromSource(contract: Contract<SqlStorage>, source: AnyFromSource): 
 }
 
 function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAst {
+  const namespaceId = namespaceCoordinateForSource(ast.from);
   return new SelectAst({
     from: bindFromSource(contract, ast.from),
     joins: ast.joins?.map((join) => bindJoin(contract, join)),
@@ -222,12 +219,12 @@ function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAs
           projection.codec,
         ),
     ),
-    where: ast.where ? bindWhereExprNode(contract, ast.where) : undefined,
+    where: ast.where ? bindWhereExprNode(contract, ast.where, namespaceId) : undefined,
     orderBy: ast.orderBy?.map((orderItem) => bindOrderByItem(contract, orderItem)),
     distinct: ast.distinct,
     distinctOn: ast.distinctOn?.map((expr) => bindExpression(contract, expr)),
     groupBy: ast.groupBy?.map((expr) => bindExpression(contract, expr)),
-    having: ast.having ? bindWhereExprNode(contract, ast.having) : undefined,
+    having: ast.having ? bindWhereExprNode(contract, ast.having, namespaceId) : undefined,
     limit: ast.limit,
     offset: ast.offset,
     selectAllIntent: ast.selectAllIntent,
