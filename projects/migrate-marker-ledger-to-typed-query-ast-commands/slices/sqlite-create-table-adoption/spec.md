@@ -8,7 +8,47 @@ Make SQLite's `CreateTableCall.toOp()` build a `SqliteCreateTable` DDL-AST node 
 
 ## Chosen design
 
-This slice mirrors slice 4's Postgres pattern; it does not re-litigate any design decisions slice 4 settled (constraint-node shape, contract-free constructor surface, `Lowerer` interface, step-contract `sql: string`). The chosen design is "do exactly what PG did, on SQLite, with the same surfaces."
+This slice mirrors slice 4's Postgres pattern. The mirror turned out to be deeper than the original spec assumed (see § Spec amendment 2026-06-08 below). The chosen design is "do exactly what PG slice 4 did, on SQLite, including the substrate refactors slice 4 made on the PG side that were never replicated on SQLite."
+
+### Spec amendment — 2026-06-08 (falsified assumption during D2)
+
+The original spec read "substrate is fully in place" and scoped slice 5 to a thin `CreateTableCall.toOp()` body migration. D2's grounding falsified that on the byte-parity dimension:
+
+1. **The SQLite adapter renderer doesn't quote identifiers** (`packages/3-targets/6-adapters/sqlite/src/core/ddl-renderer.ts:71` emits `CREATE TABLE ${tableRef}` raw, where `tableRef = node.table` straight from the node). PG's adapter renderer uses `quoteIdentifier` everywhere; the SQLite planner's `renderCreateTableSql` does too. Adapter-output and planner-output cannot be byte-identical until SQLite's adapter renderer is convention-correct.
+2. **Indentation differs** (4-space adapter vs 2-space planner).
+3. **`SqliteCreateTableCall` holds a `SqliteTableSpec` whose columns carry `defaultSql: string` (pre-rendered SQL)** — but the DDL `DdlColumn.default` requires structured `LiteralColumnDefault`/`FunctionColumnDefault`. PG slice 4 (`packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts:198`) sidesteps this by holding `DdlColumn[]` directly on `PostgresCreateTableCall`; the boundary moved upstream into the issue-planner, where structured defaults are produced from `StorageColumn` once and flow through. The same upstream refactor is needed on the SQLite side. The slice-4 substrate landed `LiteralColumnDefault` / `FunctionColumnDefault` in `relational-core/src/ast/ddl-types.ts` but did NOT migrate SQLite's call construction onto the new shape.
+
+So slice 5 expands to fix the SQLite adapter renderer AND replicate slice 4's "`*Call` holds `DdlColumn[]`" refactor on the SQLite side. This is consistent with Phase 1's stated premise that "the first port per target exposes substrate holes." Operator approved (a) on the strategic fork.
+
+### Substrate fix (new in-scope work)
+
+- **SQLite adapter renderer (`packages/3-targets/6-adapters/sqlite/src/core/ddl-renderer.ts`):** add `quoteIdentifier` to every identifier reference (table, column, constraint name, refTable, refColumns) — mirror the PG adapter's pattern at `packages/3-targets/6-adapters/postgres/src/core/ddl-renderer.ts`. Match the planner's `renderCreateTableSql` 2-space-indent format so byte-parity becomes attainable.
+- **`SqliteCreateTableCall` (`packages/3-targets/3-targets/sqlite/src/core/migrations/op-factory-call.ts:50`):** change its `spec: SqliteTableSpec` field to `columns: readonly DdlColumn[]` + `constraints?: readonly DdlTableConstraint[]` (mirror PG `PostgresCreateTableCall`). The class no longer carries pre-rendered SQL fragments.
+- **Upstream construction site:** wherever the planner constructs `SqliteCreateTableCall` (likely in the planner-strategies / issue-planner code path), build `DdlColumn` instances with structured `LiteralColumnDefault`/`FunctionColumnDefault` from the original `StorageColumn` — mirror PG's flow (the existing `defaultSql` string production becomes redundant on this call path; the planner's helper functions stay for `RecreateTable` which still uses the pre-rendered shape).
+
+### `CreateTableCall.toOp()` migration (the consumer, now substrate-clean)
+
+```ts
+// after substrate fix
+toOp(lowerer?: Lowerer): Op {
+  if (lowerer === undefined) {
+    throw new Error(
+      `CreateTableCall.toOp: a DDL lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+    );
+  }
+  const node = contractFreeDdl.createTable({
+    table: this.tableName,
+    columns: this.columns,                      // now DdlColumn[], already structured
+    ...(this.constraints ? { constraints: this.constraints } : {}),
+  });
+  const { sql } = lowerer.lower(node, { contract: {} });
+  return { /* Op shape, mirror PG */ };
+}
+```
+
+### `SqliteMigration.createTable({...})` authoring method
+
+Unchanged from the original spec — `SqliteMigration` gains a constructor that builds + holds a `controlAdapter` from `stack?.adapter` and a protected `createTable({...})` method that instantiates `SqliteCreateTableCall(...)` and calls `.toOp(this.controlAdapter)`, symmetric with `PostgresMigration.createTable`. The free `createTable` re-export comes off `@prisma-next/sqlite/migration`.
 
 ### Lowerer plumbing (mirror of slice 4 on the SQLite side)
 
