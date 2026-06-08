@@ -67,3 +67,16 @@ sonnet-mid; reviewer: opus.
   unchanged otherwise. PGlite integration test (sort + nullable). This dispatch runs the
   final slice-wide additivity / typecheck sweep. **Out:** non-Postgres targets (MySQL
   `FIELD(...)`, SQLite `CASE`) — future.
+
+## Open items (orchestrator-routed; not D1/D2/D3 blockers)
+
+- **Triplicated model/column type-level resolution.** `FindModelForTable` /
+  `FindFieldForColumn` (query-builder `selection.ts`, added in D1) duplicate the pair in
+  sql-builder `table-proxy.ts`, and relational-core has a third equivalent pair
+  (`ExtractTableToModel` / `ExtractColumnToField`). Pre-existing duplication this slice
+  extended by one copy; consolidation crosses shared lane layering. Follow-up, not in this
+  PR. (Surfaced in the D1 review.)
+- **D1 process note:** the implementer's first commit swept stale unrelated worktree files
+  (a closed-out project's docs + ADR reverts) via a broad `git add`. The orchestrator
+  re-committed D1's files only. Guardrail added to D2/D3 briefs: stage only named files,
+  verify `git diff --staged --stat` before committing.
