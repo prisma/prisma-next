@@ -1,259 +1,106 @@
 # ADR 126 — PSL top-level block SPI
 
-> **⚠️ Under revision (2026-06) — the function SPI below is superseded by a declarative descriptor.**
->
-> This ADR records a `parseFn` / `validateFn` / `emitFn` *function* SPI: each extension ships imperative code to parse and emit its block. That shape is being replaced. The decision now is that an extension **describes** a top-level block as data — its keyword, name, and typed parameters (`ref` / `value` / `option` / `list`) — and the framework owns **one generic parser / validator / printer** that interprets any declared block. No extension-supplied parse/print code runs.
->
-> Why: the PSL grammar is closed and uniform, so a block's structure can be described as data and validated/analysed without executing extension code; the function SPI re-implements parsing the framework already does and can't be inspected from its data. `value` rides the existing codec/type system (same rails as field types and `@default`); `option` is an authoring-time parameter constraint, **not** a domain or persistence enum (enums-as-domain is a separate project — PR #748).
->
-> The authoritative current design is `projects/target-contributed-psl-blocks/spec.md`. This ADR is rewritten against the as-shipped substrate in the project's close-out slice (TML-2806). Treat the sections below as historical until then.
+**Status:** Accepted
+**Date:** 2026-06-08
+
+---
 
 ## Context
 
-We want third-party packs to add first-class domain constructs to PSL, such as `pg.view`, `pg.materializedView`, or `pg.enumType`. Today PSL does not allow external authors to register new top-level blocks or define new block-level attributes. Without an extension SPI, every new database concept forces a core change, which conflicts with our thin-core, fat-targets approach.
-
-Additionally, we need a clear distinction between:
-- **Top-level blocks**: standalone constructs with stable identities (views, storage enums) — pack-owned
-- **Decorators/attributes**: metadata on existing core entities (columns, indexes, tables) — also pack-owned
+PSL has a fixed set of top-level block keywords (`model`, `type`, `types`, `namespace`, `enum`). Extensions that want to introduce new top-level constructs — Postgres RLS policies, roles, views — had no mechanism to do so. Every new construct required a core change, which conflicts with the thin-core, fat-targets principle (see [ADR 005](ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md)).
 
 ## Problem
 
-- PSL syntax is currently closed to extension; packs can only decorate core entities
-- Views and storage enums are widely used but vary across targets; they belong in packs, not core
-- Without a formal SPI, the emitter has no standard way to consume pack-provided blocks
-- Extensions need deterministic, schema-validated representation in `contract.json` with stable identities for verification and migration
+- PSL syntax is closed to extension; packs can only decorate core entities via attributes.
+- An earlier implementation (PR #718) gave each extension an imperative `parseFn` / `validateFn` / `emitFn` triple. That approach re-implements parsing the framework already does, is opaque to inspection and analysis, and forces defensive machinery to handle arbitrary extension-supplied code paths.
+- PSL's grammar is closed and uniform: a top-level block is a keyword + name + body of `x = y` assignments and double-quoted values. The framework already handles all of that for built-in block types. Contributed parser functions that re-implement a subset of that are unnecessary.
 
 ## Decision
 
-Introduce a **PSL Extension SPI** that allows packs to register:
-1. New top-level blocks with their own grammar, validation, and deterministic emission
-2. New attributes that can attach to existing blocks (already partially supported via ADR 104 decorators)
-3. A pure transformation from parsed PSL fragments to canonical, deterministic JSON under `contract.extensionPacks.<namespace>.*`
+An extension registers an **`AuthoringPslBlockDescriptor`** — a data descriptor, not code — for each top-level keyword it contributes. The descriptor declares: the keyword, a `discriminator` string, whether the block has a name, and a `parameters` map of typed value-kind descriptors.
 
-Top-level blocks remain pack-owned objects and do not enlarge core. Core may reference them indirectly through stable identifiers where necessary (e.g., migrations, read-only sources).
+The framework owns **one generic parser, one generic validator, and one generic printer** that interpret any declared block from its descriptor. No parsing or printing code runs from the extension.
+
+```ts
+import type { AuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
+
+const policySelectDescriptor: AuthoringPslBlockDescriptor = {
+  kind: 'pslBlock',
+  keyword: 'policy_select',
+  discriminator: 'postgres-policy-select',
+  name: { required: true },
+  parameters: {
+    target: { kind: 'ref',    refKind: 'model',             scope: 'same-namespace', required: true },
+    as:     { kind: 'option', values: ['permissive', 'restrictive'],                 required: false },
+    roles:  { kind: 'list',   of: { kind: 'ref', refKind: 'role', scope: 'cross-space' },           required: false },
+    using:  { kind: 'value',  codecId: 'String',                                     required: true },
+  },
+};
+```
+
+The descriptor is registered on `AuthoringContributions.pslBlockDescriptors`. Each descriptor must have a matching `AuthoringContributions.entityTypes` factory with the same discriminator — the parsed AST node lowers to an IR class instance through that factory.
 
 ## Details
 
-### Distinction: Top-Level Blocks vs Decorators
+### Parameter value-kind vocabulary
 
-**Top-level blocks** (pack-owned)
-- Declared at file root, one per definition
-- Each produces a standalone, addressable object with a stable `id`
-- Examples: `pg.view MyActiveUsers { ... }`, `pg.enumType UserStatus { ... }`
-- Emit canonical JSON under `contract.extensionPacks.<namespace>.<kind>[]`
-- May project into **types-only** surfacing for queries (lane/adapter-owned) or contribute to planning/migrations via pack ops
-- Contribute to contract hash per ADR 106 canonicalization rules
+Four kinds; the split is principled, not incidental:
 
-**Decorators/attributes** (also pack-owned)
-- Attach to existing core entities: `model`, `table`, `index`, `column`, `@id`, etc.
-- Do not introduce a new top-level identity
-- Example: `@pg.type("user_status")` on a column, `@@pg.predicate("active = true")` on an index
-- Emit augmentations/metadata via the extension encoder (decorations under `contract.extensionPacks.<ns>.decorations`)
-- Validated against pack schemas, canonicalized per ADR 106
+| Kind | What it is | Backing machinery |
+|---|---|---|
+| **`ref`** | an identifier that resolves to a declared entity | resolved against the `(spaceId, namespaceId, entityKind, entityName)` coordinate model; `scope` ∈ `same-namespace` / `same-space` / `cross-space` |
+| **`value`** | a codec-typed value — the codec owns PSL parse and print | the existing codec/type system, same as field types and `@default` literals; opaque content (SQL predicates, JSON blobs) stays opaque to the framework |
+| **`option`** | one of a fixed set of literal tokens | an inline closed token list on the descriptor — authoring-time constraint only; not a codec, not persisted data, not a domain enum |
+| **`list`** | a bracketed list of any of the above | combinator |
 
-### Block Registration API
+### `value` rides the codec JSON medium
 
-Emitter exposes a registration interface for packs to hook in:
+A `value` parameter uses a `codecId`, exactly as a field's type and a `@default` literal's type do. The codec's `encodeJson` / `decodeJson` hooks (combined with `JSON.parse` / `JSON.stringify`) carry the value through the PSL text ↔ literal ↔ encoded form pipeline. This gives structural parity across the three places PSL carries a typed value (field types, defaults, block parameters) and makes custom types available as parameter values with no additional work.
 
-```typescript
-interface BlockRegistry {
-  registerTopLevelBlock(params: {
-    kind: string                    // e.g., "view", "materializedView", "enumType"
-    namespace: string               // e.g., "postgres" (must match pack namespace)
-    parseFn: (tokens: TokenStream) => BlockAST | null
-    validateFn: (ast: BlockAST, context: ValidationContext) => Diagnostic[]
-    emitFn: (ast: BlockAST, context: EmitContext) => {
-      json: unknown                 // canonical JSON for contract.extensionPacks.<ns>.<kind>[]
-      id: string                    // stable id computed from canonical content + name
-      typeProjections?: { [logicalName: string]: unknown }  // optional types-only surfacing (non-canonical)
-    }
-    schema: JSONSchema              // for validation and documentation
-  }): void
-}
-```
+### `option` is not a domain enum
 
-### Parsing
+`as = permissive` is configuration of the policy node, not user data. It is never realised as a stored value-set or check constraint. Modelling it as an enum would couple it to the enums-as-domain machinery (see [PR #748](https://github.com/prisma/prisma-next/pull/748)); it stays a lightweight inline authoring constraint.
 
-- Parser is invoked with a `TokenStream` positioned at block keyword (e.g., `pg.view`)
-- Parser responsibility: consume tokens, validate grammar, and return a structured AST
-- Parser must be **pure** (no I/O, no environment access, no side effects)
-- Parse errors include source spans for IDE diagnostics
+### Per-block-kind schemas, no conditional logic
 
-Example parser implementation (pseudo-code):
+Where a parameter's validity depends on context, the answer is separate block keywords with fixed parameter sets — not conditional rules inside a descriptor. Postgres RLS uses `policy_select` / `policy_insert` / `policy_update` / `policy_delete` rather than one `policy` block with an `operation` parameter. The command is encoded in the keyword; an invalid parameter combination is structurally impossible.
 
-```typescript
-function parsePgView(tokens: TokenStream): BlockAST | null {
-  const name = tokens.peek() === 'IDENT' ? tokens.take().value : null
-  if (!name) return null
+### Framework behaviour at parse time
 
-  tokens.expect('{')
-  const body = parseBlockBody(tokens)  // parse schema, sql, shape, etc.
-  tokens.expect('}')
+On encountering an unknown top-level keyword, the framework looks it up in the `pslBlockDescriptors` registry. If a descriptor claims the keyword, the generic parser reads the block into a `PslExtensionBlock` node — name plus a `parameters` map of `PslExtensionBlockParamValue` values keyed by parameter name. No extension code runs.
 
-  return { kind: 'pg.view', name, body }
-}
-```
+The validator then checks (at load/parse time, with spans):
+- unknown parameters (keys not in the descriptor's `parameters` map)
+- missing required parameters
+- `option` value outside the declared `values` array
+- `value` text rejected by the codec's `decodeJson` / `JSON.parse`
+- `ref` identifier that does not resolve within the declared scope
 
-### Validation
+The printer reconstructs any declared block from its descriptor + AST node.
 
-- Validate AST structure and semantic constraints independently
-- No target system calls or environment access
-- Return structured diagnostics with source spans for IDE integration
-- Examples: check that SQL is non-empty, that references in `dependsOn` are resolvable within the same PSL file, that shape types are valid codecs
+### The parsed node lowers to IR
 
-### Emission
+The `PslExtensionBlock` node lowers to a Contract IR class instance via the matching `entityTypes` factory, keyed by the shared `discriminator`. Every extension-contributed PSL block requires a matching factory; the framework enforces this at load time (`assertPslBlocksHaveFactories`).
 
-- Transform validated AST into canonical JSON for `contract.extensionPacks.<ns>.<kind>[]`
-- Compute a stable `id` from fully-qualified name and content hash
-- Optionally emit source projections (read-only sources) for DSL consumption
-- All outputs must be JSON-serializable and deterministically canonicalized per ADR 010 and ADR 106
+### Load-time validation
 
-Example emission:
+Duplicate keywords, duplicate discriminators, a block registered without a matching `entityTypes` factory, and malformed descriptors all fail at load time with clear diagnostics naming the contributing extension.
 
-```typescript
-function emitPgView(ast: BlockAST, context: EmitContext): EmitResult {
-  const json = {
-    name: ast.name,
-    schema: ast.body.schema,
-    sql: ast.body.sql,
-    shape: ast.body.shape,
-    dependsOn: ast.body.dependsOn,
-    materialized: false
-  }
+### Parsed extension blocks in the AST
 
-  // Stable id based on hash of canonical JSON
-  const id = `pg.view:${ast.name}@${contentHash(json)}`
-
-  // Optional: project as a read-only source for the DSL
-  const sourceProjections = ast.body.shape ? {
-    [ast.name]: {
-      projection: ast.body.shape,
-      origin: { namespace: 'postgres', kind: 'view', id }
-    }
-  } : {}
-
-  return { json, id, sourceProjections }
-}
-```
-
-### Namespacing and Identity
-
-- Every pack declares a namespace like `postgres`, `mongo`, or `pgvector`
-- Top-level block kinds are fully qualified: `postgres.view`, `postgres.enumType`
-- Stable `id` computation includes fully-qualified name and content hash for conflict prevention and linking
-- Multiple blocks of the same kind are allowed; each has a unique name and id
-
-### Purity and Determinism
-
-- Parsers, validators, and emitters must be **pure and side-effect free**
-- No filesystem, network, environment access, or external function calls
-- All outputs must be JSON-serializable and deterministic
-- Any nondeterminism is a pack error and fails emission with a clear diagnostic
-
-### Linking to Core
-
-- Packs may reference core entities using stable names (e.g., table names in `dependsOn`)
-- Core may reference extension objects by origin: `{ namespace, kind, id }` where necessary (e.g., when publishing read-only sources)
-- Cross-pack references are disallowed in MVP; future versions can introduce controlled cross-namespace linking
-
-### Capabilities
-
-- Packs declare capability keys they enable, e.g., `postgres.view.base`, `postgres.view.materialized`, `postgres.enumType.storage`
-- Capabilities surface in `contract.capabilities` for negotiation by lanes, runtime, and adapters per ADR 117
-- Block registration must declare required and optional capabilities
-
-### Validation and Error Taxonomy
-
-- All pack-produced JSON is validated against pack-provided JSON Schema at emit time
-- Emitter tracks parse/validate/emit errors with stable codes, source spans, and remediation hints
-- Block misuse on unsupported targets produces a structured error per ADR 027
-
-New error codes:
-- `EMIT_BLOCK_UNKNOWN_NAMESPACE` — namespace not pinned in extensions
-- `EMIT_BLOCK_PARSE_ERROR` — syntax error in block
-- `EMIT_BLOCK_VALIDATION_ERROR` — semantic validation failed
-- `EMIT_BLOCK_SCHEMA_VIOLATION` — emitted JSON fails pack schema
-- `EMIT_BLOCK_DUP_NAME` — duplicate block name within file
-- `EMIT_BLOCK_CAPABILITY_UNSUPPORTED` — block requires unavailable capability
-
-### Watch Mode and Dev Experience
-
-- Dev auto-emit (ADR 032) reloads packs and re-parses only changed blocks
-- Diagnostics surface in IDE and terminal with file/line context
-- Parse/validate errors appear inline with immediate remediation hints
-
-### Versioning
-
-- Packs declare semver and target SPI version
-- Contract embeds `extensions.<ns>.version` for reproducibility, planning, and preflight bundling
-- SPI version enables future changes to `BlockRegistry` without breaking older packs
-
-### Security
-
-- Extension code executes within the emitter process but must remain pure
-- No dynamic code generation, eval, or WASM
-- Pack loading honors project allow-lists (per ADR 100)
-- Preflight (hosted or local) validates pack integrity via SHA-256 hashes
-
-### TS-First Parity
-
-The TS builder must support the same blocks via typed helpers:
-
-```typescript
-import { defineContract } from '@prisma/contract-core'
-import { postgres } from '@prisma/pack-postgres'
-
-const contract = defineContract({
-  tables: { /* ... */ },
-  blocks: {
-    pgViews: [
-      postgres.view('active_users', {
-        sql: `select id, email from "user" where active = true`,
-        shape: { id: 'int4', email: 'text' }
-      })
-    ]
-  }
-})
-```
-
-- TS-authored contracts emit identical canonical JSON to PSL for the same inputs
-- Lint rules enforce determinism and forbid dynamic values in TS-first authoring per ADR 096
+Parsed extension blocks are stored in `PslNamespace.entries[discriminator][name]` — the same ADR 224 coordinate structure the IR uses. The built-in accessor helpers (`models`, `enums`, `compositeTypes`) derive from `entries`; extension kinds are reached via `entries[discriminator]` or the `namespacePslExtensionBlocks` helper.
 
 ## Consequences
 
-### Positive
-- Core remains small while packs add rich domain features
-- Deterministic artifacts enable CI, preflight, and agent workflows
-- Clear SPI enables community contributions
-- Top-level blocks get stable identities for linking and migration
-
-### Negative
-- Pack authors bear responsibility for clear schemas and validation logic
-- Requires coordination between parse, validate, and emit phases
-- Adds complexity to emitter and LSP integration
-
-### Trade-offs
-- Purity constraints (no I/O, no dynamic code) limits expressiveness but ensures safety and determinism
-- Block registration happens at emit time, not parse time, so packs must be pre-loaded
-
-## Open Questions
-
-- Should we support conditional block registration based on adapter capabilities?
-- How do we handle forward compatibility when a pack adds new block types in a minor version?
-- Should blocks be allowed to contribute migrations directly, or only via pack ops?
-- Cross-namespace references: what conditions allow a block to reference another pack's construct?
+- The extension ships zero parse/print code. A descriptor that correctly declares its parameters is fully parseable, validatable, printable, and round-trippable without any additional implementation.
+- The framework's single generic parser/validator/printer handles all declared blocks. New block shapes are additive: a new `parameters` entry with a new kind cannot break existing blocks.
+- Extensibility at the PSL layer aligns with the IR: the three architectural layers (IR class, lowering factory, PSL parse/print) are all addressed by the shared `discriminator`. See [ADR 225 — Three-layer extensibility for pack-contributed entity kinds](ADR%20225%20-%20Three-layer%20extensibility%20for%20pack-contributed%20entity%20kinds.md).
+- Descriptors are inspectable data: they can be validated, documented, and reasoned about without executing extension code.
 
 ## References
 
-- **ADR 010** — Canonicalization rules for contract.json
-- **ADR 027** — Error envelope stable codes
-- **ADR 032** — Dev auto-emit integration
-- **ADR 096** — TS-authored contract parity & purity rules
-- **ADR 100** — CI contract emission trust model
-- **ADR 104** — PSL extension namespacing & syntax
-- **ADR 105** — Contract extension encoding
-- **ADR 106** — Canonicalization for extensions
-- **ADR 116** — Extension-aware migration ops
-- **ADR 117** — Extension capability keys
-- **Doc 2** — Contract Emitter & Types
-- **Doc 12** — Ecosystem Extensions & Packs
+- [ADR 005 — Thin Core Fat Targets](ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md)
+- [ADR 104 — PSL extension namespacing & syntax](ADR%20104%20-%20PSL%20extension%20namespacing%20%26%20syntax.md)
+- [ADR 221 — Contract IR two planes with uniform entity coordinate and pack-contributed entity kinds](ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)
+- [ADR 224 — Namespace concretions address entities by coordinate](ADR%20224%20-%20Namespace%20concretions%20address%20entities%20by%20coordinate.md)
+- [ADR 225 — Three-layer extensibility for pack-contributed entity kinds](ADR%20225%20-%20Three-layer%20extensibility%20for%20pack-contributed%20entity%20kinds.md)
