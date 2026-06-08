@@ -1,28 +1,24 @@
-export interface PslPosition {
-  readonly offset: number;
-  readonly line: number;
-  readonly column: number;
-}
+export type { AuthoringPslBlockDescriptorNamespace } from '../shared/framework-authoring';
+export type {
+  PslBlockParam,
+  PslBlockParamList,
+  PslBlockParamOption,
+  PslBlockParamRef,
+  PslBlockParamValue,
+  PslDiagnosticCode,
+  PslExtensionBlock,
+  PslExtensionBlockParamList,
+  PslExtensionBlockParamOption,
+  PslExtensionBlockParamRef,
+  PslExtensionBlockParamScalarValue,
+  PslExtensionBlockParamValue,
+  PslPosition,
+  PslSpan,
+} from '../shared/psl-extension-block';
 
-export interface PslSpan {
-  readonly start: PslPosition;
-  readonly end: PslPosition;
-}
-
-export type PslDiagnosticCode =
-  | 'PSL_UNTERMINATED_BLOCK'
-  | 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK'
-  | 'PSL_INVALID_NAMESPACE_BLOCK'
-  | 'PSL_INVALID_ATTRIBUTE_SYNTAX'
-  | 'PSL_INVALID_MODEL_MEMBER'
-  | 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE'
-  | 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE'
-  | 'PSL_INVALID_RELATION_ATTRIBUTE'
-  | 'PSL_INVALID_REFERENTIAL_ACTION'
-  | 'PSL_INVALID_DEFAULT_VALUE'
-  | 'PSL_INVALID_ENUM_MEMBER'
-  | 'PSL_INVALID_TYPES_MEMBER'
-  | 'PSL_INVALID_QUALIFIED_TYPE';
+import type { CodecLookup } from '../shared/codec-types';
+import type { AuthoringPslBlockDescriptorNamespace } from '../shared/framework-authoring';
+import type { PslDiagnosticCode, PslExtensionBlock, PslSpan } from '../shared/psl-extension-block';
 
 export interface PslDiagnostic {
   readonly code: PslDiagnosticCode;
@@ -212,6 +208,23 @@ export interface PslNamespace {
   readonly models: readonly PslModel[];
   readonly enums: readonly PslEnum[];
   readonly compositeTypes: readonly PslCompositeType[];
+  /**
+   * Extension-contributed top-level blocks parsed inside this namespace.
+   * These are the parsed AST nodes produced by the generic framework parser
+   * when it encounters a keyword claimed by a registered
+   * {@link AuthoringPslBlockDescriptorNamespace} entry.
+   *
+   * Absent when no extension blocks appear in this namespace. Order matches
+   * source order within the namespace; extension-contributed and built-in
+   * blocks live in their own slots, so a namespace mixing `model X { … }` and
+   * `policy_select Y { … }` keeps the model in `models` and the policy in
+   * `extensionBlocks`.
+   *
+   * Contrast with {@link ParsePslDocumentInput.pslBlockDescriptors}: that
+   * field holds the registry of declarative descriptors that teach the parser
+   * which keywords to accept; this field holds the resulting parsed nodes.
+   */
+  readonly extensionBlocks?: readonly PslExtensionBlock[];
   readonly span: PslSpan;
 }
 
@@ -248,6 +261,30 @@ export function flatPslCompositeTypes(ast: PslDocumentAst): readonly PslComposit
 export interface ParsePslDocumentInput {
   readonly schema: string;
   readonly sourceId: string;
+  /**
+   * Registry of declarative block descriptors, keyed by arbitrary path
+   * segments with {@link AuthoringPslBlockDescriptor} leaves. The registry
+   * teaches the parser which top-level keywords belong to extension
+   * contributions: when the parser encounters an unknown keyword, it looks
+   * it up here and, when found, reads the block generically into a
+   * {@link PslExtensionBlock} node. Absent or undefined means no extension
+   * blocks are registered and any unknown keyword yields
+   * `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`.
+   *
+   * Contrast with {@link PslNamespace.extensionBlocks}: that field holds the
+   * parsed block nodes in a namespace; this field holds the registry of
+   * descriptors that teach the parser how to read those blocks.
+   */
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+  /**
+   * Codec lookup for validating `value`-kind extension block parameters.
+   * When provided alongside `pslBlockDescriptors`, the generic validator runs
+   * over every parsed extension block after the full AST is assembled,
+   * appending any diagnostics to the parse result. Absent or undefined means
+   * no codec validation runs; `ref` resolution still runs when namespace
+   * context is available (built from the assembled namespaces).
+   */
+  readonly codecLookup?: CodecLookup;
 }
 
 export interface ParsePslDocumentResult {

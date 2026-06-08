@@ -12,7 +12,7 @@ const emptyContext: ContractSourceContext = {
   composedExtensionPacks: [],
   composedExtensionContracts: new Map(),
   scalarTypeDescriptors: new Map(),
-  authoringContributions: { field: {}, type: {}, entityTypes: {} },
+  authoringContributions: { field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} },
   codecLookup: emptyCodecLookup,
   controlMutationDefaults: {
     defaultFunctionRegistry: new Map(),

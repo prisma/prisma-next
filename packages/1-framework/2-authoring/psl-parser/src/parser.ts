@@ -1,4 +1,10 @@
 import type {
+  AuthoringPslBlockDescriptor,
+  AuthoringPslBlockDescriptorNamespace,
+} from '@prisma-next/framework-components/authoring';
+import { isAuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import type {
   ParsePslDocumentInput,
   ParsePslDocumentResult,
   PslAttribute,
@@ -10,6 +16,8 @@ import type {
   PslDocumentAst,
   PslEnum,
   PslEnumValue,
+  PslExtensionBlock,
+  PslExtensionBlockParamValue,
   PslField,
   PslFieldAttribute,
   PslModel,
@@ -21,7 +29,10 @@ import type {
   PslTypeConstructorCall,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
-import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import {
+  UNSPECIFIED_PSL_NAMESPACE_ID,
+  validateExtensionBlock,
+} from '@prisma-next/framework-components/psl-ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 const SCALAR_TYPES = new Set([
@@ -68,6 +79,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     models: PslModel[];
     enums: PslEnum[];
     compositeTypes: PslCompositeType[];
+    extensionBlocks: PslExtensionBlock[];
     span: PslSpan | undefined;
   }
 
@@ -79,7 +91,14 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
   ): NamespaceAccumulator => {
     let acc = namespacesByName.get(name);
     if (!acc) {
-      acc = { name, models: [], enums: [], compositeTypes: [], span: spanIfNew };
+      acc = {
+        name,
+        models: [],
+        enums: [],
+        compositeTypes: [],
+        extensionBlocks: [],
+        span: spanIfNew,
+      };
       namespacesByName.set(name, acc);
       namespaceOrder.push(name);
     }
@@ -87,6 +106,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
   };
 
   let typesBlock: PslTypesBlock | undefined;
+  const pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = input.pslBlockDescriptors ?? {};
 
   // Walk a contiguous range of lines, routing top-level declarations into the
   // active namespace bucket. Called once for the whole document and once per
@@ -198,6 +218,26 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         continue;
       }
 
+      const extensionBlockMatch = line.match(/^([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*\{$/);
+      if (extensionBlockMatch) {
+        const keyword = extensionBlockMatch[1] ?? '';
+        const blockName = extensionBlockMatch[2] ?? '';
+        const descriptor = lookupExtensionBlockDescriptor(pslBlockNamespace, keyword);
+        if (descriptor) {
+          const bounds = findBlockBounds(context, lineIndex);
+          if (blockName.length > 0) {
+            const acc = getOrCreateNamespace(
+              currentNamespaceName,
+              createTrimmedLineSpan(context, lineIndex),
+            );
+            const node = parseExtensionBlock(context, descriptor, blockName, lineIndex, bounds);
+            acc.extensionBlocks.push(node);
+          }
+          lineIndex = bounds.endLine + 1;
+          continue;
+        }
+      }
+
       if (line.includes('{')) {
         const blockName = line.split(/\s+/)[0] ?? 'block';
         pushDiagnostic(context, {
@@ -288,7 +328,8 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       name === UNSPECIFIED_PSL_NAMESPACE_ID &&
       acc.models.length === 0 &&
       acc.enums.length === 0 &&
-      acc.compositeTypes.length === 0
+      acc.compositeTypes.length === 0 &&
+      acc.extensionBlocks.length === 0
     ) {
       continue;
     }
@@ -322,8 +363,50 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       models: normalizedModels,
       enums: acc.enums,
       compositeTypes: acc.compositeTypes,
+      ...ifDefined(
+        'extensionBlocks',
+        acc.extensionBlocks.length > 0 ? acc.extensionBlocks : undefined,
+      ),
       span: acc.span ?? documentSpan,
     });
+  }
+
+  // Validate extension blocks with the generic validator after the full
+  // AST is assembled. The validator needs all namespaces for ref resolution.
+  // It runs whenever pslBlockDescriptors are registered — codecLookup falls
+  // back to emptyCodecLookup when not provided, which rejects value-kind
+  // parameters with unknown codecs. Callers with value parameters should
+  // always supply a codecLookup.
+  if (Object.keys(pslBlockNamespace).length > 0) {
+    const codecLookup = input.codecLookup ?? emptyCodecLookup;
+    // Build a discriminator → descriptor reverse map from the descriptor
+    // namespace. The parser keyed by keyword; the validator resolves by
+    // node.kind (= discriminator) so we need the reverse direction.
+    const descriptorByDiscriminator = new Map<string, AuthoringPslBlockDescriptor>();
+    for (const value of Object.values(pslBlockNamespace)) {
+      if (isAuthoringPslBlockDescriptor(value)) {
+        descriptorByDiscriminator.set(value.discriminator, value);
+      }
+    }
+    for (const ns of namespaces) {
+      for (const block of ns.extensionBlocks ?? []) {
+        const descriptor = descriptorByDiscriminator.get(block.kind);
+        if (descriptor === undefined) {
+          continue;
+        }
+        const blockDiagnostics = validateExtensionBlock(
+          block,
+          descriptor,
+          input.sourceId,
+          codecLookup,
+          {
+            ownerNamespace: ns,
+            allNamespaces: namespaces,
+          },
+        );
+        diagnostics.push(...blockDiagnostics);
+      }
+    }
   }
 
   const ast: PslDocumentAst = {
@@ -1488,4 +1571,137 @@ function pushDiagnostic(
     ...diagnostic,
     sourceId: context.sourceId,
   });
+}
+
+function lookupExtensionBlockDescriptor(
+  namespace: AuthoringPslBlockDescriptorNamespace,
+  keyword: string,
+): AuthoringPslBlockDescriptor | undefined {
+  if (!Object.hasOwn(namespace, keyword)) {
+    return undefined;
+  }
+  const value = namespace[keyword];
+  return isAuthoringPslBlockDescriptor(value) ? value : undefined;
+}
+
+/**
+ * Reads an extension block body generically, driven by the descriptor's
+ * `parameters` map. Each `key = <rhs>` line in the body is matched against
+ * a declared parameter and the RHS is captured per the parameter's kind:
+ *
+ * - `ref`    → the bareword identifier token (`PslExtensionBlockParamRef`)
+ * - `value`  → the raw RHS text verbatim (`PslExtensionBlockParamScalarValue`)
+ * - `option` → the chosen bareword token (`PslExtensionBlockParamOption`)
+ * - `list`   → bracketed `[a, b, …]` list, each element captured per `of`
+ *   (`PslExtensionBlockParamList`)
+ *
+ * No validation runs here (unknown key, missing required, codec acceptance,
+ * option-in-set, ref resolution). A body line that is not `key = value`
+ * shaped emits a `PSL_INVALID_EXTENSION_BLOCK_MEMBER` parse diagnostic.
+ */
+function parseExtensionBlock(
+  context: ParserContext,
+  descriptor: AuthoringPslBlockDescriptor,
+  blockName: string,
+  keywordLineIndex: number,
+  bounds: BlockBounds,
+): PslExtensionBlock {
+  const parameters: Record<string, PslExtensionBlockParamValue> = {};
+
+  for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; lineIndex += 1) {
+    const raw = context.lines[lineIndex] ?? '';
+    const line = stripInlineComment(raw).trim();
+    if (line.length === 0) {
+      continue;
+    }
+
+    const assignMatch = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+    if (!assignMatch) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+        message: `Invalid extension block body line "${line}"; expected "key = value"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    const key = assignMatch[1] ?? '';
+    const rhsRaw = (assignMatch[2] ?? '').trim();
+    const paramDescriptor = descriptor.parameters[key];
+
+    if (paramDescriptor === undefined) {
+      // Unknown parameter — captured as a raw value; the generic validator reports this.
+      parameters[key] = {
+        kind: 'value',
+        raw: rhsRaw,
+        span: createTrimmedLineSpan(context, lineIndex),
+      };
+      continue;
+    }
+
+    const captured = captureParamRhs(context, lineIndex, rhsRaw, paramDescriptor);
+    if (captured !== undefined) {
+      parameters[key] = captured;
+    }
+  }
+
+  return {
+    kind: descriptor.discriminator,
+    name: blockName,
+    parameters,
+    span: createLineRangeSpan(context, keywordLineIndex, bounds.endLine),
+  };
+}
+
+/**
+ * Captures a single parameter RHS string according to the declared parameter
+ * kind. Returns `undefined` and pushes a diagnostic only if the syntax is
+ * genuinely malformed (e.g. a `list` with no opening bracket). Value
+ * acceptance (codec, option-in-set, ref resolution) is handled by the validator.
+ */
+function captureParamRhs(
+  context: ParserContext,
+  lineIndex: number,
+  rhs: string,
+  param: AuthoringPslBlockDescriptor['parameters'][string],
+): PslExtensionBlockParamValue | undefined {
+  const span = createTrimmedLineSpan(context, lineIndex);
+
+  switch (param.kind) {
+    case 'ref': {
+      return { kind: 'ref', identifier: rhs, span };
+    }
+    case 'value': {
+      return { kind: 'value', raw: rhs, span };
+    }
+    case 'option': {
+      return { kind: 'option', token: rhs, span };
+    }
+    case 'list': {
+      if (!rhs.startsWith('[') || !rhs.endsWith(']')) {
+        pushDiagnostic(context, {
+          code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+          message: `Expected a bracketed list "[…]" for list parameter, got "${rhs}"`,
+          span,
+        });
+        return undefined;
+      }
+      const inner = rhs.slice(1, -1).trim();
+      const items: PslExtensionBlockParamValue[] = [];
+      if (inner.length > 0) {
+        const segments = splitTopLevelSegments(inner, ',');
+        for (const segment of segments) {
+          const itemRhs = segment.value.trim();
+          if (itemRhs.length === 0) {
+            continue;
+          }
+          const item = captureParamRhs(context, lineIndex, itemRhs, param.of);
+          if (item !== undefined) {
+            items.push(item);
+          }
+        }
+      }
+      return { kind: 'list', items, span };
+    }
+  }
 }
