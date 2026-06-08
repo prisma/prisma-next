@@ -224,6 +224,7 @@ export function buildGrid(
   }
 
   // colourLane by migration NAME (dirName) order — chronological, not hash.
+  // Each arc keeps its own colour regardless of convergence.
   const colourLaneOf = new Map<string, number>();
   [...skippingRollbacks]
     .sort((a, b) => a.dirName.localeCompare(b.dirName))
@@ -231,21 +232,33 @@ export function buildGrid(
       colourLaneOf.set(e.migrationHash, numLanes + i);
     });
 
-  // geomLane: outermost rail to the arc with the lowest target (largest target
-  // index); ties broken by the highest source (smallest source index). The first
-  // in this order gets the outermost (largest) geometric lane.
-  const geomOrder = [...skippingRollbacks].sort((a, b) => {
-    const ta = displayIndex.get(a.to) ?? 0;
-    const tb = displayIndex.get(b.to) ?? 0;
-    if (ta !== tb) return tb - ta; // lower target (larger index) first
-    const sa = displayIndex.get(a.from) ?? 0;
-    const sb = displayIndex.get(b.from) ?? 0;
-    return sa - sb; // higher source (smaller index) first
+  // Convergence: group skipping rollbacks by their target node. Arcs sharing a
+  // target share one geometric lane (rail column). Each distinct target gets its
+  // own rail; arcs within the group compose via occlusion.
+  //
+  // geomLane ordering: outermost rail goes to the group whose target is lowest
+  // in display order (largest target index — deepest in the chain). Within a
+  // group, the group's representative target index drives the ordering.
+  const targetGroups = new Map<string, ClassifiedEdge[]>();
+  for (const e of skippingRollbacks) {
+    const group = targetGroups.get(e.to);
+    if (group) group.push(e);
+    else targetGroups.set(e.to, [e]);
+  }
+  // Sort target-group keys: largest target index (lowest in display) → outermost lane.
+  const sortedTargetKeys = [...targetGroups.keys()].sort((a, b) => {
+    const ta = displayIndex.get(a) ?? 0;
+    const tb = displayIndex.get(b) ?? 0;
+    return tb - ta; // largest index first = outermost
   });
+  const numTargetGroups = sortedTargetKeys.length;
   const geomLaneOf = new Map<string, number>();
-  const outermost = numLanes + skippingRollbacks.length - 1;
-  geomOrder.forEach((e, i) => {
-    geomLaneOf.set(e.migrationHash, outermost - i);
+  const outermostGroup = numLanes + numTargetGroups - 1;
+  sortedTargetKeys.forEach((targetHash, i) => {
+    const groupGeomLane = outermostGroup - i;
+    for (const e of targetGroups.get(targetHash)!) {
+      geomLaneOf.set(e.migrationHash, groupGeomLane);
+    }
   });
 
   const routedBackArcs: RoutedBackArc[] = skippingRollbacks.map((e) => ({
@@ -280,7 +293,7 @@ export function buildGrid(
   for (const list of adjacentBySource.values())
     list.sort((a, b) => a.dirName.localeCompare(b.dirName));
 
-  const numBackLanes = skippingRollbacks.length;
+  const numBackLanes = numTargetGroups;
   const totalCols = (numLanes + numBackLanes) * colsPerLane;
 
   // Build edge lookup maps (classified)

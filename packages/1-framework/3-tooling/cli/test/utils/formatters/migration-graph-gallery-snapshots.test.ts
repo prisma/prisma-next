@@ -150,26 +150,30 @@ describe('migration-graph scenario gallery', () => {
   // lands both conditions must pass together before the it.fails wrapper is removed.
   // =========================================================================
   describe('convergence structural assertions', () => {
-    it.fails('rollback-converge-2: same-target arcs share one back-lane (grid width = 4, tip topmost)', () => {
+    it('rollback-converge-2: same-target arcs share one back-lane (grid width = 4, tip topmost)', () => {
       const grid = buildScenarioGrid('rollback-converge-2');
-      // Width: converged = (1 forward + 1 target-group) * 2 = 4; today = 6
+      // Width: converged = (1 forward + 1 target-group) * 2 = 4
       expect(grid[0]!.length).toBe(4);
-      // Tip topmost: first row must be a node row (tip rcv2_d is highest-rank)
+      // Tip topmost: the first grid row's node cell is the highest-rank tip (rcv2_d)
+      const firstNodeCell = grid[0]!.find((cell) => cell.node !== undefined);
+      expect(firstNodeCell, 'first grid row must be a node row').toBeDefined();
       expect(
-        grid[0]!.some((cell) => cell.node !== undefined),
-        'first grid row must be a node row',
-      ).toBe(true);
+        firstNodeCell!.node!.contractHash,
+        'highest-rank tip (rcv2_d) must be the first node in grid[0]',
+      ).toBe('rcv2_d');
     });
 
-    it.fails('rollback-converge-3: same-target arcs share one back-lane (grid width = 4, tip topmost)', () => {
+    it('rollback-converge-3: same-target arcs share one back-lane (grid width = 4, tip topmost)', () => {
       const grid = buildScenarioGrid('rollback-converge-3');
-      // Width: converged = (1 forward + 1 target-group) * 2 = 4; today = 8
+      // Width: converged = (1 forward + 1 target-group) * 2 = 4
       expect(grid[0]!.length).toBe(4);
-      // Tip topmost: first row must be a node row (tip rcv3_e is highest-rank)
+      // Tip topmost: the first grid row's node cell is the highest-rank tip (rcv3_e)
+      const firstNodeCell = grid[0]!.find((cell) => cell.node !== undefined);
+      expect(firstNodeCell, 'first grid row must be a node row').toBeDefined();
       expect(
-        grid[0]!.some((cell) => cell.node !== undefined),
-        'first grid row must be a node row',
-      ).toBe(true);
+        firstNodeCell!.node!.contractHash,
+        'highest-rank tip (rcv3_e) must be the first node in grid[0]',
+      ).toBe('rcv3_e');
     });
   });
 });
