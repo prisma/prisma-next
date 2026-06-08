@@ -154,6 +154,14 @@ export interface PslEnum {
   readonly span: PslSpan;
 }
 
+/**
+ * A composite type — a named, reusable group of fields that is *embedded* in a
+ * model rather than stored as its own table/collection with identity. Authored
+ * as a `type Name { … }` block (parsed by `parseCompositeTypeBlock`), it is the
+ * PSL form of e.g. a MongoDB embedded document or a Postgres composite type.
+ * Distinct from {@link PslModel}, which is a top-level entity with its own
+ * storage and primary key.
+ */
 export interface PslCompositeType {
   readonly kind: 'compositeType';
   readonly name: string;
@@ -281,15 +289,59 @@ export interface PslNamespace {
 }
 
 /**
- * Builds a frozen `PslNamespace` object whose `models`, `enums`, and
- * `compositeTypes` properties are getter functions that derive their values
- * from `entries` — the single canonical store.
+ * Concrete `PslNamespace` node. `entries` is the canonical store; `models`,
+ * `enums`, and `compositeTypes` are getters that derive from it. Because the
+ * getters live on the prototype they are non-enumerable, so spreading or
+ * serializing a namespace copies only the stored fields (`kind`, `name`,
+ * `entries`, `span`) — never a duplicated array view of the entity data.
+ */
+class PslNamespaceNode implements PslNamespace {
+  readonly kind = 'namespace' as const;
+  readonly name: string;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>>;
+  readonly span: PslSpan;
+
+  constructor(init: {
+    readonly name: string;
+    readonly entries: Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>>;
+    readonly span: PslSpan;
+  }) {
+    this.name = init.name;
+    this.entries = init.entries;
+    this.span = init.span;
+    Object.freeze(this);
+  }
+
+  get models(): readonly PslModel[] {
+    return blindCast<
+      readonly PslModel[],
+      'entries[model] holds only PslModel by makePslNamespaceEntries construction'
+    >(Object.values(this.entries['model'] ?? {}));
+  }
+
+  get enums(): readonly PslEnum[] {
+    return blindCast<
+      readonly PslEnum[],
+      'entries[enum] holds only PslEnum by makePslNamespaceEntries construction'
+    >(Object.values(this.entries['enum'] ?? {}));
+  }
+
+  get compositeTypes(): readonly PslCompositeType[] {
+    return blindCast<
+      readonly PslCompositeType[],
+      'entries[compositeType] holds only PslCompositeType by makePslNamespaceEntries construction'
+    >(Object.values(this.entries['compositeType'] ?? {}));
+  }
+}
+
+/**
+ * Builds a frozen `PslNamespace` whose `models`, `enums`, and `compositeTypes`
+ * are getters deriving from `entries` — the single canonical store. This is the
+ * only correct way to construct a `PslNamespace`; never build a namespace object
+ * literal directly, as the per-kind arrays must not be stored data.
  *
- * This is the only correct way to construct a `PslNamespace`. Never construct
- * a namespace object literal directly; the parallel per-kind array fields must
- * not be stored data.
- *
- * @param init - The four required stored fields: `kind`, `name`, `entries`, `span`.
+ * @param init - The stored fields. `kind` is accepted for call-site symmetry and
+ *   is always `'namespace'`.
  */
 export function makePslNamespace(init: {
   readonly kind: 'namespace';
@@ -297,48 +349,7 @@ export function makePslNamespace(init: {
   readonly entries: Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>>;
   readonly span: PslSpan;
 }): PslNamespace {
-  const ns = Object.freeze(
-    Object.create(null, {
-      kind: { value: init.kind, enumerable: true, writable: false, configurable: false },
-      name: { value: init.name, enumerable: true, writable: false, configurable: false },
-      entries: { value: init.entries, enumerable: true, writable: false, configurable: false },
-      span: { value: init.span, enumerable: true, writable: false, configurable: false },
-      models: {
-        enumerable: false,
-        configurable: false,
-        get(): readonly PslModel[] {
-          return blindCast<
-            readonly PslModel[],
-            'entries[model] holds only PslModel by makePslNamespaceEntries construction'
-          >(Object.values(init.entries['model'] ?? {}));
-        },
-      },
-      enums: {
-        enumerable: false,
-        configurable: false,
-        get(): readonly PslEnum[] {
-          return blindCast<
-            readonly PslEnum[],
-            'entries[enum] holds only PslEnum by makePslNamespaceEntries construction'
-          >(Object.values(init.entries['enum'] ?? {}));
-        },
-      },
-      compositeTypes: {
-        enumerable: false,
-        configurable: false,
-        get(): readonly PslCompositeType[] {
-          return blindCast<
-            readonly PslCompositeType[],
-            'entries[compositeType] holds only PslCompositeType by makePslNamespaceEntries construction'
-          >(Object.values(init.entries['compositeType'] ?? {}));
-        },
-      },
-    }),
-  );
-  return blindCast<
-    PslNamespace,
-    'Object.create result satisfies PslNamespace: all interface properties set via descriptor construction above'
-  >(ns);
+  return new PslNamespaceNode(init);
 }
 
 /**
