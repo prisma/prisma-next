@@ -611,6 +611,9 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
     for (const fk of table.foreignKeys) {
       registerNamedObject('foreign key', fk.name);
     }
+    for (const check of table.checks ?? []) {
+      registerNamedObject('check constraint', check.name);
+    }
 
     for (const [name, kinds] of namedObjects) {
       if (kinds.length > 1) {
@@ -729,6 +732,18 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
         }
       }
     }
+
+    const seenCheckDefinitions = new Set<string>();
+    for (const check of table.checks ?? []) {
+      const signature = JSON.stringify({ column: check.column, valueSet: check.valueSet });
+      if (seenCheckDefinitions.has(signature)) {
+        errors.push(
+          `Namespace "${namespaceId}" table "${tableName}": duplicate check constraint definition on column "${check.column}"`,
+        );
+        continue;
+      }
+      seenCheckDefinitions.add(signature);
+    }
   }
 
   return errors;
@@ -834,6 +849,15 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
             'storage',
           );
         }
+      }
+    }
+
+    for (const check of table.checks ?? []) {
+      if (!columnNames.has(check.column)) {
+        throw new ContractValidationError(
+          `Namespace "${namespaceId}" table "${tableName}" check constraint "${check.name}" references non-existent column "${check.column}"`,
+          'storage',
+        );
       }
     }
 
