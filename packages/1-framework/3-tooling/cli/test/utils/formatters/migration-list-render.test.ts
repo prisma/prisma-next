@@ -217,7 +217,7 @@ describe('renderMigrationList', () => {
     // Corner renderer: the merge/fork connector is a continuous trunk + a yielding
     // corner (│─╮ / │─╯), never a tee (├─). No ├ ┬ ┴ ┼ in the corner alphabet.
     expect(output).toMatch(/[│─]─[╮╯]/);
-    expect(output).not.toContain('├');
+    expect(output).not.toMatch(/[├┬┴┼]/u);
   });
 
   it('renders skip-rollback with a down arrow in the tree gutter', () => {
