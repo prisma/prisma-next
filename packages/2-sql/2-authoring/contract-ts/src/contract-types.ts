@@ -534,6 +534,7 @@ type BuiltStorageTables<Definition> = {
       };
       readonly target: {
         readonly namespaceId: NamespaceId;
+        readonly spaceId?: string;
         readonly tableName: string;
         readonly columns: readonly string[];
       };
