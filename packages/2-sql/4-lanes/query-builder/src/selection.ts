@@ -64,31 +64,34 @@ export type ExtractOutputType<
       | FieldOutputTypeFor<TContract, TTableName, TColumnName, _TColumn>
   : never;
 
+type EnumOutputOverride<TContract, TTableName extends string, TColumnName extends string> =
+  FindModelForTable<TContract, TTableName> extends infer ModelName extends string
+    ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
+      ? FindFieldForColumn<TContract, ModelName, TColumnName> extends infer FieldName extends string
+        ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
+          ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
+          : never
+        : never
+      : never
+    : never;
+
 type FieldOutputTypeFor<
   TContract,
   TTableName extends string,
   TColumnName extends string,
   _TColumn,
 > =
-  FindModelForTable<TContract, TTableName> extends infer ModelName extends string
-    ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
-      ? FindFieldForColumn<TContract, ModelName, TColumnName> extends infer FieldName extends string
-        ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
-          ? NonNullable<ExtractFieldOutputTypes<TContract>[ModelName][FieldName]>
-          : _TColumn extends {
-                readonly codecId: infer Id extends keyof ExtractCodecTypes<TContract>;
-              }
-            ? ExtractCodecTypes<TContract>[Id]['output']
-            : unknown
-        : _TColumn extends { readonly codecId: infer Id extends keyof ExtractCodecTypes<TContract> }
-          ? ExtractCodecTypes<TContract>[Id]['output']
-          : unknown
-      : _TColumn extends { readonly codecId: infer Id extends keyof ExtractCodecTypes<TContract> }
-        ? ExtractCodecTypes<TContract>[Id]['output']
-        : unknown
-    : _TColumn extends { readonly codecId: infer Id extends keyof ExtractCodecTypes<TContract> }
-      ? ExtractCodecTypes<TContract>[Id]['output']
-      : unknown;
+  EnumOutputOverride<TContract, TTableName, TColumnName> extends infer Override
+    ? [Override] extends [never]
+      ? CodecOutputType<TContract, _TColumn>
+      : string extends NonNullable<Override>
+        ? CodecOutputType<TContract, _TColumn>
+        : NonNullable<Override>
+    : never;
+
+type CodecOutputType<TContract, _TColumn> = _TColumn extends StorageColumn
+  ? ExtractCodecTypes<TContract>[_TColumn['codecId']]['output']
+  : never;
 
 /**
  * A type representing a selection of columns in a SQL `select` query in the

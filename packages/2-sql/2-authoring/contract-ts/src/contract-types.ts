@@ -641,66 +641,82 @@ type BuiltStorage<Definition> = {
   };
 };
 
-type EnumValueUnion<FieldState> =
-  FieldTypeRefOf<FieldState> extends EnumTypeHandle<string, infer Values> ? Values[number] : never;
+type EnumValueUnion<FieldState> = [FieldTypeRefOf<FieldState>] extends [
+  EnumTypeHandle<string, infer Values>,
+]
+  ? string[] extends Values
+    ? never
+    : Values[number]
+  : never;
+
+type EnumNarrowedType<Definition, ModelName extends ModelNames<Definition>, FieldName, Fallback> =
+  FieldName extends ModelFieldNames<Definition, ModelName>
+    ? ModelFieldState<Definition, ModelName, FieldName> extends infer FieldState
+      ? EnumValueUnion<FieldState> extends infer V
+        ? [V] extends [never]
+          ? Fallback
+          : FieldNullableOf<FieldState> extends true
+            ? V | null
+            : V
+        : Fallback
+      : Fallback
+    : Fallback;
+
+type FieldCodecOutputType<
+  Definition,
+  ModelName extends ModelNames<Definition>,
+  FieldName extends ModelFieldNames<Definition, ModelName>,
+> =
+  ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
+    ? Col extends { readonly codecId: infer Id extends string }
+      ? Id extends keyof CodecTypesFromDefinition<Definition>
+        ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
+          ? Col extends { readonly nullable: true }
+            ? O | null
+            : O
+          : unknown
+        : unknown
+      : unknown
+    : unknown;
+
+type FieldCodecInputType<
+  Definition,
+  ModelName extends ModelNames<Definition>,
+  FieldName extends ModelFieldNames<Definition, ModelName>,
+> =
+  ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
+    ? Col extends { readonly codecId: infer Id extends string }
+      ? Id extends keyof CodecTypesFromDefinition<Definition>
+        ? CodecTypesFromDefinition<Definition>[Id] extends { readonly input: infer I }
+          ? Col extends { readonly nullable: true }
+            ? I | null
+            : I
+          : FieldCodecOutputType<Definition, ModelName, FieldName>
+        : unknown
+      : unknown
+    : unknown;
 
 type FieldOutputType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
-> =
-  ModelFieldState<Definition, ModelName, FieldName> extends infer FieldState
-    ? FieldNullableOf<FieldState> extends infer Nullable extends boolean
-      ? EnumValueUnion<FieldState> extends infer V
-        ? [V] extends [never]
-          ? ResolveFieldDescriptor<Definition, FieldState> extends infer Descriptor
-            ? DescriptorCodecId<Descriptor> extends infer Id extends string
-              ? Id extends keyof CodecTypesFromDefinition<Definition>
-                ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
-                  ? Nullable extends true
-                    ? O | null
-                    : O
-                  : unknown
-                : unknown
-              : unknown
-            : unknown
-          : Nullable extends true
-            ? V | null
-            : V
-        : unknown
-      : unknown
-    : unknown;
+> = EnumNarrowedType<
+  Definition,
+  ModelName,
+  FieldName,
+  FieldCodecOutputType<Definition, ModelName, FieldName>
+>;
 
 type FieldInputType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
-> =
-  ModelFieldState<Definition, ModelName, FieldName> extends infer FieldState
-    ? FieldNullableOf<FieldState> extends infer Nullable extends boolean
-      ? EnumValueUnion<FieldState> extends infer V
-        ? [V] extends [never]
-          ? ResolveFieldDescriptor<Definition, FieldState> extends infer Descriptor
-            ? DescriptorCodecId<Descriptor> extends infer Id extends string
-              ? Id extends keyof CodecTypesFromDefinition<Definition>
-                ? CodecTypesFromDefinition<Definition>[Id] extends { readonly input: infer I }
-                  ? Nullable extends true
-                    ? I | null
-                    : I
-                  : CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
-                    ? Nullable extends true
-                      ? O | null
-                      : O
-                    : unknown
-                : unknown
-              : unknown
-            : unknown
-          : Nullable extends true
-            ? V | null
-            : V
-        : unknown
-      : unknown
-    : unknown;
+> = EnumNarrowedType<
+  Definition,
+  ModelName,
+  FieldName,
+  FieldCodecInputType<Definition, ModelName, FieldName>
+>;
 
 type FieldOutputTypes<Definition> = {
   readonly [ModelName in ModelNames<Definition>]: {
