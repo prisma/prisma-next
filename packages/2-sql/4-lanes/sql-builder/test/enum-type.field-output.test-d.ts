@@ -1,0 +1,129 @@
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
+import type { ContractWithTypeMaps, TypeMaps } from '@prisma-next/sql-contract/types';
+import { expectTypeOf, test } from 'vitest';
+import type { Db } from '../src/types/db';
+
+// ---------------------------------------------------------------------------
+// Minimal enum-typed contract fixture for sql-builder lane
+// ---------------------------------------------------------------------------
+
+type EnumCodecTypes = {
+  'pg/text@1': {
+    output: string;
+    input: string;
+    traits: 'equality' | 'order' | 'textual';
+  };
+};
+
+type EnumFieldOutputTypes = {
+  User: {
+    role: 'user' | 'admin';
+    status: 'active' | 'inactive' | null;
+  };
+};
+
+type EnumFieldInputTypes = {
+  User: {
+    role: 'user' | 'admin';
+    status: 'active' | 'inactive' | null;
+  };
+};
+
+type EnumTypeMaps = TypeMaps<
+  EnumCodecTypes,
+  Record<string, never>,
+  EnumFieldOutputTypes,
+  EnumFieldInputTypes
+>;
+
+type EnumContractBase = Contract<
+  {
+    storageHash: StorageHashBase<string>;
+    namespaces: {
+      readonly __unbound__: {
+        id: '__unbound__';
+        kind: 'sql-namespace';
+        entries: {
+          readonly table: {
+            readonly User: {
+              columns: {
+                readonly role: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+                readonly status: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
+              };
+              primaryKey: { columns: ['role'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [];
+            };
+          };
+        };
+      };
+    };
+  },
+  {
+    User: {
+      storage: {
+        table: 'User';
+        fields: {
+          role: { column: 'role' };
+          status: { column: 'status' };
+        };
+      };
+      fields: {
+        role: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: false;
+        };
+        status: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          readonly nullable: true;
+        };
+      };
+      relations: Record<string, never>;
+    };
+  }
+>;
+
+type EnumContract = ContractWithTypeMaps<EnumContractBase, EnumTypeMaps> & {
+  readonly capabilities: Record<string, never>;
+  readonly roots: Record<string, never>;
+};
+
+type EnumDb = Db<EnumContract>;
+
+// ---------------------------------------------------------------------------
+// The sql-builder's resolvedColumnOutputTypes uses FieldOutputTypes
+// ---------------------------------------------------------------------------
+
+test('sql-builder: column output types for enum fields come from FieldOutputTypes', () => {
+  type QC = import('../src/types/table-proxy').ContractToQC<EnumContract, 'User'>;
+  type RoleOutput = QC['resolvedColumnOutputTypes']['role'];
+  type StatusOutput = QC['resolvedColumnOutputTypes']['status'];
+
+  expectTypeOf<RoleOutput>().toEqualTypeOf<'user' | 'admin'>();
+  expectTypeOf<StatusOutput>().toEqualTypeOf<'active' | 'inactive' | null>();
+});
+
+// ---------------------------------------------------------------------------
+// Write input: insert() uses FieldInputTypes
+// ---------------------------------------------------------------------------
+
+test('sql-builder insert: non-nullable enum field rejects out-of-union literal', () => {
+  const db = null as unknown as EnumDb;
+
+  db.User.insert([
+    {
+      // @ts-expect-error 'nope' is not in the 'user' | 'admin' union
+      role: 'nope',
+    },
+  ]);
+});
+
+test('sql-builder insert: in-union literal is accepted', () => {
+  const db = null as unknown as EnumDb;
+
+  db.User.insert([{ role: 'user' }]);
+  db.User.insert([{ role: 'admin' }]);
+  db.User.insert([{ role: 'user', status: 'active' }]);
+  db.User.insert([{ role: 'user', status: null }]);
+});

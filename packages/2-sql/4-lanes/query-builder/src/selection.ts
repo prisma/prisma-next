@@ -1,10 +1,38 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
 import type {
   UnboundTables as SqlBuilderUnboundTables,
   TableProxyContract,
 } from '@prisma-next/sql-builder/types';
-import type { ExtractCodecTypes, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type {
+  ExtractCodecTypes,
+  ExtractFieldOutputTypes,
+  SqlStorage,
+  StorageColumn,
+} from '@prisma-next/sql-contract/types';
 import type { DrainOuterGeneric } from './type-atoms';
+
+type FindModelForTable<C, TableName extends string> = C extends Contract
+  ? {
+      [M in keyof ContractModelDefinitions<C> & string]: ContractModelDefinitions<C>[M] extends {
+        readonly storage: { readonly table: TableName };
+      }
+        ? M
+        : never;
+    }[keyof ContractModelDefinitions<C> & string]
+  : never;
+
+type FindFieldForColumn<C, ModelName extends string, ColumnName extends string> = C extends Contract
+  ? ModelName extends keyof ContractModelDefinitions<C>
+    ? {
+        [F in keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] &
+          string]: ContractModelDefinitions<C>[ModelName]['storage']['fields'][F] extends {
+          readonly column: ColumnName;
+        }
+          ? F
+          : never;
+      }[keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] & string]
+    : never
+  : never;
 
 /**
  * Flat table map for the query-builder surface: every table name declared in
@@ -17,7 +45,9 @@ export type UnboundTables<TContract extends Contract<SqlStorage>> = SqlBuilderUn
 
 /**
  * A utility type to extract the output type of a referenced column from a contract.
- * Uses the type-only codec channel (ExtractCodecTypes), not runtime mappings.
+ * Consults `ExtractFieldOutputTypes` first so enum fields return their value
+ * union instead of the raw codec output type. Falls back to the codec output
+ * type when no field-level override exists.
  *
  * @template TContract The contract that describes the database.
  * @template TTableName The name of the table containing the column.
@@ -31,8 +61,34 @@ export type ExtractOutputType<
 > = _TColumn extends StorageColumn
   ?
       | (_TColumn['nullable'] extends true ? null : never)
-      | ExtractCodecTypes<TContract>[_TColumn['codecId']]['output']
+      | FieldOutputTypeFor<TContract, TTableName, TColumnName, _TColumn>
   : never;
+
+type FieldOutputTypeFor<
+  TContract,
+  TTableName extends string,
+  TColumnName extends string,
+  _TColumn,
+> =
+  FindModelForTable<TContract, TTableName> extends infer ModelName extends string
+    ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
+      ? FindFieldForColumn<TContract, ModelName, TColumnName> extends infer FieldName extends string
+        ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
+          ? NonNullable<ExtractFieldOutputTypes<TContract>[ModelName][FieldName]>
+          : _TColumn extends {
+                readonly codecId: infer Id extends keyof ExtractCodecTypes<TContract>;
+              }
+            ? ExtractCodecTypes<TContract>[Id]['output']
+            : unknown
+        : _TColumn extends { readonly codecId: infer Id extends keyof ExtractCodecTypes<TContract> }
+          ? ExtractCodecTypes<TContract>[Id]['output']
+          : unknown
+      : _TColumn extends { readonly codecId: infer Id extends keyof ExtractCodecTypes<TContract> }
+        ? ExtractCodecTypes<TContract>[Id]['output']
+        : unknown
+    : _TColumn extends { readonly codecId: infer Id extends keyof ExtractCodecTypes<TContract> }
+      ? ExtractCodecTypes<TContract>[Id]['output']
+      : unknown;
 
 /**
  * A type representing a selection of columns in a SQL `select` query in the

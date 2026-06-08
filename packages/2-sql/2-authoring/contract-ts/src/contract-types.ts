@@ -17,6 +17,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { UnionToIntersection } from './authoring-type-utils';
 import type { AttributeStageIdFieldNames, FieldStateOf, ScalarFieldBuilder } from './contract-dsl';
+import type { EnumTypeHandle } from './enum-type';
 
 export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
   ? C extends Record<string, { output: unknown }>
@@ -609,19 +610,63 @@ type BuiltStorage<Definition> = {
   };
 };
 
+type EnumValueUnion<FieldState> =
+  FieldTypeRefOf<FieldState> extends EnumTypeHandle<string, infer Values> ? Values[number] : never;
+
 type FieldOutputType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
 > =
-  ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
-    ? Col extends { readonly codecId: infer Id extends string }
-      ? Id extends keyof CodecTypesFromDefinition<Definition>
-        ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
-          ? Col extends { readonly nullable: true }
-            ? O | null
-            : O
-          : unknown
+  ModelFieldState<Definition, ModelName, FieldName> extends infer FieldState
+    ? FieldNullableOf<FieldState> extends infer Nullable extends boolean
+      ? EnumValueUnion<FieldState> extends infer V
+        ? [V] extends [never]
+          ? ResolveFieldDescriptor<Definition, FieldState> extends infer Descriptor
+            ? DescriptorCodecId<Descriptor> extends infer Id extends string
+              ? Id extends keyof CodecTypesFromDefinition<Definition>
+                ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
+                  ? Nullable extends true
+                    ? O | null
+                    : O
+                  : unknown
+                : unknown
+              : unknown
+            : unknown
+          : Nullable extends true
+            ? V | null
+            : V
+        : unknown
+      : unknown
+    : unknown;
+
+type FieldInputType<
+  Definition,
+  ModelName extends ModelNames<Definition>,
+  FieldName extends ModelFieldNames<Definition, ModelName>,
+> =
+  ModelFieldState<Definition, ModelName, FieldName> extends infer FieldState
+    ? FieldNullableOf<FieldState> extends infer Nullable extends boolean
+      ? EnumValueUnion<FieldState> extends infer V
+        ? [V] extends [never]
+          ? ResolveFieldDescriptor<Definition, FieldState> extends infer Descriptor
+            ? DescriptorCodecId<Descriptor> extends infer Id extends string
+              ? Id extends keyof CodecTypesFromDefinition<Definition>
+                ? CodecTypesFromDefinition<Definition>[Id] extends { readonly input: infer I }
+                  ? Nullable extends true
+                    ? I | null
+                    : I
+                  : CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
+                    ? Nullable extends true
+                      ? O | null
+                      : O
+                    : unknown
+                : unknown
+              : unknown
+            : unknown
+          : Nullable extends true
+            ? V | null
+            : V
         : unknown
       : unknown
     : unknown;
@@ -629,6 +674,16 @@ type FieldOutputType<
 type FieldOutputTypes<Definition> = {
   readonly [ModelName in ModelNames<Definition>]: {
     readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldOutputType<
+      Definition,
+      ModelName,
+      FieldName
+    >;
+  };
+};
+
+type FieldInputTypes<Definition> = {
+  readonly [ModelName in ModelNames<Definition>]: {
+    readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldInputType<
       Definition,
       ModelName,
       FieldName
@@ -649,7 +704,7 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
   TypeMaps<
     CodecTypesFromDefinition<Definition>,
     Record<string, never>,
-    Record<string, never>,
-    FieldOutputTypes<Definition>
+    FieldOutputTypes<Definition>,
+    FieldInputTypes<Definition>
   >
 >;
