@@ -39,7 +39,7 @@ Profile.relations({
 }))
 ```
 
-The framework detects `source: 'space'` from the `spaceId` brand on `AuthUser` — no separate `refExt` / `belongsToExternal` call.
+The framework detects cross-space from the `spaceId` brand on `AuthUser` and lowers to a carrier with `spaceId` set (`spaceId` is absent on local carriers) — no separate `refExt` / `belongsToExternal` call.
 
 ## PSL form
 

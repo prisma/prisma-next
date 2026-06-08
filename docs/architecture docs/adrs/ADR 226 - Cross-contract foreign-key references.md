@@ -14,31 +14,28 @@ The architectural seam was missing, not the implementation: the contract aggrega
 
 ## Decision
 
-### FK carrier gains a `source` discriminator
+### FK carrier gains an optional `spaceId` field
 
-The FK reference carrier in Contract IR gains a `source: 'local' | 'space'` discriminator rather than a parallel carrier type:
+The FK reference carrier in Contract IR (`ForeignKeyReference`) gains an optional `spaceId` field rather than a `source` discriminator or a parallel type:
 
 ```ts
-type TargetFieldRef =
-  | { readonly source: 'local'; readonly modelName: string; readonly fieldName: string }
-  | {
-      readonly source: 'space';
-      readonly spaceId: string;
-      readonly namespace: NamespaceCoordinate;
-      readonly tableName: string;
-      readonly columnName: string;
-    };
+export class ForeignKeyReference extends SqlNode {
+  readonly namespaceId: NamespaceId;  // UNBOUND_NAMESPACE_ID ('__unbound__') for single-namespace refs
+  readonly tableName: string;
+  readonly columns: readonly string[];
+  declare readonly spaceId?: string;  // absent = local; present = cross-space
+}
 ```
 
-`source: 'local'` is what within-space cross-namespace FKs produce. `source: 'space'` adds the explicit `spaceId` plus namespace coordinate. The discriminator approach keeps the type additive — contracts that use no cross-contract refs serialize byte-identically to their pre-226 form.
+Discrimination is presence-based: `spaceId` absent means local (the referenced table is in the same contract-space); `spaceId` present means cross-space (the referenced table is in the contract-space identified by `spaceId`). This keeps local-FK JSON byte-identical to contracts authored before cross-space support was added — a `spaceId`-absent serialization is indistinguishable from a pre-226 FK.
 
-The carrier is target-agnostic at the framework and family layers. SQL and Mongo family concretions inherit the discriminator shape unchanged.
+The carrier is target-agnostic at the framework and family layers. SQL and Mongo family concretions inherit the shape unchanged.
 
 ### Implicit resolution via `extensionPacks` — no PSL `use` directive
 
 Cross-contract names resolve implicitly against the contract aggregate the framework already builds from `extensionPacks`. There is no PSL `use` directive, no TS resolver function, and no separate registration step.
 
-The lowering pass walks each FK reference. For `source: 'local'`, it resolves within the current contract. For `source: 'space'`, it looks up the named space in the aggregate, then the model, then the column. Failed resolution is a fail-fast diagnostic at lowering time that names the missing pack.
+The lowering pass walks each FK reference. When `spaceId` is absent it resolves within the current contract. When `spaceId` is present it looks up the named space in the aggregate, then the model, then the column. Failed resolution is a fail-fast diagnostic at lowering time that names the missing pack.
 
 A future `use ... as` aliasing directive is reserved as additive on top of implicit resolution. Implicit resolution remains the canonical path.
 
@@ -71,7 +68,7 @@ type_ref ::= [ <space>: ] <namespace>. <name>
            | <name>
 ```
 
-`supabase:auth.User` — contract space `supabase`, namespace `auth`, model `User`. `supabase:User` (no namespace) targets a model in the extension's `__unspecified__` namespace. `auth.User` (no colon) is the local cross-namespace form. Bare `User` is the local same-namespace form.
+`supabase:auth.AuthUser` — contract space `supabase`, namespace `auth`, model `AuthUser`. `supabase:AuthUser` (no namespace) targets a model in the extension's `__unspecified__` namespace. `auth.AuthUser` (no colon) is the local cross-namespace form. Bare `AuthUser` is the local same-namespace form.
 
 `@relation(fields: …, references: …)` is unchanged. `references:` continues to take plain column names; the parser knows which model the columns belong to from the type position.
 
@@ -87,7 +84,7 @@ AST: `PslField.typeContractSpace?: string` carries the colon-prefix coordinate, 
 
 - **The Supabase integration's canonical worked example becomes expressible.** `Profile.user → auth.users.id ON DELETE CASCADE` is the gap that motivated this work.
 - **Unified call shape.** There is no `refExt` / `belongsToExternal`. The same `rel.belongsTo` and `constraints.foreignKey` calls work for local and cross-contract FKs; the distinction is visible at the import statement (`import { AuthUser } from '@prisma-next/extension-supabase/contract'`), not duplicated at the call site.
-- **Additive on the IR.** Contracts with no cross-contract refs are unaffected. The `source: 'local'` variant preserves the existing shape exactly.
+- **Additive on the IR.** Contracts with no cross-contract refs are unaffected. A `spaceId`-absent carrier is byte-identical to the pre-226 shape.
 
 ### Trade-offs
 
