@@ -30,6 +30,10 @@ Known **non**-fits (kept on Sonnet / Opus until evidence accumulates):
 
 The trial continues. Bump the table or carve a new row as more evidence accumulates; pair each adjustment with a retro entry referencing the worked example.
 
+## Worked examples
+
+**TML-2500 M3b (2026-06, cross-contract-refs):** every implementer dispatch across the M3b milestone was spawned without an explicit `model:` parameter and silently inherited the orchestrator's (opus) tier. Mechanical work — fixture regen, cast drops, typecheck fixes — ran on opus for the whole milestone until the operator caught it mid-milestone and added explicit `model: "sonnet"` pins to implementer briefs and `model: "opus"` pins to reviewer briefs. Confirms the "defaulting to parent tier is a bug" rule with a concrete, recoverable cost: a milestone of cheap-tier dispatches burned orchestrator-tier budget.
+
 ## How this table updates
 
 Per the trigger rule in [`README.md § Maintenance discipline`](./README.md#maintenance-discipline): adjust a row when **three consecutive failed dispatches at the recommended tier** are recorded, OR when a single retro names the tier choice as a contributing factor (e.g. "we routed this to cheap tier and it lost the spec's edge case; mid tier would have caught it"). Note the rationale in the retro that triggered the change.
