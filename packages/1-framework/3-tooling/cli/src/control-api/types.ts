@@ -7,6 +7,7 @@ import type {
   ContractMarkerRecord,
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
+import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -931,6 +932,15 @@ export interface ControlClient {
    * @returns PslDocumentAst if the family supports the capability, undefined otherwise
    */
   inferPslContract(schemaIR: unknown): PslDocumentAst | undefined;
+
+  /**
+   * Returns the assembled PSL block descriptors from the control stack — the full
+   * set of extension-contributed top-level block descriptors. The CLI's
+   * `contract infer` command threads these through to `printPsl` so
+   * extension-contributed blocks in the inferred AST round-trip back to PSL
+   * source. Forces `init()` so the stack is built before access.
+   */
+  getPslBlockDescriptors(): AuthoringPslBlockDescriptorNamespace;
 
   /**
    * Renders a textual preview of a migration plan's operations for the CLI's

@@ -84,21 +84,47 @@ class PostgresDdlVisitorImpl implements PostgresDdlVisitor<string> {
   }
 }
 
+// Postgres infers a quoted-literal default's type as `text` at parse time
+// and applies an implicit text → target coercion at default-evaluation
+// time. That coercion exists for some target types (text, jsonb, json)
+// and not others (uuid, inet, timestamptz, citext, enums, user-defined
+// types, geometry/geography from PostGIS, array types). Quoted-literal
+// defaults on any non-text column therefore need an explicit
+// `::<nativeType>` cast in the emitted DDL — both to state the default's
+// intent (the literal IS that type, not text that happens to coerce) and
+// to keep emitted migrations correct for types where no implicit cast
+// exists. Numeric, boolean, and null literals are typed by Postgres
+// directly (no `text` indirection) so they need no cast.
+function isTextLikeNativeType(nativeType: string): boolean {
+  return (
+    nativeType === 'text' ||
+    nativeType === 'varchar' ||
+    nativeType.startsWith('varchar(') ||
+    nativeType === 'character varying' ||
+    nativeType.startsWith('character varying(') ||
+    nativeType === 'char' ||
+    nativeType.startsWith('char(') ||
+    nativeType === 'character' ||
+    nativeType.startsWith('character(')
+  );
+}
+
 const defaultVisitor: DdlColumnDefaultVisitor<string> = {
-  literal(node: LiteralColumnDefault): string {
+  literal(node: LiteralColumnDefault, ctx): string {
     const { value } = node;
-    if (typeof value === 'string') {
-      return `DEFAULT '${escapeLiteral(value)}'`;
-    }
     if (typeof value === 'number' || typeof value === 'boolean') {
       return `DEFAULT ${String(value)}`;
     }
     if (value === null) {
       return 'DEFAULT NULL';
     }
-    return `DEFAULT '${escapeLiteral(JSON.stringify(value))}'`;
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    const literal = `'${escapeLiteral(serialized)}'`;
+    return isTextLikeNativeType(ctx.nativeType)
+      ? `DEFAULT ${literal}`
+      : `DEFAULT ${literal}::${ctx.nativeType}`;
   },
-  function(node: FunctionColumnDefault): string {
+  function(node: FunctionColumnDefault, _ctx): string {
     if (node.expression === 'autoincrement()') {
       return '';
     }
@@ -114,7 +140,9 @@ function renderColumn(column: DdlColumn): string {
   if (column.primaryKey) {
     parts.push('PRIMARY KEY');
   }
-  const defaultClause = column.default ? column.default.accept(defaultVisitor) : '';
+  const defaultClause = column.default
+    ? column.default.accept(defaultVisitor, { nativeType: column.type })
+    : '';
   if (defaultClause.length > 0) {
     parts.push(defaultClause);
   }

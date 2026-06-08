@@ -13,13 +13,13 @@ import {
   setCommandSeeAlso,
 } from '../utils/command-helpers';
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
+import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-labels';
 import {
   computeGlobalMaxDirNameWidth,
   computeGlobalMaxEdgeTreePrefixWidth,
   indentMigrationGraphTreeBlock,
   renderMigrationGraphSpaceTree,
 } from '../utils/formatters/migration-graph-space-render';
-import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-tree-render';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';

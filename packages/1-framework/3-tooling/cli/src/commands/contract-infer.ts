@@ -53,7 +53,7 @@ async function executeContractInferCommand(
     return inspectResult;
   }
 
-  const { config, target, meta, pslContractAst } = inspectResult.value;
+  const { config, target, meta, pslContractAst, pslBlockDescriptors } = inspectResult.value;
 
   if (!pslContractAst) {
     return notOk(
@@ -65,7 +65,7 @@ async function executeContractInferCommand(
   }
 
   const outputPath = resolveContractInferOutputPath(options, config.contract?.output);
-  const pslContent = printPsl(pslContractAst);
+  const pslContent = printPsl(pslContractAst, { pslBlockDescriptors: pslBlockDescriptors });
 
   if (existsSync(outputPath) && !flags.json && !flags.quiet) {
     ui.stderr(`\u26A0 Overwriting existing file: ${relative(process.cwd(), outputPath)}`);
