@@ -101,7 +101,39 @@ export interface EnumValuesChangedIssue {
   readonly message: string;
 }
 
-export type SchemaIssue = BaseSchemaIssue | EnumValuesChangedIssue;
+export interface RlsPolicyRenamedIssue {
+  readonly kind: 'rls_policy_renamed';
+  readonly namespaceId: string;
+  readonly tableName: string;
+  /** Full wire name found in the database (matching content-hash suffix, different prefix). */
+  readonly fromName: string;
+  /** Full wire name declared in the contract. */
+  readonly toName: string;
+  readonly message: string;
+}
+
+export interface RlsPolicyTamperedIssue {
+  readonly kind: 'rls_policy_tampered';
+  readonly namespaceId: string;
+  readonly tableName: string;
+  /** Full wire name whose recomputed content hash does not match its suffix. */
+  readonly policyName: string;
+  readonly message: string;
+}
+
+export interface RlsNotEnabledIssue {
+  readonly kind: 'rls_not_enabled';
+  readonly namespaceId: string;
+  readonly tableName: string;
+  readonly message: string;
+}
+
+export type SchemaIssue =
+  | BaseSchemaIssue
+  | EnumValuesChangedIssue
+  | RlsPolicyRenamedIssue
+  | RlsPolicyTamperedIssue
+  | RlsNotEnabledIssue;
 
 export interface SchemaVerificationNode {
   readonly status: 'pass' | 'warn' | 'fail';
