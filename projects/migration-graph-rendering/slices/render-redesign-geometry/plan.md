@@ -122,3 +122,12 @@ all three slice-DoD conditions. One slice, one PR.
 ## Model tiers
 
 Implementers: sonnet-mid. Reviewer pass: opus-high.
+
+## Open items (follow-ups, not in this PR)
+
+- **`colsPerLane` is read independently by `buildGrid` and `renderGridRow`.** Today this
+  cannot diverge — every production caller uses the default and
+  `RenderMigrationGraphCommandInput` has no `colsPerLane` field — so it is not a bug. But
+  if `colsPerLane` is ever exposed to CLI users, the command-render path must thread one
+  option value to both phases (or derive width from the built grid) so the gutter reflows.
+  Surfaced in the D3 review. File a ticket if/when colsPerLane becomes user-facing.
