@@ -16,7 +16,7 @@ describe('SqliteCreateTable DDL lowering', () => {
     const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
 
     expect(lowered.sql).toBe(
-      'CREATE TABLE IF NOT EXISTS _prisma_marker (\n    space TEXT NOT NULL PRIMARY KEY\n  )',
+      'CREATE TABLE IF NOT EXISTS "_prisma_marker" (\n  "space" TEXT NOT NULL PRIMARY KEY\n)',
     );
     expect(lowered.params).toEqual([]);
   });
@@ -37,12 +37,12 @@ describe('SqliteCreateTable DDL lowering', () => {
     const adapter = createSqliteAdapter();
     const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
 
-    expect(lowered.sql).toContain("a TEXT DEFAULT 'x'");
-    expect(lowered.sql).toContain('b INTEGER DEFAULT 7');
-    expect(lowered.sql).toContain('c INTEGER DEFAULT true');
-    expect(lowered.sql).toContain('d TEXT DEFAULT NULL');
-    expect(lowered.sql).toContain("e TEXT DEFAULT (datetime('now'))");
-    expect(lowered.sql).toContain('g INTEGER');
+    expect(lowered.sql).toContain('"a" TEXT DEFAULT \'x\'');
+    expect(lowered.sql).toContain('"b" INTEGER DEFAULT 7');
+    expect(lowered.sql).toContain('"c" INTEGER DEFAULT true');
+    expect(lowered.sql).toContain('"d" TEXT DEFAULT NULL');
+    expect(lowered.sql).toContain('"e" TEXT DEFAULT (datetime(\'now\'))');
+    expect(lowered.sql).toContain('"g" INTEGER');
     expect(lowered.sql).not.toContain('autoincrement');
   });
 
@@ -55,6 +55,6 @@ describe('SqliteCreateTable DDL lowering', () => {
     const adapter = createSqliteAdapter();
     const lowered = adapter.lower(ast, { contract: {} as SqliteContract });
 
-    expect(lowered.sql).toContain("name TEXT DEFAULT 'O''Reilly'");
+    expect(lowered.sql).toContain("\"name\" TEXT DEFAULT 'O''Reilly'");
   });
 });
