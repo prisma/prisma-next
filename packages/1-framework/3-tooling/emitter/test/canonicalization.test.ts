@@ -44,7 +44,6 @@ const sqlPreserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'entries', 'table', '*'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
-  ['storage', 'types', '*', 'typeParams'],
 ] as const satisfies readonly PathPattern[];
 
 const sqlSortTargets = [
@@ -426,6 +425,24 @@ describe('canonicalization', () => {
     const extensionPacks = parsed['extensionPacks'] as Record<string, unknown>;
     const extensionKeys = Object.keys(extensionPacks);
     expect(extensionKeys).toEqual(['another', 'pgvector', 'postgres']);
+  });
+
+  it('strips empty typeParams from storage.types entries under SQL hooks', () => {
+    const ir = createTestContract({
+      storage: {
+        namespaces: {},
+        types: {
+          U: { codecId: 'x', nativeType: 'y', typeParams: {} },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir, { shouldPreserveEmpty: sqlPreserveEmpty });
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const types = storage['types'] as Record<string, unknown>;
+    const u = types['U'] as Record<string, unknown>;
+    expect(u).toEqual({ codecId: 'x', nativeType: 'y' });
   });
 
   it('omits generated false', () => {

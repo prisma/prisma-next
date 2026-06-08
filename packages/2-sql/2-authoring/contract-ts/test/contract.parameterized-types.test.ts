@@ -415,7 +415,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       expect(() => validateSqlContractFully<TestContract>(input)).toThrow(/nativeType/);
     });
 
-    it('rejects type instance missing typeParams', () => {
+    it('accepts type instance with omitted typeParams (canonical form for empty)', () => {
       const input = {
         ...baseContractInput,
         storage: {
@@ -430,7 +430,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
         },
       };
 
-      expect(() => validateSqlContractFully<TestContract>(input)).toThrow(/typeParams/);
+      expect(() => validateSqlContractFully<TestContract>(input)).not.toThrow();
     });
 
     it('rejects non-object storage.types', () => {
