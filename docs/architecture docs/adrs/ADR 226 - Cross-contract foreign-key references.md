@@ -125,7 +125,7 @@ This is deliberate. The relationship's value today is the database constraint �
 ## Consequences
 
 - **The carrier is additive.** Contracts with no cross-space references are unaffected, and their serialized form does not change.
-- **Native-type matching is the author's responsibility.** The branded column reference carries a space id, not a storage type. When a cross-space FK targets a column with a non-default native type — `auth.users.id` is `uuid` — the author must match that type on the source column, which is why the grounding example declares `types { Uuid = String @db.Uuid }` and types `userId` as `Uuid`. Postgres rejects mismatched FK column types at apply time; the framework does not coerce. The [cross-contract FK authoring rulecard](../../.agents/rules/cross-contract-fk-authoring.mdc) documents this.
+- **Native-type matching is the author's responsibility.** The branded column reference carries a space id, not a storage type. When a cross-space FK targets a column with a non-default native type — `auth.users.id` is `uuid` — the author must match that type on the source column, which is why the grounding example declares `types { Uuid = String @db.Uuid }` and types `userId` as `Uuid`. Postgres rejects mismatched FK column types at apply time; the framework does not coerce.
 - **`extensionPacks` carries two meanings at once** (imports and load-order dependency). This is acceptable while every app that imports a space also depends on it, but it leaves no way to depend on a space for ordering without importing its models.
 - **Relations are non-navigable.** Declaring a relation the ORM cannot traverse is a partial capability: the constraint and migration work, the query surface does not. This matches how the target tables are used in practice but is a seam that a future cross-space query model will need to fill.
 
@@ -144,4 +144,3 @@ This is deliberate. The relationship's value today is the database constraint �
 - [ADR 221 — Contract IR two planes](./ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md) — the IR coordinate model the carrier extends.
 - [ADR 225 — Three-layer extensibility](./ADR%20225%20-%20Three-layer%20extensibility%20for%20pack-contributed%20entity%20kinds.md) — the extensibility pattern of the surrounding framework.
 - [`explicit-opt-in-over-diagnostics`](../../.agents/rules/explicit-opt-in-over-diagnostics.mdc) — the policy behind emitting no diagnostic on cross-space cascade.
-- [`cross-contract-fk-authoring`](../../.agents/rules/cross-contract-fk-authoring.mdc) — authoring conventions, including native-type matching.
