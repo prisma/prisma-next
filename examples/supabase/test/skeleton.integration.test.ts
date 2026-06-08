@@ -220,11 +220,21 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       //
       // The `db` client connects via `db.connect({ url })`, which wires the
       // stock postgres runtime. The handler inserts a Profile and reads it back.
+      // Profile.userId is a NOT NULL FK to auth.users.id (cross-space ref), so
+      // we first seed a row in auth.users and thread that id through.
+      const userId = crypto.randomUUID();
+      await withClient(connectionString, async (client) => {
+        await client.query(
+          'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, now(), now())',
+          [userId, 'alice@example.test'],
+        );
+      });
+
       const runtime = await db.connect({ url: connectionString });
       try {
-        const rows = await insertAndReadProfile(runtime, 'alice');
+        const rows = await insertAndReadProfile(runtime, 'alice', userId);
         expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ username: 'alice' });
+        expect(rows[0]).toMatchObject({ username: 'alice', userId });
         expect(typeof rows[0]?.id).toBe('string');
       } finally {
         await db.close();
