@@ -103,6 +103,30 @@ what proves convergence.
   beyond the constant; `grep` finds no remaining hard-coded geometry literal in the
   named files; default-path snapshots byte-identical; `pnpm test:packages -- cli` green.
 
+### Dispatch 4: Convergence golden oracle (hand-authored, independent)
+
+- **Outcome:** The hand-authored `golden-pipeline` oracle independently pins the **converged
+  one-lane** output. The converging `rollback-merge` golden in `gallery-goldens-backlink.ts`
+  (`rm_c→rm_a` + `rm_d→rm_a`, both landing on `rm_a`) — currently authored in the stale
+  **two-lane** form and broken by D2's convergence — is rewritten (flat + focus:via-A +
+  focus:via-B) to the one-lane converged picture, **derived from the design** (one shared
+  back-lane, sources tee in, single `○◂╯` landing; focus = on-path green continuous along
+  its route, off-path dim, no bleed). The renderer is then confirmed to match; the
+  green-only-on-path invariant passes. A 3-arc converging golden is added for breadth.
+  The `golden-pipeline` describe drops its now-obsolete "RED baseline — expected to fail"
+  framing (it becomes a real passing oracle).
+- **Builds on:** D2's converged layout. (This is the strong independent oracle for AC-1 that
+  D1/D2's snapshot + width-assertion only weakly covered — and it fixes the CI Test job that
+  D2's convergence turned red against the stale golden.)
+- **Hands to:** convergence is pinned by a hand-authored oracle; `golden-pipeline` 53/53 green.
+- **Focus:** `gallery-goldens-backlink.ts` (rewrite/extend goldens) + `golden-pipeline.test.ts`
+  (describe rename). No `src/` change unless the design-derived golden reveals a real renderer
+  bug — in which case **halt and surface**, do not copy renderer output to force a pass.
+- **Completed when:** the converging goldens are hand-authored to the design's one-lane form;
+  `pnpm --filter @prisma-next/cli test --run test/utils/formatters/golden-pipeline.test.ts`
+  is fully green (incl. green-only-on-path); the full formatter suite green; no `.snap`
+  change; transient-ID scan empty.
+
 ## dispatch-INVEST check
 
 - **Independent:** D1 (tests only) → D2 (layout) → D3 (constants) are strictly
@@ -125,6 +149,12 @@ Implementers: sonnet-mid. Reviewer pass: opus-high.
 
 ## Open items (follow-ups, not in this PR)
 
+- **`assertGreenOnlyOnPath` in `golden-pipeline.test.ts` is vacuous.** `renderGrid` emits
+  no migration-name labels, so its `line.includes(offPathName)` check never fires — the
+  green-only-on-path guarantee is actually carried by the structure+colour `toEqual` (which
+  does compare per-glyph colour tokens, so it catches glyph-level bleed). Surfaced in the D4
+  review. Harden by rewriting the invariant against parsed colour tokens, or delete it as
+  dead weight. Not in this PR.
 - **`colsPerLane` is read independently by `buildGrid` and `renderGridRow`.** Today this
   cannot diverge — every production caller uses the default and
   `RenderMigrationGraphCommandInput` has no `colsPerLane` field — so it is not a bug. But
