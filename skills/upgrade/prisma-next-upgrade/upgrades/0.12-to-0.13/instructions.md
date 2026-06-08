@@ -11,9 +11,22 @@ changes:
         - '"base":'
       anyMatch: true
     script: ./re-emit-mti-variant-link-columns.ts
+  - id: cross-space-fk-psl-pattern
+    summary: |
+      New opt-in PSL authoring pattern: reference a model from an extension contract space
+      (e.g. `supabase:auth.AuthUser`) in a relation field and declare a named-type alias
+      (`types { Uuid = String @db.Uuid }`) for database-native types. No action required
+      for consumers who do not use cross-space foreign keys; this entry documents the
+      pattern for new adopters.
 ---
 
 <!--
+TML-2500(M3b): advances the `examples/supabase` walking skeleton to wire a
+cross-space FK from `public.Profile.userId` to `supabase:auth.AuthUser.id` with
+a cascading delete. The diff is new sample code that exercises a capability
+shipped in M2/M3a — no existing consumer has cross-space FKs to migrate. This
+entry serves as the canonical first-use reference for the PSL authoring pattern.
+
 dependabot/runtime-deps: bumped pg 8.20→8.21, pg-cursor 2.19→2.20, vitest 4.1.6→4.1.7,
 vite 8.0.13→8.0.15, tsdown 0.22.0→0.22.1, tsx 4.22.3→4.22.4, next 16.2.4→16.2.6,
 postcss 8.5.14→8.5.15, evlog 2.16.0→2.18.1, @prisma/dev 0.24.7→0.24.8,
@@ -134,3 +147,58 @@ If your database does hold variant rows that predate the link columns, they are 
 ### Validation
 
 After re-emitting and migrating, run `pnpm typecheck && pnpm test` (or your application's equivalent), then `prisma-next migration check` to confirm the on-disk chain is consistent. Inspect the `contract.json` diff: each MTI variant table should carry the base PK's link columns, a `primaryKey` over them, and a cascading `foreignKey` to its base table.
+
+## `cross-space-fk-psl-pattern`
+
+This release ships PSL support for referencing a model from an extension contract space (e.g. `supabase:auth.AuthUser`) in a relation field, together with named-type aliases for database-native column types.
+
+**This entry is informational.** No existing consumer has cross-space foreign keys to change — this is a new opt-in capability. Adopt it when you want a field in your model to reference a row owned by an extension (such as Supabase's `auth.users` table).
+
+### Named-type aliases
+
+Declare a `types` block at the top of your `contract.prisma` to give a database-native type a reusable name:
+
+```prisma
+types {
+  Uuid = String @db.Uuid
+}
+```
+
+You can then use `Uuid` as a field type anywhere in the same contract. On emit the column receives `nativeType: "uuid"` in `contract.json`.
+
+### Cross-space relation field
+
+Reference another contract space's model using the `<space>:<namespace>.<Model>` syntax in a relation field. The relation requires `extensionPacks` to declare the dependency on the space:
+
+```prisma
+// Before (no cross-space FK)
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    username String
+    @@map("profile")
+  }
+}
+
+// After (cross-space FK to supabase:auth.AuthUser)
+types {
+  Uuid = String @db.Uuid
+}
+
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    username String
+    userId   Uuid   @unique
+    user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+    @@map("profile")
+  }
+}
+```
+
+On emit, `contract.json` gains:
+- A `types.Uuid` entry under `storage` for the named-type alias.
+- The `userId` column with `typeRef: "Uuid"` on the storage table.
+- A cross-space `foreignKey` entry on the storage table pointing at the extension space's table.
+
+Run `prisma-next contract emit` after updating `contract.prisma`, then plan and apply the migration (`prisma-next migration plan --name add-user-fk && prisma-next migrate`) to add the column and foreign key to your database.
