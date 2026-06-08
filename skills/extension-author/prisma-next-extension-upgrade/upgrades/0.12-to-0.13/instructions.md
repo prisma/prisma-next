@@ -14,6 +14,15 @@ changes:
       contains:
         - '"typeParams": {}'
       anyMatch: true
+  - id: thread-namespace-id-through-codec-ref-resolver-spi
+    summary: |
+      The codec-resolution SPI in `@prisma-next/sql-relational-core` now takes a leading, required `namespaceId` coordinate. The `CodecDescriptorRegistry.codecRefForColumn(table, column)` build-time helper — the one AST authors call to stamp `codec` onto every column-bound `ParamRef` / `ProjectionItem`, exported from `@prisma-next/sql-relational-core/query-lane-context` and `@prisma-next/sql-relational-core/codec-descriptor-registry` — is now `codecRefForColumn(namespaceId, table, column)`. The underlying free function `codecRefForStorageColumn(storage, table, column)` (exported from `@prisma-next/sql-relational-core/codec-descriptor-registry`) is now `codecRefForStorageColumn(storage, namespaceId, table, column)`. Extension authors who derive codec refs directly must thread the namespace the table sits in at every call site: pass the explicit `namespaceId` ahead of `table`. There is no codemod — the right namespace is call-site-specific (read it from the model/table you are building the ref for). Two same-bare-named tables in different namespaces now resolve to their own per-namespace columns/codecs instead of the first scan hit.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "codecRefForColumn("
+        - "codecRefForStorageColumn("
+      anyMatch: true
 ---
 
 <!--
@@ -115,6 +124,46 @@ The script is idempotent — running it twice produces the same output.
 After re-emitting and re-pinning, run `pnpm typecheck && pnpm test --filter <your-extension-package>`,
 then confirm `prisma-next migration check` passes. The `contract.json` diff should show
 `"typeParams": {}` removed from every `storage.types` entry.
+
+## `thread-namespace-id-through-codec-ref-resolver-spi`
+
+Starting at the 0.13 release, every model/table sits in an explicit namespace, and the column-bound codec-resolution SPI in `@prisma-next/sql-relational-core` carries that namespace as a leading, required coordinate. If your extension stamps `codec: CodecRef` onto AST nodes at build time (the "CodecRef invariant for AST authors" path — `descriptors.codecRefForColumn(...)`), or calls the free `codecRefForStorageColumn(...)` against `SqlStorage` directly, you must thread the namespace coordinate through.
+
+### `CodecDescriptorRegistry.codecRefForColumn`
+
+The registry method exported from `@prisma-next/sql-relational-core/query-lane-context` (the `CodecDescriptorRegistry` interface) and built by `buildCodecDescriptorRegistry` (`@prisma-next/sql-relational-core/codec-descriptor-registry`) gained a leading `namespaceId` parameter.
+
+```ts
+// Before 0.13
+const ref = descriptors.codecRefForColumn('document', 'embedding');
+
+// Starting at 0.13 — namespaceId leads the coordinate args
+const ref = descriptors.codecRefForColumn('public', 'document', 'embedding');
+```
+
+The namespace is whatever namespace the model/table you are building the ref for lives in — read it from the resolved table coordinate you already hold at the construction site, not a hard-coded literal. The table is now resolved strictly within that namespace, so two same-bare-named tables in different namespaces resolve to their own per-namespace column codecs without colliding.
+
+### `codecRefForStorageColumn`
+
+The free function exported from `@prisma-next/sql-relational-core/codec-descriptor-registry` gained the same leading coordinate, inserted between `storage` and `tableName`.
+
+```ts
+// Before 0.13
+const ref = codecRefForStorageColumn(storage, 'document', 'embedding');
+
+// Starting at 0.13
+const ref = codecRefForStorageColumn(storage, 'public', 'document', 'embedding');
+```
+
+It now resolves the table via `resolveStorageTable(storage, tableName, namespaceId)` rather than scanning every namespace for the first bare-name match, so a name that is ambiguous across namespaces is no longer silently bound to whichever namespace happened to enumerate first.
+
+### Validation
+
+This is a type-level signature change — `pnpm typecheck` (or `pnpm build`) pinpoints every call site that still passes the pre-0.13 argument list. Fix each one by inserting the namespace coordinate, then run your extension's standard `pnpm test`.
+
+## Validation by execution
+
+This entry is prose-only — there is no colocated codemod, so no execution-replay applies. The right namespace coordinate is call-site-specific (it depends on which model/table the AST node is bound to), so the translation is per-site agent reasoning rather than a deterministic transform. The substrate diff inside `packages/3-extensions/` in this transition is the same translation downstream extension authors replicate by hand: the namespace coordinate threaded through every column-bound codec-ref construction site. The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory carrying at least one entry; the substantive verification of the consumer-facing translation lives in the published extension-upgrade skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.
 
 ## Many-to-many contracts (additive)
 
