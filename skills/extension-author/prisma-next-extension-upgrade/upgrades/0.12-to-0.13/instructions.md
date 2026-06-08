@@ -52,7 +52,7 @@ contracts did not validate before this change, so no working extension
 constructs them, and existing 1:1 / 1:N / N:1 relation values match the
 non-junction variant unchanged. No codemod required.
 
-TML-2782: bug fix in @prisma-next/sql-orm-client — `orderBy` on a
+Bug fix in @prisma-next/sql-orm-client — `orderBy` on a
 variant-narrowed collection now resolves MTI variant-owned fields
 (previously threw), mirroring the existing variant-aware `where`/`first`
 treatment. Additive: the no-variant `orderBy` path and its types are
