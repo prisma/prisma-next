@@ -10,6 +10,7 @@ import {
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   ColumnRef,
+  IdentifierRef,
   OrderByItem,
   ProjectionItem,
   SelectAst,
@@ -145,6 +146,35 @@ describe.sequential('ORDER BY on an enum column — declaration order, PGlite', 
     const lowered = createPostgresAdapter().lower(ast, { contract });
     expect(lowered.sql).toContain(
       `array_position(ARRAY['low', 'high', 'medium']::text[], "Task"."priority")`,
+    );
+
+    const rows = await driver!.query<{ id: string; priority: string }>(lowered.sql);
+    expect(rows.rows.map((r) => r.priority)).toEqual(['low', 'low', 'high', 'medium']);
+    expect(rows.rows.map((r) => r.id)).toEqual(['b', 'd', 'a', 'c']);
+  });
+
+  it('intercepts an unqualified identifier-ref order column (sql-builder .orderBy form)', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = makeTaskContract();
+    await migrate(driver!, contract);
+
+    await driver!.query(`INSERT INTO "Task" (id, priority) VALUES
+      ('a', 'high'), ('b', 'low'), ('c', 'medium'), ('d', 'low')`);
+
+    const ast = SelectAst.from(TableSource.named('Task', undefined, 'public'))
+      .withProjection([
+        ProjectionItem.of('id', ColumnRef.of('Task', 'id')),
+        ProjectionItem.of('priority', ColumnRef.of('Task', 'priority')),
+      ])
+      .withOrderBy([
+        OrderByItem.asc(IdentifierRef.of('priority')),
+        OrderByItem.asc(IdentifierRef.of('id')),
+      ]);
+
+    const lowered = createPostgresAdapter().lower(ast, { contract });
+    expect(lowered.sql).toContain(
+      `array_position(ARRAY['low', 'high', 'medium']::text[], "priority")`,
     );
 
     const rows = await driver!.query<{ id: string; priority: string }>(lowered.sql);

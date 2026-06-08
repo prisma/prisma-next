@@ -271,7 +271,35 @@ function resolveEnumOrderValues(
 }
 
 /**
- * Render an ORDER BY expression. A column-ref onto an enum-restricted column sorts by declaration order via `array_position(ARRAY[…]::text[], <col>)` over the value-set's ordered values (NULLs return `NULL` from `array_position`, sorting per the clause's default NULL handling). Every other expression renders unchanged.
+ * Ordered values for an unqualified ORDER BY column (an `identifier-ref`, the shape the sql-builder emits for `.orderBy('col')`). Scans every FROM/JOIN source for a column of that name carrying a value-set; resolves only when exactly one source matches, so an ambiguous name across joined tables falls through to the bare column rendering.
+ */
+function resolveEnumOrderValuesForIdentifier(
+  name: string,
+  sourcesByRef: ReadonlyMap<string, TableSourceCoordinate>,
+  contract: PostgresContract,
+): readonly string[] | undefined {
+  let resolved: readonly string[] | undefined;
+  for (const source of sourcesByRef.values()) {
+    if (source.namespaceId === undefined) {
+      continue;
+    }
+    const column =
+      contract.storage.namespaces[source.namespaceId]?.entries.table[source.name]?.columns[name];
+    const valueSet = column?.valueSet;
+    if (valueSet === undefined) {
+      continue;
+    }
+    if (resolved !== undefined) {
+      return undefined;
+    }
+    resolved =
+      contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.name]?.values;
+  }
+  return resolved;
+}
+
+/**
+ * Render an ORDER BY expression. A column reference onto an enum-restricted column sorts by declaration order via `array_position(ARRAY[…]::text[], <col>)` over the value-set's ordered values (NULLs return `NULL` from `array_position`, sorting per the clause's default NULL handling). Both qualified `column-ref`s and the unqualified `identifier-ref`s the sql-builder emits for `.orderBy('col')` are intercepted. Every other expression renders unchanged.
  */
 function renderOrderByExpr(
   expr: AnyExpression,
@@ -284,6 +312,13 @@ function renderOrderByExpr(
     if (orderValues !== undefined) {
       const array = orderValues.map((value) => `'${escapeLiteral(value)}'`).join(', ');
       return `array_position(ARRAY[${array}]::text[], ${renderColumn(expr)})`;
+    }
+  }
+  if (expr.kind === 'identifier-ref') {
+    const orderValues = resolveEnumOrderValuesForIdentifier(expr.name, sourcesByRef, contract);
+    if (orderValues !== undefined) {
+      const array = orderValues.map((value) => `'${escapeLiteral(value)}'`).join(', ');
+      return `array_position(ARRAY[${array}]::text[], ${quoteIdentifier(expr.name)})`;
     }
   }
   return renderExpr(expr, contract, pim);
