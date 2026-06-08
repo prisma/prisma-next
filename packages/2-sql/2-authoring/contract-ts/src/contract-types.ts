@@ -334,10 +334,19 @@ type ResolveNamedStorageType<Definition, TypeRef> =
       : StorageTypeInstance
     : StorageTypeInstance;
 
-// An enum-typed field carries its `EnumTypeHandle` as the field's `typeRef`.
-// The handle is neither a string nor a registered `StorageType`, so it resolves
-// its storage descriptor (codec + native type) and its column type-ref key (the
-// enum name) directly from the handle rather than through the named-type lookup.
+// An enum-typed field carries its `EnumTypeHandle` (an object with a `codecId`
+// and `nativeType`, but no `kind`) as the field's `typeRef`. It is neither a
+// string nor a registered `StorageType`, so the named-type lookup cannot reach
+// it; `EnumFieldHandle` short-circuits the resolvers to read codec + native type
+// straight off the handle, with no column type-ref (the enum name is carried
+// elsewhere). The `[...] extends [never]` guard excludes plain column fields,
+// whose `typeRef` is `never`.
+type EnumFieldHandle<FieldState> = [FieldTypeRefOf<FieldState>] extends [never]
+  ? never
+  : FieldTypeRefOf<FieldState> extends EnumTypeHandle
+    ? FieldTypeRefOf<FieldState>
+    : never;
+
 type EnumHandleDescriptor<Handle> = Handle extends {
   readonly codecId: infer CodecId extends string;
   readonly nativeType: infer NativeType extends string;
@@ -345,32 +354,25 @@ type EnumHandleDescriptor<Handle> = Handle extends {
   ? { readonly codecId: CodecId; readonly nativeType: NativeType }
   : never;
 
-type IsEnumTypeRef<FieldState> = [FieldTypeRefOf<FieldState>] extends [never]
-  ? false
-  : FieldTypeRefOf<FieldState> extends EnumTypeHandle
-    ? true
-    : false;
+type ResolveFieldDescriptor<Definition, FieldState> = [EnumFieldHandle<FieldState>] extends [never]
+  ? [FieldDescriptorOf<FieldState>] extends [never]
+    ? ResolveNamedStorageType<Definition, FieldTypeRefOf<FieldState>>
+    : FieldDescriptorOf<FieldState>
+  : EnumHandleDescriptor<EnumFieldHandle<FieldState>>;
 
-type ResolveFieldDescriptor<Definition, FieldState> =
-  IsEnumTypeRef<FieldState> extends true
-    ? EnumHandleDescriptor<FieldTypeRefOf<FieldState>>
-    : [FieldDescriptorOf<FieldState>] extends [never]
-      ? ResolveNamedStorageType<Definition, FieldTypeRefOf<FieldState>>
-      : FieldDescriptorOf<FieldState>;
+type ResolveFieldColumnTypeRef<Definition, FieldState> = [EnumFieldHandle<FieldState>] extends [
+  never,
+]
+  ? [FieldTypeRefOf<FieldState>] extends [never]
+    ? DescriptorTypeRef<FieldDescriptorOf<FieldState>>
+    : ResolveNamedStorageTypeKey<Definition, FieldTypeRefOf<FieldState>>
+  : undefined;
 
-type ResolveFieldColumnTypeRef<Definition, FieldState> =
-  IsEnumTypeRef<FieldState> extends true
-    ? undefined
-    : [FieldTypeRefOf<FieldState>] extends [never]
-      ? DescriptorTypeRef<FieldDescriptorOf<FieldState>>
-      : ResolveNamedStorageTypeKey<Definition, FieldTypeRefOf<FieldState>>;
-
-type ResolveFieldColumnTypeParams<Definition, FieldState> =
-  IsEnumTypeRef<FieldState> extends true
-    ? undefined
-    : [ResolveFieldColumnTypeRef<Definition, FieldState>] extends [string]
-      ? undefined
-      : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
+type ResolveFieldColumnTypeParams<Definition, FieldState> = [
+  ResolveFieldColumnTypeRef<Definition, FieldState>,
+] extends [string]
+  ? undefined
+  : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
 
 type ModelTableName<Definition, ModelName extends ModelNames<Definition>> = [
   Present<
@@ -686,57 +688,28 @@ type CodecChannelType<
     : unknown
   : unknown;
 
-// A field's non-null type: the enum value union when the field is enum-typed,
-// otherwise the codec channel type. Nullability is applied once by the callers.
-type FieldBaseType<
+// A field's read/write JS type: the enum value union when the field is
+// enum-typed, otherwise the codec channel type, with column nullability applied.
+type FieldChannelType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
   Channel extends 'output' | 'input',
-> = [EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>] extends [never]
-  ? CodecChannelType<Definition, ModelName, FieldName, Channel>
-  : EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>;
-
-type FieldNullable<
-  Definition,
-  ModelName extends ModelNames<Definition>,
-  FieldName extends ModelFieldNames<Definition, ModelName>,
-> = FieldNullableOf<ModelFieldState<Definition, ModelName, FieldName>>;
-
-type FieldOutputType<
-  Definition,
-  ModelName extends ModelNames<Definition>,
-  FieldName extends ModelFieldNames<Definition, ModelName>,
 > =
-  FieldNullable<Definition, ModelName, FieldName> extends true
-    ? FieldBaseType<Definition, ModelName, FieldName, 'output'> | null
-    : FieldBaseType<Definition, ModelName, FieldName, 'output'>;
+  | ([EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>] extends [never]
+      ? CodecChannelType<Definition, ModelName, FieldName, Channel>
+      : EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>)
+  | (FieldNullableOf<ModelFieldState<Definition, ModelName, FieldName>> extends true
+      ? null
+      : never);
 
-type FieldInputType<
-  Definition,
-  ModelName extends ModelNames<Definition>,
-  FieldName extends ModelFieldNames<Definition, ModelName>,
-> =
-  FieldNullable<Definition, ModelName, FieldName> extends true
-    ? FieldBaseType<Definition, ModelName, FieldName, 'input'> | null
-    : FieldBaseType<Definition, ModelName, FieldName, 'input'>;
-
-type FieldOutputTypes<Definition> = {
+type FieldChannelTypes<Definition, Channel extends 'output' | 'input'> = {
   readonly [ModelName in ModelNames<Definition>]: {
-    readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldOutputType<
+    readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldChannelType<
       Definition,
       ModelName,
-      FieldName
-    >;
-  };
-};
-
-type FieldInputTypes<Definition> = {
-  readonly [ModelName in ModelNames<Definition>]: {
-    readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldInputType<
-      Definition,
-      ModelName,
-      FieldName
+      FieldName,
+      Channel
     >;
   };
 };
@@ -755,7 +728,7 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
   TypeMaps<
     CodecTypesFromDefinition<Definition>,
     Record<string, never>,
-    FieldOutputTypes<Definition>,
-    FieldInputTypes<Definition>
+    FieldChannelTypes<Definition, 'output'>,
+    FieldChannelTypes<Definition, 'input'>
   >
 >;
