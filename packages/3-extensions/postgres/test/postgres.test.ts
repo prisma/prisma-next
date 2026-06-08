@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   createSqlExecutionStack: vi.fn(),
   withTransaction: vi.fn(),
   sqlBuilder: vi.fn(),
+  orm: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
   deserializeContract: vi.fn(),
@@ -32,7 +33,7 @@ vi.mock('@prisma-next/sql-builder/runtime', () => ({
 }));
 
 vi.mock('@prisma-next/sql-orm-client', () => ({
-  orm: vi.fn(() => ({ lane: 'orm' })),
+  orm: mocks.orm,
 }));
 
 vi.mock('@prisma-next/target-postgres/runtime', () => ({
@@ -81,6 +82,7 @@ describe('postgres', () => {
     mocks.deserializeContract.mockReset();
     mocks.poolCtor.mockReset();
     mocks.sqlBuilder.mockReset();
+    mocks.orm.mockReset();
 
     mocks.createExecutionContext.mockReturnValue({
       contract,
@@ -104,6 +106,7 @@ describe('postgres', () => {
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
+    mocks.orm.mockReturnValue({ lane: 'orm' });
     mocks.withTransaction.mockImplementation(
       async (_runtime: unknown, fn: (ctx: unknown) => unknown) => {
         const mockTxCtx = {
@@ -478,14 +481,13 @@ describe('postgres', () => {
   });
 
   it('transaction() provides orm on the transaction context', async () => {
-    const { orm: ormMock } = await import('@prisma-next/sql-orm-client');
     const txOrmProxy = { lane: 'tx-orm' };
     let ormCallCount = 0;
-    vi.mocked(ormMock).mockImplementation((() => {
+    mocks.orm.mockImplementation(() => {
       ormCallCount++;
       if (ormCallCount === 1) return { lane: 'orm' };
       return txOrmProxy;
-    }) as unknown as typeof ormMock);
+    });
 
     const db = postgres({
       contract,
