@@ -48,6 +48,33 @@ storage-legitimate concept). A column keeps its `codecId` + `nativeType` and add
 `valueSet` restriction referencing the storage value-set. The value-set is referenced,
 not inlined, so the values live once per plane.
 
+### PSL surface
+
+The codec is a required block attribute and each member's value is assigned with `=`:
+
+```prisma
+enum Role {
+  @@type("pg/text@1")
+  User  = "user"
+  Admin = "admin"
+}
+```
+
+`@@type(<codecId>)` is required — never inferred; a missing one is a validation error.
+Each member's right-hand side is the codec's **JSON-encoded value** (`encodeJson`): the
+literal is `JSON.parse`d and validated with `codec.decodeJson`, reusing the existing
+PSL-extension `value`-parameter validation path (`PSL_EXTENSION_INVALID_VALUE` on a
+non-JSON literal or a value the codec rejects). The value defaults to the member name
+for string-input codecs and is required for others; `=` carries any codec-input type
+(`Active = 1`).
+
+Rejected: **`@map(...)`** — it miscategorizes a first-class domain value as a physical
+storage mapping (its meaning everywhere else in PSL). A **parameterized header**
+(`enum Role("pg/text@1")`) reads well and makes the codec required by grammar, but
+invents a parameterized-block-header construct PSL has nowhere else and that
+extension-contributed blocks cannot reuse — so the codec rides the existing
+`@@`-attribute mechanism instead, with required-ness enforced by validation.
+
 ### Restriction and enforcement are separate jobs
 
 - The column's **`valueSet` property** is the *notional* restriction — read the column
@@ -122,9 +149,6 @@ target from the ordered values.
 - **Realization layer** — implement value-set + check at the SQL-family layer
   (MySQL/SQLite inherit) or Postgres-only now? **Working position:** family-layer; the
   structured check is dialect-agnostic.
-- **PSL surface** for declaring an enum's codec and per-member values. **Working
-  position:** an explicit codec annotation on the `enum` block + per-member `@map` for
-  the value; exact syntax settled at slice-plan time.
 - **`db.enums` scope** — local to this project or the first instance of a broader
   domain-client surface for IR-modelled entities? **Working position:** ship it here,
   shaped so a later generalization is non-breaking.
