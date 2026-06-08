@@ -143,6 +143,12 @@ it('emits contract and verifies it matches on-disk artifacts', async () => {
 
 ---
 
+## Coverage thresholds (local vs CI)
+
+`pnpm test` does **not** enforce per-package coverage thresholds — only CI's **Coverage** job (`scripts/coverage-report.mjs`) does. So a package can pass `pnpm test` locally and still fail CI on Coverage. When you add or remove code in a package that has coverage thresholds (most do; see its `vitest.config.ts`), run `pnpm --filter <pkg> test:coverage` (or `pnpm coverage:packages`) locally before pushing, so a threshold miss surfaces at your desk rather than after a CI round-trip. Fix a miss by covering the genuinely-untested branches — never by lowering the threshold.
+
+---
+
 ## DRY Test Patterns
 
 ### The Problem: Repetition
