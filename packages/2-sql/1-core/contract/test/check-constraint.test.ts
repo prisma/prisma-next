@@ -1,5 +1,6 @@
 import type { ValueSetRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { CheckConstraint } from '../src/ir/check-constraint';
 import { StorageTable } from '../src/ir/storage-table';
@@ -175,6 +176,6 @@ describe('StorageTableSchema validates checks', () => {
         ],
       }),
     );
-    expect(result instanceof Error || typeof result === 'object').toBe(true);
+    expect(result).toBeInstanceOf(type.errors);
   });
 });
