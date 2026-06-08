@@ -11,18 +11,18 @@ export interface ContentHashParts {
 }
 
 /**
- * Strips SQL line comments (`--`) and block comments (`/* … *\/`) from `sql`,
- * preserving single-quoted string literals verbatim (including any comment-like
- * sequences or parens they contain). Uses a minimal char-by-char scanner.
+ * Strips SQL line/block comments and lowercases syntax outside single-quoted
+ * string literals. Literal contents are copied verbatim — their case is data,
+ * not syntax. Uses a minimal char-by-char scanner.
  */
-function stripComments(sql: string): string {
+function stripCommentsAndLowercase(sql: string): string {
   let out = '';
   let i = 0;
   while (i < sql.length) {
     const ch = sql[i]!;
 
     if (ch === "'") {
-      // Single-quoted string literal — copy verbatim, handle '' escapes.
+      // Single-quoted string literal — copy verbatim (preserving case), handle '' escapes.
       out += ch;
       i++;
       while (i < sql.length) {
@@ -30,7 +30,6 @@ function stripComments(sql: string): string {
         out += sc;
         i++;
         if (sc === "'") {
-          // A doubled quote is an escape; a lone quote ends the literal.
           if (sql[i] === "'") {
             out += sql[i];
             i++;
@@ -43,21 +42,19 @@ function stripComments(sql: string): string {
     }
 
     if (ch === '-' && sql[i + 1] === '-') {
-      // Line comment — skip through to end of line (but not past the newline).
       i += 2;
       while (i < sql.length && sql[i] !== '\n') i++;
       continue;
     }
 
     if (ch === '/' && sql[i + 1] === '*') {
-      // Block comment — skip through to closing '*/'.
       i += 2;
       while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) i++;
       i += 2;
       continue;
     }
 
-    out += ch;
+    out += ch.toLowerCase();
     i++;
   }
   return out;
@@ -84,20 +81,18 @@ function isOuterParenWrapped(sql: string): boolean {
 /**
  * Canonicalizes a SQL predicate body across Postgres's reformatting axes:
  *
- * 1. Strip line (`--`) and block (`/* *\/`) comments, preserving string literals.
+ * 1. Strip line (`--`) and block (`/* *\/`) comments, lowercasing syntax
+ *    outside string literals. Literal contents are copied verbatim — case
+ *    inside `'...'` is data, not syntax.
  * 2. Collapse runs of whitespace to a single space and trim.
- * 3. Lowercase the entire result (keywords become lowercase; string-literal
- *    content is also lowercased, which is intentional — see stability notes).
- * 4. Remove fully-enclosing outer paren pairs (repeated until none remain).
+ * 3. Remove fully-enclosing outer paren pairs (repeated until none remain).
  *
  * The normalizer is a stability commitment: any change re-suffixes all wire names.
  */
 export function normalizePredicate(sql: string): string {
-  let result = stripComments(sql);
+  let result = stripCommentsAndLowercase(sql);
   result = result.replace(/\s+/g, ' ').trim();
-  result = result.toLowerCase();
 
-  // Trim fully-enclosing outer paren pairs.
   while (isOuterParenWrapped(result)) {
     result = result.slice(1, -1).trim();
   }

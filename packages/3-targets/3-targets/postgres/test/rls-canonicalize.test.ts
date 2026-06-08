@@ -91,7 +91,12 @@ describe('normalizePredicate', () => {
 
     it('preserves SQL keywords inside string literals — they are data not syntax', () => {
       const result = normalizePredicate("label = 'AND OR NOT NULL'");
-      expect(result).toBe("label = 'and or not null'");
+      expect(result).toBe("label = 'AND OR NOT NULL'");
+    });
+
+    it('lowercases keywords outside literals while preserving case inside literals', () => {
+      const result = normalizePredicate("WHERE x = 'Admin'");
+      expect(result).toBe("where x = 'Admin'");
     });
 
     it('preserves comment-like sequences inside string literals', () => {
@@ -247,10 +252,16 @@ describe('computeContentHash', () => {
       expect(a).not.toBe(b);
     });
 
-    it('keyword inside string literal preserved — differs from keyword outside', () => {
+    it('string literal case is preserved — different case produces different hash', () => {
       const a = computeContentHash({ ...base, using: "label = 'AND'" });
       const b = computeContentHash({ ...base, using: "label = 'and'" });
-      expect(a).toBe(b);
+      expect(a).not.toBe(b);
+    });
+
+    it('role column with mixed-case value hashes differently from lowercase value', () => {
+      const a = computeContentHash({ ...base, using: "role = 'Admin'" });
+      const b = computeContentHash({ ...base, using: "role = 'admin'" });
+      expect(a).not.toBe(b);
     });
   });
 
