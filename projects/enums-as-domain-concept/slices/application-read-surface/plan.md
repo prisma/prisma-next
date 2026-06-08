@@ -80,3 +80,14 @@ sonnet-mid; reviewer: opus.
   (a closed-out project's docs + ADR reverts) via a broad `git add`. The orchestrator
   re-committed D1's files only. Guardrail added to D2/D3 briefs: stage only named files,
   verify `git diff --staged --stat` before committing.
+- **Cross-space enum ORDER BY (D3).** `resolveEnumOrderValues` ignores `ValueSetRef.spaceId`
+  / `plane`, looking up the value-set locally. Correct for every authoring-reachable
+  contract today (storage-column `valueSet` refs are always local `plane: 'storage'`, no
+  `spaceId`), and degrades to safe fall-through otherwise. Revisit when cross-space enum
+  refs become authoring-reachable. (Surfaced in the D3 review.)
+- **Pre-existing main typecheck failures (blocks full-repo `pnpm typecheck`, NOT this slice).**
+  Verified reproducing on `origin/main`, untouched by D1/D2/D3:
+  `packages/3-extensions/postgres/test/postgres.test.ts:484` (TS2352 orm-mock cast) and
+  `test/integration/test/contract-builder.{test.ts,types.test-d.ts}` (non-enum
+  `field.column` `ResultType` → `string`). Need a standalone main-health fix before this
+  PR's CI typecheck can go green.
