@@ -1,15 +1,18 @@
+import { blindCast } from '@prisma-next/utils/casts';
 import type { Codec } from '../shared/codec';
 import type { CodecLookup, CodecMeta } from '../shared/codec-types';
 import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
   isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
+  isAuthoringPslBlockDescriptor,
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
@@ -32,6 +35,7 @@ export interface AssembledAuthoringContributions {
   readonly field: AuthoringFieldNamespace;
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
+  readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
 }
 
 export interface ControlStack<
@@ -151,6 +155,7 @@ export function assembleAuthoringContributions(
   const field = {} as Record<string, unknown>;
   const type = {} as Record<string, unknown>;
   const entityTypes = {} as Record<string, unknown>;
+  const pslBlockDescriptors: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
@@ -180,17 +185,36 @@ export function assembleAuthoringContributions(
         'entity',
       );
     }
+    if (descriptor.authoring?.pslBlockDescriptors) {
+      mergeAuthoringNamespaces(
+        pslBlockDescriptors,
+        descriptor.authoring.pslBlockDescriptors,
+        [],
+        isAuthoringPslBlockDescriptor,
+        'pslBlock',
+      );
+    }
   }
 
   const fieldNamespace = field as AuthoringFieldNamespace;
   const typeNamespace = type as AuthoringTypeNamespace;
   const entityTypeNamespace = entityTypes as AuthoringEntityTypeNamespace;
-  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace, entityTypeNamespace);
+  const pslBlockDescriptorNamespace = blindCast<
+    AuthoringPslBlockDescriptorNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(pslBlockDescriptors);
+  assertNoCrossRegistryCollisions(
+    typeNamespace,
+    fieldNamespace,
+    entityTypeNamespace,
+    pslBlockDescriptorNamespace,
+  );
 
   return {
     field: fieldNamespace,
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
+    pslBlockDescriptors: pslBlockDescriptorNamespace,
   };
 }
 

@@ -128,7 +128,7 @@ describe('extractComponentIds', () => {
 describe('assembleAuthoringContributions', () => {
   it('returns empty namespaces for descriptors without authoring', () => {
     const result = assembleAuthoringContributions([createDescriptor()]);
-    expect(result).toEqual({ field: {}, type: {}, entityTypes: {} });
+    expect(result).toEqual({ field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} });
   });
 
   it('merges field namespaces from multiple descriptors', () => {
@@ -253,6 +253,228 @@ describe('assembleAuthoringContributions', () => {
       }),
     ]);
     expect(Object.keys(result.entityTypes)).toEqual(['enum', 'demo']);
+  });
+
+  function makeDeclarativePslBlockDescriptor(discriminator: string) {
+    return {
+      kind: 'pslBlock' as const,
+      keyword: 'policy_select',
+      discriminator,
+      name: { required: true },
+      parameters: {},
+    };
+  }
+
+  it('merges pslBlockDescriptors namespaces from multiple descriptors', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          entityTypes: {
+            policyEntity: {
+              kind: 'entity',
+              discriminator: 'postgres-policy',
+              output: { factory: () => ({}) },
+            },
+            roleEntity: {
+              kind: 'entity',
+              discriminator: 'postgres-role',
+              output: { factory: () => ({}) },
+            },
+          },
+          pslBlockDescriptors: {
+            policyBlock: makeDeclarativePslBlockDescriptor('postgres-policy'),
+          },
+        },
+      }),
+      createDescriptor({
+        id: 'other',
+        authoring: {
+          pslBlockDescriptors: {
+            roleBlock: makeDeclarativePslBlockDescriptor('postgres-role'),
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.pslBlockDescriptors)).toEqual(['policyBlock', 'roleBlock']);
+  });
+
+  it('throws on duplicate pslBlockDescriptors paths from different descriptors', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              fooEntity: {
+                kind: 'entity',
+                discriminator: 'fake-foo',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslBlockDescriptors: {
+              foo: makeDeclarativePslBlockDescriptor('fake-foo'),
+            },
+          },
+        }),
+        createDescriptor({
+          id: 'other',
+          authoring: {
+            pslBlockDescriptors: {
+              foo: makeDeclarativePslBlockDescriptor('fake-foo'),
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate authoring pslBlock helper "foo"/);
+  });
+
+  it('accepts pslBlockDescriptors + entityTypes sharing the same path with matching discriminators', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          entityTypes: {
+            policy: {
+              kind: 'entity',
+              discriminator: 'postgres-policy',
+              output: { factory: () => ({}) },
+            },
+          },
+          pslBlockDescriptors: {
+            policy: makeDeclarativePslBlockDescriptor('postgres-policy'),
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.entityTypes)).toEqual(['policy']);
+    expect(Object.keys(result.pslBlockDescriptors)).toEqual(['policy']);
+  });
+
+  it('rejects a pslBlockDescriptors contribution with no matching entityTypes factory', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            pslBlockDescriptors: {
+              fooBlock: makeDeclarativePslBlockDescriptor('fake-foo'),
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/pslBlock.*"fake-foo".*entityType/);
+  });
+
+  it('rejects a malformed pslBlockDescriptors entry that carries descriptor-shaped keys but is not a valid declarative descriptor', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            pslBlockDescriptors: {
+              // Carries kind + discriminator but missing required fields (keyword, name, parameters).
+              broken: {
+                kind: 'pslBlock',
+                discriminator: 'fake-foo',
+              } as unknown as never,
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Malformed authoring pslBlock contribution at "broken"/);
+  });
+
+  it('descends into a pslBlockDescriptors sub-namespace whose key is "kind" or "discriminator" without triggering malformed check', () => {
+    // A sub-namespace keyed "kind" or "discriminator" that does not itself
+    // look like a descriptor must descend normally.
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              kind: {
+                nested: {
+                  kind: 'entity',
+                  discriminator: 'test-entity-in-kind-ns',
+                  output: { factory: () => ({}) },
+                },
+              },
+              discriminator: {
+                nested: {
+                  kind: 'entity',
+                  discriminator: 'test-entity-in-discriminator-ns',
+                  output: { factory: () => ({}) },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    ).not.toThrow();
+  });
+
+  it('rejects two pslBlockDescriptors contributions sharing a discriminator', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              policyA: {
+                kind: 'entity',
+                discriminator: 'shared-disc',
+                output: { factory: () => ({}) },
+              },
+              policyB: {
+                kind: 'entity',
+                discriminator: 'shared-disc-b',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslBlockDescriptors: {
+              policyA: makeDeclarativePslBlockDescriptor('shared-disc'),
+              policyB: makeDeclarativePslBlockDescriptor('shared-disc'),
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate pslBlock discriminator "shared-disc".*"policyA".*"policyB"/);
+  });
+
+  it('rejects two entityTypes contributions sharing a discriminator', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              enumA: {
+                kind: 'entity',
+                discriminator: 'shared-entity-disc',
+                output: { factory: () => ({}) },
+              },
+              enumB: {
+                kind: 'entity',
+                discriminator: 'shared-entity-disc',
+                output: { factory: () => ({}) },
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Duplicate entityType discriminator "shared-entity-disc".*"enumA".*"enumB"/);
+  });
+
+  it('accepts entityTypes-only contributions without a matching pslBlockDescriptors entry (standalone factory is allowed)', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              enum: {
+                kind: 'entity',
+                discriminator: 'postgres-enum',
+                output: { factory: () => ({}) },
+              },
+            },
+          },
+        }),
+      ]),
+    ).not.toThrow();
   });
 });
 
@@ -520,7 +742,12 @@ describe('createControlStack', () => {
     expect(state.codecTypeImports).toEqual([]);
     expect(state.queryOperationTypeImports).toEqual([]);
     expect(state.extensionIds).toEqual(['fam', 'tgt']);
-    expect(state.authoringContributions).toEqual({ field: {}, type: {}, entityTypes: {} });
+    expect(state.authoringContributions).toEqual({
+      field: {},
+      type: {},
+      entityTypes: {},
+      pslBlockDescriptors: {},
+    });
   });
 });
 

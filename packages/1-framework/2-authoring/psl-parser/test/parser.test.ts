@@ -1,3 +1,5 @@
+import type { AuthoringPslBlockDescriptor } from '@prisma-next/framework-components/authoring';
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   flatPslCompositeTypes,
   flatPslEnums,
@@ -1174,6 +1176,426 @@ model Post {
       const titleField = post?.fields.find((f) => f.name === 'title');
       expect(titleField?.typeName).toBe('String');
       expect(titleField?.typeNamespaceId).toBeUndefined();
+    });
+  });
+
+  describe('extension blocks (generic framework parser)', () => {
+    // Stub codecLookup: supplies a minimal Codec for the 'sql-expression' codec
+    // whose decodeJson accepts any JSON string value.
+    // Needed because the parser wires the validator into parsePslDocument, which
+    // runs whenever pslBlockDescriptors are registered and falls back to emptyCodecLookup
+    // (which has no codecs registered) when no codecLookup is supplied by the caller.
+    const stubSqlExpressionCodec: Codec = {
+      id: 'sql-expression',
+      encode: async (value) => value,
+      decode: async (wire) => wire,
+      encodeJson: (value) => value as string,
+      decodeJson: (json) => json as string,
+    };
+    const stubSqlExpressionCodecLookup: CodecLookup = {
+      get: (id) => (id === 'sql-expression' ? stubSqlExpressionCodec : undefined),
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
+    };
+
+    const policySelectDescriptor: AuthoringPslBlockDescriptor = {
+      kind: 'pslBlock',
+      keyword: 'policy_select',
+      discriminator: 'test-policy-select',
+      name: { required: true },
+      parameters: {
+        target: { kind: 'ref', refKind: 'model', scope: 'same-namespace' },
+        as: { kind: 'option', values: ['permissive', 'restrictive'] },
+        // cross-space: roles are external entities; validation is a documented pass-through.
+        roles: { kind: 'list', of: { kind: 'ref', refKind: 'role', scope: 'cross-space' } },
+        using: { kind: 'value', codecId: 'sql-expression' },
+      },
+    };
+
+    it('parses a policy_select block into a uniform PslExtensionBlock node', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = [admin, editor]
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+
+      const ns = result.ast.namespaces[0];
+      expect(ns).toBeDefined();
+      expect(ns?.extensionBlocks).toHaveLength(1);
+
+      const block = ns?.extensionBlocks?.[0];
+      expect(block?.kind).toBe('test-policy-select');
+      expect(block?.name).toBe('ReadPosts');
+      expect(block?.span).toBeDefined();
+
+      expect(block?.parameters['target']).toMatchObject({
+        kind: 'ref',
+        identifier: 'Post',
+      });
+
+      expect(block?.parameters['as']).toMatchObject({
+        kind: 'option',
+        token: 'permissive',
+      });
+
+      expect(block?.parameters['roles']).toMatchObject({
+        kind: 'list',
+        items: [
+          { kind: 'ref', identifier: 'admin' },
+          { kind: 'ref', identifier: 'editor' },
+        ],
+      });
+
+      expect(block?.parameters['using']).toMatchObject({
+        kind: 'value',
+        raw: '"true"',
+      });
+    });
+
+    it('emits PSL_UNSUPPORTED_TOP_LEVEL_BLOCK for an unregistered keyword', () => {
+      const schema = `
+unknown_keyword Foo {
+  target = Bar
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]?.code).toBe('PSL_UNSUPPORTED_TOP_LEVEL_BLOCK');
+      expect(result.diagnostics[0]?.message).toContain('unknown_keyword');
+    });
+
+    it('emits PSL_UNSUPPORTED_TOP_LEVEL_BLOCK when pslBlockDescriptors is omitted and keyword is unknown', () => {
+      const schema = `
+policy_select ReadPosts {
+  target = Post
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics[0]?.code).toBe('PSL_UNSUPPORTED_TOP_LEVEL_BLOCK');
+    });
+
+    it('parses mixed built-in and extension blocks in the same namespace', () => {
+      const schema = `
+model Post {
+  id Int @id
+  title String
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = [admin]
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+
+      const ns = result.ast.namespaces[0];
+      expect(flatPslModels(result.ast)).toHaveLength(1);
+      expect(flatPslModels(result.ast)[0]?.name).toBe('Post');
+
+      expect(ns?.extensionBlocks).toHaveLength(1);
+      expect(ns?.extensionBlocks?.[0]?.kind).toBe('test-policy-select');
+      expect(ns?.extensionBlocks?.[0]?.name).toBe('ReadPosts');
+    });
+
+    it('built-in block parsing is unchanged when pslBlockDescriptors is provided', () => {
+      const schema = `
+model User {
+  id Int @id
+  email String @unique
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      expect(flatPslModels(result.ast)).toHaveLength(1);
+      expect(flatPslEnums(result.ast)).toHaveLength(1);
+      expect(result.ast.namespaces[0]?.extensionBlocks).toBeUndefined();
+    });
+
+    it('lands extension blocks in the namespace extensionBlocks slot in source order', () => {
+      const schema = `
+model Model {
+  id Int @id
+}
+
+policy_select Alpha {
+  target = Model
+  as = permissive
+  roles = []
+  using = "true"
+}
+
+policy_select Beta {
+  target = Model
+  as = restrictive
+  roles = [admin]
+  using = "false"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      const ns = result.ast.namespaces[0];
+      expect(ns?.extensionBlocks).toHaveLength(2);
+      expect(ns?.extensionBlocks?.[0]?.name).toBe('Alpha');
+      expect(ns?.extensionBlocks?.[1]?.name).toBe('Beta');
+    });
+
+    it('captures unknown parameters as raw values and validation flags them', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = []
+  using = "true"
+  unrecognized_param = some_value
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      // The validator runs after parsing and flags unknown parameters.
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toMatchObject([{ code: 'PSL_EXTENSION_UNKNOWN_PARAMETER' }]);
+      // The parameter is still captured in the AST node.
+      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      expect(block?.parameters['unrecognized_param']).toMatchObject({
+        kind: 'value',
+        raw: 'some_value',
+      });
+    });
+
+    it('emits a diagnostic for a malformed body line (not key = value shaped)', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = []
+  using = "true"
+  not_an_assignment
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_EXTENSION_BLOCK_MEMBER');
+      expect(result.diagnostics[0]?.message).toContain('not_an_assignment');
+    });
+
+    it('parses extension block inside a named namespace', () => {
+      const schema = `
+namespace auth {
+  model Post {
+    id Int @id
+  }
+
+  policy_select ReadPosts {
+    target = Post
+    as = permissive
+    roles = [admin]
+    using = "true"
+  }
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+
+      const authNs = result.ast.namespaces.find((ns) => ns.name === 'auth');
+      expect(authNs).toBeDefined();
+      expect(authNs?.extensionBlocks).toHaveLength(1);
+      expect(authNs?.extensionBlocks?.[0]?.name).toBe('ReadPosts');
+    });
+
+    it('parses an empty list parameter correctly', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = []
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      expect(block?.parameters['roles']).toMatchObject({
+        kind: 'list',
+        items: [],
+      });
+    });
+
+    it('skips blank lines inside an extension block body', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+
+  as = permissive
+
+  roles = [admin]
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      expect(Object.keys(block?.parameters ?? {})).toEqual(['target', 'as', 'roles', 'using']);
+    });
+
+    it('emits a diagnostic and drops the parameter for a list given a non-bracketed value', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = admin
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toMatchObject([{ code: 'PSL_INVALID_EXTENSION_BLOCK_MEMBER' }]);
+      expect(result.diagnostics[0]?.message).toContain('bracketed list');
+      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      expect(block?.parameters['roles']).toBeUndefined();
+    });
+
+    it('skips empty segments in a list parameter', () => {
+      const schema = `
+model Post {
+  id Int @id
+}
+
+policy_select ReadPosts {
+  target = Post
+  as = permissive
+  roles = [admin, , editor]
+  using = "true"
+}
+`;
+      const result = parsePslDocument({
+        schema,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: { policy_select: policySelectDescriptor },
+        codecLookup: stubSqlExpressionCodecLookup,
+      });
+
+      expect(result.ok).toBe(true);
+      const block = result.ast.namespaces[0]?.extensionBlocks?.[0];
+      expect(block?.parameters['roles']).toMatchObject({
+        kind: 'list',
+        items: [
+          { kind: 'ref', identifier: 'admin' },
+          { kind: 'ref', identifier: 'editor' },
+        ],
+      });
     });
   });
 

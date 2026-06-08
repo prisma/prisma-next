@@ -207,7 +207,7 @@ describe('defineConfig', () => {
       composedExtensionPacks: [],
       composedExtensionContracts: new Map(),
       scalarTypeDescriptors: new Map(),
-      authoringContributions: { field: {}, type: {}, entityTypes: {} },
+      authoringContributions: { field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} },
       codecLookup: {
         get: () => undefined,
         targetTypesFor: () => undefined,

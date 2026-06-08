@@ -7,8 +7,10 @@ import {
   isColumnDefaultLiteralInputValue,
   isExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
+import type { PslBlockParam } from './psl-extension-block';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -157,10 +159,55 @@ export type AuthoringEntityTypeNamespace = {
   readonly [name: string]: AuthoringEntityTypeDescriptor | AuthoringEntityTypeNamespace;
 };
 
+/**
+ * Declarative descriptor for an extension-contributed top-level PSL block.
+ *
+ * An extension registers one of these per keyword it contributes. The
+ * framework owns the generic parser, validator, and printer — no
+ * parsing or printing code runs from the extension.
+ *
+ * - `keyword` is the PSL top-level identifier this descriptor claims
+ *   (`policy_select`, `role`, …).
+ * - `discriminator` is the routing key used by the printer dispatch and
+ *   the `entityTypes` lowering factory lookup. Convention:
+ *   `<target-or-family>-<kind>` (`postgres-policy-select`).
+ * - `name.required` declares whether the block must have a name token
+ *   after the keyword. Currently always `true` — anonymous blocks are
+ *   not part of the closed-grammar premise — but the field is explicit
+ *   so the type can evolve without a breaking change.
+ * - `parameters` maps parameter names to their value-kind descriptors
+ *   (`ref` / `value` / `option` / `list`). The generic parser and
+ *   validator interpret these; the extension supplies no parser or
+ *   printer function.
+ */
+export interface AuthoringPslBlockDescriptor {
+  readonly kind: 'pslBlock';
+  readonly keyword: string;
+  readonly discriminator: string;
+  readonly name: { readonly required: boolean };
+  readonly parameters: Record<string, PslBlockParam>;
+}
+
+export type AuthoringPslBlockDescriptorNamespace = {
+  readonly [name: string]: AuthoringPslBlockDescriptor | AuthoringPslBlockDescriptorNamespace;
+};
+
 export interface AuthoringContributions {
   readonly type?: AuthoringTypeNamespace;
   readonly field?: AuthoringFieldNamespace;
   readonly entityTypes?: AuthoringEntityTypeNamespace;
+  /**
+   * Registry of declarative block descriptors this contribution registers,
+   * keyed by arbitrary path segments. Each leaf is an
+   * {@link AuthoringPslBlockDescriptor} that claims a PSL top-level keyword.
+   * The framework owns the generic parser, validator, and printer; the
+   * contribution supplies only these declarative descriptors.
+   *
+   * Contrast with {@link PslNamespace.extensionBlocks}: that field holds
+   * the parsed block nodes in a namespace; this field holds the registry
+   * of descriptors that teach the parser how to read those blocks.
+   */
+  readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -226,6 +273,42 @@ export function isAuthoringEntityTypeDescriptor(
   const factory = (output as { factory?: unknown }).factory;
   const template = (output as { template?: unknown }).template;
   return typeof factory === 'function' || template !== undefined;
+}
+
+export function isAuthoringPslBlockDescriptor(
+  value: unknown,
+): value is AuthoringPslBlockDescriptor {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const record = blindCast<
+    Record<string, unknown>,
+    'type-guard probing an unknown candidate-descriptor object for known property names'
+  >(value);
+  if (record['kind'] !== 'pslBlock') {
+    return false;
+  }
+  const keyword = record['keyword'];
+  if (typeof keyword !== 'string' || keyword.length === 0) {
+    return false;
+  }
+  const discriminator = record['discriminator'];
+  if (typeof discriminator !== 'string' || discriminator.length === 0) {
+    return false;
+  }
+  const name = record['name'];
+  if (typeof name !== 'object' || name === null) {
+    return false;
+  }
+  const nameRecord = blindCast<
+    Record<string, unknown>,
+    'type-guard probing the name property of a candidate pslBlock descriptor'
+  >(name);
+  if (typeof nameRecord['required'] !== 'boolean') {
+    return false;
+  }
+  const parameters = record['parameters'];
+  return typeof parameters === 'object' && parameters !== null && !Array.isArray(parameters);
 }
 
 /**
@@ -341,10 +424,127 @@ function collectAuthoringLeafPaths(
   return paths;
 }
 
+interface AuthoringLeafEntry {
+  readonly path: string;
+  readonly discriminator: string;
+}
+
+function collectAuthoringLeafDiscriminators(
+  namespace: Readonly<Record<string, unknown>>,
+  isLeaf: (value: unknown) => boolean,
+  label: string,
+  path: readonly string[] = [],
+): AuthoringLeafEntry[] {
+  const entries: AuthoringLeafEntry[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isLeaf(value)) {
+      const record = blindCast<
+        Record<string, unknown>,
+        'discriminator extraction from a leaf already validated by isLeaf'
+      >(value);
+      const discriminator = record['discriminator'];
+      if (typeof discriminator === 'string' && discriminator.length > 0) {
+        entries.push({ path: currentPath.join('.'), discriminator });
+      }
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const record = blindCast<
+        Readonly<Record<string, unknown>>,
+        'walker inspects a non-leaf value for descriptor-shaped keys before recursing'
+      >(value);
+      // A value carrying descriptor-shaped keys (`kind`/`keyword`/`discriminator`)
+      // but failing `isAuthoringPslBlockDescriptor` (e.g. missing `parameters`) is
+      // a malformed declarative descriptor. Descending into it as a sub-namespace
+      // would silently skip it, so a half-built contribution would pass validation.
+      // Reject it at load time instead, naming the path and what's wrong.
+      //
+      // A valid sub-namespace whose key happens to be named `kind`, `keyword`, or
+      // `discriminator` (but which does not look like a descriptor overall) must
+      // still descend normally — the check requires descriptor-shaped keys present
+      // AND the leaf guard rejecting it.
+      if (
+        (record['kind'] !== undefined ||
+          record['keyword'] !== undefined ||
+          record['discriminator'] !== undefined) &&
+        !isLeaf(value)
+      ) {
+        const hasKind = record['kind'] === 'pslBlock';
+        const hasKeyword = typeof record['keyword'] === 'string';
+        const hasDiscriminator = typeof record['discriminator'] === 'string';
+        if (hasKind || (hasKeyword && hasDiscriminator)) {
+          throw new Error(
+            `Malformed authoring ${label} contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the ${label} descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+          );
+        }
+      }
+      entries.push(...collectAuthoringLeafDiscriminators(record, isLeaf, label, currentPath));
+    }
+  }
+  return entries;
+}
+
+/**
+ * Throws when two or more entries in the same namespace share a discriminator.
+ * Duplicate discriminators within a namespace make dispatch ambiguous — the
+ * lowering factory lookup dispatches by discriminator, so one would silently
+ * shadow the other. Catch duplicates before building any dispatch map.
+ */
+function assertUniqueDiscriminators(entries: readonly AuthoringLeafEntry[], label: string): void {
+  const seen = new Map<string, string>();
+  for (const { path, discriminator } of entries) {
+    const existing = seen.get(discriminator);
+    if (existing !== undefined) {
+      throw new Error(
+        `Duplicate ${label} discriminator "${discriminator}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique discriminator.`,
+      );
+    }
+    seen.set(discriminator, path);
+  }
+}
+
+/**
+ * Every `pslBlockDescriptors` entry needs a matching `entityTypes` factory
+ * (same discriminator): the parser would otherwise produce an AST node
+ * nothing can lower to an IR class instance. The link is one-directional
+ * — an `entityTypes` factory may stand alone (e.g. `enum`, reachable from
+ * the TypeScript builder without any PSL block).
+ */
+function assertPslBlocksHaveFactories(
+  entityTypeNamespace: AuthoringEntityTypeNamespace,
+  pslBlockNamespace: AuthoringPslBlockDescriptorNamespace,
+): void {
+  const blockEntries = collectAuthoringLeafDiscriminators(
+    pslBlockNamespace,
+    isAuthoringPslBlockDescriptor,
+    'pslBlock',
+  );
+  const entityEntries = collectAuthoringLeafDiscriminators(
+    entityTypeNamespace,
+    isAuthoringEntityTypeDescriptor,
+    'entityType',
+  );
+
+  assertUniqueDiscriminators(blockEntries, 'pslBlock');
+  assertUniqueDiscriminators(entityEntries, 'entityType');
+
+  const entityDiscriminators = new Set(entityEntries.map((entry) => entry.discriminator));
+
+  for (const block of blockEntries) {
+    if (!entityDiscriminators.has(block.discriminator)) {
+      throw new Error(
+        `Incomplete extension contribution: pslBlock helper "${block.path}" registers discriminator "${block.discriminator}" but no entityType contribution shares that discriminator. An extension-contributed PSL block requires a matching entityType factory so the parsed AST node can lower to an IR class instance; add an entityType helper with discriminator "${block.discriminator}".`,
+      );
+    }
+  }
+}
+
 export function assertNoCrossRegistryCollisions(
   typeNamespace: AuthoringTypeNamespace,
   fieldNamespace: AuthoringFieldNamespace,
   entityTypeNamespace: AuthoringEntityTypeNamespace = {},
+  pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = {},
 ): void {
   const typePaths = new Set(
     collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
@@ -360,20 +560,33 @@ export function assertNoCrossRegistryCollisions(
   // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
   // on same-path registrations within any single registry before this check
   // runs. This function only handles the cross-registry case.
+  //
+  // Cross-registry collisions are checked among `type` / `field` /
+  // `entityTypes` only — these three are user-facing helper paths that PSL
+  // must resolve unambiguously. `pslBlockDescriptors` is an internal
+  // framework index consumed by parser and printer dispatch, not a
+  // user-facing helper path; the natural authoring pattern is the same
+  // path key in `entityTypes` and `pslBlockDescriptors` for a single
+  // contribution. The block→factory link is enforced by
+  // `assertPslBlocksHaveFactories` via the discriminator string, not by path.
+  const ambiguityHint =
+    'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.';
   for (const fieldPath of fieldPaths) {
     if (typePaths.has(fieldPath)) {
       throw new Error(
-        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.`,
+        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. ${ambiguityHint}`,
       );
     }
   }
   for (const entityPath of entityPaths) {
     if (typePaths.has(entityPath) || fieldPaths.has(entityPath)) {
       throw new Error(
-        `Ambiguous authoring registry path "${entityPath}". The same path is registered as an entity contribution AND as a type constructor or field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.`,
+        `Ambiguous authoring registry path "${entityPath}". The same path is registered as an entity contribution AND as a type constructor or field preset; PSL resolution would be ambiguous. ${ambiguityHint}`,
       );
     }
   }
+
+  assertPslBlocksHaveFactories(entityTypeNamespace, pslBlockNamespace);
 }
 
 export function resolveAuthoringTemplateValue(
