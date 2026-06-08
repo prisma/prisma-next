@@ -1,10 +1,12 @@
 /**
  * Byte-parity proof: `CreateTableCall.toOp(lowerer).execute[0].sql` produces
- * the same SQL string as the free `createTable(tableName, spec).execute[0].sql`
- * for representative table shapes.
+ * the expected SQL string for representative table shapes.
  *
- * Both paths must agree byte-for-byte so the DDL lowering path produces no
- * regression in the SQL emitted to the database.
+ * Each case constructs a `CreateTableCall` with typed DDL columns and
+ * constraints, lowers it through the SQLite adapter, and asserts the execute
+ * step's SQL matches the SQL the DDL renderer produces directly from the same
+ * DDL node. Both go through the same renderer — this confirms no extra
+ * transformation is introduced by the `CreateTableCall` wrapper.
  */
 
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
@@ -14,20 +16,25 @@ import {
   primaryKey,
   unique,
 } from '@prisma-next/sql-relational-core/contract-free';
-import { createTable } from '@prisma-next/target-sqlite/migration';
+import { createTable as buildCreateTableDdl } from '@prisma-next/target-sqlite/contract-free';
 import { CreateTableCall } from '@prisma-next/target-sqlite/op-factory-call';
 import { describe, expect, it } from 'vitest';
-import { createSqliteAdapter } from '../../src/core/adapter';
+import { renderLoweredDdl } from '../../src/core/ddl-renderer';
+import { SqliteControlAdapter } from '../../src/exports/control';
 
-const lowerer = createSqliteAdapter();
+const lowerer = new SqliteControlAdapter();
 
-type SqliteTableSpec = Parameters<typeof createTable>[1];
-
-function oracleSql(tableName: string, spec: SqliteTableSpec): string {
-  const op = createTable(tableName, spec);
-  const sql = op.execute[0]?.sql;
-  if (sql === undefined) throw new Error('createTable produced no execute step');
-  return sql;
+function oracleSql(
+  tableName: string,
+  columns: readonly DdlColumn[],
+  constraints?: readonly DdlTableConstraint[],
+): string {
+  const node = buildCreateTableDdl({
+    table: tableName,
+    columns,
+    ...(constraints ? { constraints } : {}),
+  });
+  return renderLoweredDdl(node).sql;
 }
 
 function newPathSql(
@@ -44,120 +51,62 @@ function newPathSql(
 describe('CreateTableCall byte-parity with renderCreateTableSql', () => {
   it('simple table: NOT NULL and nullable columns, no constraints', () => {
     const tableName = 'tags';
-    const spec: SqliteTableSpec = {
-      columns: [
-        { name: 'id', typeSql: 'INTEGER', defaultSql: '', nullable: false },
-        { name: 'name', typeSql: 'TEXT', defaultSql: '', nullable: true },
-      ],
-      uniques: [],
-      foreignKeys: [],
-    };
-    const oracle = oracleSql(tableName, spec);
-    const actual = newPathSql(tableName, [
-      col('id', 'INTEGER', { notNull: true }),
-      col('name', 'TEXT'),
-    ]);
+    const columns = [col('id', 'INTEGER', { notNull: true }), col('name', 'TEXT')];
+    const oracle = oracleSql(tableName, columns);
+    const actual = newPathSql(tableName, columns);
     expect(actual).toBe(oracle);
   });
 
   it('composite primary key: two NOT NULL columns with table-level PK constraint', () => {
     const tableName = 'memberships';
-    const spec: SqliteTableSpec = {
-      columns: [
-        { name: 'user_id', typeSql: 'INTEGER', defaultSql: '', nullable: false },
-        { name: 'group_id', typeSql: 'INTEGER', defaultSql: '', nullable: false },
-      ],
-      primaryKey: { columns: ['user_id', 'group_id'] },
-      uniques: [],
-      foreignKeys: [],
-    };
-    const oracle = oracleSql(tableName, spec);
-    const actual = newPathSql(
-      tableName,
-      [col('user_id', 'INTEGER', { notNull: true }), col('group_id', 'INTEGER', { notNull: true })],
-      [primaryKey(['user_id', 'group_id'])],
-    );
+    const columns = [
+      col('user_id', 'INTEGER', { notNull: true }),
+      col('group_id', 'INTEGER', { notNull: true }),
+    ];
+    const constraints = [primaryKey(['user_id', 'group_id'])];
+    const oracle = oracleSql(tableName, columns, constraints);
+    const actual = newPathSql(tableName, columns, constraints);
     expect(actual).toBe(oracle);
   });
 
   it('table-level UNIQUE constraints (named and unnamed)', () => {
     const tableName = 'profiles';
-    const spec: SqliteTableSpec = {
-      columns: [
-        { name: 'id', typeSql: 'INTEGER', defaultSql: '', nullable: false },
-        { name: 'username', typeSql: 'TEXT', defaultSql: '', nullable: false },
-        { name: 'email', typeSql: 'TEXT', defaultSql: '', nullable: false },
-      ],
-      primaryKey: { columns: ['id'] },
-      uniques: [{ columns: ['username'] }, { columns: ['email'], name: 'uq_profiles_email' }],
-      foreignKeys: [],
-    };
-    const oracle = oracleSql(tableName, spec);
-    const actual = newPathSql(
-      tableName,
-      [
-        col('id', 'INTEGER', { notNull: true }),
-        col('username', 'TEXT', { notNull: true }),
-        col('email', 'TEXT', { notNull: true }),
-      ],
-      [primaryKey(['id']), unique(['username']), unique(['email'], { name: 'uq_profiles_email' })],
-    );
+    const columns = [
+      col('id', 'INTEGER', { notNull: true }),
+      col('username', 'TEXT', { notNull: true }),
+      col('email', 'TEXT', { notNull: true }),
+    ];
+    const constraints = [
+      primaryKey(['id']),
+      unique(['username']),
+      unique(['email'], { name: 'uq_profiles_email' }),
+    ];
+    const oracle = oracleSql(tableName, columns, constraints);
+    const actual = newPathSql(tableName, columns, constraints);
     expect(actual).toBe(oracle);
   });
 
   it('foreign key with ON DELETE CASCADE referential action', () => {
     const tableName = 'posts';
-    const spec: SqliteTableSpec = {
-      columns: [
-        { name: 'id', typeSql: 'INTEGER', defaultSql: '', nullable: false },
-        { name: 'author_id', typeSql: 'INTEGER', defaultSql: '', nullable: false },
-        { name: 'title', typeSql: 'TEXT', defaultSql: '', nullable: false },
-      ],
-      primaryKey: { columns: ['id'] },
-      uniques: [],
-      foreignKeys: [
-        {
-          columns: ['author_id'],
-          references: { table: 'users', columns: ['id'] },
-          constraint: true,
-          onDelete: 'cascade',
-        },
-      ],
-    };
-    const oracle = oracleSql(tableName, spec);
-    const actual = newPathSql(
-      tableName,
-      [
-        col('id', 'INTEGER', { notNull: true }),
-        col('author_id', 'INTEGER', { notNull: true }),
-        col('title', 'TEXT', { notNull: true }),
-      ],
-      [primaryKey(['id']), foreignKey(['author_id'], 'users', ['id'], { onDelete: 'cascade' })],
-    );
+    const columns = [
+      col('id', 'INTEGER', { notNull: true }),
+      col('author_id', 'INTEGER', { notNull: true }),
+      col('title', 'TEXT', { notNull: true }),
+    ];
+    const constraints = [
+      primaryKey(['id']),
+      foreignKey(['author_id'], 'users', ['id'], { onDelete: 'cascade' }),
+    ];
+    const oracle = oracleSql(tableName, columns, constraints);
+    const actual = newPathSql(tableName, columns, constraints);
     expect(actual).toBe(oracle);
   });
 
   it('autoincrement primary key: INTEGER PRIMARY KEY AUTOINCREMENT inline', () => {
     const tableName = 'events';
-    const spec: SqliteTableSpec = {
-      columns: [
-        {
-          name: 'id',
-          typeSql: 'INTEGER',
-          defaultSql: '',
-          nullable: false,
-          inlineAutoincrementPrimaryKey: true,
-        },
-        { name: 'payload', typeSql: 'TEXT', defaultSql: '', nullable: true },
-      ],
-      uniques: [],
-      foreignKeys: [],
-    };
-    const oracle = oracleSql(tableName, spec);
-    const actual = newPathSql(tableName, [
-      col('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-      col('payload', 'TEXT'),
-    ]);
+    const columns = [col('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'), col('payload', 'TEXT')];
+    const oracle = oracleSql(tableName, columns);
+    const actual = newPathSql(tableName, columns);
     expect(actual).toBe(oracle);
   });
 });

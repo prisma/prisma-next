@@ -25,8 +25,28 @@ describe('@prisma-next/sqlite/migration re-export parity', () => {
     expect(facadeMigration.dataTransform).toBeDefined();
   });
 
-  it('re-exports createTable', () => {
-    expect(facadeMigration.createTable).toBeDefined();
+  it('re-exports col', () => {
+    expect(facadeMigration.col).toBeDefined();
+  });
+
+  it('re-exports lit', () => {
+    expect(facadeMigration.lit).toBeDefined();
+  });
+
+  it('re-exports fn', () => {
+    expect(facadeMigration.fn).toBeDefined();
+  });
+
+  it('re-exports primaryKey', () => {
+    expect(facadeMigration.primaryKey).toBeDefined();
+  });
+
+  it('re-exports foreignKey', () => {
+    expect(facadeMigration.foreignKey).toBeDefined();
+  });
+
+  it('re-exports unique', () => {
+    expect(facadeMigration.unique).toBeDefined();
   });
 
   it('re-exports addColumn', () => {

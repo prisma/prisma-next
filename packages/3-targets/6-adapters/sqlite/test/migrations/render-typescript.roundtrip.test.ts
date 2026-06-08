@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
   CreateIndexCall,
@@ -28,8 +29,10 @@ import { renderOps } from '@prisma-next/target-sqlite/render-ops';
 import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { SqliteControlAdapter } from '../../src/exports/control';
 
 const execFileAsync = promisify(execFile);
+const testAdapter = new SqliteControlAdapter();
 const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const targetSqliteRoot = resolve(repoRoot, 'packages/3-targets/3-targets/sqlite');
@@ -112,16 +115,12 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
   it('renders TS that re-parses to operations matching renderOps(calls) exactly', {
     timeout: timeouts.coldTransformImport,
   }, async () => {
-    // CreateTableCall.toOp now requires a Lowerer (it lowers a typed DDL
-    // node through the adapter), and CreateTableCall.renderTypeScript emits
-    // `this.createTable({...})` — a method on SqliteMigration that hasn't
-    // landed yet. The round-trip evaluation here re-parses the rendered TS
-    // and calls toOp on each construction, so CreateTableCall would need
-    // both a stub lowerer AND a stub SqliteMigration in scope to round-trip.
-    // Restore CreateTableCall coverage once SqliteMigration.createTable is
-    // available; the other call types in this list still round-trip
-    // straightforwardly because their toOp doesn't depend on either.
     const calls = [
+      new CreateTableCall(
+        'user',
+        [col('id', 'INTEGER', { primaryKey: true }), col('email', 'TEXT', { notNull: true })],
+        [primaryKey(['id'])],
+      ),
       new AddColumnCall('user', {
         name: 'nickname',
         typeSql: 'TEXT',
@@ -145,7 +144,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
     const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
     const ops = JSON.parse(opsJson);
 
-    const expected = JSON.parse(JSON.stringify(renderOps(calls)));
+    const expected = JSON.parse(JSON.stringify(renderOps(calls, testAdapter)));
     expect(ops).toEqual(expected);
   });
 

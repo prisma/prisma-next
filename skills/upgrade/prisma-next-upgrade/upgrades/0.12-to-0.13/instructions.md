@@ -2,6 +2,15 @@
 from: "0.12"
 to: "0.13"
 changes:
+  - id: sqlite-create-table-method
+    summary: |
+      SQLite migrations: `createTable` is no longer a free function exported from `@prisma-next/sqlite/migration`. It is now a protected method on the `Migration` base class. Replace every free `createTable(...)` call in your SQLite migration files with `this.createTable({ table: ..., columns: [...], constraints: [...] })`. The `col()`, `lit()`, `fn()`, `primaryKey()`, `foreignKey()`, and `unique()` builder helpers are now exported from `@prisma-next/sqlite/migration` directly, so your import line stays a single entry point.
+    detection:
+      glob: "**/migration.ts"
+      contains:
+        - "createTable"
+        - "@prisma-next/sqlite/migration"
+      anyMatch: false
   - id: re-emit-mti-variant-link-columns
     summary: |
       MTI variant models — PSL `@@base(Parent, "tag")` models that carry their own `@@map` and are therefore stored in their own table — now materialise base-PK link columns in storage. On re-emit, each such variant table gains a copy of the base table's full primary-key column set (same names and types), a primary key over those columns, and a cascading foreign key referencing the base table's primary key; the contract's `storageHash` changes accordingly. Re-emit your contract artefacts (`pnpm emit`), then advance your database with the corresponding migration (`prisma-next migration plan` → `prisma-next migrate`) so the variant tables gain the link column, PK, and cascading FK. Contracts whose variants share the base table (single-table inheritance, no own `@@map`) are unaffected.
@@ -47,6 +56,65 @@ user-side action required.
 -->
 
 # 0.12 → 0.13 — User upgrade instructions
+
+## `sqlite-create-table-method`
+
+Starting at this release, `createTable` is no longer a free function exported from `@prisma-next/sqlite/migration`. It is now a protected method on the `Migration` base class — call it as `this.createTable({...})` inside `get operations()`.
+
+The column builder helpers `col()`, `lit()`, `fn()`, `primaryKey()`, `foreignKey()`, and `unique()` are now exported from `@prisma-next/sqlite/migration` directly, so you do not need an additional import.
+
+### Before 0.13
+
+```ts
+import { Migration, MigrationCLI, createTable, col, primaryKey } from '@prisma-next/sqlite/migration';
+
+export default class M extends Migration {
+  override describe() { return { from: null, to: '...' }; }
+
+  override get operations() {
+    return [
+      createTable('user', [
+        col('id', 'INTEGER', { primaryKey: true }),
+        col('email', 'TEXT', { notNull: true }),
+      ]),
+    ];
+  }
+}
+
+MigrationCLI.run(import.meta.url, M);
+```
+
+### Starting at 0.13
+
+```ts
+import { Migration, MigrationCLI, col, primaryKey } from '@prisma-next/sqlite/migration';
+
+export default class M extends Migration {
+  override describe() { return { from: null, to: '...' }; }
+
+  override get operations() {
+    return [
+      this.createTable({
+        table: 'user',
+        columns: [
+          col('id', 'INTEGER', { primaryKey: true }),
+          col('email', 'TEXT', { notNull: true }),
+        ],
+      }),
+    ];
+  }
+}
+
+MigrationCLI.run(import.meta.url, M);
+```
+
+### Migration steps
+
+1. Remove `createTable` from the import list for `@prisma-next/sqlite/migration`.
+2. In `get operations()`, replace each `createTable(tableName, columns, constraints?)` call with `this.createTable({ table: tableName, columns, constraints? })`.
+3. Run `pnpm typecheck && pnpm test` to confirm the migration compiled and all tests pass.
+
+TypeScript flags the removed `createTable` import as an error after the bump, so every affected call site is pinpointed at compile time. No contract re-emit is required — this is an authoring-surface change only.
 
 ## `re-emit-mti-variant-link-columns`
 
