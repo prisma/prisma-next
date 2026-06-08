@@ -12,7 +12,7 @@ export default class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:76c1bd5f5733774ae1182e83ca882f623cdf12e78a76c2fb06666d60bbdd6452',
+      to: 'sha256:b1fd962de2b19a2a4fdf0dd04fb123a4d7681e318cbef09fdad6f016b5144bd9',
     };
   }
 
@@ -140,13 +140,13 @@ export default class M extends Migration {
       addForeignKey('public', 'post', {
         name: 'post_userId_fkey',
         columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        references: { schema: 'public', table: 'user', columns: ['id'] },
       }),
       createIndex('public', 'post', 'post_userId_idx', ['userId']),
       addForeignKey('public', 'task', {
         name: 'task_userId_fkey',
         columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        references: { schema: 'public', table: 'user', columns: ['id'] },
       }),
       createIndex('public', 'task', 'task_userId_idx', ['userId']),
     ];

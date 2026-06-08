@@ -384,7 +384,6 @@ type ContractBase = Omit<
             readonly stepsToRepro: { readonly column: 'stepsToRepro' };
           };
         };
-        readonly base: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
       };
       readonly Feature: {
         readonly fields: {
@@ -406,7 +405,6 @@ type ContractBase = Omit<
             readonly targetRelease: { readonly column: 'targetRelease' };
           };
         };
-        readonly base: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
       };
       readonly Post: {
         readonly fields: {
@@ -515,11 +513,6 @@ type ContractBase = Omit<
             readonly createdAt: { readonly column: 'createdAt' };
           };
         };
-        readonly discriminator: { readonly field: 'type' };
-        readonly variants: {
-          readonly Bug: { readonly value: 'bug' };
-          readonly Feature: { readonly value: 'feature' };
-        };
       };
       readonly User: {
         readonly fields: {
@@ -593,6 +586,8 @@ type ContractBase = Omit<
     readonly user: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
     readonly post: { readonly namespace: 'public' & NamespaceId; readonly model: 'Post' };
     readonly task: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
+    readonly bug: { readonly namespace: 'public' & NamespaceId; readonly model: 'Bug' };
+    readonly feature: { readonly namespace: 'public' & NamespaceId; readonly model: 'Feature' };
   };
   readonly domain: {
     readonly namespaces: {
@@ -618,7 +613,6 @@ type ContractBase = Omit<
                 readonly stepsToRepro: { readonly column: 'stepsToRepro' };
               };
             };
-            readonly base: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
           };
           readonly Feature: {
             readonly fields: {
@@ -640,7 +634,6 @@ type ContractBase = Omit<
                 readonly targetRelease: { readonly column: 'targetRelease' };
               };
             };
-            readonly base: { readonly namespace: 'public' & NamespaceId; readonly model: 'Task' };
           };
           readonly Post: {
             readonly fields: {
@@ -748,11 +741,6 @@ type ContractBase = Omit<
                 readonly userId: { readonly column: 'userId' };
                 readonly createdAt: { readonly column: 'createdAt' };
               };
-            };
-            readonly discriminator: { readonly field: 'type' };
-            readonly variants: {
-              readonly Bug: { readonly value: 'bug' };
-              readonly Feature: { readonly value: 'feature' };
             };
           };
           readonly User: {

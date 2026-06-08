@@ -1,268 +1,75 @@
 #!/usr/bin/env -S node
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createCollection, createIndex } from '@prisma-next/target-mongo/migration';
+import endContractJson from './end-contract.json' with { type: 'json' };
+
+const endContract = new MongoContractSerializer().deserializeContract(endContractJson);
+
+function requireValidator(collectionName: string) {
+  const validator =
+    endContract.storage.namespaces['__unbound__']?.entries.collection[collectionName]?.validator;
+  if (validator === undefined) {
+    throw new Error(
+      `end-contract.json is missing a validator for the ${collectionName} collection`,
+    );
+  }
+  return validator;
+}
+
+const CARTS_VALIDATOR = requireValidator('carts');
+const EVENTS_VALIDATOR = requireValidator('events');
+const INVOICES_VALIDATOR = requireValidator('invoices');
+const LOCATIONS_VALIDATOR = requireValidator('locations');
+const ORDERS_VALIDATOR = requireValidator('orders');
+const PRODUCTS_VALIDATOR = requireValidator('products');
+const USERS_VALIDATOR = requireValidator('users');
 
 class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:f76977c7745bd6fbf38728c544b372927969f19955489d7ff5c9c1eddcdc0b36',
+      to: 'sha256:8ee1e7ce30ed334572583d826d9c41388c46f7db82ae2352c3a3fccf1de7cbab',
     };
   }
 
   override get operations() {
     return [
       createCollection('carts', {
-        validator: {
-          $jsonSchema: {
-            bsonType: 'object',
-            properties: {
-              _id: { bsonType: 'objectId' },
-              items: {
-                bsonType: 'array',
-                items: {
-                  bsonType: 'object',
-                  properties: {
-                    amount: { bsonType: 'int' },
-                    brand: { bsonType: 'string' },
-                    image: {
-                      bsonType: 'object',
-                      properties: { url: { bsonType: 'string' } },
-                      required: ['url'],
-                    },
-                    name: { bsonType: 'string' },
-                    price: {
-                      bsonType: 'object',
-                      properties: {
-                        amount: { bsonType: 'double' },
-                        currency: { bsonType: 'string' },
-                      },
-                      required: ['amount', 'currency'],
-                    },
-                    productId: { bsonType: 'string' },
-                  },
-                  required: ['amount', 'brand', 'image', 'name', 'price', 'productId'],
-                },
-              },
-              userId: { bsonType: 'objectId' },
-            },
-            required: ['_id', 'items', 'userId'],
-          },
-        },
-        validationLevel: 'strict',
-        validationAction: 'error',
+        validator: { $jsonSchema: CARTS_VALIDATOR.jsonSchema },
+        validationLevel: CARTS_VALIDATOR.validationLevel,
+        validationAction: CARTS_VALIDATOR.validationAction,
       }),
       createCollection('events', {
-        validator: {
-          $jsonSchema: {
-            bsonType: 'object',
-            oneOf: [
-              {
-                properties: {
-                  brand: { bsonType: 'string' },
-                  exitMethod: { bsonType: ['null', 'string'] },
-                  productId: { bsonType: 'string' },
-                  subCategory: { bsonType: 'string' },
-                  type: { enum: ['view-product'] },
-                },
-                required: ['brand', 'productId', 'subCategory', 'type'],
-              },
-              {
-                properties: { query: { bsonType: 'string' }, type: { enum: ['search'] } },
-                required: ['query', 'type'],
-              },
-              {
-                properties: {
-                  brand: { bsonType: 'string' },
-                  productId: { bsonType: 'string' },
-                  type: { enum: ['add-to-cart'] },
-                },
-                required: ['brand', 'productId', 'type'],
-              },
-            ],
-            properties: {
-              _id: { bsonType: 'objectId' },
-              sessionId: { bsonType: 'string' },
-              timestamp: { bsonType: 'date' },
-              type: { bsonType: 'string' },
-              userId: { bsonType: 'string' },
-            },
-            required: ['_id', 'sessionId', 'timestamp', 'type', 'userId'],
-          },
-        },
-        validationLevel: 'strict',
-        validationAction: 'error',
+        validator: { $jsonSchema: EVENTS_VALIDATOR.jsonSchema },
+        validationLevel: EVENTS_VALIDATOR.validationLevel,
+        validationAction: EVENTS_VALIDATOR.validationAction,
       }),
       createCollection('invoices', {
-        validator: {
-          $jsonSchema: {
-            bsonType: 'object',
-            properties: {
-              _id: { bsonType: 'objectId' },
-              issuedAt: { bsonType: 'date' },
-              items: {
-                bsonType: 'array',
-                items: {
-                  bsonType: 'object',
-                  properties: {
-                    amount: { bsonType: 'int' },
-                    lineTotal: { bsonType: 'double' },
-                    name: { bsonType: 'string' },
-                    unitPrice: { bsonType: 'double' },
-                  },
-                  required: ['amount', 'lineTotal', 'name', 'unitPrice'],
-                },
-              },
-              orderId: { bsonType: 'objectId' },
-              subtotal: { bsonType: 'double' },
-              tax: { bsonType: 'double' },
-              total: { bsonType: 'double' },
-            },
-            required: ['_id', 'issuedAt', 'items', 'orderId', 'subtotal', 'tax', 'total'],
-          },
-        },
-        validationLevel: 'strict',
-        validationAction: 'error',
+        validator: { $jsonSchema: INVOICES_VALIDATOR.jsonSchema },
+        validationLevel: INVOICES_VALIDATOR.validationLevel,
+        validationAction: INVOICES_VALIDATOR.validationAction,
       }),
       createCollection('locations', {
-        validator: {
-          $jsonSchema: {
-            bsonType: 'object',
-            properties: {
-              _id: { bsonType: 'objectId' },
-              city: { bsonType: 'string' },
-              country: { bsonType: 'string' },
-              name: { bsonType: 'string' },
-              postalCode: { bsonType: 'string' },
-              streetAndNumber: { bsonType: 'string' },
-            },
-            required: ['_id', 'city', 'country', 'name', 'postalCode', 'streetAndNumber'],
-          },
-        },
-        validationLevel: 'strict',
-        validationAction: 'error',
+        validator: { $jsonSchema: LOCATIONS_VALIDATOR.jsonSchema },
+        validationLevel: LOCATIONS_VALIDATOR.validationLevel,
+        validationAction: LOCATIONS_VALIDATOR.validationAction,
       }),
       createCollection('orders', {
-        validator: {
-          $jsonSchema: {
-            bsonType: 'object',
-            properties: {
-              _id: { bsonType: 'objectId' },
-              items: {
-                bsonType: 'array',
-                items: {
-                  bsonType: 'object',
-                  properties: {
-                    amount: { bsonType: 'int' },
-                    brand: { bsonType: 'string' },
-                    image: {
-                      bsonType: 'object',
-                      properties: { url: { bsonType: 'string' } },
-                      required: ['url'],
-                    },
-                    name: { bsonType: 'string' },
-                    price: {
-                      bsonType: 'object',
-                      properties: {
-                        amount: { bsonType: 'double' },
-                        currency: { bsonType: 'string' },
-                      },
-                      required: ['amount', 'currency'],
-                    },
-                    productId: { bsonType: 'string' },
-                  },
-                  required: ['amount', 'brand', 'image', 'name', 'price', 'productId'],
-                },
-              },
-              shippingAddress: { bsonType: 'string' },
-              statusHistory: {
-                bsonType: 'array',
-                items: {
-                  bsonType: 'object',
-                  properties: { status: { bsonType: 'string' }, timestamp: { bsonType: 'date' } },
-                  required: ['status', 'timestamp'],
-                },
-              },
-              type: { bsonType: 'string' },
-              userId: { bsonType: 'objectId' },
-            },
-            required: ['_id', 'items', 'shippingAddress', 'statusHistory', 'type', 'userId'],
-          },
-        },
-        validationLevel: 'strict',
-        validationAction: 'error',
+        validator: { $jsonSchema: ORDERS_VALIDATOR.jsonSchema },
+        validationLevel: ORDERS_VALIDATOR.validationLevel,
+        validationAction: ORDERS_VALIDATOR.validationAction,
       }),
       createCollection('products', {
-        validator: {
-          $jsonSchema: {
-            bsonType: 'object',
-            properties: {
-              _id: { bsonType: 'objectId' },
-              articleType: { bsonType: 'string' },
-              brand: { bsonType: 'string' },
-              code: { bsonType: 'string' },
-              description: { bsonType: 'string' },
-              image: {
-                bsonType: 'object',
-                properties: { url: { bsonType: 'string' } },
-                required: ['url'],
-              },
-              primaryCategory: { bsonType: 'string' },
-              name: { bsonType: 'string' },
-              price: {
-                bsonType: 'object',
-                properties: { amount: { bsonType: 'double' }, currency: { bsonType: 'string' } },
-                required: ['amount', 'currency'],
-              },
-              subCategory: { bsonType: 'string' },
-            },
-            required: [
-              '_id',
-              'articleType',
-              'brand',
-              'code',
-              'description',
-              'image',
-              'primaryCategory',
-              'name',
-              'price',
-              'subCategory',
-            ],
-          },
-        },
-        validationLevel: 'strict',
-        validationAction: 'error',
+        validator: { $jsonSchema: PRODUCTS_VALIDATOR.jsonSchema },
+        validationLevel: PRODUCTS_VALIDATOR.validationLevel,
+        validationAction: PRODUCTS_VALIDATOR.validationAction,
       }),
       createCollection('users', {
-        validator: {
-          $jsonSchema: {
-            bsonType: 'object',
-            properties: {
-              _id: { bsonType: 'objectId' },
-              address: {
-                oneOf: [
-                  { bsonType: 'null' },
-                  {
-                    bsonType: 'object',
-                    properties: {
-                      city: { bsonType: 'string' },
-                      country: { bsonType: 'string' },
-                      postalCode: { bsonType: 'string' },
-                      streetAndNumber: { bsonType: 'string' },
-                    },
-                    required: ['city', 'country', 'postalCode', 'streetAndNumber'],
-                  },
-                ],
-              },
-              email: { bsonType: 'string' },
-              name: { bsonType: 'string' },
-            },
-            required: ['_id', 'email', 'name'],
-          },
-        },
-        validationLevel: 'strict',
-        validationAction: 'error',
+        validator: { $jsonSchema: USERS_VALIDATOR.jsonSchema },
+        validationLevel: USERS_VALIDATOR.validationLevel,
+        validationAction: USERS_VALIDATOR.validationAction,
       }),
       createIndex('carts', [{ direction: 1, field: 'userId' }], { unique: true }),
       createIndex(

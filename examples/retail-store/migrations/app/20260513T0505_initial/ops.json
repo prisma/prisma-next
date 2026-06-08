@@ -26,6 +26,7 @@
           "collection": "carts",
           "validator": {
             "$jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -34,6 +35,7 @@
                 "items": {
                   "bsonType": "array",
                   "items": {
+                    "additionalProperties": false,
                     "bsonType": "object",
                     "properties": {
                       "amount": {
@@ -43,20 +45,20 @@
                         "bsonType": "string"
                       },
                       "image": {
+                        "additionalProperties": false,
                         "bsonType": "object",
                         "properties": {
                           "url": {
                             "bsonType": "string"
                           }
                         },
-                        "required": [
-                          "url"
-                        ]
+                        "required": ["url"]
                       },
                       "name": {
                         "bsonType": "string"
                       },
                       "price": {
+                        "additionalProperties": false,
                         "bsonType": "object",
                         "properties": {
                           "amount": {
@@ -66,34 +68,20 @@
                             "bsonType": "string"
                           }
                         },
-                        "required": [
-                          "amount",
-                          "currency"
-                        ]
+                        "required": ["amount", "currency"]
                       },
                       "productId": {
                         "bsonType": "string"
                       }
                     },
-                    "required": [
-                      "amount",
-                      "brand",
-                      "image",
-                      "name",
-                      "price",
-                      "productId"
-                    ]
+                    "required": ["amount", "brand", "image", "name", "price", "productId"]
                   }
                 },
                 "userId": {
                   "bsonType": "objectId"
                 }
               },
-              "required": [
-                "_id",
-                "items",
-                "userId"
-              ]
+              "required": ["_id", "items", "userId"]
             }
           },
           "validationLevel": "strict",
@@ -133,70 +121,88 @@
               "bsonType": "object",
               "oneOf": [
                 {
+                  "additionalProperties": false,
                   "properties": {
+                    "_id": {
+                      "bsonType": "objectId"
+                    },
                     "brand": {
                       "bsonType": "string"
                     },
                     "exitMethod": {
-                      "bsonType": [
-                        "null",
-                        "string"
-                      ]
+                      "bsonType": ["null", "string"]
                     },
                     "productId": {
+                      "bsonType": "string"
+                    },
+                    "sessionId": {
                       "bsonType": "string"
                     },
                     "subCategory": {
                       "bsonType": "string"
                     },
+                    "timestamp": {
+                      "bsonType": "date"
+                    },
                     "type": {
-                      "enum": [
-                        "view-product"
-                      ]
+                      "enum": ["view-product"]
+                    },
+                    "userId": {
+                      "bsonType": "string"
                     }
                   },
-                  "required": [
-                    "brand",
-                    "productId",
-                    "subCategory",
-                    "type"
-                  ]
+                  "required": ["brand", "productId", "subCategory", "type"]
                 },
                 {
+                  "additionalProperties": false,
                   "properties": {
+                    "_id": {
+                      "bsonType": "objectId"
+                    },
                     "query": {
                       "bsonType": "string"
                     },
+                    "sessionId": {
+                      "bsonType": "string"
+                    },
+                    "timestamp": {
+                      "bsonType": "date"
+                    },
                     "type": {
-                      "enum": [
-                        "search"
-                      ]
+                      "enum": ["search"]
+                    },
+                    "userId": {
+                      "bsonType": "string"
                     }
                   },
-                  "required": [
-                    "query",
-                    "type"
-                  ]
+                  "required": ["query", "type"]
                 },
                 {
+                  "additionalProperties": false,
                   "properties": {
+                    "_id": {
+                      "bsonType": "objectId"
+                    },
                     "brand": {
                       "bsonType": "string"
                     },
                     "productId": {
                       "bsonType": "string"
                     },
+                    "sessionId": {
+                      "bsonType": "string"
+                    },
+                    "timestamp": {
+                      "bsonType": "date"
+                    },
                     "type": {
-                      "enum": [
-                        "add-to-cart"
-                      ]
+                      "enum": ["add-to-cart"]
+                    },
+                    "userId": {
+                      "bsonType": "string"
                     }
                   },
-                  "required": [
-                    "brand",
-                    "productId",
-                    "type"
-                  ]
+                  "required": ["brand", "productId", "type"]
                 }
               ],
               "properties": {
@@ -216,13 +222,7 @@
                   "bsonType": "string"
                 }
               },
-              "required": [
-                "_id",
-                "sessionId",
-                "timestamp",
-                "type",
-                "userId"
-              ]
+              "required": ["_id", "sessionId", "timestamp", "type", "userId"]
             }
           },
           "validationLevel": "strict",
@@ -259,6 +259,7 @@
           "collection": "invoices",
           "validator": {
             "$jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -270,6 +271,7 @@
                 "items": {
                   "bsonType": "array",
                   "items": {
+                    "additionalProperties": false,
                     "bsonType": "object",
                     "properties": {
                       "amount": {
@@ -285,12 +287,7 @@
                         "bsonType": "double"
                       }
                     },
-                    "required": [
-                      "amount",
-                      "lineTotal",
-                      "name",
-                      "unitPrice"
-                    ]
+                    "required": ["amount", "lineTotal", "name", "unitPrice"]
                   }
                 },
                 "orderId": {
@@ -306,15 +303,7 @@
                   "bsonType": "double"
                 }
               },
-              "required": [
-                "_id",
-                "issuedAt",
-                "items",
-                "orderId",
-                "subtotal",
-                "tax",
-                "total"
-              ]
+              "required": ["_id", "issuedAt", "items", "orderId", "subtotal", "tax", "total"]
             }
           },
           "validationLevel": "strict",
@@ -351,6 +340,7 @@
           "collection": "locations",
           "validator": {
             "$jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -372,14 +362,7 @@
                   "bsonType": "string"
                 }
               },
-              "required": [
-                "_id",
-                "city",
-                "country",
-                "name",
-                "postalCode",
-                "streetAndNumber"
-              ]
+              "required": ["_id", "city", "country", "name", "postalCode", "streetAndNumber"]
             }
           },
           "validationLevel": "strict",
@@ -416,6 +399,7 @@
           "collection": "orders",
           "validator": {
             "$jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -424,6 +408,7 @@
                 "items": {
                   "bsonType": "array",
                   "items": {
+                    "additionalProperties": false,
                     "bsonType": "object",
                     "properties": {
                       "amount": {
@@ -433,20 +418,20 @@
                         "bsonType": "string"
                       },
                       "image": {
+                        "additionalProperties": false,
                         "bsonType": "object",
                         "properties": {
                           "url": {
                             "bsonType": "string"
                           }
                         },
-                        "required": [
-                          "url"
-                        ]
+                        "required": ["url"]
                       },
                       "name": {
                         "bsonType": "string"
                       },
                       "price": {
+                        "additionalProperties": false,
                         "bsonType": "object",
                         "properties": {
                           "amount": {
@@ -456,23 +441,13 @@
                             "bsonType": "string"
                           }
                         },
-                        "required": [
-                          "amount",
-                          "currency"
-                        ]
+                        "required": ["amount", "currency"]
                       },
                       "productId": {
                         "bsonType": "string"
                       }
                     },
-                    "required": [
-                      "amount",
-                      "brand",
-                      "image",
-                      "name",
-                      "price",
-                      "productId"
-                    ]
+                    "required": ["amount", "brand", "image", "name", "price", "productId"]
                   }
                 },
                 "shippingAddress": {
@@ -481,6 +456,7 @@
                 "statusHistory": {
                   "bsonType": "array",
                   "items": {
+                    "additionalProperties": false,
                     "bsonType": "object",
                     "properties": {
                       "status": {
@@ -490,10 +466,7 @@
                         "bsonType": "date"
                       }
                     },
-                    "required": [
-                      "status",
-                      "timestamp"
-                    ]
+                    "required": ["status", "timestamp"]
                   }
                 },
                 "type": {
@@ -503,14 +476,7 @@
                   "bsonType": "objectId"
                 }
               },
-              "required": [
-                "_id",
-                "items",
-                "shippingAddress",
-                "statusHistory",
-                "type",
-                "userId"
-              ]
+              "required": ["_id", "items", "shippingAddress", "statusHistory", "type", "userId"]
             }
           },
           "validationLevel": "strict",
@@ -547,6 +513,7 @@
           "collection": "products",
           "validator": {
             "$jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -565,23 +532,20 @@
                   "bsonType": "string"
                 },
                 "image": {
+                  "additionalProperties": false,
                   "bsonType": "object",
                   "properties": {
                     "url": {
                       "bsonType": "string"
                     }
                   },
-                  "required": [
-                    "url"
-                  ]
-                },
-                "primaryCategory": {
-                  "bsonType": "string"
+                  "required": ["url"]
                 },
                 "name": {
                   "bsonType": "string"
                 },
                 "price": {
+                  "additionalProperties": false,
                   "bsonType": "object",
                   "properties": {
                     "amount": {
@@ -591,10 +555,10 @@
                       "bsonType": "string"
                     }
                   },
-                  "required": [
-                    "amount",
-                    "currency"
-                  ]
+                  "required": ["amount", "currency"]
+                },
+                "primaryCategory": {
+                  "bsonType": "string"
                 },
                 "subCategory": {
                   "bsonType": "string"
@@ -607,9 +571,9 @@
                 "code",
                 "description",
                 "image",
-                "primaryCategory",
                 "name",
                 "price",
+                "primaryCategory",
                 "subCategory"
               ]
             }
@@ -648,6 +612,7 @@
           "collection": "users",
           "validator": {
             "$jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -659,6 +624,7 @@
                       "bsonType": "null"
                     },
                     {
+                      "additionalProperties": false,
                       "bsonType": "object",
                       "properties": {
                         "city": {
@@ -674,12 +640,7 @@
                           "bsonType": "string"
                         }
                       },
-                      "required": [
-                        "city",
-                        "country",
-                        "postalCode",
-                        "streetAndNumber"
-                      ]
+                      "required": ["city", "country", "postalCode", "streetAndNumber"]
                     }
                   ]
                 },
@@ -690,11 +651,7 @@
                   "bsonType": "string"
                 }
               },
-              "required": [
-                "_id",
-                "email",
-                "name"
-              ]
+              "required": ["_id", "email", "name"]
             }
           },
           "validationLevel": "strict",

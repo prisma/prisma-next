@@ -4,6 +4,14 @@
   "target": "postgres",
   "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
+    "bug": {
+      "model": "Bug",
+      "namespace": "public"
+    },
+    "feature": {
+      "model": "Feature",
+      "namespace": "public"
+    },
     "post": {
       "model": "Post",
       "namespace": "public"
@@ -22,10 +30,6 @@
       "public": {
         "models": {
           "Bug": {
-            "base": {
-              "model": "Task",
-              "namespace": "public"
-            },
             "fields": {
               "severity": {
                 "nullable": false,
@@ -57,10 +61,6 @@
             }
           },
           "Feature": {
-            "base": {
-              "model": "Task",
-              "namespace": "public"
-            },
             "fields": {
               "priority": {
                 "nullable": false,
@@ -136,12 +136,8 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "userId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["userId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "User",
@@ -172,9 +168,6 @@
             }
           },
           "Task": {
-            "discriminator": {
-              "field": "type"
-            },
             "fields": {
               "createdAt": {
                 "nullable": false,
@@ -233,12 +226,8 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": [
-                    "userId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
+                  "localFields": ["userId"],
+                  "targetFields": ["id"]
                 },
                 "to": {
                   "model": "User",
@@ -272,14 +261,6 @@
               },
               "namespaceId": "public",
               "table": "task"
-            },
-            "variants": {
-              "Bug": {
-                "value": "bug"
-              },
-              "Feature": {
-                "value": "feature"
-              }
             }
           },
           "User": {
@@ -334,12 +315,8 @@
               "posts": {
                 "cardinality": "1:N",
                 "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "userId"
-                  ]
+                  "localFields": ["id"],
+                  "targetFields": ["userId"]
                 },
                 "to": {
                   "model": "Post",
@@ -349,12 +326,8 @@
               "tasks": {
                 "cardinality": "1:N",
                 "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "userId"
-                  ]
+                  "localFields": ["id"],
+                  "targetFields": ["userId"]
                 },
                 "to": {
                   "model": "Task",
@@ -512,16 +485,12 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": [
-                      "userId"
-                    ],
+                    "columns": ["userId"],
                     "namespaceId": "public",
                     "tableName": "post"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -529,9 +498,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -589,16 +556,12 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": [
-                      "userId"
-                    ],
+                    "columns": ["userId"],
                     "namespaceId": "public",
                     "tableName": "task"
                   },
                   "target": {
-                    "columns": [
-                      "id"
-                    ],
+                    "columns": ["id"],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -606,9 +569,7 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             },
@@ -656,9 +617,7 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": [
-                  "id"
-                ]
+                "columns": ["id"]
               },
               "uniques": []
             }
@@ -669,10 +628,7 @@
               "kind": "postgres-enum",
               "name": "user_type",
               "nativeType": "user_type",
-              "values": [
-                "admin",
-                "user"
-              ]
+              "values": ["admin", "user"]
             }
           }
         },

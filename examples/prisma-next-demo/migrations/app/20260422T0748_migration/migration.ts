@@ -12,8 +12,8 @@ const db = postgres<Contract>({ contractJson: endContractJson, extensions: [pgve
 export default class M extends Migration {
   override describe() {
     return {
-      from: 'sha256:5618dcac53bc3aebf85f5da0f74670d6d2b2d340d449adc73219d7cbba360d69',
-      to: 'sha256:6cee6146eaf257ce236bf1144efb238a1087e45a62e04a8104a55d490d9029f4',
+      from: 'sha256:a12e04d6c0659fefdb8f5082a555117c88092bd11fd66221d634c75ef9c0a1bc',
+      to: 'sha256:7c31c2e1119a16c7cc438e6fd132c34f0872d70bfbc3d2a888a4d5d44730d07b',
     };
   }
 
