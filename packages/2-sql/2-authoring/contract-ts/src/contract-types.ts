@@ -334,23 +334,43 @@ type ResolveNamedStorageType<Definition, TypeRef> =
       : StorageTypeInstance
     : StorageTypeInstance;
 
-type ResolveFieldDescriptor<Definition, FieldState> = [FieldDescriptorOf<FieldState>] extends [
-  never,
-]
-  ? ResolveNamedStorageType<Definition, FieldTypeRefOf<FieldState>>
-  : FieldDescriptorOf<FieldState>;
+// An enum-typed field carries its `EnumTypeHandle` as the field's `typeRef`.
+// The handle is neither a string nor a registered `StorageType`, so it resolves
+// its storage descriptor (codec + native type) and its column type-ref key (the
+// enum name) directly from the handle rather than through the named-type lookup.
+type EnumHandleDescriptor<Handle> = Handle extends {
+  readonly codecId: infer CodecId extends string;
+  readonly nativeType: infer NativeType extends string;
+}
+  ? { readonly codecId: CodecId; readonly nativeType: NativeType }
+  : never;
 
-type ResolveFieldColumnTypeRef<Definition, FieldState> = [FieldTypeRefOf<FieldState>] extends [
-  never,
-]
-  ? DescriptorTypeRef<FieldDescriptorOf<FieldState>>
-  : ResolveNamedStorageTypeKey<Definition, FieldTypeRefOf<FieldState>>;
+type IsEnumTypeRef<FieldState> = [FieldTypeRefOf<FieldState>] extends [never]
+  ? false
+  : FieldTypeRefOf<FieldState> extends EnumTypeHandle
+    ? true
+    : false;
 
-type ResolveFieldColumnTypeParams<Definition, FieldState> = [
-  ResolveFieldColumnTypeRef<Definition, FieldState>,
-] extends [string]
-  ? undefined
-  : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
+type ResolveFieldDescriptor<Definition, FieldState> =
+  IsEnumTypeRef<FieldState> extends true
+    ? EnumHandleDescriptor<FieldTypeRefOf<FieldState>>
+    : [FieldDescriptorOf<FieldState>] extends [never]
+      ? ResolveNamedStorageType<Definition, FieldTypeRefOf<FieldState>>
+      : FieldDescriptorOf<FieldState>;
+
+type ResolveFieldColumnTypeRef<Definition, FieldState> =
+  IsEnumTypeRef<FieldState> extends true
+    ? undefined
+    : [FieldTypeRefOf<FieldState>] extends [never]
+      ? DescriptorTypeRef<FieldDescriptorOf<FieldState>>
+      : ResolveNamedStorageTypeKey<Definition, FieldTypeRefOf<FieldState>>;
+
+type ResolveFieldColumnTypeParams<Definition, FieldState> =
+  IsEnumTypeRef<FieldState> extends true
+    ? undefined
+    : [ResolveFieldColumnTypeRef<Definition, FieldState>] extends [string]
+      ? undefined
+      : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
 
 type ModelTableName<Definition, ModelName extends ModelNames<Definition>> = [
   Present<
@@ -641,82 +661,65 @@ type BuiltStorage<Definition> = {
   };
 };
 
+// The enum value union for an enum-typed field, or `never` for a non-enum
+// field. The field's `typeRef` carries the authored `EnumTypeHandle`, whose
+// `Values` tuple preserves the literal member values (text or numeric).
 type EnumValueUnion<FieldState> = [FieldTypeRefOf<FieldState>] extends [
   EnumTypeHandle<string, infer Values>,
 ]
-  ? string[] extends Values
+  ? readonly (string | number)[] extends Values
     ? never
     : Values[number]
   : never;
 
-type EnumNarrowedType<Definition, ModelName extends ModelNames<Definition>, FieldName, Fallback> =
-  FieldName extends ModelFieldNames<Definition, ModelName>
-    ? ModelFieldState<Definition, ModelName, FieldName> extends infer FieldState
-      ? EnumValueUnion<FieldState> extends infer V
-        ? [V] extends [never]
-          ? Fallback
-          : FieldNullableOf<FieldState> extends true
-            ? V | null
-            : V
-        : Fallback
-      : Fallback
-    : Fallback;
-
-type FieldCodecOutputType<
+// The codec's `output` / `input` JS type for a field's column, before
+// nullability. `unknown` when the codec is not in the definition's codec map.
+type CodecChannelType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
-> =
-  ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
-    ? Col extends { readonly codecId: infer Id extends string }
-      ? Id extends keyof CodecTypesFromDefinition<Definition>
-        ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
-          ? Col extends { readonly nullable: true }
-            ? O | null
-            : O
-          : unknown
-        : unknown
-      : unknown
-    : unknown;
+  Channel extends 'output' | 'input',
+> = ModelStorageColumn<Definition, ModelName, FieldName>['codecId'] extends infer Id extends
+  keyof CodecTypesFromDefinition<Definition>
+  ? CodecTypesFromDefinition<Definition>[Id] extends { readonly [K in Channel]: infer T }
+    ? T
+    : unknown
+  : unknown;
 
-type FieldCodecInputType<
+// A field's non-null type: the enum value union when the field is enum-typed,
+// otherwise the codec channel type. Nullability is applied once by the callers.
+type FieldBaseType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
-> =
-  ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
-    ? Col extends { readonly codecId: infer Id extends string }
-      ? Id extends keyof CodecTypesFromDefinition<Definition>
-        ? CodecTypesFromDefinition<Definition>[Id] extends { readonly input: infer I }
-          ? Col extends { readonly nullable: true }
-            ? I | null
-            : I
-          : FieldCodecOutputType<Definition, ModelName, FieldName>
-        : unknown
-      : unknown
-    : unknown;
+  Channel extends 'output' | 'input',
+> = [EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>] extends [never]
+  ? CodecChannelType<Definition, ModelName, FieldName, Channel>
+  : EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>;
+
+type FieldNullable<
+  Definition,
+  ModelName extends ModelNames<Definition>,
+  FieldName extends ModelFieldNames<Definition, ModelName>,
+> = FieldNullableOf<ModelFieldState<Definition, ModelName, FieldName>>;
 
 type FieldOutputType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
-> = EnumNarrowedType<
-  Definition,
-  ModelName,
-  FieldName,
-  FieldCodecOutputType<Definition, ModelName, FieldName>
->;
+> =
+  FieldNullable<Definition, ModelName, FieldName> extends true
+    ? FieldBaseType<Definition, ModelName, FieldName, 'output'> | null
+    : FieldBaseType<Definition, ModelName, FieldName, 'output'>;
 
 type FieldInputType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
-> = EnumNarrowedType<
-  Definition,
-  ModelName,
-  FieldName,
-  FieldCodecInputType<Definition, ModelName, FieldName>
->;
+> =
+  FieldNullable<Definition, ModelName, FieldName> extends true
+    ? FieldBaseType<Definition, ModelName, FieldName, 'input'> | null
+    : FieldBaseType<Definition, ModelName, FieldName, 'input'>;
 
 type FieldOutputTypes<Definition> = {
   readonly [ModelName in ModelNames<Definition>]: {

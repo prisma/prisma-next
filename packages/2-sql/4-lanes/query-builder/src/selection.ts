@@ -11,29 +11,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { DrainOuterGeneric } from './type-atoms';
 
-type FindModelForTable<C, TableName extends string> = C extends Contract
-  ? {
-      [M in keyof ContractModelDefinitions<C> & string]: ContractModelDefinitions<C>[M] extends {
-        readonly storage: { readonly table: TableName };
-      }
-        ? M
-        : never;
-    }[keyof ContractModelDefinitions<C> & string]
-  : never;
-
-type FindFieldForColumn<C, ModelName extends string, ColumnName extends string> = C extends Contract
-  ? ModelName extends keyof ContractModelDefinitions<C>
-    ? {
-        [F in keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] &
-          string]: ContractModelDefinitions<C>[ModelName]['storage']['fields'][F] extends {
-          readonly column: ColumnName;
-        }
-          ? F
-          : never;
-      }[keyof ContractModelDefinitions<C>[ModelName]['storage']['fields'] & string]
-    : never
-  : never;
-
 /**
  * Flat table map for the query-builder surface: every table name declared in
  * any storage namespace, with colliding names unioned (parity with
@@ -44,10 +21,37 @@ export type UnboundTables<TContract extends Contract<SqlStorage>> = SqlBuilderUn
 >;
 
 /**
- * A utility type to extract the output type of a referenced column from a contract.
- * Consults `ExtractFieldOutputTypes` first so enum fields return their value
- * union instead of the raw codec output type. Falls back to the codec output
- * type when no field-level override exists.
+ * The field-output override (the enum value union) for a `table.column`, or
+ * `never` when no model field maps to it. The emitted `FieldOutputTypes`
+ * TypeMap is keyed by model/field, so one pass over the models matches both the
+ * `storage.table` and the field's `storage.fields[*].column` to read the
+ * already-narrowed type back out.
+ */
+type FieldOutputOverride<
+  TContract extends Contract,
+  TTableName extends string,
+  TColumnName extends string,
+  Models = ContractModelDefinitions<TContract>,
+  FOT = ExtractFieldOutputTypes<TContract>,
+> = {
+  [M in keyof Models & keyof FOT & string]: Models[M] extends {
+    readonly storage: { readonly table: TTableName; readonly fields: infer Fields };
+  }
+    ? {
+        [F in keyof Fields & keyof FOT[M] & string]: Fields[F] extends {
+          readonly column: TColumnName;
+        }
+          ? FOT[M][F]
+          : never;
+      }[keyof Fields & keyof FOT[M] & string]
+    : never;
+}[keyof Models & keyof FOT & string];
+
+/**
+ * The output type of a referenced column. Returns the enum value union from the
+ * `FieldOutputTypes` TypeMap when the column is enum-typed (the override already
+ * carries the correct nullability), otherwise the codec output type with column
+ * nullability applied.
  *
  * @template TContract The contract that describes the database.
  * @template TTableName The name of the table containing the column.
@@ -58,40 +62,13 @@ export type ExtractOutputType<
   TTableName extends keyof UnboundTables<TContract> & string,
   TColumnName extends keyof UnboundTables<TContract>[TTableName]['columns'] & string,
   _TColumn = UnboundTables<TContract>[TTableName]['columns'][TColumnName],
-> = _TColumn extends StorageColumn
-  ?
-      | (_TColumn['nullable'] extends true ? null : never)
-      | FieldOutputTypeFor<TContract, TTableName, TColumnName, _TColumn>
-  : never;
-
-type EnumOutputOverride<TContract, TTableName extends string, TColumnName extends string> =
-  FindModelForTable<TContract, TTableName> extends infer ModelName extends string
-    ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
-      ? FindFieldForColumn<TContract, ModelName, TColumnName> extends infer FieldName extends string
-        ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
-          ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
-          : never
-        : never
-      : never
-    : never;
-
-type FieldOutputTypeFor<
-  TContract,
-  TTableName extends string,
-  TColumnName extends string,
-  _TColumn,
-> =
-  EnumOutputOverride<TContract, TTableName, TColumnName> extends infer Override
-    ? [Override] extends [never]
-      ? CodecOutputType<TContract, _TColumn>
-      : string extends NonNullable<Override>
-        ? CodecOutputType<TContract, _TColumn>
-        : NonNullable<Override>
-    : never;
-
-type CodecOutputType<TContract, _TColumn> = _TColumn extends StorageColumn
-  ? ExtractCodecTypes<TContract>[_TColumn['codecId']]['output']
-  : never;
+> = [FieldOutputOverride<TContract, TTableName, TColumnName>] extends [never]
+  ? _TColumn extends StorageColumn
+    ?
+        | (_TColumn['nullable'] extends true ? null : never)
+        | ExtractCodecTypes<TContract>[_TColumn['codecId']]['output']
+    : never
+  : FieldOutputOverride<TContract, TTableName, TColumnName>;
 
 /**
  * A type representing a selection of columns in a SQL `select` query in the

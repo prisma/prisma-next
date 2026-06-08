@@ -36,6 +36,7 @@ const postgresTargetPack = {
 } as const satisfies TargetPackRef<'sql', 'postgres'>;
 
 const pgText = { codecId: 'pg/text@1' as const, nativeType: 'text' } as const;
+const pgInt = { codecId: 'pg/int4@1' as const, nativeType: 'int4' } as const;
 
 // ---------------------------------------------------------------------------
 // Fixture: enum + model using enumType field
@@ -48,16 +49,18 @@ const Status = enumType(
   member('Active', 'active'),
   member('Inactive', 'inactive'),
 );
+const Priority = enumType('Priority', pgInt, member('Low', 1), member('High', 10));
 
 const enumContract = defineContract({
   family: sqlFamilyPack,
   target: postgresTargetPack,
-  enums: { Role, Status },
+  enums: { Role, Status, Priority },
   models: {
     User: model('User', {
       fields: {
         role: field.namedType(Role),
         status: field.namedType(Status).optional(),
+        priority: field.namedType(Priority),
       },
     }),
   },
@@ -85,6 +88,10 @@ describe('FieldOutputTypes: enum field narrows to value union', () => {
   it('nullable enum field is not string | null', () => {
     expectTypeOf<FOT['User']['status']>().not.toEqualTypeOf<string | null>();
   });
+
+  it('non-text (int-backed) enum field narrows to its int value union', () => {
+    expectTypeOf<FOT['User']['priority']>().toEqualTypeOf<1 | 10>();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -100,5 +107,9 @@ describe('FieldInputTypes: enum field write input narrows to value union', () =>
 
   it('nullable enum field input is value union | null', () => {
     expectTypeOf<FIT['User']['status']>().toEqualTypeOf<'active' | 'inactive' | null>();
+  });
+
+  it('non-text (int-backed) enum field input narrows to its int value union', () => {
+    expectTypeOf<FIT['User']['priority']>().toEqualTypeOf<1 | 10>();
   });
 });

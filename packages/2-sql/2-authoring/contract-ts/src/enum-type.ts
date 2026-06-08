@@ -10,22 +10,23 @@ import { blindCast } from '@prisma-next/utils/casts';
  * are preserved as literal types so `enumType()` can carry the ordered value
  * tuple in its return type.
  */
-export interface EnumMember<Name extends string, Value extends string> {
+export interface EnumMember<Name extends string, Value extends string | number> {
   readonly name: Name;
   readonly value: Value;
 }
 
 /**
- * Declare an enum member. The `value` defaults to `name` when omitted.
- * Both generics are preserved as literals so downstream `enumType` can
- * carry the ordered value tuple in its type.
+ * Declare an enum member. The `value` defaults to `name` when omitted, and may
+ * be a string or number literal (e.g. an int-backed enum). Both generics are
+ * preserved as literals so downstream `enumType` carries the value union in its
+ * type; the value is encoded to its codec string form only at lowering.
  */
 export function member<const Name extends string>(name: Name): EnumMember<Name, Name>;
-export function member<const Name extends string, const Value extends string>(
+export function member<const Name extends string, const Value extends string | number>(
   name: Name,
   value: Value,
 ): EnumMember<Name, Value>;
-export function member<const Name extends string, const Value extends string = Name>(
+export function member<const Name extends string, const Value extends string | number = Name>(
   name: Name,
   value?: Value,
 ): EnumMember<Name, Value> {
@@ -42,15 +43,17 @@ export function member<const Name extends string, const Value extends string = N
 // Internal types for inferring the literal tuple from the members spread
 // ---------------------------------------------------------------------------
 
-type MembersToValues<Members extends readonly EnumMember<string, string>[]> = {
+type MembersToValues<Members extends readonly EnumMember<string, string | number>[]> = {
   readonly [K in keyof Members]: Members[K] extends EnumMember<string, infer V> ? V : never;
 };
 
-type MembersToNames<Members extends readonly EnumMember<string, string>[]> = {
-  readonly [K in keyof Members]: Members[K] extends EnumMember<infer N, string> ? N : never;
+type MembersToNames<Members extends readonly EnumMember<string, string | number>[]> = {
+  readonly [K in keyof Members]: Members[K] extends EnumMember<infer N, string | number>
+    ? N
+    : never;
 };
 
-type MembersAccessorMap<Members extends readonly EnumMember<string, string>[]> = {
+type MembersAccessorMap<Members extends readonly EnumMember<string, string | number>[]> = {
   readonly [M in Members[number] as M['name']]: M['value'];
 };
 
@@ -80,9 +83,9 @@ export const ENUM_TYPE_HANDLE_BRAND = Symbol('EnumTypeHandle');
  */
 export interface EnumTypeHandle<
   Name extends string = string,
-  Values extends readonly string[] = readonly string[],
+  Values extends readonly (string | number)[] = readonly (string | number)[],
   Names extends readonly string[] = readonly string[],
-  MembersMap extends Record<string, string> = Record<string, string>,
+  MembersMap extends Record<string, string | number> = Record<string, string | number>,
 > {
   /** Internal brand for lowering-pipeline detection. */
   readonly [ENUM_TYPE_HANDLE_BRAND]: true;
@@ -97,7 +100,7 @@ export interface EnumTypeHandle<
   readonly nativeType: string;
 
   /** Ordered member list for lowering (name + value pairs). */
-  readonly enumMembers: readonly { readonly name: string; readonly value: string }[];
+  readonly enumMembers: readonly { readonly name: string; readonly value: string | number }[];
 
   /** Ordered literal value tuple. Declaration order is preserved. */
   readonly values: Values;
@@ -112,13 +115,13 @@ export interface EnumTypeHandle<
   readonly members: MembersMap;
 
   /** Returns `true` if `v` is a declared member value. */
-  has(v: string): boolean;
+  has(v: string | number): boolean;
 
   /** Returns the member name for a value, or `undefined` if not found. */
-  nameOf(v: string): string | undefined;
+  nameOf(v: string | number): string | undefined;
 
   /** Returns the zero-based declaration index of a value, or `-1` if not found. */
-  ordinalOf(v: string): number;
+  ordinalOf(v: string | number): number;
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +157,10 @@ export interface EnumTypeHandle<
 export function enumType<
   const Name extends string,
   const Codec extends Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'>,
-  const Members extends readonly [EnumMember<string, string>, ...EnumMember<string, string>[]],
+  const Members extends readonly [
+    EnumMember<string, string | number>,
+    ...EnumMember<string, string | number>[],
+  ],
 >(
   name: Name,
   codec: Codec,
@@ -168,19 +174,19 @@ export function enumType<
 export function enumType(
   name: string,
   codec: Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'>,
-  ...members: EnumMember<string, string>[]
+  ...members: EnumMember<string, string | number>[]
 ): EnumTypeHandle;
 export function enumType(
   name: string,
   codec: Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'>,
-  ...members: EnumMember<string, string>[]
+  ...members: EnumMember<string, string | number>[]
 ): EnumTypeHandle {
   if (members.length === 0) {
     throw new Error(`enumType("${name}"): must have at least one member.`);
   }
 
   const seenNames = new Set<string>();
-  const seenValues = new Set<string>();
+  const seenValues = new Set<string | number>();
   for (const m of members) {
     if (seenNames.has(m.name)) {
       throw new Error(
@@ -216,9 +222,9 @@ export function enumType(
     values,
     names,
     members: membersAccessor,
-    has: (v: string) => valueSet.has(v),
-    nameOf: (v: string) => valueToName.get(v),
-    ordinalOf: (v: string) => valueToOrdinal.get(v) ?? -1,
+    has: (v: string | number) => valueSet.has(v),
+    nameOf: (v: string | number) => valueToName.get(v),
+    ordinalOf: (v: string | number) => valueToOrdinal.get(v) ?? -1,
   };
 }
 

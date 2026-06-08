@@ -688,7 +688,7 @@ export function buildSqlContractFromDefinition(
     }
     domainSlot[enumName] = {
       codecId: handle.codecId,
-      members: handle.enumMembers,
+      members: handle.enumMembers.map((m) => ({ name: m.name, value: String(m.value) })),
     };
 
     let storageSlot = storageValueSetsByNs[nsId];
@@ -698,7 +698,7 @@ export function buildSqlContractFromDefinition(
     }
     storageSlot[enumName] = {
       kind: 'value-set',
-      values: handle.values,
+      values: handle.values.map(String),
     };
   }
 
