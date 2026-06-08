@@ -328,22 +328,26 @@ export function buildGrid(
   // back-lane to the right: it tees off the source node row (○─╮), runs a
   // vertical │ down its back-lane, and lands into the target node (◂╯).
   //
-  // Two independent numbers per routed back-arc:
+  // Three independent numbers per routed back-arc:
   //   geomLane   — the column its rail occupies. Outermost (largest) goes to the
   //                arc reaching the lowest target (ties: higher source first), so
   //                interleaving spans cross and nested spans nest cleanly.
-  //   colourLane — the lane index used purely for colour. Assigned by
-  //                migrationHash order, continuing after the forward lanes, so the
-  //                first rollback is lane numLanes, the next numLanes+1, etc.
-  // These differ whenever two arcs interleave (rollback-cross): the inner column
-  // may carry the higher colour. Colour is read off LineRef.lane; the column is
-  // where the cell is placed.
+  //   colourLane — the lane index used purely for colour (flat mode). Assigned
+  //                by greedy colouring (bottom-up walk; see below) so that no
+  //                two concurrently-active lanes/arcs share a palette colour,
+  //                and no arc reuses its origin branch's colour or green.
+  //   planeLane  — the z-order index for occlusion within a shared back-lane.
+  //                Arcs sharing the same geomLane are sorted by sourceIndex
+  //                descending: the arc whose source is lowest in display
+  //                (largest sourceIndex = bottom-most visually) draws on top
+  //                (smallest planeLane number). Decoupled from colourLane.
   interface RoutedBackArc {
     readonly edge: ClassifiedEdge;
     readonly sourceIndex: number;
     readonly targetIndex: number;
     readonly geomLane: number;
     readonly colourLane: number;
+    readonly planeLane: number;
   }
 
   const rollbackEdges = rowModel.edges.filter((e) => e.kind === 'rollback' && e.from !== e.to);
@@ -358,15 +362,6 @@ export function buildGrid(
     if (ti === si + 1) adjacentRollbacks.push(e);
     else skippingRollbacks.push(e);
   }
-
-  // colourLane by migration NAME (dirName) order — chronological, not hash.
-  // Each arc keeps its own colour regardless of convergence.
-  const colourLaneOf = new Map<string, number>();
-  [...skippingRollbacks]
-    .sort((a, b) => a.dirName.localeCompare(b.dirName))
-    .forEach((e, i) => {
-      colourLaneOf.set(e.migrationHash, numLanes + i);
-    });
 
   // Convergence: group skipping rollbacks by their target node. Arcs sharing a
   // target share one geometric lane (rail column). Each distinct target gets its
@@ -397,12 +392,117 @@ export function buildGrid(
     }
   });
 
+  // ── planeLane: z-order for back-arcs ────────────────────────────────────
+  // The arc whose source is furthest down the display (largest sourceIndex)
+  // draws on top (lowest planeLane). This applies both within shared back-lanes
+  // and at crossing points where arcs on different geomLanes overlap.
+  // planeLane = totalNodes - sourceIndex gives: larger sourceIndex → smaller value.
+  const totalDisplayNodes = displayOrder.filter((d) => d !== null).length;
+  const planeLaneOf = new Map<string, number>();
+  for (const e of skippingRollbacks) {
+    const si = displayIndex.get(e.from) ?? 0;
+    planeLaneOf.set(e.migrationHash, totalDisplayNodes - si);
+  }
+
+  // ── colourLane: greedy assignment (flat mode) ─────────────────────────────
+  // Walk displayOrder bottom → top. Maintain the set of concurrently-active
+  // palette-colour indices (forward lanes + active back-arc assignments). When
+  // a new arc first becomes visible (at its target node, going upward), pick the
+  // lowest palette index not in use. Additionally exclude:
+  //   - the arc's origin lane's colour (nodeLane.get(from) % PALETTE_SIZE)
+  //   - index 5 (green — reserved for focus on-path)
+  // When the arc's source node is processed, release its colour.
+  //
+  // Forward lanes hold colour = laneIndex % PALETTE_SIZE (unchanged); back-arc
+  // colourLane is set to the chosen palette index directly (0–5), so that
+  // `colourLane % 6 == chosenIndex`.
+  const PALETTE_SIZE = 6;
+  const GREEN_PALETTE_IDX = 5;
+
+  // Precompute per-arc display indices for the walk.
+  const arcSourceIndex = new Map<string, number>();
+  const arcTargetIndex = new Map<string, number>();
+  for (const e of skippingRollbacks) {
+    arcSourceIndex.set(e.migrationHash, displayIndex.get(e.from) ?? 0);
+    arcTargetIndex.set(e.migrationHash, displayIndex.get(e.to) ?? 0);
+  }
+
+  // Build lookup: arcs by target node hash and source node hash.
+  const arcsByTarget = new Map<string, ClassifiedEdge[]>();
+  const arcsBySource = new Map<string, ClassifiedEdge[]>();
+  for (const e of skippingRollbacks) {
+    const tb = arcsByTarget.get(e.to);
+    if (tb) tb.push(e);
+    else arcsByTarget.set(e.to, [e]);
+    const sb = arcsBySource.get(e.from);
+    if (sb) sb.push(e);
+    else arcsBySource.set(e.from, [e]);
+  }
+
+  // Greedy walk: bottom → top through displayOrder.
+  const colourLaneOf = new Map<string, number>();
+  // activeArcColours: migHash → palette index currently in use by that arc.
+  const activeArcColours = new Map<string, number>();
+  // activeFwdLaneColours: set of palette indices held by currently-active forward lanes.
+  const activeFwdLaneColours = new Set<number>();
+
+  for (let i = displayOrder.length - 1; i >= 0; i--) {
+    const nd = displayOrder[i];
+    if (nd === null || nd === undefined) continue; // separator or missing — skip
+
+    const { hash: nodeHash } = nd;
+    const nodeFwdLane = nodeLane.get(nodeHash) ?? 0;
+
+    // 1. Activate this node's forward lane (if not already active from a lower node).
+    activeFwdLaneColours.add(nodeFwdLane % PALETTE_SIZE);
+
+    // 2. Assign colour to arcs that TARGET this node. They become visible
+    //    starting here, running upward to their source.
+    const incomingArcs = arcsByTarget.get(nodeHash) ?? [];
+    // Process in a stable order (dirName) for determinism.
+    const sortedIncoming = [...incomingArcs].sort((a, b) => a.dirName.localeCompare(b.dirName));
+    for (const arc of sortedIncoming) {
+      const originLaneColour = (nodeLane.get(arc.from) ?? 0) % PALETTE_SIZE;
+      // Colours currently occupied.
+      const occupied = new Set<number>(activeFwdLaneColours);
+      for (const c of activeArcColours.values()) occupied.add(c);
+      occupied.add(GREEN_PALETTE_IDX);
+      occupied.add(originLaneColour);
+      // Pick the lowest free index; if all are taken, pick lowest excluding green.
+      let chosen = -1;
+      for (let ci = 0; ci < PALETTE_SIZE; ci++) {
+        if (!occupied.has(ci)) {
+          chosen = ci;
+          break;
+        }
+      }
+      if (chosen === -1) {
+        // Palette exhausted — forced reuse. Pick lowest excluding green.
+        for (let ci = 0; ci < PALETTE_SIZE; ci++) {
+          if (ci !== GREEN_PALETTE_IDX) {
+            chosen = ci;
+            break;
+          }
+        }
+      }
+      colourLaneOf.set(arc.migrationHash, chosen === -1 ? 0 : chosen);
+      activeArcColours.set(arc.migrationHash, chosen === -1 ? 0 : chosen);
+    }
+
+    // 3. Release arcs that SOURCE at this node. Their rail runs from here
+    //    downward; above this node they're gone.
+    for (const arc of arcsBySource.get(nodeHash) ?? []) {
+      activeArcColours.delete(arc.migrationHash);
+    }
+  }
+
   const routedBackArcs: RoutedBackArc[] = skippingRollbacks.map((e) => ({
     edge: e,
     sourceIndex: displayIndex.get(e.from) ?? 0,
     targetIndex: displayIndex.get(e.to) ?? 0,
     geomLane: geomLaneOf.get(e.migrationHash) ?? numLanes,
-    colourLane: colourLaneOf.get(e.migrationHash) ?? numLanes,
+    colourLane: colourLaneOf.get(e.migrationHash) ?? 0,
+    planeLane: planeLaneOf.get(e.migrationHash) ?? numLanes,
   }));
 
   const backArcsBySource = new Map<string, RoutedBackArc[]>();
@@ -579,8 +679,8 @@ export function buildGrid(
 
   function backArcPlane(arc: RoutedBackArc): number {
     const role = roleOf(arc.edge.migrationHash);
-    if (!isFocus) return arc.colourLane;
-    return role === 'on-path' ? 0 : arc.colourLane + 1;
+    if (!isFocus) return arc.planeLane;
+    return role === 'on-path' ? 0 : arc.planeLane + 1;
   }
 
   // Compose a CellLine into a row cell (never overwrite — occlusion arbitrates).
