@@ -20,7 +20,6 @@ import { type RenderContext, renderCells } from '../test/utils/formatters/galler
 import { GOLDENS, goldenId, type ScenarioGolden } from '../test/utils/formatters/gallery-goldens';
 import { BACKLINK_GOLDENS } from '../test/utils/formatters/gallery-goldens-backlink';
 import { KNOWN_BROKEN_GOLDENS } from '../test/utils/formatters/gallery-goldens-known-broken';
-import { SHOWCASE_GOLDENS } from '../test/utils/formatters/gallery-goldens-showcase';
 
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
@@ -75,12 +74,7 @@ function matchesFilter(golden: ScenarioGolden): boolean {
 function runGoldensMode(): void {
   let count = 0;
 
-  const allGoldens = [
-    ...GOLDENS,
-    ...BACKLINK_GOLDENS,
-    ...SHOWCASE_GOLDENS,
-    ...KNOWN_BROKEN_GOLDENS,
-  ];
+  const allGoldens = [...GOLDENS, ...BACKLINK_GOLDENS, ...KNOWN_BROKEN_GOLDENS];
 
   for (const golden of allGoldens) {
     if (!matchesFilter(golden)) continue;
