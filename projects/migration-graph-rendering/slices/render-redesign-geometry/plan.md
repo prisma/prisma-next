@@ -79,7 +79,9 @@ what proves convergence.
 - **Focus:** back-arc planning + tee/landing emission + width computation in
   `grid-layout.ts`. No colour-semantics change; no geometry-constant refactor.
 - **Completed when:** D1's structural convergence assertion passes (flip `it.fails` →
-  `it`; revert-to-red verified by reverting the layout change); the `rollback-converge`
+  `it`; **strengthen the tip-topmost check** when un-`fails`ing — assert `grid[0]`'s node
+  cell is the highest-rank tip, not merely that some node leads the grid, per the D1
+  review); revert-to-red verified by reverting the layout change); the `rollback-converge`
   snapshot is re-recorded to the converged output via `pnpm gallery` then
   `--update-snapshots`; `rollback-arc` / `rollback-cross` / `rollback-merge` /
   `rollback-adjacent` snapshots byte-identical (non-converging cases untouched);
