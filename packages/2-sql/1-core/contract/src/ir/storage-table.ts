@@ -15,7 +15,6 @@ export interface StorageTableInput {
   readonly indexes: ReadonlyArray<Index | IndexInput>;
   readonly foreignKeys: ReadonlyArray<ForeignKey | ForeignKeyInput>;
   readonly control?: ControlPolicy;
-  /** Optional check constraints for enum-restricted columns. Omitted when empty. */
   readonly checks?: ReadonlyArray<CheckConstraint | CheckConstraintInput>;
 }
 
