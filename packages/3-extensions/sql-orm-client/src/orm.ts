@@ -2,6 +2,7 @@ import { type Contract, domainModelsAtDefaultNamespace } from '@prisma-next/cont
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from './collection';
+import { buildEnumsMap, type EnumAccessor } from './enum-accessor';
 import { domainModelNames } from './storage-resolution';
 import type {
   CollectionContext,
@@ -48,10 +49,18 @@ type ModelCollectionMap<
   [K in ModelNames<TContract>]: ModelCollection<TContract, Collections, K>;
 };
 
+type ContractEnumAccessors<TContract extends Contract<SqlStorage>> = TContract extends {
+  readonly enumAccessors: infer Accessors;
+}
+  ? Accessors
+  : Record<never, never>;
+
 type OrmClient<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
-> = ModelCollectionMap<TContract, Collections>;
+> = ModelCollectionMap<TContract, Collections> & {
+  readonly enums: ContractEnumAccessors<TContract>;
+};
 
 export function orm<
   TContract extends Contract<SqlStorage>,
@@ -66,11 +75,17 @@ export function orm<
     ModelNames<TContract>,
     Collection<TContract, string, unknown, CollectionTypeState>
   >();
+  let enumsMap: Readonly<Record<string, EnumAccessor>> | undefined;
 
   return new Proxy({} as OrmClient<TContract, Collections>, {
     get(_target, prop: string | symbol): unknown {
       if (typeof prop !== 'string') {
         return undefined;
+      }
+
+      if (prop === 'enums') {
+        enumsMap ??= Object.freeze(buildEnumsMap(contract.domain));
+        return enumsMap;
       }
 
       if (!modelNames.has(prop)) {

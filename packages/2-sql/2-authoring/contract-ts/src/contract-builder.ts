@@ -62,6 +62,7 @@ type ContractDefinition<
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
   Namespaces extends readonly string[] | undefined = undefined,
+  Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -75,7 +76,7 @@ type ContractDefinition<
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
-  readonly enums?: Record<string, EnumTypeHandle>;
+  readonly enums?: Enums;
 };
 
 type ContractScaffold<
@@ -86,6 +87,7 @@ type ContractScaffold<
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
   Namespaces extends readonly string[] | undefined = undefined,
+  Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -99,7 +101,7 @@ type ContractScaffold<
   readonly types?: never;
   readonly models?: never;
   readonly codecLookup?: CodecLookup;
-  readonly enums?: Record<string, EnumTypeHandle>;
+  readonly enums?: Enums;
 };
 
 type ContractFactory<
@@ -437,6 +439,7 @@ export function defineContract<
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
   const Namespaces extends readonly string[] | undefined = undefined,
+  const Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 >(
   definition: ContractDefinition<
     Family,
@@ -447,7 +450,8 @@ export function defineContract<
     Naming,
     StorageHash,
     ForeignKeyDefaults,
-    Namespaces
+    Namespaces,
+    Enums
   >,
 ): SqlContractResult<
   ContractDefinition<
@@ -459,7 +463,8 @@ export function defineContract<
     Naming,
     StorageHash,
     ForeignKeyDefaults,
-    Namespaces
+    Namespaces,
+    Enums
   >
 >;
 export function defineContract<
@@ -477,6 +482,7 @@ export function defineContract<
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
   const Namespaces extends readonly string[] | undefined = undefined,
+  const Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
 >(
   definition: ContractScaffold<
     Family,
@@ -485,7 +491,8 @@ export function defineContract<
     Naming,
     StorageHash,
     ForeignKeyDefaults,
-    Namespaces
+    Namespaces,
+    Enums
   >,
   factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks>,
 ): SqlContractResult<
@@ -498,7 +505,8 @@ export function defineContract<
     Naming,
     StorageHash,
     ForeignKeyDefaults,
-    Namespaces
+    Namespaces,
+    Enums
   >
 >;
 export function defineContract(

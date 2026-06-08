@@ -558,6 +558,37 @@ type BuiltStorageTables<Definition> = {
     : Record<string, never>);
 };
 
+type DefinitionEnums<Definition> = Definition extends {
+  readonly enums?: infer E;
+}
+  ? Present<E> extends Record<string, EnumTypeHandle>
+    ? // A bare `Record<string, EnumTypeHandle>` (no literal keys) is the
+      // widened default for a contract authored without enums; treat it as
+      // empty so `db.enums` carries only literally-authored enums.
+      string extends keyof Present<E>
+      ? Record<never, never>
+      : Present<E>
+    : Record<never, never>
+  : Record<never, never>;
+
+type EnumHandleAccessorType<Handle> =
+  Handle extends EnumTypeHandle<infer _Name, infer Values, infer Names, infer MembersMap>
+    ? {
+        readonly values: Values;
+        readonly names: Names;
+        readonly members: MembersMap;
+        has(v: string): boolean;
+        nameOf(v: string): string | undefined;
+        ordinalOf(v: string): number;
+      }
+    : never;
+
+type BuiltEnumAccessors<Definition> = {
+  readonly [K in keyof DefinitionEnums<Definition>]: EnumHandleAccessorType<
+    DefinitionEnums<Definition>[K]
+  >;
+};
+
 type BuiltDocumentScopedTypes<Definition> = {
   readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends StorageTypeInstance
     ? K
@@ -700,6 +731,7 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
       ? Record<string, never>
       : DefinitionExtensionPacks<Definition>;
     readonly capabilities: DerivedCapabilities<Definition>;
+    readonly enumAccessors: BuiltEnumAccessors<Definition>;
   },
   TypeMaps<
     CodecTypesFromDefinition<Definition>,
