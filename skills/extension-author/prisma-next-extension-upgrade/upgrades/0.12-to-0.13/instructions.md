@@ -33,6 +33,15 @@ TML-2500 M4: `packages/3-extensions/supabase/README.md` link updated
 from the old project spec to the canonical ecosystem-extensions doc and
 ADR 226. Docs-only; no runtime, contract, or public-API change.
 Incidental substrate diff only.
+
+TML-2784: many-to-many became a first-class, validatable contract shape.
+`ContractReferenceRelation` is now a cardinality-discriminated union — the
+`'N:M'` variant requires a `through` junction descriptor ({ table,
+namespaceId, parentColumns, childColumns, targetColumns }); the
+non-junction variant carries `through?: never`. Purely additive: N:M
+contracts did not validate before this change, so no working extension
+constructs them, and existing 1:1 / 1:N / N:1 relation values match the
+non-junction variant unchanged. No codemod required.
 -->
 
 # 0.12 → 0.13 — Extension-author upgrade instructions
@@ -106,3 +115,7 @@ The script is idempotent — running it twice produces the same output.
 After re-emitting and re-pinning, run `pnpm typecheck && pnpm test --filter <your-extension-package>`,
 then confirm `prisma-next migration check` passes. The `contract.json` diff should show
 `"typeParams": {}` removed from every `storage.types` entry.
+
+## Many-to-many contracts (additive)
+
+No extension-author action required for the many-to-many change: M:N relations became a first-class, validatable contract shape this release (`'N:M'` cardinality with a required `through` junction descriptor). It is additive — existing non-junction relations and the public framework factories (`crossRef`, the contract-builder) are unchanged.
