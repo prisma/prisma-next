@@ -8,6 +8,22 @@ export * from '../lowered-params';
 export * from '../operation-descriptors';
 export * from '../timeouts';
 
+/**
+ * Node flags for vitest worker forks in any suite that starts a `@prisma/dev`
+ * server (PGlite — Postgres compiled to WebAssembly).
+ *
+ * On Linux CI, repeatedly creating and tearing down PGlite WASM instances
+ * intermittently aborts the worker fork inside V8:
+ *   `Check failed: jit_page_->allocations_.erase(addr) == 1`
+ * Every test passes, but the run fails with "Worker exited unexpectedly".
+ * The CHECK is in V8's PKU-based JIT write-protection (ThreadIsolation), the
+ * `--memory-protection-keys` feature — Linux-only, which is why it never
+ * reproduces on macOS. The flag is rejected in NODE_OPTIONS, so it must be
+ * passed through vitest's top-level `test.execArgv` (not
+ * `poolOptions.forks.execArgv`, which vitest silently drops).
+ */
+export const pgliteWorkerExecArgv = ['--no-memory-protection-keys'];
+
 function normalizeConnectionString(raw: string): string {
   const url = new URL(raw);
   if (url.hostname === 'localhost' || url.hostname === '::1') {

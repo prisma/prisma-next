@@ -6,7 +6,7 @@ class InitialMigration extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
+      to: 'sha256:2827cbad7293fe13a4fb2aab60a55d3cddd856a86d1f6ccea6e11519faacff92',
     };
   }
 

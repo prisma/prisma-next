@@ -76,8 +76,8 @@ function backfillRun(): MongoQueryPlan {
 class BackfillProductStatus extends Migration {
   override describe() {
     return {
-      from: 'sha256:8a15f8e37a3a8731578a87102f9507da65b5f84556f84320ea0ead82645e394d',
-      to: 'sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65',
+      from: 'sha256:059f3f35403c5a7a90851c23f1028e16d5250630f8a82fba33053e9a50534589',
+      to: 'sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c',
       labels: ['backfill-product-status'],
     };
   }

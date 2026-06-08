@@ -9,21 +9,21 @@
     "precheck": [
       {
         "description": "Check handle-nulls-user-displayName has work to do",
-        "sql": "SELECT EXISTS (SELECT \"id\" AS \"id\" FROM \"user\" WHERE \"displayName\" IS NULL LIMIT 1) AS ok",
+        "sql": "SELECT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"user\" WHERE \"displayName\" IS NULL LIMIT 1) AS ok",
         "params": []
       }
     ],
     "execute": [
       {
         "description": "Run handle-nulls-user-displayName",
-        "sql": "UPDATE \"user\" SET \"displayName\" = $1 WHERE \"displayName\" IS NULL",
+        "sql": "UPDATE \"public\".\"user\" SET \"displayName\" = $1 WHERE \"displayName\" IS NULL",
         "params": ["Anonymous"]
       }
     ],
     "postcheck": [
       {
         "description": "Verify handle-nulls-user-displayName resolved all violations",
-        "sql": "SELECT NOT EXISTS (SELECT \"id\" AS \"id\" FROM \"user\" WHERE \"displayName\" IS NULL LIMIT 1) AS ok",
+        "sql": "SELECT NOT EXISTS (SELECT \"id\" AS \"id\" FROM \"public\".\"user\" WHERE \"displayName\" IS NULL LIMIT 1) AS ok",
         "params": []
       }
     ]

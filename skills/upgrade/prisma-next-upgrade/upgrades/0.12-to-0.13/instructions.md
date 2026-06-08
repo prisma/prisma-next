@@ -51,6 +51,13 @@ dependabot/runtime-deps (PR #761): bumps react 19.2.6→19.2.7, vitest
 mongodb-memory-server 11.1.0→11.2.0. Touches examples/ only via
 package.json version fields; no runtime, contract, or public-API change.
 
+TML-2838: regenerates example-app migration snapshots via pnpm
+fixtures:emit. The prisma-next-demo initial migration was updated from
+the removed standalone createTable function to this.createTable({...})
+(the base-class method introduced by the planner-create-table-adopts-ddl-ast
+refactor). The ops.json snapshots are regenerated accordingly. No
+user-side action required.
+
 TML-2843: `@prisma-next/sqlite` gained an additive facade transaction
 API (`db.transaction(async (tx) => …)`) demonstrated in
 `examples/prisma-next-demo-sqlite`. No user action required; incidental
