@@ -65,15 +65,15 @@ export const emptySchema: SqlSchemaIR = {
   tables: {},
 };
 
-export const familyInstance = sqlFamilyDescriptor.create(
-  createControlStack({
-    family: sqlFamilyDescriptor,
-    target: sqliteTargetDescriptor,
-    adapter: sqliteAdapterDescriptor,
-    driver: sqliteDriverDescriptor,
-    extensionPacks: [],
-  }),
-);
+const controlStack = createControlStack({
+  family: sqlFamilyDescriptor,
+  target: sqliteTargetDescriptor,
+  adapter: sqliteAdapterDescriptor,
+  driver: sqliteDriverDescriptor,
+  extensionPacks: [],
+});
+export const familyInstance = sqlFamilyDescriptor.create(controlStack);
+export const controlAdapter = sqliteAdapterDescriptor.create(controlStack);
 
 export const frameworkComponents = [
   sqliteTargetDescriptor,

@@ -5,6 +5,7 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   contract,
+  controlAdapter,
   createMigrationPlan,
   createTestDatabase,
   emptySchema,
@@ -27,7 +28,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
   it('applies an additive plan, creating the table and writing marker and ledger', async () => {
     testDb = createTestDatabase();
     const { driver } = testDb;
-    const planner = sqliteTargetDescriptor.createPlanner(familyInstance);
+    const planner = sqliteTargetDescriptor.createPlanner(controlAdapter);
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
 
     const result = planner.plan({
@@ -90,7 +91,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
   it('when schema already matches, executes empty plan and still upserts marker and appends ledger', async () => {
     testDb = createTestDatabase();
     const { driver } = testDb;
-    const planner = sqliteTargetDescriptor.createPlanner(familyInstance);
+    const planner = sqliteTargetDescriptor.createPlanner(controlAdapter);
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
 
     const initialPlan = planner.plan({

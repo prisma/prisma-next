@@ -122,20 +122,26 @@ const featureFlagsContract = featureFlagsContractSpace.contractJson;
 const FEATURE_FLAGS_STORAGE_HASH = featureFlagsContractSpace.headRef.hash;
 const featureFlagsHeadRef = featureFlagsContractSpace.headRef;
 
-function buildFamilyInstance(declarationOrder: 'natural' | 'reverse') {
+function buildControlStack(declarationOrder: 'natural' | 'reverse') {
   const extensionPacks =
     declarationOrder === 'natural'
       ? [auditExtensionDescriptor, featureFlagsExtensionDescriptor]
       : [featureFlagsExtensionDescriptor, auditExtensionDescriptor];
-  return sqlFamilyDescriptor.create(
-    createControlStack({
-      family: sqlFamilyDescriptor,
-      target: postgresTargetDescriptor,
-      adapter: postgresAdapterDescriptor,
-      driver: postgresDriverDescriptor,
-      extensionPacks,
-    }),
-  );
+  return createControlStack({
+    family: sqlFamilyDescriptor,
+    target: postgresTargetDescriptor,
+    adapter: postgresAdapterDescriptor,
+    driver: postgresDriverDescriptor,
+    extensionPacks,
+  });
+}
+
+function buildFamilyInstance(declarationOrder: 'natural' | 'reverse') {
+  return sqlFamilyDescriptor.create(buildControlStack(declarationOrder));
+}
+
+function buildControlAdapter(declarationOrder: 'natural' | 'reverse') {
+  return postgresAdapterDescriptor.create(buildControlStack(declarationOrder));
 }
 
 const appContract = buildFamilyInstance('natural').deserializeContract(
@@ -263,6 +269,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
 
     const result = await executeDbInit({
       driver: driver!,
+      adapter: buildControlAdapter('natural'),
       familyInstance: buildFamilyInstance('natural'),
       contract: appContract,
       mode: 'plan',
@@ -298,6 +305,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
 
     const result = await executeDbInit({
       driver: driver!,
+      adapter: buildControlAdapter('natural'),
       familyInstance: buildFamilyInstance('natural'),
       contract: appContract,
       mode: 'apply',
@@ -387,6 +395,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
 
     const result = await executeDbInit({
       driver: driver!,
+      adapter: buildControlAdapter('reverse'),
       familyInstance: buildFamilyInstance('reverse'),
       contract: appContract,
       mode: 'apply',

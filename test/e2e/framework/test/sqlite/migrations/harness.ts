@@ -24,15 +24,15 @@ import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalize
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
 
-const familyInstance = sqlFamilyDescriptor.create(
-  createControlStack({
-    family: sqlFamilyDescriptor,
-    target: sqliteTargetDescriptor,
-    adapter: sqliteAdapterDescriptor,
-    driver: sqliteDriverDescriptor,
-    extensionPacks: [],
-  }),
-);
+const controlStack = createControlStack({
+  family: sqlFamilyDescriptor,
+  target: sqliteTargetDescriptor,
+  adapter: sqliteAdapterDescriptor,
+  driver: sqliteDriverDescriptor,
+  extensionPacks: [],
+});
+const familyInstance = sqlFamilyDescriptor.create(controlStack);
+const controlAdapter = sqliteAdapterDescriptor.create(controlStack);
 
 const fw = [sqliteTargetDescriptor, sqliteAdapterDescriptor, sqliteDriverDescriptor] as const;
 
@@ -131,7 +131,7 @@ export async function applyMigration(
   const testDb = createTestDb();
   const { driver } = testDb;
   try {
-    const planner = sqliteTargetDescriptor.createPlanner(familyInstance);
+    const planner = sqliteTargetDescriptor.createPlanner(controlAdapter);
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
     const adapter = new SqliteControlAdapter();
     const policy = options.policy ?? INIT_ADDITIVE_POLICY;
