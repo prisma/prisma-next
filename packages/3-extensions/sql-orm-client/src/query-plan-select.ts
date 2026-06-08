@@ -25,7 +25,6 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type PolymorphismInfo,
@@ -371,8 +370,9 @@ function buildManyToManyJunctionArtifacts(
       ColumnRef.of(childTableRef, targetColumns[i] ?? junctionCol),
     ),
   );
+  const firstJoinPair = joinOnPairs[0];
   const joinOn: AnyExpression =
-    joinOnPairs.length === 1 ? castAs<AnyExpression>(joinOnPairs[0]!) : AndExpr.of(joinOnPairs);
+    joinOnPairs.length === 1 && firstJoinPair ? firstJoinPair : AndExpr.of(joinOnPairs);
 
   const correlationPairs = parentColumns.map((junctionCol, i) =>
     BinaryExpr.eq(
@@ -380,9 +380,10 @@ function buildManyToManyJunctionArtifacts(
       ColumnRef.of(parentTableName, parentLocalColumns[i] ?? junctionCol),
     ),
   );
+  const firstCorrelationPair = correlationPairs[0];
   const whereExpr: AnyExpression =
-    correlationPairs.length === 1
-      ? castAs<AnyExpression>(correlationPairs[0]!)
+    correlationPairs.length === 1 && firstCorrelationPair
+      ? firstCorrelationPair
       : AndExpr.of(correlationPairs);
 
   const junctionJoin = JoinAst.inner(
