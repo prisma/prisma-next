@@ -387,7 +387,9 @@ function initializeTypeHelpers(
       continue;
     }
 
-    const validatedParams = validateTypeParams(typeParams, descriptor, {
+    // `typeParams` may be absent on the canonical empty form. Forward `{}`
+    // to the descriptor's paramsSchema so it can probe its own optionality.
+    const validatedParams = validateTypeParams(typeParams ?? {}, descriptor, {
       typeName,
     });
 
@@ -480,7 +482,22 @@ function assertColumnCodecIntegrity(
           }
         }
 
-        if (!descriptor.isParameterized && ref.typeParams !== undefined) {
+        // An object-typed field's empty state is canonical at every boundary
+        // that compares them: `typeParams: {}` and missing `typeParams` are
+        // equivalent — both mean "no parameters were supplied". A
+        // non-parameterized codec only conflicts with typeParams that carry
+        // at least one key. The PSL interpreter emits `typeParams: {}` for
+        // `@db.X` named types whose body has no parameters; treating that as
+        // a mismatch would reject every such alias against `pg/text@1`
+        // (e.g. the supabase extension's `Uuid` type).
+        const refTypeParams = ref.typeParams;
+        const refHasTypeParamKeys =
+          refTypeParams !== undefined &&
+          refTypeParams !== null &&
+          typeof refTypeParams === 'object' &&
+          !Array.isArray(refTypeParams) &&
+          Object.keys(refTypeParams).length > 0;
+        if (!descriptor.isParameterized && refHasTypeParamKeys) {
           throw runtimeError(
             'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
             `Column '${tableName}.${columnName}' supplies typeParams to non-parameterized codec '${ref.codecId}'. Remove the typeParams or switch to a parameterized codec id.`,
@@ -526,15 +543,24 @@ function buildContractCodecRegistry(
   const typeRefSites = collectTypeRefSites(contract.storage);
   for (const [typeName, typeInstance] of Object.entries(documentScopedCodecTypes(contract) ?? {})) {
     const enumView = readEnumViewIfApplicable(typeInstance);
+    const instanceTypeParams = enumView
+      ? enumView.typeParams
+      : (typeInstance as StorageTypeInstance).typeParams;
+    const hasParamKeys =
+      instanceTypeParams !== undefined && Object.keys(instanceTypeParams).length > 0;
     const ref: CodecRef = enumView
-      ? {
-          codecId: enumView.codecId,
-          typeParams: enumView.typeParams as unknown as JsonValue,
-        }
-      : {
-          codecId: (typeInstance as StorageTypeInstance).codecId,
-          typeParams: (typeInstance as StorageTypeInstance).typeParams as JsonValue,
-        };
+      ? hasParamKeys
+        ? {
+            codecId: enumView.codecId,
+            typeParams: instanceTypeParams as unknown as JsonValue,
+          }
+        : { codecId: enumView.codecId }
+      : hasParamKeys
+        ? {
+            codecId: (typeInstance as StorageTypeInstance).codecId,
+            typeParams: instanceTypeParams as JsonValue,
+          }
+        : { codecId: (typeInstance as StorageTypeInstance).codecId };
     const key = refKeyOf(ref);
     const sites = typeRefSites.get(typeName) ?? [];
     const existing = usedAtByKey.get(key);
