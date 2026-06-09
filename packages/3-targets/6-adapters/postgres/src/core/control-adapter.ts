@@ -51,6 +51,12 @@ import {
   readPostgresSchemaIrAnnotations,
 } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+import {
+  computeContentHash,
+  normalizePredicate,
+  type RlsPolicyOperation,
+} from '@prisma-next/target-postgres/rls-canonicalize';
+import { PostgresRlsPolicy, PostgresRole } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
@@ -1094,10 +1100,82 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const rawStorageTypes = await introspectPostgresEnumTypes({ driver, schemaName: schema });
+    const [rawStorageTypes, policiesResult, rolesResult, rlsEnabledResult] = await Promise.all([
+      introspectPostgresEnumTypes({ driver, schemaName: schema }),
+      driver.query<{
+        schemaname: string;
+        tablename: string;
+        policyname: string;
+        cmd: string;
+        roles: string[];
+        qual: string | null;
+        with_check: string | null;
+        permissive: string;
+      }>(
+        `SELECT schemaname, tablename, policyname, cmd, roles, qual, with_check, permissive
+         FROM pg_catalog.pg_policies
+         WHERE schemaname = $1
+         ORDER BY tablename, policyname`,
+        [schema],
+      ),
+      driver.query<{ rolname: string }>(
+        `SELECT rolname
+         FROM pg_catalog.pg_roles
+         WHERE rolname NOT LIKE 'pg_%'
+           AND rolname != 'postgres'
+         ORDER BY rolname`,
+      ),
+      driver.query<{ relname: string; relrowsecurity: boolean }>(
+        `SELECT c.relname, c.relrowsecurity
+         FROM pg_catalog.pg_class c
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = $1
+           AND c.relkind = 'r'
+         ORDER BY c.relname`,
+        [schema],
+      ),
+    ]);
+
     const storageTypes: Record<string, PostgresEnumStorageTypeAnnotation> = {};
     for (const [typeName, annotation] of Object.entries(rawStorageTypes)) {
       storageTypes[enumStorageCompoundKey(schema, typeName)] = annotation;
+    }
+
+    const rlsPolicies: PostgresRlsPolicy[] = policiesResult.rows.map((row) => {
+      const operation = mapPgCmd(row.cmd);
+      const roles = [...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase()))].sort();
+      const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
+      const hash = computeContentHash({
+        ...(row.qual !== null ? { using: row.qual } : {}),
+        ...(row.with_check !== null ? { withCheck: row.with_check } : {}),
+        roles,
+        operation,
+        permissive,
+      });
+      const suffix = `_${hash}`;
+      const prefix = row.policyname.endsWith(suffix)
+        ? row.policyname.slice(0, -suffix.length)
+        : row.policyname;
+      return new PostgresRlsPolicy({
+        name: `${prefix}_${hash}`,
+        prefix,
+        tableName: row.tablename,
+        namespaceId: row.schemaname,
+        operation,
+        roles,
+        ...(row.qual !== null ? { using: normalizePredicate(row.qual) } : {}),
+        ...(row.with_check !== null ? { withCheck: normalizePredicate(row.with_check) } : {}),
+        permissive,
+      });
+    });
+
+    const roles: PostgresRole[] = rolesResult.rows.map(
+      (row) => new PostgresRole({ name: row.rolname }),
+    );
+
+    const rlsEnabledByTable: Record<string, boolean> = {};
+    for (const row of rlsEnabledResult.rows) {
+      rlsEnabledByTable[row.relname] = row.relrowsecurity;
     }
 
     const annotations = {
@@ -1107,6 +1185,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...ifDefined(
           'storageTypes',
           Object.keys(storageTypes).length > 0 ? storageTypes : undefined,
+        ),
+        ...ifDefined('rlsPolicies', rlsPolicies.length > 0 ? rlsPolicies : undefined),
+        ...ifDefined('roles', roles.length > 0 ? roles : undefined),
+        ...ifDefined(
+          'rlsEnabledByTable',
+          Object.keys(rlsEnabledByTable).length > 0 ? rlsEnabledByTable : undefined,
         ),
       },
     };
@@ -1126,6 +1210,52 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     // Extract version number from "PostgreSQL 15.1 ..." format
     const match = versionString.match(/PostgreSQL (\d+\.\d+)/);
     return match?.[1] ?? 'unknown';
+  }
+}
+
+/**
+ * Normalises a `name[]` column value from `pg_policies.roles`.
+ *
+ * The `pg` client's type-parser registry handles `text[]` (OID 1009) but not
+ * `name[]` (OID 1003). When the parser is absent the raw Postgres text-array
+ * literal (`{role1,role2}`) is returned as a string instead of a JS array.
+ * This function accepts either form and returns a plain string array.
+ */
+function parsePgNameArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value as string[];
+  }
+  if (typeof value !== 'string') {
+    return [];
+  }
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    return [];
+  }
+  const inner = trimmed.slice(1, -1);
+  if (inner === '') {
+    return [];
+  }
+  return inner.split(',').map((s) => s.trim());
+}
+
+/**
+ * Maps `pg_policies.cmd` text values to the `RlsPolicyOperation` union.
+ * The `pg_policies` view renders the internal command code as an uppercase
+ * English keyword; this function lowercases to match the IR type.
+ */
+function mapPgCmd(cmd: string): RlsPolicyOperation {
+  switch (cmd.toUpperCase()) {
+    case 'SELECT':
+      return 'select';
+    case 'INSERT':
+      return 'insert';
+    case 'UPDATE':
+      return 'update';
+    case 'DELETE':
+      return 'delete';
+    default:
+      return 'all';
   }
 }
 

@@ -79,6 +79,7 @@
     "./planner-target-details": "./dist/planner-target-details.mjs",
     "./render-ops": "./dist/render-ops.mjs",
     "./render-typescript": "./dist/render-typescript.mjs",
+    "./rls-canonicalize": "./dist/rls-canonicalize.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./sql-utils": "./dist/sql-utils.mjs",
     "./types": "./dist/types.mjs",

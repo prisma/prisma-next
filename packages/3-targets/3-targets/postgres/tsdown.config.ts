@@ -26,6 +26,7 @@ export default defineConfig({
     'src/exports/planner.ts',
     'src/exports/render-ops.ts',
     'src/exports/render-typescript.ts',
+    'src/exports/rls-canonicalize.ts',
     'src/exports/runtime.ts',
     'src/exports/sql-utils.ts',
     'src/exports/types.ts',

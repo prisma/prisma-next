@@ -10,6 +10,8 @@ import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-cont
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PG_ENUM_CODEC_ID } from '../codec-ids';
 import type { PostgresEnumType } from '../postgres-enum-type';
+import type { PostgresRlsPolicy } from '../postgres-rls-policy';
+import type { PostgresRole } from '../postgres-role';
 import { isPostgresSchema } from '../postgres-schema';
 
 /**
@@ -25,6 +27,12 @@ interface PgStorageTypeEntry {
 export interface PostgresSchemaIrAnnotations {
   readonly schema?: string;
   readonly storageTypes?: Readonly<Record<string, PgStorageTypeEntry>>;
+  /** RLS policies introspected from `pg_policies`, keyed by full wire name. */
+  readonly rlsPolicies?: readonly PostgresRlsPolicy[];
+  /** Database roles introspected from `pg_roles`, excluding system roles. */
+  readonly roles?: readonly PostgresRole[];
+  /** Per-table RLS enabled flag from `pg_class.relrowsecurity`. */
+  readonly rlsEnabledByTable?: Readonly<Record<string, boolean>>;
 }
 
 function readOptionalString(value: unknown): string | undefined {
@@ -79,9 +87,29 @@ export function readPostgresSchemaIrAnnotations(schema: SqlSchemaIR): PostgresSc
   }
   const schemaField = readOptionalString(Reflect.get(raw, 'schema'));
   const storageTypes = readPgStorageTypesMap(Reflect.get(raw, 'storageTypes'));
+
+  const rlsPoliciesRaw = Reflect.get(raw, 'rlsPolicies');
+  const rlsPolicies = Array.isArray(rlsPoliciesRaw)
+    ? (rlsPoliciesRaw as readonly PostgresRlsPolicy[])
+    : undefined;
+
+  const rolesRaw = Reflect.get(raw, 'roles');
+  const roles = Array.isArray(rolesRaw) ? (rolesRaw as readonly PostgresRole[]) : undefined;
+
+  const rlsEnabledByTableRaw = Reflect.get(raw, 'rlsEnabledByTable');
+  const rlsEnabledByTable =
+    rlsEnabledByTableRaw !== null &&
+    typeof rlsEnabledByTableRaw === 'object' &&
+    !Array.isArray(rlsEnabledByTableRaw)
+      ? (rlsEnabledByTableRaw as Readonly<Record<string, boolean>>)
+      : undefined;
+
   return {
     ...(schemaField !== undefined ? { schema: schemaField } : {}),
     ...(storageTypes !== undefined ? { storageTypes } : {}),
+    ...(rlsPolicies !== undefined ? { rlsPolicies } : {}),
+    ...(roles !== undefined ? { roles } : {}),
+    ...(rlsEnabledByTable !== undefined ? { rlsEnabledByTable } : {}),
   };
 }
 
