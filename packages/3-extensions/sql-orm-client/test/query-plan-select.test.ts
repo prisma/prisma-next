@@ -640,6 +640,7 @@ describe('M:N include correlated subquery', () => {
     return {
       relationName: 'children',
       relatedModelName: 'Child',
+      relatedNamespaceId: 'public',
       relatedTableName: 'children',
       targetColumn: opts.targetColumns[0] ?? 'id',
       localColumn: parentLocalColumns[0] ?? 'id',
@@ -675,7 +676,7 @@ describe('M:N include correlated subquery', () => {
     });
 
     const state = { ...emptyState(), includes: [include] };
-    const plan = compileSelectWithIncludes(contract, 'parents', state);
+    const plan = compileSelectWithIncludes(contract, 'public', 'parents', state);
 
     expectSelectAst(plan.ast);
     // Single top-level subquery projection — no multiple executions
@@ -728,7 +729,7 @@ describe('M:N include correlated subquery', () => {
     });
 
     const state = { ...emptyState(), includes: [include] };
-    const plan = compileSelectWithIncludes(contract, 'parents', state);
+    const plan = compileSelectWithIncludes(contract, 'public', 'parents', state);
 
     expectSelectAst(plan.ast);
     const childrenProjection = plan.ast.projection.find((item) => item.alias === 'children');
@@ -768,7 +769,7 @@ describe('M:N include correlated subquery', () => {
     const { collection } = createCollection();
     const state = collection.include('posts').state;
 
-    const plan = compileSelectWithIncludes(baseContract, 'users', state);
+    const plan = compileSelectWithIncludes(baseContract, 'public', 'users', state);
     expectSelectAst(plan.ast);
 
     const postsProjection = plan.ast.projection.find((item) => item.alias === 'posts');
@@ -902,6 +903,7 @@ describe('M:N include correlated subquery', () => {
     const grandchildInclude: IncludeExpr = {
       relationName: 'grandchildren',
       relatedModelName: 'Grandchild',
+      relatedNamespaceId: 'public',
       relatedTableName: 'grandchildren',
       targetColumn: 'child_id',
       localColumn: 'id',
@@ -917,6 +919,7 @@ describe('M:N include correlated subquery', () => {
     const include: IncludeExpr = {
       relationName: 'children',
       relatedModelName: 'Child',
+      relatedNamespaceId: 'public',
       relatedTableName: 'children',
       targetColumn: 'id',
       localColumn: 'id',
@@ -943,6 +946,7 @@ describe('M:N include correlated subquery', () => {
     // generated nominal types; the cast is local to this test.
     const plan = compileSelectWithIncludes(
       contract as unknown as Parameters<typeof compileSelectWithIncludes>[0],
+      'public',
       'parents',
       state,
     );

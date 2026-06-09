@@ -331,7 +331,7 @@ export function resolveIncludeRelation(
   let through: IncludeThroughDescriptor | undefined;
   if (relation.through !== undefined) {
     const parentLocalColumns = relation.on.localFields.map((field) =>
-      resolveFieldToColumn(contract, modelName, field),
+      resolveFieldToColumn(contract, namespaceId, modelName, field),
     );
     through = {
       table: relation.through.table,
