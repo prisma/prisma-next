@@ -1,12 +1,6 @@
 import type { ContractModelDefinitions } from '@prisma-next/contract/types';
-import {
-  defineContract,
-  enumType,
-  field,
-  member,
-  model,
-} from '@prisma-next/postgres/contract-builder';
 import { expectTypeOf } from 'vitest';
+import { defineContract, enumType, field, member, model } from '../../src/exports/contract-builder';
 
 // @ts-expect-error — capabilities are contributed by components, not authoring input
 defineContract({ capabilities: { postgres: { lateral: true } } });
