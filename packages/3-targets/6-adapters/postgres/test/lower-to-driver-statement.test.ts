@@ -134,4 +134,16 @@ describe('PostgresControlAdapter.lower output is unchanged after D1', () => {
     expect(lowered.sql).toContain('"f" uuid DEFAULT (gen_random_uuid())');
     expect(lowered.params).toEqual([]);
   });
+
+  it('throws when a numeric literal default is non-finite (NaN / ±Infinity)', async () => {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const ast = new PostgresCreateTable({
+        table: 'defaults',
+        columns: [col('x', 'double precision', { default: lit(value) })],
+      });
+      await expect(adapter.lowerToDriverStatement(ast, ctx)).rejects.toThrow(
+        /non-finite number wire value/,
+      );
+    }
+  });
 });

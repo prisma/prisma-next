@@ -1421,7 +1421,14 @@ function pgIsTextLikeNativeType(nativeType: string): boolean {
 function pgInlineLiteral(wire: unknown, nativeType: string): string {
   if (wire === null) return 'NULL';
   if (typeof wire === 'boolean') return wire ? 'true' : 'false';
-  if (typeof wire === 'number') return String(wire);
+  if (typeof wire === 'number') {
+    if (!Number.isFinite(wire)) {
+      throw new Error(
+        `pgRenderDdlDriverStatement: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+      );
+    }
+    return String(wire);
+  }
   if (typeof wire === 'bigint') return String(wire);
   if (wire instanceof Date) {
     const quoted = `'${escapeLiteral(wire.toISOString())}'`;
