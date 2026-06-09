@@ -152,8 +152,8 @@ export function extractEnumInfo(annotations?: Record<string, unknown>): EnumInfo
           const nativeType = typeInstance.nativeType;
           typeNames.add(nativeType);
           const values = typeInstance.typeParams?.['values'];
-          if (Array.isArray(values)) {
-            definitions.set(nativeType, values as string[]);
+          if (Array.isArray(values) && values.every((v): v is string => typeof v === 'string')) {
+            definitions.set(nativeType, values);
           }
         }
       }
