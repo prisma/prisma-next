@@ -9,7 +9,9 @@ The project ships in three PRs sequenced rename-only → infrastructure → docu
 
 ## Cross-project dependencies
 
-This project has no upstream dependencies in the umbrella. It is the most independent of the four constituents and can land first. It does not depend on [TML-2459](../target-extensible-ir/spec.md) (different concern); does not depend on [postgres-rls](../postgres-rls/spec.md) (static side vs dynamic side); does not depend on [cross-contract-refs](../cross-contract-refs/spec.md) (orthogonal).
+This project has no upstream **build** dependencies in the umbrella — the code (export `SqlRuntime`, add `PostgresRuntime`, add `withRawConnection`) can be written first. It does not depend on [TML-2459](../target-extensible-ir/spec.md) (different concern) or [cross-contract-refs](../cross-contract-refs/spec.md) (orthogonal).
+
+**However, proving it works depends on [postgres-rls](../postgres-rls/spec.md).** The architectural payoff of the below-middleware raw-connection accessor is that a `SET LOCAL role` issued through it actually *gates access* — and that can only be demonstrated against real RLS policies + roles to enforce against, which `postgres-rls` provides. So this project's end-to-end proof / DoD follows `postgres-rls` rather than running fully in parallel. (The mechanical M2 check — that bootstrap SQL issued inside `withRawConnection` is invisible to user middleware — stays independent; it's the *value* proof, "role binding gates access," that waits on `postgres-rls`.)
 
 It is a hard dependency of [extension-supabase](../extension-supabase/spec.md), which extends `PostgresRuntime` to ship `SupabaseRuntime`.
 
@@ -80,6 +82,7 @@ The three PRs below correspond to the three milestones (M1, M2, M3). Each milest
 Per the umbrella's walking-skeleton strategy (decisions [C13/C14](../supabase-integration/decisions.md); [README](../supabase-integration/README.md) §"Walking skeleton"), this project's definition of done includes wiring its feature into the running `examples/supabase` app:
 
 - [ ] Switch the `examples/supabase` `db.ts` onto the exported `PostgresRuntime` (the skeleton ran on the stock `@prisma-next/postgres/runtime` factory until now). This proves `PostgresRuntime` is the substrate `SupabaseRuntime` will extend in `extension-supabase` M2; no behaviour change expected, since the initial `PostgresRuntime` is identity-like.
+- [ ] **Prove the value against `postgres-rls`** (the dependency this project's proof rests on): a test that issues `SET LOCAL role` via `withRawConnection` below the middleware chain and shows a subsequent query is gated by an RLS policy + role authored through `postgres-rls`. This is the end-to-end demonstration that below-middleware role binding actually enforces access — it requires `postgres-rls` to have landed, so it sequences after it.
 
 ## Risks and mitigations
 
