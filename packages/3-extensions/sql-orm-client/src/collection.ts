@@ -16,6 +16,7 @@ import {
   type ToWhereExpr,
   type WhereArg,
 } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
@@ -513,7 +514,7 @@ export class Collection<
       targetColumn: relation.targetColumn,
       localColumn: relation.localColumn,
       cardinality: relation.cardinality,
-      ...(relation.through !== undefined ? { through: relation.through } : {}),
+      ...ifDefined('through', relation.through),
       nested: nestedState,
       scalar: scalarSelector,
       combine: combineBranches,
