@@ -83,7 +83,7 @@ describe('runtime verify-marker: missing marker table', {
       driver,
       log,
     });
-    const builder = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
+    const builder = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } }).public;
 
     try {
       const rows = await runtime.execute(builder.users.select('id').build()).toArray();

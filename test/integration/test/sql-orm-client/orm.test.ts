@@ -33,7 +33,7 @@ describe('integration/orm', () => {
           runtime,
           context: getTestContext(),
           collections: { Post: PostCollection },
-        });
+        }).public;
 
         await seedUsers(runtime, [
           { id: 1, name: 'Alice', email: 'alice@example.com' },
@@ -83,7 +83,7 @@ describe('integration/orm', () => {
           runtime,
           context: getTestContext(),
           collections: { Post: PostCollection, Comment: CommentCollection },
-        });
+        }).public;
 
         await seedUsers(runtime, [
           { id: 1, name: 'Alice', email: 'alice@example.com' },

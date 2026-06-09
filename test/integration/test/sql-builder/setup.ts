@@ -151,7 +151,9 @@ export function setupIntegrationTest() {
   });
 
   return {
-    db: () => sql({ context, rawCodecInferer: postgresRawCodecInferer }),
+    // The builder surface is always qualified; alias `db()` to the `public`
+    // namespace facet (the sole shape) so tables are reached as `db().<table>`.
+    db: () => sql({ context, rawCodecInferer: postgresRawCodecInferer }).public,
     runtime: () => runtime,
   };
 }

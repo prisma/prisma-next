@@ -3,6 +3,7 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { orm as sqlOrm } from '@prisma-next/sql-orm-client';
 import {
@@ -152,7 +153,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
           });
 
           try {
-            const ormClient = sqlOrm({ runtime, context });
+            const ormClient = sqlOrm({ runtime, context })[UNBOUND_NAMESPACE_ID]!;
 
             const shops = await ormClient.Shop.all();
             expect(shops).toHaveLength(1);

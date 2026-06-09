@@ -158,7 +158,7 @@ describe('integration: rawSql expression in typed builder', {
   describe('rawSql expression survives the full pipeline and returns expected rows', () => {
     it('rawSql in aliased select produces correct computed values from the database', async () => {
       const adapter = postgresRawCodecInferer;
-      const db = sql({ context, rawCodecInferer: adapter });
+      const db = sql({ context, rawCodecInferer: adapter }).public;
       const runtime = buildRuntime();
 
       // posts.views values: 100, 50, 200, 10 — doubled they become 200, 100, 400, 20.
@@ -178,7 +178,7 @@ describe('integration: rawSql expression in typed builder', {
 
     it('rawSql with a literal scalar expression returns the same value for every row', async () => {
       const adapter = postgresRawCodecInferer;
-      const db = sql({ context, rawCodecInferer: adapter });
+      const db = sql({ context, rawCodecInferer: adapter }).public;
       const runtime = buildRuntime();
 
       const rows = await runtime.execute(
@@ -210,7 +210,7 @@ describe('integration: rawSql expression in typed builder', {
       };
 
       const adapter = postgresRawCodecInferer;
-      const db = sql({ context, rawCodecInferer: adapter });
+      const db = sql({ context, rawCodecInferer: adapter }).public;
       const runtime = buildRuntime([middleware]);
 
       // The where clause embeds a param() inside a rawSql expression.
@@ -252,7 +252,7 @@ describe('integration: rawSql expression in typed builder', {
       };
 
       const adapter = postgresRawCodecInferer;
-      const db = sql({ context, rawCodecInferer: adapter });
+      const db = sql({ context, rawCodecInferer: adapter }).public;
       const runtime = buildRuntime([middleware]);
 
       // Two param() calls: param(10) and param(200).
