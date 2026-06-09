@@ -8,6 +8,7 @@ import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import { param } from '@prisma-next/sql-relational-core/expression';
@@ -28,7 +29,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 interface Harness {
-  readonly db: Db<Contract>;
+  readonly db: Db<Contract>[typeof UNBOUND_NAMESPACE_ID];
   readonly runtime: Runtime;
   readonly close: () => Promise<void>;
 }
@@ -97,7 +98,11 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
   });
 
   const adapter = sqliteRawCodecInferer;
-  const db: Db<Contract> = sql<Contract>({ context, rawCodecInferer: adapter });
+  // sqlite is single-namespace: alias to the unbound facet so tables are flat.
+  const db: Db<Contract>[typeof UNBOUND_NAMESPACE_ID] = sql<Contract>({
+    context,
+    rawCodecInferer: adapter,
+  })[UNBOUND_NAMESPACE_ID];
 
   return {
     db,

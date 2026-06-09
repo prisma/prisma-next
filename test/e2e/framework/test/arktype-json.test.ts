@@ -44,7 +44,7 @@ async function withPostgresClient(
     let runtime: Runtime | undefined;
     try {
       runtime = await db.connect();
-      await db.orm.User.first();
+      await db.orm.public.User.first();
       await callback(db);
     } finally {
       await runtime?.close();
@@ -59,12 +59,12 @@ function buildEmbedding(seed: number): Vector<1536> {
 describe('arktype-json column round-trip', { timeout: timeouts.spinUpPpgDev }, () => {
   it('writes and reads back a typed JSON value through the ORM', async () => {
     await withPostgresClient(async (db) => {
-      const created = await db.orm.Embedding.create({
+      const created = await db.orm.public.Embedding.create({
         embedding: buildEmbedding(0),
         profile: { name: 'alice', age: 30 },
       });
 
-      const found = await db.orm.Embedding.where({ id: created.id }).first();
+      const found = await db.orm.public.Embedding.where({ id: created.id }).first();
       expect(found).not.toBeNull();
       expect(found!.profile).toEqual({ name: 'alice', age: 30 });
     });
