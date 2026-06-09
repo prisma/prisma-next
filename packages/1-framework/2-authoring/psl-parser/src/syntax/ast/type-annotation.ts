@@ -12,13 +12,26 @@ export class TypeAnnotationAst implements AstNode {
     this.syntax = syntax;
   }
 
-  // REVIEW: don't collect the array
-  #segments(): IdentifierAst[] {
-    return Array.from(filterChildren(this.syntax, IdentifierAst.cast));
+  #lastSegment(): IdentifierAst | undefined {
+    let last: IdentifierAst | undefined;
+    for (const segment of filterChildren(this.syntax, IdentifierAst.cast)) {
+      last = segment;
+    }
+    return last;
+  }
+
+  #penultimateSegment(): IdentifierAst | undefined {
+    let last: IdentifierAst | undefined;
+    let penultimate: IdentifierAst | undefined;
+    for (const segment of filterChildren(this.syntax, IdentifierAst.cast)) {
+      penultimate = last;
+      last = segment;
+    }
+    return penultimate;
   }
 
   name(): IdentifierAst | undefined {
-    return this.#segments().at(-1);
+    return this.#lastSegment();
   }
 
   colon(): Token | undefined {
@@ -31,12 +44,12 @@ export class TypeAnnotationAst implements AstNode {
 
   spaceName(): IdentifierAst | undefined {
     if (!this.colon()) return undefined;
-    return this.#segments().at(0);
+    return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
   namespaceName(): IdentifierAst | undefined {
     if (!this.dot()) return undefined;
-    return this.#segments().at(-2);
+    return this.#penultimateSegment();
   }
 
   constructorCall(): FunctionCallAst | undefined {
