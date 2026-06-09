@@ -456,6 +456,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'Parent',
       data: {
         id: 1,
@@ -486,6 +487,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'Parent',
       data: {
         id: 1,
@@ -522,6 +524,7 @@ describe('mutation-executor', () => {
     await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'Parent',
       data: {
         tenant_id: 7,
@@ -552,6 +555,7 @@ describe('mutation-executor', () => {
     await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'Parent',
       filters: [BinaryExpr.eq(ColumnRef.of('parents', 'id'), LiteralExpr.of(1))],
       data: {
@@ -580,6 +584,7 @@ describe('mutation-executor', () => {
     await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'Parent',
       filters: [BinaryExpr.eq(ColumnRef.of('parents', 'id'), LiteralExpr.of(1))],
       data: {
@@ -629,6 +634,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         data: {
           id: 1,
@@ -652,6 +658,7 @@ describe('mutation-executor', () => {
       executeNestedCreateMutation({
         context: { ...getTestContext(), contract },
         runtime,
+        namespaceId: 'public',
         modelName: 'User',
         data: {
           id: 1,
@@ -678,6 +685,7 @@ describe('mutation-executor', () => {
     await executeNestedUpdateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       filters: [userIdFilter],
       data: {
@@ -702,6 +710,7 @@ describe('mutation-executor', () => {
     const created = await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
       runtime,
+      namespaceId: 'public',
       modelName: 'User',
       data: {
         id: 1,
