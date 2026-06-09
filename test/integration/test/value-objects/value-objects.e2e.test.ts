@@ -3,7 +3,6 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { orm as sqlOrm } from '@prisma-next/sql-orm-client';
 import {
@@ -155,7 +154,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
           try {
             const ormClient = sqlOrm({ runtime, context });
 
-            const shops = await ormClient[UNBOUND_NAMESPACE_ID]!.Shop.all();
+            const shops = await ormClient.public.Shop.all();
             expect(shops).toHaveLength(1);
 
             const shop = shops[0]!;
@@ -164,7 +163,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
             expect(shop.location).toEqual(locationData);
             expect(shop.notes).toBeNull();
 
-            const created = await ormClient[UNBOUND_NAMESPACE_ID]!.Shop.create({
+            const created = await ormClient.public.Shop.create({
               id: 2,
               name: 'Blue Bar',
               location: { street: '7 Elm St', city: 'Seattle', zip: '98101' },
@@ -182,7 +181,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
               zip: '98401',
             });
 
-            const allShops = await ormClient[UNBOUND_NAMESPACE_ID]!.Shop.all();
+            const allShops = await ormClient.public.Shop.all();
             expect(allShops).toHaveLength(2);
           } finally {
             await runtime.close();
