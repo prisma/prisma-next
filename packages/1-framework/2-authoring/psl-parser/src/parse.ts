@@ -525,11 +525,15 @@ function parseNamespace(
     parseIdentifier(cursor);
   }
   if (insideNamespace) {
-    cursor.diagnostic(INVALID_NAMESPACE_BLOCK, 'Namespace blocks may not nest', keywordIndex);
+    cursor.diagnostic(
+      INVALID_NAMESPACE_BLOCK,
+      `Recursive "namespace ${name}" block is not allowed; namespace blocks may not nest`,
+      keywordIndex,
+    );
   } else if (name === UNSPECIFIED_PSL_NAMESPACE_ID) {
     cursor.diagnostic(
       INVALID_NAMESPACE_BLOCK,
-      'Namespace name is reserved for the parser-synthesised bucket',
+      `Namespace name "${UNSPECIFIED_PSL_NAMESPACE_ID}" is reserved for the parser-synthesised bucket for top-level declarations`,
       keywordIndex,
     );
   }
@@ -547,13 +551,13 @@ function parseTypesBlock(
   if (insideNamespace) {
     cursor.diagnostic(
       INVALID_NAMESPACE_BLOCK,
-      '`types` blocks must be declared at the document top level',
+      '`types` blocks must be declared at the document top level, not inside a namespace block',
       keywordIndex,
     );
   } else if (state.topLevelTypesSeen) {
     cursor.diagnostic(
       INVALID_TYPES_MEMBER,
-      'Only one top-level `types` block is allowed',
+      'Only one top-level `types` block is allowed per document',
       keywordIndex,
     );
   } else {
@@ -581,16 +585,17 @@ function parseBlockBody(cursor: ParserCursor, parseMember: MemberParser): void {
   if (cursor.peekKind() === 'RBrace') {
     cursor.bump();
   } else {
-    cursor.diagnostic(UNTERMINATED_BLOCK, 'Block is not closed before end of input', braceIndex);
+    cursor.diagnostic(UNTERMINATED_BLOCK, 'Unterminated block declaration', braceIndex);
   }
 }
 
 function parseUnsupportedTopLevel(cursor: ParserCursor): void {
-  cursor.diagnostic(
-    UNSUPPORTED_TOP_LEVEL_BLOCK,
-    'Unsupported top-level declaration',
-    cursor.currentSignificantIndex(),
-  );
+  const offending = cursor.peekToken().text;
+  const message =
+    cursor.peekKind(1) === 'LBrace'
+      ? `Unsupported top-level block "${offending}"`
+      : `Unsupported top-level declaration "${offending}"`;
+  cursor.diagnostic(UNSUPPORTED_TOP_LEVEL_BLOCK, message, cursor.currentSignificantIndex());
   cursor.bump();
   cursor.recoverToSyncPoint();
 }
@@ -605,7 +610,11 @@ function parseModelMember(cursor: ParserCursor): void {
     parseField(cursor);
     return;
   }
-  invalidMember(cursor, INVALID_MODEL_MEMBER, 'Invalid model member');
+  invalidMember(
+    cursor,
+    INVALID_MODEL_MEMBER,
+    `Invalid model member declaration "${cursor.peekToken().text}"`,
+  );
 }
 
 function parseEnumMember(cursor: ParserCursor): void {
@@ -618,7 +627,11 @@ function parseEnumMember(cursor: ParserCursor): void {
     parseEnumValue(cursor);
     return;
   }
-  invalidMember(cursor, INVALID_ENUM_MEMBER, 'Invalid enum member');
+  invalidMember(
+    cursor,
+    INVALID_ENUM_MEMBER,
+    `Invalid enum value declaration "${cursor.peekToken().text}"`,
+  );
 }
 
 function parseNamedTypeMember(cursor: ParserCursor): void {
@@ -626,7 +639,11 @@ function parseNamedTypeMember(cursor: ParserCursor): void {
     parseNamedType(cursor);
     return;
   }
-  invalidMember(cursor, INVALID_TYPES_MEMBER, 'Invalid types block member');
+  invalidMember(
+    cursor,
+    INVALID_TYPES_MEMBER,
+    `Invalid types declaration "${cursor.peekToken().text}"`,
+  );
 }
 
 function parseKeyValueMember(cursor: ParserCursor): void {

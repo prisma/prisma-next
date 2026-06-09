@@ -469,6 +469,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
     // range points at the offending second dot
     expect(offendingOffset(cursor, diagnostics[0]!)).toBe(3);
     expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe('.');
@@ -482,6 +483,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
     expect(offendingOffset(cursor, diagnostics[0]!)).toBe(3);
     expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe(':');
   });
@@ -496,8 +498,20 @@ describe('parseAttribute fault tolerance', () => {
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    expect(diagnostics[0]!.message).toBe('Attribute name expected');
     expect(offendingOffset(cursor, diagnostics[0]!)).toBe(0);
     expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe('@');
+  });
+
+  it('flags a missing name after a dotted attribute segment', () => {
+    const source = '@ns.';
+    const { node, diagnostics } = parse(source, parseAttribute);
+
+    expect(node.kind).toBe('FieldAttribute');
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    expect(diagnostics[0]!.message).toBe('Attribute name expected after "."');
   });
 });
 
