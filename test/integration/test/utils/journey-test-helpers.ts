@@ -460,9 +460,7 @@ export function injectMigrationSqlDbSetup(scaffold: string): string {
     '    contract: endContract,',
     '    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),',
     '  }),',
-    // Always-qualified builder: alias to the `public` namespace facet so the
-    // injected data-transform lambdas reach tables flat as `db.<table>`.
-    '}).public;',
+    '});',
     '',
     'export default class M extends Migration {',
   ].join('\n');

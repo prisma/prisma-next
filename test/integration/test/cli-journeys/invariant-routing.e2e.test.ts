@@ -79,11 +79,11 @@ function patchBackfillMigrationTs(
   let filled = injectMigrationSqlDbSetup(scaffold)
     .replace(
       `() => placeholder('${INVARIANT_ID}:check')`,
-      "() => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1)",
+      "() => db.public.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1)",
     )
     .replace(
       `() => placeholder('${INVARIANT_ID}:run')`,
-      `() => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null))`,
+      `() => db.public.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null))`,
     );
 
   if (opts.addInvariantId) {
@@ -594,7 +594,7 @@ const db = sql({
     contract: endContract,
     stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
   }),
-}).public;
+});
 
 export default class M extends Migration {
   override describe() {
@@ -605,8 +605,8 @@ export default class M extends Migration {
     return [
       this.dataTransform(endContract, 'normalize-user-email', {
         invariantId: 'normalize-user-email',
-        check: () => db.user.select('id').where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')).limit(1),
-        run: () => db.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')),
+        check: () => db.public.user.select('id').where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')).limit(1),
+        run: () => db.public.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')),
       }),
     ];
   }
@@ -746,7 +746,7 @@ const db = sql({
     contract: endContract,
     stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
   }),
-}).public;
+});
 
 export default class M extends Migration {
   override describe() {
@@ -757,8 +757,8 @@ export default class M extends Migration {
     return [
       this.dataTransform(endContract, '${SELF_EDGE_INVARIANT}', {
         invariantId: '${SELF_EDGE_INVARIANT}',
-        check: () => db.user.select('id').where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')).limit(1),
-        run: () => db.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')),
+        check: () => db.public.user.select('id').where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')).limit(1),
+        run: () => db.public.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')),
       }),
     ];
   }

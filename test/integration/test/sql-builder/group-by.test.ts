@@ -7,7 +7,7 @@ describe('integration: GROUP BY / HAVING', { timeout: timeouts.databaseOperation
   it('GROUP BY with COUNT', async () => {
     const rows = await runtime().execute(
       db()
-        .posts.select('user_id')
+        .public.posts.select('user_id')
         .select('cnt', (_f, fns) => fns.count())
         .groupBy('user_id')
         .orderBy('user_id')
@@ -21,7 +21,7 @@ describe('integration: GROUP BY / HAVING', { timeout: timeouts.databaseOperation
   it('HAVING filters groups', async () => {
     const rows = await runtime().execute(
       db()
-        .posts.select('user_id')
+        .public.posts.select('user_id')
         .select('cnt', (_f, fns) => fns.count())
         .groupBy('user_id')
         .having((_f, fns) => fns.gt(fns.count(), 1))

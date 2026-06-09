@@ -153,9 +153,9 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
           });
 
           try {
-            const ormClient = sqlOrm({ runtime, context })[UNBOUND_NAMESPACE_ID]!;
+            const ormClient = sqlOrm({ runtime, context });
 
-            const shops = await ormClient.Shop.all();
+            const shops = await ormClient[UNBOUND_NAMESPACE_ID]!.Shop.all();
             expect(shops).toHaveLength(1);
 
             const shop = shops[0]!;
@@ -164,7 +164,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
             expect(shop.location).toEqual(locationData);
             expect(shop.notes).toBeNull();
 
-            const created = await ormClient.Shop.create({
+            const created = await ormClient[UNBOUND_NAMESPACE_ID]!.Shop.create({
               id: 2,
               name: 'Blue Bar',
               location: { street: '7 Elm St', city: 'Seattle', zip: '98101' },
@@ -182,7 +182,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
               zip: '98401',
             });
 
-            const allShops = await ormClient.Shop.all();
+            const allShops = await ormClient[UNBOUND_NAMESPACE_ID]!.Shop.all();
             expect(allShops).toHaveLength(2);
           } finally {
             await runtime.close();

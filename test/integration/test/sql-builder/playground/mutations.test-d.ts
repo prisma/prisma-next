@@ -3,12 +3,12 @@ import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('INSERT array form without returning resolves to empty row', () => {
-  const result = db.users.insert([{ id: 1, name: 'Alice', email: 'a@b.com' }]).build();
+  const result = db.public.users.insert([{ id: 1, name: 'Alice', email: 'a@b.com' }]).build();
   expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<Record<never, never>>>();
 });
 
 test('INSERT array form with returning resolves to selected columns', () => {
-  const result = db.users
+  const result = db.public.users
     .insert([{ id: 1, name: 'Alice', email: 'a@b.com' }])
     .returning('id', 'email')
     .build();
@@ -16,7 +16,7 @@ test('INSERT array form with returning resolves to selected columns', () => {
 });
 
 test('INSERT array form build return type', () => {
-  const result = db.users
+  const result = db.public.users
     .insert([{ id: 1 }])
     .returning('id', 'name')
     .build();
@@ -24,7 +24,7 @@ test('INSERT array form build return type', () => {
 });
 
 test('INSERT array form build returns SqlQueryPlan', () => {
-  const result = db.users
+  const result = db.public.users
     .insert([{ id: 1 }])
     .returning('id')
     .build();
@@ -32,7 +32,7 @@ test('INSERT array form build returns SqlQueryPlan', () => {
 });
 
 test('INSERT multi-row with returning resolves to selected columns', () => {
-  const result = db.users
+  const result = db.public.users
     .insert([
       { id: 1, name: 'Alice' },
       { id: 2, name: 'Bob' },
@@ -43,7 +43,7 @@ test('INSERT multi-row with returning resolves to selected columns', () => {
 });
 
 test('UPDATE without returning resolves to empty row', () => {
-  const result = db.users
+  const result = db.public.users
     .update({ name: 'Bob' })
     .where((f, fns) => fns.eq(f.id, 1))
     .build();
@@ -51,7 +51,7 @@ test('UPDATE without returning resolves to empty row', () => {
 });
 
 test('UPDATE with WHERE and returning resolves to selected columns', () => {
-  const result = db.users
+  const result = db.public.users
     .update({ name: 'Bob' })
     .where((f, fns) => fns.eq(f.id, 1))
     .returning('id', 'name')
@@ -60,7 +60,7 @@ test('UPDATE with WHERE and returning resolves to selected columns', () => {
 });
 
 test('UPDATE returning before where preserves row type', () => {
-  const result = db.users
+  const result = db.public.users
     .update({ email: 'new@test.com' })
     .returning('id', 'email')
     .where((f, fns) => fns.eq(f.id, 1))
@@ -69,7 +69,7 @@ test('UPDATE returning before where preserves row type', () => {
 });
 
 test('DELETE without returning resolves to empty row', () => {
-  const result = db.users
+  const result = db.public.users
     .delete()
     .where((f, fns) => fns.eq(f.id, 1))
     .build();
@@ -77,7 +77,7 @@ test('DELETE without returning resolves to empty row', () => {
 });
 
 test('DELETE with WHERE and returning resolves to selected columns', () => {
-  const result = db.users
+  const result = db.public.users
     .delete()
     .where((f, fns) => fns.eq(f.id, 1))
     .returning('id', 'email')
@@ -86,7 +86,7 @@ test('DELETE with WHERE and returning resolves to selected columns', () => {
 });
 
 test('INSERT returning includes nullable column', () => {
-  const result = db.users
+  const result = db.public.users
     .insert([{ id: 1 }])
     .returning('id', 'invited_by_id')
     .build();
@@ -95,44 +95,44 @@ test('INSERT returning includes nullable column', () => {
 
 test('INSERT array values accept codec input types', () => {
   // number for int4, string for text — should compile
-  db.users.insert([{ id: 1, name: 'Alice', email: 'a@b.com' }]);
+  db.public.users.insert([{ id: 1, name: 'Alice', email: 'a@b.com' }]);
 
   // nullable column accepts value or undefined (optional)
-  db.users.insert([{ id: 1, invited_by_id: 42 }]);
-  db.users.insert([{ id: 1 }]); // invited_by_id omitted — all fields optional
+  db.public.users.insert([{ id: 1, invited_by_id: 42 }]);
+  db.public.users.insert([{ id: 1 }]); // invited_by_id omitted — all fields optional
 });
 
 test('UPDATE values accept codec input types', () => {
-  db.users.update({ name: 'Bob' });
-  db.users.update({ email: 'new@test.com', name: 'Bob' });
+  db.public.users.update({ name: 'Bob' });
+  db.public.users.update({ email: 'new@test.com', name: 'Bob' });
 });
 
 test('returning only accepts valid column names', () => {
   // @ts-expect-error — 'nonexistent' is not a column
-  db.users.insert([{ id: 1 }]).returning('nonexistent');
+  db.public.users.insert([{ id: 1 }]).returning('nonexistent');
 
   // @ts-expect-error — 'nonexistent' is not a column
-  db.users.update({ name: 'Bob' }).returning('nonexistent');
+  db.public.users.update({ name: 'Bob' }).returning('nonexistent');
 
   // @ts-expect-error — 'nonexistent' is not a column
-  db.users.delete().returning('nonexistent');
+  db.public.users.delete().returning('nonexistent');
 });
 
 // Negative type tests — bare-object insert form must be rejected
 test('INSERT bare object form is a type error', () => {
   // @ts-expect-error — bare object is no longer accepted; wrap in array: insert([{ id: 1 }])
-  db.users.insert({ id: 1 });
+  db.public.users.insert({ id: 1 });
 });
 
 // UPDATE callback overload — type-level tests
 
 test('UPDATE callback overload type-checks with field reference', () => {
-  const result = db.users.update((f) => ({ name: f.name })).build();
+  const result = db.public.users.update((f) => ({ name: f.name })).build();
   expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<Record<never, never>>>();
 });
 
 test('UPDATE callback overload type-checks with where and returning', () => {
-  const result = db.users
+  const result = db.public.users
     .update((f) => ({ name: f.name }))
     .where((f, fns) => fns.eq(f.id, 1))
     .returning('id', 'name')
@@ -143,11 +143,11 @@ test('UPDATE callback overload type-checks with where and returning', () => {
 // Negative type tests — callback overload must enforce codec compatibility
 test('UPDATE callback codec mismatch is a type error', () => {
   // @ts-expect-error — f.name is a text expression; id expects a numeric expression
-  db.users.update((f) => ({ id: f.name }));
+  db.public.users.update((f) => ({ id: f.name }));
 });
 
 test('UPDATE callback aggregate function is a type error', () => {
-  db.users
+  db.public.users
     // @ts-expect-error — count() is not in Functions (non-aggregate only); update callback cannot use aggregates
     .update((_f, fns) => ({ name: fns.count() }));
 });

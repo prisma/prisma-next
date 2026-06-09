@@ -105,11 +105,11 @@ withTempDir(({ createTempDir }) => {
         const filled = injectMigrationSqlDbSetup(scaffold)
           .replace(
             "() => placeholder('handle-nulls-user-name:check')",
-            "() => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1)",
+            "() => db.public.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1)",
           )
           .replace(
             "() => placeholder('handle-nulls-user-name:run')",
-            `() => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null))`,
+            `() => db.public.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null))`,
           );
         expect(filled).not.toContain('placeholder(');
         expect(filled).toContain('const db = sql(');

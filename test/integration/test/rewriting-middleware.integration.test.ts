@@ -182,8 +182,8 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
       debug,
     });
 
-    const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } }).public;
-    const rows = await runtime.execute(db.users.select('id').build()).toArray();
+    const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
+    const rows = await runtime.execute(db.public.users.select('id').build()).toArray();
 
     expect(rows.map((r) => r.id)).toEqual([1]);
     expect(debug).toHaveBeenCalledWith({
@@ -215,8 +215,8 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
       debug,
     });
 
-    const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } }).public;
-    const rows = await runtime.execute(db.users.select('id', 'name').build()).toArray();
+    const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
+    const rows = await runtime.execute(db.public.users.select('id', 'name').build()).toArray();
 
     expect(rows.map((r) => r.id).sort()).toEqual([2, 3]);
     expect(debug).toHaveBeenCalledTimes(2);

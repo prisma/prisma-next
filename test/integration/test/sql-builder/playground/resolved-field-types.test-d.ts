@@ -7,14 +7,14 @@ import { db } from './preamble';
 type ExtractRow<T> = T extends SqlQueryPlan<infer R> ? R : never;
 
 test('SELECT resolves Vector column to concrete type via FieldOutputTypes', () => {
-  const result = db.posts.select('id', 'embedding').build();
+  const result = db.public.posts.select('id', 'embedding').build();
   assertType<{ id: number; embedding: Vector | null }>(
     null as unknown as ExtractRow<typeof result>,
   );
 });
 
 test('SELECT resolves parameterized Char column to concrete type via FieldOutputTypes', () => {
-  const result = db.articles.select('id', 'title').build();
+  const result = db.public.articles.select('id', 'title').build();
   expectTypeOf<ExtractRow<typeof result>>().toEqualTypeOf<{
     id: Char<36>;
     title: string;
@@ -22,7 +22,7 @@ test('SELECT resolves parameterized Char column to concrete type via FieldOutput
 });
 
 test('INSERT accepts concrete input types via FieldInputTypes', () => {
-  db.posts.insert([
+  db.public.posts.insert([
     {
       id: 1,
       title: 'test',
@@ -34,7 +34,7 @@ test('INSERT accepts concrete input types via FieldInputTypes', () => {
 });
 
 test('INSERT returning resolves to concrete output types', () => {
-  const result = db.posts
+  const result = db.public.posts
     .insert([{ id: 1, title: 'test', user_id: 1, views: 0 }])
     .returning('id', 'embedding')
     .build();
@@ -44,14 +44,14 @@ test('INSERT returning resolves to concrete output types', () => {
 });
 
 test('UPDATE returning resolves to concrete output types', () => {
-  const result = db.posts.update({ views: 10 }).returning('id', 'embedding').build();
+  const result = db.public.posts.update({ views: 10 }).returning('id', 'embedding').build();
   assertType<{ id: number; embedding: Vector | null }>(
     null as unknown as ExtractRow<typeof result>,
   );
 });
 
 test('DELETE returning resolves to concrete output types', () => {
-  const result = db.posts.delete().returning('id', 'embedding').build();
+  const result = db.public.posts.delete().returning('id', 'embedding').build();
   assertType<{ id: number; embedding: Vector | null }>(
     null as unknown as ExtractRow<typeof result>,
   );

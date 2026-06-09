@@ -8,7 +8,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     const row = await runtime()
       .execute(
         db()
-          .users.insert([{ id: 100, name: 'NewUser', email: 'new@test.com' }])
+          .public.users.insert([{ id: 100, name: 'NewUser', email: 'new@test.com' }])
           .returning('id', 'name')
           .build(),
       )
@@ -16,7 +16,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     expect(row.id).toBe(100);
     expect(row.name).toBe('NewUser');
 
-    const allRows = await runtime().execute(db().users.select('id', 'name').build());
+    const allRows = await runtime().execute(db().public.users.select('id', 'name').build());
     expect(allRows.find((r) => r.id === 100)).toEqual({ id: 100, name: 'NewUser' });
   });
 
@@ -24,7 +24,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     const row = await runtime()
       .execute(
         db()
-          .users.update({ name: 'UpdatedAlice' })
+          .public.users.update({ name: 'UpdatedAlice' })
           .where((f, fns) => fns.eq(f.id, 1))
           .returning('id', 'name')
           .build(),
@@ -35,7 +35,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     const verified = await runtime()
       .execute(
         db()
-          .users.select('id', 'name')
+          .public.users.select('id', 'name')
           .where((f, fns) => fns.eq(f.id, 1))
           .build(),
       )
@@ -47,7 +47,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     const row = await runtime()
       .execute(
         db()
-          .users.delete()
+          .public.users.delete()
           .where((f, fns) => fns.eq(f.id, 4))
           .returning('id', 'name')
           .build(),
@@ -58,7 +58,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     const deleted = await runtime()
       .execute(
         db()
-          .users.select('id')
+          .public.users.select('id')
           .where((f, fns) => fns.eq(f.id, 4))
           .build(),
       )
@@ -69,14 +69,14 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
   it('UPDATE accumulates multiple where() clauses with AND', async () => {
     await runtime().execute(
       db()
-        .users.insert([{ id: 300, name: 'Multi', email: 'multi@test.com' }])
+        .public.users.insert([{ id: 300, name: 'Multi', email: 'multi@test.com' }])
         .build(),
     );
 
     const row = await runtime()
       .execute(
         db()
-          .users.update({ name: 'MultiUpdated' })
+          .public.users.update({ name: 'MultiUpdated' })
           .where((f, fns) => fns.eq(f.name, 'Multi'))
           .where((f, fns) => fns.eq(f.email, 'multi@test.com'))
           .returning('id', 'name')
@@ -89,7 +89,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
   it('multi-row INSERT with returning yields one result per row', async () => {
     const rows = await runtime().execute(
       db()
-        .users.insert([
+        .public.users.insert([
           { id: 401, name: 'First', email: 'first@test.com' },
           { id: 402, name: 'Second', email: 'second@test.com' },
         ])
@@ -104,7 +104,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     const row = await runtime()
       .execute(
         db()
-          .users.insert([{ id: 200, name: 'Silent', email: 'silent@test.com' }])
+          .public.users.insert([{ id: 200, name: 'Silent', email: 'silent@test.com' }])
           .build(),
       )
       .first();
@@ -113,7 +113,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     const inserted = await runtime()
       .execute(
         db()
-          .users.select('id', 'name')
+          .public.users.select('id', 'name')
           .where((f, fns) => fns.eq(f.id, 200))
           .build(),
       )

@@ -168,8 +168,8 @@ describe('builder integration', () => {
     const db = sql<typeof contract>({
       context,
       rawCodecInferer: { inferCodec: () => 'pg/text' },
-    }).public;
-    const plan = db.user.select('id', 'email').build();
+    });
+    const plan = db.public.user.select('id', 'email').build();
 
     // Runtime checks
     expect(plan.ast).toBeInstanceOf(SelectAst);
@@ -210,8 +210,8 @@ describe('builder integration', () => {
     const db = sql<typeof contract>({
       context,
       rawCodecInferer: { inferCodec: () => 'pg/text' },
-    }).public;
-    const _plan = db.user.select('id', 'email', 'createdAt').build();
+    });
+    const _plan = db.public.user.select('id', 'email', 'createdAt').build();
 
     type Row = ResultType<typeof _plan>;
 

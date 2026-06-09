@@ -5,7 +5,7 @@ describe('integration: SELECT', { timeout: timeouts.databaseOperation }, () => {
   const { db, runtime } = setupIntegrationTest();
 
   it('basic column projection returns correct rows', async () => {
-    const rows = await runtime().execute(db().users.select('id', 'name').build());
+    const rows = await runtime().execute(db().public.users.select('id', 'name').build());
     expect(rows).toHaveLength(4);
     expect(typeof rows[0]!.id).toBe('number');
     expect(typeof rows[0]!.name).toBe('string');
@@ -14,7 +14,7 @@ describe('integration: SELECT', { timeout: timeouts.databaseOperation }, () => {
   it('aliased expression select', async () => {
     const rows = await runtime().execute(
       db()
-        .users.select('id')
+        .public.users.select('id')
         .select('userName', (f) => f.name)
         .build(),
     );
@@ -26,7 +26,7 @@ describe('integration: SELECT', { timeout: timeouts.databaseOperation }, () => {
   it('callback record select', async () => {
     const rows = await runtime().execute(
       db()
-        .users.select((f) => ({ myId: f.id, myName: f.name }))
+        .public.users.select((f) => ({ myId: f.id, myName: f.name }))
         .build(),
     );
     expect(rows).toHaveLength(4);
@@ -35,7 +35,7 @@ describe('integration: SELECT', { timeout: timeouts.databaseOperation }, () => {
   });
 
   it('chained select accumulates projections', async () => {
-    const rows = await runtime().execute(db().users.select('id').select('name').build());
+    const rows = await runtime().execute(db().public.users.select('id').select('name').build());
     expect(rows).toHaveLength(4);
     expect(rows[0]).toHaveProperty('id');
     expect(rows[0]).toHaveProperty('name');

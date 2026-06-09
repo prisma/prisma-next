@@ -82,8 +82,8 @@ test('ResultType inference works identically to fixture contract', () => {
   const adapter = createStubAdapter();
   const context = createTestContext(validatedBuilderContract, adapter);
 
-  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } }).public;
-  const _plan = db.user.select('id', 'email', 'createdAt').build();
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
+  const _plan = db.public.user.select('id', 'email', 'createdAt').build();
 
   type BuilderRow = ResultType<typeof _plan>;
 
@@ -94,8 +94,8 @@ test('ResultType inference works identically to fixture contract', () => {
   const fixtureDb = sql({
     context: fixtureContext,
     rawCodecInferer: { inferCodec: () => 'pg/text' },
-  }).public;
-  const _fixturePlan = fixtureDb['user']!.select('id', 'email', 'createdAt').build();
+  });
+  const _fixturePlan = fixtureDb.public['user']!.select('id', 'email', 'createdAt').build();
 
   type FixtureRow = ResultType<typeof _fixturePlan>;
 
@@ -392,8 +392,8 @@ test('codec type inference via type option', () => {
   const validated = new SqlContractSerializer().deserializeContract(contract) as typeof contract;
   const context = createTestContext(validated, createStubAdapter());
 
-  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } }).public;
-  const _plan = db.user.select('id', 'email', 'createdAt').build();
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
+  const _plan = db.public.user.select('id', 'email', 'createdAt').build();
 
   type Row = ResultType<typeof _plan>;
 
@@ -461,8 +461,8 @@ test('arktypeJson and jsonbColumn currently resolve to never in no-emit type pat
     extensionPacks: [arktypeJsonRuntime],
   });
 
-  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } }).public;
-  const _plan = db.event.select('payload', 'meta').build();
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
+  const _plan = db.public.event.select('payload', 'meta').build();
 
   type Row = ResultType<typeof _plan>;
 

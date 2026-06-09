@@ -6,7 +6,7 @@ describe('integration: ORDER BY', { timeout: timeouts.databaseOperation }, () =>
 
   it('sorts by column descending', async () => {
     const rows = await runtime().execute(
-      db().users.select('id', 'name').orderBy('name', { direction: 'desc' }).build(),
+      db().public.users.select('id', 'name').orderBy('name', { direction: 'desc' }).build(),
     );
     expect(rows).toHaveLength(4);
     expect(rows[0]!.name).toBe('Diana');
@@ -14,14 +14,14 @@ describe('integration: ORDER BY', { timeout: timeouts.databaseOperation }, () =>
   });
 
   it('sorts by column ascending (default)', async () => {
-    const rows = await runtime().execute(db().users.select('id').orderBy('id').build());
+    const rows = await runtime().execute(db().public.users.select('id').orderBy('id').build());
     expect(rows.map((r) => r.id)).toEqual([1, 2, 3, 4]);
   });
 
   it('sorts by expression callback', async () => {
     const rows = await runtime().execute(
       db()
-        .posts.select('id', 'views')
+        .public.posts.select('id', 'views')
         .orderBy((f) => f.views, { direction: 'desc' })
         .build(),
     );
@@ -32,7 +32,7 @@ describe('integration: ORDER BY', { timeout: timeouts.databaseOperation }, () =>
   it('alias column can be used in ORDER BY by name', async () => {
     const rows = await runtime().execute(
       db()
-        .posts.select('id')
+        .public.posts.select('id')
         .select('v', (f) => f.views)
         .orderBy('v', { direction: 'desc' })
         .build(),
@@ -44,7 +44,7 @@ describe('integration: ORDER BY', { timeout: timeouts.databaseOperation }, () =>
   it('multiple orderBy calls accumulate', async () => {
     const rows = await runtime().execute(
       db()
-        .posts.select('user_id', 'views')
+        .public.posts.select('user_id', 'views')
         .orderBy('user_id')
         .orderBy('views', { direction: 'desc' })
         .build(),

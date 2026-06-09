@@ -11,7 +11,7 @@ describe('integration: runtime.execute({ signal }) — abort semantics', {
     const reason = new Error('user cancelled before execute');
     controller.abort(reason);
 
-    const plan = db().users.select('id', 'name').build();
+    const plan = db().public.users.select('id', 'name').build();
 
     await expect(
       runtime().execute(plan, { signal: controller.signal }).toArray(),
@@ -25,7 +25,7 @@ describe('integration: runtime.execute({ signal }) — abort semantics', {
   it('mid-stream abort between rows exits with RUNTIME.ABORTED { phase: stream } and yields the rows received before the abort', async () => {
     const controller = new AbortController();
     const reason = new Error('cancelled mid-stream');
-    const plan = db().users.select('id', 'name').orderBy('id').build();
+    const plan = db().public.users.select('id', 'name').orderBy('id').build();
 
     const collected: { id: number; name: string }[] = [];
     const consume = async (): Promise<void> => {
@@ -50,7 +50,7 @@ describe('integration: runtime.execute({ signal }) — abort semantics', {
   });
 
   it('regression — omitting options is identical to today (stream completes)', async () => {
-    const plan = db().users.select('id').orderBy('id').build();
+    const plan = db().public.users.select('id').orderBy('id').build();
     const rows = await runtime().execute(plan).toArray();
     expect(rows.map((r) => r.id)).toEqual([1, 2, 3, 4]);
   });
