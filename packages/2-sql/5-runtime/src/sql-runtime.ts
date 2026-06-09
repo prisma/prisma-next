@@ -73,6 +73,17 @@ import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export type Log = RuntimeLog;
 
+/**
+ * Narrow view of a raw transaction exposed to the `executeWithSessionBootstrap` bootstrap closure.
+ * Provides only `query()` — no lifecycle methods leak to the caller.
+ */
+export interface RawSessionConnection {
+  query(
+    sql: string,
+    params?: readonly unknown[],
+  ): Promise<{ readonly rows: ReadonlyArray<Record<string, unknown>> }>;
+}
+
 export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
   readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
@@ -323,6 +334,71 @@ export class SqlRuntime<TContract extends Contract<SqlStorage> = Contract<SqlSto
       this.driver,
       options,
     );
+  }
+
+  protected executeWithSessionBootstrap<Row>(
+    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
+    bootstrap: (conn: RawSessionConnection) => Promise<void>,
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row> {
+    const self = this;
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      const conn = await self.driver.acquireConnection();
+      let connectionDisposed = false;
+      const destroyConnection = async (reason: unknown): Promise<void> => {
+        if (connectionDisposed) return;
+        connectionDisposed = true;
+        await conn.destroy(reason).catch(() => undefined);
+      };
+
+      const tx = await conn.beginTransaction();
+
+      try {
+        try {
+          const view: RawSessionConnection = {
+            query: (sql, params) => tx.query(sql, params),
+          };
+          await bootstrap(view);
+          yield* self.executeAgainstQueryable<Row>(plan, tx, { ...options, scope: 'transaction' });
+        } catch (error) {
+          try {
+            await tx.rollback();
+          } catch (rollbackError) {
+            await destroyConnection(rollbackError);
+            const wrapped = runtimeError(
+              'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
+              'Transaction rollback failed',
+              { rollbackError },
+            );
+            wrapped.cause = error;
+            throw wrapped;
+          }
+          throw error;
+        }
+
+        try {
+          await tx.commit();
+        } catch (commitError) {
+          try {
+            await tx.rollback();
+          } catch {
+            await destroyConnection(commitError);
+          }
+          const wrapped = runtimeError(
+            'RUNTIME.TRANSACTION_COMMIT_FAILED',
+            'Transaction commit failed',
+            { commitError },
+          );
+          wrapped.cause = commitError;
+          throw wrapped;
+        }
+      } finally {
+        if (!connectionDisposed) {
+          await conn.release();
+        }
+      }
+    };
+    return new AsyncIterableResult(generator());
   }
 
   private async *streamRows<Row>(
