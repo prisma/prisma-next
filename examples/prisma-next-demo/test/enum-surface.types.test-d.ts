@@ -1,12 +1,12 @@
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { expectTypeOf, test } from 'vitest';
-import type { EnumContract } from '../prisma/enum-contract';
-import { queries } from '../prisma/enum-db';
+import type { contract } from '../prisma/contract';
+import { sql } from '../src/prisma-no-emit/context';
 
 type Priority = 'low' | 'high' | 'urgent';
 
-test('reading the enum column yields the value union, not string', () => {
-  const plan = queries.enum_task.select('id', 'priority').build();
+test('reading Post.priority yields the value union, not string', () => {
+  const plan = sql.post.select('id', 'priority').build();
   type Row = ResultType<typeof plan>;
   // The non-enum id stays the codec output (string), unaffected by narrowing.
   expectTypeOf<Row['id']>().toEqualTypeOf<string>();
@@ -15,17 +15,17 @@ test('reading the enum column yields the value union, not string', () => {
   expectTypeOf<Row['priority']>().not.toEqualTypeOf<string>();
 });
 
-test('writing the enum column only accepts the value union', () => {
-  queries.enum_task.insert([{ id: 'a', title: 'ok', priority: 'high' }]).build();
+test('writing Post.priority only accepts the value union', () => {
+  sql.post.insert([{ id: 'a', title: 'ok', userId: 'u', priority: 'high' }]).build();
 
-  queries.enum_task.insert([
+  sql.post.insert([
     // @ts-expect-error 'nope' is not a Priority member value.
-    { id: 'b', title: 'bad', priority: 'nope' },
+    { id: 'b', title: 'bad', userId: 'u', priority: 'nope' },
   ]);
 });
 
 test('db.enums value tuple keeps its literal declaration order', () => {
-  type Accessors = EnumContract extends { enumAccessors: infer A } ? A : never;
+  type Accessors = typeof contract extends { enumAccessors: infer A } ? A : never;
   type Values = Accessors extends { Priority: { values: infer V } } ? V : never;
   expectTypeOf<Values>().toEqualTypeOf<readonly ['low', 'high', 'urgent']>();
 });

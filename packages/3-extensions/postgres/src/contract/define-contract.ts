@@ -93,6 +93,7 @@ export function defineContract<
   factory: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, ExtensionPacks>) => {
     readonly types?: Types;
     readonly models?: Models;
+    readonly enums?: Enums;
   },
 ): PostgresResult<Types, Models, ExtensionPacks, Enums>;
 
@@ -103,6 +104,7 @@ export function defineContract(
   factory?: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, undefined>) => {
     readonly types?: TypesConstraint;
     readonly models?: ModelsConstraint;
+    readonly enums?: EnumsConstraint;
   },
 ): PostgresResult<TypesConstraint, ModelsConstraint, undefined, EnumsConstraint> {
   const bound = { ...definition, createNamespace: postgresCreateNamespace };
