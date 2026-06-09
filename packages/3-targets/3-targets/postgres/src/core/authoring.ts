@@ -2,6 +2,7 @@ import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
@@ -81,6 +82,39 @@ export const postgresAuthoringEntityTypes = {
  * via the TS callback surface (e.g. `field.int()`) and via the PSL scalar
  * surface (e.g. `Int`) lowers to byte-identical contracts.
  */
+/**
+ * PSL block descriptor for `policy_select`.
+ *
+ * The parser learns the block shape from this descriptor; lowering from
+ * `PslExtensionBlock` to `PostgresRlsPolicy` is wired in the PSL
+ * interpreter (a later dispatch). The `discriminator` matches
+ * `PostgresRlsPolicy.kind` so the parsed block node carries the same
+ * discriminant as the IR class it will lower to.
+ *
+ * The `roles` list uses `scope:'cross-space'` because same-namespace
+ * role ref resolution requires PSL namespace entries keyed by `refKind`
+ * (i.e. `'role'`), which in turn requires the role block discriminator to
+ * equal `'role'`. Aligning discriminator with refKind is tracked for
+ * slice 4 (cross-space roles). Until then cross-space passes validation
+ * unconditionally and the authored role names flow through unchanged.
+ */
+export const postgresAuthoringPslBlockDescriptors = {
+  policy_select: {
+    kind: 'pslBlock',
+    keyword: 'policy_select',
+    discriminator: 'postgres-rls-policy',
+    name: { required: true },
+    parameters: {
+      target: { kind: 'ref', refKind: 'model', scope: 'same-namespace', required: true },
+      roles: {
+        kind: 'list',
+        of: { kind: 'ref', refKind: 'role', scope: 'cross-space' },
+      },
+      using: { kind: 'value', codecId: 'pg/text@1', required: true },
+    },
+  },
+} as const satisfies AuthoringPslBlockDescriptorNamespace;
+
 export const postgresAuthoringFieldPresets = {
   text: {
     kind: 'fieldPreset',
