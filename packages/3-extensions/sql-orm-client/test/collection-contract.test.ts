@@ -387,7 +387,7 @@ describe('resolveModelRelations() through descriptor', () => {
   it('populates through descriptor for a simple single-column M:N relation', () => {
     const contract = getTestContract();
 
-    const relations = resolveModelRelations(contract, 'User');
+    const relations = resolveModelRelations(contract, 'public', 'User');
     expect(relations['tags']?.through).toEqual({
       table: 'user_tags',
       parentColumns: ['user_id'],
@@ -401,7 +401,7 @@ describe('resolveModelRelations() through descriptor', () => {
   it('populates through descriptor for a composite-key M:N junction', () => {
     const contract = getTestContract();
 
-    const through = resolveModelRelations(contract, 'Project')['related']?.through;
+    const through = resolveModelRelations(contract, 'public', 'Project')['related']?.through;
     expect(through?.parentColumns).toEqual(['src_tenant_id', 'src_id']);
     expect(through?.childColumns).toEqual(['dst_tenant_id', 'dst_id']);
     expect(through?.targetColumns).toEqual(['tenant_id', 'id']);
@@ -412,7 +412,7 @@ describe('resolveModelRelations() through descriptor', () => {
     const contract = getTestContract();
 
     expect(
-      resolveModelRelations(contract, 'User')['roles']?.through?.requiredPayloadColumns,
+      resolveModelRelations(contract, 'public', 'User')['roles']?.through?.requiredPayloadColumns,
     ).toEqual(['level']);
   });
 
@@ -422,7 +422,7 @@ describe('resolveModelRelations() through descriptor', () => {
     // user_tags carries a nullable `note` column and a `created_at` column with a
     // now() default alongside its FK pair, so neither belongs in the payload.
     expect(
-      resolveModelRelations(contract, 'User')['tags']?.through?.requiredPayloadColumns,
+      resolveModelRelations(contract, 'public', 'User')['tags']?.through?.requiredPayloadColumns,
     ).toEqual([]);
   });
 
@@ -442,6 +442,6 @@ describe('resolveModelRelations() through descriptor', () => {
       };
     });
 
-    expect(resolveModelRelations(contract, 'User')['tags']?.through).toBeUndefined();
+    expect(resolveModelRelations(contract, 'public', 'User')['tags']?.through).toBeUndefined();
   });
 });
