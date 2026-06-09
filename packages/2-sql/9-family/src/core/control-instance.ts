@@ -675,7 +675,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const resolveExistingEnumValues =
         controlAdapter.resolveExistingEnumValuesForContract?.(contract) ??
         controlAdapter.resolveExistingEnumValues;
-      return verifySqlSchema({
+      const sqlResult = verifySqlSchema({
         contract,
         schema: options.schema,
         strict: options.strict,
@@ -685,6 +685,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
         ...ifDefined('resolveExistingEnumValues', resolveExistingEnumValues),
       });
+      const extensionIssues =
+        controlAdapter.collectExtensionIssues?.(contract, options.schema) ?? [];
+      if (extensionIssues.length === 0) return sqlResult;
+      return {
+        ...sqlResult,
+        schema: { ...sqlResult.schema, extensionIssues },
+      };
     },
     async sign(options: {
       readonly driver: SqlControlDriverInstance<string>;

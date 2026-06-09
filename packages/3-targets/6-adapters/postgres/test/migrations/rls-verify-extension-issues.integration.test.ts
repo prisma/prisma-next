@@ -1,0 +1,217 @@
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  computeContentHash,
+  normalizePredicate,
+} from '@prisma-next/target-postgres/rls-canonicalize';
+import { PostgresRlsPolicy, PostgresSchema } from '@prisma-next/target-postgres/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  controlAdapter,
+  createDriver,
+  createTestDatabase,
+  emptySchema,
+  familyInstance,
+  formatRunnerFailure,
+  frameworkComponents,
+  type PostgresControlDriver,
+  postgresTargetDescriptor,
+  resetDatabase,
+  synthEdges,
+  testTimeout,
+} from './fixtures/runner-fixtures';
+
+const TABLE_NAME = 'profiles';
+const POLICY_USING = '(id = user_id)';
+const POLICY_PREFIX = 'read_own_profiles';
+const POLICY_HASH = computeContentHash({
+  using: normalizePredicate(POLICY_USING),
+  roles: ['public'],
+  operation: 'select',
+  permissive: true,
+});
+
+const policy = new PostgresRlsPolicy({
+  name: `${POLICY_PREFIX}_${POLICY_HASH}`,
+  prefix: POLICY_PREFIX,
+  tableName: TABLE_NAME,
+  namespaceId: 'public',
+  operation: 'select',
+  roles: ['public'],
+  using: POLICY_USING,
+  permissive: true,
+});
+
+function buildContractWithPolicy(): Contract<SqlStorage> {
+  const schema = new PostgresSchema({
+    id: UNBOUND_NAMESPACE_ID,
+    entries: {
+      table: {
+        [TABLE_NAME]: new StorageTable({
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        }),
+      },
+      type: {},
+      rlsPolicy: { [policy.name]: policy },
+    },
+  });
+
+  return {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:rls-verify-test'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:rls-verify-test'),
+      namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
+    }),
+    roots: {},
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+}
+
+describe.sequential('RLS verify extension issues', () => {
+  let database: Awaited<ReturnType<typeof createTestDatabase>>;
+  let driver: PostgresControlDriver | undefined;
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+  }, testTimeout);
+
+  afterAll(async () => {
+    if (database) await database.close();
+  }, testTimeout);
+
+  beforeEach(async () => {
+    driver = await createDriver(database.connectionString);
+    await resetDatabase(driver);
+  }, testTimeout);
+
+  afterEach(async () => {
+    if (driver) {
+      await driver.close();
+      driver = undefined;
+    }
+  });
+
+  async function applyContract(
+    d: PostgresControlDriver,
+    contractInput: Contract<SqlStorage>,
+  ): Promise<void> {
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const planResult = planner.plan({
+      contract: contractInput,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (planResult.kind !== 'success') throw new Error(`Planner failed: ${planResult.kind}`);
+    const executeResult = await runner.execute({
+      driver: d,
+      perSpaceOptions: [
+        {
+          space: planResult.plan.spaceId ?? APP_SPACE_ID,
+          plan: planResult.plan,
+          migrationEdges: synthEdges(planResult.plan),
+          driver: d,
+          destinationContract: contractInput,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+    if (!executeResult.ok) {
+      throw new Error(`Runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+    }
+  }
+
+  it('extensionIssues is empty when declared policy exists in the database', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = buildContractWithPolicy();
+    await applyContract(driver!, contract);
+
+    const schema = await familyInstance.introspect({ driver: driver!, contract });
+    const result = familyInstance.verifySchema({
+      contract,
+      schema,
+      strict: false,
+      frameworkComponents,
+    });
+
+    expect(result.schema.extensionIssues).toEqual([]);
+  });
+
+  it('extensionIssues contains one missing issue when policy is declared but not applied', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = buildContractWithPolicy();
+
+    // Apply only the table (no policy) by using a contract without rlsPolicy.
+    const noPolicySchema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: {
+          [TABLE_NAME]: new StorageTable({
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        type: {},
+        rlsPolicy: {},
+      },
+    });
+    const noPolicyContract: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:rls-verify-no-policy'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:rls-verify-no-policy'),
+        namespaces: { [UNBOUND_NAMESPACE_ID]: noPolicySchema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+    await applyContract(driver!, noPolicyContract);
+
+    // Verify against the policy contract — policy is absent in the DB.
+    const schema = await familyInstance.introspect({ driver: driver!, contract });
+    const result = familyInstance.verifySchema({
+      contract,
+      schema,
+      strict: false,
+      frameworkComponents,
+    });
+
+    expect(result.schema.extensionIssues).toHaveLength(1);
+    const issue = result.schema.extensionIssues[0];
+    expect(issue?.outcome).toBe('missing');
+    expect(issue?.coordinate.entityKind).toBe('rlsPolicy');
+    expect(issue?.coordinate.entityName).toBe(policy.name);
+  });
+});

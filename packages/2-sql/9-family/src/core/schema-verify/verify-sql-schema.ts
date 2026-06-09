@@ -309,6 +309,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       issues,
       root,
       counts,
+      extensionIssues: [],
     },
     meta: {
       strict,

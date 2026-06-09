@@ -6,6 +6,7 @@ import type {
 import type {
   ControlAdapterInstance,
   ControlStack,
+  SchemaDiffIssue,
 } from '@prisma-next/framework-components/control';
 import type {
   PostgresEnumStorageEntry,
@@ -207,6 +208,17 @@ export interface SqlControlAdapter<TTarget extends string = string>
     enumType: PostgresEnumStorageEntry,
     namespaceId: string,
   ) => readonly string[] | null;
+
+  /**
+   * Optional hook for collecting target-extension drift issues during schema
+   * verification. Called after the relational SQL verification pass; returns
+   * `SchemaDiffIssue[]` that are merged into `VerifyDatabaseSchemaResult.schema.extensionIssues`.
+   * The signature is generic — the SQL family never names any target-specific concept.
+   */
+  collectExtensionIssues?(
+    contract: Contract<SqlStorage>,
+    schema: SqlSchemaIR,
+  ): readonly SchemaDiffIssue[];
 
   /**
    * Ordered DDL queries that bootstrap marker/ledger control tables for migration

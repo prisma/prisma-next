@@ -11,7 +11,11 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  diffNodes,
+  type SchemaDiffIssue,
+} from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import type {
@@ -56,7 +60,11 @@ import {
   normalizePredicate,
   type RlsPolicyOperation,
 } from '@prisma-next/target-postgres/rls-canonicalize';
-import { PostgresRlsPolicy, PostgresRole } from '@prisma-next/target-postgres/types';
+import {
+  isPostgresSchema,
+  PostgresRlsPolicy,
+  PostgresRole,
+} from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
@@ -144,6 +152,23 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
   readonly resolveExistingEnumValuesForContract = (contract: Contract<SqlStorage>) =>
     createResolveExistingEnumValues(contract.storage);
+
+  collectExtensionIssues(
+    contract: Contract<SqlStorage>,
+    schema: SqlSchemaIR,
+  ): readonly SchemaDiffIssue[] {
+    const expectedPolicies: PostgresRlsPolicy[] = [];
+    for (const ns of Object.values(contract.storage.namespaces)) {
+      if (isPostgresSchema(ns)) {
+        for (const policy of Object.values(ns.entries.rlsPolicy)) {
+          expectedPolicies.push(policy);
+        }
+      }
+    }
+    if (expectedPolicies.length === 0) return [];
+    const { rlsPolicies: actualPolicies = [] } = readPostgresSchemaIrAnnotations(schema);
+    return diffNodes(expectedPolicies, actualPolicies);
+  }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {
     return buildControlTableBootstrapQueries();

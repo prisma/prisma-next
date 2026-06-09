@@ -6,6 +6,7 @@ export {
 } from '../core/postgres-rls-policy';
 export { PostgresRole, type PostgresRoleInput } from '../core/postgres-role';
 export {
+  isPostgresSchema,
   PostgresSchema,
   PostgresUnboundSchema,
   postgresCreateNamespace,
