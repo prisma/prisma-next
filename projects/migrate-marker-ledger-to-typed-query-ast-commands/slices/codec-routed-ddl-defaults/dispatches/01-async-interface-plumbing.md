@@ -1,217 +1,197 @@
-# Brief: D1 — Define `DriverExecutableStatement` + add `lowerForControl` on both adapters
+# Brief: D1 — Define `DriverStatement` + add `lowerToDriverStatement` on both adapters (purely additive)
 
-## What this dispatch does
+## Mental model — read this before you touch any file
 
-Adds the missing half of the SQL adapter's lowering pipeline: a new async method `lowerForControl(ast, ctx): Promise<DriverExecutableStatement>` on both PG and SQLite control adapter implementations. The method consults the column's codec to encode literal default values, then either keeps them as parameters or substitutes them inline depending on the grammar position. The existing sync `lower(ast, ctx): LoweredStatement` method is **untouched**; the runtime query path keeps its existing two-stage flow (lower → middleware → encodeParams → driver) exactly as it works today.
+This dispatch is **purely additive**. The new method `lowerToDriverStatement` is a SECOND, INDEPENDENT path through the adapter. It does NOT share output with the existing `lower()` method. It does NOT depend on changes to the existing renderer. The existing `lower()`, the existing renderer's `defaultVisitor.literal`, `LoweredStatement`, `LoweredParam`, and all their consumers stay **bit-for-bit unchanged** after this dispatch.
 
-The renderer's `defaultVisitor.literal` on both targets gets its hand-rolled type-branching deleted. It emits a parameter placeholder (`$N`) plus a `{kind: 'literal', value, inlineRequired: true}` entry in the `LoweredStatement.params` array, marking the position as one that grammar forces inline. The substitution actually happens inside `lowerForControl`.
+The bug we eventually want to fix (Date / bigint / jsonb defaults producing wrong SQL via the renderer's hand-rolled type-branching) **stays unfixed in D1**. D1 only adds the substrate. D2 and D3 migrate `*Call.toOp()` consumers onto the new method, which is when the bug fix manifests.
 
-No `*Call.toOp()` changes in this dispatch. No framework-interface changes. No consumer changes. The substrate goes in; D2 and D3 wire `*Call.toOp` onto it.
+### Anti-pattern — DO NOT do this
 
-## Concrete changes
+A prior attempt at this dispatch ended up modifying `lower()` to call a new sync helper that materialized DDL literal defaults inline, so that existing `*Call.toOp()` callers consuming `lower()`'s output kept getting executable SQL. **That was wrong.** It muddled the two methods into one shared path.
 
-### 1. Define `DriverExecutableStatement`
-
-Where: co-locate with `LoweredStatement` — likely `packages/2-sql/4-lanes/relational-core/src/ast/types.ts` (where `LoweredStatement` lives at line 1984). Confirm by grep before writing.
+The agreed design is two **independent** methods on the adapter:
 
 ```ts
-export interface DriverExecutableStatement {
-  readonly sql: string;                              // fully lowered, all literals materialized
-  readonly params: readonly unknown[];               // codec-encoded wire values; driver-ready
+interface SqlControlAdapter<TTarget extends string = string> extends Lowerer {
+  // existing — bit-for-bit unchanged
+  lower(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
+
+  // new — independent, async, does its own work
+  lowerToDriverStatement(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): Promise<DriverStatement>;
 }
 ```
 
-Export from the package's existing exports surface (whatever `LoweredStatement` exports through).
+If you find yourself modifying `lower()`, the renderer's `defaultVisitor.literal`, `LoweredStatement`'s shape, or `LoweredParam`'s shape — **halt and surface**. None of those change in D1.
 
-### 2. Extend `LoweredParam` with `inlineRequired`
+## Concrete changes
+
+### 1. Define `DriverStatement` type
+
+Where: co-locate with `LoweredStatement` at `packages/2-sql/4-lanes/relational-core/src/ast/types.ts:1984`.
 
 ```ts
-// types.ts:1980 — current
-export type LoweredParam =
-  | { readonly kind: 'literal'; readonly value: unknown }
-  | { readonly kind: 'bind'; readonly name: string };
-
-// change to
-export type LoweredParam =
-  | { readonly kind: 'literal'; readonly value: unknown; readonly inlineRequired?: boolean }
-  | { readonly kind: 'bind'; readonly name: string };
+/**
+ * Fully lowered SQL payload ready for direct driver execution.
+ *
+ * Produced by `SqlControlAdapter.lowerToDriverStatement`. All literal values that
+ * required inline substitution (e.g. DDL `DEFAULT` clauses where the dialect
+ * grammar forbids parameters) have been encoded by their column's codec and
+ * substituted back into `sql`; `params` holds only the codec-encoded wire values
+ * for parameterizable positions, in placeholder order.
+ */
+export interface DriverStatement {
+  /** Fully lowered SQL — all inline literals materialized. */
+  readonly sql: string;
+  /** Codec-encoded wire values for parameterizable `$N` positions; driver-ready. */
+  readonly params: readonly unknown[];
+}
 ```
 
-`inlineRequired` is set by the renderer when emitting in a DDL `DEFAULT` position (or any other position that the dialect grammar doesn't accept parameters in). Default `false` / `undefined` means parameterize. Optional field so existing literal-param construction sites don't need to change.
+Export from the package's `exports` surface (whatever `LoweredStatement` exports through). No changes to `LoweredParam` or `LoweredStatement`.
 
-### 3. Add `lowerForControl` to `SqlControlAdapter`
+### 2. Add `lowerToDriverStatement` to `SqlControlAdapter`
 
 Where: `packages/2-sql/9-family/src/core/control-adapter.ts` around line 232 (where the existing `lower` is declared on `SqlControlAdapter`).
 
 ```ts
 export interface SqlControlAdapter<TTarget extends string = string> extends ... {
-  // existing
+  // existing, unchanged
   lower(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
 
   // new
-  lowerForControl(
+  /**
+   * Lower an AST all the way to a driver-ready statement. Encodes every literal
+   * value through its column's codec and substitutes inline those that grammar
+   * forbids parameterizing (e.g. DDL `DEFAULT` clauses on PG/SQLite).
+   *
+   * Independent of `lower()` — does its own AST walk and produces `DriverStatement`
+   * directly. The runtime query path continues to use `lower()` + the runtime
+   * middleware lifecycle; this method exists for the control plane path that
+   * persists migration ops directly to ops.json with no middleware sandwich.
+   */
+  lowerToDriverStatement(
     ast: AnyQueryAst | DdlNode,
     context: LowererContext<unknown>,
-  ): Promise<DriverExecutableStatement>;
+  ): Promise<DriverStatement>;
 }
 ```
 
-Don't change the `Lowerer` structural interface — that one stays sync (`lower` only). `lowerForControl` is specific to control adapters; the structural `Lowerer` used by the runtime query path doesn't need to know about it.
+Do NOT extend the structural `Lowerer` interface (the one used by the runtime query path) — only `SqlControlAdapter` gets the new method. Runtime consumers of `Lowerer` see no change.
 
-### 4. Implement `lowerForControl` on PG
+### 3. Implement `lowerToDriverStatement` on PG
 
 Where: `packages/3-targets/6-adapters/postgres/src/core/control-adapter.ts` (the class with the existing sync `lower` at line 157).
 
-Sketch:
+Add the method as a new `async` method on the class. **Do not modify the existing `lower` method.** Implementation walks the AST and produces `DriverStatement` directly. How it shares code with the existing renderer is your call — could be a separate parameterized visitor in the same file or a sibling file, could be a fresh AST walk that inlines everything itself. The constraint is that the existing renderer's exported surfaces (`renderLoweredDdl`, `defaultVisitor`) stay byte-for-byte unchanged and continue to behave exactly as they do today.
+
+Pseudocode:
 
 ```ts
-async lowerForControl(
+async lowerToDriverStatement(
   ast: AnyQueryAst | PostgresDdlNode,
   context: LowererContext<unknown>,
-): Promise<DriverExecutableStatement> {
-  const lowered = this.lower(ast, context);          // existing sync path
-  const wireParams: unknown[] = [];
-  let sql = lowered.sql;
-  let nextParamIndex = 1;
-  let nextInputParamIndex = 0;
-  // walk lowered.params; for each {kind:'literal'} resolve codec + encode;
-  // if inlineRequired, substitute into sql with proper quoting + cast suffix;
-  // otherwise put wire value into wireParams and renumber placeholder
-  for (const param of lowered.params) {
-    if (param.kind !== 'literal') {
-      // bind passthrough — keep $N referencing this param's slot
-      ...
-      continue;
-    }
-    const codec = this.resolveCodec(param /* codec selection — see (5) */);
-    const wire = await codec.encode(param.value, {});
-    if (param.inlineRequired) {
-      const literal = renderInlineLiteral(wire, /* native type from context */);
-      sql = substituteAt(sql, nextInputParamIndex + 1, literal);
-    } else {
-      wireParams.push(wire);
-    }
-    nextInputParamIndex += 1;
-  }
+): Promise<DriverStatement> {
+  // walk the AST and produce { sql, params } directly.
+  // For each LiteralColumnDefault encountered (DDL paths):
+  //   - resolve the codec from this.codecLookup using the column's native type
+  //   - await codec.encode(literal.value, {})
+  //   - render the wire value as an inline SQL literal using a PG-specific helper
+  //   - inline the result into the sql string with proper quoting + cast suffix
+  // For literal/bind parameters in parameterizable positions (most query positions):
+  //   - codec-encode and append wire value to the output params array
+  //   - emit `$N` in the sql string
+  // For query ASTs (non-DDL): same general approach, but every position is
+  //   parameterizable so nothing inlines.
+  // ...
   return { sql, params: wireParams };
 }
 ```
 
-`renderInlineLiteral(wire, nativeType)` is target-specific:
-- `string` wire: `'${escapeLiteral(wire)}'` then if not text-like (per TML-2861's `isTextLikeNativeType`) append `::${nativeType}`.
-- `Uint8Array` wire: `'\\x${bytesToHex(wire)}'` then `::bytea`.
-- `number` / `bigint`: `String(wire)` — unquoted, no cast.
-- Anything else: throw with `RUNTIME.ENCODE_UNSUPPORTED_WIRE_TYPE` (or whatever envelope fits the pattern in the file).
+PG-specific inline-literal helper (new, lives alongside `lowerToDriverStatement` or in a helper file in the adapter package):
 
-Move TML-2861's `isTextLikeNativeType` helper from `ddl-renderer.ts` into the adapter's `lowerForControl` (or a helper file alongside it). It stops being a renderer concern; it's a substitution-time concern.
+- `string` wire → `'${escapeLiteral(s)}'` + `::${nativeType}` if not text-like (reimplements the TML-2861 `isTextLikeNativeType` decision; don't move the helper from the renderer — leave the renderer's copy intact).
+- `Uint8Array` wire → `'\\x${bytesToHex(b)}'::bytea`.
+- `number` / `bigint` wire → bare numeric string (`String(value)`).
+- `boolean` wire → bare `true` / `false`.
+- Objects (JSON-serializable) → `'${escapeLiteral(JSON.stringify(value))}'::${nativeType}`.
+- `Date` wire → `'${escapeLiteral(value.toISOString())}'::${nativeType}`.
+- Anything else → throw with a named error envelope.
 
-### 5. Codec resolution in `lowerForControl`
+Codec resolution: the adapter has `this.codecLookup` (the existing field). For a `LiteralColumnDefault` on a column with native type `text` (or `jsonb`, etc.), resolve the codec via `this.codecLookup` keyed by native type. If your AST walk doesn't have the column's native type in scope at the literal-default node, thread it down through the visitor context.
 
-The adapter has access to the codec registry via its constructor (`codecLookup` field — grep `PostgresControlAdapter` for the field). The renderer must pass enough information through `LoweredParam` for `lowerForControl` to resolve the right codec per param. Two ways:
-
-- **(a)** Extend `LoweredParam.literal` with a `codecRef?: CodecRef` field. The renderer emits the codec ref when it knows it (every DDL literal default's column has a known codec).
-- **(b)** Extend `LoweredParam.literal` with a `nativeType?: string` field. The adapter uses `codecLookup` to find the codec by storage type.
-
-(a) is more direct (codec is named, not resolved by lookup). (b) reuses the existing `codecLookup` shape but adds an indirection.
-
-Pick (a). The DDL renderer has the column's `DdlColumn` in hand when it visits the default; the column type maps to a codec ref via the adapter's existing codec ref resolution (grep `codecRefForNativeType` or similar — likely in `relational-core`). Pass that ref through `LoweredParam`.
-
-For `nativeType` (needed for the `::nativeType` cast suffix and for `isTextLikeNativeType`), also add it to `LoweredParam.literal`:
-
-```ts
-type LoweredParam =
-  | { kind: 'literal'; value: unknown; inlineRequired?: boolean; codecRef?: CodecRef; nativeType?: string }
-  | { kind: 'bind'; name: string };
-```
-
-The renderer fills `inlineRequired` / `codecRef` / `nativeType` when emitting DDL literal defaults. Other literal-param emit sites (e.g. query lowering for `WHERE id = literal(5)`) keep the existing fields and ignore the new ones (they don't need them — runtime path doesn't use `lowerForControl`).
-
-### 6. Implement `lowerForControl` on SQLite
+### 4. Implement `lowerToDriverStatement` on SQLite
 
 Where: `packages/3-targets/6-adapters/sqlite/src/core/control-adapter.ts` (the class with the existing sync `lower` at line 128).
 
 Same shape as PG, modulo dialect differences:
-- No `::nativeType` cast suffix — SQLite has no cast syntax in DDL.
-- `Uint8Array` wire → `X'${bytesToHex(wire)}'` (SQLite blob literal syntax).
-- `string` / `number` / `bigint` wire same as PG.
+- No `::nativeType` cast suffix anywhere — SQLite has no cast syntax in DDL.
+- `Uint8Array` wire → `X'${bytesToHex(b)}'` (SQLite blob literal syntax).
+- `boolean` wire → `0` / `1` (SQLite has no boolean type).
+- `string` / `number` / `bigint` wire same as PG (minus the cast suffix).
 
-The `isTextLikeNativeType` helper isn't needed on SQLite (no cast).
+### 5. Adapter-level tests
 
-### 7. Renderer cleanup — PG
+Where: `packages/3-targets/6-adapters/postgres/test/` + `packages/3-targets/6-adapters/sqlite/test/` — new test files for `lowerToDriverStatement`.
 
-Where: `packages/3-targets/6-adapters/postgres/src/core/ddl-renderer.ts:112-126`.
+Each test file covers, at minimum:
+- A `CREATE TABLE` with a `string` literal default → SQL has the value inlined with single-quoting + (PG) cast suffix.
+- A `CREATE TABLE` with a `Date` literal default → SQL has ISO-formatted single-quoted + (PG) cast.
+- A `CREATE TABLE` with a `bigint` literal default → SQL has the numeric value inlined unquoted.
+- A `CREATE TABLE` with a `boolean` literal default → SQL has `true`/`false` (PG) or `0`/`1` (SQLite).
+- A `CREATE TABLE` with a JSON-object literal default → SQL has JSON-stringified + single-quoted + (PG) `::jsonb` cast.
+- A `CREATE TABLE` with a `null` literal default → SQL has `DEFAULT NULL`.
+- A `CREATE TABLE` with no literal default and one `function` default → SQL has the function expression intact.
 
-Delete the existing `defaultVisitor.literal` body. Replace with:
+Tests assert that the EXISTING `lower()` method's output is unchanged — call `adapter.lower(sameNode, sameCtx)` and assert it produces the same SQL it did before D1 (bit-for-bit byte-parity with main).
 
-```ts
-literal(node: LiteralColumnDefault, ctx): string {
-  // The visitor's job is to emit the SQL fragment for the default. For
-  // literal values, emit a parameter placeholder and surface the value +
-  // grammar position + codec metadata as a LoweredParam. The adapter's
-  // lowerForControl substitutes the wire-encoded value back into the
-  // SQL string at lowering time.
-  const paramIndex = ctx.allocParam({
-    kind: 'literal',
-    value: node.value,
-    inlineRequired: true,                          // DDL DEFAULT can't be parameterized in PG
-    codecRef: ctx.codecRefForColumn,               // threaded through ctx by the column visitor
-    nativeType: ctx.nativeType,
-  });
-  return `DEFAULT $${paramIndex}`;
-}
-```
+### 6. What stays unchanged (verified by grep / read-back)
 
-The renderer's visitor-context mechanism — how params are allocated and threaded — already exists for query AST lowering; reuse the same path. Find it (grep `allocParam` or how `ParamRef` lowers to `$N`); follow that pattern. If the DDL visitor doesn't currently have a param-allocation context, extend it.
+- `Lowerer.lower()` interface signature.
+- `SqlControlAdapter.lower()` interface signature.
+- `LoweredStatement` shape.
+- `LoweredParam` shape (no `inlineRequired`, no `nativeType`, no `codecRef`; the union stays as `{kind:'literal', value:unknown} | {kind:'bind', name:string}`).
+- `packages/3-targets/6-adapters/postgres/src/core/ddl-renderer.ts` (the entire file is unchanged — `defaultVisitor`, `renderColumn`, `renderLoweredDdl`, `isTextLikeNativeType`, all of it).
+- `packages/3-targets/6-adapters/sqlite/src/core/ddl-renderer.ts` (entire file unchanged).
+- `PostgresControlAdapter.lower()` body.
+- `SqliteControlAdapter.lower()` body.
+- `*Call.toOp()` bodies (every one of them).
+- `MigrationPlan` and `MigrationPlanWithAuthoringSurface` framework interfaces.
+- All runners, planner-strategies, synth.ts, CLI consumers.
+- The 5-runtime layer (`packages/2-sql/5-runtime/src/codecs/encoding.ts` and friends).
 
-The `function` visitor stays unchanged (`autoincrement()` → empty; everything else → `DEFAULT (${expression})`).
-
-Delete `isTextLikeNativeType` from this file (moves to `lowerForControl` / its helper).
-
-### 8. Renderer cleanup — SQLite
-
-Where: `packages/3-targets/6-adapters/sqlite/src/core/ddl-renderer.ts:79-106`.
-
-Same pattern as PG. Delete the TML-2859 D5 expanded type-branching (boolean / Date / bigint / null / JSON fallback). Replace with the `DEFAULT $N` + `allocParam` shape.
-
-SQLite has no `nativeType` cast, so the `nativeType` field on the param is set but `lowerForControl`'s inline-substitution helper ignores it (or uses it only to dispatch wire-shape, not to emit `::type`).
-
-### 9. Out of scope
-
-- **`*Call.toOp()` changes.** D2 / D3 own that. The existing `*Call.toOp` bodies that call `lowerer.lower(...)` keep doing so; their output now includes parameterized DDL defaults that the existing path can't render correctly **for the live executable path**. That's expected — those `*Call`s still funnel through the old code; D2 / D3 rewire them onto `lowerForControl`. D1's renderer changes only need to be observable through new adapter-level tests for `lowerForControl`, NOT through full migration-emission integration tests.
-- **Framework-interface widening.** `MigrationPlan.operations` / `MigrationPlanWithAuthoringSurface.operations` stay `readonly Op[]`. The type-system widening is D2's job (when async `*Call.toOp` actually returns Promise<Op>).
-- **Consumers adding `await Promise.all`.** D2 / D3.
-- **`SerializedQueryPlan`.** Leave unchanged. Whether to unify it with `DriverExecutableStatement` (they have the same shape) is a follow-up decision.
+If grep shows a diff in any of these after your work, surface — the dispatch leaked.
 
 ## Completed when
 
-- [ ] `DriverExecutableStatement` type defined and exported.
-- [ ] `LoweredParam.literal` extended with optional `inlineRequired`, `codecRef`, `nativeType` fields.
-- [ ] `SqlControlAdapter.lowerForControl(ast, ctx): Promise<DriverExecutableStatement>` exists on the interface and on both `PostgresControlAdapter` and `SqliteControlAdapter` implementations.
-- [ ] `Lowerer` structural interface (used by runtime query path) is **unchanged** — still has only `lower`.
-- [ ] PG `defaultVisitor.literal` and SQLite `defaultVisitor.literal` no longer type-branch on the JS value. Both emit `DEFAULT $N` + populate `LoweredParam` with `inlineRequired: true` + codec/nativeType metadata.
-- [ ] Inline-substitution helper handles `string`, `Uint8Array`, `number`, `bigint` wire types per target; throws on unexpected wire types with a named error.
-- [ ] TML-2861's `isTextLikeNativeType` helper moved from PG renderer into PG `lowerForControl` (or its helper file).
-- [ ] TML-2859 D5's expanded type-branching in SQLite renderer is deleted (boolean → 0/1, Date → ISO, bigint → String(value)). The autoincrement guard in `sqliteDefaultToDdlColumnDefault` (in `issue-planner.ts`) STAYS (codec-orthogonal).
-- [ ] Adapter-level tests for `lowerForControl` covering string / Date / bigint / Uint8Array / null literal defaults on both targets, asserting that the returned SQL has the wire value substituted inline with correct quoting + cast (PG only).
-- [ ] Existing PG migration goldens / SQLite migration goldens — may regenerate for `Date` / `bigint` / `jsonb` default cases where the codec-routed output is the correct one. **The regen IS the intended bug fix; don't try to preserve the broken output.** Capture which fixtures regenerated and why in the dispatch summary.
+- [ ] `DriverStatement` type defined and exported.
+- [ ] `SqlControlAdapter.lowerToDriverStatement(ast, ctx): Promise<DriverStatement>` exists on the interface.
+- [ ] `lowerToDriverStatement` implemented on `PostgresControlAdapter` and `SqliteControlAdapter`. Each implementation walks the AST and produces `DriverStatement` directly — does NOT call `this.lower()` and does NOT share output with `lower()`.
+- [ ] PG inline-literal substitution helper handles `string` / `Date` / `Uint8Array` / `number` / `bigint` / `boolean` / `null` / JSON-object wire types with proper quoting + cast suffix; throws on unexpected wire types with a named error.
+- [ ] SQLite inline-literal substitution helper handles the same wire shapes minus cast suffix, with SQLite-specific blob literal + boolean-as-0/1.
+- [ ] Adapter-level tests for `lowerToDriverStatement` covering each literal-default kind across both targets.
+- [ ] Tests that pin `lower()`'s output unchanged after D1 (byte-parity against main).
+- [ ] `Lowerer.lower()` / `LoweredStatement` / `LoweredParam` / the entire renderer file on both targets / `*Call.toOp` bodies / framework interfaces / runners / consumers — ALL bit-for-bit unchanged. `git diff main packages/3-targets/6-adapters/postgres/src/core/ddl-renderer.ts` returns empty. Same for SQLite.
+- [ ] No goldens regenerated (D1 doesn't migrate consumers; nothing should regenerate). `pnpm fixtures:check` green with no fixture diffs.
 - [ ] `pnpm typecheck` green workspace-wide.
 - [ ] `pnpm test:packages` green.
-- [ ] `pnpm fixtures:check` green (including any expected fixture regens).
 - [ ] `pnpm lint:deps` + `pnpm lint:casts` green.
-- [ ] Runtime query path (`pnpm test:packages --filter relational-core`, `... --filter sql-runtime`) **unchanged** — no test changes in those packages. If a test fails there, D1 leaked.
 
 ## Halt conditions
 
-- The visitor context mechanism doesn't have a param-allocation path that's reusable for DDL defaults (the existing path is queries-only). Surface; the brief assumes the mechanism exists.
-- A codec implementation returns a wire type outside `string | Uint8Array | number | bigint` and the inline-substitution helper can't format it. Surface with the codec name + wire type.
-- The runtime query path tests fail. The slice should NOT change that path; if a test fails, the dispatch leaked into territory it shouldn't have. Surface.
-- A migration golden regenerates in a way that suggests a bug — output WORSE than what the broken type-branching produced for a case where the broken output happened to be valid by accident. Surface with the diff.
-- More than 25 source files modified. Surface.
-- 200+ tool calls without committing. Surface.
+- You're about to modify `lower()`, `LoweredStatement`, `LoweredParam`, or anything in `ddl-renderer.ts`. **Halt.** D1 is purely additive; the agreed design rejects any change to those surfaces.
+- The AST walk inside `lowerToDriverStatement` shares non-trivial logic with the existing renderer in a way that requires extracting the existing renderer's code into a shared helper. **Halt** — duplicating is fine for D1; refactoring the renderer is out of scope. A follow-up can deduplicate after the slice lands.
+- A codec implementation returns a wire type outside the documented set and the helper can't format it. Surface with the codec name + wire type.
+- A migration golden regenerates. **Halt** — something leaked. D1 doesn't migrate consumers; nothing should change shape.
+- The runtime query path tests fail. **Halt.** The slice should NOT touch that path.
+- More than 25 source files modified. **Halt.**
+- 200+ tool calls without committing. **Halt.**
 
 ## Standing instruction
 
-Stay focused. Substrate-only. Do NOT touch `*Call.toOp` bodies (D2 / D3 own that). Do NOT widen the framework `MigrationPlan` interface (D2). Do NOT change consumers (D2 / D3). Do NOT touch the runtime query path (`relational-core`, `sql-runtime`, the runtime middleware lifecycle, `encodeParams`, `LoweredStatement` consumers outside the renderer).
+Stay focused. Purely additive. Do NOT improve adjacent code. Do NOT delete the existing renderer's type-branching (even though it's broken for Date/bigint/jsonb). The bug fix is for D2/D3 to manifest by migrating consumers, not for D1 to fix in the renderer.
+
+If two slices of logic look duplicate-y (the renderer's inline substitution and your new helper), accept the duplication — refactoring is a follow-up. The architecture for D1 is "add a parallel path"; cleanups come after.
 
 ## References
 
@@ -221,10 +201,9 @@ Stay focused. Substrate-only. Do NOT touch `*Call.toOp` bodies (D2 / D3 own that
 - **Existing `Lowerer.lower`:** `packages/2-sql/9-family/src/core/control-adapter.ts:31`.
 - **Existing PG `lower` impl:** `packages/3-targets/6-adapters/postgres/src/core/control-adapter.ts:157`.
 - **Existing SQLite `lower` impl:** `packages/3-targets/6-adapters/sqlite/src/core/control-adapter.ts:128`.
-- **PG renderer's `defaultVisitor`:** `packages/3-targets/6-adapters/postgres/src/core/ddl-renderer.ts:112`.
-- **SQLite renderer's `defaultVisitor`:** `packages/3-targets/6-adapters/sqlite/src/core/ddl-renderer.ts:79`.
+- **PG renderer (untouched):** `packages/3-targets/6-adapters/postgres/src/core/ddl-renderer.ts`.
+- **SQLite renderer (untouched):** `packages/3-targets/6-adapters/sqlite/src/core/ddl-renderer.ts`.
 - **`LoweredStatement` / `LoweredParam`:** `packages/2-sql/4-lanes/relational-core/src/ast/types.ts:1980`.
-- **Mongo's gold-standard wire-type pattern (reference):** `packages/2-mongo-family/4-query/query-ast/src/migration-operation-types.ts:17` (`MongoMigrationStep.command: AnyMongoDdlCommand`).
 
 ## Operational metadata
 
@@ -239,8 +218,8 @@ Stay focused. Substrate-only. Do NOT touch `*Call.toOp` bodies (D2 / D3 own that
 - `pnpm`, never `npm` / `npx`.
 - No bare `as` casts in production code; tests exempt.
 - No TS import file extensions.
-- No transient project refs in code or comments (`// D1`, `// TML-2867`, etc. all forbidden in code; allowed in commit messages).
+- No transient project refs in code or comments.
 
 ## Commit + sign-off
 
-Commit on `tml-2867-codec-routed-ddl-defaults`. Sign off as `Will Madden <madden@prisma.io>`. End with `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`. Commit message describes the structural change (e.g. `add lowerForControl + DriverExecutableStatement; renderer stops inlining literal defaults`).
+Commit on `tml-2867-codec-routed-ddl-defaults`. Sign off as `Will Madden <madden@prisma.io>`. End with `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`. Commit message describes the structural change concisely (e.g. `add lowerToDriverStatement + DriverStatement — additive substrate, no consumer changes`).
