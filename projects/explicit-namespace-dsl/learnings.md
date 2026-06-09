@@ -4,6 +4,14 @@ Working ledger (orchestrator-maintained). Cross-cutting lessons migrate to durab
 
 ## Patterns surfaced this run
 
+### Mongo's ORM/query surfaces are root-keyed, never part of the namespaced-only cut — slice-02 facade projection is a mongo no-op
+
+**Surfaced:** slice 02, D4 (implementer halt + orchestrator decision).
+
+Slice 02's facade projection (postgres qualified / sqlite+mongo flat-via-`__unbound__`) presupposed all three target ORMs were converted to namespace-keyed maps (`{ [ns]: facet }`) so the unbound target could alias `db.orm = orm.__unbound__`. That holds for the **SQL family** (slice 01 + D1/D2 cut `sql-builder`/`sql-orm-client` to namespaced-only). It does **not** hold for **mongo**: `mongo-orm`'s `MongoOrmClient` keys on `TContract['roots']` (model names — `{ users, tasks }`), and `mongo-query-builder`'s `db.query` is a method API (`{ from, rawCommand }`), not a property map. Neither carries a `[UNBOUND_NAMESPACE_ID]` facet. Mongo is inherently single-namespace (`__unbound__`), so there is no namespace dimension to qualify, **no flat fallback to remove, and no facet to alias**. The mongo facade is therefore already in the slice's intended end-state for an unbound target — flat `db.orm.<Model>` works and is asserted by `mongo/test/mongo.types.test-d.ts` (`keyof Db['orm']` = `'tasks' | 'users'`).
+
+**Decision (operator-delegated, orchestrator-made):** D4-mongo closes as a **no-op**. AC4/AC5's mongo arm is satisfied **by construction** (mongo `db.orm` is flat/root-keyed = the "unbound → flat" rule; no per-target switch exists), evidenced by the existing green mongo type-test, not by a new alias. The project spec's AC4/AC5 mongo wording ("`db` aliased to `orm.__unbound__`") describes a *mechanism* that doesn't apply; the *outcome* (flat ergonomics on the unbound mongo target) is met. **Lesson:** when a cross-target "projection"/"always-qualified" mandate is written, check each target's builder *keying* up front — a target that was never multi-namespaced (and whose ORM keys by model/root) needs neither the cut nor the projection. The D6 ADR documents mongo's root-keyed surface as a deliberate exception; spec AC4/AC5 mongo wording reconciled at close-out.
+
 ### ORM query-execution path was not covered by the prerequisite's qualification machinery
 
 **Surfaced:** slice 01, D2 (both implementer and reviewer flagged independently).
