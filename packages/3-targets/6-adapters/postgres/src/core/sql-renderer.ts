@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import {
@@ -249,11 +250,15 @@ function collectTableSources(ast: SelectAst): ReadonlyMap<string, TableSourceCoo
 /**
  * Ordered, codec-encoded values of the value-set a storage column restricts to, or `undefined` when the referenced column carries no value-set (the common, non-enum case). Resolves the column's storage coordinate from the SELECT's table sources, then the column's `valueSet` ref to the value-set's `values`.
  */
+function allStrings(values: readonly JsonValue[]): values is readonly string[] {
+  return values.every((value) => typeof value === 'string');
+}
+
 function resolveEnumOrderValues(
   ref: ColumnRef,
   sourcesByRef: ReadonlyMap<string, TableSourceCoordinate>,
   contract: PostgresContract,
-): readonly string[] | undefined {
+): readonly JsonValue[] | undefined {
   const source = sourcesByRef.get(ref.table);
   if (source === undefined || source.namespaceId === undefined) {
     return undefined;
@@ -277,9 +282,9 @@ function resolveEnumOrderValuesForIdentifier(
   name: string,
   sourcesByRef: ReadonlyMap<string, TableSourceCoordinate>,
   contract: PostgresContract,
-): readonly string[] | undefined {
+): readonly JsonValue[] | undefined {
   let matchedColumns = 0;
-  let resolved: readonly string[] | undefined;
+  let resolved: readonly JsonValue[] | undefined;
   for (const source of sourcesByRef.values()) {
     if (source.namespaceId === undefined) {
       continue;
@@ -312,16 +317,20 @@ function renderOrderByExpr(
   contract: PostgresContract,
   pim: ParamIndexMap,
 ): string {
+  // Only TEXT enums lower to a value-set whose ORDER BY rewrite ships in this
+  // slice. Numeric-enum ORDER BY is future work; until then a non-string
+  // value-set falls through to plain column rendering rather than emitting a
+  // wrong numeric-as-text ARRAY.
   if (expr.kind === 'column-ref') {
     const orderValues = resolveEnumOrderValues(expr, sourcesByRef, contract);
-    if (orderValues !== undefined) {
+    if (orderValues !== undefined && allStrings(orderValues)) {
       const array = orderValues.map((value) => `'${escapeLiteral(value)}'`).join(', ');
       return `array_position(ARRAY[${array}]::text[], ${renderColumn(expr)})`;
     }
   }
   if (expr.kind === 'identifier-ref') {
     const orderValues = resolveEnumOrderValuesForIdentifier(expr.name, sourcesByRef, contract);
-    if (orderValues !== undefined) {
+    if (orderValues !== undefined && allStrings(orderValues)) {
       const array = orderValues.map((value) => `'${escapeLiteral(value)}'`).join(', ');
       return `array_position(ARRAY[${array}]::text[], ${quoteIdentifier(expr.name)})`;
     }
