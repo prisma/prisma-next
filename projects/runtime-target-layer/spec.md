@@ -1,280 +1,106 @@
-# Summary
+# runtime-target-layer
 
-The runtime layer's class hierarchy is two-thirds populated: `RuntimeCore` (abstract framework base) and `SqlRuntimeImpl` / `MongoRuntimeImpl` (concrete family implementations) exist, but `RuntimeCore`'s `protected override` hooks are explicitly designed for a third layer that doesn't exist yet. There is no `PostgresRuntime`; the Postgres extension uses `createRuntime(...)` directly and returns a `SqlRuntimeImpl` as a `Runtime` interface. This project introduces the missing **target layer** at the runtime — `SqlRuntime` (renamed and exported), `PostgresRuntime extends SqlRuntime` (a near-empty class providing the extension seam), and the supporting infrastructure subclasses need: a raw-connection accessor that lives *below* the user middleware chain (load-bearing for security-by-architecture properties Supabase will rely on) and a transaction primitive subclasses can wrap. The runtime layer is the canonical sibling of TML-2459's IR target layer; this project closes the symmetry. `SupabaseRuntime extends PostgresRuntime` itself does not land here — it lands in [extension-supabase](../extension-supabase/spec.md), which is the first consumer of this project's deliverables.
+## Purpose
 
-# Context
+Make role-scoped session state (Postgres `SET LOCAL role` / `request.jwt.claims`) a **structural** property of query execution rather than a convention a user can forget or a middleware can undo. The runtime must be able to set session state on the exact connection a query runs on, below the user middleware chain, so that Row-Level-Security enforcement is correct by architecture. Without this, the Supabase integration — and every future Postgres extension that depends on per-request session identity — has no safe place to stand.
 
 ## At a glance
 
-Today's runtime class diagram (Postgres path):
+Today the SQL runtime executes user middleware as a chain wrapping the driver call. Connection acquisition happens *inside* the runtime, below that chain, and nothing exposes the raw connection. So there is no way to issue `SET LOCAL` on the same connection a query then uses, below middleware — which is exactly what RLS needs.
 
 ```
-abstract class RuntimeCore<TQueryPlan, TExecPlan, TMiddleware>          // framework-components (exported)
-   ↑ extends
-class SqlRuntimeImpl extends RuntimeCore<SqlQueryPlan, …>               // packages/2-sql/5-runtime (NOT exported)
-
-const db = createRuntime({ … });  // factory returns a `Runtime` interface; concrete class is hidden
+RuntimeCore.execute(plan)
+  └─ runWithMiddleware( user middleware chain )      ← user code runs here
+       └─ runDriver(exec)                            ← SqlRuntimeImpl.executeAgainstQueryable(plan, queryable)
+            └─ raw SqlConnection / SqlTransaction     ← .query("SET LOCAL …") here is BELOW middleware
 ```
 
-After this project:
-
-```
-abstract class RuntimeCore<TQueryPlan, TExecPlan, TMiddleware>          // unchanged
-   ↑ extends
-class SqlRuntime extends RuntimeCore<SqlQueryPlan, …>                   // renamed from SqlRuntimeImpl, EXPORTED
-   ↑ extends
-class PostgresRuntime extends SqlRuntime                                // NEW; thin target-layer subclass
-                                                                        // shipped by Postgres extension
-
-// In a separate project (extension-supabase):
-class SupabaseRuntime extends PostgresRuntime
-```
-
-Three properties of the design:
-
-- **`createRuntime` factory stays.** Apps that don't need subclassing keep calling it; nothing changes for them. The factory's return type continues to be `Runtime`. Subclassing is the path for extensions; direct construction (via `new SqlRuntime(…)` / `new PostgresRuntime(…)`) is the path for extension authors.
-- **`SET LOCAL` injection is structural, not policy.** The infrastructure refactor exposes a raw-connection accessor *below* the user middleware chain, so subclasses can issue session-state SQL that user middleware cannot bypass or reorder. This is the load-bearing primitive that makes Supabase's RLS-via-`SET LOCAL` correct by architecture rather than correct by convention. The accessor is intentionally narrow and protected — extension authors get a single hook, not "the raw connection" as an unbounded extensibility surface.
-- **Implicit transactions are subclass-driven.** `RuntimeCore`'s existing `withTransaction` primitive is reused; `SupabaseRuntime` wraps every role-bound `execute()` in an implicit transaction. The base runtime ships no policy change; the new contract is "subclasses may wrap arbitrary scopes in `withTransaction` via the base primitive."
-
-## Problem
-
-Three concrete problems motivate this project:
-
-**1. The Postgres extension has no target-layer subclass.** Today's runtime layering ends at the family abstraction. The Postgres extension's runtime entry point is `createRuntime(...)` — a factory that constructs a `SqlRuntimeImpl` and returns it cast to `Runtime`. There is no `PostgresRuntime` class. Any Postgres-specific runtime behaviour (prepared-statement caching, `LISTEN` / `NOTIFY`, `COPY`-based bulk load) has nowhere to live except (a) the SQL family layer (wrong — SQLite doesn't have `LISTEN`), (b) an `if (target === 'postgres')` branch (explicitly forbidden by [`no-target-branches.mdc`](../../.cursor/rules/no-target-branches.mdc)), or (c) middleware (the right place for cross-cutting concerns, not for foundational target capabilities). The architectural rule says "no target branches"; the codebase says "you can't follow the rule because there's no class to put your target-specific code in."
-
-**2. `SET LOCAL` must be below the middleware chain — by architecture, not by documentation.** RLS enforcement depends on session variables (`role`, `request.jwt.claims`) being set before every query and not being reordered, removed, or replaced by user-defined middleware. If user middleware sits between the role-bound `execute()` and the driver, a misbehaving middleware can break the RLS contract silently. The fix is structural: subclasses get a way to issue session-state SQL on the raw connection, *below* the user middleware chain. The existing `RuntimeCore` middleware seam doesn't have a "below user middleware" hook; this project adds one.
-
-**3. The Supabase project surfaces the gap first, but the gap isn't Supabase-specific.** The Supabase extension is the first downstream consumer that needs target-layer subclassing in anger, but the architectural gap is independent of Supabase. CipherStash, pgvector, future TimescaleDB / Citus / Aurora-extension packages — every Postgres extension that needs to override runtime semantics (encrypted-payload pre-processing, query-plan hinting, target-specific connection bootstrap) hits the same wall. Doing the refactor as a focused project (rather than buried inside Supabase) lets it benefit every downstream Postgres extension and gets reviewed against its architectural merits, not against a single use case.
-
-## Approach
-
-### Three deliverables
-
-The project ships three pieces:
-
-- **A renamed-and-exported `SqlRuntime`** (today's `SqlRuntimeImpl`). The class itself doesn't change shape; only its visibility does. The existing `protected override` hooks (`lower`, `runDriver`, the family-extended middleware lifecycle) were already designed for subclassing — only the export was missing.
-- **A new `PostgresRuntime extends SqlRuntime`** in the Postgres extension. Initially identity-like. The `postgres()` factory constructs a `PostgresRuntime` instead of going through `createRuntime`.
-- **A raw-connection accessor below user middleware**, plus a transaction primitive subclasses can wrap. These are the load-bearing primitives the Supabase runtime will consume.
-
-### Class hierarchy
-
-Mirrors TML-2459's three-layer IR pattern at the runtime layer:
-
-| Layer | IR (TML-2459) | Runtime (after this project) |
-|---|---|---|
-| Framework | `SchemaNodeBase` (abstract) | `RuntimeCore` (abstract) |
-| Family | `SqlNode` / `MongoSchemaNode` (abstract) | `SqlRuntime` / `MongoRuntime` (concrete, extendable) |
-| Target | `PostgresTable` / `SqliteTable` (concrete) | `PostgresRuntime` / `SqliteRuntime` (concrete) |
-
-The two layers are symmetric in shape but not in concern: IR shapes the on-disk artefact, runtime shapes execution. The recipe (framework abstract → family concrete-extendable → target concrete) is the same. Per ADR 005 ("Thin core, fat targets") the framework provides the affordances and targets fill in specifics; this project follows that rule and gives the runtime layer a structural home for the "specifics" the IR layer has had for two years already.
-
-### Below-middleware raw-connection accessor
-
-The piece of this project that requires the most design care.
-
-Today the runtime executes user middleware as a chain wrapping the `execute(plan)` call. A query traverses every registered middleware on the way in and the way out. There is no seam between the innermost middleware and the driver.
-
-For RLS enforcement, `SupabaseRuntime` needs to issue `SET LOCAL role = ...; SET LOCAL request.jwt.claims = ...;` on the same physical connection that handles the subsequent `execute()`, and it needs to do that *after* all user middleware has run (otherwise a middleware could re-issue `SET LOCAL role = 'service_role'` and bypass the policy check). The cleanest shape is a protected accessor that returns the raw connection the runtime is about to use, scoped to a callback:
+This project adds one primitive at the family layer and builds the Supabase consumer on top of it:
 
 ```ts
-// Illustrative — exact shape up to the implementer
-abstract class RuntimeCore<…> {
-  protected withRawConnection<R>(callback: (conn: RawConnection) => Promise<R>): Promise<R> {
-    // base implementation: acquire connection, run callback, release
-  }
-}
+// Family layer (SqlRuntime), protected — the substrate this project ships:
+protected executeWithSessionBootstrap<Row>(
+  plan,
+  bootstrap: (conn: RawSessionConnection) => Promise<void>,  // runs below middleware, on the query's connection
+  options?,
+): AsyncIterableResult<Row>
+// opens an implicit transaction, runs `bootstrap` on its raw connection,
+// then runs the typed query against that same (sticky) connection, commit/rollback/release correctly.
 
-class SupabaseRuntime extends PostgresRuntime {
-  override async execute(plan: SqlExecutionPlan): Promise<unknown> {
-    return this.withTransaction(async () => {
-      return this.withRawConnection(async (conn) => {
-        await conn.exec(`SET LOCAL role = '${this.role}'`);
-        await conn.exec(`SET LOCAL request.jwt.claims = '${JSON.stringify(this.claims)}'`);
-        return super.execute(plan);  // user middleware chain runs from here down
-      });
-    });
-  }
-}
+// Consumer (this project subsumes it): a real role-bound Db
+const db = await supabase({ contractJson, url, jwtSecret });
+const rows = await db.asUser(jwt).sql.from('profile').select(...).build().execute();
+//                    └─ captures bootstrap = conn => { SET LOCAL role='authenticated'; SET LOCAL request.jwt.claims=… }
+//                       and an RLS policy on public.profile lets the user see only their own rows.
 ```
 
-Three properties:
-
-- **Scoped to a callback.** The raw connection is never returned from a method that exits with it still acquired. The callback shape forces release semantics; subclasses can't accidentally leak connections.
-- **Protected, not public.** User code cannot reach the raw connection — it's a subclass-only escape hatch. The middleware chain remains the only public extension point for query interception.
-- **Returns the same connection the subsequent `execute` will use.** The connection is sticky across the callback boundary; the `SET LOCAL` settings persist for the duration of the transaction the runtime opened. This is what makes the security property structural rather than conventional — there is no scenario where `SET LOCAL` is issued on one connection and `execute` runs on another.
-
-### Implicit transaction primitive
-
-`RuntimeCore` already has a `withTransaction` primitive (today consumed by the runtime's `.transaction()` user-facing method). The contract this project formalises is: subclasses may compose `withTransaction` around arbitrary scopes, including the entire role-bound `execute()` path, without re-implementing transaction semantics.
-
-Concretely:
-
-- The base primitive opens a transaction on the runtime's connection pool, executes the callback, commits on success / rolls back on throw.
-- Subclasses can nest `withTransaction` calls; the inner call no-ops if a transaction is already open (or escalates to a savepoint — implementer's choice, must be consistent with the existing `RuntimeCore` behaviour).
-- The transaction is sticky to the connection — the same connection is used for the entire callback. This is what makes `SET LOCAL` safe inside `withTransaction`.
-
-The Supabase runtime composes `withTransaction` + `withRawConnection` to get "implicit transaction on every role-bound execute, with `SET LOCAL` issued on the transaction's connection." Other extensions get the same composition for free.
-
-### Middleware option threading
-
-The current `createRuntime` factory accepts a `middleware?: readonly SqlMiddleware[]` option. After this project, the subclass constructors expose the same option, and the option is threaded through to `RuntimeCore`'s middleware chain without change. The Supabase runtime adds its `SET LOCAL`-injecting layer *inside* `withRawConnection` — which runs below the user middleware chain — so user middleware is unaffected.
-
-### Construction pattern
-
-The migration from `createRuntime(...)` to direct subclass construction is mostly invisible to users:
-
-```ts
-// Before this project (user code, unchanged):
-import postgres from '@prisma-next/extension-supabase/runtime';  // or extension-postgres
-const db = postgres({ contractJson, url, middleware: [...] });
-
-// What changes is the implementation:
-export function postgres(options: PostgresOptions): PostgresRuntime {
-  return new PostgresRuntime({ /* derived from options */ });
-}
-```
-
-The factory function remains the user's entry point; the type widens from `Runtime` to a `PostgresRuntime` subclass instance so extensions that want to subclass *that* can do so directly. Apps that consume the runtime through the `Runtime` interface keep working unchanged.
-
-### What `PostgresRuntime` does in v0.1
-
-Almost nothing. The whole point of this project is to provide the structural home, not to fill it with content. v0.1 of `PostgresRuntime` is identity-like — its constructor calls `super(...)` with the options it received, and that's the only required code. The two "must-haves" it provides:
-
-- A protected hook for subclasses to override `execute()` (or whatever method is appropriate per the existing `RuntimeCore` extension contract) without coupling to `SqlRuntime`'s internals.
-- A type identity (`PostgresRuntime`) that downstream extensions can extend.
-
-Future projects (whether internal or community-driven) fill `PostgresRuntime` with Postgres-specific runtime behaviour. The relevant candidates:
-
-- Prepared-statement caching (Postgres-specific because of the `pg_prepare` protocol semantics).
-- `LISTEN` / `NOTIFY` support (Postgres-specific entirely).
-- `COPY`-based bulk load (Postgres-specific binary protocol).
-- Postgres-target connection bootstrap (`application_name`, `statement_timeout`, `idle_in_transaction_session_timeout` defaults).
-
-None of these are in scope for this project. The project's claim is "the structural home exists"; the content lands as separately-scoped follow-ups.
-
-# Requirements
-
-## Functional Requirements
-
-### Class hierarchy
-
-- **FR1.** Rename `SqlRuntimeImpl` to `SqlRuntime` in `packages/2-sql/5-runtime/src/sql-runtime.ts` and export it from the package's public surface.
-- **FR2.** Introduce `class PostgresRuntime extends SqlRuntime` in the Postgres extension package. Its constructor forwards options to `super(...)` unchanged. No behavioural differences from `SqlRuntime` in v0.1.
-- **FR3.** The Postgres extension's user-facing factory (`postgres({...})`) returns a `PostgresRuntime` instance. The factory's return type widens from `Runtime` (interface) to `PostgresRuntime` (concrete class) — subtype-compatible with existing consumers.
-
-### Below-middleware raw-connection accessor
-
-- **FR4.** `RuntimeCore` gains a `protected withRawConnection<R>(callback: (conn: RawConnection) => Promise<R>): Promise<R>` method (or equivalent shape — exact signature implementer's choice, but the scoping-by-callback discipline is required). The accessor returns the connection the runtime is about to use for subsequent `execute` calls within the callback's scope.
-- **FR5.** The raw connection is sticky inside the callback's scope: the connection passed to the callback is the same connection used for subsequent `execute` calls made from inside the callback. This is the load-bearing property that makes `SET LOCAL` semantically correct.
-- **FR6.** `withRawConnection` enforces release semantics: the connection is returned to the pool when the callback resolves or throws. There is no API for subclasses to "hold the connection beyond the callback."
-- **FR7.** The accessor is `protected`. User code (outside the runtime class hierarchy) cannot reach the raw connection. User middleware retains its existing seam — the middleware chain wrapping `execute(plan)` — and gains no new privileges.
-
-### Implicit transaction primitive
-
-- **FR8.** `RuntimeCore`'s existing `withTransaction` primitive is formalised as the canonical composition point for subclasses that want to wrap arbitrary scopes in transactions. The behaviour (open, execute callback, commit / rollback, release) is documented in a contributor doc as part of M3.
-- **FR9.** `withTransaction` is sticky to a connection: the same connection is used for the entire callback. This is consistent with the existing behaviour; the project's contribution is documenting it as a load-bearing property rather than an implementation accident.
-- **FR10.** `withTransaction` and `withRawConnection` compose: nesting `withTransaction(() => withRawConnection(conn => ...))` uses the transaction's connection for `withRawConnection`'s callback. Verified by unit tests.
-
-### Construction surface
-
-- **FR11.** The `createRuntime` factory continues to exist and continues to return a `Runtime` (interface). Apps that use the factory directly are unaffected by this project's changes.
-- **FR12.** `SqlRuntime` and `PostgresRuntime` constructors accept the same options as `createRuntime`. Subclasses (Supabase, etc.) extend the option type additively (e.g. adding `jwtSecret`, `role`, `claims` for Supabase) per their own design.
-- **FR13.** The `middleware?: readonly SqlMiddleware[]` option threads from `PostgresRuntime` → `SqlRuntime` → `RuntimeCore` unchanged. User middleware is unaffected by the runtime-target-layer refactor.
-
-### Build / packaging
-
-- **FR14.** `SqlRuntime` is exported from `@prisma-next/sql-runtime` (or its current package name) under a stable public symbol. The `Impl` suffix is dropped.
-- **FR15.** `PostgresRuntime` is exported from the Postgres extension's `/runtime` subpath (per the [C6](../supabase-integration/decisions.md) extension package layout). The `postgres({...})` factory and the `PostgresRuntime` class are both visible to consumers.
-- **FR16.** No backward-compatibility shims for the old `SqlRuntimeImpl` symbol. Per the project's no-backwards-compat policy, the rename is final; downstream packages migrate their imports.
-
-## Non-Functional Requirements
-
-- **NFR1.** The runtime hot path (the cost of an `execute` call without `withRawConnection` or `withTransaction` invocation) is unchanged. Specifically: existing benchmarks for `createRuntime`-constructed runtimes show no statistically significant regression after the refactor. The new protected methods are additive; they cost nothing when not called.
-- **NFR2.** Layering is enforced by `pnpm lint:deps`. `PostgresRuntime` lives in the Postgres target layer; the family `SqlRuntime` doesn't import Postgres-specific code; the framework `RuntimeCore` doesn't import family code. The new `withRawConnection` accessor lives at the framework layer (`RuntimeCore`) because connection acquisition is a framework-level concern.
-- **NFR3.** Type identities are stable: extensions can refer to `PostgresRuntime` as a type for subclassing without depending on private symbols. The class is exported from a stable path.
-- **NFR4.** Test coverage: unit tests for the rename + export (compile-level), unit tests for `withRawConnection` scoping + release semantics, unit tests for `withTransaction` + `withRawConnection` composition (sticky-connection property), integration tests for `PostgresRuntime` against a live Postgres (PGlite) confirming no regression.
-- **NFR5.** Documentation: `docs/architecture docs/subsystems/runtime-and-middleware-framework.md` (or its analog) is updated to reflect the new three-layer hierarchy. The ADR draft (already in `projects/runtime-target-layer/specs/`) is promoted to `docs/architecture docs/adrs/` at close-out.
+The proof is end-to-end through the ORM, in the existing `examples/supabase` walking skeleton, against a **raw-SQL** RLS policy — so it stands entirely on its own, ahead of the policy-authoring work in `postgres-rls`.
 
 ## Non-goals
 
-- **`SupabaseRuntime` itself.** The Supabase subclass — its constructor signature, JWT validation, role-bound `Db` interface, `SET LOCAL` invocations — is owned by the [extension-supabase](../extension-supabase/spec.md) project. This project ships the substrate Supabase will consume.
-- **Postgres-specific runtime behaviour.** `LISTEN`/`NOTIFY`, `COPY`-based bulk load, prepared-statement caching, connection bootstrap (`application_name`, timeouts) — all out of scope. `PostgresRuntime` is intentionally near-empty in v0.1.
-- **Mongo target-layer parity.** The same architectural gap exists in the Mongo family (`MongoRuntimeImpl` is not exported, no `MongoTargetRuntime` class exists). This project focuses on Postgres because Postgres is what unblocks Supabase. The Mongo equivalent is a future project; the patterns established here are the template.
-- **Middleware seam redesign.** The user middleware chain remains the public extension point for query interception. The new `withRawConnection` accessor is `protected` and reserved for subclasses; it is not a generalised "below-middleware injection" hook for arbitrary user middleware.
-- **`Runtime` interface evolution.** The framework's `Runtime` interface (the public-facing type that user code consumes) does not change shape. The new `withRawConnection` and (formalised) `withTransaction` methods are `protected` and visible only on subclasses.
+- **Authoring RLS from PSL / the contract.** `.rls([...])` grammar, `PostgresRole` IR, policy DDL emission, the `auth.role()`/`auth.uid()` helpers — all owned by `postgres-rls` (TML-2501). This project proves the runtime against a hand-written raw-SQL policy and never touches the authoring surface.
+- **Postgres-specific runtime behaviour.** `COPY`, `LISTEN`/`NOTIFY`, prepared-statement caching, connection bootstrap defaults. `PostgresRuntime` is a near-empty target home; filling it is future work.
+- **Mongo target-layer parity.** The same gap exists in the Mongo family; out of scope. The pattern established here is the template.
+- **Middleware seam redesign.** The user middleware chain stays the public extension point for query interception. The new primitive is `protected`, reserved for subclasses — not a generalised below-middleware hook for arbitrary user middleware.
+- **The non-runtime half of `extension-supabase`.** The contract / `/pack` / typed handles / example polish stay with `extension-supabase` (TML-2503). This project subsumes only its runtime half — `SupabaseRuntime` + the `supabase()` façade.
+- **JWKS production hardening.** Key rotation, multi-key caches, network retry policy. The façade validates JWTs and warms a single JWKS key; CI signs test JWTs with a local secret. Hardening is follow-up.
 
-## Sequencing constraints
+## Place in the larger world
 
-This project has no *build*-stage dependency on the other umbrella projects — the code can land first.
+**Umbrella.** Constituent of `supabase-integration` (decision **C12** — three-layer runtime hierarchy; **C13/C14** — walking-skeleton delivery). The umbrella's `examples/supabase` is the shared surface every constituent extends in place; this project's contribution is automatic role-binding e2e, which C13/C14 reserve for "runtime-target-layer + extension-supabase".
 
-It does *not* depend on [TML-2459](../target-extensible-ir/spec.md) (TML-2459 is about IR; this project is about runtime). The two projects are siblings — the same three-layer recipe at two different concerns — but they share no code path, so they can land in either order.
+**Depends on (already landed):**
+- The SQL runtime execution stack: `RuntimeCore` (`framework-components`), `SqlRuntimeImpl` + `createRuntime` (`packages/2-sql/5-runtime`), the raw driver contract `SqlConnection`/`SqlTransaction`/`SqlDriver` (`packages/2-sql/4-lanes/relational-core/.../driver-types.ts`).
+- The `examples/supabase` walking skeleton (`Profile` model + cross-contract FK to `auth.AuthUser`), and `bootstrapSupabaseShim` (PGlite seeds the `auth.*` schema).
+- `cross-contract-refs` (TML-2500) — the skeleton's `supabase:auth.AuthUser` reference already resolves.
 
-**Its proof depends on [postgres-rls](../postgres-rls/spec.md), though.** RLS is the static contract side and this is the dynamic runtime side, so the *code* is independent — but the whole point of the below-middleware raw-connection accessor is that a `SET LOCAL role` issued through it gates access, and demonstrating that requires RLS policies + roles to enforce against. So this project's end-to-end validation follows `postgres-rls`, even though implementation can start in parallel.
+**Deliberately independent of:** `postgres-rls` (TML-2501). RLS is a raw Postgres feature; the proof uses raw-SQL policy setup. `postgres-rls` later swaps its authored policy onto the same proven substrate without changing the runtime.
 
-It does *not* depend on [cross-contract-refs](../cross-contract-refs/spec.md).
+**Consumed by:** `extension-supabase` (TML-2503) builds its contract/pack/handles on the `SupabaseRuntime` + `supabase()` façade this project ships.
 
-It *is* a hard dependency of [extension-supabase](../extension-supabase/spec.md), which consumes `PostgresRuntime` as the base class for `SupabaseRuntime`.
+**Adapter impact.** Postgres only. The new family-layer primitive is target-agnostic (it sits on `SqlRuntime` / `RuntimeCore`); SQLite and Mongo are untouched. `PostgresRuntime` and `SupabaseRuntime` are the only target/extension-specific additions.
 
-Resulting global sequence (within the Supabase umbrella): **this project** can land in parallel with TML-2459, postgres-rls, and cross-contract-refs. All four feed into **extension-supabase** as the integration project.
+**ADR.** This is an architectural shift (a new runtime extension seam + the target-layer class). A draft exists at `specs/adr-runtime-target-layer.md`; it must be revised to match the as-built mechanism (the `executeWithSessionBootstrap` primitive, not the original `withRawConnection`/`withTransaction` pair) and promoted to `docs/architecture docs/adrs/` at close-out.
 
-# Acceptance Criteria
+## Cross-cutting requirements
 
-- [ ] **AC1.** `SqlRuntime` is exported from `@prisma-next/sql-runtime` under a stable public symbol. `SqlRuntimeImpl` is removed; the symbol does not appear in the public API surface. All downstream consumers in the workspace import `SqlRuntime` directly.
-- [ ] **AC2.** `PostgresRuntime extends SqlRuntime` is exported from the Postgres extension's `/runtime` subpath. The `postgres({...})` factory returns a `PostgresRuntime` instance.
-- [ ] **AC3.** Existing app contracts that consume the runtime through the `Runtime` interface compile and run unchanged. End-to-end integration tests (PGlite-backed) green; no observable behaviour change in the existing test suite.
-- [ ] **AC4.** A subclass of `PostgresRuntime` can call `protected withRawConnection(async (conn) => { … })` and receive a raw connection. The connection is released when the callback resolves or throws. Demonstrated by a synthetic test fixture (not the Supabase extension — that lives in a separate project).
-- [ ] **AC5.** `withRawConnection` + `withTransaction` compose: nesting both yields a single connection for the entire scope. Verified by a unit test asserting connection identity equality across the nested callbacks.
-- [ ] **AC6.** A user middleware registered via the `middleware` option runs as before. The synthetic `withRawConnection` test fixture confirms `SET …` issued inside the callback is not visible to user middleware as a regular `execute()` call (i.e., user middleware doesn't see the bootstrap SQL).
-- [ ] **AC7.** Performance: existing runtime micro-benchmarks (whichever the repo has) show no statistically significant regression. The hot path for `execute` calls is unchanged.
-- [ ] **AC8.** `pnpm lint:deps` passes; no new layering violations. `PostgresRuntime` lives in the Postgres extension package; `SqlRuntime` is at the family layer; `RuntimeCore` + the new `withRawConnection` infrastructure live at the framework layer.
-- [ ] **AC9.** The runtime ADR draft is promoted from `projects/runtime-target-layer/specs/adr-runtime-target-layer.md` into `docs/architecture docs/adrs/` (named per the ADR convention). The subsystem doc for runtime + middleware is updated to reflect the new hierarchy.
+- **Below-middleware guarantee holds for every role-bound execute.** No execution path on a role-bound `Db` issues a query without the session bootstrap having run first on that query's connection, and user middleware never observes the bootstrap SQL. This is the security-relevant invariant; it must be true of single-statement executes and multi-statement transactions alike.
+- **Sticky connection.** The bootstrap SQL and the subsequent typed query run on the *same* physical connection, inside the same transaction, for the binding's lifetime. `SET LOCAL` is meaningless otherwise.
+- **Connection-lifecycle correctness is owned by the substrate, not the consumer.** Release-vs-destroy, rollback-on-throw, destroy-on-failed-rollback are handled by the family-layer primitive. A consumer supplies only a bootstrap closure; it cannot get the lifecycle wrong.
+- **No framework-options pollution.** The role/claims binding does not appear on the cross-family `RuntimeExecuteOptions` type. It rides in the bootstrap closure (a SQL-layer parameter), keeping the session/role concept out of `framework-components`.
+- **Hot path unchanged.** A plain `createRuntime(...)` execute that never calls the new primitive incurs no new cost. The primitive is additive.
+- **`createRuntime` and the stock `postgres()` factory keep working unchanged.** Apps not using role binding are unaffected; their consumers compile and run as before.
+- **The skeleton stays green throughout.** `examples/supabase` is a continuous CI surface; every slice leaves its existing assertions passing and only adds to them.
 
-# Other Considerations
+## Transitional-shape constraints
 
-## Security
+- **The `SqlRuntimeImpl` → `SqlRuntime` rename + export is a no-behaviour-change step landed on its own**, isolating any hot-path regression from the new functionality. No backward-compat alias for `SqlRuntimeImpl` (per the repo's no-backwards-compat rule); downstream imports move in the same slice.
+- **Every slice keeps CI green on `main`.** No slice leaves the workspace un-typecheckable or the skeleton red.
+- **The `supabase()` façade replaces the M1 runtime stub** (`packages/3-extensions/supabase/src/exports/runtime.ts`) without breaking the skeleton's existing external-contract migrate/verify + FK-cascade assertions.
 
-The below-middleware raw-connection accessor is the load-bearing primitive for downstream RLS enforcement (in the Supabase project). The security properties this project commits to:
+## Project Definition of Done
 
-- **Scoping discipline.** The accessor is callback-scoped, returns connections to the pool on resolve / throw, and is `protected` — user code cannot reach it. This combination prevents the obvious leaks (forgotten release, accidentally-public raw connection) at the API surface.
-- **Connection stickiness inside the callback.** The same physical connection is used for the entire callback's nested `execute` and `withTransaction` calls. This is the property that makes `SET LOCAL` correct — it persists for the transaction's lifetime on that specific connection.
+Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibration/dod.md)) — not restated. Project-specific conditions:
 
-This project does not itself enforce any RLS or session-state policy. It ships the primitive; the policy is the consumer's job (Supabase's role-bound `Db` interface, future encryption extensions, etc.).
+- [ ] `SqlRuntime` is exported from its package under a stable public symbol; `SqlRuntimeImpl` no longer appears in the public surface; all workspace consumers import `SqlRuntime`.
+- [ ] The family-layer session-bootstrap primitive exists, is `protected`, opens an implicit transaction, runs the bootstrap on the raw connection below middleware, runs the typed query on that same sticky connection, and releases/destroys correctly on success and on throw. Unit-tested for: connection identity across bootstrap + query, release on resolve, destroy/rollback on throw, and bootstrap SQL invisible to user middleware.
+- [ ] `PostgresRuntime extends SqlRuntime` exists as a thin target home; `SupabaseRuntime extends PostgresRuntime` exists; the RLS seam works without depending on `PostgresRuntime` carrying any behaviour.
+- [ ] `supabase({ contractJson, url, jwtSecret | jwksUrl, pool?, middleware? })` returns a `SupabaseDb` exposing exactly `asUser(jwt)` / `asAnon()` / `asServiceRole()`; `SupabaseDb` is not a `Db` (role must be picked first); the returned `RoleBoundDb` is a `Db` plus a `transaction()` that issues one bootstrap at transaction open. `asUser` validates the JWT (signature, expiry) and throws a typed error before any connection is acquired.
+- [ ] **Acceptance demo (the project's point):** `examples/supabase` asserts, through the ORM, that with a raw-SQL RLS policy on `public.profile`: a query via `asUser(jwt)` returns only the JWT-owner's rows; `asServiceRole()` sees all rows; and a registered user middleware never observes the `SET LOCAL` traffic. Runs hermetically on PGlite + `bootstrapSupabaseShim` (test JWTs signed with a local secret); no real Supabase, no `postgres-rls`.
+- [ ] `pnpm lint:deps` passes: the primitive lives at the framework/family layer, `PostgresRuntime`/`SupabaseRuntime` at their target/extension layers; no new layering violations.
+- [ ] The runtime ADR is revised to the as-built mechanism and promoted to `docs/architecture docs/adrs/`; the runtime + middleware subsystem doc reflects the new seam and hierarchy.
 
-## Cost
+## Open Questions
 
-Internal engineering effort only. The rename + export + new `PostgresRuntime` class is ~50–100 LOC mechanical. The `withRawConnection` accessor and its test surface are larger — perhaps 200–300 LOC including the unit tests for scoping / release / composition semantics.
+1. **Does the family-layer primitive belong on `SqlRuntime` or on `RuntimeCore`?** Working position: `SqlRuntime` (family), because connection acquisition, `connection()`/`wrapTransaction`, and `executeAgainstQueryable` already live there; `RuntimeCore` has no connection concept. The Mongo equivalent, when it comes, adds its own primitive at the Mongo family layer. Confirm during the first implementation slice by inspection.
+2. **Exact bootstrap connection surface.** The closure needs to issue raw SQL on the transaction's connection. Working position: pass a narrow `RawSessionConnection` exposing only `query(sql, params)` (a slice of the existing `SqlQueryable`), not the full `SqlConnection`/`SqlTransaction` — minimal surface, no lifecycle methods leaked to the consumer. Name and exact shape are the implementer's call within that constraint.
+3. **Multi-statement `RoleBoundDb.transaction()` semantics.** Working position: one bootstrap issued at transaction open; the closure body runs against the pinned connection; commit/rollback at closure exit — reusing the same primitive. Confirm it composes with the existing public `transaction()`/`withTransaction` path without double-opening a transaction.
 
-Documentation work (ADR promotion + subsystem doc update) is bounded.
+## References
 
-Total: ~300–400 LOC + tests + docs.
-
-The two biggest risks are scope creep ("while we're in here, let's also redesign middleware") and accidental hot-path regression in the rename. M1 should land the rename as a no-behaviour-change PR to isolate the regression risk; M2 lands the new functionality on top.
-
-## Observability
-
-The new `withRawConnection` accessor is observable through whatever connection-acquisition / release telemetry the runtime already emits. No new metrics or events are required by this project; downstream consumers (Supabase) may add their own.
-
-## Data Protection
-
-Not applicable — no user data flows are changed.
-
-## Analytics
-
-Not applicable.
-
-# References
-
-- [Umbrella project — Supabase integration](../supabase-integration/README.md) — context for why this project exists.
-- [Umbrella `decisions.md` C12](../supabase-integration/decisions.md) — the canonical decision capturing the three-layer runtime hierarchy. This spec is the spec implementing C12.
-- [TML-2459 — Target-Extensible IR](../target-extensible-ir/spec.md) — sibling project. Same three-layer recipe at the IR layer; this project closes the symmetry at the runtime layer.
-- [`projects/runtime-target-layer/specs/adr-runtime-target-layer.md`](specs/adr-runtime-target-layer.md) — the load-bearing ADR. Promoted at close-out.
-- [ADR 005 — Thin core, fat targets](../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md) — the architectural principle the runtime layer didn't yet follow; this project gets it there.
-- [`.cursor/rules/no-target-branches.mdc`](../../.cursor/rules/no-target-branches.mdc) — the rule that "no target branches in code" relies on. Today the rule is unenforceable in runtime code because there's no target class to put target-specific code in; this project gives the rule a structural home.
-- [extension-supabase project spec](../extension-supabase/spec.md) — the consumer that extends `PostgresRuntime` to ship `SupabaseRuntime`.
-- [postgres-rls project spec](../postgres-rls/spec.md) — the sibling project that ships the static RLS contract whose runtime side this project's accessor unblocks.
-
-# Open Questions
-
-- **`SqliteRuntime` parity.** Does this project also introduce `class SqliteRuntime extends SqlRuntime` for symmetry? **Working assumption: yes**, with the same identity-like v0.1 shape. The marginal cost is small (~20 LOC), and the symmetry pays off the first time a SQLite extension (or even a future internal feature) needs target-layer-specific runtime behaviour. The implementer should add it in the same PR as `PostgresRuntime` unless the test surface balloons unexpectedly.
-- **`withTransaction` documentation surface.** The primitive already exists in `RuntimeCore`; what this project commits to is *documenting* it as a stable composition point. Should that documentation live in a contributor doc (`docs/architecture docs/subsystems/runtime-and-middleware-framework.md`), an ADR (independent of the target-layer ADR), or both? **Working assumption: both.** The subsystem doc is the day-to-day reference; the ADR captures the durable decision that `withTransaction` is a public-to-subclasses primitive.
-- **Naming: `withRawConnection` vs alternatives.** Other plausible names: `withConnection`, `acquireConnection`, `belowMiddleware`. **Working assumption: `withRawConnection`** — the word "raw" telegraphs "this is the actual connection, not a wrapped one." The exact name is implementer-flexible; the *shape* (callback-scoped, returns connection identity) is fixed by FR4–FR7.
+- Linear: [TML-2502](https://linear.app/prisma-company/issue/TML-2502)
+- Umbrella: [`supabase-integration`](../supabase-integration/README.md); decisions [`C12`](../supabase-integration/decisions.md) (three-layer runtime hierarchy), C13/C14 (walking skeleton).
+- Sibling / dependent projects: [`postgres-rls`](../postgres-rls/spec.md) (independent; swaps authored policy onto this substrate), [`extension-supabase`](../extension-supabase/spec.md) (consumes the façade), [`cross-contract-refs`](../cross-contract-refs/spec.md) (landed).
+- ADR draft: [`specs/adr-runtime-target-layer.md`](specs/adr-runtime-target-layer.md) — revise to as-built mechanism, promote at close-out.
+- [ADR 005 — Thin core, fat targets](../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md); [`no-target-branches.mdc`](../../.agents/rules/no-target-branches.mdc).
+- Key code surfaces: `packages/1-framework/1-core/framework-components/src/execution/runtime-core.ts`, `packages/2-sql/5-runtime/src/sql-runtime.ts`, `packages/2-sql/4-lanes/relational-core/src/ast/driver-types.ts`, `examples/supabase/`, `packages/3-extensions/supabase/src/exports/runtime.ts`.
