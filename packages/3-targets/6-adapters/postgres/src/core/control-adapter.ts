@@ -597,20 +597,26 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: SqlControlDriverInstance<'postgres'>,
     namespaceIds: readonly string[],
   ): Promise<SqlSchemaIR> {
-    const resolvedSchemas = await Promise.all(
-      namespaceIds.map(async (id) => {
-        if (id === UNBOUND_NAMESPACE_ID) {
-          const { rows } = await driver.query<{ current_schema: string }>(
-            'SELECT current_schema() AS current_schema',
-          );
-          return rows[0]?.current_schema ?? 'public';
-        }
-        return id;
-      }),
-    );
+    const resolvedSchemas: string[] = [];
+    for (const id of namespaceIds) {
+      if (id === UNBOUND_NAMESPACE_ID) {
+        const { rows } = await driver.query<{ current_schema: string }>(
+          'SELECT current_schema() AS current_schema',
+        );
+        resolvedSchemas.push(rows[0]?.current_schema ?? 'public');
+      } else {
+        resolvedSchemas.push(id);
+      }
+    }
     const uniqueSchemas = Array.from(new Set(resolvedSchemas));
 
-    const perSchema = await Promise.all(uniqueSchemas.map((s) => this.introspectSchema(driver, s)));
+    // Walk schemas sequentially: every introspectSchema call shares the one
+    // control connection, so a parallel walk only serialises behind the wire
+    // protocol and trips pg's "already executing a query" deprecation.
+    const perSchema: SqlSchemaIR[] = [];
+    for (const s of uniqueSchemas) {
+      perSchema.push(await this.introspectSchema(driver, s));
+    }
 
     const mergedTables: Record<string, SqlTableIR> = {};
     for (const ir of perSchema) {
@@ -661,39 +667,33 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: SqlControlDriverInstance<'postgres'>,
     schema: string,
   ): Promise<SqlSchemaIR> {
-    // Execute all queries in parallel for efficiency (7 queries instead of 6T+1)
-    const [
-      tablesResult,
-      columnsResult,
-      pkResult,
-      fkResult,
-      uniqueResult,
-      indexResult,
-      checkResult,
-    ] = await Promise.all([
-      // Query all tables
-      driver.query<{ table_name: string }>(
-        `SELECT table_name
+    // Issue the schema-wide queries one at a time. A single control connection
+    // serialises queries anyway, so Promise.all buys no parallelism here and
+    // makes pg emit a "client is already executing a query" deprecation. One
+    // schema-wide query per relation kind keeps this to 7 round-trips, not 6T+1.
+    // Query all tables
+    const tablesResult = await driver.query<{ table_name: string }>(
+      `SELECT table_name
          FROM information_schema.tables
          WHERE table_schema = $1
            AND table_type = 'BASE TABLE'
          ORDER BY table_name`,
-        [schema],
-      ),
-      // Query all columns for all tables in schema
-      driver.query<{
-        table_name: string;
-        column_name: string;
-        data_type: string;
-        udt_name: string;
-        is_nullable: string;
-        character_maximum_length: number | null;
-        numeric_precision: number | null;
-        numeric_scale: number | null;
-        column_default: string | null;
-        formatted_type: string | null;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all columns for all tables in schema
+    const columnsResult = await driver.query<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+      udt_name: string;
+      is_nullable: string;
+      character_maximum_length: number | null;
+      numeric_precision: number | null;
+      numeric_scale: number | null;
+      column_default: string | null;
+      formatted_type: string | null;
+    }>(
+      `SELECT
            c.table_name,
            column_name,
            data_type,
@@ -717,16 +717,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            AND NOT a.attisdropped
          WHERE c.table_schema = $1
          ORDER BY c.table_name, c.ordinal_position`,
-        [schema],
-      ),
-      // Query all primary keys for all tables in schema
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all primary keys for all tables in schema
+    const pkResult = await driver.query<{
+      table_name: string;
+      constraint_name: string;
+      column_name: string;
+      ordinal_position: number;
+    }>(
+      `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -739,24 +739,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'PRIMARY KEY'
          ORDER BY tc.table_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all foreign keys for all tables in schema, including referential actions.
-      // Uses pg_catalog for correct positional pairing of composite FK columns
-      // (information_schema.constraint_column_usage lacks ordinal_position,
-      // which causes Cartesian products for multi-column FKs).
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-        referenced_table_schema: string;
-        referenced_table_name: string;
-        referenced_column_name: string;
-        delete_rule: string;
-        update_rule: string;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all foreign keys for all tables in schema, including referential actions.
+    // Uses pg_catalog for correct positional pairing of composite FK columns
+    // (information_schema.constraint_column_usage lacks ordinal_position,
+    // which causes Cartesian products for multi-column FKs).
+    const fkResult = await driver.query<{
+      table_name: string;
+      constraint_name: string;
+      column_name: string;
+      ordinal_position: number;
+      referenced_table_schema: string;
+      referenced_table_name: string;
+      referenced_column_name: string;
+      delete_rule: string;
+      update_rule: string;
+    }>(
+      `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -789,16 +789,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'FOREIGN KEY'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all unique constraints for all tables in schema (excluding PKs)
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all unique constraints for all tables in schema (excluding PKs)
+    const uniqueResult = await driver.query<{
+      table_name: string;
+      constraint_name: string;
+      column_name: string;
+      ordinal_position: number;
+    }>(
+      `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -811,31 +811,31 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'UNIQUE'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all indexes for all tables in schema (excluding constraints).
-      // `index_position` is the column's position within the index (1-based),
-      // derived from `pg_index.indkey` so composite indexes round-trip with
-      // their declared column order intact.
-      driver.query<{
-        tablename: string;
-        indexname: string;
-        indisunique: boolean;
-        attname: string | null;
-        index_position: number;
-        amname: string | null;
-        reloptions: string[] | null;
-      }>(
-        // `ix.indkey` is an int2vector of column numbers in the order the
-        // columns appear in the index definition. Unnest it WITH ORDINALITY
-        // so each (index, column) row carries its position in the index,
-        // then ORDER BY that position. Without this the rows come back in
-        // table-column order (`a.attnum`), which silently shuffles the
-        // columns of any composite index whose index order differs from
-        // the table order — verification compares against the contract
-        // with order-sensitive equality and reports a spurious
-        // `index_mismatch`.
-        `SELECT
+      [schema],
+    );
+    // Query all indexes for all tables in schema (excluding constraints).
+    // `index_position` is the column's position within the index (1-based),
+    // derived from `pg_index.indkey` so composite indexes round-trip with
+    // their declared column order intact.
+    const indexResult = await driver.query<{
+      tablename: string;
+      indexname: string;
+      indisunique: boolean;
+      attname: string | null;
+      index_position: number;
+      amname: string | null;
+      reloptions: string[] | null;
+    }>(
+      // `ix.indkey` is an int2vector of column numbers in the order the
+      // columns appear in the index definition. Unnest it WITH ORDINALITY
+      // so each (index, column) row carries its position in the index,
+      // then ORDER BY that position. Without this the rows come back in
+      // table-column order (`a.attnum`), which silently shuffles the
+      // columns of any composite index whose index order differs from
+      // the table order — verification compares against the contract
+      // with order-sensitive equality and reports a spurious
+      // `index_mismatch`.
+      `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
@@ -861,22 +861,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
                AND tc.constraint_name = i.indexname
            )
          ORDER BY i.tablename, i.indexname, k.ord`,
-        [schema],
-      ),
-      // Query all check constraints for enum-restricted columns.
-      // `pg_get_constraintdef(oid)` returns the predicate including the
-      // `CHECK (...)` wrapper. We parse the inner predicate to extract
-      // the column name and permitted values.
-      //
-      // Scope: only parses the `= ANY (ARRAY[...])` and `IN (...)` shapes
-      // that this slice emits. Arbitrary SQL predicates are left as-is
-      // and will not produce check IR entries (they are silently skipped).
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        constraintdef: string;
-      }>(
-        `SELECT
+      [schema],
+    );
+    // Query all check constraints for enum-restricted columns.
+    // `pg_get_constraintdef(oid)` returns the predicate including the
+    // `CHECK (...)` wrapper. We parse the inner predicate to extract
+    // the column name and permitted values.
+    //
+    // Scope: only parses the `= ANY (ARRAY[...])` and `IN (...)` shapes
+    // that this slice emits. Arbitrary SQL predicates are left as-is
+    // and will not produce check IR entries (they are silently skipped).
+    const checkResult = await driver.query<{
+      table_name: string;
+      constraint_name: string;
+      constraintdef: string;
+    }>(
+      `SELECT
            cl.relname AS table_name,
            c.conname AS constraint_name,
            pg_get_constraintdef(c.oid) AS constraintdef
@@ -886,9 +886,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE ns.nspname = $1
            AND c.contype = 'c'
          ORDER BY cl.relname, c.conname`,
-        [schema],
-      ),
-    ]);
+      [schema],
+    );
 
     // Group results by table name for efficient lookup
     const columnsByTable = groupBy(columnsResult.rows, 'table_name');
