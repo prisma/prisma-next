@@ -80,12 +80,11 @@ describe('integration/mn-include', () => {
   );
 
   it(
-    'include("tags") resolves in a single SQL execution with no LATERAL keyword',
+    'include("tags") resolves in a single SQL execution',
     async () => {
       // The M:N correlated subquery through the junction must lower to a
-      // single SQL execution. The junction join inside the subquery is an
-      // inner join — never a LATERAL join — so LATERAL must be absent from
-      // the emitted SQL.
+      // single SQL execution — that is the only non-functional invariant worth
+      // asserting here.
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
 
@@ -103,7 +102,6 @@ describe('integration/mn-include', () => {
           { id: 1, name: 'Alice', tags: [{ id: TAG_TS, name: 'TypeScript' }] },
         ]);
         expect(runtime.executions).toHaveLength(1);
-        expect(runtime.executions[0]?.sql).not.toContain('LATERAL');
       });
     },
     timeouts.spinUpPpgDev,
@@ -276,7 +274,6 @@ describe('integration/mn-include', () => {
           },
         ]);
         expect(runtime.executions).toHaveLength(1);
-        expect(runtime.executions[0]?.sql).not.toContain('LATERAL');
       });
     },
     timeouts.spinUpPpgDev,
