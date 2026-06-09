@@ -49,6 +49,7 @@ import { emptyState } from './types';
 
 interface JunctionThrough {
   readonly table: string;
+  readonly namespaceId: string;
   readonly parentColumns: readonly string[];
   readonly childColumns: readonly string[];
   readonly targetColumns: readonly string[];
@@ -247,6 +248,7 @@ async function createGraph(
     await applyJunctionOwnedMutation(
       scope,
       context,
+      namespaceId,
       modelName,
       parentRow,
       relationMutation.relation,
@@ -352,6 +354,7 @@ async function updateFirstGraph(
     await applyJunctionOwnedMutation(
       scope,
       context,
+      namespaceId,
       modelName,
       parentRow,
       relationMutation.relation,
@@ -675,6 +678,7 @@ async function applyChildOwnedMutation(
 async function applyJunctionOwnedMutation(
   scope: RuntimeScope,
   context: ExecutionContext,
+  parentNamespaceId: string,
   parentModelName: string,
   parentRow: Record<string, unknown>,
   relation: JunctionRelationDefinition,
@@ -682,7 +686,13 @@ async function applyJunctionOwnedMutation(
 ): Promise<void> {
   const contract = context.contract;
   const through = relation.through;
-  const parentPkValues = readJunctionParentValues(contract, parentModelName, relation, parentRow);
+  const parentPkValues = readJunctionParentValues(
+    contract,
+    parentNamespaceId,
+    parentModelName,
+    relation,
+    parentRow,
+  );
 
   if (mutation.kind === 'create' || mutation.kind === 'connect') {
     if (through.requiredPayloadColumns.length > 0) {
@@ -698,6 +708,7 @@ async function applyJunctionOwnedMutation(
       const relatedRow = await insertSingleRow(
         scope,
         context,
+        relation.relatedNamespaceId,
         relation.relatedModelName,
         blindCast<Record<string, unknown>, 'mutation create input is a plain object payload'>(
           childInput,
@@ -751,6 +762,7 @@ async function resolveJunctionTargetValues(
   const relatedRow = await findRowByCriterion(
     scope,
     context,
+    relation.relatedNamespaceId,
     relation.relatedModelName,
     blindCast<Record<string, unknown>, 'connect/disconnect criterion is a plain object'>(criterion),
   );
@@ -764,6 +776,7 @@ async function resolveJunctionTargetValues(
 
 function readJunctionParentValues(
   contract: Contract<SqlStorage>,
+  parentNamespaceId: string,
   parentModelName: string,
   relation: JunctionRelationDefinition,
   parentRow: Record<string, unknown>,
@@ -777,7 +790,7 @@ function readJunctionParentValues(
       continue;
     }
 
-    const parentFieldName = toFieldName(contract, parentModelName, parentColumn);
+    const parentFieldName = toFieldName(contract, parentNamespaceId, parentModelName, parentColumn);
     const parentValue = parentRow[parentFieldName];
     if (parentValue === undefined) {
       throw new Error(
@@ -805,7 +818,12 @@ function readJunctionTargetValues(
       continue;
     }
 
-    const targetFieldName = toFieldName(contract, relation.relatedModelName, targetColumn);
+    const targetFieldName = toFieldName(
+      contract,
+      relation.relatedNamespaceId,
+      relation.relatedModelName,
+      targetColumn,
+    );
     const targetValue = relatedRow[targetFieldName];
     if (targetValue === undefined) {
       throw new Error(
@@ -834,7 +852,9 @@ async function insertJunctionLink(
     junctionRow[column] = value;
   }
 
-  const compiled = compileInsertCount(context.contract, through.table, [junctionRow]);
+  const compiled = compileInsertCount(context.contract, through.namespaceId, through.table, [
+    junctionRow,
+  ]);
   await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 }
 
@@ -855,7 +875,9 @@ async function deleteJunctionLink(
 
   const first = exprs[0];
   const where = exprs.length === 1 && first !== undefined ? first : and(...exprs);
-  const compiled = compileDeleteCount(context.contract, through.table, [where]);
+  const compiled = compileDeleteCount(context.contract, through.namespaceId, through.table, [
+    where,
+  ]);
   await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
 }
 
@@ -1057,6 +1079,7 @@ function getRelationDefinitions(
     through: relation.through
       ? {
           table: relation.through.table,
+          namespaceId: relation.through.namespaceId,
           parentColumns: relation.through.parentColumns,
           childColumns: relation.through.childColumns,
           targetColumns: relation.through.targetColumns,
