@@ -1,0 +1,187 @@
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  computeContentHash,
+  normalizePredicate,
+} from '@prisma-next/target-postgres/rls-canonicalize';
+import {
+  PostgresRlsPolicy,
+  PostgresRole,
+  PostgresSchema,
+} from '@prisma-next/target-postgres/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  controlAdapter,
+  createDriver,
+  createTestDatabase,
+  emptySchema,
+  familyInstance,
+  frameworkComponents,
+  type PostgresControlDriver,
+  postgresTargetDescriptor,
+  testTimeout,
+} from './fixtures/runner-fixtures';
+
+// ============================================================================
+// Contract construction (foundation IR path)
+// ============================================================================
+
+const TABLE_NAME = 'profile';
+const POLICY_PREFIX = 'profile_read_own';
+const POLICY_USING = "owner_id = current_setting('app.uid')::int";
+
+const POLICY_HASH = computeContentHash({
+  using: normalizePredicate(POLICY_USING),
+  roles: ['app_user'],
+  operation: 'select',
+  permissive: true,
+});
+const POLICY_WIRE_NAME = `${POLICY_PREFIX}_${POLICY_HASH}`;
+
+function buildRlsWalkingSkeletonContract(): Contract<SqlStorage> {
+  const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
+
+  const policy = new PostgresRlsPolicy({
+    name: POLICY_WIRE_NAME,
+    prefix: POLICY_PREFIX,
+    tableName: TABLE_NAME,
+    namespaceId: 'public',
+    operation: 'select',
+    roles: ['app_user'],
+    using: POLICY_USING,
+    permissive: true,
+  });
+
+  const schema = new PostgresSchema({
+    id: 'public',
+    entries: {
+      table: {
+        [TABLE_NAME]: new StorageTable({
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            owner_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        }),
+      },
+      type: {},
+      role: { [role.name]: role },
+      rlsPolicy: { [policy.name]: policy },
+    },
+  });
+
+  return {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:rls-walking-skeleton'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:rls-walking-skeleton'),
+      namespaces: { public: schema },
+    }),
+    roots: {},
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+}
+
+// ============================================================================
+// Walking-skeleton test
+// ============================================================================
+
+describe.sequential('RLS walking skeleton — author → plan → apply → filter → verify', () => {
+  let database: Awaited<ReturnType<typeof createTestDatabase>>;
+  let driver: PostgresControlDriver;
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+    driver = await createDriver(database.connectionString);
+  }, testTimeout);
+
+  afterAll(async () => {
+    if (driver) await driver.close();
+    if (database) await database.close();
+  }, testTimeout);
+
+  it(
+    'applies an RLS policy, enforces row isolation under SET ROLE, and re-verifies clean',
+    async () => {
+      const contract = buildRlsWalkingSkeletonContract();
+
+      // Pre-create the role — role creation is out of scope for the planner.
+      await driver.query('CREATE ROLE app_user');
+
+      // Step 3: plan against empty schema.
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+      const planResult = planner.plan({
+        contract,
+        schema: emptySchema,
+        policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
+        frameworkComponents,
+        spaceId: APP_SPACE_ID,
+      });
+
+      expect(planResult.kind).toBe('success');
+      if (planResult.kind !== 'success') return;
+
+      const allSql = planResult.plan.operations
+        .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
+        .map((step) => step.sql);
+
+      // Sanity: plan contains CREATE TABLE, ENABLE ROW LEVEL SECURITY, CREATE POLICY.
+      expect(allSql.some((s) => s.includes('CREATE TABLE'))).toBe(true);
+      expect(allSql.some((s) => s.includes('ENABLE ROW LEVEL SECURITY'))).toBe(true);
+      expect(allSql.some((s) => s.includes('CREATE POLICY'))).toBe(true);
+
+      // Step 4: apply all operations.
+      for (const op of planResult.plan.operations) {
+        for (const step of [...op.precheck, ...op.execute, ...op.postcheck]) {
+          await driver.query(step.sql, step.params ?? []);
+        }
+      }
+
+      // Step 5: prove RLS filters rows.
+      // Insert two rows with different owner_id values.
+      await driver.query(
+        `INSERT INTO "public"."${TABLE_NAME}" (id, owner_id) VALUES (1, 101), (2, 202)`,
+      );
+
+      // Grant SELECT so app_user can read the table.
+      await driver.query(`GRANT SELECT ON "public"."${TABLE_NAME}" TO app_user`);
+
+      // Switch to app_user and set the GUC to owner of row 1.
+      await driver.query('SET ROLE app_user');
+      await driver.query(`SELECT set_config('app.uid', '101', false)`);
+
+      const filtered = await driver.query<{ id: number; owner_id: number }>(
+        `SELECT id, owner_id FROM "public"."${TABLE_NAME}"`,
+      );
+
+      await driver.query('RESET ROLE');
+
+      // The spine: only row 1 (owner_id=101) should be visible.
+      expect(filtered.rows).toHaveLength(1);
+      expect(filtered.rows[0]).toMatchObject({ id: 1, owner_id: 101 });
+
+      // Step 6: re-verify clean — extensionIssues must be empty.
+      const introspected = await familyInstance.introspect({ driver, contract });
+      const verifyResult = familyInstance.verifySchema({
+        contract,
+        schema: introspected,
+        strict: false,
+        frameworkComponents,
+      });
+
+      expect(verifyResult.schema.extensionIssues).toEqual([]);
+    },
+    testTimeout,
+  );
+});
