@@ -1,4 +1,6 @@
-import { freezeNode } from '@prisma-next/framework-components/ir';
+import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
+import { freezeNode, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
 export type RlsPolicyOperation = 'select' | 'insert' | 'update' | 'delete' | 'all';
@@ -10,6 +12,12 @@ export interface PostgresRlsPolicyInput {
   readonly prefix: string;
   /** Name of the table this policy attaches to, by name within the same schema. */
   readonly tableName: string;
+  /**
+   * Namespace coordinate. Policies are schema-scoped; defaults to
+   * `UNBOUND_NAMESPACE_ID` when not provided (for backward compatibility
+   * with construction sites that predate the DiffableNode interface).
+   */
+  readonly namespaceId?: string;
   readonly operation: RlsPolicyOperation;
   /** Sorted role names rendered in `TO <roles>`. Plain strings in this slice. */
   readonly roles: readonly string[];
@@ -29,11 +37,12 @@ export interface PostgresRlsPolicyInput {
  * discriminant is enumerable (overrides SqlNode's non-enumerable `'sql'`) so it
  * survives JSON serialization and enables dispatch.
  */
-export class PostgresRlsPolicy extends SqlNode {
+export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
   override readonly kind = 'postgres-rls-policy' as const;
   readonly name: string;
   readonly prefix: string;
   readonly tableName: string;
+  readonly namespaceId: string;
   readonly operation: RlsPolicyOperation;
   readonly roles: readonly string[];
   declare readonly using?: string;
@@ -45,11 +54,30 @@ export class PostgresRlsPolicy extends SqlNode {
     this.name = input.name;
     this.prefix = input.prefix;
     this.tableName = input.tableName;
+    this.namespaceId = input.namespaceId ?? UNBOUND_NAMESPACE_ID;
     this.operation = input.operation;
     this.roles = Object.freeze([...input.roles]);
     if (input.using !== undefined) this.using = input.using;
     if (input.withCheck !== undefined) this.withCheck = input.withCheck;
     this.permissive = input.permissive;
     freezeNode(this);
+  }
+
+  identity(): EntityCoordinate {
+    return {
+      plane: 'storage',
+      namespaceId: this.namespaceId,
+      entityKind: 'rlsPolicy',
+      entityName: this.name,
+    };
+  }
+
+  isEqualTo(other: DiffableNode): boolean {
+    if (!(other instanceof PostgresRlsPolicy)) {
+      throw new Error(
+        `PostgresRlsPolicy.isEqualTo: expected a PostgresRlsPolicy, got ${other.identity().entityKind}`,
+      );
+    }
+    return this.name === other.name;
   }
 }

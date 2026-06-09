@@ -1,3 +1,5 @@
+import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
 import { freezeNode, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
@@ -19,7 +21,7 @@ export interface PostgresRoleInput {
  * Extends `SqlNode` directly, frozen at construction via `freezeNode(this)`.
  * The `kind: 'postgres-role'` discriminant is enumerable so it survives JSON.
  */
-export class PostgresRole extends SqlNode {
+export class PostgresRole extends SqlNode implements DiffableNode {
   override readonly kind = 'postgres-role' as const;
   readonly name: string;
   readonly namespaceId: string;
@@ -29,5 +31,23 @@ export class PostgresRole extends SqlNode {
     this.name = input.name;
     this.namespaceId = input.namespaceId ?? UNBOUND_NAMESPACE_ID;
     freezeNode(this);
+  }
+
+  identity(): EntityCoordinate {
+    return {
+      plane: 'storage',
+      namespaceId: this.namespaceId,
+      entityKind: 'role',
+      entityName: this.name,
+    };
+  }
+
+  isEqualTo(other: DiffableNode): boolean {
+    if (!(other instanceof PostgresRole)) {
+      throw new Error(
+        `PostgresRole.isEqualTo: expected a PostgresRole, got ${other.identity().entityKind}`,
+      );
+    }
+    return this.name === other.name;
   }
 }

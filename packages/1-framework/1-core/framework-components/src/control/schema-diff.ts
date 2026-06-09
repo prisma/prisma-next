@@ -1,0 +1,74 @@
+import type { EntityCoordinate } from '../ir/storage';
+
+export type SchemaDiffOutcome = 'missing' | 'extra' | 'mismatch';
+
+export interface SchemaDiffIssue {
+  readonly coordinate: EntityCoordinate;
+  readonly outcome: SchemaDiffOutcome;
+  readonly message: string;
+}
+
+/** A node the generic differ can align and compare. Implemented by target IR nodes. */
+export interface DiffableNode {
+  identity(): EntityCoordinate;
+  isEqualTo(other: DiffableNode): boolean;
+}
+
+function stableKey(c: EntityCoordinate): string {
+  return `${c.entityKind}\0${c.namespaceId}\0${c.entityName}`;
+}
+
+function outcomeMessage(outcome: SchemaDiffOutcome, c: EntityCoordinate): string {
+  return `${outcome}: ${c.entityKind} '${c.entityName}' in namespace '${c.namespaceId}'`;
+}
+
+/** Align two node collections by identity; emit missing/extra/mismatch issues sorted by key. */
+export function diffNodes(
+  expected: readonly DiffableNode[],
+  actual: readonly DiffableNode[],
+): readonly SchemaDiffIssue[] {
+  const expectedMap = new Map<string, DiffableNode>();
+  for (const node of expected) {
+    expectedMap.set(stableKey(node.identity()), node);
+  }
+
+  const actualMap = new Map<string, DiffableNode>();
+  for (const node of actual) {
+    actualMap.set(stableKey(node.identity()), node);
+  }
+
+  const issues: SchemaDiffIssue[] = [];
+
+  for (const [key, expectedNode] of expectedMap) {
+    const actualNode = actualMap.get(key);
+    const coordinate = expectedNode.identity();
+    if (actualNode === undefined) {
+      issues.push({
+        coordinate,
+        outcome: 'missing',
+        message: outcomeMessage('missing', coordinate),
+      });
+    } else if (!expectedNode.isEqualTo(actualNode)) {
+      issues.push({
+        coordinate,
+        outcome: 'mismatch',
+        message: outcomeMessage('mismatch', coordinate),
+      });
+    }
+  }
+
+  for (const [key, actualNode] of actualMap) {
+    if (!expectedMap.has(key)) {
+      const coordinate = actualNode.identity();
+      issues.push({ coordinate, outcome: 'extra', message: outcomeMessage('extra', coordinate) });
+    }
+  }
+
+  issues.sort((a, b) => {
+    const ka = stableKey(a.coordinate);
+    const kb = stableKey(b.coordinate);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+
+  return issues;
+}
