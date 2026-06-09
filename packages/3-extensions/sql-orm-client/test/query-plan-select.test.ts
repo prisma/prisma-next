@@ -759,7 +759,13 @@ describe('M:N include correlated subquery', () => {
     );
   });
 
-  it('FK include path is unchanged (no regression)', () => {
+  // Control case for the M:N lowering above: an ordinary 1:N FK include
+  // (users → posts, joined by posts.user_id = users.id) must still lower to a
+  // correlated subquery whose child SELECT has NO junction JOIN and correlates
+  // with a plain WHERE on the child's FK column. This pins that the
+  // junction-join branch fires only for N:M relations and never leaks into the
+  // FK include path.
+  it('1:N FK include lowers to a child-FK WHERE with no junction join', () => {
     const { collection } = createCollection();
     const state = collection.include('posts').state;
 
@@ -773,7 +779,6 @@ describe('M:N include correlated subquery', () => {
     expectDerivedTableSource(childRowsSelect);
     const childSelect = childRowsSelect.query;
 
-    // FK path: no JOIN to junction, just WHERE on child FK
     expect(childSelect.joins ?? []).toHaveLength(0);
     expect(childSelect.where).toEqual(
       BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
