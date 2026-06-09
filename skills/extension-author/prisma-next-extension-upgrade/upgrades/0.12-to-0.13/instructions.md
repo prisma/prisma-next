@@ -23,6 +23,18 @@ changes:
         - "codecRefForColumn("
         - "codecRefForStorageColumn("
       anyMatch: true
+  - id: storage-namespace-envelope-re-emit
+    summary: |
+      The storage IR in `contract.json` moved to a namespace envelope
+      (`storage.namespaces.<ns>.entries.<kind>`). This changes `storageHash` for every
+      SQL and Mongo extension contract. Re-emit your extension contract artefacts
+      (`pnpm --filter <your-extension-package> build:contract-space`), then re-pin your
+      migration baselines so `migrations/refs/head.json`, `end-contract.json`,
+      `end-contract.d.ts`, `migration.json`, `migration.ts`, and `ops.json` all reflect
+      the new hash. No source change is required — re-emitting is sufficient.
+    detection:
+      glob: "**/contract.json"
+      anyMatch: true
 ---
 
 <!--
@@ -121,13 +133,20 @@ pnpm --filter <your-extension-package> build:contract-space
 
 Because the `storageHash` changes, re-generate the migration baselines so
 `migrations/refs/head.json`, `end-contract.json`, `end-contract.d.ts`, `migration.json`,
-`migration.ts`, and `ops.json` all reflect the new hash:
+`migration.ts`, and `ops.json` all reflect the new hash.
 
-```bash
-node scripts/regen-extension-migrations.mjs
-```
+> **Note:** `scripts/regen-extension-migrations.mjs` is a monorepo-internal tool that
+> hard-codes `packages/3-extensions/` paths. It does not exist in external extension
+> repos. Follow the manual steps below.
 
-The script is idempotent — running it twice produces the same output.
+1. Copy the freshly-emitted `src/contract.json` → `migrations/refs/end-contract.json`
+   and `src/contract.d.ts` → `migrations/refs/end-contract.d.ts`.
+2. Open your HEAD migration's `migration.ts` and update the `to` literal to the new
+   `storageHash` from `src/contract.json`.
+3. Run `pnpm exec tsx migrations/<head-migration>/migration.ts` (from the extension
+   package root) to re-emit `ops.json` and `migration.json`.
+4. Update `migrations/refs/head.json` — set `"hash"` to the new `storageHash`,
+   preserving the existing `"invariants"` array unchanged.
 
 ### Validation
 
@@ -174,6 +193,52 @@ This is a type-level signature change — `pnpm typecheck` (or `pnpm build`) pin
 ## Validation by execution
 
 This entry is prose-only — there is no colocated codemod, so no execution-replay applies. The right namespace coordinate is call-site-specific (it depends on which model/table the AST node is bound to), so the translation is per-site agent reasoning rather than a deterministic transform. The substrate diff inside `packages/3-extensions/` in this transition is the same translation downstream extension authors replicate by hand: the namespace coordinate threaded through every column-bound codec-ref construction site. The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory carrying at least one entry; the substantive verification of the consumer-facing translation lives in the published extension-upgrade skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.
+
+## `storage-namespace-envelope-re-emit`
+
+The storage IR inside `contract.json` moved to a namespace envelope in 0.13. Every
+table and type entry that was previously at the top level of `storage` now lives under
+`storage.namespaces.<ns>.entries.<kind>`. Cross-references that were bare strings are
+now `{ namespace, model }` objects in `domain`. The emitter handles the shape change
+automatically — no source change is needed.
+
+Because the shape change affects `storageHash`, every extension contract must be
+re-emitted and migration baselines re-pinned.
+
+### Re-emit your extension contract
+
+```bash
+pnpm --filter <your-extension-package> build:contract-space
+```
+
+### Re-pin migration baselines
+
+Follow the manual re-pin steps described in the
+[`regen-extension-contracts-strip-empty-type-params`](#regen-extension-contracts-strip-empty-type-params)
+section above: copy `src/contract.{json,d.ts}` to `migrations/refs/end-contract.*`,
+update `migration.ts` with the new `storageHash`, re-run `tsx migration.ts` to
+re-emit `ops.json` + `migration.json`, then update `migrations/refs/head.json`.
+
+### Validation
+
+After re-emitting and re-pinning, run `pnpm typecheck && pnpm test --filter
+<your-extension-package>`, then confirm `prisma-next migration check` passes.
+
+## Declarative PSL-block SPI (additive)
+
+**Informational — no action required.**
+
+This release adds a declarative SPI for extension-contributed top-level PSL blocks.
+Register an `AuthoringPslBlockDescriptor` under `AuthoringContributions.pslBlockDescriptors`
+(exported from `@prisma-next/framework-components`) and the framework's generic PSL
+parser, validator, and printer handle the block round-trip through `contract infer`
+without any per-block parsing code. Each descriptor claims a PSL keyword and supplies
+the argument schema; a matching `entityTypes` entry lowers the parsed node to an IR
+class instance.
+
+This is purely additive — existing extensions that use hand-written PSL-block parsers
+are unaffected. Adopt `pslBlockDescriptors` when you want the framework to own the
+parse/print cycle for a new top-level block your extension introduces.
 
 ## Many-to-many contracts (additive)
 

@@ -195,6 +195,18 @@ pnpm prisma-next migration show
 pnpm prisma-next migration show <dirName-or-migrationHash-prefix>
 ```
 
+`migration show` displays a single migration package. To see the ordered list of migrations that would run — across all contract spaces — use `migrate --show`:
+
+```bash
+# Online: reads the live DB marker as the origin.
+pnpm prisma-next migrate --show --db $DATABASE_URL
+
+# Offline: hypothetical path from any ref or hash.
+pnpm prisma-next migrate --show --from <hash-or-ref> --to <hash-or-ref>
+```
+
+`migrate --show` is read-only and never writes to the DB or the migration graph. Use it before applying to confirm the execution order.
+
 Fill in any data transforms (see *Fill a placeholder*), self-emit if you edited `migration.ts`, then:
 
 ```bash
@@ -480,6 +492,24 @@ In non-interactive contexts (CI, `--no-interactive`, `--json`), the destructive-
 - **Seeds-as-first-class.** Prisma Next doesn't ship a `prisma db seed` equivalent. Workaround: write a TypeScript script that imports your `db` instance and runs your setup queries; invoke it from `package.json`'s scripts. If you need first-class seeding, file a feature request via the `prisma-next-feedback` skill.
 - **Migration squashing.** Prisma Next doesn't squash older migrations into a baseline. They accumulate; for very large histories, manual baseline-and-truncate is the path. If you need built-in squashing, file a feature request via the `prisma-next-feedback` skill.
 - **In-contract rename hints.** The planner cannot detect that a field rename is a rename rather than a drop+add. Workaround: hand-edit `migration.ts` to issue a `RENAME COLUMN` via `rawSql(...)`, or use a keep / backfill / drop pattern across two migrations. If you need a contract-level rename hint, file a feature request via the `prisma-next-feedback` skill.
+
+## Graph and history commands
+
+After planning or applying, you can inspect the migration graph offline:
+
+- `pnpm prisma-next migration list` — enumerate all on-disk migrations, rendered as a graph tree. Supports `--legend` (print the glyph key), `--ascii` (pipe-safe glyphs), and `--json`.
+- `pnpm prisma-next migration log --db $DATABASE_URL` — flat chronological table of applied migrations, read from the live DB. Supports `--ascii` and `--json`.
+
+For the full graph topology: `pnpm prisma-next migration graph` (also supports `--legend`, `--ascii`, `--dot`, `--json`).
+
+## `@@control` and DDL scope
+
+Objects whose `@@control` policy excludes them from Prisma Next's managed surface are omitted from planned DDL. The four policies are: `managed` (Prisma plans and applies DDL), `tolerated` (object may exist, no DDL emitted), `external` (object is expected to exist, no DDL), `observed` (Prisma reads but never writes). Declare `@@control(managed|tolerated|external|observed)` in your schema; see `prisma-next-contract` and [`packages/2-sql/2-authoring/contract-psl/README.md`](../../packages/2-sql/2-authoring/contract-psl/README.md) for authoring syntax.
+
+## Telemetry
+
+The CLI collects anonymous usage data by default. To opt out, set `PRISMA_NEXT_DISABLE_TELEMETRY=1` or `DO_NOT_TRACK=1` in your environment. See [`docs/Telemetry.md`](../../docs/Telemetry.md) for the full opt-out reference.
+
 ## Checklist
 
 - [ ] Contract emitted (`contract.json` + `contract.d.ts` current).

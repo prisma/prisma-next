@@ -18,6 +18,23 @@ changes:
       (`types { Uuid = String @db.Uuid }`) for database-native types. No action required
       for consumers who do not use cross-space foreign keys; this entry documents the
       pattern for new adopters.
+  - id: storage-namespace-envelope-re-emit
+    summary: |
+      The storage IR in `contract.json` moved to a namespace envelope
+      (`storage.namespaces.<ns>.entries.<kind>`). This changes `storageHash` for every
+      SQL and Mongo contract. Re-emit your contract artefacts (`prisma-next contract
+      emit`), then plan and apply the corresponding migration (`prisma-next migration
+      plan` → `prisma-next migrate`) so your database schema is reconciled with the new
+      contract shape. No source change is required — re-emitting is sufficient.
+    detection:
+      glob: "**/contract.json"
+      anyMatch: true
+  - id: telemetry-now-opt-out
+    summary: |
+      Telemetry is now opt-out by default. If you previously relied on the opt-in
+      default to keep telemetry off, set `PRISMA_NEXT_DISABLE_TELEMETRY=1` or
+      `DO_NOT_TRACK=1` in your environment to restore that behaviour. No code change
+      is required.
 ---
 
 <!--
@@ -208,3 +225,47 @@ On emit, `contract.json` gains:
 - A cross-space `foreignKey` entry on the storage table pointing at the extension space's table.
 
 Run `prisma-next contract emit` after updating `contract.prisma`, then plan and apply the migration (`prisma-next migration plan --name add-user-fk && prisma-next migrate`) to add the column and foreign key to your database.
+
+## `storage-namespace-envelope-re-emit`
+
+The storage IR inside `contract.json` moved to a namespace envelope in 0.13. Every
+table and type entry that was previously at the top level of `storage` now lives under
+`storage.namespaces.<ns>.entries.<kind>`. Cross-references that were bare strings are
+now `{ namespace, model }` objects in `domain`. The emitter handles this automatically
+— no schema source change is needed.
+
+Because the shape change affects `storageHash`, every SQL and Mongo contract must be
+re-emitted, and the database must be migrated to match.
+
+### Re-emit your contract
+
+```bash
+prisma-next contract emit
+```
+
+### Migrate your database
+
+```bash
+prisma-next migration plan --name storage-namespace-envelope
+prisma-next migrate
+```
+
+The migration records the hash transition; no column or table is added or removed — this
+is a metadata-only change. Confirm with `prisma-next migration check` once done.
+
+## `telemetry-now-opt-out`
+
+**Informational — no code change required.**
+
+Starting at 0.13, the CLI collects anonymised usage telemetry by default (previously
+opt-in). If you want to disable it, set either of the following environment variables:
+
+```bash
+PRISMA_NEXT_DISABLE_TELEMETRY=1
+# or
+DO_NOT_TRACK=1
+```
+
+Either variable takes effect immediately — no config file change needed. See
+[Telemetry](https://github.com/prisma/prisma-next/blob/main/docs/Telemetry.md) for
+what is collected and how to opt out permanently.
