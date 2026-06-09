@@ -1,5 +1,15 @@
 import type { ContractEnum, JsonValue } from '@prisma-next/contract/types';
 
+/**
+ * Runtime view of a domain enum, built at the client from the emitted
+ * `ContractEnum` JSON (codec-encoded `JsonValue` members, literal types erased).
+ *
+ * This deliberately mirrors the accessor shape of the authoring-time
+ * `EnumTypeHandle` (in `contract-ts`) rather than reusing it: that handle carries
+ * the literal value generics and lives in the authoring layer, which the runtime
+ * orm-client cannot depend on. The two are the same surface seen from the two
+ * planes — authoring (typed) and runtime (validated JSON).
+ */
 export interface EnumAccessor {
   readonly values: readonly JsonValue[];
   readonly names: readonly string[];

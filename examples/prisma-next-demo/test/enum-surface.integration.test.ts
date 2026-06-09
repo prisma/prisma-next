@@ -2,7 +2,7 @@ import { instantiateExecutionStack } from '@prisma-next/framework-components/exe
 import { createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { contract } from '../prisma/contract';
 import { context, sql, stack } from '../src/prisma-no-emit/context';
 import { getPostsByPriority, getPriorityEnum } from '../src/prisma-no-emit/priority-feed';
@@ -92,13 +92,17 @@ describe('TS-authored enum on the demo contract (Post.priority)', () => {
 
           const ordered = await getPostsByPriority(runtime);
 
-          // The read narrows to the value union, not string: assigning each
-          // row's priority into the union typechecks without a cast.
-          const unions: Array<'low' | 'high' | 'urgent'> = ordered.map((row) => row.priority);
+          // The read narrows to the enum's own value union, not string. The
+          // expected type is taken from the `db.enums` surface rather than
+          // re-typed by hand, and asserted against the inferred row type with
+          // no annotation — so a widening to `string` fails here.
+          type PriorityValue = ReturnType<typeof getPriorityEnum>['values'][number];
+          const priorities = ordered.map((row) => row.priority);
+          expectTypeOf(priorities).toEqualTypeOf<PriorityValue[]>();
 
           // Declaration order is low -> high -> urgent; lexical would be
           // high, low, low, urgent.
-          expect(unions).toEqual(['low', 'low', 'high', 'urgent']);
+          expect(priorities).toEqual(['low', 'low', 'high', 'urgent']);
           expect(ordered.map((row) => row.id)).toEqual([
             '10000000-0000-0000-0000-00000000000b',
             '10000000-0000-0000-0000-00000000000d',
