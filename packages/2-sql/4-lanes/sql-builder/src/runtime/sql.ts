@@ -34,9 +34,7 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
         return undefined;
       }
       if (!Object.hasOwn(storage.namespaces, prop)) {
-        throw new Error(
-          `Unknown namespace '${prop}'. Available namespaces: ${Object.keys(storage.namespaces).join(', ')}`,
-        );
+        return undefined;
       }
       const namespaceId = prop;
       return new Proxy(
@@ -50,12 +48,7 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
             if (table) {
               return new TableProxyImpl(tableName, table, tableName, ctx, namespaceId);
             }
-            const availableTables = Object.keys(
-              storage.namespaces[namespaceId]?.entries.table ?? {},
-            );
-            throw new Error(
-              `No table '${tableName}' in namespace '${namespaceId}'. Available tables: ${availableTables.join(', ')}`,
-            );
+            return undefined;
           },
         },
       );

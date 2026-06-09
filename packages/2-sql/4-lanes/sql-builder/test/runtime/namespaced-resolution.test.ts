@@ -49,12 +49,9 @@ const stubBase = {
 const stubInferer = { inferCodec: () => 'pg/text@1' };
 
 type TableHandle = { buildAst(): TableSource };
-// Flat bare-name keys are typed `undefined`: not on the surface, fail fast at runtime (FR11).
 type TwoNamespaceDb = {
   public: { users: TableHandle; sessions: undefined };
   auth: { users: TableHandle; sessions: TableHandle };
-  users: undefined;
-  posts: undefined;
 };
 
 function db() {
@@ -73,15 +70,9 @@ describe('namespaced table resolution', () => {
     expect(db().auth.users.buildAst().namespaceId).toBe('auth');
   });
 
-  it('scopes table lookup to the named namespace and fails fast on a foreign table (FR11)', () => {
+  it('scopes table lookup to the named namespace, returning undefined for a foreign table', () => {
     // `sessions` exists only in `auth`.
-    expect(() => db().public.sessions).toThrow(/No table 'sessions' in namespace 'public'/);
+    expect(db().public.sessions).toBeUndefined();
     expect(db().auth.sessions.buildAst().namespaceId).toBe('auth');
-  });
-
-  it('fails fast naming the unknown namespace on flat bare-name access (FR11)', () => {
-    // `posts` is unique to one namespace, `users` is shared; both are unknown-namespace accesses.
-    expect(() => db().posts).toThrow(/Unknown namespace 'posts'/);
-    expect(() => db().users).toThrow(/Unknown namespace 'users'/);
   });
 });

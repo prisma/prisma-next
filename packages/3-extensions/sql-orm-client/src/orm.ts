@@ -120,9 +120,7 @@ export function orm<
             return undefined;
           }
           if (!facetModelNames.has(modelProp)) {
-            throw new Error(
-              `No model '${modelProp}' in namespace '${namespaceId}'. Available models: ${[...facetModelNames].join(', ')}`,
-            );
+            return undefined;
           }
           const hit = facetCache.get(modelProp);
           if (hit) {
@@ -149,9 +147,7 @@ export function orm<
       }
 
       if (!Object.hasOwn(contract.domain.namespaces, prop)) {
-        throw new Error(
-          `Unknown namespace '${prop}'. Available namespaces: ${Object.keys(contract.domain.namespaces).join(', ')}`,
-        );
+        return undefined;
       }
 
       return namespaceFacet(prop);
