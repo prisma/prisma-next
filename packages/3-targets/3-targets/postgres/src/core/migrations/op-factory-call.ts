@@ -37,6 +37,7 @@ import { FunctionColumnDefault, LiteralColumnDefault } from '@prisma-next/sql-re
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { blindCast } from '@prisma-next/utils/casts';
 import * as contractFreeDdl from '../../contract-free/ddl';
+import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import {
@@ -59,6 +60,7 @@ import {
 import { createExtension } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
+import { createRlsPolicy, enableRowLevelSecurity } from './operations/rls';
 import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
 import { step, targetDetails } from './operations/shared';
 import { dropTable } from './operations/tables';
@@ -1103,6 +1105,56 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   }
 }
 
+export class CreatePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'createRlsPolicy' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly policy: PostgresRlsPolicy;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string, policy: PostgresRlsPolicy) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.policy = policy;
+    this.label = `Create RLS policy "${policy.name}" on "${tableName}"`;
+    this.freeze();
+  }
+
+  toOp(): Op {
+    return createRlsPolicy(this.schemaName, this.tableName, this.policy);
+  }
+
+  renderTypeScript(): string {
+    return `createRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.policy)})`;
+  }
+}
+
+export class EnableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'enableRowLevelSecurity' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.label = `Enable row-level security on "${tableName}"`;
+    this.freeze();
+  }
+
+  toOp(): Op {
+    return enableRowLevelSecurity(this.schemaName, this.tableName);
+  }
+
+  renderTypeScript(): string {
+    return `enableRowLevelSecurity(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)})`;
+  }
+}
+
 export type PostgresOpFactoryCall =
   | CreateTableCall
   | DropTableCall
@@ -1128,4 +1180,6 @@ export type PostgresOpFactoryCall =
   | RawSqlCall
   | CreateExtensionCall
   | CreateSchemaCall
+  | CreatePostgresRlsPolicyCall
+  | EnableRowLevelSecurityCall
   | DataTransformCall;

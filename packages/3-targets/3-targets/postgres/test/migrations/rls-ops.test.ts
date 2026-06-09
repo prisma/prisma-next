@@ -1,0 +1,157 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CreatePostgresRlsPolicyCall,
+  EnableRowLevelSecurityCall,
+} from '../../src/core/migrations/op-factory-call';
+import { createRlsPolicy, enableRowLevelSecurity } from '../../src/core/migrations/operations/rls';
+import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
+
+const basePolicy = new PostgresRlsPolicy({
+  name: 'read_own_profiles_ab12cd34',
+  prefix: 'read_own_profiles',
+  tableName: 'profiles',
+  namespaceId: 'public',
+  operation: 'select',
+  roles: ['authenticated'],
+  using: '(auth.uid() = user_id)',
+  permissive: true,
+});
+
+describe('createRlsPolicy op', () => {
+  it('emits the correct CREATE POLICY DDL', () => {
+    const op = createRlsPolicy('public', 'profiles', basePolicy);
+    const executeSql = op.execute[0]?.sql;
+    expect(executeSql).toBe(
+      `CREATE POLICY "read_own_profiles_ab12cd34" ON "public"."profiles" AS PERMISSIVE FOR SELECT TO authenticated USING ((auth.uid() = user_id))`,
+    );
+  });
+
+  it('emits WITH CHECK clause when present', () => {
+    const policy = new PostgresRlsPolicy({
+      name: 'insert_own_profiles_ab12cd34',
+      prefix: 'insert_own_profiles',
+      tableName: 'profiles',
+      namespaceId: 'public',
+      operation: 'insert',
+      roles: ['authenticated'],
+      withCheck: '(auth.uid() = user_id)',
+      permissive: true,
+    });
+    const op = createRlsPolicy('public', 'profiles', policy);
+    const executeSql = op.execute[0]?.sql;
+    expect(executeSql).toBe(
+      `CREATE POLICY "insert_own_profiles_ab12cd34" ON "public"."profiles" AS PERMISSIVE FOR INSERT TO authenticated WITH CHECK ((auth.uid() = user_id))`,
+    );
+  });
+
+  it('emits AS RESTRICTIVE when permissive is false', () => {
+    const policy = new PostgresRlsPolicy({
+      ...basePolicy,
+      name: 'restrict_profiles_ab12cd34',
+      prefix: 'restrict_profiles',
+      permissive: false,
+    });
+    const op = createRlsPolicy('public', 'profiles', policy);
+    expect(op.execute[0]?.sql).toContain('AS RESTRICTIVE');
+  });
+
+  it('emits precheck asserting policy is absent', () => {
+    const op = createRlsPolicy('public', 'profiles', basePolicy);
+    const precheckSql = op.precheck[0]?.sql ?? '';
+    expect(precheckSql).toContain('pg_policies');
+    expect(precheckSql).toContain('NOT EXISTS');
+    expect(precheckSql).toContain('read_own_profiles_ab12cd34');
+  });
+
+  it('emits postcheck asserting policy is present', () => {
+    const op = createRlsPolicy('public', 'profiles', basePolicy);
+    const postcheckSql = op.postcheck[0]?.sql ?? '';
+    expect(postcheckSql).toContain('pg_policies');
+    expect(postcheckSql).not.toContain('NOT EXISTS');
+    expect(postcheckSql).toContain('read_own_profiles_ab12cd34');
+  });
+
+  it('operationClass is additive', () => {
+    const op = createRlsPolicy('public', 'profiles', basePolicy);
+    expect(op.operationClass).toBe('additive');
+  });
+});
+
+describe('enableRowLevelSecurity op', () => {
+  it('emits the correct ALTER TABLE DDL', () => {
+    const op = enableRowLevelSecurity('public', 'profiles');
+    expect(op.execute[0]?.sql).toBe(`ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY`);
+  });
+
+  it('emits precheck reading pg_class.relrowsecurity', () => {
+    const op = enableRowLevelSecurity('public', 'profiles');
+    const precheckSql = op.precheck[0]?.sql ?? '';
+    expect(precheckSql).toContain('pg_class');
+    expect(precheckSql).toContain('relrowsecurity');
+  });
+
+  it('emits postcheck asserting relrowsecurity = true', () => {
+    const op = enableRowLevelSecurity('public', 'profiles');
+    const postcheckSql = op.postcheck[0]?.sql ?? '';
+    expect(postcheckSql).toContain('pg_class');
+    expect(postcheckSql).toContain('relrowsecurity');
+  });
+
+  it('operationClass is additive', () => {
+    const op = enableRowLevelSecurity('public', 'profiles');
+    expect(op.operationClass).toBe('additive');
+  });
+});
+
+describe('CreatePostgresRlsPolicyCall', () => {
+  it('toOp() returns the same DDL as createRlsPolicy()', () => {
+    const call = new CreatePostgresRlsPolicyCall('public', 'profiles', basePolicy);
+    const directOp = createRlsPolicy('public', 'profiles', basePolicy);
+    expect(call.toOp().execute[0]?.sql).toBe(directOp.execute[0]?.sql);
+  });
+
+  it('renderTypeScript() round-trips the call', () => {
+    const call = new CreatePostgresRlsPolicyCall('public', 'profiles', basePolicy);
+    const rendered = call.renderTypeScript();
+    expect(rendered).toContain('createRlsPolicy');
+    expect(rendered).toContain('public');
+    expect(rendered).toContain('profiles');
+  });
+
+  it('factoryName is createRlsPolicy', () => {
+    const call = new CreatePostgresRlsPolicyCall('public', 'profiles', basePolicy);
+    expect(call.factoryName).toBe('createRlsPolicy');
+  });
+
+  it('operationClass is additive', () => {
+    const call = new CreatePostgresRlsPolicyCall('public', 'profiles', basePolicy);
+    expect(call.operationClass).toBe('additive');
+  });
+});
+
+describe('EnableRowLevelSecurityCall', () => {
+  it('toOp() returns the correct DDL', () => {
+    const call = new EnableRowLevelSecurityCall('public', 'profiles');
+    expect(call.toOp().execute[0]?.sql).toBe(
+      `ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY`,
+    );
+  });
+
+  it('renderTypeScript() round-trips the call', () => {
+    const call = new EnableRowLevelSecurityCall('public', 'profiles');
+    const rendered = call.renderTypeScript();
+    expect(rendered).toContain('enableRowLevelSecurity');
+    expect(rendered).toContain('public');
+    expect(rendered).toContain('profiles');
+  });
+
+  it('factoryName is enableRowLevelSecurity', () => {
+    const call = new EnableRowLevelSecurityCall('public', 'profiles');
+    expect(call.factoryName).toBe('enableRowLevelSecurity');
+  });
+
+  it('operationClass is additive', () => {
+    const call = new EnableRowLevelSecurityCall('public', 'profiles');
+    expect(call.operationClass).toBe('additive');
+  });
+});
