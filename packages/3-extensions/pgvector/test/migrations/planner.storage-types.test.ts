@@ -1,6 +1,6 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecControlHooks } from '@prisma-next/family-sql/control';
+import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
@@ -12,19 +12,20 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter();
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
 };
 
 describe('PostgresMigrationPlanner - storage types', () => {
-  it('plans type operations before table operations', () => {
+  it('plans type operations before table operations', async () => {
     const planner = createPostgresMigrationPlanner(testAdapter);
     const hooks: CodecControlHooks = {
       planTypeOperations: (_options) => ({
@@ -115,7 +116,10 @@ describe('PostgresMigrationPlanner - storage types', () => {
     });
 
     expectNarrowedType(result.kind === 'success');
-    expect(result.plan.operations.map((op) => op.id)).toEqual(['type.Role', 'table.user']);
+    const ops = (await Promise.all(
+      result.plan.operations,
+    )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    expect(ops.map((op) => op.id)).toEqual(['type.Role', 'table.user']);
   });
 
   it('fails when storage type operations are non-additive under init policy', () => {
@@ -195,7 +199,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
     });
   });
 
-  it('quotes custom type names in CREATE TABLE to preserve case', () => {
+  it('quotes custom type names in CREATE TABLE to preserve case', async () => {
     const planner = createPostgresMigrationPlanner(testAdapter);
     const hooks: CodecControlHooks = {
       planTypeOperations: (_options) => ({
@@ -289,17 +293,18 @@ describe('PostgresMigrationPlanner - storage types', () => {
 
     expectNarrowedType(result.kind === 'success');
 
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.user');
+    const ops = (await Promise.all(
+      result.plan.operations,
+    )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    const tableOp = ops.find((op) => op.id === 'table.user');
     expect(tableOp).toBeDefined();
 
     const createTableSql = tableOp!.execute[0]?.sql;
 
-    // Custom type names must be quoted to preserve case in PostgreSQL
-    // Without quotes, PostgreSQL lowercases "UserKind" to "userkind"
     expect(createTableSql).toContain('"UserKind"');
   });
 
-  it('expands parameterized storage type refs when creating tables', () => {
+  it('expands parameterized storage type refs when creating tables', async () => {
     const planner = createPostgresMigrationPlanner(testAdapter);
     const contract: Contract<SqlStorage> = {
       target: 'postgres',
@@ -358,7 +363,10 @@ describe('PostgresMigrationPlanner - storage types', () => {
 
     expectNarrowedType(result.kind === 'success');
 
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.document');
+    const ops = (await Promise.all(
+      result.plan.operations,
+    )) as SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    const tableOp = ops.find((op) => op.id === 'table.document');
     expect(tableOp).toBeDefined();
 
     const createTableSql = tableOp?.execute[0]?.sql ?? '';
