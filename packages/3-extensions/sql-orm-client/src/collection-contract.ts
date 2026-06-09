@@ -1,5 +1,9 @@
-import type { Contract, ContractFieldType,
-  type ContractRelationThrough, CrossReference } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractFieldType,
+  ContractRelationThrough,
+  CrossReference,
+} from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
