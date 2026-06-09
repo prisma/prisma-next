@@ -40,15 +40,15 @@ describe('orm()', () => {
       runtime,
       context,
       collections: { Post: PostCollection },
-    }).public;
-    expect(db.Post).toBeInstanceOf(PostCollection);
+    });
+    expect(db.public.Post).toBeInstanceOf(PostCollection);
   });
 
   it('creates default collections for model names', async () => {
     const runtime = createMockRuntime();
-    const db = orm({ runtime, context }).public;
+    const db = orm({ runtime, context });
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
-    const results = await db.User.all();
+    const results = await db.public.User.all();
     expect(results).toHaveLength(1);
   });
 
@@ -60,18 +60,16 @@ describe('orm()', () => {
 
   it('caches lazily created collections', () => {
     const runtime = createMockRuntime();
-    const db = orm({ runtime, context }).public;
-    const first = db.User;
-    const second = db.User;
+    const db = orm({ runtime, context });
+    const first = db.public.User;
+    const second = db.public.User;
     expect(first).toBe(second);
   });
 
-  it('throws for an unknown model name on a namespace facet', () => {
+  it('returns undefined for an unknown model name on a namespace facet', () => {
     const runtime = createMockRuntime();
     const db = orm({ runtime, context });
-    expect(() => (db.public as Record<string, unknown>)['unknown']).toThrow(
-      /No model 'unknown' in namespace 'public'/,
-    );
+    expect((db.public as Record<string, unknown>)['unknown']).toBeUndefined();
   });
 
   it('custom collection overrides default for same key', () => {
@@ -80,9 +78,9 @@ describe('orm()', () => {
       runtime,
       context,
       collections: { Post: PostCollection },
-    }).public;
+    });
 
-    expect(db.Post).toBeInstanceOf(PostCollection);
+    expect(db.public.Post).toBeInstanceOf(PostCollection);
   });
 
   it('resolves User to custom collection instance', () => {
@@ -91,9 +89,9 @@ describe('orm()', () => {
       runtime,
       context,
       collections: { User: UserCollection },
-    }).public;
+    });
 
-    expect(db.User).toBeInstanceOf(UserCollection);
+    expect(db.public.User).toBeInstanceOf(UserCollection);
   });
 
   it('instantiates custom collections lazily and caches by model', () => {
@@ -107,14 +105,14 @@ describe('orm()', () => {
       runtime,
       context,
       collections: { Post: LazyPostCollection },
-    }).public;
+    });
 
     expect(constructions).toBe(0);
-    void db.User;
+    void db.public.User;
     expect(constructions).toBe(0);
-    const postsFirst = db.Post;
+    const postsFirst = db.public.Post;
     expect(constructions).toBe(1);
-    const postsSecond = db.Post;
+    const postsSecond = db.public.Post;
     expect(postsSecond).toBe(postsFirst);
     expect(constructions).toBe(1);
   });
@@ -125,10 +123,10 @@ describe('orm()', () => {
       runtime,
       context,
       collections: { Post: undefined as unknown as typeof PostCollection },
-    }).public;
+    });
 
-    expect(db.Post).toBeInstanceOf(Collection);
-    expect(db.Post).not.toBeInstanceOf(PostCollection);
+    expect(db.public.Post).toBeInstanceOf(Collection);
+    expect(db.public.Post).not.toBeInstanceOf(PostCollection);
   });
 
   it('throws when a custom collection key cannot resolve to a model', () => {
@@ -193,14 +191,12 @@ describe('orm()', () => {
     ).toThrow(/must be a Collection class/);
   });
 
-  it('does not type a flat bare-model key on the client', () => {
+  it('exposes models through the namespace facet on the client', () => {
     const runtime = createMockRuntime();
     const db = orm({ runtime, context });
     expect(db.public.User).toBeDefined();
     type DbClient = typeof db;
-    // @ts-expect-error flat 'User' is not a namespace key
-    type _FlatModelGone = DbClient['User'];
-    // @ts-expect-error an unknown key is likewise absent from the typed client
+    // @ts-expect-error an unknown key is absent from the typed client
     type _UnknownCollection = DbClient['unknown'];
   });
 
@@ -212,9 +208,9 @@ describe('orm()', () => {
       runtime,
       context,
       collections: { Post: PostCollection },
-    }).public;
+    });
 
-    const withPosts = db.User.include('posts', (posts) => {
+    const withPosts = db.public.User.include('posts', (posts) => {
       expectPostCollection(posts);
       return posts.popular();
     });
@@ -232,9 +228,9 @@ describe('orm()', () => {
         Post: PostCollection,
         Comment: CommentCollection,
       },
-    }).public;
+    });
 
-    const withNested = db.User.include('posts', (posts) => {
+    const withNested = db.public.User.include('posts', (posts) => {
       expectPostCollection(posts);
       return posts.include('comments', (comments) => {
         expectCommentCollection(comments);

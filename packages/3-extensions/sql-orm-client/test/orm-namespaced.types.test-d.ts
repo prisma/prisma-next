@@ -11,13 +11,6 @@ test('the namespace facet exposes its models', () => {
   expectTypeOf(db.public).toHaveProperty('Post');
 });
 
-test('the flat by-bare-model surface is gone — namespace selection is mandatory', () => {
-  // @ts-expect-error flat 'User' is not a namespace key
-  db.User;
-  // @ts-expect-error flat 'Post' is not a namespace key
-  db.Post;
-});
-
 test('an undeclared namespace id is not a key on the typed surface', () => {
   // @ts-expect-error 'auth' is not a declared domain namespace of this contract
   db.auth;

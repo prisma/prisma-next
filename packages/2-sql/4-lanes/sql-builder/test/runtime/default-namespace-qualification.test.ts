@@ -24,33 +24,34 @@ function db() {
       typeof sqlContract
     >,
     rawCodecInferer: stubInferer,
-  }).public;
+  });
 }
 
 describe('namespace-facet table resolution', () => {
   it('stamps the public namespace on TableSource from the namespace facet', () => {
-    const ast = db().users.buildAst() as TableSource;
+    const ast = db().public.users.buildAst() as TableSource;
     expect(ast.namespaceId).toBe('public');
   });
 
   it('carries the namespace coordinate through select, insert, update, and delete plans', () => {
-    const selectFrom = (db().users.select('id').build().ast as { from: TableSource }).from;
+    const selectFrom = (db().public.users.select('id').build().ast as { from: TableSource }).from;
     expect(selectFrom.namespaceId).toBe('public');
 
     const insertTable = (
       db()
-        .users.insert([{ id: 1, email: 'a@example.com', name: 'Ann' }])
+        .public.users.insert([{ id: 1, email: 'a@example.com', name: 'Ann' }])
         .build().ast as { table: TableSource }
     ).table;
     expect(insertTable.namespaceId).toBe('public');
 
-    const updateTable = (db().users.update({ name: 'Bob' }).build().ast as { table: TableSource })
-      .table;
+    const updateTable = (
+      db().public.users.update({ name: 'Bob' }).build().ast as { table: TableSource }
+    ).table;
     expect(updateTable.namespaceId).toBe('public');
 
     const deleteTable = (
       db()
-        .users.delete()
+        .public.users.delete()
         .where((f, fns) => fns.eq(f.id, '1'))
         .build().ast as { table: TableSource }
     ).table;

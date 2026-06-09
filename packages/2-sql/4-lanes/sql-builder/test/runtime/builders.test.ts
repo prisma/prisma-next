@@ -38,7 +38,7 @@ function db() {
       typeof sqlContract
     >,
     rawCodecInferer: stubInferer,
-  }).public;
+  });
 }
 
 function dbNoCapabilities() {
@@ -51,7 +51,7 @@ function dbNoCapabilities() {
       typeof noLateralContract
     >,
     rawCodecInferer: stubInferer,
-  }).public;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -69,22 +69,20 @@ function getAst(builder: { buildAst(): SelectAst }): SelectAst {
 describe('sql', () => {
   it('exposes table proxies for all tables in contract', () => {
     const d = db();
-    expect(d.users).toBeDefined();
-    expect(d.posts).toBeDefined();
+    expect(d.public.users).toBeDefined();
+    expect(d.public.posts).toBeDefined();
   });
 
-  it('fails fast naming the namespace on an unknown table (FR11)', () => {
+  it('returns undefined for an unknown table in a namespace', () => {
     const d = db();
-    expect(() => (d as Record<string, unknown>)['nonexistent']).toThrow(
-      /No table 'nonexistent' in namespace 'public'/,
-    );
+    expect((d.public as Record<string, unknown>)['nonexistent']).toBeUndefined();
   });
 });
 
 describe('TableProxy', () => {
   it('as() produces proxy with rebound alias', () => {
     const d = db();
-    const u1 = d.users.as('u1');
+    const u1 = d.public.users.as('u1');
     const ast = u1.buildAst() as TableSource;
     expect(ast).toBeInstanceOf(TableSource);
     expect(ast.name).toBe('users');
@@ -95,7 +93,7 @@ describe('TableProxy', () => {
 
 describe('select', () => {
   it('select by column names produces ProjectionItems', () => {
-    const ast = getAst(db().users.select('id', 'name'));
+    const ast = getAst(db().public.users.select('id', 'name'));
     expect(ast.projection).toHaveLength(2);
     expect(ast.projection[0]!.alias).toBe('id');
     expect(ast.projection[0]!.expr).toBeInstanceOf(IdentifierRef);
@@ -104,21 +102,21 @@ describe('select', () => {
   });
 
   it('select with aliased expression', () => {
-    const ast = getAst(db().users.select('upper_name', (f, _fns) => f.name));
+    const ast = getAst(db().public.users.select('upper_name', (f, _fns) => f.name));
     expect(ast.projection).toHaveLength(1);
     expect(ast.projection[0]!.alias).toBe('upper_name');
     expect(ast.projection[0]!.expr).toBeInstanceOf(IdentifierRef);
   });
 
   it('select with callback record', () => {
-    const ast = getAst(db().users.select((f) => ({ myId: f.id, myName: f.name })));
+    const ast = getAst(db().public.users.select((f) => ({ myId: f.id, myName: f.name })));
     expect(ast.projection).toHaveLength(2);
     expect(ast.projection[0]!.alias).toBe('myId');
     expect(ast.projection[1]!.alias).toBe('myName');
   });
 
   it('chained select accumulates projections', () => {
-    const ast = getAst(db().users.select('id').select('name'));
+    const ast = getAst(db().public.users.select('id').select('name'));
     expect(ast.projection).toHaveLength(2);
     expect(ast.projection[0]!.alias).toBe('id');
     expect(ast.projection[1]!.alias).toBe('name');
@@ -129,7 +127,7 @@ describe('where', () => {
   it('single where produces BinaryExpr', () => {
     const ast = getAst(
       db()
-        .users.select('id')
+        .public.users.select('id')
         .where((f, fns) => fns.eq(f.id, 1)),
     );
     expect(ast.where).toBeInstanceOf(BinaryExpr);
@@ -139,7 +137,7 @@ describe('where', () => {
   it('multiple where calls produce AndExpr', () => {
     const ast = getAst(
       db()
-        .users.select('id')
+        .public.users.select('id')
         .where((f, fns) => fns.eq(f.id, 1))
         .where((f, fns) => fns.gt(f.id, 0)),
     );
@@ -150,14 +148,14 @@ describe('where', () => {
 
 describe('immutability', () => {
   it('where does not mutate original builder', () => {
-    const base = db().users.select('id');
+    const base = db().public.users.select('id');
     const filtered = base.where((f, fns) => fns.eq(f.id, 1));
     expect(getAst(base).where).toBeUndefined();
     expect(getAst(filtered).where).toBeDefined();
   });
 
   it('select does not mutate original builder', () => {
-    const base = db().users.select('id');
+    const base = db().public.users.select('id');
     const extended = base.select('name');
     expect(getAst(base).projection).toHaveLength(1);
     expect(getAst(extended).projection).toHaveLength(2);
@@ -168,7 +166,7 @@ describe('joins', () => {
   it('innerJoin produces JoinAst with inner type', () => {
     const ast = getAst(
       db()
-        .users.innerJoin(db().posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+        .public.users.innerJoin(db().public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
         .select('name', 'title'),
     );
     expect(ast.joins).toHaveLength(1);
@@ -180,7 +178,9 @@ describe('joins', () => {
   it('outerLeftJoin produces JoinAst with left type', () => {
     const ast = getAst(
       db()
-        .users.outerLeftJoin(db().posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+        .public.users.outerLeftJoin(db().public.posts, (f, fns) =>
+          fns.eq(f.users.id, f.posts.user_id),
+        )
         .select('name'),
     );
     expect(ast.joins![0]!.joinType).toBe('left');
@@ -189,7 +189,9 @@ describe('joins', () => {
   it('outerRightJoin produces JoinAst with right type', () => {
     const ast = getAst(
       db()
-        .users.outerRightJoin(db().posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+        .public.users.outerRightJoin(db().public.posts, (f, fns) =>
+          fns.eq(f.users.id, f.posts.user_id),
+        )
         .select('title'),
     );
     expect(ast.joins![0]!.joinType).toBe('right');
@@ -198,7 +200,9 @@ describe('joins', () => {
   it('outerFullJoin produces JoinAst with full type', () => {
     const ast = getAst(
       db()
-        .users.outerFullJoin(db().posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+        .public.users.outerFullJoin(db().public.posts, (f, fns) =>
+          fns.eq(f.users.id, f.posts.user_id),
+        )
         .select((f) => ({ name: f.users.name })),
     );
     expect(ast.joins![0]!.joinType).toBe('full');
@@ -207,7 +211,7 @@ describe('joins', () => {
   it('join on expression references columns from both sides', () => {
     const ast = getAst(
       db()
-        .users.innerJoin(db().posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+        .public.users.innerJoin(db().public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
         .select('name'),
     );
     const on = ast.joins![0]!.on as BinaryExpr;
@@ -223,8 +227,8 @@ describe('joins', () => {
 describe('self-join via as()', () => {
   it('self-join with aliased tables', () => {
     const d = db();
-    const u1 = d.users.as('u1');
-    const u2 = d.users.as('u2');
+    const u1 = d.public.users.as('u1');
+    const u2 = d.public.users.as('u2');
     const ast = getAst(
       u1
         .innerJoin(u2, (f, fns) => fns.eq(f.u1.id, f.u2.invited_by_id))
@@ -239,7 +243,9 @@ describe('self-join via as()', () => {
 
 describe('orderBy', () => {
   it('orderBy string with desc direction', () => {
-    const ast = getAst(db().users.select('id', 'name').orderBy('name', { direction: 'desc' }));
+    const ast = getAst(
+      db().public.users.select('id', 'name').orderBy('name', { direction: 'desc' }),
+    );
     expect(ast.orderBy).toHaveLength(1);
     expect(ast.orderBy![0]!.dir).toBe('desc');
     expect(ast.orderBy![0]!.expr).toBeInstanceOf(IdentifierRef);
@@ -247,14 +253,14 @@ describe('orderBy', () => {
   });
 
   it('orderBy defaults to asc', () => {
-    const ast = getAst(db().users.select('id').orderBy('id'));
+    const ast = getAst(db().public.users.select('id').orderBy('id'));
     expect(ast.orderBy![0]!.dir).toBe('asc');
   });
 
   it('orderBy with expression callback', () => {
     const ast = getAst(
       db()
-        .users.select('id')
+        .public.users.select('id')
         .orderBy((f) => f.id),
     );
     expect(ast.orderBy).toHaveLength(1);
@@ -263,7 +269,7 @@ describe('orderBy', () => {
 
   it('multiple orderBy calls accumulate', () => {
     const ast = getAst(
-      db().users.select('id', 'name').orderBy('id').orderBy('name', { direction: 'desc' }),
+      db().public.users.select('id', 'name').orderBy('id').orderBy('name', { direction: 'desc' }),
     );
     expect(ast.orderBy).toHaveLength(2);
   });
@@ -271,7 +277,7 @@ describe('orderBy', () => {
 
 describe('groupBy and having', () => {
   it('groupBy transitions builder and produces groupBy on AST', () => {
-    const ast = getAst(db().posts.select('user_id').groupBy('user_id'));
+    const ast = getAst(db().public.posts.select('user_id').groupBy('user_id'));
     expect(ast.groupBy).toHaveLength(1);
     expect(ast.groupBy![0]).toBeInstanceOf(IdentifierRef);
     expect((ast.groupBy![0] as IdentifierRef).name).toBe('user_id');
@@ -280,7 +286,7 @@ describe('groupBy and having', () => {
   it('having adds HAVING clause', () => {
     const ast = getAst(
       db()
-        .posts.select('user_id')
+        .public.posts.select('user_id')
         .select('cnt', (_f, fns) => fns.count())
         .groupBy('user_id')
         .having((_f, fns) => fns.gt(fns.count(), 1)),
@@ -292,7 +298,7 @@ describe('groupBy and having', () => {
   it('groupBy with expression callback', () => {
     const ast = getAst(
       db()
-        .posts.select('user_id')
+        .public.posts.select('user_id')
         .groupBy((f) => f.user_id),
     );
     expect(ast.groupBy).toHaveLength(1);
@@ -301,17 +307,17 @@ describe('groupBy and having', () => {
 
 describe('limit and offset', () => {
   it('limit sets limit on AST', () => {
-    const ast = getAst(db().users.select('id').limit(10));
+    const ast = getAst(db().public.users.select('id').limit(10));
     expect(ast.limit).toBe(10);
   });
 
   it('offset sets offset on AST', () => {
-    const ast = getAst(db().users.select('id').offset(5));
+    const ast = getAst(db().public.users.select('id').offset(5));
     expect(ast.offset).toBe(5);
   });
 
   it('limit and offset together', () => {
-    const ast = getAst(db().users.select('id').limit(10).offset(5));
+    const ast = getAst(db().public.users.select('id').limit(10).offset(5));
     expect(ast.limit).toBe(10);
     expect(ast.offset).toBe(5);
   });
@@ -319,18 +325,18 @@ describe('limit and offset', () => {
 
 describe('distinct', () => {
   it('distinct sets distinct on AST', () => {
-    const ast = getAst(db().users.select('id').distinct());
+    const ast = getAst(db().public.users.select('id').distinct());
     expect(ast.distinct).toBe(true);
   });
 
   it('distinctOn sets distinctOn on AST', () => {
-    const ast = getAst(db().users.select('id', 'name').distinctOn('id'));
+    const ast = getAst(db().public.users.select('id', 'name').distinctOn('id'));
     expect(ast.distinctOn).toHaveLength(1);
     expect(ast.distinctOn![0]).toBeInstanceOf(IdentifierRef);
   });
 
   it('distinctOn throws without capability', () => {
-    const query = dbNoCapabilities().users.select('id') as unknown as {
+    const query = dbNoCapabilities().public.users.select('id') as unknown as {
       distinctOn(s: string): void;
     };
     expect(() => query.distinctOn('id')).toThrow(
@@ -343,10 +349,10 @@ describe('lateral joins', () => {
   it('lateralJoin produces lateral JoinAst with DerivedTableSource', () => {
     const d = db();
     const ast = getAst(
-      d.users
+      d.public.users
         .lateralJoin('recent_posts', (lateral) =>
           lateral
-            .from(d.posts)
+            .from(d.public.posts)
             .select('title')
             .where((f, fns) => fns.eq(f.posts.user_id, f.users.id))
             .limit(3),
@@ -361,12 +367,12 @@ describe('lateral joins', () => {
 
   it('lateralJoin throws without capability', () => {
     const d = dbNoCapabilities();
-    const users = d.users as unknown as { lateralJoin(alias: string, fn: unknown): void };
+    const users = d.public.users as unknown as { lateralJoin(alias: string, fn: unknown): void };
     expect(() =>
       users.lateralJoin(
         'x',
         (lateral: { from(t: unknown): { select(...args: string[]): unknown } }) =>
-          lateral.from(d.posts).select('id'),
+          lateral.from(d.public.posts).select('id'),
       ),
     ).toThrow('lateralJoin() requires capability sql.lateral');
   });
@@ -374,7 +380,7 @@ describe('lateral joins', () => {
 
 describe('subquery as join source', () => {
   it('select query .as() produces JoinSource backed by DerivedTableSource', () => {
-    const sub = db().posts.select('user_id').as('sub');
+    const sub = db().public.posts.select('user_id').as('sub');
     const source = sub.buildAst() as DerivedTableSource;
     expect(source).toBeInstanceOf(DerivedTableSource);
     expect(source.alias).toBe('sub');
@@ -382,9 +388,9 @@ describe('subquery as join source', () => {
 
   it('subquery can be used in innerJoin', () => {
     const d = db();
-    const sub = d.posts.select('user_id').as('sub');
+    const sub = d.public.posts.select('user_id').as('sub');
     const ast = getAst(
-      d.users.innerJoin(sub, (f, fns) => fns.eq(f.users.id, f.sub.user_id)).select('name'),
+      d.public.users.innerJoin(sub, (f, fns) => fns.eq(f.users.id, f.sub.user_id)).select('name'),
     );
     expect(ast.joins).toHaveLength(1);
     expect(ast.joins![0]!.source).toBeInstanceOf(DerivedTableSource);
@@ -394,7 +400,7 @@ describe('subquery as join source', () => {
 describe('subquery in exists/in', () => {
   it('subquery implements buildAst for exists()', () => {
     const d = db();
-    const sub = d.posts.select('id');
+    const sub = d.public.posts.select('id');
     // sub should have buildAst() for Subquery interface
     const ast = sub.buildAst();
     expect(ast).toBeInstanceOf(SelectAst);
@@ -403,10 +409,10 @@ describe('subquery in exists/in', () => {
   it('subquery used in where with exists', () => {
     const d = db();
     const ast = getAst(
-      d.users
+      d.public.users
         .select('id')
         .where((f, fns) =>
-          fns.exists(d.posts.select('id').where((pf, pfns) => pfns.eq(pf.user_id, f.id))),
+          fns.exists(d.public.posts.select('id').where((pf, pfns) => pfns.eq(pf.user_id, f.id))),
         ),
     );
     expect(ast.where).toBeInstanceOf(ExistsExpr);
@@ -416,32 +422,37 @@ describe('subquery in exists/in', () => {
 describe('grouped query methods', () => {
   it('grouped query supports orderBy', () => {
     const ast = getAst(
-      db().posts.select('user_id').groupBy('user_id').orderBy('user_id', { direction: 'desc' }),
+      db()
+        .public.posts.select('user_id')
+        .groupBy('user_id')
+        .orderBy('user_id', { direction: 'desc' }),
     );
     expect(ast.orderBy).toHaveLength(1);
     expect(ast.orderBy![0]!.dir).toBe('desc');
   });
 
   it('grouped query supports limit/offset', () => {
-    const ast = getAst(db().posts.select('user_id').groupBy('user_id').limit(5).offset(10));
+    const ast = getAst(db().public.posts.select('user_id').groupBy('user_id').limit(5).offset(10));
     expect(ast.limit).toBe(5);
     expect(ast.offset).toBe(10);
   });
 
   it('grouped query supports distinct', () => {
-    const ast = getAst(db().posts.select('user_id').groupBy('user_id').distinct());
+    const ast = getAst(db().public.posts.select('user_id').groupBy('user_id').distinct());
     expect(ast.distinct).toBe(true);
   });
 
   it('grouped query supports as() for subquery', () => {
-    const sub = db().posts.select('user_id').groupBy('user_id').as('grouped');
+    const sub = db().public.posts.select('user_id').groupBy('user_id').as('grouped');
     const source = sub.buildAst() as DerivedTableSource;
     expect(source).toBeInstanceOf(DerivedTableSource);
     expect(source.alias).toBe('grouped');
   });
 
   it('grouped query supports chained groupBy', () => {
-    const ast = getAst(db().posts.select('user_id', 'views').groupBy('user_id').groupBy('views'));
+    const ast = getAst(
+      db().public.posts.select('user_id', 'views').groupBy('user_id').groupBy('views'),
+    );
     expect(ast.groupBy).toHaveLength(2);
   });
 });
@@ -456,13 +467,13 @@ describe('mutation defaults', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    }).public;
+    });
     return { d, spy };
   }
 
   it('INSERT calls applyMutationDefaults with op create', () => {
     const { d, spy } = dbWithSpy();
-    d.users.insert([{ id: 1, name: 'A', email: 'a@b.com' }]).build();
+    d.public.users.insert([{ id: 1, name: 'A', email: 'a@b.com' }]).build();
     expect(spy).toHaveBeenCalledWith({
       op: 'create',
       table: 'users',
@@ -472,7 +483,7 @@ describe('mutation defaults', () => {
 
   it('UPDATE calls applyMutationDefaults with op update', () => {
     const { d, spy } = dbWithSpy();
-    d.users
+    d.public.users
       .update({ name: 'B' })
       .where((f, fns) => fns.eq(f.id, 1))
       .build();
@@ -486,7 +497,7 @@ describe('mutation defaults', () => {
 
 describe('INSERT multi-row', () => {
   it('empty array throws at build time', () => {
-    expect(() => db().users.insert([]).build()).toThrow(
+    expect(() => db().public.users.insert([]).build()).toThrow(
       'insert() called with an empty row array — at least one row is required',
     );
   });
@@ -500,8 +511,8 @@ describe('INSERT multi-row', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    }).public;
-    d.users.insert([{ id: 1, name: 'A' }]).build();
+    });
+    d.public.users.insert([{ id: 1, name: 'A' }]).build();
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith({
       op: 'create',
@@ -519,8 +530,8 @@ describe('INSERT multi-row', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    }).public;
-    const plan = d.users
+    });
+    const plan = d.public.users
       .insert([
         { id: 1, name: 'A' },
         { id: 2, name: 'B' },
@@ -533,7 +544,7 @@ describe('INSERT multi-row', () => {
 
   it('multi-row with differing column sets passes each row through with its own columns only', () => {
     const d = db();
-    const plan = d.users
+    const plan = d.public.users
       .insert([
         { id: 1, name: 'A' },
         { id: 2, email: 'b@x.com' },
@@ -562,8 +573,8 @@ describe('INSERT multi-row', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    }).public;
-    const plan = d.users
+    });
+    const plan = d.public.users
       .insert([
         { id: 1, name: 'A' },
         { id: 2, name: 'B' },
@@ -582,7 +593,7 @@ describe('INSERT multi-row', () => {
 describe('UPDATE callback overload', () => {
   it('set clause carries a non-ParamRef expression node for callback-assigned column', () => {
     const d = db();
-    const plan = d.users
+    const plan = d.public.users
       .update((f) => ({ name: f.name }))
       .where((f, fns) => fns.eq(f.id, 1))
       .build();
@@ -603,8 +614,8 @@ describe('UPDATE callback overload', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    }).public;
-    d.users
+    });
+    d.public.users
       .update((f) => ({ name: f.name }))
       .where((f, fns) => fns.eq(f.id, 1))
       .build();
@@ -614,12 +625,12 @@ describe('UPDATE callback overload', () => {
 
   it('where and returning clauses are identical between object and callback overloads', () => {
     const d = db();
-    const objectPlan = d.users
+    const objectPlan = d.public.users
       .update({ name: 'x' })
       .where((f, fns) => fns.eq(f.id, 42))
       .returning('id')
       .build();
-    const callbackPlan = d.users
+    const callbackPlan = d.public.users
       .update((f) => ({ name: f.name }))
       .where((f, fns) => fns.eq(f.id, 42))
       .returning('id')

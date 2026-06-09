@@ -21,10 +21,10 @@ const db = orm({
   runtime,
   context,
   collections: { User: UserCollection, Post: PostCollection },
-}).public;
+});
 
-db.User.named('Alice');
-db.Post.published();
+db.public.User.named('Alice');
+db.public.Post.published();
 
 orm({
   runtime,
@@ -43,27 +43,27 @@ orm({
 // text → 'equality' | 'order' | 'textual'.
 
 // Text fields: equality + order + textual
-db.User.where((user) => user.name.eq('x'));
-db.User.where((user) => user.name.like('x%'));
-db.User.where((user) => user.name.gt('a'));
-db.User.orderBy((user) => user.name.asc());
+db.public.User.where((user) => user.name.eq('x'));
+db.public.User.where((user) => user.name.like('x%'));
+db.public.User.where((user) => user.name.gt('a'));
+db.public.User.orderBy((user) => user.name.asc());
 
 // Int fields: equality + order + numeric (no textual)
-db.Post.where((post) => post.views.eq(1));
-db.Post.where((post) => post.views.gt(5));
-db.Post.orderBy((post) => post.views.asc());
+db.public.Post.where((post) => post.views.eq(1));
+db.public.Post.where((post) => post.views.gt(5));
+db.public.Post.orderBy((post) => post.views.asc());
 
 // isNull/isNotNull always available
-db.User.where((user) => user.name.isNull());
-db.Post.where((post) => post.views.isNotNull());
+db.public.User.where((user) => user.name.isNull());
+db.public.Post.where((post) => post.views.isNotNull());
 
 // @ts-expect-error int4 has no textual trait → like() not available
-db.Post.where((post) => post.views.like('%'));
+db.public.Post.where((post) => post.views.like('%'));
 // @ts-expect-error int4 has no textual trait → ilike extension op not available
-db.Post.where((post) => post.views.ilike('%'));
+db.public.Post.where((post) => post.views.ilike('%'));
 
 // text has no numeric trait → sum/avg restricted
-db.Post.aggregate((agg) => ({
+db.public.Post.aggregate((agg) => ({
   // @ts-expect-error text field is not numeric
   total: agg.sum('title'),
 }));
