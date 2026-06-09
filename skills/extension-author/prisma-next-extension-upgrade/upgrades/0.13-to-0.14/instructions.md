@@ -121,6 +121,11 @@ TML-2786: the sql-orm-client runtime gained M:N relation filters — a
 through the junction table. Internal runtime only; no extension API or
 contract-shape change. No extension-author action required.
 
+TML-2787: the sql-orm-client runtime gained M:N nested writes — connect /
+disconnect / nested create on an N:M relation insert and delete
+junction-table rows. Internal runtime only; no extension API or
+contract-shape change. No extension-author action required.
+
 TML-2838: the temporary `--no-memory-protection-keys` test-harness workaround
 has been removed from every PGlite-backed vitest config (including
 `packages/3-extensions/{postgres,supabase}`) now that the WAL-teardown crash is
