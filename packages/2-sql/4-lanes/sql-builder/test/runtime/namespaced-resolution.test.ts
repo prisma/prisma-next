@@ -49,11 +49,13 @@ const stubBase = {
 const stubInferer = { inferCodec: () => 'pg/text@1' };
 
 type TableHandle = { buildAst(): TableSource };
+// The builder surface is namespace-facets only; flat by-bare-name keys are
+// gone. They are modelled here as `undefined` to assert their runtime absence.
 type TwoNamespaceDb = {
   public: { users: TableHandle; sessions: undefined };
   auth: { users: TableHandle; sessions: TableHandle };
-  users: TableHandle;
-  posts: TableHandle;
+  users: undefined;
+  posts: undefined;
 };
 
 function db() {
@@ -79,13 +81,13 @@ describe('namespaced table resolution', () => {
     expect(db().auth.sessions.buildAst().namespaceId).toBe('auth');
   });
 
-  it('keeps the flat surface resolving a unique bare table name', () => {
-    // `posts` is declared only in `public`, so the flat surface resolves it
-    // unambiguously.
-    expect(db().posts.buildAst().namespaceId).toBe('public');
-  });
-
-  it('throws on flat access to a bare table name shared across namespaces', () => {
-    expect(() => db().users).toThrow(/ambiguous/i);
+  it('no longer exposes a flat by-bare-name surface — flat access yields undefined', () => {
+    // The flat fallback branch was removed: a bare table name is not a namespace
+    // key, so the proxy resolves to `undefined` (rather than resolving a unique
+    // name or throwing on a shared one). This holds whether the bare name is
+    // unique to one namespace (`posts`) or shared across namespaces (`users`).
+    // Tables are reached only through their namespace facet.
+    expect(db().posts).toBeUndefined();
+    expect(db().users).toBeUndefined();
   });
 });

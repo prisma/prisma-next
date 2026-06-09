@@ -32,13 +32,17 @@ const stubBase = {
 
 const stubInferer = { inferCodec: () => 'pg/text@1' };
 
+// The builder surface is always qualified, so these helpers alias to the
+// `public` namespace facet (the sole shape) — mirroring how a single-namespace
+// facade aliases `db` to a namespace facet. Tables are reached as `db().<table>`
+// through that facet.
 function db() {
   return sql({
     context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<
       typeof sqlContract
     >,
     rawCodecInferer: stubInferer,
-  });
+  }).public;
 }
 
 function dbNoCapabilities() {
@@ -51,7 +55,7 @@ function dbNoCapabilities() {
       typeof noLateralContract
     >,
     rawCodecInferer: stubInferer,
-  });
+  }).public;
 }
 
 // ---------------------------------------------------------------------------
@@ -450,7 +454,7 @@ describe('mutation defaults', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    });
+    }).public;
     return { d, spy };
   }
 
@@ -494,7 +498,7 @@ describe('INSERT multi-row', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    });
+    }).public;
     d.users.insert([{ id: 1, name: 'A' }]).build();
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith({
@@ -513,7 +517,7 @@ describe('INSERT multi-row', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    });
+    }).public;
     const plan = d.users
       .insert([
         { id: 1, name: 'A' },
@@ -556,7 +560,7 @@ describe('INSERT multi-row', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    });
+    }).public;
     const plan = d.users
       .insert([
         { id: 1, name: 'A' },
@@ -597,7 +601,7 @@ describe('UPDATE callback overload', () => {
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
       rawCodecInferer: stubInferer,
-    });
+    }).public;
     d.users
       .update((f) => ({ name: f.name }))
       .where((f, fns) => fns.eq(f.id, 1))

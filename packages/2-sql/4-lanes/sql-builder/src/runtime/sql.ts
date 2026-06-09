@@ -4,7 +4,7 @@ import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expressio
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Db, TableProxyContract } from '../types/db';
 import type { BuilderContext } from './builder-base';
-import { resolveTableForFlatName, resolveTableInNamespace } from './resolve-table';
+import { resolveTableInNamespace } from './resolve-table';
 import { TableProxyImpl } from './table-proxy-impl';
 
 export interface SqlOptions<C extends Contract<SqlStorage> & TableProxyContract> {
@@ -44,10 +44,6 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
             },
           },
         );
-      }
-      const resolved = resolveTableForFlatName(storage, prop);
-      if (resolved) {
-        return new TableProxyImpl(prop, resolved.table, prop, ctx, resolved.namespaceId);
       }
       return undefined;
     },

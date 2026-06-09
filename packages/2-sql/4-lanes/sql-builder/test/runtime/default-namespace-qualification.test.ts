@@ -18,17 +18,19 @@ const stubBase = {
 
 const stubInferer = { inferCodec: () => 'pg/text@1' };
 
+// Always-qualified builder: alias to the `public` namespace facet (the sole
+// shape) so tables are reached as `db().<table>` through that facet.
 function db() {
   return sql({
     context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<
       typeof sqlContract
     >,
     rawCodecInferer: stubInferer,
-  });
+  }).public;
 }
 
-describe('default-namespace table resolution', () => {
-  it('stamps the public namespace on TableSource from the flat db proxy', () => {
+describe('namespace-facet table resolution', () => {
+  it('stamps the public namespace on TableSource from the namespace facet', () => {
     const ast = db().users.buildAst() as TableSource;
     expect(ast.namespaceId).toBe('public');
   });
