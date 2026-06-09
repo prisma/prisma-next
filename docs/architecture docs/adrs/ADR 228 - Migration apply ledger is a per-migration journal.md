@@ -8,7 +8,7 @@ Accepted. Builds on [ADR 039 — Migration graph path resolution & integrity](./
 
 Someone applies two migrations to a database, decides the second was wrong, reverts it, then re-applies it. `migration log` shows exactly that, one row per thing that happened:
 
-```
+```text
 APPLIED AT                   MIGRATION       FROM → TO            OPS
 2026-06-02 16:37:31 +02:00   init            ∅ → ef9de27         1
 2026-06-02 16:38:02 +02:00   add_email       ef9de27 → a94b7b4   2

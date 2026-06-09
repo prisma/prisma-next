@@ -9,7 +9,7 @@ pictures use real fixture hashes/names.
 The core device: **a direction arrow in the edge's own
 lane** (`↑` forward, `↓` rollback).
 
-> **Color extension (TML-2773, slice `lane-colors-and-legend`).** These mockups are
+> **Color extension.** These mockups are
 > drawn **monochrome** — every layout rule below must read unambiguously without
 > color (rule 4 is explicit about this: the lane that owns the label carries the
 > arrow, so a wide fan is unambiguous in monochrome). On top of that monochrome-

@@ -8,7 +8,7 @@ Accepted. Refines [ADR 227 — Migration read commands share one graphical rende
 
 A space has three forward migrations and one rollback. `000_init` through `002_fwd_bc` advance the history; `003_rollback` then rolls back from `arc_c` to `arc_a`, skipping `arc_b`. Here is `migration graph` drawing it — newest contract at the top, the empty contract `∅` at the bottom:
 
-```
+```text
 ○─╮   arc_c
 │ │↓  003_rollback
 │↑│   002_fwd_bc

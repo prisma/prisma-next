@@ -10,7 +10,7 @@ A contract space has two migrations: `init` brings the empty contract to `ef9de2
 
 Three commands let you look at that state, and they all draw the *same* picture — contracts as `○` nodes, migrations as labelled edges, newest at the top, the empty contract at the bottom:
 
-```
+```text
 migration graph                migration list                 migration status
 ─────────────────              ─────────────────              ─────────────────
 ○   a94b7b4  (@contract)        ○   a94b7b4                    ○   a94b7b4  (@contract)
