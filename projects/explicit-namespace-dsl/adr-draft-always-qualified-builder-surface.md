@@ -116,7 +116,7 @@ The one design fork during implementation was *how* the facade decides flat-vs-q
 - **Positive:** Single-namespace facade users (SQLite, Mongo) keep flat `db.sql.<table>` / `db.orm.<Model>` unchanged — the breaking change is invisible to them.
 - **Positive:** No `framework-components` substrate change and no runtime-bundle regression — the facade projection adds zero descriptor plumbing, consistent with TML-2766.
 - **Breaking change (deliberate):** Consumers calling `orm.<Model>` / `sql.<table>` directly on the builder outputs, or `db.sql.<table>` / `db.orm.<Model>` on a **multi-namespace (Postgres)** facade, must qualify (`sql.public.<table>`, `orm.public.<Model>`, `db.sql.public.<table>`, …). Recorded as a user upgrade-instructions entry (`qualify-flat-builder-accessors`, 0.12 → 0.13).
-- **Trade-off:** The SQL facet returns `undefined` for an unknown table (no fail-fast), while the ORM facet throws a namespace-naming diagnostic for an unknown model. Tightening the SQL facet to fail-fast (project FR11) is a follow-up in `sql-builder`, deliberately out of this slice.
+- **Unknown access returns `undefined`, not a throw.** The `sql()` / `orm()` proxy `get` traps return `undefined` for an unknown namespace, table, or model rather than throwing. Throwing inside a `Proxy` trap breaks ordinary JS property probing (e.g. `then`/`toJSON`/`constructor` checks done by frameworks and serializers on whatever value flows past), so the always-qualified contract is enforced at the **type level** (unknown access is a compile error) and the runtime stays permissive.
 - **Trade-off:** A facade generic over `TContract` needs one narrowed cast to bridge the generic-index widening to its literal-keyed facet type. Concrete-contract consumers are unaffected.
 
 ---
