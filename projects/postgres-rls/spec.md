@@ -8,7 +8,7 @@ Make Postgres Row-Level Security (RLS) **policies** and **roles** first-class el
 
 ## Design
 
-The design is six decisions. Each is stated concretely, then names the requirement it satisfies. Authoritative detail for the two largest (naming, authoring surface) lives in the linked docs; everything an implementer needs to build is here.
+The design is five decisions. Each is stated concretely, then names the requirement it satisfies. Authoritative detail for the largest (naming, authoring surface, the generic differ) lives in the linked docs and `plan.md § Architecture decisions`; everything an implementer needs to build is here.
 
 ### D1. Policies and roles are Postgres-target-only IR entities on `PostgresSchema.entries`
 
@@ -36,14 +36,7 @@ class PostgresRole {                 // stored at entries['role'][name]
 }
 ```
 
-The family-shared table node gains one field:
-
-```ts
-// packages/2-sql/1-core/contract/src/ir/storage-table.ts (already carries control?: ControlPolicy)
-StorageTable.rls?: 'auto' | 'enabled' | 'disabled';   // default 'auto'; omitted from JSON when 'auto'
-```
-
-`rls` semantics: **`'auto'`** ⇒ the planner enables RLS on the table iff it has ≥1 declared policy (the common case, so it needs no authoring). **`'enabled'`** / **`'disabled'`** force the state regardless of policy count.
+The table-level **RLS-enabled state** is Postgres-owned and is **not** a field on the family-shared `StorageTable` (that would leak a Postgres concept into SQL core — the layering violation the first foundation attempt made). For the common case the planner *derives* it: RLS is enabled on a table iff it has ≥1 declared policy, so it needs no authoring. An explicit per-table force-enable/disable, if a consumer ever needs it, lives in the Postgres target's own IR — not on the shared table node, and not in slice 1.
 
 Both node classes extend the SQL IR base (`SqlNode`/`IRNodeBase`), call `freezeNode(this)`, and are JSON-canonical (per ADR 192).
 
@@ -113,24 +106,19 @@ Field mapping (both surfaces): the keyword/helper name → `operation`; `name` �
 
 > **Satisfies:** *Role references track declarations* (a renamed role declaration updates referring policies) · *cross-space composition* with extension packs.
 
-### D5. The planner emits RLS DDL; the verifier diffs by wire name
+### D5. Verify and plan via a generic schema differ — no target-specific issue kinds
 
-**Planner** (migration ops follow ADR 195's `OpFactoryCall` pattern): per table with declared policies and `rls` ∈ {`auto`, `enabled`} → `ENABLE ROW LEVEL SECURITY`; per policy, diff declared vs introspected by full wire name → `CREATE` / `DROP` / `ALTER POLICY`; matching-hash-different-prefix → `ALTER POLICY … RENAME TO`; changes Postgres can't `ALTER` in place (operation change, `permissive`↔`restrictive`) → drop + create.
+The verifier does **not** enumerate RLS issue kinds anywhere in the framework or SQL family (that was the layering violation in the first attempt). Instead:
 
-**Verifier** fills the empty `PostgresSchemaVerifier.verifyTargetExtensions()` stub: introspect `pg_policies`, `pg_roles`, `pg_class.relrowsecurity`; diff by wire name and emit:
+- **Derive + introspect to one shape.** The contract lowers to a `SchemaIR` (the *expected* schema); the live DB introspects to a `SchemaIR` (the *actual* schema). Both sides are the same hierarchy, so comparison is homogeneous.
+- **Generic diff.** A framework differ walks the two trees, aligning nodes by `identity()` and comparing matched pairs by `isEqualTo(other)` — both virtual methods on the IR node hierarchy. It emits only `{ coordinate, outcome: missing | extra | mismatch, expected?, actual? }`. There is **no `kind` vocabulary**; the framework references nothing about RLS.
+- **Per-node planning.** Each node type defines `create / delete / update(from,to) → OpFactoryCall[]` (ADR 195) — methods on target-only nodes (policy/role); target-contributed strategies for family-shared nodes (SQLite/Postgres DDL diverge). `missing → create`, `extra → delete`, `mismatch → update`/drop+create. Coarse-bucket ordering sequences roles → tables → policies + `ENABLE ROW LEVEL SECURITY`.
 
-| Condition | Issue kind | Severity source |
-| --- | --- | --- |
-| declared, not present | `missing_rls_policy` | table's `ControlPolicy` |
-| present, not declared | `extra_rls_policy` | table's `ControlPolicy` |
-| matching hash, different prefix | `rls_policy_renamed` | always surfaces |
-| introspected hash ≠ name suffix | `rls_policy_tampered` | always surfaces |
-| policies declared, RLS off | `rls_not_enabled` | always surfaces |
-| declared role absent from `pg_roles` | `missing_role` | always a `fail` |
+RLS is the clean consumer: a policy's `identity()` *is* its content-addressed wire name (D2), so identity already settles equality; introspection recomputes the hash, so **rename** (matching hash, different prefix → `ALTER POLICY … RENAME TO`) and **tamper** (recomputed hash ≠ the suffix → drop+create) both fall out of the generic extra/missing diff — no dedicated issue kinds. The table RLS-enabled state and a missing role (`pg_roles` existence) are ordinary `mismatch`/`missing` outcomes. Severity for the control-policy-governed outcomes flows through the **landed** `ControlPolicy` disposition (`dispositionForCategory`), reused, not reinvented.
 
-Severity for the control-policy-governed kinds comes from the **landed** two-layer dispatch (`classifySqlVerifierIssueKind` → `dispositionForCategory` → `fail | warn | suppress`); this project classifies the new kinds and **does not reinvent** the dispatch. The structural kinds (`renamed`/`tampered`/`not_enabled`) always surface; their planner response is dispatch-driven.
+The generic differ ships scoped to the **top-level-entity layer** RLS needs; porting the relational kinds onto it is a separate project (`plan.md` follow-on A). Until then the legacy per-kind verifier runs **side-by-side**, untouched; the new path emits only `{coordinate, outcome}` into its own channel and never produces a framework `SchemaIssue`. Design detail: `plan.md § Architecture decisions`.
 
-> **Satisfies:** *RLS is migrated and verified like any other contract element* · *control-policy composition, not reinvention.*
+> **Satisfies:** *RLS is migrated and verified with zero framework/SQL-family knowledge of it* (the layering invariant the first attempt broke) · *no false drift* (content-addressed identity) · *control-policy composition, not reinvention.*
 
 ---
 
@@ -147,7 +135,7 @@ Severity for the control-policy-governed kinds comes from the **landed** two-lay
 
 This project fills existing extension points; nothing it needs is unbuilt. The seams an implementer touches:
 
-- **target-extensible-ir (TML-2459):** the `SqlNode`/`IRNodeBase` base + `freezeNode`; the `entityTypes` contribution point (D1); the `ContractSerializer` seam; and **the empty `PostgresSchemaVerifier.verifyTargetExtensions()` stub this project fills** (D5); the `UNBOUND_NAMESPACE_ID = '__unbound__'` sentinel.
+- **target-extensible-ir (TML-2459):** the `SqlNode`/`IRNodeBase` base + `freezeNode`; the `entityTypes` contribution point (D1); the `ContractSerializer` seam; the `UNBOUND_NAMESPACE_ID = '__unbound__'` sentinel. **Note:** its `verifyTargetExtensions()` hook returns the *closed* framework `SchemaIssue[]`; the generic differ (D5) **supersedes** that channel rather than extending it (returning RLS kinds through it is what forced the original union-widening leak).
 - **control-policy (TML-2493, [ADR 224](../../docs/architecture%20docs/adrs/ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md)):** the `ControlPolicy` enum + the two-layer verifier/planner dispatch this project's severity flows through (D5).
 - **target-contributed-psl-blocks:** the declarative `AuthoringPslBlockDescriptor` SPI (`ref`/`value`/`option`/`list` params, generic parser/printer, `entries[kind][name]` storage) through which the Postgres pack contributes the `policy_*` keywords (D3).
 - **cross-contract-refs (TML-2500):** `extensionModel(…)` handles carrying `{ namespaceId, tableName }` (consumed for the TS `ref()` predicate helper, no integration needed) + the aggregate/coordinate machinery reused for cross-space role resolution (D4).
@@ -158,11 +146,11 @@ Ground-truth mapping of these landed seams to real file paths: [`specs/reconcili
 
 Invariants every slice upholds (the design above is built to satisfy them; they are the acceptance bar, not a puzzle to infer the design from):
 
-- **Postgres-only layering.** No framework or SQL-family visitor (serializer, planner, verifier) sees RLS; only Postgres-target code does. `pnpm lint:deps` is clean after every slice. The one framework-level change — widening the `SchemaIssue` union with `rls_policy_renamed | rls_policy_tampered | rls_not_enabled` — is an additive **type-only** change (following the `EnumValuesChangedIssue` precedent), carrying no Postgres import.
+- **Postgres-only layering — no exceptions.** No framework or SQL-family file references RLS: not a visitor, not a type, not an issue kind, not a field. After every slice, `pnpm lint:deps` is clean **and** no RLS string/identifier appears in any framework or SQL-family/core file. RLS verifier findings are generic `{coordinate, outcome}` issues (D5), never framework `SchemaIssue` members — widening that union is exactly the violation the first foundation attempt made, and is forbidden.
 - **Content-addressed naming is the only equivalence relation** wherever policies are compared (authoring, diff, verify). No code path compares reparsed predicate bodies for equivalence; the lone body-level inspection is the tamper check (recompute hash, compare to suffix). The normalizer's output never leaks past the hash input. Diagnostics name the user's **prefix** only, never the hash suffix.
 - **Round-trip fidelity.** `deserialize(serialize(contract))` preserves every `PostgresRlsPolicy`/`PostgresRole` field, including the prefix-vs-full-name asymmetry.
 - **No non-Postgres regression** at any slice boundary (`pnpm test:packages` + integration suites green; SQLite + Mongo untouched).
-- **IR-first, CI-green increments.** The IR + naming + serializer land before any authoring surface, and every slice keeps `main` green — including the union widening, which must not break existing exhaustive `kind` switches.
+- **CI-green increments, legacy untouched.** Every slice keeps `main` green and SQLite/Mongo untouched. The new generic differ runs **side-by-side** with the legacy per-kind verifier (which this project does not modify) and emits only new-native structures; the legacy verifier is retired later by the relational-port project, not here.
 
 ## Definition of Done
 
@@ -170,7 +158,7 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 
 - [ ] A TS contract and a PSL contract declaring the same policies lower to **structurally identical** `PostgresRlsPolicy` IR (modulo prefix), each carrying the content-hash wire name; round-trip through `contract.json` is lossless. The TS helpers are absent from a SQLite/Mongo author's surface. *(D1, D3)*
 - [ ] A TS `using: ({ ref }) => …${ref(AuthUser)}…` predicate lowers `ref()` to the qualified identifier read from the handle; renaming a referenced local model's table updates the predicate and recomputes the hash. *(D2, D4)*
-- [ ] Against live Postgres (PGlite): present-and-declared → zero issues; missing → `missing_rls_policy`; extra → `extra_rls_policy` (severities per control policy); matching-hash-different-prefix → `rls_policy_renamed` + planner `ALTER POLICY … RENAME TO`; hash-recompute-mismatch → `rls_policy_tampered`; declared policies with RLS off → `rls_not_enabled` + planner `ENABLE`. A manual `ALTER POLICY … USING (reformatted)` is classified `rls_policy_tampered`, **not** false drift — proving the content-addressing trick against the real expression printer. *(D2, D5)*
+- [ ] Against live Postgres (PGlite), through the generic differ (`{coordinate, outcome}` issues, no framework RLS kinds): present-and-declared → clean; declared-not-present → create; present-not-declared → drop (severity per control policy); matching-hash-different-prefix → `ALTER POLICY … RENAME TO`; recomputed-hash-mismatch → drop+create; policies declared with RLS off → `ENABLE`. Postgres's own reprinting of an unchanged policy does **not** false-drift (recomputed hash matches the suffix); a genuine out-of-band `ALTER POLICY` body change **is** caught — proving the content-addressing trick against the real expression printer. *(D2, D5)*
 - [ ] A declared `PostgresRole` absent from `pg_roles` surfaces `missing_role` (a `fail` even under `control: 'external'`). *(D4, D5)*
 - [ ] **Walking skeleton:** `examples/supabase` `Profile` gains `anon` SELECT + `authenticated` UPDATE-own policies; `bootstrapSupabaseShim` is extended with the Postgres roles + `auth.uid()`/`auth.jwt()`/`auth.role()` SQL functions reading session GUCs; a hermetic PGlite test proves RLS filters rows under a manual `SET ROLE`, and the verifier diffs clean. *(D3, D4, D5 end-to-end)*
 - [ ] `pnpm lint:deps` confirms no RLS reference in framework/SQL-family layers; SQLite + Mongo suites green. *(layering)*
@@ -182,6 +170,12 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 
 - **A1 — a chained `.rls(…)` model-builder method.** Rejected: there is no target identity on the shared model-builder type to gate a Postgres-only method on, so it would leak into SQLite/Mongo author surfaces. The established Postgres-only authoring affordance (`enum`) is a top-level helper, not a builder method — D3 follows that precedent. Full comparison: [design-rls-authoring-surface.md](specs/design-rls-authoring-surface.md).
 - **A2 — a single PSL `policy { operation = … }` block.** Rejected: the declarative PSL-block substrate deliberately rejects conditional-body blocks (a block's parameter set must be fixed). Per-operation keywords (`policy_select`, …) give each a fixed, unconditional parameter set.
+
+### Verifier architecture (D5)
+
+- **Widen the framework `SchemaIssue` union target-side (rejected).** The interim pattern the codebase documents and that `EnumValuesChangedIssue` already follows — it puts a Postgres concept in the framework. That's the layering violation the first foundation attempt made. The generic differ removes the need: issues are `{coordinate, outcome}`, so the framework enumerates nothing. (Enum is prior art for the same bug, not a precedent.)
+- **Diff the contract IR directly against the introspected schema IR (rejected).** They are two non-isomorphic hierarchies (different field names/shapes). Instead derive *both* sides to one canonical `SchemaIR` and diff homogeneously, so node `identity()`/`isEqualTo()` are well-typed and per-kind canonicalization (type/default normalization, FK-backing-index + unique↔index synthesis) concentrates in the derivation, leaving the diff a pure walk.
+- **Reseat all 25 relational kinds onto the differ in this project (rejected).** Off RLS's critical path; deferred to its own project (`plan.md` follow-on A). The differ ships scoped to the top-level layer RLS needs, side-by-side with the untouched legacy verifier.
 
 ### Equivalence / naming (D2)
 
