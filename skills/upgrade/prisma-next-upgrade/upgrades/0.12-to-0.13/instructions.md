@@ -75,6 +75,12 @@ TML-2843: `@prisma-next/sqlite` gained an additive facade transaction
 API (`db.transaction(async (tx) => …)`) demonstrated in
 `examples/prisma-next-demo-sqlite`. No user action required; incidental
 substrate diff.
+
+Release bump 0.13.0 (#789): version-number changes across all workspace
+`package.json` files and `pnpm-lock.yaml` specifiers; the
+`examples/supabase/src/contract.json` and `contract.d.ts` `version`
+field updated to `0.13.0`. Incidental substrate diff — no user-side
+action required.
 -->
 
 # 0.12 → 0.13 — User upgrade instructions

@@ -51,6 +51,10 @@ non-junction variant carries `through?: never`. Purely additive: N:M
 contracts did not validate before this change, so no working extension
 constructs them, and existing 1:1 / 1:N / N:1 relation values match the
 non-junction variant unchanged. No codemod required.
+
+Release bump 0.13.0 (#789): version-number changes across all workspace
+`package.json` files and `pnpm-lock.yaml` specifiers. Incidental substrate
+diff — no extension-author action required.
 -->
 
 # 0.12 → 0.13 — Extension-author upgrade instructions

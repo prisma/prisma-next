@@ -233,7 +233,7 @@ type ContractBase = Omit<
       readonly id: 'supabase';
       readonly kind: 'extension';
       readonly targetId: 'postgres';
-      readonly version: '0.12.0';
+      readonly version: '0.13.0';
     };
   };
   readonly execution: {
