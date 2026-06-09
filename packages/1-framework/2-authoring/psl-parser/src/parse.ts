@@ -26,30 +26,15 @@ const TRIVIA_KINDS: ReadonlySet<TokenKind> = new Set<TokenKind>([
   'Comment',
 ]);
 
-const EOF_TOKEN: Token = { kind: 'Eof', text: '' };
-
 /**
- * Pulls every token from the {@link Tokenizer} in a single pass — including
- * trivia (`Whitespace`/`Newline`/`Comment`) and `Invalid` tokens, terminated by
- * `Eof` — alongside a parallel array whose `i`-th entry is the absolute source
- * offset of token `i` (the sum of the text lengths of the tokens before it).
+ * The absolute source span of a single token, captured for a diagnostic: the
+ * token's start offset (total source text consumed before it) and its text
+ * length. Captured eagerly so a marker stays valid after the cursor advances
+ * past the token it points at.
  */
-export function pullTokens(source: string): {
-  readonly tokens: readonly Token[];
-  readonly offsets: readonly number[];
-} {
-  const tokenizer = new Tokenizer(source);
-  const tokens: Token[] = [];
-  const offsets: number[] = [];
-  let offset = 0;
-  for (;;) {
-    const token = tokenizer.next();
-    tokens.push(token);
-    offsets.push(offset);
-    if (token.kind === 'Eof') break;
-    offset += token.text.length;
-  }
-  return { tokens, offsets };
+export interface DiagnosticMark {
+  readonly offset: number;
+  readonly length: number;
 }
 
 /**
@@ -64,14 +49,14 @@ export interface ParserCursor {
   readonly sourceFile: SourceFile;
   peekKind(ahead?: number): TokenKind;
   peekToken(ahead?: number): Token;
-  currentSignificantIndex(): number;
+  mark(): DiagnosticMark;
   startNode(kind: SyntaxKind): void;
   finishNode(): GreenNode;
   bump(): Token;
   captureBalancedBraces(): void;
   recoverToSyncPoint(): void;
   flushTrivia(): void;
-  diagnostic(code: PslDiagnosticCode, message: string, tokenIndex: number): void;
+  diagnostic(code: PslDiagnosticCode, message: string, mark: DiagnosticMark): void;
 }
 
 export function createParserCursor(source: string): ParserCursor {
@@ -79,18 +64,15 @@ export function createParserCursor(source: string): ParserCursor {
 }
 
 class Cursor implements ParserCursor {
-  readonly #tokens: readonly Token[];
-  readonly #offsets: readonly number[];
+  readonly #tokenizer: Tokenizer;
   readonly #sourceFile: SourceFile;
   readonly #builder = new GreenNodeBuilder();
   readonly #diagnostics: ParseDiagnostic[] = [];
-  #pos = 0;
+  #offset = 0;
   #depth = 0;
 
   constructor(source: string) {
-    const { tokens, offsets } = pullTokens(source);
-    this.#tokens = tokens;
-    this.#offsets = offsets;
+    this.#tokenizer = new Tokenizer(source);
     this.#sourceFile = new SourceFile(source);
   }
 
@@ -107,29 +89,31 @@ class Cursor implements ParserCursor {
   }
 
   peekToken(ahead = 0): Token {
-    let index = this.#pos;
+    let rawIndex = 0;
     let remaining = ahead;
     for (;;) {
-      const token = this.#tokens[index] ?? EOF_TOKEN;
+      const token = this.#tokenizer.peek(rawIndex);
       if (token.kind === 'Eof') return token;
       if (TRIVIA_KINDS.has(token.kind)) {
-        index++;
+        rawIndex++;
         continue;
       }
       if (remaining === 0) return token;
       remaining--;
-      index++;
+      rawIndex++;
     }
   }
 
-  currentSignificantIndex(): number {
-    let index = this.#pos;
+  mark(): DiagnosticMark {
+    let rawIndex = 0;
+    let offset = this.#offset;
     for (;;) {
-      const token = this.#tokens[index];
-      if (!token || token.kind === 'Eof' || !TRIVIA_KINDS.has(token.kind)) {
-        return Math.min(index, this.#tokens.length - 1);
+      const token = this.#tokenizer.peek(rawIndex);
+      if (token.kind === 'Eof' || !TRIVIA_KINDS.has(token.kind)) {
+        return { offset, length: token.text.length };
       }
-      index++;
+      offset += token.text.length;
+      rawIndex++;
     }
   }
 
@@ -148,10 +132,10 @@ class Cursor implements ParserCursor {
 
   bump(): Token {
     this.#flushTrivia();
-    const token = this.#tokens[this.#pos] ?? EOF_TOKEN;
+    const token = this.#tokenizer.peek();
     if (token.kind === 'Eof') return token;
     this.#builder.token(token.kind, token.text);
-    this.#pos++;
+    this.#advance();
     return token;
   }
 
@@ -159,10 +143,10 @@ class Cursor implements ParserCursor {
     this.#flushTrivia();
     let depth = 0;
     for (;;) {
-      const token = this.#tokens[this.#pos];
-      if (!token || token.kind === 'Eof') return;
+      const token = this.#tokenizer.peek();
+      if (token.kind === 'Eof') return;
       this.#builder.token(token.kind, token.text);
-      this.#pos++;
+      this.#advance();
       if (token.kind === 'LBrace') {
         depth++;
       } else if (token.kind === 'RBrace') {
@@ -174,12 +158,12 @@ class Cursor implements ParserCursor {
 
   recoverToSyncPoint(): void {
     for (;;) {
-      const token = this.#tokens[this.#pos];
-      if (!token || token.kind === 'Eof' || token.kind === 'Newline' || token.kind === 'RBrace') {
+      const token = this.#tokenizer.peek();
+      if (token.kind === 'Eof' || token.kind === 'Newline' || token.kind === 'RBrace') {
         return;
       }
       this.#builder.token(token.kind, token.text);
-      this.#pos++;
+      this.#advance();
     }
   }
 
@@ -187,10 +171,9 @@ class Cursor implements ParserCursor {
     this.#flushTrivia();
   }
 
-  diagnostic(code: PslDiagnosticCode, message: string, tokenIndex: number): void {
-    const token = this.#tokens[tokenIndex] ?? EOF_TOKEN;
-    const start = this.#offsets[tokenIndex] ?? this.#sourceFile.length;
-    const end = start + token.text.length;
+  diagnostic(code: PslDiagnosticCode, message: string, mark: DiagnosticMark): void {
+    const start = mark.offset;
+    const end = start + mark.length;
     this.#diagnostics.push({
       code,
       message,
@@ -203,11 +186,15 @@ class Cursor implements ParserCursor {
 
   #flushTrivia(): void {
     for (;;) {
-      const token = this.#tokens[this.#pos];
-      if (!token || !TRIVIA_KINDS.has(token.kind)) return;
+      const token = this.#tokenizer.peek();
+      if (!TRIVIA_KINDS.has(token.kind)) return;
       this.#builder.token(token.kind, token.text);
-      this.#pos++;
+      this.#advance();
     }
+  }
+
+  #advance(): void {
+    this.#offset += this.#tokenizer.next().text.length;
   }
 }
 
@@ -330,7 +317,7 @@ export function parseAttributeArgList(cursor: ParserCursor): GreenNode {
 
 export function parseAttribute(cursor: ParserCursor): GreenNode {
   const isBlockAttribute = cursor.peekKind() === 'DoubleAt';
-  const markerIndex = cursor.currentSignificantIndex();
+  const attributeMark = cursor.mark();
   cursor.startNode(isBlockAttribute ? 'ModelAttribute' : 'FieldAttribute');
   cursor.bump(); // At or DoubleAt
   if (cursor.peekKind() === 'Ident') {
@@ -343,12 +330,12 @@ export function parseAttribute(cursor: ParserCursor): GreenNode {
         cursor.diagnostic(
           INVALID_ATTRIBUTE_SYNTAX,
           'Attribute name expected after "."',
-          cursor.currentSignificantIndex(),
+          cursor.mark(),
         );
       }
     }
   } else {
-    cursor.diagnostic(INVALID_ATTRIBUTE_SYNTAX, 'Attribute name expected', markerIndex);
+    cursor.diagnostic(INVALID_ATTRIBUTE_SYNTAX, 'Attribute name expected', attributeMark);
   }
   if (cursor.peekKind() === 'LParen') {
     parseAttributeArgList(cursor);
@@ -388,13 +375,13 @@ function parseQualifierSegments(cursor: ParserCursor, separator: 'Colon' | 'Dot'
   let seen = 0;
   while (cursor.peekKind() === separator) {
     seen++;
-    const separatorIndex = cursor.currentSignificantIndex();
+    const separatorMark = cursor.mark();
     cursor.bump(); // separator
     if (seen > 1) {
       cursor.diagnostic(
         INVALID_QUALIFIED_TYPE,
         'Qualified type reference has too many segments',
-        separatorIndex,
+        separatorMark,
       );
     }
     if (cursor.peekKind() === 'Ident') {
@@ -517,7 +504,7 @@ function parseNamespace(
   insideNamespace: boolean,
   state: DocumentState,
 ): void {
-  const keywordIndex = cursor.currentSignificantIndex();
+  const keywordMark = cursor.mark();
   cursor.startNode('Namespace');
   cursor.bump(); // namespace
   const name = cursor.peekKind() === 'Ident' ? cursor.peekToken().text : '';
@@ -528,13 +515,13 @@ function parseNamespace(
     cursor.diagnostic(
       INVALID_NAMESPACE_BLOCK,
       `Recursive "namespace ${name}" block is not allowed; namespace blocks may not nest`,
-      keywordIndex,
+      keywordMark,
     );
   } else if (name === UNSPECIFIED_PSL_NAMESPACE_ID) {
     cursor.diagnostic(
       INVALID_NAMESPACE_BLOCK,
       `Namespace name "${UNSPECIFIED_PSL_NAMESPACE_ID}" is reserved for the parser-synthesised bucket for top-level declarations`,
-      keywordIndex,
+      keywordMark,
     );
   }
   parseBlockBody(cursor, (inner) => parseDeclaration(inner, true, state));
@@ -546,19 +533,19 @@ function parseTypesBlock(
   insideNamespace: boolean,
   state: DocumentState,
 ): void {
-  const keywordIndex = cursor.currentSignificantIndex();
+  const keywordMark = cursor.mark();
   cursor.startNode('TypesBlock');
   if (insideNamespace) {
     cursor.diagnostic(
       INVALID_NAMESPACE_BLOCK,
       '`types` blocks must be declared at the document top level, not inside a namespace block',
-      keywordIndex,
+      keywordMark,
     );
   } else if (state.topLevelTypesSeen) {
     cursor.diagnostic(
       INVALID_TYPES_MEMBER,
       'Only one top-level `types` block is allowed per document',
-      keywordIndex,
+      keywordMark,
     );
   } else {
     state.topLevelTypesSeen = true;
@@ -575,7 +562,7 @@ function parseTypesBlock(
  * always terminates.
  */
 function parseBlockBody(cursor: ParserCursor, parseMember: MemberParser): void {
-  const braceIndex = cursor.currentSignificantIndex();
+  const braceMark = cursor.mark();
   cursor.bump(); // LBrace
   for (;;) {
     const kind = cursor.peekKind();
@@ -585,7 +572,7 @@ function parseBlockBody(cursor: ParserCursor, parseMember: MemberParser): void {
   if (cursor.peekKind() === 'RBrace') {
     cursor.bump();
   } else {
-    cursor.diagnostic(UNTERMINATED_BLOCK, 'Unterminated block declaration', braceIndex);
+    cursor.diagnostic(UNTERMINATED_BLOCK, 'Unterminated block declaration', braceMark);
   }
 }
 
@@ -595,7 +582,7 @@ function parseUnsupportedTopLevel(cursor: ParserCursor): void {
     cursor.peekKind(1) === 'LBrace'
       ? `Unsupported top-level block "${offending}"`
       : `Unsupported top-level declaration "${offending}"`;
-  cursor.diagnostic(UNSUPPORTED_TOP_LEVEL_BLOCK, message, cursor.currentSignificantIndex());
+  cursor.diagnostic(UNSUPPORTED_TOP_LEVEL_BLOCK, message, cursor.mark());
   cursor.bump();
   cursor.recoverToSyncPoint();
 }
@@ -655,7 +642,7 @@ function parseKeyValueMember(cursor: ParserCursor): void {
 }
 
 function invalidMember(cursor: ParserCursor, code: PslDiagnosticCode, message: string): void {
-  cursor.diagnostic(code, message, cursor.currentSignificantIndex());
+  cursor.diagnostic(code, message, cursor.mark());
   cursor.bump(); // consume the offending token so the member loop makes progress
   cursor.recoverToSyncPoint();
 }

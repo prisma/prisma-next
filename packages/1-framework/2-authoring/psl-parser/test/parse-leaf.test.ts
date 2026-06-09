@@ -7,7 +7,6 @@ import {
   parseAttributeArgList,
   parseExpression,
   parseTypeAnnotation,
-  pullTokens,
 } from '../src/parse';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import { GreenNodeBuilder } from '../src/syntax/green-builder';
@@ -17,22 +16,18 @@ function greenText(element: GreenElement): string {
   return element.children.map(greenText).join('');
 }
 
-describe('pullTokens', () => {
-  it('keeps trivia, Invalid, and the terminating Eof with absolute per-token offsets', () => {
-    const source = 'a  b\n§';
-    const { tokens, offsets } = pullTokens(source);
-    expect(tokens.map((t) => t.kind)).toEqual([
-      'Ident',
-      'Whitespace',
-      'Ident',
-      'Newline',
-      'Invalid',
-      'Eof',
-    ]);
-    expect(offsets).toEqual([0, 1, 3, 4, 5, 6]);
-    for (let i = 0; i < tokens.length; i++) {
-      expect(source.slice(offsets[i], offsets[i]! + tokens[i]!.text.length)).toBe(tokens[i]!.text);
-    }
+describe('offset tracking', () => {
+  it('maps a diagnostic range through interspersed trivia using the running offset', () => {
+    // The second `.` is the offending separator; a newline precedes it, so its
+    // start offset is only correct if every consumed token (the leading
+    // segments and that trivia) advanced the running offset counter.
+    const source = 'a.b\n.c';
+    const { diagnostics, cursor } = parse(source, parseTypeAnnotation);
+
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    expect(offendingOffset(cursor, diagnostics[0]!)).toBe(4);
+    expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe('.');
   });
 });
 
