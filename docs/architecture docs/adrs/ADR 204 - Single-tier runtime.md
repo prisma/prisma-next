@@ -26,7 +26,7 @@ import {
   runWithMiddleware,
 } from '@prisma-next/framework-components/runtime';
 
-class SqlRuntimeImpl
+class SqlRuntime
   extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
   implements Runtime
 {
@@ -102,7 +102,7 @@ A useful corollary of the abstract-base shape: any middleware typed against the 
 |---------|--------|-------|
 | `@prisma-next/runtime-executor` (framework, runtime layer) | Owned the runtime SPI + plugin lifecycle. | **Deleted.** Contents folded into `@prisma-next/framework-components`. |
 | `@prisma-next/framework-components` (framework, core layer) | Component descriptors; control / execution / emission types. | Adds a `runtime` subpath export with the SPI, abstract `RuntimeCore`, and `runWithMiddleware`. |
-| `@prisma-next/sql-runtime` (SQL, runtime layer) | Composed an inner `runtime-executor`. | `SqlRuntimeImpl extends RuntimeCore` directly. |
+| `@prisma-next/sql-runtime` (SQL, runtime layer) | Composed an inner `runtime-executor`. | `SqlRuntime extends RuntimeCore` directly. |
 | `@prisma-next/mongo-runtime` (Mongo, runtime layer) | Composed an inner `runtime-executor`. | `MongoRuntimeImpl extends RuntimeCore` directly. |
 
 The dependency-direction enforcement chain in `architecture.config.json` collapses from

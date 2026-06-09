@@ -61,4 +61,4 @@ export type {
   RuntimeTransaction,
   TransactionContext,
 } from '../sql-runtime';
-export { createRuntime, withTransaction } from '../sql-runtime';
+export { createRuntime, SqlRuntime, withTransaction } from '../sql-runtime';
