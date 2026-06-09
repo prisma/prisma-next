@@ -134,6 +134,70 @@ describe('normalizePredicate', () => {
       expect(a).toBe(b);
     });
   });
+
+  describe('::text strip on string literals', () => {
+    it("strips ::text from 'x'::text — authored and pg-reprinted forms are equivalent", () => {
+      expect(normalizePredicate("'x'::text")).toBe("'x'");
+    });
+
+    it('preserves string content that contains ::text as data', () => {
+      expect(normalizePredicate("note = 'a::text'")).toBe("note = 'a::text'");
+    });
+
+    it('preserves string content that contains ) as data', () => {
+      expect(normalizePredicate("note = 'a)'")).toBe("note = 'a)'");
+    });
+  });
+
+  describe('cast-paren strip — atomic operands', () => {
+    it('strips parens around a function call: (current_setting(...))::int ≡ current_setting(...)::int', () => {
+      expect(normalizePredicate("(current_setting('k'))::int")).toBe("current_setting('k')::int");
+    });
+
+    it('strips parens around a bare identifier', () => {
+      expect(normalizePredicate('(user_id)::text')).toBe('user_id::text');
+    });
+  });
+
+  describe('cast-paren strip — multi-operand operands are kept', () => {
+    it('keeps parens for OR inside cast: (a OR b)::text ≠ a OR b::text', () => {
+      const withParens = normalizePredicate('(a or b)::text');
+      const withoutParens = normalizePredicate('a or b::text');
+      expect(withParens).not.toBe(withoutParens);
+    });
+
+    it('keeps parens for addition inside cast: (amount + tax)::int = total ≠ amount + tax::int = total', () => {
+      const withParens = normalizePredicate('(amount + tax)::int = total');
+      const withoutParens = normalizePredicate('amount + tax::int = total');
+      expect(withParens).not.toBe(withoutParens);
+    });
+  });
+
+  describe('type-alias normalization', () => {
+    it('::integer collapses to ::int', () => {
+      expect(normalizePredicate('x::integer')).toBe('x::int');
+    });
+
+    it('::boolean collapses to ::bool', () => {
+      expect(normalizePredicate('x::boolean')).toBe('x::bool');
+    });
+
+    it('::bigint collapses to ::int8', () => {
+      expect(normalizePredicate('x::bigint')).toBe('x::int8');
+    });
+
+    it('::character varying collapses to ::varchar', () => {
+      expect(normalizePredicate('x::character varying')).toBe('x::varchar');
+    });
+
+    it('::double precision collapses to ::float8', () => {
+      expect(normalizePredicate('x::double precision')).toBe('x::float8');
+    });
+
+    it('::text and ::varchar remain distinct types', () => {
+      expect(normalizePredicate('x::text')).not.toBe(normalizePredicate('x::varchar'));
+    });
+  });
 });
 
 describe('computeContentHash', () => {

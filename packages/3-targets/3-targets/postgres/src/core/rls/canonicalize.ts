@@ -102,10 +102,84 @@ function normalizeCastAliases(sql: string): string {
 }
 
 /**
- * Strips redundant grouping parentheses that Postgres adds around cast
- * operands, i.e. `(expr)::type` → `expr::type`. This is semantically
- * equivalent in SQL because the `::` operator already binds to its
- * immediate left argument regardless of parentheses.
+ * Returns true when `inner` contains a top-level binary operator — i.e. an
+ * operator not nested inside parens or a string literal. Used to decide
+ * whether `(inner)::type` can safely have its parens stripped.
+ *
+ * `::` binds tighter than every binary operator, so `(a OR b)::text` means
+ * `(a OR (b::text))` without the parens — semantically different. When
+ * `inner` is atomic (identifier, literal, or a function call), the parens add
+ * nothing and can be dropped safely.
+ */
+function hasTopLevelBinaryOperator(inner: string): boolean {
+  let depth = 0;
+  let i = 0;
+  while (i < inner.length) {
+    const ch = inner[i]!;
+
+    if (ch === "'") {
+      // Skip string literal — its contents are not operators.
+      i++;
+      while (i < inner.length) {
+        if (inner[i] === "'") {
+          i++;
+          if (inner[i] === "'") {
+            i++;
+          } else {
+            break;
+          }
+        } else {
+          i++;
+        }
+      }
+      continue;
+    }
+
+    if (ch === '(') {
+      depth++;
+      i++;
+      continue;
+    }
+    if (ch === ')') {
+      depth--;
+      i++;
+      continue;
+    }
+
+    if (depth > 0) {
+      i++;
+      continue;
+    }
+
+    // At depth 0, check for binary operators.
+    // Single-char symbolic operators: = < > + - * / % | &
+    if (/[=<>+\-*/%|&]/.test(ch)) {
+      return true;
+    }
+
+    // Word-boundary operators: AND, OR, NOT, IS, IN, LIKE, BETWEEN, ILIKE
+    // (sql has already been lowercased by this point)
+    if (/[a-z]/.test(ch)) {
+      const wordMatch = inner.slice(i).match(/^(and|or|not|is|in|like|ilike|between)\b/);
+      if (wordMatch) {
+        return true;
+      }
+    }
+
+    i++;
+  }
+  return false;
+}
+
+/**
+ * Strips redundant grouping parentheses around **atomic** cast operands only:
+ * `(expr)::type` → `expr::type` when `expr` contains no top-level binary
+ * operator (i.e. is a single identifier, literal, or function call).
+ *
+ * When `expr` contains a top-level operator (e.g. `a OR b`, `amount + tax`),
+ * the parens are semantically meaningful — `::` binds tighter than binary
+ * operators, so stripping them would change the expression's meaning — and
+ * are left in place.
  *
  * Only removes `(...)::` where the `(` is preceded by a non-identifier
  * character (start-of-string, space, or an operator). This avoids stripping
@@ -136,11 +210,16 @@ function stripRedundantCastParens(sql: string): string {
           // j now points one past the closing ')'.
           // Check if the next chars are '::'.
           if (depth === 0 && s.slice(j, j + 2) === '::') {
-            // Remove the outer parens — emit the inner content directly.
-            out += s.slice(i + 1, j - 1);
-            i = j;
-            changed = true;
-            continue;
+            const inner = s.slice(i + 1, j - 1);
+            // Only strip when the inner expression is atomic — no top-level
+            // binary operator. When inner has a top-level operator, the parens
+            // are semantically meaningful (:: binds tighter than any binary op).
+            if (!hasTopLevelBinaryOperator(inner)) {
+              out += inner;
+              i = j;
+              changed = true;
+              continue;
+            }
           }
         }
       }
