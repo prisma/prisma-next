@@ -1,6 +1,6 @@
 # ADR (draft) — Always-qualified builder surface with per-facade default-namespace projection
 
-**Status:** Draft (project-local; migrates to `docs/architecture docs/adrs/` with a final number at project close-out)
+**Status:** Draft
 **Date:** 2026-06-09
 **Linear:** [TML-2550](https://linear.app/prisma-company/issue/TML-2550)
 **Builds on:** [ADR 223 — Target-owned default namespace](../../docs/architecture%20docs/adrs/ADR%20223%20-%20Target-owned%20default%20namespace.md) (TML-2605)
@@ -9,7 +9,7 @@
 
 ## Context
 
-ADR 223 made a target's default namespace a static descriptor fact and deferred multi-namespace flat access and bare-name collision ergonomics to [TML-2550](https://linear.app/prisma-company/issue/TML-2550) — this project. Two questions had to be decided: how a multi-namespace contract is navigated, and how single-namespace ergonomics are preserved.
+ADR 223 made a target's default namespace a static descriptor fact and deferred multi-namespace flat access and bare-name collision ergonomics. Two questions had to be decided: how a multi-namespace contract is navigated, and how single-namespace ergonomics are preserved.
 
 ---
 
@@ -54,4 +54,4 @@ Accessing an unknown namespace, table, or model yields `undefined` at runtime; t
 
 - [ADR 223 — Target-owned default namespace](../../docs/architecture%20docs/adrs/ADR%20223%20-%20Target-owned%20default%20namespace.md)
 - [ADR 221 — Contract IR two planes with uniform entity coordinate and pack-contributed entity kinds](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)
-- Linear: [TML-2550](https://linear.app/prisma-company/issue/TML-2550) (this project), [TML-2605](https://linear.app/prisma-company/issue/TML-2605) (prerequisite), TML-2766 (runtime-descriptor minimisation)
+- Linear: [TML-2550](https://linear.app/prisma-company/issue/TML-2550), [TML-2605](https://linear.app/prisma-company/issue/TML-2605) (runtime identifier-qualification), TML-2766 (runtime-descriptor minimisation)
