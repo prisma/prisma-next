@@ -54,20 +54,16 @@ await db.Profile.find({ where: { id: profileId } });
 
 [TML-2605](../target-extensible-ir-namespaces/spec.md) provides the runtime identifier-qualification machinery (qualified SQL emission for `"auth"."users"` vs `"public"."users"`). This project consumes that machinery to build the per-namespace facets on `orm` and `sql`, and removes any flat default-namespace fallback at the builder layer — flat ergonomics become a facade concern.
 
-```text
-Contract IR (nested namespaces on domain + storage planes)
-         │
-         ▼
-TML-2605 — runtime-qualification (PREREQUISITE)
-  • Runtime SQL qualifies identifiers by namespace coordinate
-  • Provides the qualification helpers explicit accessors call into
-         │
-         ▼
-TML-2550 — explicit-namespace-dsl (THIS PROJECT)
-  • orm.<ns>.<Model> / sql.<ns>.<table> — per-namespace facets on builders
-  • Builder surface is always qualified (no flat fallback)
-  • Facade aliases `db` to a namespace facet on single-namespace targets
+```mermaid
+flowchart TD
+  ir["Contract IR (nested namespaces: domain + storage planes)"]
+  prereq["TML-2605 runtime-qualification (PREREQUISITE)"]
+  proj["TML-2550 explicit-namespace-dsl (THIS PROJECT)"]
+  ir --> prereq --> proj
 ```
+
+- **TML-2605 — runtime-qualification (prerequisite):** runtime SQL qualifies identifiers by namespace coordinate; provides the qualification helpers explicit accessors call into.
+- **TML-2550 — explicit-namespace-dsl (this project):** `orm.<ns>.<Model>` / `sql.<ns>.<table>` per-namespace facets on builders; builder surface always qualified (no flat fallback); facade aliases `db` to a namespace facet on single-namespace targets.
 
 ## Problem
 

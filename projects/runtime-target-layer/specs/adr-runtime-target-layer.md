@@ -8,12 +8,15 @@ Related: [TML-2459 — Target-extensible IR](../../target-extensible-ir/spec.md)
 
 The runtime layer is class-based but only two of the three layers are populated today:
 
+```mermaid
+classDiagram
+  RuntimeCore <|-- SqlRuntimeImpl
+  RuntimeCore <|-- MongoRuntimeImpl
 ```
-abstract class RuntimeCore<TQueryPlan, TExecPlan, TMiddleware>          // framework-components (exported)
-   ↑ extends
-class SqlRuntimeImpl extends RuntimeCore<SqlQueryPlan, …>               // sql-runtime (NOT exported)
-class MongoRuntimeImpl extends RuntimeCore<MongoQueryPlan, …>           // mongo-runtime (NOT exported)
-```
+
+- `RuntimeCore<TQueryPlan, TExecPlan, TMiddleware>` — framework-components (exported).
+- `SqlRuntimeImpl` — sql-runtime (NOT exported).
+- `MongoRuntimeImpl` — mongo-runtime (NOT exported).
 
 `RuntimeCore` is abstract and explicitly designed for subclassing — its `protected override lower(...)` and `protected override runDriver(...)` hooks document the contract for family-level concretions. The family-level classes (`SqlRuntimeImpl`, `MongoRuntimeImpl`) implement those hooks and extend the protected surface for their family's middleware lifecycle.
 

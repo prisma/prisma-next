@@ -8,27 +8,28 @@ The runtime layer's class hierarchy is two-thirds populated: `RuntimeCore` (abst
 
 Today's runtime class diagram (Postgres path):
 
+```mermaid
+classDiagram
+  RuntimeCore <|-- SqlRuntimeImpl
 ```
-abstract class RuntimeCore<TQueryPlan, TExecPlan, TMiddleware>          // framework-components (exported)
-   ↑ extends
-class SqlRuntimeImpl extends RuntimeCore<SqlQueryPlan, …>               // packages/2-sql/5-runtime (NOT exported)
 
-const db = createRuntime({ … });  // factory returns a `Runtime` interface; concrete class is hidden
-```
+- `RuntimeCore<TQueryPlan, TExecPlan, TMiddleware>` — framework-components (exported).
+- `SqlRuntimeImpl` — `packages/2-sql/5-runtime` (NOT exported).
+- `createRuntime({ … })` returns a `Runtime` interface; the concrete class is hidden.
 
 After this project:
 
+```mermaid
+classDiagram
+  RuntimeCore <|-- SqlRuntime
+  SqlRuntime <|-- PostgresRuntime
+  PostgresRuntime <|-- SupabaseRuntime
 ```
-abstract class RuntimeCore<TQueryPlan, TExecPlan, TMiddleware>          // unchanged
-   ↑ extends
-class SqlRuntime extends RuntimeCore<SqlQueryPlan, …>                   // renamed from SqlRuntimeImpl, EXPORTED
-   ↑ extends
-class PostgresRuntime extends SqlRuntime                                // NEW; thin target-layer subclass
-                                                                        // shipped by Postgres extension
 
-// In a separate project (extension-supabase):
-class SupabaseRuntime extends PostgresRuntime
-```
+- `RuntimeCore` — unchanged.
+- `SqlRuntime` — renamed from `SqlRuntimeImpl`, now **exported**.
+- `PostgresRuntime` — **new**; thin target-layer subclass shipped by the Postgres extension.
+- `SupabaseRuntime` — added in a separate project (extension-supabase), shown here for context.
 
 Three properties of the design:
 
