@@ -14,6 +14,7 @@ import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
+import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type {
   PostgresEnumStorageEntry,
   SqlControlDriverInstance,
@@ -21,7 +22,12 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
+  DdlColumn,
   DdlNode,
+  DdlTableConstraint,
+  DriverStatement,
+  FunctionColumnDefault,
+  LiteralColumnDefault,
   LoweredStatement,
   LowererContext,
   MarkerReadResult,
@@ -42,7 +48,12 @@ import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
 } from '@prisma-next/target-postgres/contract-free';
-import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
+import type {
+  PostgresCreateSchema,
+  PostgresCreateTable,
+  PostgresDdlNode,
+  PostgresDdlVisitor,
+} from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import {
   createResolveExistingEnumValues,
@@ -50,6 +61,7 @@ import {
   readPostgresSchemaIrAnnotations,
 } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
@@ -159,6 +171,29 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       return renderLoweredDdl(ast);
     }
     return renderLoweredSql(ast, context.contract as PostgresContract, this.codecLookup);
+  }
+
+  /**
+   * Lower an AST all the way to a driver-ready statement. For DDL nodes,
+   * literal column defaults are formatted as inline SQL with proper quoting and
+   * `::nativeType` cast suffixes. For query ASTs, params are kept as `$N`
+   * placeholders; wire values go in `params`. Does NOT call `this.lower()` —
+   * independent implementation.
+   */
+  async lowerToDriverStatement(
+    ast: AnyQueryAst | PostgresDdlNode,
+    context: LowererContext<unknown>,
+  ): Promise<DriverStatement> {
+    if (isDdlNode(ast)) {
+      return pgRenderDdlDriverStatement(blindCast<PostgresDdlNode, 'isDdlNode guard'>(ast));
+    }
+    const lowered = renderLoweredSql(
+      ast,
+      blindCast<PostgresContract, 'Caller must supply matching contract'>(context.contract),
+      this.codecLookup,
+    );
+    const params = lowered.params.map((p) => (p.kind === 'literal' ? p.value : p.name));
+    return { sql: lowered.sql, params };
   }
 
   /**
@@ -1365,4 +1400,130 @@ function extractQuotedLiterals(listBody: string): readonly string[] | undefined 
   const pattern = /'((?:[^'\\]|\\.|'')*)'/g;
   const values = [...listBody.matchAll(pattern)].map((m) => (m[1] ?? '').replace(/''/g, "'"));
   return values.length > 0 ? values : undefined;
+// ---------------------------------------------------------------------------
+// pgRenderDdlDriverStatement — independent DDL walker for lowerToDriverStatement
+// ---------------------------------------------------------------------------
+
+function pgIsTextLikeNativeType(nativeType: string): boolean {
+  return (
+    nativeType === 'text' ||
+    nativeType === 'varchar' ||
+    nativeType.startsWith('varchar(') ||
+    nativeType === 'character varying' ||
+    nativeType.startsWith('character varying(') ||
+    nativeType === 'char' ||
+    nativeType.startsWith('char(') ||
+    nativeType === 'character' ||
+    nativeType.startsWith('character(')
+  );
+}
+
+function pgInlineLiteral(wire: unknown, nativeType: string): string {
+  if (wire === null) return 'NULL';
+  if (typeof wire === 'boolean') return wire ? 'true' : 'false';
+  if (typeof wire === 'number') return String(wire);
+  if (typeof wire === 'bigint') return String(wire);
+  if (wire instanceof Date) {
+    const quoted = `'${escapeLiteral(wire.toISOString())}'`;
+    return pgIsTextLikeNativeType(nativeType) ? quoted : `${quoted}::${nativeType}`;
+  }
+  if (typeof wire === 'string') {
+    const quoted = `'${escapeLiteral(wire)}'`;
+    return pgIsTextLikeNativeType(nativeType) ? quoted : `${quoted}::${nativeType}`;
+  }
+  if (wire instanceof Uint8Array) {
+    const hex = Array.from(wire)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return `'\\x${hex}'::bytea`;
+  }
+  if (typeof wire === 'object') {
+    const quoted = `'${escapeLiteral(JSON.stringify(wire))}'`;
+    return `${quoted}::${nativeType}`;
+  }
+  throw new Error(
+    `pgRenderDdlDriverStatement: unexpected wire type "${typeof wire}" for native type "${nativeType}"`,
+  );
+}
+
+function pgRenderDdlColumnDefault(
+  def: LiteralColumnDefault | FunctionColumnDefault,
+  nativeType: string,
+): string {
+  if (def.kind === 'function') {
+    if (def.expression === 'autoincrement()') return '';
+    return `DEFAULT (${def.expression})`;
+  }
+  return `DEFAULT ${pgInlineLiteral(def.value, nativeType)}`;
+}
+
+function pgRenderDdlColumn(column: DdlColumn): string {
+  const parts = [quoteIdentifier(column.name), column.type];
+  if (column.notNull) parts.push('NOT NULL');
+  if (column.primaryKey) parts.push('PRIMARY KEY');
+  if (column.default) {
+    const clause = pgRenderDdlColumnDefault(column.default, column.type);
+    if (clause.length > 0) parts.push(clause);
+  }
+  return parts.join(' ');
+}
+
+function pgRenderDdlConstraint(constraint: DdlTableConstraint): string {
+  if (constraint.kind === 'primary-key') {
+    const cols = constraint.columns.map(quoteIdentifier).join(', ');
+    if (constraint.name !== undefined) {
+      return `CONSTRAINT ${quoteIdentifier(constraint.name)} PRIMARY KEY (${cols})`;
+    }
+    return `PRIMARY KEY (${cols})`;
+  }
+  if (constraint.kind === 'foreign-key') {
+    const cols = constraint.columns.map(quoteIdentifier).join(', ');
+    const refTable = constraint.refTable.split('.').map(quoteIdentifier).join('.');
+    const refCols = constraint.refColumns.map(quoteIdentifier).join(', ');
+    let sql = `FOREIGN KEY (${cols}) REFERENCES ${refTable} (${refCols})`;
+    if (constraint.onDelete !== undefined) {
+      sql += ` ON DELETE ${REFERENTIAL_ACTION_SQL[constraint.onDelete]}`;
+    }
+    if (constraint.onUpdate !== undefined) {
+      sql += ` ON UPDATE ${REFERENTIAL_ACTION_SQL[constraint.onUpdate]}`;
+    }
+    if (constraint.name !== undefined) {
+      sql = `CONSTRAINT ${quoteIdentifier(constraint.name)} ${sql}`;
+    }
+    return sql;
+  }
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
+  if (constraint.name !== undefined) {
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} UNIQUE (${cols})`;
+  }
+  return `UNIQUE (${cols})`;
+}
+
+class PgDdlDriverStatementVisitor implements PostgresDdlVisitor<DriverStatement> {
+  createTable(node: PostgresCreateTable): DriverStatement {
+    const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+    const tableRef = node.schema
+      ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
+      : quoteIdentifier(node.table);
+    const columnDefs = node.columns.map(pgRenderDdlColumn);
+    const constraintDefs =
+      node.constraints !== undefined ? node.constraints.map(pgRenderDdlConstraint) : [];
+    const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
+    return {
+      sql: `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`,
+      params: [],
+    };
+  }
+
+  createSchema(node: PostgresCreateSchema): DriverStatement {
+    const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+    return {
+      sql: `CREATE SCHEMA ${ifNotExists}${quoteIdentifier(node.schema)}`,
+      params: [],
+    };
+  }
+}
+
+function pgRenderDdlDriverStatement(ast: PostgresDdlNode): DriverStatement {
+  return ast.accept(new PgDdlDriverStatementVisitor());
 }

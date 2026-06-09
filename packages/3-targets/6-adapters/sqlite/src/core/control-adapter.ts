@@ -4,10 +4,16 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
+import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
+  DdlColumn,
   DdlNode,
+  DdlTableConstraint,
+  DriverStatement,
+  FunctionColumnDefault,
+  LiteralColumnDefault,
   LoweredStatement,
   LowererContext,
   MarkerReadResult,
@@ -27,9 +33,14 @@ import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
 } from '@prisma-next/target-sqlite/contract-free';
-import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
+import type {
+  SqliteCreateTable,
+  SqliteDdlNode,
+  SqliteDdlVisitor,
+} from '@prisma-next/target-sqlite/ddl';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
+import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
@@ -130,6 +141,28 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       return renderLoweredDdl(ast);
     }
     return renderLoweredSql(ast, context.contract as SqliteContract);
+  }
+
+  /**
+   * Lower an AST all the way to a driver-ready statement. For DDL nodes,
+   * literal column defaults are formatted as inline SQL with SQLite-specific
+   * literal syntax (no cast suffix, boolean as 0/1, blob as X'hex'). For
+   * query ASTs, params are kept as `?` placeholders; wire values go in
+   * `params`. Does NOT call `this.lower()` — independent implementation.
+   */
+  async lowerToDriverStatement(
+    ast: AnyQueryAst | SqliteDdlNode,
+    context: LowererContext<unknown>,
+  ): Promise<DriverStatement> {
+    if (isDdlNode(ast)) {
+      return sqliteRenderDdlDriverStatement(blindCast<SqliteDdlNode, 'isDdlNode guard'>(ast));
+    }
+    const lowered = renderLoweredSql(
+      ast,
+      blindCast<SqliteContract, 'Caller must supply matching contract'>(context.contract),
+    );
+    const params = lowered.params.map((p) => (p.kind === 'literal' ? p.value : p.name));
+    return { sql: lowered.sql, params };
   }
 
   /**
@@ -581,4 +614,97 @@ function mapSqliteReferentialAction(rule: string): SqlReferentialAction | undefi
   }
   if (mapped === 'noAction') return undefined;
   return mapped;
+}
+
+// ---------------------------------------------------------------------------
+// sqliteRenderDdlDriverStatement — independent DDL walker for lowerToDriverStatement
+// ---------------------------------------------------------------------------
+
+function sqliteInlineLiteral(wire: unknown): string {
+  if (wire === null) return 'NULL';
+  if (typeof wire === 'boolean') return wire ? '1' : '0';
+  if (typeof wire === 'number') return String(wire);
+  if (typeof wire === 'bigint') return String(wire);
+  if (wire instanceof Date) return `'${escapeLiteral(wire.toISOString())}'`;
+  if (typeof wire === 'string') return `'${escapeLiteral(wire)}'`;
+  if (wire instanceof Uint8Array) {
+    const hex = Array.from(wire)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return `X'${hex}'`;
+  }
+  if (typeof wire === 'object') return `'${escapeLiteral(JSON.stringify(wire))}'`;
+  throw new Error(`sqliteRenderDdlDriverStatement: unexpected wire type "${typeof wire}"`);
+}
+
+function sqliteRenderDdlColumnDefault(def: LiteralColumnDefault | FunctionColumnDefault): string {
+  if (def.kind === 'function') {
+    if (def.expression === 'autoincrement()') return '';
+    return `DEFAULT (${def.expression})`;
+  }
+  return `DEFAULT ${sqliteInlineLiteral(def.value)}`;
+}
+
+function sqliteRenderDdlColumn(column: DdlColumn): string {
+  if (column.type.includes('AUTOINCREMENT')) {
+    return `${quoteIdentifier(column.name)} ${column.type}`;
+  }
+  const parts = [quoteIdentifier(column.name), column.type];
+  if (column.notNull) parts.push('NOT NULL');
+  if (column.primaryKey) parts.push('PRIMARY KEY');
+  if (column.default) {
+    const clause = sqliteRenderDdlColumnDefault(column.default);
+    if (clause.length > 0) parts.push(clause);
+  }
+  return parts.join(' ');
+}
+
+function sqliteRenderDdlConstraint(constraint: DdlTableConstraint): string {
+  if (constraint.kind === 'primary-key') {
+    const cols = constraint.columns.map(quoteIdentifier).join(', ');
+    if (constraint.name !== undefined) {
+      return `CONSTRAINT ${quoteIdentifier(constraint.name)} PRIMARY KEY (${cols})`;
+    }
+    return `PRIMARY KEY (${cols})`;
+  }
+  if (constraint.kind === 'foreign-key') {
+    const cols = constraint.columns.map(quoteIdentifier).join(', ');
+    const refTable = constraint.refTable.split('.').map(quoteIdentifier).join('.');
+    const refCols = constraint.refColumns.map(quoteIdentifier).join(', ');
+    let sql = `FOREIGN KEY (${cols}) REFERENCES ${refTable} (${refCols})`;
+    if (constraint.onDelete !== undefined) {
+      sql += ` ON DELETE ${REFERENTIAL_ACTION_SQL[constraint.onDelete]}`;
+    }
+    if (constraint.onUpdate !== undefined) {
+      sql += ` ON UPDATE ${REFERENTIAL_ACTION_SQL[constraint.onUpdate]}`;
+    }
+    if (constraint.name !== undefined) {
+      sql = `CONSTRAINT ${quoteIdentifier(constraint.name)} ${sql}`;
+    }
+    return sql;
+  }
+  const cols = constraint.columns.map(quoteIdentifier).join(', ');
+  if (constraint.name !== undefined) {
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} UNIQUE (${cols})`;
+  }
+  return `UNIQUE (${cols})`;
+}
+
+class SqliteDdlDriverStatementVisitor implements SqliteDdlVisitor<DriverStatement> {
+  createTable(node: SqliteCreateTable): DriverStatement {
+    const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+    const tableRef = quoteIdentifier(node.table);
+    const columnDefs = node.columns.map(sqliteRenderDdlColumn);
+    const constraintDefs =
+      node.constraints !== undefined ? node.constraints.map(sqliteRenderDdlConstraint) : [];
+    const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
+    return {
+      sql: `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`,
+      params: [],
+    };
+  }
+}
+
+function sqliteRenderDdlDriverStatement(ast: SqliteDdlNode): DriverStatement {
+  return ast.accept(new SqliteDdlDriverStatementVisitor());
 }

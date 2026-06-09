@@ -15,6 +15,7 @@ import type {
 import type {
   AnyQueryAst,
   DdlNode,
+  DriverStatement,
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
@@ -230,6 +231,21 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * emit.
    */
   lower(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
+
+  /**
+   * Lower an AST all the way to a driver-ready statement. Encodes every literal
+   * value through its column's codec and substitutes inline those that grammar
+   * forbids parameterizing (e.g. DDL `DEFAULT` clauses on PG/SQLite).
+   *
+   * Independent of `lower()` — does its own AST walk and produces `DriverStatement`
+   * directly. The runtime query path continues to use `lower()` + the runtime
+   * middleware lifecycle; this method exists for the control plane path that
+   * persists migration ops directly to ops.json with no middleware sandwich.
+   */
+  lowerToDriverStatement(
+    ast: AnyQueryAst | DdlNode,
+    context: LowererContext<unknown>,
+  ): Promise<DriverStatement>;
 }
 
 /**
