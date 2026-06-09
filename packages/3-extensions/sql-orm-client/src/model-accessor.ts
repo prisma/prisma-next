@@ -14,6 +14,7 @@ import {
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import { blindCast } from '@prisma-next/utils/casts';
 import {
   getFieldToColumnMap,
   resolveFieldToColumn,
@@ -29,6 +30,7 @@ import {
   type ComparisonMethodFns,
   type ModelAccessor,
   type RelationFilterAccessor,
+  type VariantAwareModelAccessor,
 } from './types';
 
 type ResolvedModelRelation = ReturnType<typeof resolveModelRelations>[string];
@@ -42,12 +44,13 @@ type NamedOp = readonly [name: string, entry: SqlOperationEntry];
 export function createModelAccessor<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
+  VariantName extends string | undefined = undefined,
 >(
   context: ExecutionContext<TContract>,
   namespaceId: string,
   modelName: ModelName,
-  variantName?: string,
-): ModelAccessor<TContract, ModelName> {
+  variantName?: VariantName,
+): VariantAwareModelAccessor<TContract, ModelName, VariantName> {
   const contract = context.contract;
   const fieldToColumn = getFieldToColumnMap(contract, namespaceId, modelName);
   const tableName = resolveModelTableName(contract, namespaceId, modelName);
@@ -91,49 +94,56 @@ export function createModelAccessor<
     }
   }
 
-  return new Proxy({} as ModelAccessor<TContract, ModelName>, {
-    get(_target, prop: string | symbol): unknown {
-      if (typeof prop !== 'string') {
-        return undefined;
-      }
+  const accessor = new Proxy(
+    {},
+    {
+      get(_target, prop: string | symbol): unknown {
+        if (typeof prop !== 'string') {
+          return undefined;
+        }
 
-      const relation = modelRelations[prop];
-      if (relation) {
-        return createRelationFilterAccessor(context, namespaceId, modelName, tableName, relation);
-      }
+        const relation = modelRelations[prop];
+        if (relation) {
+          return createRelationFilterAccessor(context, namespaceId, modelName, tableName, relation);
+        }
 
-      const variantField = variantFieldColumns[prop];
-      const resolvedTable = variantField?.table ?? tableName;
-      const columnName = variantField?.column ?? fieldToColumn[prop] ?? prop;
-      const column = resolveColumn(contract, namespaceId, resolvedTable, columnName);
-      // Unknown fields return `undefined`, matching plain JS object semantics.
-      // The `ModelAccessor<TContract, ModelName>` type already rejects typos
-      // at compile time for TS consumers, and contexts that iterate accessor
-      // keys (e.g. relation-shorthand predicates) can detect missing fields
-      // with an `undefined` check and raise their own, domain-specific error.
-      if (!column) {
-        return undefined;
-      }
-      const traits = context.codecDescriptors.descriptorFor(column.codecId)?.traits ?? [];
-      const operations = opsByCodecId.get(column.codecId) ?? [];
-      const codec = codecRefForStorageColumn(
-        contract.storage,
-        namespaceId,
-        resolvedTable,
-        columnName,
-      );
-      return createScalarFieldAccessor(
-        resolvedTable,
-        columnName,
-        column.codecId,
-        column.nullable,
-        codec,
-        traits,
-        operations,
-        context,
-      );
+        const variantField = variantFieldColumns[prop];
+        const resolvedTable = variantField?.table ?? tableName;
+        const columnName = variantField?.column ?? fieldToColumn[prop] ?? prop;
+        const column = resolveColumn(contract, namespaceId, resolvedTable, columnName);
+        // Unknown fields return `undefined`, matching plain JS object semantics.
+        // The `ModelAccessor<TContract, ModelName>` type already rejects typos
+        // at compile time for TS consumers, and contexts that iterate accessor
+        // keys (e.g. relation-shorthand predicates) can detect missing fields
+        // with an `undefined` check and raise their own, domain-specific error.
+        if (!column) {
+          return undefined;
+        }
+        const traits = context.codecDescriptors.descriptorFor(column.codecId)?.traits ?? [];
+        const operations = opsByCodecId.get(column.codecId) ?? [];
+        const codec = codecRefForStorageColumn(
+          contract.storage,
+          namespaceId,
+          resolvedTable,
+          columnName,
+        );
+        return createScalarFieldAccessor(
+          resolvedTable,
+          columnName,
+          column.codecId,
+          column.nullable,
+          codec,
+          traits,
+          operations,
+          context,
+        );
+      },
     },
-  });
+  );
+  return blindCast<
+    VariantAwareModelAccessor<TContract, ModelName, VariantName>,
+    'model accessor proxy resolves declared model fields and the selected variant fields dynamically'
+  >(accessor);
 }
 
 function resolveColumn(

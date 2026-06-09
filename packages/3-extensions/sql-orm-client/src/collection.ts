@@ -16,7 +16,6 @@ import {
   type ToWhereExpr,
   type WhereArg,
 } from '@prisma-next/sql-relational-core/ast';
-import { blindCast } from '@prisma-next/utils/casts';
 import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
@@ -269,26 +268,11 @@ export class Collection<
     const whereArg =
       typeof input === 'function'
         ? input(
-            // The variant name is already threaded through the type state
-            // (`State['variantName']`, set by `variant()`); that is what the
-            // callback param's `VariantAwareModelAccessor` reads. The blindCast
-            // remains because `createModelAccessor` is declared to return the
-            // base `ModelAccessor` — its runtime proxy carries the selected
-            // variant's fields when `variantName` is passed, but its *return
-            // type* is not variant-parameterized. Making that return type
-            // variant-aware would ripple into every non-variant caller
-            // (relation predicates, orderBy, etc.), so the widening is kept
-            // callback-param-only and bridged here with a single narrow cast.
-            blindCast<
-              VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
-              'runtime accessor carries the selected variant fields; the variant widening is callback-param-only'
-            >(
-              createModelAccessor(
-                this.ctx.context,
-                this.namespaceId,
-                this.modelName,
-                this.state.variantName,
-              ),
+            createModelAccessor<TContract, ModelName, State['variantName']>(
+              this.ctx.context,
+              this.namespaceId,
+              this.modelName,
+              this.state.variantName,
             ),
           )
         : isWhereDirectInput(input)
@@ -628,23 +612,11 @@ export class Collection<
           ) => OrderByItem
         >,
   ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
-    // Mirrors `where()`: the variant name is threaded through the type state
-    // (`State['variantName']`, set by `variant()`), and the runtime proxy
-    // carries the selected variant's fields when `variantName` is passed. The
-    // blindCast bridges the gap because `createModelAccessor` is declared to
-    // return the base `ModelAccessor` — its return type is not
-    // variant-parameterized — so the variant widening is kept callback-param
-    // only and bridged here with a single narrow cast.
-    const accessor = blindCast<
-      VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
-      'runtime accessor carries the selected variant fields; the variant widening is callback-param-only'
-    >(
-      createModelAccessor(
-        this.ctx.context,
-        this.namespaceId,
-        this.modelName,
-        this.state.variantName,
-      ),
+    const accessor = createModelAccessor<TContract, ModelName, State['variantName']>(
+      this.ctx.context,
+      this.namespaceId,
+      this.modelName,
+      this.state.variantName,
     );
     const selectors = Array.isArray(selection) ? selection : [selection];
     const nextOrders = selectors.map((selector) => selector(accessor));

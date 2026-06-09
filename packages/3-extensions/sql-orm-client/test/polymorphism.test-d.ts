@@ -1,7 +1,9 @@
 import type { Contract, NamespaceId } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { expectTypeOf, test } from 'vitest';
 import type { Collection } from '../src/collection';
+import { createModelAccessor } from '../src/model-accessor';
 import type {
   CreateInput,
   DefaultModelRow,
@@ -427,6 +429,7 @@ test('where without a variant exposes only base fields on the predicate model', 
 // ---------------------------------------------------------------------------
 
 declare const tasks: Collection<PolyContract, 'Task'>;
+declare const executionContext: ExecutionContext<PolyContract>;
 
 test('first after variant("Feature") exposes the MTI variant field on the predicate model', () => {
   tasks.variant('Feature').first((task) => {
@@ -492,4 +495,18 @@ test('orderBy after variant("Feature") on an include refinement exposes the MTI 
       return task.priority.desc();
     }),
   );
+});
+
+test('createModelAccessor with a selected variant returns a variant-aware accessor', () => {
+  const task = createModelAccessor(executionContext, '__unbound__', 'Task', 'Feature');
+  expectTypeOf(task).toHaveProperty('priority');
+  expectTypeOf(task).toHaveProperty('title');
+  task.priority.gte(3);
+});
+
+test('createModelAccessor without a selected variant returns the base accessor', () => {
+  const task = createModelAccessor(executionContext, '__unbound__', 'Task');
+  expectTypeOf(task).toHaveProperty('title');
+  // @ts-expect-error priority is an MTI variant field, absent without a selected variant
+  task.priority;
 });
