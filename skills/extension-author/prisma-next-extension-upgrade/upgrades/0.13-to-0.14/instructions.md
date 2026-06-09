@@ -22,6 +22,12 @@ changes:
 ---
 
 <!--
+TML-2785: the sql-orm-client runtime gained M:N correlated include
+reads — `.include()` of an N:M relation resolves child rows through the
+junction table via a correlated subquery. Internal runtime only; no
+extension API or contract-shape change. No extension-author action
+required.
+
 TML-2838: the temporary `--no-memory-protection-keys` test-harness workaround
 has been removed from every PGlite-backed vitest config (including
 `packages/3-extensions/{postgres,supabase}`) now that the WAL-teardown crash is
