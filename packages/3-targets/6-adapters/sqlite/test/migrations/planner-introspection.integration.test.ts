@@ -9,6 +9,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -133,7 +134,10 @@ describe('SQLite planner + introspection round-trip', () => {
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') return;
 
-      await runPlannedSteps(driver, result.plan.operations);
+      await runPlannedSteps(
+        driver,
+        (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[],
+      );
 
       const schema = await adapter.introspect(driver);
       expect(schema.tables['users']).toBeDefined();
@@ -192,7 +196,10 @@ describe('SQLite planner + introspection round-trip', () => {
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') return;
 
-      await runPlannedSteps(driver, result.plan.operations);
+      await runPlannedSteps(
+        driver,
+        (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[],
+      );
 
       await driver.query('INSERT INTO items (value) VALUES (?)', ['first']);
       await driver.query('INSERT INTO items (value) VALUES (?)', ['second']);
@@ -257,7 +264,10 @@ describe('SQLite planner + introspection round-trip', () => {
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') return;
 
-      await runPlannedSteps(driver, result.plan.operations);
+      await runPlannedSteps(
+        driver,
+        (await Promise.all(result.plan.operations)) as SqlMigrationPlanOperation<unknown>[],
+      );
 
       await driver.query('INSERT INTO authors (id) VALUES (?)', [1]);
       await driver.query('INSERT INTO posts (id, author_id) VALUES (?, ?)', [1, 1]);

@@ -33,19 +33,20 @@ function oracleSql(tableName: string, spec: SqliteTableSpec): string {
   return sql;
 }
 
-function newPathSql(
+async function newPathSql(
   tableName: string,
   columns: readonly DdlColumn[],
   constraints?: readonly DdlTableConstraint[],
-): string {
+): Promise<string> {
   const call = new CreateTableCall(tableName, columns, constraints);
-  const sql = call.toOp(lowerer).execute[0]?.sql;
+  const op = await call.toOp(lowerer);
+  const sql = op.execute[0]?.sql;
   if (sql === undefined) throw new Error('CreateTableCall.toOp produced no execute step');
   return sql;
 }
 
 describe('CreateTableCall byte-parity with pre-slice createTable', () => {
-  it('simple table: NOT NULL and nullable columns, no constraints', () => {
+  it('simple table: NOT NULL and nullable columns, no constraints', async () => {
     const tableName = 'tags';
 
     const spec: SqliteTableSpec = {
@@ -56,10 +57,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     };
     const columns = [col('id', 'INTEGER', { notNull: true }), col('name', 'TEXT')];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 
-  it('composite primary key: two NOT NULL columns with table-level PK constraint', () => {
+  it('composite primary key: two NOT NULL columns with table-level PK constraint', async () => {
     const tableName = 'memberships';
 
     const spec: SqliteTableSpec = {
@@ -75,10 +76,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     ];
     const constraints = [primaryKey(['user_id', 'group_id'])];
 
-    expect(newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
   });
 
-  it('table-level UNIQUE constraints (named and unnamed)', () => {
+  it('table-level UNIQUE constraints (named and unnamed)', async () => {
     const tableName = 'profiles';
 
     const spec: SqliteTableSpec = {
@@ -101,10 +102,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
       unique(['email'], { name: 'uq_profiles_email' }),
     ];
 
-    expect(newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
   });
 
-  it('foreign key with ON DELETE CASCADE referential action', () => {
+  it('foreign key with ON DELETE CASCADE referential action', async () => {
     const tableName = 'posts';
 
     const spec: SqliteTableSpec = {
@@ -133,10 +134,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
       foreignKey(['author_id'], 'users', ['id'], { onDelete: 'cascade' }),
     ];
 
-    expect(newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns, constraints)).toBe(oracleSql(tableName, spec));
   });
 
-  it('autoincrement primary key: INTEGER PRIMARY KEY AUTOINCREMENT inline', () => {
+  it('autoincrement primary key: INTEGER PRIMARY KEY AUTOINCREMENT inline', async () => {
     const tableName = 'events';
 
     const spec: SqliteTableSpec = {
@@ -153,10 +154,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     };
     const columns = [col('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'), col('payload', 'TEXT')];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 
-  it('string literal default', () => {
+  it('string literal default', async () => {
     const tableName = 'settings';
 
     const spec: SqliteTableSpec = {
@@ -164,10 +165,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     };
     const columns = [col('theme', 'TEXT', { default: lit('light') })];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 
-  it('number literal default', () => {
+  it('number literal default', async () => {
     const tableName = 'limits';
 
     const spec: SqliteTableSpec = {
@@ -177,10 +178,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     };
     const columns = [col('max_items', 'INTEGER', { default: lit(10) })];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 
-  it('boolean literal default emitted as 0/1', () => {
+  it('boolean literal default emitted as 0/1', async () => {
     const tableName = 'flags';
 
     const spec: SqliteTableSpec = {
@@ -194,10 +195,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
       col('deleted', 'INTEGER', { default: lit(false) }),
     ];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 
-  it('null literal default', () => {
+  it('null literal default', async () => {
     const tableName = 'items';
 
     const spec: SqliteTableSpec = {
@@ -205,10 +206,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     };
     const columns = [col('notes', 'TEXT', { default: lit(null) })];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 
-  it('Date literal default emitted as a single-quoted ISO string', () => {
+  it('Date literal default emitted as a single-quoted ISO string', async () => {
     const tableName = 'logs';
     const date = new Date('2025-01-01T00:00:00.000Z');
 
@@ -224,10 +225,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     };
     const columns = [col('created_at', 'TEXT', { default: lit(date) })];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 
-  it('JSON object literal default', () => {
+  it('JSON object literal default', async () => {
     const tableName = 'configs';
 
     const spec: SqliteTableSpec = {
@@ -242,10 +243,10 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     };
     const columns = [col('settings', 'TEXT', { default: lit({ retries: 3 }) })];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 
-  it('function default (non-autoincrement)', () => {
+  it('function default (non-autoincrement)', async () => {
     const tableName = 'sessions';
 
     const spec: SqliteTableSpec = {
@@ -260,6 +261,6 @@ describe('CreateTableCall byte-parity with pre-slice createTable', () => {
     };
     const columns = [col('created_at', 'TEXT', { default: fn("datetime('now')") })];
 
-    expect(newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
+    expect(await newPathSql(tableName, columns)).toBe(oracleSql(tableName, spec));
   });
 });

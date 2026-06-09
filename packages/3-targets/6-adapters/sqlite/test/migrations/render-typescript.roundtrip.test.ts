@@ -144,7 +144,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
     const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
     const ops = JSON.parse(opsJson);
 
-    const expected = JSON.parse(JSON.stringify(renderOps(calls, testAdapter)));
+    const expected = JSON.parse(JSON.stringify(await Promise.all(renderOps(calls, testAdapter))));
     expect(ops).toEqual(expected);
   });
 
