@@ -218,7 +218,7 @@ export interface TestRuntimeContext<TContract extends Contract<SqlStorage>> {
   readonly context: ReturnType<typeof createTestContext>;
   /** The test runtime for executing queries */
   readonly runtime: Awaited<ReturnType<typeof createTestRuntimeFromClient>>;
-  /** The sql-builder Db proxy for building and executing queries */
+  /** The sql-builder proxy for building and executing queries */
   readonly db: Db<TContract>;
   /** The raw pg client for direct SQL queries */
   readonly client: Client;
@@ -239,7 +239,7 @@ export interface TestRuntimeContext<TContract extends Contract<SqlStorage>> {
  * ```typescript
  * it('runs a query', async () => {
  *   await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
- *     const plan = db.user.select('id').build();
+ *     const plan = db.public.user.select('id').build();
  *     const rows = await executePlanAndCollect(runtime, plan);
  *     expect(rows.length).toBeGreaterThan(0);
  *   });

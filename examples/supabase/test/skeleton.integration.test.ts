@@ -217,7 +217,6 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       // Step 5 (bonus) — raw read from the seeded auth.users table.
       //
       // Proves the external table is reachable via a raw pg Client.
-      // The typed `db.sql.auth.users` surface waits for `explicit-namespace-dsl`.
       await withClient(connectionString, async (client) => {
         const result = await client.query<{ table_name: string }>(
           `SELECT table_name
@@ -298,11 +297,11 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       const runtime = await db.connect({ url: connectionString });
       try {
         // Insert a profile row via the ORM.
-        await runtime.execute(db.sql.profile.insert([{ username: 'bob', userId }]).build());
+        await runtime.execute(db.sql.public.profile.insert([{ username: 'bob', userId }]).build());
 
         // Count profiles for this user before the cascade delete.
         const beforeRows = await runtime.execute(
-          db.sql.profile
+          db.sql.public.profile
             .select('id')
             .where((f, fns) => fns.eq(f.userId, userId))
             .build(),
@@ -317,7 +316,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
 
         // Count profiles for this user after the cascade delete — must be zero.
         const afterRows = await runtime.execute(
-          db.sql.profile
+          db.sql.public.profile
             .select('id')
             .where((f, fns) => fns.eq(f.userId, userId))
             .build(),

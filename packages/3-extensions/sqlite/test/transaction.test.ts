@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createContract } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -133,8 +134,8 @@ describe('sqlite transaction()', () => {
     let callCount = 0;
     mocks.sqlBuilder.mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return { lane: 'sql' };
-      return txSqlProxy;
+      if (callCount === 1) return { [UNBOUND_NAMESPACE_ID]: { lane: 'sql' } };
+      return { [UNBOUND_NAMESPACE_ID]: txSqlProxy };
     });
 
     const db = sqlite({
@@ -157,8 +158,8 @@ describe('sqlite transaction()', () => {
     let ormCallCount = 0;
     mocks.orm.mockImplementation(() => {
       ormCallCount++;
-      if (ormCallCount === 1) return { lane: 'orm' };
-      return txOrmProxy;
+      if (ormCallCount === 1) return { [UNBOUND_NAMESPACE_ID]: { lane: 'orm' } };
+      return { [UNBOUND_NAMESPACE_ID]: txOrmProxy };
     });
 
     const db = sqlite({

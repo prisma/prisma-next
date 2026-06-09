@@ -86,7 +86,7 @@ describe('runtime verify-marker: missing marker table', {
     const builder = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
     try {
-      const rows = await runtime.execute(builder.users.select('id').build()).toArray();
+      const rows = await runtime.execute(builder.public.users.select('id').build()).toArray();
 
       expect(rows.map((r) => r.id)).toEqual([1]);
       expect(log.warn).toHaveBeenCalledOnce();

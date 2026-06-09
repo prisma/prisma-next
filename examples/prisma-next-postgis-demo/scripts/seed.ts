@@ -23,17 +23,17 @@ async function main() {
 
   try {
     for (const cafe of cafes) {
-      await runtime.execute(db.sql.cafe.insert([cafe]).build());
+      await runtime.execute(db.sql.public.cafe.insert([cafe]).build());
     }
     console.log(`Seeded ${cafes.length} cafes`);
 
     for (const hood of neighborhoods) {
-      await runtime.execute(db.sql.neighborhood.insert([hood]).build());
+      await runtime.execute(db.sql.public.neighborhood.insert([hood]).build());
     }
     console.log(`Seeded ${neighborhoods.length} neighborhoods`);
 
     for (const route of routes) {
-      await runtime.execute(db.sql.route.insert([route]).build());
+      await runtime.execute(db.sql.public.route.insert([route]).build());
     }
     console.log(`Seeded ${routes.length} routes`);
 

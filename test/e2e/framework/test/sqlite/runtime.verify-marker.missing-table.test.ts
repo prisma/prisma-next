@@ -7,6 +7,7 @@ import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import {
@@ -68,7 +69,7 @@ async function buildHarness(log: Log): Promise<Harness> {
   await driver.connect({ kind: 'path', path: dbPath });
 
   const runtime = createRuntime({ stackInstance, context, driver, log });
-  const db: Db<Contract> = sqlBuilder<Contract>({
+  const db = sqlBuilder<Contract>({
     context,
     rawCodecInferer: stack.adapter.rawCodecInferer,
   });
@@ -109,7 +110,9 @@ describe('sqlite runtime verify-marker: missing marker table', {
 
     harness = await buildHarness(log);
 
-    const rows = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+    const rows = await harness.runtime
+      .execute(harness.db[UNBOUND_NAMESPACE_ID].users.select('id').build())
+      .toArray();
 
     expect(rows.map((r) => r.id)).toEqual([1]);
     expect(log.warn).toHaveBeenCalledOnce();

@@ -53,7 +53,6 @@ type Accessor = { readonly modelName: string; readonly tableName: string };
 type TwoNamespaceOrm = {
   public: { User: Accessor; Post: Accessor; Session: undefined };
   auth: { User: Accessor; Session: Accessor };
-  User: Accessor;
 };
 
 function db() {
@@ -74,17 +73,9 @@ describe('namespaced orm accessor', () => {
   });
 
   it('scopes model lookup to the named namespace rather than the flat model set', () => {
-    // `Session` exists only in `auth`; the flat set contains it, so an
-    // unscoped facet would wrongly resolve `auth.Session` under `public`.
-    expect(() => db().public.Session).toThrow();
+    // `Session` exists only in `auth`, so resolving it under `public` must
+    // return undefined rather than the `auth` model.
+    expect(db().public.Session).toBeUndefined();
     expect(db().auth.Session.tableName).toBe('sessions');
-  });
-
-  it('throws on flat bare-name access against a multi-namespace contract (bare=default deferred)', () => {
-    // With a required, leading namespace the flat surface resolves the sole
-    // domain namespace; a multi-namespace contract has no sole namespace, so
-    // bare access throws until bare=default lands. Namespace-qualified access
-    // (db().public.User) remains the supported path.
-    expect(() => db().User).toThrow(/exactly one domain namespace/);
   });
 });

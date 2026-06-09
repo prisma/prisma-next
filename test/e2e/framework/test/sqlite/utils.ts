@@ -48,7 +48,7 @@ export async function withSqliteTestRuntime<TContract extends Contract<SqlStorag
     const { runtime, context, rawCodecInferer } = await createSqliteRuntime(contract, dbPath);
 
     try {
-      const db: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
+      const db = sqlBuilder<TContract>({ context, rawCodecInferer });
       const ormClient = orm({
         context,
         runtime: {

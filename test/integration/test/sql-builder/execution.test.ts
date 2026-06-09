@@ -8,7 +8,7 @@ describe('integration: execution methods', { timeout: timeouts.databaseOperation
     const row = await runtime()
       .execute(
         db()
-          .users.select('id', 'name')
+          .public.users.select('id', 'name')
           .where((f, fns) => fns.eq(f.id, 1))
           .build(),
       )
@@ -21,7 +21,7 @@ describe('integration: execution methods', { timeout: timeouts.databaseOperation
     const row = await runtime()
       .execute(
         db()
-          .users.select('id')
+          .public.users.select('id')
           .where((f, fns) => fns.eq(f.id, 9999))
           .build(),
       )
@@ -33,7 +33,7 @@ describe('integration: execution methods', { timeout: timeouts.databaseOperation
     const row = await runtime()
       .execute(
         db()
-          .users.select('id', 'name')
+          .public.users.select('id', 'name')
           .where((f, fns) => fns.eq(f.id, 2))
           .build(),
       )

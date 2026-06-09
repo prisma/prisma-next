@@ -15,5 +15,5 @@ export function createOrmClient(runtime: Runtime) {
       User: UserCollection,
       Post: PostCollection,
     },
-  });
+  }).public;
 }

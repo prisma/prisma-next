@@ -1,33 +1,29 @@
-import type { Db, Namespace, TableProxy } from '@prisma-next/sql-builder/types';
+import type { Namespace, TableProxy } from '@prisma-next/sql-builder/types';
 import { expectTypeOf, test } from 'vitest';
 import type { SqliteClient } from '../src/runtime/sqlite';
 import type { Contract } from './fixtures/namespaced-contract';
 
 declare const db: SqliteClient<Contract>;
 
-test('db.sql exposes the namespace facet alongside the flat surface', () => {
-  expectTypeOf(db.sql.main.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
+test('db.sql exposes the flat surface via the unbound-namespace alias', () => {
   expectTypeOf(db.sql.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
-  expectTypeOf<Namespace<Contract, 'main'>['users']>().toEqualTypeOf<
+  expectTypeOf<Namespace<Contract, '__unbound__'>['users']>().toEqualTypeOf<
     TableProxy<Contract, 'users'>
   >();
 });
 
-test('db.orm exposes the namespace facet alongside the flat surface', () => {
-  expectTypeOf(db.orm.main.User).toEqualTypeOf(db.orm.User);
-  expectTypeOf(db.orm.User).toEqualTypeOf(db.orm.main.User);
+test('db.orm exposes the flat surface via the unbound-namespace alias', () => {
+  expectTypeOf(db.orm.User).toHaveProperty('all');
 });
 
-test('an undeclared namespace id is not a key on db.sql or db.orm', () => {
-  // @ts-expect-error 'auth' is not a declared storage namespace of this contract
+test('an undeclared key is not on db.sql or db.orm', () => {
+  // @ts-expect-error 'auth' is neither a table on the unbound sql facet
   db.sql.auth;
-  // @ts-expect-error 'auth' is not a declared domain namespace of this contract
+  // @ts-expect-error 'auth' is neither a model on the unbound orm facet
   db.orm.auth;
 });
 
-test('prepare callback receives the namespaced sql surface', () => {
+test('prepare callback receives the flat (unbound-facet) sql surface', () => {
   type PrepareSql = Parameters<Parameters<SqliteClient<Contract>['prepare']>[1]>[0];
-  expectTypeOf<PrepareSql>().toEqualTypeOf<Db<Contract>>();
-  expectTypeOf<PrepareSql['main']['users']>().toEqualTypeOf<TableProxy<Contract, 'users'>>();
   expectTypeOf<PrepareSql['users']>().toEqualTypeOf<TableProxy<Contract, 'users'>>();
 });

@@ -4,7 +4,7 @@ import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expressio
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Db, TableProxyContract } from '../types/db';
 import type { BuilderContext } from './builder-base';
-import { resolveTableForFlatName, resolveTableInNamespace } from './resolve-table';
+import { resolveTableInNamespace } from './resolve-table';
 import { TableProxyImpl } from './table-proxy-impl';
 
 export interface SqlOptions<C extends Contract<SqlStorage> & TableProxyContract> {
@@ -29,27 +29,29 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
   const { storage } = context.contract;
 
   return new Proxy({} as Db<C>, {
-    get(_target, prop: string) {
-      if (Object.hasOwn(storage.namespaces, prop)) {
-        const namespaceId = prop;
-        return new Proxy(
-          {},
-          {
-            get(_facetTarget, tableName: string) {
-              const table = resolveTableInNamespace(storage, namespaceId, tableName);
-              if (table) {
-                return new TableProxyImpl(tableName, table, tableName, ctx, namespaceId);
-              }
+    get(_target, prop: string | symbol) {
+      if (typeof prop !== 'string') {
+        return undefined;
+      }
+      if (!Object.hasOwn(storage.namespaces, prop)) {
+        return undefined;
+      }
+      const namespaceId = prop;
+      return new Proxy(
+        {},
+        {
+          get(_facetTarget, tableName: string | symbol) {
+            if (typeof tableName !== 'string') {
               return undefined;
-            },
+            }
+            const table = resolveTableInNamespace(storage, namespaceId, tableName);
+            if (table) {
+              return new TableProxyImpl(tableName, table, tableName, ctx, namespaceId);
+            }
+            return undefined;
           },
-        );
-      }
-      const resolved = resolveTableForFlatName(storage, prop);
-      if (resolved) {
-        return new TableProxyImpl(prop, resolved.table, prop, ctx, resolved.namespaceId);
-      }
-      return undefined;
+        },
+      );
     },
   });
 }

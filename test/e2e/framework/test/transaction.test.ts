@@ -13,8 +13,8 @@ describe('transaction E2E', { timeout: 30000 }, () => {
   it('commits both writes atomically', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime, client }) => {
       await withTransaction(runtime, async (tx) => {
-        await tx.execute(db.user.insert([{ email: 'tx-user-1@example.com' }]).build());
-        await tx.execute(db.user.insert([{ email: 'tx-user-2@example.com' }]).build());
+        await tx.execute(db.public.user.insert([{ email: 'tx-user-1@example.com' }]).build());
+        await tx.execute(db.public.user.insert([{ email: 'tx-user-2@example.com' }]).build());
       });
 
       const result = await client.query(
@@ -31,7 +31,7 @@ describe('transaction E2E', { timeout: 30000 }, () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime, client }) => {
       await expect(
         withTransaction(runtime, async (tx) => {
-          await tx.execute(db.user.insert([{ email: 'tx-rollback@example.com' }]).build());
+          await tx.execute(db.public.user.insert([{ email: 'tx-rollback@example.com' }]).build());
           throw new Error('deliberate rollback');
         }),
       ).rejects.toThrow('deliberate rollback');
@@ -46,7 +46,7 @@ describe('transaction E2E', { timeout: 30000 }, () => {
   it('forwards the callback return value after commit', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const result = await withTransaction(runtime, async (tx) => {
-        await tx.execute(db.user.insert([{ email: 'tx-return@example.com' }]).build());
+        await tx.execute(db.public.user.insert([{ email: 'tx-return@example.com' }]).build());
         return { inserted: true };
       });
 
@@ -57,9 +57,9 @@ describe('transaction E2E', { timeout: 30000 }, () => {
   it('collects returned stream before commit', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const result = await withTransaction(runtime, async (tx) => {
-        await tx.execute(db.user.insert([{ email: 'tx-user-1@example.com' }]).build());
-        await tx.execute(db.user.insert([{ email: 'tx-user-2@example.com' }]).build());
-        return tx.execute(db.user.select('email').build());
+        await tx.execute(db.public.user.insert([{ email: 'tx-user-1@example.com' }]).build());
+        await tx.execute(db.public.user.insert([{ email: 'tx-user-2@example.com' }]).build());
+        return tx.execute(db.public.user.select('email').build());
       });
 
       expect(result).toEqual([
@@ -72,8 +72,8 @@ describe('transaction E2E', { timeout: 30000 }, () => {
   it('rejects escaped AsyncIterableResult consumed after commit', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const escaped = await withTransaction(runtime, async (tx) => {
-        await tx.execute(db.user.insert([{ email: 'tx-escape@example.com' }]).build());
-        return { rows: tx.execute(db.user.select('email').build()) };
+        await tx.execute(db.public.user.insert([{ email: 'tx-escape@example.com' }]).build());
+        return { rows: tx.execute(db.public.user.select('email').build()) };
       });
 
       await expect(escaped.rows.toArray()).rejects.toThrow(

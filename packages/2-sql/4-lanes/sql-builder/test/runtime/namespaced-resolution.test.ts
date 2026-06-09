@@ -52,8 +52,6 @@ type TableHandle = { buildAst(): TableSource };
 type TwoNamespaceDb = {
   public: { users: TableHandle; sessions: undefined };
   auth: { users: TableHandle; sessions: TableHandle };
-  users: TableHandle;
-  posts: TableHandle;
 };
 
 function db() {
@@ -72,20 +70,9 @@ describe('namespaced table resolution', () => {
     expect(db().auth.users.buildAst().namespaceId).toBe('auth');
   });
 
-  it('scopes table lookup to the named namespace rather than scanning across namespaces', () => {
-    // `sessions` exists only in `auth`; a cross-namespace scan would wrongly
-    // resolve it under `public`.
+  it('scopes table lookup to the named namespace, returning undefined for a foreign table', () => {
+    // `sessions` exists only in `auth`.
     expect(db().public.sessions).toBeUndefined();
     expect(db().auth.sessions.buildAst().namespaceId).toBe('auth');
-  });
-
-  it('keeps the flat surface resolving a unique bare table name', () => {
-    // `posts` is declared only in `public`, so the flat surface resolves it
-    // unambiguously.
-    expect(db().posts.buildAst().namespaceId).toBe('public');
-  });
-
-  it('throws on flat access to a bare table name shared across namespaces', () => {
-    expect(() => db().users).toThrow(/ambiguous/i);
   });
 });

@@ -3,12 +3,6 @@ import type { TableProxy } from './table-proxy';
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
-// The sql-builder DSL is flat by table name across every declared
-// namespace. Two namespaces declaring tables with the same name produce
-// a union at the DSL surface (which collapses to a type error at the
-// first call site); landing the namespace-aware DSL surface (db.<ns>.<table>)
-// is tracked separately. Within scope here: the DSL accepts the
-// namespaced storage shape directly and walks every namespace.
 export type TableProxyContract = {
   readonly storage: {
     readonly namespaces: Readonly<
@@ -49,10 +43,6 @@ export type Namespace<
     string]: TableProxy<C, Name>;
 };
 
-// Additive intersection: the flat by-bare-name surface retained alongside a
-// per-namespace facet keyed by namespace id.
 export type Db<C extends TableProxyContract> = {
-  readonly [Name in TableNamesAcrossNamespaces<C>]: TableProxy<C, Name>;
-} & {
   readonly [Ns in keyof C['storage']['namespaces']]: Namespace<C, Ns>;
 };

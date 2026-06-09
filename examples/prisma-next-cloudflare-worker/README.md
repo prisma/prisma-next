@@ -9,7 +9,7 @@ This example mirrors `examples/prisma-next-demo` (the Node demo), minus pgvector
 - **Module-scope `db`** built once per isolate via `postgresServerless<Contract>({ contractJson, middleware })`.
 - **Per-request `runtime`** via `await using runtime = await db.connect({ url: env.HYPERDRIVE.connectionString })`. The `[Symbol.asyncDispose]` ensures the underlying `pg.Client` is `end()`-ed when the `fetch` handler returns.
 - **All three query surfaces** through `Runtime`:
-  - SQL DSL: `runtime.execute(db.sql.user.select(...).build())`
+  - SQL DSL: `runtime.execute(db.sql.public.user.select(...).build())`
   - ORM client: `createOrmClient(runtime).User.newestFirst().take(10).all()`
   - Transactions: `withTransaction(runtime, async (tx) => …)`
 - **Cursor early-break** over a streamed result set (`for await … break`), exercising the cursor path that `postgresServerless` enables by default.
@@ -19,7 +19,7 @@ Routes implemented in [`src/worker.ts`](src/worker.ts):
 | Route               | Surface           | Notes                                                    |
 | ------------------- | ----------------- | -------------------------------------------------------- |
 | `GET /health`       | —                 | DB-free liveness check                                   |
-| `GET /sql/users`    | SQL DSL           | `db.sql.user.select(...).limit(?)`                       |
+| `GET /sql/users`    | SQL DSL           | `db.sql.public.user.select(...).limit(?)`                       |
 | `GET /orm/users`    | ORM client        | `User.newestFirst().take(?)`                             |
 | `GET /orm/posts`    | ORM client        | `Post.forUser(?).orderBy(...).take(?)`                   |
 | `GET /tx/commit`    | `withTransaction` | INSERT post + UPDATE user atomically                     |

@@ -3,13 +3,13 @@ import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('distinct() on a basic select', () => {
-  const distinctUsers = db.users.select('name', 'email').distinct().build();
+  const distinctUsers = db.public.users.select('name', 'email').distinct().build();
 
   expectTypeOf(distinctUsers).toEqualTypeOf<SqlQueryPlan<{ name: string; email: string }>>();
 });
 
 test('distinctOn with a single column name', () => {
-  const distinctOnName = db.users
+  const distinctOnName = db.public.users
     .select('name', 'email')
     .distinctOn('name')
     .orderBy('name')
@@ -19,7 +19,7 @@ test('distinctOn with a single column name', () => {
 });
 
 test('distinctOn with multiple column names', () => {
-  const distinctOnMulti = db.users
+  const distinctOnMulti = db.public.users
     .select('name', 'email')
     .distinctOn('name', 'email')
     .orderBy('name')
@@ -29,7 +29,7 @@ test('distinctOn with multiple column names', () => {
 });
 
 test('distinctOn with expression callback', () => {
-  const distinctOnExpr = db.users
+  const distinctOnExpr = db.public.users
     .select('name', 'email')
     .distinctOn((f) => f.name)
     .orderBy('name')
@@ -39,8 +39,8 @@ test('distinctOn with expression callback', () => {
 });
 
 test('distinctOn with joined tables — namespace access in expression', () => {
-  const distinctOnJoin = db.users
-    .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  const distinctOnJoin = db.public.users
+    .innerJoin(db.public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name', 'title')
     .distinctOn((f) => f.users.name)
     .orderBy((f) => f.users.name)
@@ -50,7 +50,7 @@ test('distinctOn with joined tables — namespace access in expression', () => {
 });
 
 test('distinct() on a grouped query', () => {
-  const distinctGrouped = db.users
+  const distinctGrouped = db.public.users
     .select('name')
     .select('cnt', (_f, fns) => fns.count())
     .groupBy('name')
@@ -61,8 +61,8 @@ test('distinct() on a grouped query', () => {
 });
 
 test('distinctOn on a grouped query', () => {
-  const distinctOnGrouped = db.users
-    .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  const distinctOnGrouped = db.public.users
+    .innerJoin(db.public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name')
     .select('postCount', (_f, fns) => fns.count())
     .groupBy('name')
@@ -76,7 +76,7 @@ test('distinctOn on a grouped query', () => {
 });
 
 test('distinctOn referencing scope field not in select', () => {
-  const distinctOnScope = db.users.select('name').distinctOn('id').orderBy('id').build();
+  const distinctOnScope = db.public.users.select('name').distinctOn('id').orderBy('id').build();
 
   expectTypeOf(distinctOnScope).toEqualTypeOf<SqlQueryPlan<{ name: string }>>();
 });

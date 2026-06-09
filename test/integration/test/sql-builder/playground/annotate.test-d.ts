@@ -34,7 +34,7 @@ const otelAnnotation = defineAnnotation<{ traceId: string }>()({
 
 describe('SelectQuery.annotate (read-typed)', () => {
   test('accepts a read-only annotation', () => {
-    const plan = db.users
+    const plan = db.public.users
       .select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .build();
@@ -42,7 +42,7 @@ describe('SelectQuery.annotate (read-typed)', () => {
   });
 
   test('accepts a both-kind annotation', () => {
-    const plan = db.users
+    const plan = db.public.users
       .select('id')
       .annotate(otelAnnotation({ traceId: 't' }))
       .build();
@@ -50,7 +50,7 @@ describe('SelectQuery.annotate (read-typed)', () => {
   });
 
   test('accepts multiple compatible annotations in a single call', () => {
-    const plan = db.users
+    const plan = db.public.users
       .select('id')
       .annotate(cacheAnnotation({ ttl: 60 }), otelAnnotation({ traceId: 't' }))
       .build();
@@ -59,23 +59,23 @@ describe('SelectQuery.annotate (read-typed)', () => {
 
   test('rejects a write-only annotation (negative)', () => {
     // @ts-expect-error - audit declares applicableTo: ['write'], not 'read'
-    db.users.select('id').annotate(auditAnnotation({ actor: 'system' }));
+    db.public.users.select('id').annotate(auditAnnotation({ actor: 'system' }));
   });
 
   test('rejects a mix containing a write-only annotation (negative)', () => {
-    db.users
+    db.public.users
       .select('id')
       // @ts-expect-error - audit declares applicableTo: ['write'], not 'read'
       .annotate(cacheAnnotation({ ttl: 60 }), auditAnnotation({ actor: 'system' }));
   });
 
   test('accepts zero annotations (empty variadic)', () => {
-    const plan = db.users.select('id').annotate().build();
+    const plan = db.public.users.select('id').annotate().build();
     expectTypeOf(plan).toEqualTypeOf<SqlQueryPlan<{ id: number }>>();
   });
 
   test('chainable: .annotate() before .where preserves row type', () => {
-    const plan = db.users
+    const plan = db.public.users
       .select('id', 'email')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .where((c, fns) => fns.eq(c.id, 1))
@@ -84,7 +84,7 @@ describe('SelectQuery.annotate (read-typed)', () => {
   });
 
   test('chainable: .annotate() after .where preserves row type', () => {
-    const plan = db.users
+    const plan = db.public.users
       .select('id', 'email')
       .where((c, fns) => fns.eq(c.id, 1))
       .annotate(cacheAnnotation({ ttl: 60 }))
@@ -93,7 +93,7 @@ describe('SelectQuery.annotate (read-typed)', () => {
   });
 
   test('chainable: .annotate() between .select and .limit preserves row type', () => {
-    const plan = db.users
+    const plan = db.public.users
       .select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .limit(10)
@@ -104,7 +104,7 @@ describe('SelectQuery.annotate (read-typed)', () => {
 
 describe('GroupedQuery.annotate (read-typed)', () => {
   test('accepts a read-only annotation', () => {
-    const plan = db.posts
+    const plan = db.public.posts
       .select('user_id')
       .groupBy('user_id')
       .annotate(cacheAnnotation({ ttl: 60 }))
@@ -113,7 +113,7 @@ describe('GroupedQuery.annotate (read-typed)', () => {
   });
 
   test('accepts a both-kind annotation', () => {
-    const plan = db.posts
+    const plan = db.public.posts
       .select('user_id')
       .groupBy('user_id')
       .annotate(otelAnnotation({ traceId: 't' }))
@@ -122,7 +122,7 @@ describe('GroupedQuery.annotate (read-typed)', () => {
   });
 
   test('rejects a write-only annotation (negative)', () => {
-    db.posts
+    db.public.posts
       .select('user_id')
       .groupBy('user_id')
       // @ts-expect-error - audit declares applicableTo: ['write'], not 'read'
@@ -130,7 +130,7 @@ describe('GroupedQuery.annotate (read-typed)', () => {
   });
 
   test('chainable: .annotate() between .groupBy and .orderBy preserves row type', () => {
-    const plan = db.posts
+    const plan = db.public.posts
       .select('user_id')
       .groupBy('user_id')
       .annotate(cacheAnnotation({ ttl: 60 }))
@@ -142,27 +142,27 @@ describe('GroupedQuery.annotate (read-typed)', () => {
 
 describe('InsertQuery.annotate (write-typed)', () => {
   test('accepts a write-only annotation', () => {
-    db.users.insert([{ name: 'Alice' }]).annotate(auditAnnotation({ actor: 'system' }));
+    db.public.users.insert([{ name: 'Alice' }]).annotate(auditAnnotation({ actor: 'system' }));
   });
 
   test('accepts a both-kind annotation', () => {
-    db.users.insert([{ name: 'Alice' }]).annotate(otelAnnotation({ traceId: 't' }));
+    db.public.users.insert([{ name: 'Alice' }]).annotate(otelAnnotation({ traceId: 't' }));
   });
 
   test('rejects a read-only annotation (negative)', () => {
     // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
-    db.users.insert([{ name: 'Alice' }]).annotate(cacheAnnotation({ ttl: 60 }));
+    db.public.users.insert([{ name: 'Alice' }]).annotate(cacheAnnotation({ ttl: 60 }));
   });
 
   test('rejects a mix containing a read-only annotation (negative)', () => {
-    db.users
+    db.public.users
       .insert([{ name: 'Alice' }])
       // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
       .annotate(auditAnnotation({ actor: 'system' }), cacheAnnotation({ ttl: 60 }));
   });
 
   test('chainable: .annotate() before .returning preserves the resulting row type', () => {
-    const plan = db.users
+    const plan = db.public.users
       .insert([{ name: 'Alice' }])
       .annotate(auditAnnotation({ actor: 'system' }))
       .returning('id', 'name')
@@ -173,21 +173,21 @@ describe('InsertQuery.annotate (write-typed)', () => {
 
 describe('UpdateQuery.annotate (write-typed)', () => {
   test('accepts a write-only annotation', () => {
-    db.users
+    db.public.users
       .update({ name: 'Alice' })
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(auditAnnotation({ actor: 'system' }));
   });
 
   test('accepts a both-kind annotation', () => {
-    db.users
+    db.public.users
       .update({ name: 'Alice' })
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(otelAnnotation({ traceId: 't' }));
   });
 
   test('rejects a read-only annotation (negative)', () => {
-    db.users
+    db.public.users
       .update({ name: 'Alice' })
       .where((f, fns) => fns.eq(f.id, 1))
       // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
@@ -195,7 +195,7 @@ describe('UpdateQuery.annotate (write-typed)', () => {
   });
 
   test('chainable: .annotate() before .returning preserves the resulting row type', () => {
-    const plan = db.users
+    const plan = db.public.users
       .update({ name: 'Alice' })
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(auditAnnotation({ actor: 'system' }))
@@ -207,21 +207,21 @@ describe('UpdateQuery.annotate (write-typed)', () => {
 
 describe('DeleteQuery.annotate (write-typed)', () => {
   test('accepts a write-only annotation', () => {
-    db.users
+    db.public.users
       .delete()
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(auditAnnotation({ actor: 'system' }));
   });
 
   test('accepts a both-kind annotation', () => {
-    db.users
+    db.public.users
       .delete()
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(otelAnnotation({ traceId: 't' }));
   });
 
   test('rejects a read-only annotation (negative)', () => {
-    db.users
+    db.public.users
       .delete()
       .where((f, fns) => fns.eq(f.id, 1))
       // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
@@ -229,7 +229,7 @@ describe('DeleteQuery.annotate (write-typed)', () => {
   });
 
   test('chainable: .annotate() before .returning preserves the resulting row type', () => {
-    const plan = db.users
+    const plan = db.public.users
       .delete()
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(auditAnnotation({ actor: 'system' }))

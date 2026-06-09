@@ -4,7 +4,7 @@ import type { Route } from './+types/users';
 
 export async function loader() {
   const db = getDb();
-  const plan = db.sql.user
+  const plan = db.sql.public.user
     .select('id', 'email', 'createdAt')
     .orderBy('createdAt', { direction: 'desc' })
     .limit(20)
@@ -25,7 +25,7 @@ export async function action({ request }: Route.ActionArgs) {
     throw new Response('email required', { status: 400 });
   }
   const db = getDb();
-  const plan = db.sql.user.insert([{ email }]).build();
+  const plan = db.sql.public.user.insert([{ email }]).build();
   await db.runtime().execute(plan);
   return redirect('/');
 }

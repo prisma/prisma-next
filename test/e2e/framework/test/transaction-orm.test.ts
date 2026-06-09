@@ -42,7 +42,7 @@ async function withPostgresClient(
       // own connection) runs before the first transaction.  PGlite only allows
       // one concurrent connection, so verification inside a transaction would
       // deadlock.
-      await db.orm.User.first();
+      await db.orm.public.User.first();
 
       await callback(db);
     } finally {
@@ -55,17 +55,19 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
   it('ORM create with nested relation mutation commits atomically', async () => {
     await withPostgresClient(async (db) => {
       await db.transaction(async (tx) => {
-        await tx.orm.Post.create({
+        await tx.orm.public.Post.create({
           title: 'Atomic Post',
           published: true,
           author: (r) => r.create({ email: v('nested-author@example.com') }),
         });
       });
 
-      const user = await db.orm.User.where({ email: v('nested-author@example.com') }).first();
+      const user = await db.orm.public.User.where({
+        email: v('nested-author@example.com'),
+      }).first();
       expect(user).not.toBeNull();
 
-      const post = await db.orm.Post.where({ title: 'Atomic Post' }).first();
+      const post = await db.orm.public.Post.where({ title: 'Atomic Post' }).first();
       expect(post).not.toBeNull();
       expect(post!.published).toBe(true);
       expect(post!.userId).toBe(user!.id);
@@ -76,7 +78,7 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
     await withPostgresClient(async (db) => {
       await expect(
         db.transaction(async (tx) => {
-          await tx.orm.Post.create({
+          await tx.orm.public.Post.create({
             title: 'Rollback Post',
             published: false,
             author: (r) => r.create({ email: v('rollback-author@example.com') }),
@@ -86,10 +88,12 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
         }),
       ).rejects.toThrow('deliberate rollback');
 
-      const user = await db.orm.User.where({ email: v('rollback-author@example.com') }).first();
+      const user = await db.orm.public.User.where({
+        email: v('rollback-author@example.com'),
+      }).first();
       expect(user).toBeNull();
 
-      const post = await db.orm.Post.where({ title: 'Rollback Post' }).first();
+      const post = await db.orm.public.Post.where({ title: 'Rollback Post' }).first();
       expect(post).toBeNull();
     });
   });
@@ -97,15 +101,15 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
   it('ORM write then read within the same transaction uses the transaction connection', async () => {
     await withPostgresClient(async (db) => {
       await db.transaction(async (tx) => {
-        const created = await tx.orm.User.create({ email: v('tx-ryow@example.com') });
+        const created = await tx.orm.public.User.create({ email: v('tx-ryow@example.com') });
 
-        const found = await tx.orm.User.where({ email: v('tx-ryow@example.com') }).first();
+        const found = await tx.orm.public.User.where({ email: v('tx-ryow@example.com') }).first();
         expect(found).not.toBeNull();
         expect(found!.id).toBe(created.id);
         expect(found!.email).toBe('tx-ryow@example.com');
       });
 
-      const user = await db.orm.User.where({ email: v('tx-ryow@example.com') }).first();
+      const user = await db.orm.public.User.where({ email: v('tx-ryow@example.com') }).first();
       expect(user).not.toBeNull();
     });
   });
@@ -113,25 +117,25 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
   it('multiple ORM operations in a transaction are atomic', async () => {
     await withPostgresClient(async (db) => {
       await db.transaction(async (tx) => {
-        const user = await tx.orm.User.create({ email: v('multi-op@example.com') });
+        const user = await tx.orm.public.User.create({ email: v('multi-op@example.com') });
 
-        await tx.orm.Post.create({
+        await tx.orm.public.Post.create({
           title: 'First Post',
           userId: user.id,
           published: true,
         });
 
-        await tx.orm.Post.create({
+        await tx.orm.public.Post.create({
           title: 'Second Post',
           userId: user.id,
           published: false,
         });
       });
 
-      const user = await db.orm.User.where({ email: v('multi-op@example.com') }).first();
+      const user = await db.orm.public.User.where({ email: v('multi-op@example.com') }).first();
       expect(user).not.toBeNull();
 
-      const posts = await db.orm.Post.where({ userId: user!.id })
+      const posts = await db.orm.public.Post.where({ userId: user!.id })
         .orderBy((p) => p.title.asc())
         .all();
       expect(posts).toHaveLength(2);
@@ -144,9 +148,9 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
     await withPostgresClient(async (db) => {
       await expect(
         db.transaction(async (tx) => {
-          const user = await tx.orm.User.create({ email: v('multi-rollback@example.com') });
+          const user = await tx.orm.public.User.create({ email: v('multi-rollback@example.com') });
 
-          await tx.orm.Post.create({
+          await tx.orm.public.Post.create({
             title: 'Doomed Post',
             userId: user.id,
             published: true,
@@ -156,10 +160,12 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
         }),
       ).rejects.toThrow('rollback everything');
 
-      const user = await db.orm.User.where({ email: v('multi-rollback@example.com') }).first();
+      const user = await db.orm.public.User.where({
+        email: v('multi-rollback@example.com'),
+      }).first();
       expect(user).toBeNull();
 
-      const post = await db.orm.Post.where({ title: 'Doomed Post' }).first();
+      const post = await db.orm.public.Post.where({ title: 'Doomed Post' }).first();
       expect(post).toBeNull();
     });
   });

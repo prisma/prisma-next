@@ -33,10 +33,12 @@ export const context = createExecutionContext({
 export const sql = sqlBuilder<typeof contract>({
   context,
   rawCodecInferer: { inferCodec: () => 'pg/text' },
-});
+}).public;
 
 export function createOrmClient(runtime: Runtime) {
-  return orm({
+  // The no-emit contract types its domain namespaces loosely, so narrow the
+  // `public` facet with a runtime guard rather than a cast.
+  const client = orm({
     runtime,
     context,
     collections: {
@@ -44,4 +46,9 @@ export function createOrmClient(runtime: Runtime) {
       Post: PostCollection,
     },
   });
+  const publicNs = client['public'];
+  if (publicNs === undefined) {
+    throw new Error("ORM client is missing the 'public' namespace");
+  }
+  return publicNs;
 }

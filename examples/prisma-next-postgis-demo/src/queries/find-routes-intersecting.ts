@@ -8,5 +8,5 @@ import { db } from '../prisma/db';
  * SQL: WHERE ST_Intersects(path, $other)
  */
 export function findRoutesIntersecting(other: Geometry) {
-  return db.orm.Route.where((r) => r.path.intersects(other)).all();
+  return db.orm.public.Route.where((r) => r.path.intersects(other)).all();
 }
