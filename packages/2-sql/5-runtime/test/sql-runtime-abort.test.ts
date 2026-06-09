@@ -213,7 +213,7 @@ function projectingExecutionPlan(
   };
 }
 
-describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
+describe('SqlRuntime.execute({ signal }) — abort semantics', () => {
   it('regression — omitting options is bit-for-bit identical to today (no signal supplied)', async () => {
     const { stackInstance, context, driver } = createTestSetup();
     const runtime = createRuntime({

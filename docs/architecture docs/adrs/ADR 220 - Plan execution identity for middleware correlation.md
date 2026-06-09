@@ -102,7 +102,7 @@ const execCtx: RuntimeMiddlewareContext = {
 // ...threaded into runBeforeExecuteChain and runWithMiddleware.
 ```
 
-`SqlRuntimeImpl.executeAgainstQueryable` and `executePreparedAgainstQueryable` already construct a per-execute middleware context (`execMiddlewareCtx`) that spreads the stored runtime-level ctx with `signal` and `scope`. They gain `planExecutionId: crypto.randomUUID()` in the same spread.
+`SqlRuntime.executeAgainstQueryable` and `executePreparedAgainstQueryable` already construct a per-execute middleware context (`execMiddlewareCtx`) that spreads the stored runtime-level ctx with `signal` and `scope`. They gain `planExecutionId: crypto.randomUUID()` in the same spread.
 
 `MongoRuntimeImpl.execute` constructs its own per-execute context with the same shape. The pattern is uniform across runtimes; family-specific detail is that SQL and Mongo override `execute()` and do not delegate to `super`, so the assignment happens at each entry point.
 

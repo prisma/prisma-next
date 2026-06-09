@@ -167,7 +167,7 @@ function isExecutionPlan(plan: SqlExecutionPlan | SqlQueryPlan): plan is SqlExec
 const noopLogSink = (): void => {};
 const noopLog: Log = { info: noopLogSink, warn: noopLogSink, error: noopLogSink };
 
-class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
+export class SqlRuntime<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
   implements Runtime
 {
@@ -865,7 +865,7 @@ export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId 
 ): Runtime {
   const { stackInstance, context, driver, verifyMarker, middleware, mode, log } = options;
 
-  return new SqlRuntimeImpl({
+  return new SqlRuntime({
     context,
     adapter: stackInstance.adapter,
     driver,
