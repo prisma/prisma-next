@@ -74,11 +74,11 @@ Release bump 0.13.0 (#789): version-number changes across all workspace
 `package.json` files and `pnpm-lock.yaml` specifiers. Incidental substrate
 diff — no extension-author action required.
 
-TML-2785 / TML-2786 / TML-2787: the sql-orm-client runtime gained M:N
-support — correlated include reads, EXISTS-through-junction filters, and
-junction-table nested writes (connect / disconnect / create). Internal
-runtime only; no extension API or contract-shape change beyond the
-TML-2784 descriptor above. No extension-author action required.
+TML-2785: the sql-orm-client runtime gained M:N correlated include
+reads — `.include()` of an N:M relation resolves child rows through the
+junction table via a correlated subquery. Internal runtime only; no
+extension API or contract-shape change beyond the TML-2784 descriptor
+above. No extension-author action required.
 -->
 
 # 0.12 → 0.13 — Extension-author upgrade instructions
