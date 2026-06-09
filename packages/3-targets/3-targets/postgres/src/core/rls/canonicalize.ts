@@ -122,7 +122,7 @@ function stripRedundantCastParens(sql: string): string {
       if (s[i] === '(') {
         // Only treat as a grouping paren (not a function-call paren) if the
         // preceding character is not an identifier char.
-        const prevChar = out.length > 0 ? out[out.length - 1] : '';
+        const prevChar = out.length > 0 ? out[out.length - 1]! : '';
         const isPrecedingIdentChar = prevChar !== '' && /[a-z0-9_$"]/i.test(prevChar);
         if (!isPrecedingIdentChar) {
           // Find the matching close paren.
