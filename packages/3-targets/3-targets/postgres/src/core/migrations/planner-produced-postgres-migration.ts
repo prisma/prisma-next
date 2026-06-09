@@ -26,12 +26,10 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
-  MigrationPlanOperation,
   MigrationPlanWithAuthoringSurface,
   OpFactoryCall,
 } from '@prisma-next/framework-components/control';
 import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
-import { blindCast } from '@prisma-next/utils/casts';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import { PostgresMigration } from './postgres-migration';
 import { renderOps } from './render-ops';
@@ -61,15 +59,9 @@ export class TypeScriptRenderablePostgresMigration
 
   override get operations(): readonly (
     | SqlMigrationPlanOperation<PostgresPlanTargetDetails>
-    | Promise<MigrationPlanOperation>
+    | Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>
   )[] {
-    return blindCast<
-      readonly (
-        | SqlMigrationPlanOperation<PostgresPlanTargetDetails>
-        | Promise<MigrationPlanOperation>
-      )[],
-      'SqlMigrationPlanOperation<T> extends MigrationPlanOperation; Promise covariance is safe because ops are consumed via Promise.all'
-    >(renderOps(this.#calls, this.#lowerer));
+    return renderOps(this.#calls, this.#lowerer);
   }
 
   override describe(): MigrationMeta {

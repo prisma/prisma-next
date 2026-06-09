@@ -253,7 +253,7 @@ export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
   readonly destination: SqlMigrationPlanContractInfo;
   readonly operations: readonly (
     | SqlMigrationPlanOperation<TTargetDetails>
-    | Promise<MigrationPlanOperation>
+    | Promise<SqlMigrationPlanOperation<TTargetDetails>>
   )[];
   /**
    * Sorted, deduplicated invariant ids declared by this plan's data-transform
