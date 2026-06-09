@@ -185,9 +185,10 @@ export interface OpFactoryCall {
    * Lower this call to a runtime migration plan operation suitable for
    * execution / inclusion in `ops.json`. Concrete implementations narrow
    * the return type via covariant return (e.g. SQL targets return
-   * `SqlMigrationPlanOperation<TTargetDetails>`).
+   * `SqlMigrationPlanOperation<TTargetDetails>`). May return a Promise when
+   * the lowering requires async codec resolution (e.g. DDL with literal defaults).
    */
-  toOp(): MigrationPlanOperation;
+  toOp(): MigrationPlanOperation | Promise<MigrationPlanOperation>;
 }
 
 // ============================================================================
@@ -223,8 +224,8 @@ export interface MigrationPlan {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
-  /** Ordered list of operations to execute. */
-  readonly operations: readonly MigrationPlanOperation[];
+  /** Ordered list of operations to execute. May contain Promises for ops that require async codec resolution. */
+  readonly operations: readonly (MigrationPlanOperation | Promise<MigrationPlanOperation>)[];
   /**
    * Sorted, deduplicated invariant ids declared by this plan's data-transform
    * ops. Authored migrations carry the canonical value from

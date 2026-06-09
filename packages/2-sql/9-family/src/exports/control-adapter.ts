@@ -1,4 +1,5 @@
 export type {
+  DdlDriverLowerer,
   Lowerer,
   SqlControlAdapter,
   SqlControlAdapterDescriptor,

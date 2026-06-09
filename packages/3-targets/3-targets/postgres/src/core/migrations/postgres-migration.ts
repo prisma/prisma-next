@@ -82,7 +82,7 @@ export abstract class PostgresMigration extends SqlMigration<
     readonly ifNotExists?: boolean;
     readonly columns: readonly DdlColumn[];
     readonly constraints?: readonly DdlTableConstraint[];
-  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
@@ -102,7 +102,7 @@ export abstract class PostgresMigration extends SqlMigration<
   protected createSchema(options: {
     readonly schema: string;
     readonly ifNotExists?: boolean;
-  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }

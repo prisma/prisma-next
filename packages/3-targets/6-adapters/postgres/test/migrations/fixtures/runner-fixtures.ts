@@ -1,7 +1,10 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
-import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
+import sqlFamilyDescriptor, {
+  createMigrationPlan,
+  type SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
 import {
   APP_SPACE_ID,
   createControlStack,
@@ -145,7 +148,7 @@ export const LEDGER_TEST_SPACE_ID = 'ledger-test';
 
 export function createLedgerTestPlan<TDetails extends PostgresPlanTargetDetails>(options: {
   readonly destinationHash: string;
-  readonly operations: ReturnType<typeof createMigrationPlan<TDetails>>['operations'];
+  readonly operations: readonly SqlMigrationPlanOperation<TDetails>[];
   readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
 }) {
   return createMigrationPlan<TDetails>({

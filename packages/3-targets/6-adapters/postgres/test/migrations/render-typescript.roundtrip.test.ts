@@ -32,10 +32,10 @@ import { renderOps } from '@prisma-next/target-postgres/render-ops';
 import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../src/core/adapter';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const execFileAsync = promisify(execFile);
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter();
 const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const targetPostgresRoot = resolve(repoRoot, 'packages/3-targets/3-targets/postgres');
@@ -157,7 +157,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
     const ops = JSON.parse(opsJson);
 
-    const expected = JSON.parse(JSON.stringify(renderOps(calls, testAdapter)));
+    const expected = await Promise.all(renderOps(calls, testAdapter));
     expect(ops).toEqual(expected);
   });
 

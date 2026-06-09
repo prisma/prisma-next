@@ -31,6 +31,9 @@ export abstract class SqlMigration<
    * `MigrationPlan.providedInvariants?` stays optional.
    */
   get providedInvariants(): readonly string[] {
-    return deriveProvidedInvariants(this.operations);
+    const ops = this.operations.filter(
+      (op): op is SqlMigrationPlanOperation<TDetails> => !(op instanceof Promise),
+    );
+    return deriveProvidedInvariants(ops);
   }
 }

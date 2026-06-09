@@ -1,5 +1,8 @@
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import {
+  INIT_ADDITIVE_POLICY,
+  type SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -126,11 +129,14 @@ describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
       // Confirm the plan emits CREATE SCHEMA "auth" before any DDL that
       // targets that schema — closes the FR9 / AC1 gap where the
       // database was missing the schema container at apply time.
-      const operationIds = planResult.plan.operations.map((op) => op.id);
+      const planOps = (await Promise.all(
+        planResult.plan.operations,
+      )) as SqlMigrationPlanOperation<unknown>[];
+      const operationIds = planOps.map((op) => op.id);
       const createSchemaIdx = operationIds.findIndex((id) => id === 'schema.auth');
       expect(createSchemaIdx).toBeGreaterThanOrEqual(0);
 
-      const allSql = planResult.plan.operations
+      const allSql = planOps
         .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
         .map((step) => step.sql);
 
@@ -144,7 +150,7 @@ describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
       expect(fkDdl).toContain('"auth"."user"');
 
       // CREATE SCHEMA must precede every table DDL that targets auth.
-      const sqlByOpIdx = planResult.plan.operations.map((op) => ({
+      const sqlByOpIdx = planOps.map((op) => ({
         id: op.id,
         sql: [...op.precheck, ...op.execute, ...op.postcheck].map((step) => step.sql).join('\n'),
       }));
@@ -155,7 +161,7 @@ describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
       expect(createSchemaIdx).toBeLessThan(createAuthUserIdx);
 
       // Apply all operations
-      for (const op of planResult.plan.operations) {
+      for (const op of planOps) {
         for (const step of [...op.precheck, ...op.execute, ...op.postcheck]) {
           await driver.query(step.sql, step.params ?? []);
         }

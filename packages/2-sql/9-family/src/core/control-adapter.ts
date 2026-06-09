@@ -34,6 +34,19 @@ export interface Lowerer {
 }
 
 /**
+ * Extends {@link Lowerer} with async codec-routed DDL lowering. Control
+ * adapters implement this; the planner's `CreateTableCall.toOp` and
+ * `CreateSchemaCall.toOp` accept it to produce parameterised DDL statements
+ * with literal defaults encoded through their codec.
+ */
+export interface DdlDriverLowerer extends Lowerer {
+  lowerToDriverStatement(
+    ast: AnyQueryAst | DdlNode,
+    context: LowererContext<unknown>,
+  ): Promise<DriverStatement>;
+}
+
+/**
  * SQL control adapter interface for control-plane operations.
  * Implemented by target-specific adapters (e.g., Postgres, MySQL).
  *

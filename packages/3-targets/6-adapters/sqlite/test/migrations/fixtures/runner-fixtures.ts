@@ -5,7 +5,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
-import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
+import sqlFamilyDescriptor, {
+  createMigrationPlan,
+  type SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
 import {
   APP_SPACE_ID,
   createControlStack,
@@ -174,9 +177,7 @@ export const LEDGER_TEST_SPACE_ID = 'ledger-test';
 
 export function createLedgerTestPlan(options: {
   readonly destinationHash: string;
-  readonly operations: ReturnType<
-    typeof createMigrationPlan<SqlitePlanTargetDetails>
-  >['operations'];
+  readonly operations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[];
   readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
 }) {
   return createMigrationPlan<SqlitePlanTargetDetails>({

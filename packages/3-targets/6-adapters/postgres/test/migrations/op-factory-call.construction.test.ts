@@ -13,12 +13,12 @@ import {
   DataTransformCall,
 } from '@prisma-next/target-postgres/op-factory-call';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../../src/core/adapter';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter();
 
 describe('Postgres call classes - construction + toOp parity', () => {
-  it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', () => {
+  it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', async () => {
     const call = new CreateTableCall('public', 'user', [col('id', 'text', { notNull: true })]);
 
     expect(Object.isFrozen(call)).toBe(true);
@@ -26,7 +26,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     expect(call.operationClass).toBe('additive');
     expect(call.label).toBe('Create table "user"');
 
-    expect(call.toOp(testAdapter)).toMatchObject({
+    expect(await call.toOp(testAdapter)).toMatchObject({
       id: 'table.user',
       operationClass: 'additive',
       target: {
@@ -46,7 +46,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     expect(() => call.toOp()).toThrow(/Unfilled migration placeholder/);
   });
 
-  it('CreateTableCall.toOp produces byte-identical SQL for a composite-PK table', () => {
+  it('CreateTableCall.toOp produces byte-identical SQL for a composite-PK table', async () => {
     const call = new CreateTableCall(
       'public',
       'item',
@@ -58,7 +58,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
       [primaryKey(['tenant_id', 'id'])],
     );
 
-    const op = call.toOp(testAdapter);
+    const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "public"."item" (\n' +
         '  "tenant_id" uuid NOT NULL,\n' +
@@ -69,19 +69,19 @@ describe('Postgres call classes - construction + toOp parity', () => {
     );
   });
 
-  it('CreateSchemaCall.toOp produces byte-identical SQL', () => {
+  it('CreateSchemaCall.toOp produces byte-identical SQL', async () => {
     const call = new CreateSchemaCall('app');
 
-    const op = call.toOp(testAdapter);
+    const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe('CREATE SCHEMA IF NOT EXISTS "app"');
   });
 
-  it('CreateTableCall.toOp with a sequence default produces nextval SQL (byte-parity)', () => {
+  it('CreateTableCall.toOp with a sequence default produces nextval SQL (byte-parity)', async () => {
     const call = new CreateTableCall('public', 'user', [
       col('id', 'bigint', { notNull: true, default: fn(`nextval('"user_id_seq"'::regclass)`) }),
     ]);
 
-    const op = call.toOp(testAdapter);
+    const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "public"."user" (\n' +
         `  "id" bigint NOT NULL DEFAULT (nextval('"user_id_seq"'::regclass))\n` +
@@ -89,7 +89,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     );
   });
 
-  it('CreateTableCall.toOp with __unbound__ schema produces an unqualified table name', () => {
+  it('CreateTableCall.toOp with __unbound__ schema produces an unqualified table name', async () => {
     const call = new CreateTableCall(
       '__unbound__',
       'item',
@@ -97,7 +97,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
       [primaryKey(['id'])],
     );
 
-    const op = call.toOp(testAdapter);
+    const op = await call.toOp(testAdapter);
     expect(op.execute[0]?.sql).toBe(
       'CREATE TABLE "item" (\n' + '  "id" text NOT NULL,\n' + '  PRIMARY KEY ("id")\n' + ')',
     );

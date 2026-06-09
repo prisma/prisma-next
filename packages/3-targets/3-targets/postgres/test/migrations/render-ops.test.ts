@@ -22,8 +22,8 @@ function makeCall(targetId: string, opId: string, factoryName = 'noop'): OpFacto
 }
 
 describe('renderOps', () => {
-  it('passes through ops whose target.id is "postgres"', () => {
-    const result = renderOps([makeCall('postgres', 'table.users.create')]);
+  it('passes through ops whose target.id is "postgres"', async () => {
+    const result = await Promise.all(renderOps([makeCall('postgres', 'table.users.create')]));
     expect(result).toHaveLength(1);
     expect(result[0]?.target.id).toBe('postgres');
     expect(result[0]?.id).toBe('table.users.create');

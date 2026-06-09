@@ -17,6 +17,7 @@ import type { MigrationRunnerResult } from '@prisma-next/framework-components/co
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
@@ -51,13 +52,19 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     }
     const space = options.plan.spaceId;
 
+    // Materialize any async ops before running checks or executing.
+    const planOps = blindCast<
+      readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[],
+      'ops were produced by the SQLite planner and are SqlMigrationPlanOperation<SqlitePlanTargetDetails>; MigrationPlan.operations uses the wider framework type to accommodate Promise covariance'
+    >(await Promise.all(options.plan.operations));
+
     const destinationCheck = this.ensurePlanMatchesDestinationContract(
       options.plan.destination,
       options.destinationContract,
     );
     if (!destinationCheck.ok) return destinationCheck;
 
-    const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
+    const policyCheck = this.enforcePolicyCompatibility(options.policy, planOps);
     if (!policyCheck.ok) return policyCheck;
 
     const ensureResult = await this.ensureControlTables(driver, options.destinationContract);
@@ -78,7 +85,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       operationsExecuted = 0;
       executedOperations = [];
     } else {
-      const applyResult = await this.applyPlan(driver, options);
+      const applyResult = await this.applyPlan(driver, options, planOps);
       if (!applyResult.ok) return applyResult;
       operationsExecuted = applyResult.value.operationsExecuted;
       executedOperations = applyResult.value.executedOperations;
@@ -122,7 +129,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     }
 
     return runnerSuccess({
-      operationsPlanned: options.plan.operations.length,
+      operationsPlanned: planOps.length,
       operationsExecuted,
     });
   }
@@ -226,6 +233,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
   private async applyPlan(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
+    ops: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[],
   ): Promise<
     Result<
       {
@@ -243,7 +251,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     let operationsExecuted = 0;
     const executedOperations: Array<SqlMigrationPlanOperation<SqlitePlanTargetDetails>> = [];
 
-    for (const operation of options.plan.operations) {
+    for (const operation of ops) {
       options.callbacks?.onOperationStart?.(operation);
       try {
         if (runPostchecks && runIdempotency) {

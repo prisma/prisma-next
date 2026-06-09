@@ -27,6 +27,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { MongoMigrationPlanner } from '../src/core/mongo-planner';
 import { CollModCall, CreateIndexCall } from '../src/core/op-factory-call';
+import type { PlannerProducedMongoMigration } from '../src/exports/control';
 
 const ALL_CLASSES_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
@@ -100,7 +101,7 @@ function planSuccess(
   contract: MongoContract,
   schema: MongoSchemaIR,
   policy = ALL_CLASSES_POLICY,
-) {
+): PlannerProducedMongoMigration {
   const result = planner.plan({
     contract,
     schema,
@@ -110,7 +111,7 @@ function planSuccess(
   });
   expect(result.kind).toBe('success');
   if (result.kind !== 'success') throw new Error('Expected success');
-  return result.plan;
+  return result.plan as PlannerProducedMongoMigration;
 }
 
 describe('MongoMigrationPlanner', () => {

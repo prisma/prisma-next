@@ -222,7 +222,10 @@ export function toColumnSpec(
 ): SqliteColumnSpec {
   const typeSql = buildColumnTypeSql(
     column,
-    storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+    blindCast<
+      Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+      'buildColumnTypeSql declares its storageTypes parameter as mutable Record while the planner stores it readonly; the helper does not mutate, so the readonly→mutable narrowing is sound'
+    >(storageTypes),
   );
   const defaultSql = buildColumnDefaultSql(column.default);
   return {
@@ -305,7 +308,14 @@ export function tableToDdlParts(
 ): { columns: DdlColumn[]; constraints: DdlTableConstraint[] } {
   const columns: DdlColumn[] = Object.entries(table.columns).map(([name, column]) => {
     const inlineAutoincrement = isInlineAutoincrementPrimaryKey(table, name);
-    const typeSql = buildColumnTypeSql(column, storageTypes);
+    const typeSql = buildColumnTypeSql(
+      column,
+      blindCast<
+        Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+        'buildColumnTypeSql declares its storageTypes parameter as mutable Record while the planner stores it readonly; the helper does not mutate, so the readonly→mutable narrowing is sound'
+      >(storageTypes),
+    );
+
     if (inlineAutoincrement) {
       // `DdlColumn` has no SQLite-specific autoincrement flag, so the full
       // `PRIMARY KEY AUTOINCREMENT` clause is embedded in the `type` string.

@@ -222,7 +222,7 @@ export async function applyMigration(
       driver,
       schema: { ...freshSchema, tables: userTables },
       operationsExecuted: runResult.value.perSpaceResults[0]?.value.operationsExecuted ?? 0,
-      plannedOperationIds: planResult.plan.operations.map((op) => op.id),
+      plannedOperationIds: (await Promise.all(planResult.plan.operations)).map((op) => op.id),
     });
   } finally {
     testDb.cleanup();

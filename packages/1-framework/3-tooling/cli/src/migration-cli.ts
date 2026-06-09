@@ -505,15 +505,15 @@ function readExistingMetadata(metadataPath: string): Partial<MigrationMetadata> 
  * legitimate site for combining config loading, stack assembly, and
  * filesystem persistence.
  */
-function serializeMigrationToDisk(
+async function serializeMigrationToDisk(
   instance: Migration,
   migrationDir: string,
   dryRun: boolean,
   stdout: MigrationCliWritable,
-): void {
+): Promise<void> {
   const metadataPath = join(migrationDir, 'migration.json');
   const existing = readExistingMetadata(metadataPath);
-  const { opsJson, metadataJson } = buildMigrationArtifacts(instance, existing);
+  const { opsJson, metadataJson } = await buildMigrationArtifacts(instance, existing);
 
   if (dryRun) {
     stdout.write(`--- migration.json ---\n${metadataJson}\n`);
@@ -572,6 +572,6 @@ async function runMigration(
   const stack = createControlStack(config);
   const instance = new MigrationClass(stack);
 
-  serializeMigrationToDisk(instance, migrationDir, parsed.dryRun, ctx.stdout);
+  await serializeMigrationToDisk(instance, migrationDir, parsed.dryRun, ctx.stdout);
   void ctx.stderr;
 }

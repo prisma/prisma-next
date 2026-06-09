@@ -616,7 +616,11 @@ describe('referential actions integration', () => {
           expect(planResult.kind).toBe('success');
           if (planResult.kind !== 'success') throw new Error('Expected planning success');
 
-          const fkOps = planResult.plan.operations.filter((op) => op.id.startsWith('foreignKey.'));
+          const planOps = (await Promise.all(planResult.plan.operations)) as ReadonlyArray<{
+            readonly id: string;
+            readonly execute: ReadonlyArray<{ readonly sql: string }>;
+          }>;
+          const fkOps = planOps.filter((op) => op.id.startsWith('foreignKey.'));
           expect(fkOps.length).toBeGreaterThan(0);
 
           const fkSql = fkOps.flatMap((op) => op.execute.map((step) => step.sql)).join('\n');

@@ -1,4 +1,4 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -41,7 +41,7 @@ const RECONCILIATION_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
 };
 
-const testAdapter = createPostgresAdapter();
+const testAdapter = new PostgresControlAdapter();
 const planner = createPostgresMigrationPlanner(testAdapter);
 
 const emptySchema: SqlSchemaIR = { tables: {} };
@@ -63,7 +63,7 @@ function liveSchemaWithUsers(
   };
 }
 
-function planAgainst(contract: Contract<SqlStorage>, schema: SqlSchemaIR) {
+async function planAgainst(contract: Contract<SqlStorage>, schema: SqlSchemaIR) {
   const result = planner.plan({
     contract,
     schema,
@@ -74,7 +74,8 @@ function planAgainst(contract: Contract<SqlStorage>, schema: SqlSchemaIR) {
   });
   expect(result.kind).toBe('success');
   if (result.kind !== 'success') throw new Error('expected planner success');
-  return { operations: result.plan.operations, warnings: result.warnings };
+  const operations = await Promise.all(result.plan.operations);
+  return { operations, warnings: result.warnings };
 }
 
 // Exercises the input-side partition that gates the planner: the live
@@ -83,8 +84,8 @@ function planAgainst(contract: Contract<SqlStorage>, schema: SqlSchemaIR) {
 // `observed`, and non-creation issues for `tolerated` subjects, never enter
 // `planIssues`. The tests pin "this subject's diff never ran" by asserting
 // zero operations and the corresponding suppressed-subject warning.
-describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
-  describe('managed', () => {
+describe('PostgresMigrationPlanner.plan control-policy partitioning', async () => {
+  describe('managed', async () => {
     const contract = makeContract({
       users: {
         columns: { id: baseColumn, email: baseColumn },
@@ -95,13 +96,13 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
       },
     });
 
-    it('emits createTable when the live schema is empty', () => {
-      const { operations } = planAgainst(contract, emptySchema);
+    it('emits createTable when the live schema is empty', async () => {
+      const { operations } = await planAgainst(contract, emptySchema);
       expect(operations.some((o) => o.id.startsWith('table.users'))).toBe(true);
     });
   });
 
-  describe('tolerated', () => {
+  describe('tolerated', async () => {
     function toleratedContract(extraColumns: Record<string, typeof baseColumn> = {}) {
       return makeContract({
         users: {
@@ -115,18 +116,18 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
       });
     }
 
-    it('emits createTable for an entirely-absent tolerated table', () => {
-      const { operations } = planAgainst(toleratedContract(), emptySchema);
+    it('emits createTable for an entirely-absent tolerated table', async () => {
+      const { operations } = await planAgainst(toleratedContract(), emptySchema);
       expect(operations.some((o) => o.id.startsWith('table.users'))).toBe(true);
     });
 
-    it('skips diffing an existing tolerated table — no DDL even when contract adds a column', () => {
+    it('skips diffing an existing tolerated table — no DDL even when contract adds a column', async () => {
       // Live DB has `users(id)`; contract adds nullable `email`. Under
       // tolerated semantics, the missing-column issue is suppressed at the
       // input partition.
       const contract = toleratedContract({ email: nullableColumn });
       const live = liveSchemaWithUsers({ id: { name: 'id', nativeType: 'text', nullable: false } });
-      const result = planAgainst(contract, live);
+      const result = await planAgainst(contract, live);
       expect(result.operations).toHaveLength(0);
       expect(result.warnings ?? []).toEqual(
         expect.arrayContaining([
@@ -140,16 +141,16 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
       );
     });
 
-    it('emits createTable for a tolerated table whose live shape is absent (diff engine is short-circuited)', () => {
+    it('emits createTable for a tolerated table whose live shape is absent (diff engine is short-circuited)', async () => {
       // The diff engine never sees an existing tolerated table — it only
       // ever sees the create path. This pins the create-if-absent semantic.
       const contract = toleratedContract({ email: nullableColumn });
-      const { operations } = planAgainst(contract, emptySchema);
+      const { operations } = await planAgainst(contract, emptySchema);
       expect(operations.some((o) => o.id.startsWith('table.users'))).toBe(true);
     });
   });
 
-  describe('external', () => {
+  describe('external', async () => {
     const contract = makeContract({
       users: {
         control: 'external',
@@ -160,8 +161,8 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
       },
     });
 
-    it('emits zero DDL and one suppressed-subject warning, regardless of live state', () => {
-      const result = planAgainst(contract, emptySchema);
+    it('emits zero DDL and one suppressed-subject warning, regardless of live state', async () => {
+      const result = await planAgainst(contract, emptySchema);
       expect(result.operations).toHaveLength(0);
       expect(result.warnings ?? []).toEqual(
         expect.arrayContaining([
@@ -176,7 +177,7 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
     });
   });
 
-  describe('observed', () => {
+  describe('observed', async () => {
     const contract = makeContract({
       users: {
         control: 'observed',
@@ -187,8 +188,8 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
       },
     });
 
-    it('emits zero DDL and one suppressed-subject warning', () => {
-      const result = planAgainst(contract, emptySchema);
+    it('emits zero DDL and one suppressed-subject warning', async () => {
+      const result = await planAgainst(contract, emptySchema);
       expect(result.operations).toHaveLength(0);
       expect(result.warnings ?? []).toEqual(
         expect.arrayContaining([
@@ -203,8 +204,8 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
     });
   });
 
-  describe('external defaultControlPolicy floor', () => {
-    it('suppresses managed-override object DDL (the floor wins) and emits the floor warning', () => {
+  describe('external defaultControlPolicy floor', async () => {
+    it('suppresses managed-override object DDL (the floor wins) and emits the floor warning', async () => {
       const contract = makeContract(
         {
           users: {
@@ -217,7 +218,7 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
         },
         'external',
       );
-      const result = planAgainst(contract, emptySchema);
+      const result = await planAgainst(contract, emptySchema);
       expect(result.operations).toHaveLength(0);
       expect(result.warnings ?? []).toEqual(
         expect.arrayContaining([
@@ -238,7 +239,7 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', () => {
 // `tolerated` table that already exists in the database may grow new objects
 // but never be modified in place. The same diff under `managed` emits the
 // add-column.
-describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', () => {
+describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', async () => {
   const liveSchemaWithUsersIdOnly: SqlSchemaIR = liveSchemaWithUsers({
     id: { name: 'id', nativeType: 'text', nullable: false },
   });
@@ -267,12 +268,12 @@ describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', () => 
     return result.plan;
   }
 
-  it('suppresses a tolerated table add-column', () => {
+  it('suppresses a tolerated table add-column', async () => {
     const plan = planAddColumn('tolerated');
     expect(plan.operations).toHaveLength(0);
   });
 
-  it('emits the add-column when the same table is managed', () => {
+  it('emits the add-column when the same table is managed', async () => {
     const plan = planAddColumn('managed');
     expect(plan.operations).toEqual(
       expect.arrayContaining([
