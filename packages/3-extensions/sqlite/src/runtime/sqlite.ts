@@ -39,18 +39,11 @@ import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 export type SqliteTargetId = 'sqlite';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
-// SQLite is a single-namespace target: the facade aliases `db.sql` / `db.orm`
-// to the unbound-namespace facet of the (namespaced-only) builder outputs, so
-// flat `db.sql.users` / `db.orm.User` work without a builder-level fallback.
 type UnboundSqlFacet<TContract extends Contract<SqlStorage>> =
   Db<TContract>[typeof UNBOUND_NAMESPACE_ID];
 type UnboundOrmFacet<TContract extends Contract<SqlStorage>> =
   OrmClient<TContract>[typeof UNBOUND_NAMESPACE_ID];
 
-// Aliases a namespaced-only builder output to its unbound-namespace facet.
-// Indexing a generic builder value widens the namespace key to `string`, so
-// bridge to the literal-keyed facet type with a single narrowed cast — the
-// unbound namespace always exists on a sqlite contract.
 function unboundFacet<TFacet>(builderOutput: {
   readonly [UNBOUND_NAMESPACE_ID]?: unknown;
 }): TFacet {

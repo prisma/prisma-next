@@ -30,18 +30,14 @@ export const context = createExecutionContext({
   stack,
 });
 
-// Always-qualified builder: alias to the `public` namespace facet (single-
-// namespace postgres) so tables/models are reached flat as `sql.<table>` /
-// `orm.<Model>`.
 export const sql = sqlBuilder<typeof contract>({
   context,
   rawCodecInferer: { inferCodec: () => 'pg/text' },
 }).public;
 
 export function createOrmClient(runtime: Runtime) {
-  // The ORM surface is always qualified; reach the `public` namespace facet
-  // (single-namespace postgres). The no-emit contract types its domain
-  // namespaces loosely, so narrow the facet with a guard rather than a cast.
+  // The no-emit contract types its domain namespaces loosely, so narrow the
+  // `public` facet with a runtime guard rather than a cast.
   const client = orm({
     runtime,
     context,

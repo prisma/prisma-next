@@ -66,9 +66,6 @@ type NamespacedClientMap<
   [Ns in keyof TContract['domain']['namespaces']]: OrmNamespace<TContract, Collections, Ns>;
 };
 
-// Per-namespace facets keyed by domain namespace id. Namespace selection is
-// mandatory — there is no flat by-bare-name accessor at the builder layer;
-// flat ergonomics are recovered at the facade by aliasing to a namespace facet.
 type OrmClient<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,

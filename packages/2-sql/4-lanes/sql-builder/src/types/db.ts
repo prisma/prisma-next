@@ -3,9 +3,6 @@ import type { TableProxy } from './table-proxy';
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
-// The sql-builder DSL is always qualified: tables are reached through their
-// namespace facet (`db.<ns>.<table>`), keyed by the contract's storage
-// namespace ids. The DSL accepts the namespaced storage shape directly.
 export type TableProxyContract = {
   readonly storage: {
     readonly namespaces: Readonly<
@@ -46,9 +43,6 @@ export type Namespace<
     string]: TableProxy<C, Name>;
 };
 
-// Per-namespace facets keyed by namespace id. Namespace selection is
-// mandatory — there is no flat by-bare-name accessor at the builder layer;
-// flat ergonomics are recovered at the facade by aliasing to a namespace facet.
 export type Db<C extends TableProxyContract> = {
   readonly [Ns in keyof C['storage']['namespaces']]: Namespace<C, Ns>;
 };
