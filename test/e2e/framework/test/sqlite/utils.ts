@@ -7,7 +7,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -21,25 +20,11 @@ import {
   type Runtime,
 } from '@prisma-next/sql-runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
-import { blindCast } from '@prisma-next/utils/casts';
-
-// SQLite is single-namespace: alias the builder/orm surfaces to the unbound
-// namespace facet (the sole shape) so tables/models are reached flat. Indexing
-// a generic builder value widens the namespace key to `string`, so bridge to
-// the literal-keyed facet type with one narrowed cast (the unbound namespace
-// always exists on a sqlite contract).
-function unboundFacet<TFacet>(builderOutput: {
-  readonly [UNBOUND_NAMESPACE_ID]?: unknown;
-}): TFacet {
-  return blindCast<TFacet, 'the unbound-namespace facet always exists on a sqlite builder output'>(
-    builderOutput[UNBOUND_NAMESPACE_ID],
-  );
-}
 
 export interface SqliteTestContext<TContract extends Contract<SqlStorage>> {
-  readonly db: Db<TContract>[typeof UNBOUND_NAMESPACE_ID];
+  readonly db: Db<TContract>;
   readonly runtime: Runtime;
-  readonly ormClient: ReturnType<typeof orm<TContract>>[typeof UNBOUND_NAMESPACE_ID];
+  readonly ormClient: ReturnType<typeof orm<TContract>>;
   readonly rawDb: DatabaseSync;
 }
 
@@ -63,23 +48,18 @@ export async function withSqliteTestRuntime<TContract extends Contract<SqlStorag
     const { runtime, context, rawCodecInferer } = await createSqliteRuntime(contract, dbPath);
 
     try {
-      const db: Db<TContract>[typeof UNBOUND_NAMESPACE_ID] = unboundFacet(
-        sqlBuilder<TContract>({ context, rawCodecInferer }),
-      );
-      const ormClient: ReturnType<typeof orm<TContract>>[typeof UNBOUND_NAMESPACE_ID] =
-        unboundFacet(
-          orm({
-            context,
-            runtime: {
-              execute(plan) {
-                return runtime.execute(plan);
-              },
-              connection() {
-                return runtime.connection();
-              },
-            },
-          }),
-        );
+      const db = sqlBuilder<TContract>({ context, rawCodecInferer });
+      const ormClient = orm({
+        context,
+        runtime: {
+          execute(plan) {
+            return runtime.execute(plan);
+          },
+          connection() {
+            return runtime.connection();
+          },
+        },
+      });
 
       await callback({ db, runtime, ormClient, rawDb });
     } finally {

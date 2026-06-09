@@ -218,13 +218,8 @@ export interface TestRuntimeContext<TContract extends Contract<SqlStorage>> {
   readonly context: ReturnType<typeof createTestContext>;
   /** The test runtime for executing queries */
   readonly runtime: Awaited<ReturnType<typeof createTestRuntimeFromClient>>;
-  /**
-   * The sql-builder proxy for building and executing queries. The builder
-   * surface is always qualified; this aliases to the `public` namespace facet
-   * (these e2e contracts are single-namespace postgres) so tables are reached
-   * flat as `db.<table>`.
-   */
-  readonly db: Db<TContract>['public'];
+  /** The sql-builder proxy for building and executing queries */
+  readonly db: Db<TContract>;
   /** The raw pg client for direct SQL queries */
   readonly client: Client;
   /** The DDL SQL generated for the contract */
@@ -244,7 +239,7 @@ export interface TestRuntimeContext<TContract extends Contract<SqlStorage>> {
  * ```typescript
  * it('runs a query', async () => {
  *   await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
- *     const plan = db.user.select('id').build();
+ *     const plan = db.public.user.select('id').build();
  *     const rows = await executePlanAndCollect(runtime, plan);
  *     expect(rows.length).toBeGreaterThan(0);
  *   });
@@ -280,7 +275,7 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
           const db = sqlBuilder<TContract>({
             context,
             rawCodecInferer: { inferCodec: () => 'pg/text' },
-          })['public']!;
+          });
           await callback({ contract, context, runtime, db, client, sql });
         } finally {
           await runtime.close();

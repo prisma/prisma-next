@@ -12,10 +12,10 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
   it('inserts, updates, and deletes a user', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
       // Insert
-      await runtime.execute(db.user.insert([{ email: 'e2e@example.com' }]).build());
+      await runtime.execute(db.public.user.insert([{ email: 'e2e@example.com' }]).build());
 
       const insertedRows = await runtime.execute(
-        db.user
+        db.public.user
           .select('id', 'email', 'created_at', 'update_at')
           .where((f, fns) => fns.eq(f.email, 'e2e@example.com'))
           .limit(1)
@@ -34,14 +34,14 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
 
       // Update
       await runtime.execute(
-        db.user
+        db.public.user
           .update({ email: 'updated-e2e@example.com' })
           .where((f, fns) => fns.eq(f.id, userId))
           .build(),
       );
 
       const updatedRows = await runtime.execute(
-        db.user
+        db.public.user
           .select('id', 'email')
           .where((f, fns) => fns.eq(f.id, userId))
           .limit(1)
@@ -56,7 +56,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
 
       // Delete
       await runtime.execute(
-        db.user
+        db.public.user
           .delete()
           .where((f, fns) => fns.eq(f.id, userId))
           .build(),
@@ -74,10 +74,10 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
 
   it('auto-generates a valid UUIDv7 id on insert', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
-      await runtime.execute(db.event.insert([{ name: 'uuidv7-test-event' }]).build());
+      await runtime.execute(db.public.event.insert([{ name: 'uuidv7-test-event' }]).build());
 
       const rows = await runtime.execute(
-        db.event
+        db.public.event
           .select('id', 'name', 'created_at', 'scheduled_at')
           .where((f, fns) => fns.eq(f.name, 'uuidv7-test-event'))
           .limit(1)
@@ -98,10 +98,12 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const overrideId = '019470ab-9a66-7000-8000-000000000001';
 
-      await runtime.execute(db.event.insert([{ id: overrideId, name: 'override-event' }]).build());
+      await runtime.execute(
+        db.public.event.insert([{ id: overrideId, name: 'override-event' }]).build(),
+      );
 
       const rows = await runtime.execute(
-        db.event
+        db.public.event
           .select('id', 'name')
           .where((f, fns) => fns.eq(f.id, overrideId))
           .limit(1)
@@ -119,10 +121,10 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   it('updates and deletes by UUIDv7 id', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
       // Insert (auto-generated id)
-      await runtime.execute(db.event.insert([{ name: 'to-be-updated' }]).build());
+      await runtime.execute(db.public.event.insert([{ name: 'to-be-updated' }]).build());
 
       const insertedRows = await runtime.execute(
-        db.event
+        db.public.event
           .select('id', 'name')
           .where((f, fns) => fns.eq(f.name, 'to-be-updated'))
           .limit(1)
@@ -135,14 +137,14 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
 
       // Update
       await runtime.execute(
-        db.event
+        db.public.event
           .update({ name: 'updated-event' })
           .where((f, fns) => fns.eq(f.id, eventId))
           .build(),
       );
 
       const updatedRows = await runtime.execute(
-        db.event
+        db.public.event
           .select('id', 'name')
           .where((f, fns) => fns.eq(f.id, eventId))
           .limit(1)
@@ -157,7 +159,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
 
       // Delete
       await runtime.execute(
-        db.event
+        db.public.event
           .delete()
           .where((f, fns) => fns.eq(f.id, eventId))
           .build(),
@@ -171,10 +173,10 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
 
   it('applies literal defaults for every supported type', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
-      await runtime.execute(db.literal_defaults.insert([{}]).build());
+      await runtime.execute(db.public.literal_defaults.insert([{}]).build());
 
       const rows = await runtime.execute(
-        db.literal_defaults
+        db.public.literal_defaults
           .select('id', 'label', 'score', 'rating', 'active', 'big_count', 'metadata', 'tags')
           .limit(1)
           .build(),
@@ -206,10 +208,12 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         verified: true,
       } as const;
 
-      await runtime.execute(db.user.insert([{ email: 'json@example.com', profile }]).build());
+      await runtime.execute(
+        db.public.user.insert([{ email: 'json@example.com', profile }]).build(),
+      );
 
       const userRows = await runtime.execute(
-        db.user
+        db.public.user
           .select('id', 'profile')
           .where((f, fns) => fns.eq(f.email, 'json@example.com'))
           .limit(1)
@@ -220,7 +224,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
       expect(userRow).toMatchObject({ profile });
 
       await runtime.execute(
-        db.post
+        db.public.post
           .insert([
             {
               userId: userRow!.id,
@@ -233,7 +237,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
       );
 
       const postRows = await runtime.execute(
-        db.post
+        db.public.post
           .select('id', 'meta')
           .where((f, fns) => fns.eq(f.title, 'Typed JSON post'))
           .limit(1)

@@ -26,7 +26,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 interface Harness {
-  readonly db: Db<Contract>[typeof UNBOUND_NAMESPACE_ID];
+  readonly db: Db<Contract>;
   readonly runtime: Runtime;
   readonly cleanup: () => Promise<void>;
 }
@@ -69,11 +69,10 @@ async function buildHarness(log: Log): Promise<Harness> {
   await driver.connect({ kind: 'path', path: dbPath });
 
   const runtime = createRuntime({ stackInstance, context, driver, log });
-  // sqlite is single-namespace: alias to the unbound facet so tables are flat.
-  const db: Db<Contract>[typeof UNBOUND_NAMESPACE_ID] = sqlBuilder<Contract>({
+  const db = sqlBuilder<Contract>({
     context,
     rawCodecInferer: stack.adapter.rawCodecInferer,
-  })[UNBOUND_NAMESPACE_ID];
+  });
 
   return {
     db,
@@ -111,7 +110,9 @@ describe('sqlite runtime verify-marker: missing marker table', {
 
     harness = await buildHarness(log);
 
-    const rows = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+    const rows = await harness.runtime
+      .execute(harness.db[UNBOUND_NAMESPACE_ID].users.select('id').build())
+      .toArray();
 
     expect(rows.map((r) => r.id)).toEqual([1]);
     expect(log.warn).toHaveBeenCalledOnce();

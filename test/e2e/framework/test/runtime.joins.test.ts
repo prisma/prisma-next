@@ -25,8 +25,8 @@ describe('end-to-end JOIN queries', () => {
         );
 
         const rows = await runtime.execute(
-          db.user
-            .innerJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
+          db.public.user
+            .innerJoin(db.public.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .select((f) => ({
               userId: f.user.id,
               email: f.user.email,
@@ -64,8 +64,8 @@ describe('end-to-end JOIN queries', () => {
         ]);
 
         const rows = await runtime.execute(
-          db.user
-            .outerLeftJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
+          db.public.user
+            .outerLeftJoin(db.public.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .select((f) => ({
               userId: f.user.id,
               email: f.user.email,
@@ -113,8 +113,8 @@ describe('end-to-end JOIN queries', () => {
         );
 
         const rows = await runtime.execute(
-          db.user
-            .outerRightJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
+          db.public.user
+            .outerRightJoin(db.public.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .select((f) => ({
               userId: f.user.id,
               email: f.user.email,
@@ -158,8 +158,8 @@ describe('end-to-end JOIN queries', () => {
         );
 
         const rows = await runtime.execute(
-          db.user
-            .outerFullJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
+          db.public.user
+            .outerFullJoin(db.public.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
             .select((f) => ({
               userId: f.user.id,
               email: f.user.email,
@@ -213,9 +213,9 @@ describe('end-to-end JOIN queries', () => {
         ]);
 
         const rows = await runtime.execute(
-          db.user
-            .innerJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
-            .outerLeftJoin(db.comment, (f, fns) => fns.eq(f.post.id, f.comment.postId))
+          db.public.user
+            .innerJoin(db.public.post, (f, fns) => fns.eq(f.user.id, f.post.userId))
+            .outerLeftJoin(db.public.comment, (f, fns) => fns.eq(f.post.id, f.comment.postId))
             .select((f) => ({
               userId: f.user.id,
               email: f.user.email,

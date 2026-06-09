@@ -29,7 +29,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 interface Harness {
-  readonly db: Db<Contract>[typeof UNBOUND_NAMESPACE_ID];
+  readonly db: Db<Contract>;
   readonly runtime: Runtime;
   readonly close: () => Promise<void>;
 }
@@ -98,11 +98,10 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
   });
 
   const adapter = sqliteRawCodecInferer;
-  // sqlite is single-namespace: alias to the unbound facet so tables are flat.
-  const db: Db<Contract>[typeof UNBOUND_NAMESPACE_ID] = sql<Contract>({
+  const db = sql<Contract>({
     context,
     rawCodecInferer: adapter,
-  })[UNBOUND_NAMESPACE_ID];
+  });
 
   return {
     db,
@@ -136,7 +135,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
 
       // posts.views values: 100, 50, 200, 10 — doubled they become 200, 100, 400, 20.
       const rows = await harness.runtime.execute(
-        harness.db.posts
+        harness.db[UNBOUND_NAMESPACE_ID].posts
           .select('id')
           .select('doubled', (f, fns) => fns.raw`${f.views} * 2`.returns('sqlite/integer@1'))
           .orderBy('id')
@@ -152,7 +151,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
       cleanup = harness.close;
 
       const rows = await harness.runtime.execute(
-        harness.db.posts
+        harness.db[UNBOUND_NAMESPACE_ID].posts
           .select('id')
           .select('magic', (_f, fns) => fns.raw`42`.returns('sqlite/integer@1'))
           .orderBy('id')
@@ -186,7 +185,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
       // After lowering, the plan carries one ParamRef (value 50, codec sqlite/integer@1).
       // The middleware's beforeExecute should see it via params.entries().
       await harness.runtime.execute(
-        harness.db.posts
+        harness.db[UNBOUND_NAMESPACE_ID].posts
           .select('id')
           .where((_f, fns) =>
             fns.gt(
@@ -222,7 +221,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
 
       // Two param() calls: param(10) and param(200).
       await harness.runtime.execute(
-        harness.db.posts
+        harness.db[UNBOUND_NAMESPACE_ID].posts
           .select('id')
           .where((_f, fns) =>
             fns.and(
