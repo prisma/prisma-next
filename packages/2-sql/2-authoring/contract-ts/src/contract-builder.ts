@@ -432,11 +432,12 @@ export function buildBoundContract(
         extensionPacks: definition.extensionPacks,
       }),
     );
+    const mergedEnums = { ...(definition.enums ?? {}), ...built.enums };
     return buildContractFromDsl({
       ...full,
       ...ifDefined('types', built.types),
       ...ifDefined('models', built.models),
-      ...ifDefined('enums', built.enums),
+      ...ifDefined('enums', Object.keys(mergedEnums).length > 0 ? mergedEnums : undefined),
     });
   }
 

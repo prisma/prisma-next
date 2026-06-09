@@ -1,9 +1,11 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ExtractFieldInputTypes,
   ExtractFieldOutputTypes,
+  SqlStorage,
 } from '@prisma-next/sql-contract/types';
-import { describe, expectTypeOf, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
 
@@ -129,5 +131,41 @@ describe('factory-form db.enums matches the definition form', () => {
       .toHaveProperty('ordinalOf')
       .parameter(0)
       .toEqualTypeOf<1 | 10>();
+  });
+});
+
+// A contract that authors one enum on the scaffold definition and another in
+// the factory callback. The factory-form type advertises a merge of both, so
+// the runtime must surface both — not overwrite the scaffold-authored one.
+const mixedContract = defineContract(
+  {
+    family: sqlFamilyPack,
+    target: postgresTargetPack,
+    enums: { Role },
+  },
+  () => ({
+    enums: { Priority },
+    models: {
+      User: model('User', {
+        fields: {
+          role: field.namedType(Role),
+          priority: field.namedType(Priority),
+        },
+      }),
+    },
+  }),
+);
+
+describe('factory form merges scaffold-authored and factory-authored enums', () => {
+  it('surfaces both enums in the runtime contract', () => {
+    const domainNs = (mixedContract as Contract<SqlStorage>).domain.namespaces['public'];
+    expect(domainNs?.enum?.['Role']).toBeDefined();
+    expect(domainNs?.enum?.['Priority']).toBeDefined();
+  });
+
+  it('advertises both enums in the enumAccessors type', () => {
+    type MixedAccessors = typeof mixedContract extends { enumAccessors: infer A } ? A : never;
+    expectTypeOf<MixedAccessors>().toHaveProperty('Role');
+    expectTypeOf<MixedAccessors>().toHaveProperty('Priority');
   });
 });
