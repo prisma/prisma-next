@@ -8,8 +8,6 @@ import { SqlNode } from './sql-node';
 import { StorageColumn, type StorageColumnInput } from './storage-column';
 import { UniqueConstraint, type UniqueConstraintInput } from './unique-constraint';
 
-export type RlsMode = 'auto' | 'enabled' | 'disabled';
-
 export interface StorageTableInput {
   readonly columns: Record<string, StorageColumn | StorageColumnInput>;
   readonly primaryKey?: PrimaryKey | PrimaryKeyInput;
@@ -18,14 +16,6 @@ export interface StorageTableInput {
   readonly foreignKeys: ReadonlyArray<ForeignKey | ForeignKeyInput>;
   readonly control?: ControlPolicy;
   readonly checks?: ReadonlyArray<CheckConstraint | CheckConstraintInput>;
-  /**
-   * Row-level security mode for this table. `'auto'` (default) leaves RLS
-   * management to the migration planner; `'enabled'` / `'disabled'` force
-   * `ALTER TABLE … ENABLE/DISABLE ROW LEVEL SECURITY`. Absent-when-default:
-   * the property is only set when the value differs from `'auto'`, mirroring
-   * the `control?` discipline.
-   */
-  readonly rls?: RlsMode;
 }
 
 /**
@@ -48,7 +38,6 @@ export class StorageTable extends SqlNode {
   declare readonly primaryKey?: PrimaryKey;
   declare readonly control?: ControlPolicy;
   declare readonly checks?: ReadonlyArray<CheckConstraint>;
-  declare readonly rls?: RlsMode;
 
   constructor(input: StorageTableInput) {
     super();
@@ -77,7 +66,6 @@ export class StorageTable extends SqlNode {
     if (input.checks !== undefined && input.checks.length > 0) {
       this.checks = Object.freeze(input.checks.map((cc) => new CheckConstraint(cc)));
     }
-    if (input.rls !== undefined && input.rls !== 'auto') this.rls = input.rls;
     freezeNode(this);
   }
 }

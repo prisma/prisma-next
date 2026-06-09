@@ -259,13 +259,7 @@ export function buildRecreatePostchecks(
   const byName = new Map(spec.columns.map((c) => [c.name, c]));
 
   for (const issue of issues) {
-    if (
-      issue.kind === 'enum_values_changed' ||
-      issue.kind === 'rls_policy_renamed' ||
-      issue.kind === 'rls_policy_tampered' ||
-      issue.kind === 'rls_not_enabled'
-    )
-      continue;
+    if (issue.kind === 'enum_values_changed') continue;
     if (!COLUMN_LEVEL_ISSUE_KINDS.has(issue.kind)) continue;
     if (!issue.column) continue;
     const c = escapeLiteral(issue.column);

@@ -38,7 +38,7 @@ export {
 } from './ir/sql-storage';
 export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
-export { type RlsMode, StorageTable, type StorageTableInput } from './ir/storage-table';
+export { StorageTable, type StorageTableInput } from './ir/storage-table';
 export {
   CODEC_INSTANCE_KIND,
   isStorageTypeInstance,

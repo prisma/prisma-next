@@ -17,7 +17,7 @@ import {
 import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
-import type { Type } from 'arktype';
+import { type as arktypeType, type Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
 import type { PostgresEnumType } from './postgres-enum-type';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
@@ -41,15 +41,18 @@ function isAuthoringEntityTypeFactoryOutput(
 
 /**
  * Walks a pack's entity-type namespace tree and emits the maps the
- * family base consumes — hydrators and validator-schema fragments, both
- * keyed by the descriptor's `discriminator`.
+ * family base consumes — hydrators, validator-schema fragments (keyed
+ * by discriminator), and validator entry slots (keyed by slot name)
+ * for entity kinds that declare an `entrySlotName`.
  */
 function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamespace): {
   readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>;
   readonly validatorFragments: ReadonlyMap<string, Type<unknown>>;
+  readonly validatorEntrySlots: ReadonlyMap<string, Type<unknown>>;
 } {
   const entityTypeRegistry = new Map<string, SqlEntityHydrationFactory>();
   const validatorFragments = new Map<string, Type<unknown>>();
+  const entrySlotFragments = new Map<string, Type<unknown>>();
   const walk = (node: AuthoringEntityTypeNamespace): void => {
     for (const value of Object.values(node)) {
       if (isAuthoringEntityTypeDescriptor(value)) {
@@ -61,6 +64,12 @@ function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamesp
         }
         if (value.validatorSchema !== undefined) {
           validatorFragments.set(value.discriminator, value.validatorSchema);
+          if (value.entrySlotName !== undefined) {
+            const existing = entrySlotFragments.get(value.entrySlotName);
+            const schema =
+              existing !== undefined ? existing.or(value.validatorSchema) : value.validatorSchema;
+            entrySlotFragments.set(value.entrySlotName, schema);
+          }
         }
         continue;
       }
@@ -70,15 +79,18 @@ function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamesp
     }
   };
   walk(namespace);
-  return { entityTypeRegistry, validatorFragments };
+  const validatorEntrySlots = new Map<string, Type<unknown>>();
+  for (const [slotName, schema] of entrySlotFragments) {
+    validatorEntrySlots.set(slotName, arktypeType({ '[string]': schema }));
+  }
+  return { entityTypeRegistry, validatorFragments, validatorEntrySlots };
 }
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
-    const { entityTypeRegistry, validatorFragments } = collectEntityRegistryContributions(
-      postgresAuthoringEntityTypes,
-    );
-    super(entityTypeRegistry, validatorFragments);
+    const { entityTypeRegistry, validatorFragments, validatorEntrySlots } =
+      collectEntityRegistryContributions(postgresAuthoringEntityTypes);
+    super(entityTypeRegistry, validatorFragments, validatorEntrySlots);
   }
 
   protected override hydrateSqlNamespaceEntry(

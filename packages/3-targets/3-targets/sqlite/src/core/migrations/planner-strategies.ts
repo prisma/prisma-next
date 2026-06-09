@@ -106,13 +106,7 @@ const DESTRUCTIVE_ISSUE_KINDS = new Set<SchemaIssue['kind']>([
 ]);
 
 function classifyIssue(issue: SchemaIssue): 'widening' | 'destructive' | null {
-  if (
-    issue.kind === 'enum_values_changed' ||
-    issue.kind === 'rls_policy_renamed' ||
-    issue.kind === 'rls_policy_tampered' ||
-    issue.kind === 'rls_not_enabled'
-  )
-    return null;
+  if (issue.kind === 'enum_values_changed') return null;
   if (!issue.table) return null;
   if (issue.kind === 'nullability_mismatch') {
     // Relaxing (NOT NULL → nullable) is widening; tightening is destructive.
@@ -139,13 +133,7 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
   for (const issue of issues) {
     const cls = classifyIssue(issue);
     if (!cls) continue;
-    if (
-      issue.kind === 'enum_values_changed' ||
-      issue.kind === 'rls_policy_renamed' ||
-      issue.kind === 'rls_policy_tampered' ||
-      issue.kind === 'rls_not_enabled'
-    )
-      continue;
+    if (issue.kind === 'enum_values_changed') continue;
     if (!issue.table) continue;
     const table = issue.table;
     const entry = byTable.get(table);

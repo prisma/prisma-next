@@ -77,14 +77,17 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       SqlEntityHydrationFactory
     > = new Map(),
     validatorFragments?: ReadonlyMap<string, Type<unknown>>,
+    validatorEntrySlots?: ReadonlyMap<string, Type<unknown>>,
   ) {
     // Only build a fragments-aware contract schema when pack contributions
     // exist. The cached module-level default in `validators.ts` covers the
     // no-contributions case and avoids per-instance schema compilation.
-    this.contractSchema =
-      validatorFragments !== undefined && validatorFragments.size > 0
-        ? createSqlContractSchema(validatorFragments)
-        : undefined;
+    const hasContributions =
+      (validatorFragments !== undefined && validatorFragments.size > 0) ||
+      (validatorEntrySlots !== undefined && validatorEntrySlots.size > 0);
+    this.contractSchema = hasContributions
+      ? createSqlContractSchema(validatorFragments, validatorEntrySlots)
+      : undefined;
   }
 
   deserializeContract<T extends TContract = TContract>(json: unknown): T {

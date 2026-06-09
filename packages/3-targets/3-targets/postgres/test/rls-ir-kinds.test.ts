@@ -114,32 +114,9 @@ describe('PostgresRlsPolicy', () => {
   });
 });
 
-describe('StorageTable rls field', () => {
-  it('is absent when rls is not provided', () => {
-    const table = new StorageTable(emptyTableInput);
-    expect(Object.hasOwn(table, 'rls')).toBe(false);
-  });
-
-  it('is absent when rls is the default "auto"', () => {
-    const table = new StorageTable({ ...emptyTableInput, rls: 'auto' });
-    expect(Object.hasOwn(table, 'rls')).toBe(false);
-    expect('rls' in JSON.parse(JSON.stringify(table))).toBe(false);
-  });
-
-  it('retains rls when set to "enabled"', () => {
-    const table = new StorageTable({ ...emptyTableInput, rls: 'enabled' });
-    expect(table.rls).toBe('enabled');
-    const json = JSON.parse(JSON.stringify(table)) as Record<string, unknown>;
-    expect(json['rls']).toBe('enabled');
-  });
-
-  it('retains rls when set to "disabled"', () => {
-    const table = new StorageTable({ ...emptyTableInput, rls: 'disabled' });
-    expect(table.rls).toBe('disabled');
-  });
-
+describe('StorageTable', () => {
   it('is frozen after construction', () => {
-    const table = new StorageTable({ ...emptyTableInput, rls: 'enabled' });
+    const table = new StorageTable(emptyTableInput);
     expect(Object.isFrozen(table)).toBe(true);
   });
 });

@@ -153,6 +153,15 @@ export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> 
    * `Input` after `validatorSchema` validates it.
    */
   readonly validatorSchema?: Type<unknown>;
+  /**
+   * The `entries` slot name this entity kind belongs to in a storage
+   * namespace. When set, the family validator adds an optional
+   * `[entrySlotName]?` slot to the namespace entries schema, validated
+   * by entries with matching {@link discriminator}s. When absent, the
+   * entry kind must be routed to an existing slot (e.g. `'type'`) by
+   * the family core.
+   */
+  readonly entrySlotName?: string;
 }
 
 export type AuthoringEntityTypeNamespace = {

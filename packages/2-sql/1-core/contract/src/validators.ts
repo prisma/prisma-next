@@ -220,32 +220,6 @@ const StorageTableSchema = type({
   foreignKeys: ForeignKeySchema.array().readonly(),
   'control?': ControlPolicySchema,
   'checks?': CheckConstraintSchema.array().readonly(),
-  'rls?': "'enabled' | 'disabled'",
-});
-
-/**
- * Postgres database role entry under `storage.namespaces[id].entries.role[name]`.
- */
-export const PostgresRoleSchema = type({
-  kind: "'postgres-role'",
-  name: 'string',
-  namespaceId: 'string',
-});
-
-/**
- * Postgres row-level security policy entry under
- * `storage.namespaces[id].entries.rlsPolicy[name]`.
- */
-export const PostgresRlsPolicySchema = type({
-  kind: "'postgres-rls-policy'",
-  name: 'string',
-  prefix: 'string',
-  tableName: 'string',
-  operation: "'select' | 'insert' | 'update' | 'delete' | 'all'",
-  roles: type.string.array().readonly(),
-  'using?': 'string',
-  'withCheck?': 'string',
-  permissive: 'boolean',
 });
 
 /**
@@ -331,12 +305,21 @@ function slotMapSchema(
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
  * Pack-contributed `validatorSchema` fragments — keyed by the
  * descriptor's `discriminator` — validate each entry by matching the
- * entry's `kind` field on the `'entries.type'`, `'entries.role'`, and
- * `'entries.rlsPolicy'` slots.
+ * entry's `kind` field on the `'entries.type'` slot and on any extra
+ * slots named in `validatorEntrySlots`. Pack-contributed slots are
+ * added dynamically so the SQL family core carries no knowledge of
+ * target-specific slot names.
  */
 export function createNamespaceEntrySchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
+  validatorEntrySlots?: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
+  const extraEntries: Record<string, Type<unknown>> = {};
+  if (validatorEntrySlots !== undefined) {
+    for (const [slotName, schema] of validatorEntrySlots) {
+      extraEntries[`${slotName}?`] = schema;
+    }
+  }
   return type({
     '+': 'reject',
     id: 'string',
@@ -345,9 +328,8 @@ export function createNamespaceEntrySchema(
       '+': 'reject',
       'table?': type({ '[string]': StorageTableSchema }),
       'type?': slotMapSchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
-      'role?': slotMapSchema(PostgresRoleSchema, 'postgres-role', fragments),
-      'rlsPolicy?': slotMapSchema(PostgresRlsPolicySchema, 'postgres-rls-policy', fragments),
       'valueSet?': type({ '[string]': StorageValueSetSchema }),
+      ...extraEntries,
     }),
   }) as Type<unknown>;
 }
@@ -360,8 +342,9 @@ export function createNamespaceEntrySchema(
  */
 export function createSqlStorageSchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
+  validatorEntrySlots?: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
-  const namespaceEntry = createNamespaceEntrySchema(fragments);
+  const namespaceEntry = createNamespaceEntrySchema(fragments, validatorEntrySlots);
   return type({
     '+': 'reject',
     storageHash: 'string',
@@ -500,8 +483,9 @@ const ContractMetaSchema = type({
  */
 export function createSqlContractSchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
+  validatorEntrySlots?: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
-  const storage = createSqlStorageSchema(fragments);
+  const storage = createSqlStorageSchema(fragments, validatorEntrySlots);
   return type({
     '+': 'reject',
     target: 'string',

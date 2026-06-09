@@ -303,7 +303,6 @@ describe('role + rlsPolicy round-trip', () => {
                   uniques: [],
                   indexes: [],
                   foreignKeys: [],
-                  rls: 'enabled',
                 },
                 logs: {
                   columns: {
@@ -313,7 +312,6 @@ describe('role + rlsPolicy round-trip', () => {
                   uniques: [],
                   indexes: [],
                   foreignKeys: [],
-                  // no rls: defaults to 'auto' — should be omitted in JSON
                 },
               },
             },
@@ -407,21 +405,6 @@ describe('role + rlsPolicy round-trip', () => {
     expect(insertPolicy?.roles).toEqual(['app_user', 'admin']);
     expect(insertPolicy?.withCheck).toBe('user_id = current_user_id()');
     expect(insertPolicy?.permissive).toBe(false);
-  });
-
-  it('preserves rls field on tables when non-default, omits when auto', () => {
-    const serializer = new PostgresContractSerializer();
-    const input = makeContractWithRolesAndPolicies();
-
-    const contract = serializer.deserializeContract(input);
-    const json = serializer.serializeContract(contract);
-    const reparsed = JSON.parse(JSON.stringify(json));
-
-    const ns = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID];
-    // 'enabled' persists in JSON
-    expect(ns.entries.table.posts.rls).toBe('enabled');
-    // 'auto' is omitted (absent-when-default)
-    expect(ns.entries.table.logs).not.toHaveProperty('rls');
   });
 
   it('produces frozen PostgresRlsPolicy and PostgresRole instances after round-trip', () => {

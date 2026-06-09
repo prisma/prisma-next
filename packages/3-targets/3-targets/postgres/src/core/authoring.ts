@@ -5,14 +5,11 @@ import type {
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
-import {
-  PostgresEnumTypeSchema,
-  PostgresRlsPolicySchema,
-  PostgresRoleSchema,
-} from '@prisma-next/sql-contract/validators';
+import { PostgresEnumTypeSchema } from '@prisma-next/sql-contract/validators';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { PostgresRlsPolicy, type PostgresRlsPolicyInput } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
+import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 
@@ -60,6 +57,7 @@ export const postgresAuthoringEntityTypes = {
     kind: 'entity',
     discriminator: 'postgres-role',
     validatorSchema: PostgresRoleSchema,
+    entrySlotName: 'role',
     output: {
       factory: (input: PostgresRoleInput): PostgresRole => new PostgresRole(input),
     },
@@ -68,6 +66,7 @@ export const postgresAuthoringEntityTypes = {
     kind: 'entity',
     discriminator: 'postgres-rls-policy',
     validatorSchema: PostgresRlsPolicySchema,
+    entrySlotName: 'rlsPolicy',
     output: {
       factory: (input: PostgresRlsPolicyInput): PostgresRlsPolicy => new PostgresRlsPolicy(input),
     },
