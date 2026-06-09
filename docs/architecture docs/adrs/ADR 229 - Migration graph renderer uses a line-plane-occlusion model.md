@@ -6,19 +6,22 @@ Accepted. Refines [ADR 227 — Migration read commands share one graphical rende
 
 ## A worked example
 
-A space has a trunk and a rollback. `add_email` advances the trunk; later, `revert_email` rolls the database back to the contract before it. The rollback runs against the forward grain of the history, so it is drawn as a back-arc to the right of the trunk — and somewhere it has to cross the forward line:
+A space has three forward migrations and one rollback. `000_init` through `002_fwd_bc` advance the history; `003_rollback` then rolls back from `arc_c` to `arc_a`, skipping `arc_b`. Here is `migration graph` drawing it — newest contract at the top, the empty contract `∅` at the bottom:
 
 ```
-○    a94b7b4
-│ ╮  revert_email      ← the back-arc leaves the trunk
-○ │  ef9de27
-│ │  add_email         ← here the forward line and the back-arc share a column
-○ ╯  7c31c2e
+○─╮   arc_c
+│ │↓  003_rollback
+│↑│   002_fwd_bc
+○ │   arc_b
+│↑│   001_fwd_ab
+○◂╯   arc_a
+│↑    000_init
+○     ∅
 ```
 
-Look at the middle row. One character cell has both a forward trunk line passing vertically through it and a rollback arc running down beside it. The two lines are different colours — the trunk is one lane colour, the rollback is another. A single text cell can only show one glyph in one colour. Something has to decide which line that cell belongs to, and the cell's colour has to be honestly that line's colour and not a blend of the two.
+The forward history runs straight up the left column: each `○` is a contract, each `│↑` a forward migration. `003_rollback` cannot be a plain downward edge because it skips `arc_b`, so it is routed as an arc — it leaves `arc_c` through the corner `─╮` into a lane of its own to the right of the trunk, runs down that lane as `│`, and lands on `arc_a` at the `◂╯`, where the `◂` marks the arrival.
 
-Getting that decision wrong is how colour bleeds between branches: a cell drawn in the rollback's colour while it structurally belongs to the trunk, or a junction glyph that carries one colour while standing for two differently-coloured lines. The whole renderer is built around making that decision unambiguous.
+Two things in that picture drive the whole design. The rollback is a different colour from the trunk, and it gets its own column rather than being crammed into the trunk's. That is deliberate: a single text cell can hold only one glyph in one colour, so two differently-coloured lines must never be made to share one. Where lines genuinely have to overlap — a routed arc passing over another line at a crossing — one of them has to win the cell and the other has to give way, and each must keep its own colour. Deciding that unambiguously is what the renderer is built around.
 
 ## Decision
 
