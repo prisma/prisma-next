@@ -391,7 +391,7 @@ This project is the integration layer; it consumes all four sibling projects:
 
 Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy → cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer → this project**.
 
-This project lands the integration / launch milestone. Slipping any upstream dependency cascades into this project.
+This project lands the integration / launch. Slipping any upstream dependency cascades into this project.
 
 # Acceptance Criteria
 

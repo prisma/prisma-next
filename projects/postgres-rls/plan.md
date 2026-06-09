@@ -19,9 +19,9 @@ This project can run in parallel with [cross-contract-refs](../cross-contract-re
 
 Resulting global sequence: **TML-2459 + control-policy** → **this project ∥ cross-contract-refs ∥ runtime-target-layer** → **extension-supabase**.
 
-## Milestones
+## Slices
 
-The five PRs below correspond to the five milestones (M1, M2, M3, M4, M5). Each milestone is one PR.
+The five PRs below correspond to the five slices (M1–M5). Each slice is one PR.
 
 ### M1 — Foundation (IR kinds + content-addressed naming)
 
@@ -43,7 +43,7 @@ The five PRs below correspond to the five milestones (M1, M2, M3, M4, M5). Each 
 
 ### M2 — TypeScript authoring surface
 
-**Goal:** make the IR reachable through TS authoring. After this milestone, an app contract can declare RLS policies and produce valid `PostgresRlsPolicy` IR.
+**Goal:** make the IR reachable through TS authoring. After this slice, an app contract can declare RLS policies and produce valid `PostgresRlsPolicy` IR.
 
 **Tasks:**
 

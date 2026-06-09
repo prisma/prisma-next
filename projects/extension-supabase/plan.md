@@ -17,13 +17,13 @@ This project is the integration layer; it consumes **all four** sibling projects
 - **[postgres-rls](../postgres-rls/spec.md)** — `.rls(...)` authoring + `PostgresRole` IR + verifier algorithm.
 - **[runtime-target-layer](../runtime-target-layer/spec.md)** — `PostgresRuntime` base class + `withRawConnection` accessor.
 
-Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy** → **cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer** → **this project** (the integration / launch milestone).
+Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy** → **cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer** → **this project** (the integration / launch).
 
 A slip in any upstream project cascades into this project. The implementer should watch upstream PR status and surface blockers early.
 
-## Milestones
+## Slices
 
-The four PRs below correspond to the four milestones (M1, M2, M3, M4). Each milestone is one PR.
+The four PRs below correspond to the four slices (M1–M4). Each slice is one PR.
 
 ### M1 — Package scaffolding + PSL contract + `/pack` + walking skeleton
 
