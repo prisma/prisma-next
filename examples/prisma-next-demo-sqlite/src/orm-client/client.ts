@@ -8,7 +8,5 @@ import { db } from '../prisma/db';
 const context = db.context as ExecutionContext<Contract>;
 
 export function createOrmClient(runtime: Runtime) {
-  // The ORM surface is always qualified; alias to the unbound namespace facet
-  // (single-namespace sqlite) so models are reached flat.
   return orm({ runtime, context })[UNBOUND_NAMESPACE_ID];
 }

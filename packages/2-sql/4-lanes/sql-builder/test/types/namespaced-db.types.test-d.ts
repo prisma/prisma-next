@@ -12,9 +12,7 @@ test('the namespace facet exposes its tables as TableProxy', () => {
 });
 
 test('the flat by-bare-name surface is gone — namespace selection is mandatory', () => {
-  // @ts-expect-error 'users' is a table, not a declared storage namespace: the
-  // flat by-bare-name accessor was removed, so `db.<table>` is no longer a key
-  // on `Db<C>`. Reach tables via their namespace facet (`db.public.users`).
+  // @ts-expect-error flat 'users' is not a namespace key
   db.users;
 });
 

@@ -198,8 +198,7 @@ describe('orm()', () => {
     const db = orm({ runtime, context });
     expect(db.public.User).toBeDefined();
     type DbClient = typeof db;
-    // @ts-expect-error 'User' is a model, not a namespace: the flat by-bare-model
-    // key was removed from OrmClient — reach models via the namespace facet.
+    // @ts-expect-error flat 'User' is not a namespace key
     type _FlatModelGone = DbClient['User'];
     // @ts-expect-error an unknown key is likewise absent from the typed client
     type _UnknownCollection = DbClient['unknown'];

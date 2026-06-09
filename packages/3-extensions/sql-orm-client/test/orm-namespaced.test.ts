@@ -50,8 +50,7 @@ const twoNamespaceContract = {
 };
 
 type Accessor = { readonly modelName: string; readonly tableName: string };
-// The orm client is namespace-facets only; flat by-bare-model keys are gone.
-// They are modelled here as `undefined` to assert their runtime absence.
+// Flat bare-model keys are typed `undefined` to assert their runtime absence.
 type TwoNamespaceOrm = {
   public: { User: Accessor; Post: Accessor; Session: undefined };
   auth: { User: Accessor; Session: Accessor };
@@ -83,10 +82,6 @@ describe('namespaced orm accessor', () => {
   });
 
   it('fails fast naming the unknown namespace on flat bare-model access (FR11)', () => {
-    // The flat fallback branch was removed: a bare model name is not a namespace
-    // key, so flat access is an unknown-namespace access. It fails fast naming
-    // the bare name rather than returning undefined. Namespace-qualified access
-    // (db().public.User) is the sole supported path.
     expect(() => db().User).toThrow(/Unknown namespace 'User'/);
   });
 });

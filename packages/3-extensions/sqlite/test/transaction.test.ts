@@ -132,8 +132,6 @@ describe('sqlite transaction()', () => {
   it('transaction() provides sql on the transaction context', async () => {
     const txSqlProxy = { lane: 'tx-sql' };
     let callCount = 0;
-    // The sqlite facade aliases db.sql to the unbound-namespace facet, so the
-    // builder output is a namespace map; expose the proxy under that facet key.
     mocks.sqlBuilder.mockImplementation(() => {
       callCount++;
       if (callCount === 1) return { [UNBOUND_NAMESPACE_ID]: { lane: 'sql' } };
@@ -158,8 +156,6 @@ describe('sqlite transaction()', () => {
   it('transaction() provides orm on the transaction context', async () => {
     const txOrmProxy = { lane: 'tx-orm' };
     let ormCallCount = 0;
-    // The sqlite facade aliases db.orm to the unbound-namespace facet, so the
-    // orm client is a namespace map; expose the proxy under that facet key.
     mocks.orm.mockImplementation(() => {
       ormCallCount++;
       if (ormCallCount === 1) return { [UNBOUND_NAMESPACE_ID]: { lane: 'orm' } };

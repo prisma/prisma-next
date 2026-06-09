@@ -17,8 +17,6 @@ class PostCollection extends Collection<TestContract, 'Post'> {
 const runtime = createMockRuntime();
 const context = getTestContext();
 
-// Always-qualified builder: alias to the `public` namespace facet (the sole
-// shape) so models are reached as `db.<Model>` through that facet.
 const db = orm({
   runtime,
   context,

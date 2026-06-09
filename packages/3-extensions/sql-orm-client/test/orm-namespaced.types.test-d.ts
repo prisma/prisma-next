@@ -12,11 +12,9 @@ test('the namespace facet exposes its models', () => {
 });
 
 test('the flat by-bare-model surface is gone — namespace selection is mandatory', () => {
-  // @ts-expect-error 'User' is a model, not a declared domain namespace: the
-  // flat by-bare-model accessor was removed, so `orm.<Model>` is no longer a
-  // key on OrmClient. Reach models via their namespace facet (`orm.public.User`).
+  // @ts-expect-error flat 'User' is not a namespace key
   db.User;
-  // @ts-expect-error 'Post' is a model, not a declared domain namespace.
+  // @ts-expect-error flat 'Post' is not a namespace key
   db.Post;
 });
 

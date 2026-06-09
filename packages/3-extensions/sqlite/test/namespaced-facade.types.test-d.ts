@@ -17,11 +17,9 @@ test('db.orm exposes the flat surface via the unbound-namespace alias', () => {
 });
 
 test('the qualified namespace map is gone — db.sql/db.orm are the unbound facet', () => {
-  // @ts-expect-error db.sql is aliased to the unbound facet, so the namespace
-  // id is no longer a key — tables are reached flat (db.sql.users).
+  // @ts-expect-error db.sql is the unbound facet, not a namespace map
   db.sql.__unbound__;
-  // @ts-expect-error db.orm is aliased to the unbound facet, so the namespace
-  // id is no longer a key — models are reached flat (db.orm.User).
+  // @ts-expect-error db.orm is the unbound facet, not a namespace map
   db.orm.__unbound__;
 });
 

@@ -217,7 +217,6 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       // Step 5 (bonus) — raw read from the seeded auth.users table.
       //
       // Proves the external table is reachable via a raw pg Client.
-      // The typed `db.sql.public.auth.users` surface waits for `explicit-namespace-dsl`.
       await withClient(connectionString, async (client) => {
         const result = await client.query<{ table_name: string }>(
           `SELECT table_name

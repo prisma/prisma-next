@@ -32,10 +32,6 @@ const stubBase = {
 
 const stubInferer = { inferCodec: () => 'pg/text@1' };
 
-// The builder surface is always qualified, so these helpers alias to the
-// `public` namespace facet (the sole shape) — mirroring how a single-namespace
-// facade aliases `db` to a namespace facet. Tables are reached as `db().<table>`
-// through that facet.
 function db() {
   return sql({
     context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<

@@ -49,9 +49,7 @@ const stubBase = {
 const stubInferer = { inferCodec: () => 'pg/text@1' };
 
 type TableHandle = { buildAst(): TableSource };
-// The builder surface is namespace-facets only; flat by-bare-name keys are
-// gone. They are modelled here as `undefined` because they are not part of the
-// typed surface; at runtime accessing them fails fast (see the FR11 tests).
+// Flat bare-name keys are typed `undefined`: not on the surface, fail fast at runtime (FR11).
 type TwoNamespaceDb = {
   public: { users: TableHandle; sessions: undefined };
   auth: { users: TableHandle; sessions: TableHandle };
@@ -76,19 +74,13 @@ describe('namespaced table resolution', () => {
   });
 
   it('scopes table lookup to the named namespace and fails fast on a foreign table (FR11)', () => {
-    // `sessions` exists only in `auth`; rather than silently resolve it under
-    // `public` (a cross-namespace scan) or return undefined, the facet fails
-    // fast naming the namespace.
+    // `sessions` exists only in `auth`.
     expect(() => db().public.sessions).toThrow(/No table 'sessions' in namespace 'public'/);
     expect(db().auth.sessions.buildAst().namespaceId).toBe('auth');
   });
 
   it('fails fast naming the unknown namespace on flat bare-name access (FR11)', () => {
-    // The flat fallback branch was removed: a bare table name is not a namespace
-    // key, so flat access is an unknown-namespace access. It fails fast naming
-    // the bare name (whether unique to one namespace — `posts` — or shared
-    // across namespaces — `users`) rather than returning undefined. Tables are
-    // reached only through their namespace facet.
+    // `posts` is unique to one namespace, `users` is shared; both are unknown-namespace accesses.
     expect(() => db().posts).toThrow(/Unknown namespace 'posts'/);
     expect(() => db().users).toThrow(/Unknown namespace 'users'/);
   });
