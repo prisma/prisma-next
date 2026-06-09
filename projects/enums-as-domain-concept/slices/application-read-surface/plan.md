@@ -68,6 +68,32 @@ sonnet-mid; reviewer: opus.
   final slice-wide additivity / typecheck sweep. **Out:** non-Postgres targets (MySQL
   `FIELD(...)`, SQLite `CASE`) — future.
 
+### Dispatch 4: emit-path value-union narrowing — the emitter honors the `valueSet` ref (R4, R5)
+
+- **Why this exists:** D1 narrowed enum I/O on the **in-memory `typeof contract`** path
+  only — it reads the literal tuple off the live `EnumTypeHandle` generics, which are erased
+  by emission. A real consumer imports the **emitted `contract.d.ts`**, where an
+  `enumType`-authored field still resolved to the bare codec output (`pg/text@1 → string`).
+  So the slice's headline feature (typed enum I/O) was **not delivered for the product path**.
+  The IR was already correct — the domain field carries a `valueSet` ref and the domain `enum`
+  carries literal members — but the emitter dropped both. This dispatch completes the slice;
+  it is NOT a follow-up.
+- **Outcome:** the emitter narrows a domain field that carries a `valueSet` ref to its
+  referenced enum's **value union** on BOTH read output and write input, codec-agnostically
+  (text → `'low' | 'high' | 'urgent'`, int → `1 | 10`). The emitted `contract.d.ts`'s field
+  type IS the union, so a consumer of the emitted contract narrows — not just the no-emit path.
+  The old `pg/enum@1` `typeRef → renderOutputType` path stays working (`User.kind`
+  → `'admin' | 'user'` unchanged); unifying/retiring that special-case is out of scope here.
+- **Done (`9060b1ced`, `8afe4a167`):** `resolveFieldType`
+  (`packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts`) now renders the
+  member-value union from `field.valueSet` (resolved against `domain…enum[name].members`,
+  each `JsonValue` → TS literal), threaded via an optional `EnumValuesResolver`. Proof: an
+  emit-then-consume test drives the real `emit()` pipeline and asserts the emitted
+  output/input typemaps carry the union (non-vacuous — fails to bare codec output when the
+  branch is disabled). `contract.json`/`storageHash` unchanged; `fixtures:check` zero-diff
+  (the committed demo fixture is PSL-mode where `priority` is plain `String` — the new enum
+  is TS-authored only until PSL `enum` repoints at the cutover, TML-2853).
+
 ## Open items (orchestrator-routed; not D1/D2/D3 blockers)
 
 - **Triplicated model/column type-level resolution.** `FindModelForTable` /
