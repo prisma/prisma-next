@@ -591,6 +591,7 @@ describe('createModelAccessor', () => {
       });
       const accessor = createModelAccessor(
         { ...getTestContext(), contract } as never,
+        'public',
         'Parent',
       ) as unknown as Record<string, { some: (pred?: unknown) => unknown }>;
 
@@ -621,6 +622,7 @@ describe('createModelAccessor', () => {
       });
       const accessor = createModelAccessor(
         { ...getTestContext(), contract } as never,
+        'public',
         'Parent',
       ) as unknown as Record<string, { some: (pred: (c: unknown) => unknown) => unknown }>;
 
@@ -652,6 +654,7 @@ describe('createModelAccessor', () => {
       });
       const accessor = createModelAccessor(
         { ...getTestContext(), contract } as never,
+        'public',
         'Parent',
       ) as unknown as Record<string, { none: (pred?: unknown) => unknown }>;
 
@@ -671,6 +674,7 @@ describe('createModelAccessor', () => {
       });
       const accessor = createModelAccessor(
         { ...getTestContext(), contract } as never,
+        'public',
         'Parent',
       ) as unknown as Record<string, { every: (pred: (c: unknown) => unknown) => unknown }>;
 
@@ -704,6 +708,7 @@ describe('createModelAccessor', () => {
       });
       const accessor = createModelAccessor(
         { ...getTestContext(), contract } as never,
+        'public',
         'Parent',
       ) as unknown as Record<string, { every: (pred: unknown) => unknown }>;
 
@@ -720,6 +725,7 @@ describe('createModelAccessor', () => {
       });
       const accessor = createModelAccessor(
         { ...getTestContext(), contract } as never,
+        'public',
         'Parent',
       ) as unknown as Record<string, { some: () => unknown }>;
 

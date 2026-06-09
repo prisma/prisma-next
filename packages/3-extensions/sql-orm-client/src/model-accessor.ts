@@ -302,6 +302,7 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
   if (hasThrough(relation)) {
     return buildManyToManyExistsExpr(
       context,
+      parentNamespaceId,
       parentModelName,
       parentTableName,
       relatedTableName,
@@ -357,6 +358,7 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
 
 function buildManyToManyExistsExpr<TContract extends Contract<SqlStorage>>(
   context: ExecutionContext<TContract>,
+  parentNamespaceId: string,
   parentModelName: string,
   parentTableName: string,
   relatedTableName: string,
@@ -377,7 +379,7 @@ function buildManyToManyExistsExpr<TContract extends Contract<SqlStorage>>(
   );
 
   const parentLocalColumns = relation.on.localFields.map((field) =>
-    resolveFieldToColumn(context.contract, parentModelName, field),
+    resolveFieldToColumn(context.contract, parentNamespaceId, parentModelName, field),
   );
   const junctionCorrelation = buildPairedColumnExprs(
     junctionTable,
@@ -386,7 +388,12 @@ function buildManyToManyExistsExpr<TContract extends Contract<SqlStorage>>(
     parentLocalColumns,
   );
 
-  const childWhere = toRelationWhereExpr(context, relation.to, options.predicate);
+  const childWhere = toRelationWhereExpr(
+    context,
+    relation.toNamespace,
+    relation.to,
+    options.predicate,
+  );
 
   let subqueryWhere: AnyExpression = junctionCorrelation;
   let existsNot = false;
@@ -407,7 +414,9 @@ function buildManyToManyExistsExpr<TContract extends Contract<SqlStorage>>(
   }
 
   const firstTargetCol = through.targetColumns[0] ?? 'id';
-  const subquery = SelectAst.from(tableSourceForContract(context.contract, relatedTableName))
+  const subquery = SelectAst.from(
+    tableSourceForContract(context.contract, relation.toNamespace, relatedTableName),
+  )
     .withJoins([
       JoinAst.inner(
         TableSource.named(junctionTable, undefined, through.namespaceId),
