@@ -3,9 +3,6 @@ import { defineContract, enumType, member, rel } from '@prisma-next/postgres/con
 
 const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 
-// A TS-authored domain enum (the `enumType` API). Declaration order is
-// low -> high -> urgent; lexical order differs (high, low, urgent), which is
-// what the declaration-order `ORDER BY` surface sorts against.
 const Priority = enumType(
   'Priority',
   pgText,

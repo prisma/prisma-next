@@ -67,7 +67,8 @@ describe('TS-authored enum on the demo contract (Post.priority)', () => {
           expect(priority.names).toEqual(['Low', 'High', 'Urgent']);
           expect(priority.members.Urgent).toBe('urgent');
           expect(priority.has('high')).toBe(true);
-          expect(priority.has('nope')).toBe(false);
+          const notAMember = 'nope' as 'low' | 'high' | 'urgent';
+          expect(priority.has(notAMember)).toBe(false);
           expect(priority.ordinalOf('urgent')).toBe(2);
         } finally {
           await close();
