@@ -119,4 +119,15 @@ describe('factory-form db.enums matches the definition form', () => {
     type Values = FactoryAccessors extends { Priority: { values: infer V } } ? V : never;
     expectTypeOf<Values>().toEqualTypeOf<readonly [1, 10]>();
   });
+
+  it('int-enum accessors accept the int value union', () => {
+    type PriorityAccessor = FactoryAccessors extends { Priority: infer A } ? A : never;
+    expectTypeOf<PriorityAccessor>().toHaveProperty('has');
+    expectTypeOf<PriorityAccessor>().toHaveProperty('has').parameter(0).toEqualTypeOf<1 | 10>();
+    expectTypeOf<PriorityAccessor>().toHaveProperty('nameOf').parameter(0).toEqualTypeOf<1 | 10>();
+    expectTypeOf<PriorityAccessor>()
+      .toHaveProperty('ordinalOf')
+      .parameter(0)
+      .toEqualTypeOf<1 | 10>();
+  });
 });

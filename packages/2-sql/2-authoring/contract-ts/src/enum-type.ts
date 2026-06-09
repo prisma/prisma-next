@@ -8,25 +8,27 @@ import { blindCast } from '@prisma-next/utils/casts';
 /**
  * A single enum member produced by `member()`. The `Name` and `Value` generics
  * are preserved as literal types so `enumType()` can carry the ordered value
- * tuple in its return type.
+ * tuple in its return type. `Value` is whatever the codec dictates — its type
+ * is constrained at `enumType` against the codec's input type, not here.
  */
-export interface EnumMember<Name extends string, Value extends string | number> {
+export interface EnumMember<Name extends string, Value> {
   readonly name: Name;
   readonly value: Value;
 }
 
 /**
- * Declare an enum member. The `value` defaults to `name` when omitted, and may
- * be a string or number literal (e.g. an int-backed enum). Both generics are
- * preserved as literals so downstream `enumType` carries the value union in its
- * type; the value is encoded to its codec string form only at lowering.
+ * Declare an enum member. The `value` defaults to `name` when omitted. The
+ * value is an unconstrained literal here; `enumType` constrains it against the
+ * codec's input type. Both generics are preserved as literals so downstream
+ * `enumType` carries the value union in its type; the value is serialized to its
+ * codec string form only at lowering.
  */
 export function member<const Name extends string>(name: Name): EnumMember<Name, Name>;
-export function member<const Name extends string, const Value extends string | number>(
+export function member<const Name extends string, const Value>(
   name: Name,
   value: Value,
 ): EnumMember<Name, Value>;
-export function member<const Name extends string, const Value extends string | number = Name>(
+export function member<const Name extends string, const Value = Name>(
   name: Name,
   value?: Value,
 ): EnumMember<Name, Value> {
@@ -43,17 +45,15 @@ export function member<const Name extends string, const Value extends string | n
 // Internal types for inferring the literal tuple from the members spread
 // ---------------------------------------------------------------------------
 
-type MembersToValues<Members extends readonly EnumMember<string, string | number>[]> = {
+type MembersToValues<Members extends readonly EnumMember<string, unknown>[]> = {
   readonly [K in keyof Members]: Members[K] extends EnumMember<string, infer V> ? V : never;
 };
 
-type MembersToNames<Members extends readonly EnumMember<string, string | number>[]> = {
-  readonly [K in keyof Members]: Members[K] extends EnumMember<infer N, string | number>
-    ? N
-    : never;
+type MembersToNames<Members extends readonly EnumMember<string, unknown>[]> = {
+  readonly [K in keyof Members]: Members[K] extends EnumMember<infer N, unknown> ? N : never;
 };
 
-type MembersAccessorMap<Members extends readonly EnumMember<string, string | number>[]> = {
+type MembersAccessorMap<Members extends readonly EnumMember<string, unknown>[]> = {
   readonly [M in Members[number] as M['name']]: M['value'];
 };
 
@@ -83,9 +83,9 @@ export const ENUM_TYPE_HANDLE_BRAND = Symbol('EnumTypeHandle');
  */
 export interface EnumTypeHandle<
   Name extends string = string,
-  Values extends readonly (string | number)[] = readonly (string | number)[],
+  Values extends readonly unknown[] = readonly unknown[],
   Names extends readonly string[] = readonly string[],
-  MembersMap extends Record<string, string | number> = Record<string, string | number>,
+  MembersMap extends Record<string, unknown> = Record<string, unknown>,
 > {
   /** Internal brand for lowering-pipeline detection. */
   readonly [ENUM_TYPE_HANDLE_BRAND]: true;
@@ -100,7 +100,7 @@ export interface EnumTypeHandle<
   readonly nativeType: string;
 
   /** Ordered member list for lowering (name + value pairs). */
-  readonly enumMembers: readonly { readonly name: string; readonly value: string | number }[];
+  readonly enumMembers: readonly { readonly name: string; readonly value: Values[number] }[];
 
   /** Ordered literal value tuple. Declaration order is preserved. */
   readonly values: Values;
@@ -115,18 +115,28 @@ export interface EnumTypeHandle<
   readonly members: MembersMap;
 
   /** Returns `true` if `v` is a declared member value. */
-  has(v: string | number): boolean;
+  has(v: Values[number]): boolean;
 
   /** Returns the member name for a value, or `undefined` if not found. */
-  nameOf(v: string | number): string | undefined;
+  nameOf(v: Values[number]): string | undefined;
 
   /** Returns the zero-based declaration index of a value, or `-1` if not found. */
-  ordinalOf(v: string | number): number;
+  ordinalOf(v: Values[number]): number;
 }
 
 // ---------------------------------------------------------------------------
 // enumType()
 // ---------------------------------------------------------------------------
+
+/**
+ * The application input type a codec descriptor dictates for its values. The
+ * `enumType` codec argument is a {@link ColumnTypeDescriptor}; descriptors may
+ * carry an optional `__input` phantom that pins the codec's JS input type
+ * (e.g. `string` for `pg/text@1`, `number` for `pg/int4@1`). When the descriptor
+ * carries no phantom the input is unconstrained, so any member-value literal is
+ * accepted and inferred verbatim.
+ */
+type CodecInput<Codec> = Codec extends { readonly __input?: infer In } ? In : unknown;
 
 /**
  * Declare a domain enum for use in TS-authoring contracts.
@@ -158,8 +168,8 @@ export function enumType<
   const Name extends string,
   const Codec extends Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'>,
   const Members extends readonly [
-    EnumMember<string, string | number>,
-    ...EnumMember<string, string | number>[],
+    EnumMember<string, CodecInput<Codec>>,
+    ...EnumMember<string, CodecInput<Codec>>[],
   ],
 >(
   name: Name,
@@ -174,19 +184,19 @@ export function enumType<
 export function enumType(
   name: string,
   codec: Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'>,
-  ...members: EnumMember<string, string | number>[]
+  ...members: EnumMember<string, unknown>[]
 ): EnumTypeHandle;
 export function enumType(
   name: string,
   codec: Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'>,
-  ...members: EnumMember<string, string | number>[]
+  ...members: EnumMember<string, unknown>[]
 ): EnumTypeHandle {
   if (members.length === 0) {
     throw new Error(`enumType("${name}"): must have at least one member.`);
   }
 
   const seenNames = new Set<string>();
-  const seenValues = new Set<string | number>();
+  const seenValues = new Set<string>();
   for (const m of members) {
     if (seenNames.has(m.name)) {
       throw new Error(
@@ -195,12 +205,13 @@ export function enumType(
     }
     seenNames.add(m.name);
 
-    if (seenValues.has(m.value)) {
+    const loweredValue = String(m.value);
+    if (seenValues.has(loweredValue)) {
       throw new Error(
-        `enumType("${name}"): duplicate member value "${m.value}". Member values must be unique.`,
+        `enumType("${name}"): duplicate member value "${loweredValue}". Member values must be unique.`,
       );
     }
-    seenValues.add(m.value);
+    seenValues.add(loweredValue);
   }
 
   const values = Object.freeze(members.map((m) => m.value));
@@ -222,9 +233,9 @@ export function enumType(
     values,
     names,
     members: membersAccessor,
-    has: (v: string | number) => valueSet.has(v),
-    nameOf: (v: string | number) => valueToName.get(v),
-    ordinalOf: (v: string | number) => valueToOrdinal.get(v) ?? -1,
+    has: (v: unknown) => valueSet.has(v),
+    nameOf: (v: unknown) => valueToName.get(v),
+    ordinalOf: (v: unknown) => valueToOrdinal.get(v) ?? -1,
   };
 }
 

@@ -599,9 +599,9 @@ type EnumHandleAccessorType<Handle> =
         readonly values: Values;
         readonly names: Names;
         readonly members: MembersMap;
-        has(v: string): boolean;
-        nameOf(v: string): string | undefined;
-        ordinalOf(v: string): number;
+        has(v: Values[number]): boolean;
+        nameOf(v: Values[number]): string | undefined;
+        ordinalOf(v: Values[number]): number;
       }
     : never;
 
@@ -669,7 +669,7 @@ type BuiltStorage<Definition> = {
 type EnumValueUnion<FieldState> = [FieldTypeRefOf<FieldState>] extends [
   EnumTypeHandle<string, infer Values>,
 ]
-  ? readonly (string | number)[] extends Values
+  ? readonly unknown[] extends Values
     ? never
     : Values[number]
   : never;
