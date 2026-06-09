@@ -140,12 +140,13 @@ export function extractEnumInfo(annotations?: Record<string, unknown>): EnumInfo
   const definitions = new Map<string, readonly string[]>();
 
   if (storageTypes) {
-    for (const [key, typeInstance] of Object.entries(storageTypes)) {
+    for (const typeInstance of Object.values(storageTypes)) {
       if (typeInstance.codecId === ENUM_CODEC_ID) {
-        typeNames.add(key);
+        const nativeType = typeInstance.nativeType;
+        typeNames.add(nativeType);
         const values = typeInstance.typeParams?.['values'];
         if (Array.isArray(values)) {
-          definitions.set(key, values as string[]);
+          definitions.set(nativeType, values as string[]);
         }
       }
     }

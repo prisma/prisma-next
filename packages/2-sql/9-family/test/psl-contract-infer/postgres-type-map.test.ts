@@ -157,6 +157,25 @@ describe('extractEnumTypeNames', () => {
     expect(extractEnumTypeNames({})).toEqual(new Set());
   });
 
+  it('decodes schema-qualified compound keys to the unqualified native type', () => {
+    const annotations = {
+      pg: {
+        storageTypes: {
+          // Adapter keys storageTypes by `schema\u0000nativeType`.
+          ['public\u0000application_kind']: {
+            codecId: 'pg/enum@1',
+            nativeType: 'application_kind',
+            typeParams: { values: ['complete', 'formless'] },
+          },
+        },
+      },
+    };
+    expect(extractEnumTypeNames(annotations)).toEqual(new Set(['application_kind']));
+    expect(extractEnumDefinitions(annotations)).toEqual(
+      new Map([['application_kind', ['complete', 'formless']]]),
+    );
+  });
+
   it('ignores non-enum storage types while keeping enum codec entries', () => {
     const annotations = {
       pg: {
