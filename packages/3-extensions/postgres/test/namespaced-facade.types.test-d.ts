@@ -8,17 +8,19 @@ declare const db: PostgresClient<Contract>;
 type DbSql = PostgresClient<Contract>['sql'];
 type DbOrm = PostgresClient<Contract>['orm'];
 
-test('db.sql exposes the namespace facet alongside the flat surface', () => {
+test('db.sql exposes the qualified namespace map; flat access is gone', () => {
   expectTypeOf(db.sql.public.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
-  expectTypeOf(db.sql.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
   expectTypeOf<Namespace<Contract, 'public'>['users']>().toEqualTypeOf<
     TableProxy<Contract, 'users'>
   >();
+  // @ts-expect-error namespace selection is mandatory: flat db.sql.users is gone
+  db.sql.users;
 });
 
-test('db.orm exposes the namespace facet alongside the flat surface', () => {
-  expectTypeOf(db.orm.public.User).toEqualTypeOf(db.orm.User);
-  expectTypeOf(db.orm.User).toEqualTypeOf(db.orm.public.User);
+test('db.orm exposes the qualified namespace map; flat access is gone', () => {
+  expectTypeOf(db.orm.public.User).toHaveProperty('all');
+  // @ts-expect-error namespace selection is mandatory: flat db.orm.User is gone
+  db.orm.User;
 });
 
 test('an undeclared namespace id is not a key on db.sql or db.orm', () => {
@@ -28,7 +30,7 @@ test('an undeclared namespace id is not a key on db.sql or db.orm', () => {
   db.orm.auth;
 });
 
-test('transaction re-types sql/orm with the same namespaced surface', () => {
+test('transaction re-types sql/orm with the same qualified surface', () => {
   type TxSql = PostgresTransactionContext<Contract>['sql'];
   type TxOrm = PostgresTransactionContext<Contract>['orm'];
   expectTypeOf<TxSql>().toEqualTypeOf<DbSql>();
@@ -36,15 +38,17 @@ test('transaction re-types sql/orm with the same namespaced surface', () => {
 
   db.transaction(async (tx) => {
     expectTypeOf(tx.sql.public.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
-    expectTypeOf(tx.sql.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
-    expectTypeOf(tx.orm.public.User).toEqualTypeOf(tx.orm.User);
+    // @ts-expect-error namespace selection is mandatory: flat tx.sql.users is gone
+    tx.sql.users;
+    expectTypeOf(tx.orm.public.User).toHaveProperty('all');
     return undefined;
   });
 });
 
-test('prepare callback receives the namespaced sql surface', () => {
+test('prepare callback receives the qualified sql surface', () => {
   type PrepareSql = Parameters<Parameters<PostgresClient<Contract>['prepare']>[1]>[0];
   expectTypeOf<PrepareSql>().toEqualTypeOf<Db<Contract>>();
   expectTypeOf<PrepareSql['public']['users']>().toEqualTypeOf<TableProxy<Contract, 'users'>>();
-  expectTypeOf<PrepareSql['users']>().toEqualTypeOf<TableProxy<Contract, 'users'>>();
+  // @ts-expect-error namespace selection is mandatory: flat PrepareSql['users'] is gone
+  type _Flat = PrepareSql['users'];
 });

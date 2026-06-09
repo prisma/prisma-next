@@ -4,6 +4,7 @@ import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -31,22 +32,42 @@ import {
   withTransaction,
 } from '@prisma-next/sql-runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
-import { castAs } from '@prisma-next/utils/casts';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 
 export type SqliteTargetId = 'sqlite';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
+// SQLite is a single-namespace target: the facade aliases `db.sql` / `db.orm`
+// to the unbound-namespace facet of the (namespaced-only) builder outputs, so
+// flat `db.sql.users` / `db.orm.User` work without a builder-level fallback.
+type UnboundSqlFacet<TContract extends Contract<SqlStorage>> =
+  Db<TContract>[typeof UNBOUND_NAMESPACE_ID];
+type UnboundOrmFacet<TContract extends Contract<SqlStorage>> =
+  OrmClient<TContract>[typeof UNBOUND_NAMESPACE_ID];
+
+// Aliases a namespaced-only builder output to its unbound-namespace facet.
+// Indexing a generic builder value widens the namespace key to `string`, so
+// bridge to the literal-keyed facet type with a single narrowed cast — the
+// unbound namespace always exists on a sqlite contract.
+function unboundFacet<TFacet>(builderOutput: {
+  readonly [UNBOUND_NAMESPACE_ID]?: unknown;
+}): TFacet {
+  return blindCast<TFacet, 'the unbound-namespace facet always exists on a sqlite builder output'>(
+    builderOutput[UNBOUND_NAMESPACE_ID],
+  );
+}
+
 export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>>
   extends TransactionContext {
-  readonly sql: Db<TContract>;
-  readonly orm: OrmClient<TContract>;
+  readonly sql: UnboundSqlFacet<TContract>;
+  readonly orm: UnboundOrmFacet<TContract>;
 }
 
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
-  readonly sql: Db<TContract>;
-  readonly orm: OrmClient<TContract>;
+  readonly sql: UnboundSqlFacet<TContract>;
+  readonly orm: UnboundOrmFacet<TContract>;
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<SqliteTargetId>;
@@ -58,7 +79,7 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
     CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
   >(
     declaration: D,
-    callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+    callback: (sql: UnboundSqlFacet<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
   ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
   transaction<R>(fn: (tx: SqliteTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
   close(): Promise<void>;
@@ -126,7 +147,9 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   const rawCodecInferer = stack.adapter.rawCodecInferer;
   const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
+  const sql: UnboundSqlFacet<TContract> = unboundFacet(
+    sqlBuilder<TContract>({ context, rawCodecInferer }),
+  );
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -190,17 +213,19 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     return runtimeInstance;
   };
 
-  const orm: OrmClient<TContract> = ormBuilder({
-    context,
-    runtime: {
-      execute(plan) {
-        return getRuntime().execute(plan);
+  const orm: UnboundOrmFacet<TContract> = unboundFacet(
+    ormBuilder({
+      context,
+      runtime: {
+        execute(plan) {
+          return getRuntime().execute(plan);
+        },
+        connection() {
+          return getRuntime().connection();
+        },
       },
-      connection() {
-        return getRuntime().connection();
-      },
-    },
-  });
+    }),
+  );
 
   return {
     sql,
@@ -246,7 +271,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
     >(
       declaration: D,
-      callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+      callback: (sql: UnboundSqlFacet<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
     ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
       return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
     },
@@ -259,19 +284,23 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
         return Promise.reject(err);
       }
       return withTransaction(runtime, (txCtx) => {
-        const txSql: Db<TContract> = sqlBuilder<TContract>({
-          context,
-          rawCodecInferer,
-        });
+        const txSql: UnboundSqlFacet<TContract> = unboundFacet(
+          sqlBuilder<TContract>({
+            context,
+            rawCodecInferer,
+          }),
+        );
 
-        const txOrm: OrmClient<TContract> = ormBuilder({
-          runtime: {
-            execute(plan) {
-              return txCtx.execute(plan);
+        const txOrm: UnboundOrmFacet<TContract> = unboundFacet(
+          ormBuilder({
+            runtime: {
+              execute(plan) {
+                return txCtx.execute(plan);
+              },
             },
-          },
-          context,
-        });
+            context,
+          }),
+        );
 
         // Use `txCtx` as the prototype instead of spreading it so that live
         // accessors (notably the `invalidated` getter, which reads a closure

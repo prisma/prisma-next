@@ -2,8 +2,9 @@ import type { Contract as ContractType, StorageHashBase } from '@prisma-next/con
 import type { ContractWithTypeMaps, TypeMaps } from '@prisma-next/sql-contract/types';
 
 // A hand-authored stand-in for an emitted `contract.d.ts`, trimmed to the
-// shape the facade reachability tests need: a single `main` namespace whose
-// storage carries a `users` table and whose domain carries a `User` model.
+// shape the facade reachability tests need: a single `__unbound__` namespace
+// (real sqlite contracts land in the unbound schema) whose storage carries a
+// `users` table and whose domain carries a `User` model.
 // Mirrors the structural literal an emitted contract produces (so it stays
 // assignable to the facade's `Contract<SqlStorage>` bound) without depending
 // on a target's generated codec type maps.
@@ -34,8 +35,8 @@ type Models = {
 type Storage = {
   readonly storageHash: StorageHashBase<'sha256:namespaced-facade-fixture'>;
   readonly namespaces: {
-    readonly main: {
-      readonly id: 'main';
+    readonly __unbound__: {
+      readonly id: '__unbound__';
       readonly kind: 'sql-namespace';
       readonly entries: {
         readonly table: {
@@ -69,7 +70,7 @@ type ContractBase = Omit<ContractType<Storage, Models>, 'roots' | 'domain'> & {
   readonly roots: Record<string, never>;
   readonly domain: {
     readonly namespaces: {
-      readonly main: { readonly models: Models };
+      readonly __unbound__: { readonly models: Models };
     };
   };
 };

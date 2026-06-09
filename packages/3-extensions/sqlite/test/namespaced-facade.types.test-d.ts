@@ -1,33 +1,40 @@
-import type { Db, Namespace, TableProxy } from '@prisma-next/sql-builder/types';
+import type { Namespace, TableProxy } from '@prisma-next/sql-builder/types';
 import { expectTypeOf, test } from 'vitest';
 import type { SqliteClient } from '../src/runtime/sqlite';
 import type { Contract } from './fixtures/namespaced-contract';
 
 declare const db: SqliteClient<Contract>;
 
-test('db.sql exposes the namespace facet alongside the flat surface', () => {
-  expectTypeOf(db.sql.main.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
+test('db.sql exposes the flat surface via the unbound-namespace alias', () => {
   expectTypeOf(db.sql.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
-  expectTypeOf<Namespace<Contract, 'main'>['users']>().toEqualTypeOf<
+  expectTypeOf<Namespace<Contract, '__unbound__'>['users']>().toEqualTypeOf<
     TableProxy<Contract, 'users'>
   >();
 });
 
-test('db.orm exposes the namespace facet alongside the flat surface', () => {
-  expectTypeOf(db.orm.main.User).toEqualTypeOf(db.orm.User);
-  expectTypeOf(db.orm.User).toEqualTypeOf(db.orm.main.User);
+test('db.orm exposes the flat surface via the unbound-namespace alias', () => {
+  expectTypeOf(db.orm.User).toHaveProperty('all');
 });
 
-test('an undeclared namespace id is not a key on db.sql or db.orm', () => {
-  // @ts-expect-error 'auth' is not a declared storage namespace of this contract
+test('the qualified namespace map is gone — db.sql/db.orm are the unbound facet', () => {
+  // @ts-expect-error db.sql is aliased to the unbound facet, so the namespace
+  // id is no longer a key — tables are reached flat (db.sql.users).
+  db.sql.__unbound__;
+  // @ts-expect-error db.orm is aliased to the unbound facet, so the namespace
+  // id is no longer a key — models are reached flat (db.orm.User).
+  db.orm.__unbound__;
+});
+
+test('an undeclared key is not on db.sql or db.orm', () => {
+  // @ts-expect-error 'auth' is neither a table on the unbound sql facet
   db.sql.auth;
-  // @ts-expect-error 'auth' is not a declared domain namespace of this contract
+  // @ts-expect-error 'auth' is neither a model on the unbound orm facet
   db.orm.auth;
 });
 
-test('prepare callback receives the namespaced sql surface', () => {
+test('prepare callback receives the flat (unbound-facet) sql surface', () => {
   type PrepareSql = Parameters<Parameters<SqliteClient<Contract>['prepare']>[1]>[0];
-  expectTypeOf<PrepareSql>().toEqualTypeOf<Db<Contract>>();
-  expectTypeOf<PrepareSql['main']['users']>().toEqualTypeOf<TableProxy<Contract, 'users'>>();
   expectTypeOf<PrepareSql['users']>().toEqualTypeOf<TableProxy<Contract, 'users'>>();
+  // @ts-expect-error the qualified namespace map is gone on the unbound-aliased facade
+  type _Qualified = PrepareSql['__unbound__'];
 });

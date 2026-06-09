@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createContract } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -131,10 +132,12 @@ describe('sqlite transaction()', () => {
   it('transaction() provides sql on the transaction context', async () => {
     const txSqlProxy = { lane: 'tx-sql' };
     let callCount = 0;
+    // The sqlite facade aliases db.sql to the unbound-namespace facet, so the
+    // builder output is a namespace map; expose the proxy under that facet key.
     mocks.sqlBuilder.mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return { lane: 'sql' };
-      return txSqlProxy;
+      if (callCount === 1) return { [UNBOUND_NAMESPACE_ID]: { lane: 'sql' } };
+      return { [UNBOUND_NAMESPACE_ID]: txSqlProxy };
     });
 
     const db = sqlite({
@@ -155,10 +158,12 @@ describe('sqlite transaction()', () => {
   it('transaction() provides orm on the transaction context', async () => {
     const txOrmProxy = { lane: 'tx-orm' };
     let ormCallCount = 0;
+    // The sqlite facade aliases db.orm to the unbound-namespace facet, so the
+    // orm client is a namespace map; expose the proxy under that facet key.
     mocks.orm.mockImplementation(() => {
       ormCallCount++;
-      if (ormCallCount === 1) return { lane: 'orm' };
-      return txOrmProxy;
+      if (ormCallCount === 1) return { [UNBOUND_NAMESPACE_ID]: { lane: 'orm' } };
+      return { [UNBOUND_NAMESPACE_ID]: txOrmProxy };
     });
 
     const db = sqlite({

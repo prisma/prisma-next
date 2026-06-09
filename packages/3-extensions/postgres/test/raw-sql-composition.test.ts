@@ -78,22 +78,24 @@ describe('rawSql composition with the typed builder', () => {
     // the narrow structural subset that this test exercises so TypeScript can typecheck
     // the call site without requiring the full contract-typed DB surface.
     const db = sql({ context: ctx, rawCodecInferer: adapter }) as unknown as {
-      users: {
-        select: (
-          alias: string,
-          cb: (
-            f: Record<
-              string,
-              { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
-            >,
-            fns: { raw: typeof tag },
-          ) => { buildAst(): AnyExpression; returnType: unknown },
-        ) => { buildAst(): import('@prisma-next/sql-relational-core/ast').SelectAst };
+      __unbound__: {
+        users: {
+          select: (
+            alias: string,
+            cb: (
+              f: Record<
+                string,
+                { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
+              >,
+              fns: { raw: typeof tag },
+            ) => { buildAst(): AnyExpression; returnType: unknown },
+          ) => { buildAst(): import('@prisma-next/sql-relational-core/ast').SelectAst };
+        };
       };
     };
 
     let capturedAst: AnyExpression | undefined;
-    db.users
+    db.__unbound__.users
       .select('greeting', (_f, fns) => {
         const expr = fns.raw`'hello'`.returns('pg/text@1');
         capturedAst = expr.buildAst();
@@ -159,24 +161,26 @@ describe('rawSql composition with the typed builder', () => {
     // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
     // the narrow structural subset that this test exercises.
     const db = sql({ context: ctx, rawCodecInferer: adapter }) as unknown as {
-      users: {
-        select: (
-          cb: (
-            f: Record<
+      __unbound__: {
+        users: {
+          select: (
+            cb: (
+              f: Record<
+                string,
+                { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
+              >,
+              fns: { raw: typeof tag },
+            ) => Record<
               string,
               { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
             >,
-            fns: { raw: typeof tag },
-          ) => Record<
-            string,
-            { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
-          >,
-        ) => { buildAst(): import('@prisma-next/sql-relational-core/ast').SelectAst };
+          ) => { buildAst(): import('@prisma-next/sql-relational-core/ast').SelectAst };
+        };
       };
     };
 
     const capturedAsts: AnyExpression[] = [];
-    db.users
+    db.__unbound__.users
       .select((_f, fns) => {
         const rawSql = rawSqlOf(fns, tag);
         const rawExpr = rawSql`coalesce(score, 0)`.returns('pg/int4@1');
