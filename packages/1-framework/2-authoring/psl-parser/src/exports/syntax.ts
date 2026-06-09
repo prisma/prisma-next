@@ -3,8 +3,10 @@ export {
   FieldAttributeAst,
   ModelAttributeAst,
 } from '../syntax/ast/attributes';
+export type { NamespaceMemberAst } from '../syntax/ast/declarations';
 export {
   BlockDeclarationAst,
+  CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
   EnumValueDeclarationAst,
@@ -12,6 +14,7 @@ export {
   KeyValuePairAst,
   ModelDeclarationAst,
   NamedTypeDeclarationAst,
+  NamespaceDeclarationAst,
   TypesBlockAst,
 } from '../syntax/ast/declarations';
 export type { ExpressionAst } from '../syntax/ast/expressions';

@@ -6,6 +6,7 @@ import {
 } from '../../src/syntax/ast/attributes';
 import {
   BlockDeclarationAst,
+  CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
   EnumValueDeclarationAst,
@@ -13,6 +14,7 @@ import {
   KeyValuePairAst,
   ModelDeclarationAst,
   NamedTypeDeclarationAst,
+  NamespaceDeclarationAst,
   TypesBlockAst,
 } from '../../src/syntax/ast/declarations';
 import {
@@ -76,6 +78,8 @@ describe('static cast', () => {
 
   const castTests: Array<[string, (node: SyntaxNode) => unknown, SyntaxKind]> = [
     ['EnumDeclarationAst', EnumDeclarationAst.cast, 'EnumDeclaration'],
+    ['CompositeTypeDeclarationAst', CompositeTypeDeclarationAst.cast, 'CompositeTypeDeclaration'],
+    ['NamespaceDeclarationAst', NamespaceDeclarationAst.cast, 'Namespace'],
     ['TypesBlockAst', TypesBlockAst.cast, 'TypesBlock'],
     ['BlockDeclarationAst', BlockDeclarationAst.cast, 'BlockDeclaration'],
     ['KeyValuePairAst', KeyValuePairAst.cast, 'KeyValuePair'],
@@ -780,5 +784,293 @@ describe('ModelAttributeAst.argList', () => {
     expect(argList!.lparen()?.text).toBe('(');
     const args = Array.from(argList!.args());
     expect(args).toHaveLength(1);
+  });
+});
+
+describe('EnumDeclarationAst.attributes', () => {
+  function buildEnumWithAttributes() {
+    // enum Role { ADMIN @map("admin")\n @@map("roles") }
+    const b = new GreenNodeBuilder();
+    b.startNode('EnumDeclaration');
+    b.token('Ident', 'enum');
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'Role');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('LBrace', '{');
+    b.startNode('EnumValueDeclaration');
+    b.startNode('Identifier');
+    b.token('Ident', 'ADMIN');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.startNode('FieldAttribute');
+    b.token('At', '@');
+    b.startNode('Identifier');
+    b.token('Ident', 'map');
+    b.finishNode();
+    b.finishNode();
+    b.finishNode();
+    b.startNode('ModelAttribute');
+    b.token('DoubleAt', '@@');
+    b.startNode('Identifier');
+    b.token('Ident', 'map');
+    b.finishNode();
+    b.finishNode();
+    b.token('RBrace', '}');
+    return b.finishNode();
+  }
+
+  it('iterates enum-level attributes', () => {
+    const root = createSyntaxTree(buildEnumWithAttributes());
+    const decl = EnumDeclarationAst.cast(root)!;
+    const attrs = Array.from(decl.attributes());
+    expect(attrs).toHaveLength(1);
+    expect(attrs[0]!.doubleAt()?.text).toBe('@@');
+    expect(attrs[0]!.name()?.token()?.text).toBe('map');
+  });
+
+  it('iterates enum-value attributes', () => {
+    const root = createSyntaxTree(buildEnumWithAttributes());
+    const decl = EnumDeclarationAst.cast(root)!;
+    const value = Array.from(decl.values())[0]!;
+    const attrs = Array.from(value.attributes());
+    expect(attrs).toHaveLength(1);
+    expect(attrs[0]!.at()?.text).toBe('@');
+    expect(attrs[0]!.name()?.token()?.text).toBe('map');
+  });
+});
+
+describe('CompositeTypeDeclarationAst', () => {
+  function buildCompositeType() {
+    // type Address { street String\n @@map("addresses") }
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    b.startNode('CompositeTypeDeclaration');
+    b.token('Ident', 'type');
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'Address');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('LBrace', '{');
+    b.startNode('FieldDeclaration');
+    b.startNode('Identifier');
+    b.token('Ident', 'street');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.startNode('TypeAnnotation');
+    b.startNode('Identifier');
+    b.token('Ident', 'String');
+    b.finishNode();
+    b.finishNode();
+    b.finishNode();
+    b.startNode('ModelAttribute');
+    b.token('DoubleAt', '@@');
+    b.startNode('Identifier');
+    b.token('Ident', 'map');
+    b.finishNode();
+    b.finishNode();
+    b.token('RBrace', '}');
+    b.finishNode();
+    return b.finishNode();
+  }
+
+  it('exposes keyword, name, braces', () => {
+    const root = createSyntaxTree(buildCompositeType());
+    const doc = DocumentAst.cast(root)!;
+    const ct = Array.from(doc.declarations())[0] as CompositeTypeDeclarationAst;
+    expect(ct).toBeInstanceOf(CompositeTypeDeclarationAst);
+    expect(ct.keyword()?.text).toBe('type');
+    expect(ct.name()?.token()?.text).toBe('Address');
+    expect(ct.lbrace()?.text).toBe('{');
+    expect(ct.rbrace()?.text).toBe('}');
+  });
+
+  it('iterates fields and attributes', () => {
+    const root = createSyntaxTree(buildCompositeType());
+    const doc = DocumentAst.cast(root)!;
+    const ct = Array.from(doc.declarations())[0] as CompositeTypeDeclarationAst;
+    const fields = Array.from(ct.fields());
+    expect(fields).toHaveLength(1);
+    expect(fields[0]!.name()?.token()?.text).toBe('street');
+    const attrs = Array.from(ct.attributes());
+    expect(attrs).toHaveLength(1);
+    expect(attrs[0]!.name()?.token()?.text).toBe('map');
+  });
+});
+
+describe('NamespaceDeclarationAst', () => {
+  function buildNamespace() {
+    // namespace auth { model User {} enum Role {} extend Something {} }
+    const b = new GreenNodeBuilder();
+    b.startNode('Document');
+    b.startNode('Namespace');
+    b.token('Ident', 'namespace');
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'auth');
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('LBrace', '{');
+    b.startNode('ModelDeclaration');
+    b.token('Ident', 'model');
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'User');
+    b.finishNode();
+    b.token('LBrace', '{');
+    b.token('RBrace', '}');
+    b.finishNode();
+    b.startNode('EnumDeclaration');
+    b.token('Ident', 'enum');
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'Role');
+    b.finishNode();
+    b.token('LBrace', '{');
+    b.token('RBrace', '}');
+    b.finishNode();
+    b.startNode('BlockDeclaration');
+    b.token('Ident', 'extend');
+    b.token('Whitespace', ' ');
+    b.startNode('Identifier');
+    b.token('Ident', 'Something');
+    b.finishNode();
+    b.token('LBrace', '{');
+    b.token('RBrace', '}');
+    b.finishNode();
+    b.token('RBrace', '}');
+    b.finishNode();
+    return b.finishNode();
+  }
+
+  it('exposes keyword, name, braces', () => {
+    const root = createSyntaxTree(buildNamespace());
+    const doc = DocumentAst.cast(root)!;
+    const ns = Array.from(doc.declarations())[0] as NamespaceDeclarationAst;
+    expect(ns).toBeInstanceOf(NamespaceDeclarationAst);
+    expect(ns.keyword()?.text).toBe('namespace');
+    expect(ns.name()?.token()?.text).toBe('auth');
+    expect(ns.lbrace()?.text).toBe('{');
+    expect(ns.rbrace()?.text).toBe('}');
+  });
+
+  it('iterates nested declarations, including block declarations', () => {
+    const root = createSyntaxTree(buildNamespace());
+    const doc = DocumentAst.cast(root)!;
+    const ns = Array.from(doc.declarations())[0] as NamespaceDeclarationAst;
+    const decls = Array.from(ns.declarations());
+    expect(decls).toHaveLength(3);
+    expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
+    expect(decls[1]).toBeInstanceOf(EnumDeclarationAst);
+    expect(decls[2]).toBeInstanceOf(BlockDeclarationAst);
+  });
+});
+
+describe('TypeAnnotationAst qualified references', () => {
+  it('exposes dot-qualified namespace and name', () => {
+    // auth.User
+    const b = new GreenNodeBuilder();
+    b.startNode('TypeAnnotation');
+    b.startNode('Identifier');
+    b.token('Ident', 'auth');
+    b.finishNode();
+    b.token('Dot', '.');
+    b.startNode('Identifier');
+    b.token('Ident', 'User');
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+    const ta = TypeAnnotationAst.cast(root)!;
+    expect(ta.dot()?.text).toBe('.');
+    expect(ta.namespaceName()?.token()?.text).toBe('auth');
+    expect(ta.name()?.token()?.text).toBe('User');
+    expect(ta.spaceName()).toBeUndefined();
+    expect(ta.constructorCall()).toBeUndefined();
+    expect(ta.isList()).toBe(false);
+    expect(ta.isOptional()).toBe(false);
+  });
+
+  it('exposes colon-prefixed cross-space reference', () => {
+    // supabase:auth.User?
+    const b = new GreenNodeBuilder();
+    b.startNode('TypeAnnotation');
+    b.startNode('Identifier');
+    b.token('Ident', 'supabase');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.startNode('Identifier');
+    b.token('Ident', 'auth');
+    b.finishNode();
+    b.token('Dot', '.');
+    b.startNode('Identifier');
+    b.token('Ident', 'User');
+    b.finishNode();
+    b.token('Question', '?');
+    const root = createSyntaxTree(b.finishNode());
+    const ta = TypeAnnotationAst.cast(root)!;
+    expect(ta.colon()?.text).toBe(':');
+    expect(ta.spaceName()?.token()?.text).toBe('supabase');
+    expect(ta.namespaceName()?.token()?.text).toBe('auth');
+    expect(ta.name()?.token()?.text).toBe('User');
+    expect(ta.isOptional()).toBe(true);
+  });
+
+  it('exposes colon-prefixed cross-space reference without namespace', () => {
+    // supabase:User
+    const b = new GreenNodeBuilder();
+    b.startNode('TypeAnnotation');
+    b.startNode('Identifier');
+    b.token('Ident', 'supabase');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.startNode('Identifier');
+    b.token('Ident', 'User');
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+    const ta = TypeAnnotationAst.cast(root)!;
+    expect(ta.spaceName()?.token()?.text).toBe('supabase');
+    expect(ta.namespaceName()).toBeUndefined();
+    expect(ta.name()?.token()?.text).toBe('User');
+  });
+
+  it('exposes inline constructor call', () => {
+    // Vector(1536)
+    const b = new GreenNodeBuilder();
+    b.startNode('TypeAnnotation');
+    b.startNode('FunctionCall');
+    b.startNode('Identifier');
+    b.token('Ident', 'Vector');
+    b.finishNode();
+    b.token('LParen', '(');
+    b.startNode('AttributeArg');
+    b.startNode('NumberLiteralExpr');
+    b.token('NumberLiteral', '1536');
+    b.finishNode();
+    b.finishNode();
+    b.token('RParen', ')');
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+    const ta = TypeAnnotationAst.cast(root)!;
+    const ctor = ta.constructorCall();
+    expect(ctor).toBeInstanceOf(FunctionCallAst);
+    expect(ctor!.name()?.token()?.text).toBe('Vector');
+    expect(ta.name()).toBeUndefined();
+    expect(ta.namespaceName()).toBeUndefined();
+    expect(ta.spaceName()).toBeUndefined();
+  });
+
+  it('returns base name for bare reference', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('TypeAnnotation');
+    b.startNode('Identifier');
+    b.token('Ident', 'String');
+    b.finishNode();
+    const root = createSyntaxTree(b.finishNode());
+    const ta = TypeAnnotationAst.cast(root)!;
+    expect(ta.name()?.token()?.text).toBe('String');
+    expect(ta.namespaceName()).toBeUndefined();
+    expect(ta.spaceName()).toBeUndefined();
+    expect(ta.constructorCall()).toBeUndefined();
   });
 });

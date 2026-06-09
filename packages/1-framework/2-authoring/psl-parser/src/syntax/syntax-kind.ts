@@ -2,6 +2,8 @@ export type SyntaxKind =
   | 'Document'
   | 'ModelDeclaration'
   | 'EnumDeclaration'
+  | 'CompositeTypeDeclaration'
+  | 'Namespace'
   | 'TypesBlock'
   | 'BlockDeclaration'
   | 'FieldDeclaration'

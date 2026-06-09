@@ -8,6 +8,27 @@ import { castExpression } from './expressions';
 import { IdentifierAst } from './identifier';
 import { TypeAnnotationAst } from './type-annotation';
 
+/**
+ * What may appear inside a `namespace` block: models, enums, composite types,
+ * and extension (block) declarations. Mirrors what `parsePslDocument` accepts
+ * in a namespace body. `types {}` blocks and nested `namespace` blocks are
+ * document-only, so they are not namespace members.
+ */
+export type NamespaceMemberAst =
+  | ModelDeclarationAst
+  | EnumDeclarationAst
+  | CompositeTypeDeclarationAst
+  | BlockDeclarationAst;
+
+function castNamespaceMember(node: SyntaxNode): NamespaceMemberAst | undefined {
+  return (
+    ModelDeclarationAst.cast(node) ??
+    EnumDeclarationAst.cast(node) ??
+    CompositeTypeDeclarationAst.cast(node) ??
+    BlockDeclarationAst.cast(node)
+  );
+}
+
 export class DocumentAst implements AstNode {
   readonly syntax: SyntaxNode;
 
@@ -15,16 +36,11 @@ export class DocumentAst implements AstNode {
     this.syntax = syntax;
   }
 
-  *declarations(): Iterable<
-    ModelDeclarationAst | EnumDeclarationAst | TypesBlockAst | BlockDeclarationAst
-  > {
+  *declarations(): Iterable<NamespaceMemberAst | TypesBlockAst | NamespaceDeclarationAst> {
     yield* filterChildren(
       this.syntax,
       (node) =>
-        ModelDeclarationAst.cast(node) ??
-        EnumDeclarationAst.cast(node) ??
-        TypesBlockAst.cast(node) ??
-        BlockDeclarationAst.cast(node),
+        castNamespaceMember(node) ?? TypesBlockAst.cast(node) ?? NamespaceDeclarationAst.cast(node),
     );
   }
 
@@ -96,8 +112,82 @@ export class EnumDeclarationAst implements AstNode {
     yield* filterChildren(this.syntax, EnumValueDeclarationAst.cast);
   }
 
+  *attributes(): Iterable<ModelAttributeAst> {
+    yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
   static cast(node: SyntaxNode): EnumDeclarationAst | undefined {
     return node.kind === 'EnumDeclaration' ? new EnumDeclarationAst(node) : undefined;
+  }
+}
+
+export class CompositeTypeDeclarationAst implements AstNode {
+  readonly syntax: SyntaxNode;
+
+  constructor(syntax: SyntaxNode) {
+    this.syntax = syntax;
+  }
+
+  keyword(): Token | undefined {
+    return findChildToken(this.syntax, 'Ident');
+  }
+
+  name(): IdentifierAst | undefined {
+    return findFirstChild(this.syntax, IdentifierAst.cast);
+  }
+
+  lbrace(): Token | undefined {
+    return findChildToken(this.syntax, 'LBrace');
+  }
+
+  rbrace(): Token | undefined {
+    return findChildToken(this.syntax, 'RBrace');
+  }
+
+  *fields(): Iterable<FieldDeclarationAst> {
+    yield* filterChildren(this.syntax, FieldDeclarationAst.cast);
+  }
+
+  *attributes(): Iterable<ModelAttributeAst> {
+    yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
+  static cast(node: SyntaxNode): CompositeTypeDeclarationAst | undefined {
+    return node.kind === 'CompositeTypeDeclaration'
+      ? new CompositeTypeDeclarationAst(node)
+      : undefined;
+  }
+}
+
+export class NamespaceDeclarationAst implements AstNode {
+  readonly syntax: SyntaxNode;
+
+  constructor(syntax: SyntaxNode) {
+    this.syntax = syntax;
+  }
+
+  keyword(): Token | undefined {
+    return findChildToken(this.syntax, 'Ident');
+  }
+
+  name(): IdentifierAst | undefined {
+    return findFirstChild(this.syntax, IdentifierAst.cast);
+  }
+
+  lbrace(): Token | undefined {
+    return findChildToken(this.syntax, 'LBrace');
+  }
+
+  rbrace(): Token | undefined {
+    return findChildToken(this.syntax, 'RBrace');
+  }
+
+  *declarations(): Iterable<NamespaceMemberAst> {
+    yield* filterChildren(this.syntax, castNamespaceMember);
+  }
+
+  static cast(node: SyntaxNode): NamespaceDeclarationAst | undefined {
+    return node.kind === 'Namespace' ? new NamespaceDeclarationAst(node) : undefined;
   }
 }
 
@@ -229,6 +319,10 @@ export class EnumValueDeclarationAst implements AstNode {
 
   name(): IdentifierAst | undefined {
     return findFirstChild(this.syntax, IdentifierAst.cast);
+  }
+
+  *attributes(): Iterable<FieldAttributeAst> {
+    yield* filterChildren(this.syntax, FieldAttributeAst.cast);
   }
 
   static cast(node: SyntaxNode): EnumValueDeclarationAst | undefined {
