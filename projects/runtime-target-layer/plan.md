@@ -17,9 +17,9 @@ It is a hard dependency of [extension-supabase](../extension-supabase/spec.md), 
 
 Resulting global sequence (within the Supabase umbrella): **this project ∥ TML-2459 ∥ postgres-rls ∥ cross-contract-refs** → **extension-supabase**.
 
-## Milestones
+## Slices
 
-The three PRs below correspond to the three milestones (M1, M2, M3). Each milestone is one PR.
+The three PRs below correspond to the three slices (M1–M3). Each slice is one PR.
 
 ### M1 — Rename + export + identity-like `PostgresRuntime`
 

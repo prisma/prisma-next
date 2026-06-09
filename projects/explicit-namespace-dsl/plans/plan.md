@@ -39,11 +39,11 @@ Implicit gate: the facade's `defaultNamespaceId === UNBOUND_NAMESPACE_ID` discri
 
 Hard prerequisite: [TML-2605](https://linear.app/prisma-company/issue/TML-2605) (runtime-qualification) must be merged before M1 begins. This project reuses its identifier-qualification helpers; it does not re-implement them.
 
-Release reaches users on the next NPM release-train cut. The wait between merge and publication is a task inside M2, not a separate Deploy milestone.
+Release reaches users on the next NPM release-train cut. The wait between merge and publication is a task inside M2, not a separate Deploy slice.
 
 ## Test Design
 
-| AC | TC | Test Case | Type | Milestone | Expected Outcome |
+| AC | TC | Test Case | Type | Slice | Expected Outcome |
 | --- | --- | --- | --- | --- | --- |
 | AC-1 | TC-1 | Multi-namespace contract where `auth.users` and `public.users` both exist: `sql.public.users` and `sql.auth.users` resolve and execute against distinct tables | Integration (PGlite) | M1 | Both queries succeed; emitted SQL contains `"public"."users"` vs `"auth"."users"` |
 | AC-1 | TC-2 | Explicit SQL accessor supports the same builder operations (select / insert / update / delete) as the previously flat path | Integration | M1 | All four operation kinds execute through the qualified accessor and return expected results |
@@ -65,7 +65,7 @@ Release reaches users on the next NPM release-train cut. The wait between merge 
 | FR-10 | TC-20 | Explicit accessors invoke the TML-2605 identifier-qualification helper rather than a parallel pipeline | Static (code review + grep) | M1 | Per-namespace facet construction imports the same qualification helper as TML-2605's emit path; no duplicate qualifier implementation in this project's diff |
 | FR-11 | TC-21 | Unknown namespace id passed at runtime (contract widened from JSON) fails fast with a diagnostic naming the namespace | Integration | M1 | Thrown error mentions the offending namespace id |
 
-## Milestones
+## Slices
 
 ### Implement M1: Always-qualified builders and per-target facade projection
 

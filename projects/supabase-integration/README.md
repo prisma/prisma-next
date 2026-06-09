@@ -130,7 +130,7 @@ The `decisions.md` log retains the canonical record of all decisions reached dur
 2. Read [`overview.md`](overview.md) for the end-to-end narrative — how the constituent projects compose into a Supabase-using Prisma Next app.
 3. Skim [`example/`](example/) — the design-artifact example app. It's intentionally not implementation-ready; it informed the design surface.
 4. Identify which constituent project is closest to your work. Read its `spec.md`. The spec is self-contained except for references back to `decisions.md` and to sibling specs.
-5. Read the corresponding `plan.md` for the milestone structure.
+5. Read the corresponding `plan.md` for the slice structure.
 6. [`deferred.md`](deferred.md) is short — worth skimming so you don't propose deferred work.
 
 ## Close-out
