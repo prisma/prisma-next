@@ -614,8 +614,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     // control connection, so a parallel walk only serialises behind the wire
     // protocol and trips pg's "already executing a query" deprecation.
     const perSchema: SqlSchemaIR[] = [];
-    for (const s of uniqueSchemas) {
-      perSchema.push(await this.introspectSchema(driver, s));
+    for (const schema of uniqueSchemas) {
+      perSchema.push(await this.introspectSchema(driver, schema));
     }
 
     const mergedTables: Record<string, SqlTableIR> = {};
