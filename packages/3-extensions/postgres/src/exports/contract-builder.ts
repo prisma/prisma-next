@@ -16,10 +16,10 @@ export type {
 } from '@prisma-next/sql-contract-ts/contract-builder';
 export {
   buildSqlContractFromDefinition,
-  enumType,
   field,
   member,
   model,
   rel,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 export { defineContract } from '../contract/define-contract';
+export { enumType } from '../contract/enum-type';
