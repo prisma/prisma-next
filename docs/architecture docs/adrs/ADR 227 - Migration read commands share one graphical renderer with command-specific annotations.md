@@ -134,3 +134,4 @@ The tree is never part of machine output, and this costs nothing to enforce: a n
 - [ADR 039 — Migration graph path resolution & integrity](./ADR%20039%20-%20Migration%20graph%20path%20resolution%20%26%20integrity.md) — the graph model and path computation this renderer visualizes.
 - [ADR 218 — Refs with paired contract snapshots and universal graph-node invariant](./ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md) — refs rendered as node overlays.
 - [ADR 228 — Migration apply ledger is a per-migration journal](./ADR%20228%20-%20Migration%20apply%20ledger%20is%20a%20per-migration%20journal.md) — the ledger that backs the `status` applied/pending overlay.
+- [ADR 229 — Migration graph renderer uses a line/plane/occlusion model](./ADR%20229%20-%20Migration%20graph%20renderer%20uses%20a%20line-plane-occlusion%20model.md) — how the shared renderer is built internally.
