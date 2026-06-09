@@ -261,14 +261,16 @@ describe('react-router-demo smoke (e2e)', () => {
       const freshModule = (await server.ssrLoadModule('/app/lib/db.server.ts')) as unknown as {
         getDb: () => {
           sql: {
-            user: {
-              select(...columns: readonly string[]): { build(): unknown };
+            public: {
+              user: {
+                select(...columns: readonly string[]): { build(): unknown };
+              };
             };
           };
         };
       };
       const freshDb = freshModule.getDb();
-      expect(() => freshDb.sql.user.select('id', 'email', 'nickname').build()).not.toThrow();
+      expect(() => freshDb.sql.public.user.select('id', 'email', 'nickname').build()).not.toThrow();
 
       const followUpResponse = await fetch(`${baseUrl}/`);
       expect(followUpResponse.ok).toBe(true);
