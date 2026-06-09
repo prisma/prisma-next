@@ -186,6 +186,14 @@ export interface IssuePlannerOptions {
    */
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   readonly strategies?: readonly CallMigrationStrategy[];
+  /**
+   * Pre-built calls to include in the bucketable pool alongside
+   * issue-derived calls. They are classified by `classifyCall()` and
+   * land in the same dependency-order buckets as all other calls. Used
+   * by the planner to inject RLS diff calls without routing them through
+   * `mapIssueToCall`.
+   */
+  readonly extraBucketableCalls?: readonly PostgresOpFactoryCall[];
 }
 
 export interface IssuePlannerValue {
@@ -727,6 +735,8 @@ type CallCategory =
   | 'dep'
   | 'drop'
   | 'table'
+  | 'rlsEnable'
+  | 'rlsPolicy'
   | 'column'
   | 'alter'
   | 'primaryKey'
@@ -760,6 +770,10 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
       return 'unique'; // after uniques, before indexes
     case 'createTable':
       return 'table';
+    case 'enableRowLevelSecurity':
+      return 'rlsEnable';
+    case 'createRlsPolicy':
+      return 'rlsPolicy';
     case 'addColumn':
       return 'column';
     case 'alterColumnType':
@@ -977,8 +991,10 @@ export function planIssues(
   // pattern strategies (`dependencyInstallCallStrategy`,
   // `storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) produce
   // individually classifiable calls that slot into DDL buckets alongside
-  // default-mapped calls.
-  const combinedBucketable = [...gatedDefault, ...gatedBucketable];
+  // default-mapped calls. Extra calls (e.g. RLS diff calls from planSql)
+  // are merged here so they sort into the same dependency-order buckets.
+  const extra = options.extraBucketableCalls ?? [];
+  const combinedBucketable = [...gatedDefault, ...gatedBucketable, ...extra];
   const byCategory = (cat: CallCategory) =>
     combinedBucketable.filter((c) => classifyCall(c) === cat);
 
@@ -986,6 +1002,8 @@ export function planIssues(
     ...byCategory('dep'),
     ...byCategory('drop'),
     ...byCategory('table'),
+    ...byCategory('rlsEnable'),
+    ...byCategory('rlsPolicy'),
     ...byCategory('column'),
     ...gatedRecipe,
     ...byCategory('alter'),
