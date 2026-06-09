@@ -36,16 +36,6 @@ export function storageTableForContract(
   return requireStorageTableForContract(contract, namespaceId, tableName).table;
 }
 
-export function domainModelNames(contract: Contract<SqlStorage>): string[] {
-  const names = new Set<string>();
-  for (const namespace of Object.values(contract.domain.namespaces)) {
-    for (const modelName of Object.keys(namespace.models)) {
-      names.add(modelName);
-    }
-  }
-  return [...names];
-}
-
 export function domainModelNamesInNamespace(
   contract: Contract<SqlStorage>,
   namespaceId: string,
