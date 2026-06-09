@@ -129,14 +129,28 @@ export interface EnumTypeHandle<
 // ---------------------------------------------------------------------------
 
 /**
- * The application input type a codec descriptor dictates for its values. The
- * `enumType` codec argument is a {@link ColumnTypeDescriptor}; descriptors may
- * carry an optional `__input` phantom that pins the codec's JS input type
- * (e.g. `string` for `pg/text@1`, `number` for `pg/int4@1`). When the descriptor
- * carries no phantom the input is unconstrained, so any member-value literal is
- * accepted and inferred verbatim.
+ * A codec typemap: codecId → `{ input, output }`, the same shape the query
+ * lanes consume (e.g. `{ 'pg/text@1': { input: string }, 'pg/int4@1': { input: number } }`).
+ * The bound `enumType` wrappers supply the target pack's typemap; the core
+ * defaults to an empty map (no codec is known), so member values stay
+ * unconstrained.
  */
-type CodecInput<Codec> = Codec extends { readonly __input?: infer In } ? In : unknown;
+export type CodecTypeMap = Record<string, { readonly input?: unknown }>;
+
+/**
+ * The application input type the codec dictates for an enum's member values:
+ * looks `Codec['codecId']` up in the supplied codec typemap. When the codecId
+ * isn't in the map (the core's empty default, or an unknown codec) the input is
+ * unconstrained, so any member-value literal is accepted and inferred verbatim.
+ */
+export type CodecInput<
+  CodecTypes extends CodecTypeMap,
+  Codec extends { readonly codecId: string },
+> = Codec['codecId'] extends keyof CodecTypes
+  ? CodecTypes[Codec['codecId']] extends { readonly input: infer In }
+    ? In
+    : unknown
+  : unknown;
 
 /**
  * Declare a domain enum for use in TS-authoring contracts.
@@ -165,12 +179,16 @@ type CodecInput<Codec> = Codec extends { readonly __input?: infer In } ? In : un
  * ```
  */
 export function enumType<
-  const Name extends string,
-  const Codec extends Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'>,
+  CodecTypes extends CodecTypeMap = Record<string, never>,
+  const Name extends string = string,
+  const Codec extends Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'> = Pick<
+    ColumnTypeDescriptor,
+    'codecId' | 'nativeType'
+  >,
   const Members extends readonly [
-    EnumMember<string, CodecInput<Codec>>,
-    ...EnumMember<string, CodecInput<Codec>>[],
-  ],
+    EnumMember<string, CodecInput<CodecTypes, Codec>>,
+    ...EnumMember<string, CodecInput<CodecTypes, Codec>>[],
+  ] = readonly [EnumMember<string, CodecInput<CodecTypes, Codec>>],
 >(
   name: Name,
   codec: Codec,
@@ -237,6 +255,41 @@ export function enumType(
     nameOf: (v: unknown) => valueToName.get(v),
     ordinalOf: (v: unknown) => valueToOrdinal.get(v) ?? -1,
   };
+}
+
+/**
+ * The signature of an `enumType` whose codec typemap is already bound — the
+ * shape a target-bound wrapper (e.g. `@prisma-next/postgres/contract-builder`)
+ * exposes. The member values are constrained to the codec's input type drawn
+ * from `CodecTypes` (so a `pg/text@1` codec rejects numeric members, etc.),
+ * while `Name`, `Codec`, and the member tuple still infer from the call.
+ */
+export type BoundEnumType<CodecTypes extends CodecTypeMap> = <
+  const Name extends string,
+  const Codec extends Pick<ColumnTypeDescriptor, 'codecId' | 'nativeType'>,
+  const Members extends readonly [
+    EnumMember<string, CodecInput<CodecTypes, Codec>>,
+    ...EnumMember<string, CodecInput<CodecTypes, Codec>>[],
+  ],
+>(
+  name: Name,
+  codec: Codec,
+  ...members: Members
+) => EnumTypeHandle<
+  Name,
+  MembersToValues<[...Members]>,
+  MembersToNames<[...Members]>,
+  MembersAccessorMap<[...Members]>
+>;
+
+/**
+ * Bind `enumType` to a target's codec typemap. The returned function is the
+ * same runtime `enumType`, retyped so member values are constrained to the
+ * codec's input type. Target packages call this with their pack's
+ * `ExtractCodecTypesFromPack<Pack>` to expose a codec-aware `enumType`.
+ */
+export function bindEnumType<CodecTypes extends CodecTypeMap>(): BoundEnumType<CodecTypes> {
+  return enumType;
 }
 
 /**
