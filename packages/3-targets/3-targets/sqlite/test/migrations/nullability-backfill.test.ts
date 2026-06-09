@@ -1,5 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -13,8 +13,9 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
 
-const stubLowerer: Lowerer = {
+const stubLowerer: DdlDriverLowerer = {
   lower: () => ({ sql: '', params: [] }),
+  lowerToDriverStatement: async () => ({ sql: '', params: [] }),
 };
 
 function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
@@ -98,10 +99,10 @@ function tightenedEmailContract() {
   });
 }
 
-describe('nullability-tightening backfill', () => {
+describe('nullability-tightening backfill', async () => {
   const planner = createSqliteMigrationPlanner(stubLowerer);
 
-  it("without 'data' in policy, recreate alone runs and would fail at runtime on NULLs", () => {
+  it("without 'data' in policy, recreate alone runs and would fail at runtime on NULLs", async () => {
     const result = planner.plan({
       contract: tightenedEmailContract(),
       schema: nullableEmailSchema(),
@@ -114,13 +115,13 @@ describe('nullability-tightening backfill', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const ops = result.plan.operations;
+    const ops = await Promise.all(result.plan.operations);
     expect(ops).toHaveLength(1);
     expect(ops[0]?.id).toBe('recreateTable.users');
     expect(ops[0]?.operationClass).toBe('destructive');
   });
 
-  it("with 'data' allowed, emits a backfill data-transform stub before the recreate", () => {
+  it("with 'data' allowed, emits a backfill data-transform stub before the recreate", async () => {
     const result = planner.plan({
       contract: tightenedEmailContract(),
       schema: nullableEmailSchema(),
@@ -150,7 +151,7 @@ describe('nullability-tightening backfill', () => {
     expect(ts).toContain('placeholder("users-email-backfill-sql")');
   });
 
-  it("relaxing NOT NULL → nullable does not emit a backfill even with 'data' allowed", () => {
+  it("relaxing NOT NULL → nullable does not emit a backfill even with 'data' allowed", async () => {
     // Swap: schema is NOT NULL, contract wants nullable.
     const schema = {
       tables: {
@@ -198,7 +199,7 @@ describe('nullability-tightening backfill', () => {
     if (result.kind !== 'success') return;
 
     // No data transform — just a widening recreate.
-    const ops = result.plan.operations;
+    const ops = await Promise.all(result.plan.operations);
     expect(ops).toHaveLength(1);
     expect(ops[0]?.id).toBe('recreateTable.users');
     expect(ops[0]?.operationClass).toBe('widening');

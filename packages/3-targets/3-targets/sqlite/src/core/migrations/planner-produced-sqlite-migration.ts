@@ -1,10 +1,12 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
+  MigrationPlanOperation,
   MigrationPlanWithAuthoringSurface,
   OpFactoryCall,
 } from '@prisma-next/framework-components/control';
 import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 import { renderOps } from './render-ops';
 import { renderCallsToTypeScript } from './render-typescript';
@@ -25,14 +27,14 @@ export class TypeScriptRenderableSqliteMigration
   readonly #meta: MigrationMeta;
   readonly #destination: SqliteMigrationDestinationInfo;
   readonly #spaceId: string;
-  readonly #lowerer: Lowerer | undefined;
+  readonly #lowerer: DdlDriverLowerer | undefined;
 
   constructor(
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
     destination?: SqliteMigrationDestinationInfo,
-    lowerer?: Lowerer,
+    lowerer?: DdlDriverLowerer,
   ) {
     super();
     this.#calls = calls;
@@ -42,8 +44,11 @@ export class TypeScriptRenderableSqliteMigration
     this.#lowerer = lowerer;
   }
 
-  override get operations(): readonly Op[] {
-    return renderOps(this.#calls, this.#lowerer);
+  override get operations(): readonly (Op | Promise<MigrationPlanOperation>)[] {
+    return blindCast<
+      readonly (Op | Promise<MigrationPlanOperation>)[],
+      'SqlMigrationPlanOperation<T> extends MigrationPlanOperation; Promise covariance is safe because ops are consumed via Promise.all'
+    >(renderOps(this.#calls, this.#lowerer));
   }
 
   override describe(): MigrationMeta {

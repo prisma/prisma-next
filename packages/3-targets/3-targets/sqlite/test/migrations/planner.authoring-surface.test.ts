@@ -1,5 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -12,8 +12,9 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
 
-const stubLowerer: Lowerer = {
+const stubLowerer: DdlDriverLowerer = {
   lower: () => ({ sql: '', params: [] }),
+  lowerToDriverStatement: async () => ({ sql: '', params: [] }),
 };
 
 function createContract(): Contract<SqlStorage> {
@@ -134,7 +135,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       });
     });
 
-    it('operations getter renders the IR via toOp() in emission order', () => {
+    it('operations getter renders the IR via toOp() in emission order', async () => {
       const planner = createSqliteMigrationPlanner(stubLowerer);
       const result = planner.plan({
         contract: createContract(),
@@ -146,7 +147,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
-      const ops = result.plan.operations;
+      const ops = await Promise.all(result.plan.operations);
       expect(ops).toHaveLength(1);
       expect(ops[0]?.id).toBe('table.user');
       expect(ops[0]?.operationClass).toBe('additive');

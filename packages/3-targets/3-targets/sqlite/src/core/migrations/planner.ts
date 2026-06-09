@@ -10,7 +10,7 @@ import {
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -28,7 +28,7 @@ import {
 import { sqlitePlannerStrategies } from './planner-strategies';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 
-export function createSqliteMigrationPlanner(lowerer: Lowerer): SqliteMigrationPlanner {
+export function createSqliteMigrationPlanner(lowerer: DdlDriverLowerer): SqliteMigrationPlanner {
   return new SqliteMigrationPlanner(lowerer);
 }
 
@@ -53,9 +53,9 @@ export type SqlitePlanResult =
 export class SqliteMigrationPlanner
   implements SqlMigrationPlanner<SqlitePlanTargetDetails>, MigrationPlanner<'sql', 'sqlite'>
 {
-  readonly #lowerer: Lowerer;
+  readonly #lowerer: DdlDriverLowerer;
 
-  constructor(lowerer: Lowerer) {
+  constructor(lowerer: DdlDriverLowerer) {
     this.#lowerer = lowerer;
   }
 

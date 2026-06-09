@@ -1,4 +1,4 @@
-import type { Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
 import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import { describe, expect, it } from 'vitest';
 import {
@@ -16,9 +16,10 @@ import type {
   SqliteTableSpec,
 } from '../../src/core/migrations/operations/shared';
 
-function stubLowerer(sql: string): Lowerer {
+function stubLowerer(sql: string): DdlDriverLowerer {
   return {
     lower: () => Object.freeze({ sql, params: Object.freeze([]) }),
+    lowerToDriverStatement: async () => Object.freeze({ sql, params: Object.freeze([]) }),
   };
 }
 
@@ -45,7 +46,7 @@ function tableSpec(
 }
 
 describe('CreateTableCall', () => {
-  it('produces an additive op with correct id, label, and execute/pre/postcheck SQL', () => {
+  it('produces an additive op with correct id, label, and execute/pre/postcheck SQL', async () => {
     const lowerer = stubLowerer(
       'CREATE TABLE "user" (\n  "id" INTEGER NOT NULL,\n  "email" TEXT NOT NULL,\n  PRIMARY KEY ("id")\n)',
     );
@@ -58,7 +59,7 @@ describe('CreateTableCall', () => {
     expect(call.operationClass).toBe('additive');
     expect(call.label).toBe('Create table user');
 
-    const op = call.toOp(lowerer);
+    const op = await call.toOp(lowerer);
     expect(op.id).toBe('table.user');
     expect(op.label).toBe('Create table user');
     expect(op.execute[0]?.sql).toContain('CREATE TABLE "user"');
@@ -68,10 +69,17 @@ describe('CreateTableCall', () => {
     expect(op.postcheck[0]?.sql).toContain("name = 'user'");
   });
 
-  it('passes columns and constraints to the lowerer', () => {
+  it('passes columns and constraints to the lowerer', async () => {
     const received: unknown[] = [];
-    const capturingLowerer: Lowerer = {
+    const capturingLowerer: DdlDriverLowerer = {
       lower: (ast) => {
+        received.push(ast);
+        return Object.freeze({
+          sql: 'CREATE TABLE "user" (\n  "id" INTEGER PRIMARY KEY AUTOINCREMENT\n)',
+          params: Object.freeze([]),
+        });
+      },
+      lowerToDriverStatement: async (ast) => {
         received.push(ast);
         return Object.freeze({
           sql: 'CREATE TABLE "user" (\n  "id" INTEGER PRIMARY KEY AUTOINCREMENT\n)',
@@ -80,13 +88,13 @@ describe('CreateTableCall', () => {
       },
     };
     const call = new CreateTableCall('user', [col('id', 'INTEGER PRIMARY KEY AUTOINCREMENT')]);
-    call.toOp(capturingLowerer);
+    await call.toOp(capturingLowerer);
     expect(received).toHaveLength(1);
   });
 
-  it('toOp() throws when no lowerer is provided', () => {
+  it('toOp() throws when no lowerer is provided', async () => {
     const call = new CreateTableCall('user', [col('id', 'INTEGER', { notNull: true })]);
-    expect(() => call.toOp()).toThrow('createSqliteMigrationPlanner');
+    await expect(call.toOp()).rejects.toThrow('createSqliteMigrationPlanner');
   });
 
   it('renderTypeScript() emits a this.createTable({...}) expression with col() calls', () => {

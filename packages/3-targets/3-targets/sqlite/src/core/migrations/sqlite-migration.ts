@@ -51,7 +51,7 @@ export abstract class SqliteMigration extends SqlMigration<SqlitePlanTargetDetai
     readonly ifNotExists?: boolean;
     readonly columns: readonly DdlColumn[];
     readonly constraints?: readonly DdlTableConstraint[];
-  }): SqlMigrationPlanOperation<SqlitePlanTargetDetails> {
+  }): Promise<SqlMigrationPlanOperation<SqlitePlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorSqliteMigrationStackMissing();
     }

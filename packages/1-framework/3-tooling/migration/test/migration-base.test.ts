@@ -251,14 +251,14 @@ describe('buildMigrationArtifacts', async () => {
   });
 
   it('throws a clear error when describe() returns invalid metadata', async () => {
-    expect(() =>
+    await expect(
       buildMigrationArtifacts(
         makeMigration([{ id: 'op1', label: 'Op 1', operationClass: 'additive' }], {
           bad: true,
         } as never),
         null,
       ),
-    ).toThrow(/describe\(\).*invalid/);
+    ).rejects.toThrow(/describe\(\).*invalid/);
   });
 
   // The on-disk loader (`MigrationMetadataSchema` in `io.ts`) rejects
@@ -266,7 +266,7 @@ describe('buildMigrationArtifacts', async () => {
   // Otherwise an authored migration could self-emit a package whose own
   // loader would refuse to read it back.
   it("rejects describe() returning from: '' (empty-string sentinel is not allowed)", async () => {
-    expect(() =>
+    await expect(
       buildMigrationArtifacts(
         makeMigration([{ id: 'op1', label: 'Op 1', operationClass: 'additive' }], {
           from: '',
@@ -274,7 +274,7 @@ describe('buildMigrationArtifacts', async () => {
         }),
         null,
       ),
-    ).toThrow(/describe\(\).*invalid/);
+    ).rejects.toThrow(/describe\(\).*invalid/);
   });
 
   it('derives providedInvariants from data ops with invariantId (sorted, deduped)', async () => {
