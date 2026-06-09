@@ -13,7 +13,7 @@ describe('static context (no runtime)', () => {
   });
 
   it('can build query plans from static context', () => {
-    const plan = db.sql.user.select('id', 'email').limit(1).build();
+    const plan = db.sql.public.user.select('id', 'email').limit(1).build();
 
     expect(plan.ast).toBeInstanceOf(SelectAst);
     expect(plan.meta).toMatchObject({ lane: 'dsl', target: 'postgres' });
@@ -40,7 +40,7 @@ describe('static context (no runtime)', () => {
     const targetSpy = vi.spyOn(executionStack.target, 'create');
     const extensionSpies = executionStack.extensionPacks.map((ext) => vi.spyOn(ext, 'create'));
 
-    db.sql.user.select('id', 'email').limit(1).build();
+    db.sql.public.user.select('id', 'email').limit(1).build();
 
     expect(targetSpy).not.toHaveBeenCalled();
     expect(adapterSpy).not.toHaveBeenCalled();

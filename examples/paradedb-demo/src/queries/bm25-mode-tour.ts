@@ -7,7 +7,7 @@ export async function bm25ModeTour() {
       note: "tokenized OR — items with 'with' OR 'cooling'",
       run: () =>
         db.runtime().execute(
-          db.sql.item
+          db.sql.public.item
             .select('id', 'description')
             .where((f, fns) => fns.paradeDbMatchAny(f.description, 'with cooling'))
             .build(),
@@ -18,7 +18,7 @@ export async function bm25ModeTour() {
       note: "tokenized AND — items with 'with' AND 'cooling' (any order)",
       run: () =>
         db.runtime().execute(
-          db.sql.item
+          db.sql.public.item
             .select('id', 'description')
             .where((f, fns) => fns.paradeDbMatchAll(f.description, 'with cooling'))
             .build(),
@@ -29,7 +29,7 @@ export async function bm25ModeTour() {
       note: 'exact ordered, consecutive — adjacent tokens',
       run: () =>
         db.runtime().execute(
-          db.sql.item
+          db.sql.public.item
             .select('id', 'description')
             .where((f, fns) => fns.paradeDbPhrase(f.description, 'cooling fan'))
             .build(),
@@ -40,7 +40,7 @@ export async function bm25ModeTour() {
       note: 'same tokens reversed — fails because phrase is order-sensitive',
       run: () =>
         db.runtime().execute(
-          db.sql.item
+          db.sql.public.item
             .select('id', 'description')
             .where((f, fns) => fns.paradeDbPhrase(f.description, 'fan cooling'))
             .build(),
@@ -51,7 +51,7 @@ export async function bm25ModeTour() {
       note: 'AND ignores order — both tokens present, anywhere',
       run: () =>
         db.runtime().execute(
-          db.sql.item
+          db.sql.public.item
             .select('id', 'description')
             .where((f, fns) => fns.paradeDbMatchAll(f.description, 'shoes running'))
             .build(),
@@ -62,7 +62,7 @@ export async function bm25ModeTour() {
       note: "same tokens — phrase requires the original 'running shoes' order",
       run: () =>
         db.runtime().execute(
-          db.sql.item
+          db.sql.public.item
             .select('id', 'description')
             .where((f, fns) => fns.paradeDbPhrase(f.description, 'shoes running'))
             .build(),
@@ -73,7 +73,7 @@ export async function bm25ModeTour() {
       note: 'exact indexed token — finds the literal post-tokenizer term',
       run: () =>
         db.runtime().execute(
-          db.sql.item
+          db.sql.public.item
             .select('id', 'description')
             .where((f, fns) => fns.paradeDbTerm(f.description, 'wireless'))
             .build(),
@@ -84,7 +84,7 @@ export async function bm25ModeTour() {
       note: 'multi-word string — never an indexed token, so empty',
       run: () =>
         db.runtime().execute(
-          db.sql.item
+          db.sql.public.item
             .select('id', 'description')
             .where((f, fns) => fns.paradeDbTerm(f.description, 'wireless mechanical'))
             .build(),

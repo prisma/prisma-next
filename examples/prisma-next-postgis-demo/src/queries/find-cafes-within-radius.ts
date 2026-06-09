@@ -17,7 +17,7 @@ import { db } from '../prisma/db';
  *      LIMIT $limit
  */
 export function findCafesWithinRadius(point: Geometry, metres: number, limit: number) {
-  return db.orm.Cafe.where((c) => c.location.distanceSphere(point).lte(metres))
+  return db.orm.public.Cafe.where((c) => c.location.distanceSphere(point).lte(metres))
     .orderBy((c) => c.location.distanceSphere(point).asc())
     .orderBy((c) => c.id.asc())
     .take(limit)

@@ -8,6 +8,8 @@ import { PostCollection, TaskCollection, UserCollection } from './collections';
 const context = db.context as ExecutionContext<Contract>;
 
 export function createOrmClient(runtime: Runtime) {
+  // The ORM surface is always qualified; alias to the `public` namespace facet
+  // (this is a single-namespace postgres contract) so models are reached flat.
   return orm({
     runtime,
     context,
@@ -16,5 +18,5 @@ export function createOrmClient(runtime: Runtime) {
       Post: PostCollection,
       Task: TaskCollection,
     },
-  });
+  }).public;
 }

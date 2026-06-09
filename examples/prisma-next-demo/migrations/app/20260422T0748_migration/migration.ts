@@ -21,12 +21,12 @@ export default class M extends Migration {
     return [
       this.dataTransform(endContract, 'handle-nulls-user-displayName', {
         check: () =>
-          db.sql.user
+          db.sql.public.user
             .select('id')
             .where((f, fns) => fns.eq(f.displayName, null))
             .limit(1),
         run: () =>
-          db.sql.user
+          db.sql.public.user
             .update({ displayName: 'Anonymous' })
             .where((f, fns) => fns.eq(f.displayName, null)),
       }),

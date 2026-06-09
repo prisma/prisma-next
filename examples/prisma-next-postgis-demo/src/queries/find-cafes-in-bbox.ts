@@ -12,5 +12,5 @@ import { db } from '../prisma/db';
  */
 export function findCafesInBbox(bbox: readonly [number, number, number, number]) {
   const envelope = bboxPolygon(bbox, 4326);
-  return db.orm.Cafe.where((c) => c.location.intersectsBbox(envelope)).all();
+  return db.orm.public.Cafe.where((c) => c.location.intersectsBbox(envelope)).all();
 }

@@ -11,7 +11,7 @@ export async function bm25ProximityChain(
   steps: readonly ProximityChainStep[],
   limit = 20,
 ) {
-  const plan = db.sql.item
+  const plan = db.sql.public.item
     .select('id', 'description', 'category', 'rating')
     .select('score', (f, fns) => fns.paradeDbScore(f.id))
     .where((f, fns) => {
