@@ -25,6 +25,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type PolymorphismInfo,
@@ -364,22 +365,41 @@ function buildManyToManyJunctionArtifacts(
     namespaceId,
   } = through;
 
-  const joinOnPairs = childColumns.map((junctionCol, i) =>
-    BinaryExpr.eq(
-      ColumnRef.of(junctionTable, junctionCol),
-      ColumnRef.of(childTableRef, targetColumns[i] ?? junctionCol),
-    ),
+  invariant(
+    childColumns.length === targetColumns.length,
+    `M:N junction '${junctionTable}': childColumns (${childColumns.length}) and targetColumns (${targetColumns.length}) must have equal length`,
   );
+  invariant(
+    parentColumns.length === parentLocalColumns.length,
+    `M:N junction '${junctionTable}': parentColumns (${parentColumns.length}) and parentLocalColumns (${parentLocalColumns.length}) must have equal length`,
+  );
+
+  const joinOnPairs = childColumns.map((junctionCol, i) => {
+    const targetCol = targetColumns[i];
+    assertDefined(
+      targetCol,
+      `M:N junction '${junctionTable}': missing target column at index ${i}`,
+    );
+    return BinaryExpr.eq(
+      ColumnRef.of(junctionTable, junctionCol),
+      ColumnRef.of(childTableRef, targetCol),
+    );
+  });
   const firstJoinPair = joinOnPairs[0];
   const joinOn: AnyExpression =
     joinOnPairs.length === 1 && firstJoinPair ? firstJoinPair : AndExpr.of(joinOnPairs);
 
-  const correlationPairs = parentColumns.map((junctionCol, i) =>
-    BinaryExpr.eq(
+  const correlationPairs = parentColumns.map((junctionCol, i) => {
+    const parentLocalCol = parentLocalColumns[i];
+    assertDefined(
+      parentLocalCol,
+      `M:N junction '${junctionTable}': missing parent-local column at index ${i}`,
+    );
+    return BinaryExpr.eq(
       ColumnRef.of(junctionTable, junctionCol),
-      ColumnRef.of(parentTableName, parentLocalColumns[i] ?? junctionCol),
-    ),
-  );
+      ColumnRef.of(parentTableName, parentLocalCol),
+    );
+  });
   const firstCorrelationPair = correlationPairs[0];
   const whereExpr: AnyExpression =
     correlationPairs.length === 1 && firstCorrelationPair
