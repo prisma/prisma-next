@@ -9,7 +9,7 @@
 
 ## Context
 
-ADR 223 made a target's default namespace a static descriptor fact and deferred multi-namespace flat access and bare-name collision ergonomics. Two questions had to be decided: how a multi-namespace contract is navigated, and how single-namespace ergonomics are preserved.
+ADR 223 made a target's default namespace a static descriptor fact and deferred multi-namespace flat access and bare-name collision ergonomics. Two questions had to be decided: how a contract on a target that supports multiple namespaces is navigated, and how a target that supports a single namespace keeps flat ergonomics. Throughout, whether namespaces are in play is a property of the **target**, not of the contract.
 
 ---
 
@@ -26,11 +26,14 @@ await orm.public.Profile.find({ where: { id } });
 
 This separates **navigation** (which namespace's table/model?) from **ergonomics** (don't make me type the namespace when there's only one): navigation is a builder concern, ergonomics a facade concern.
 
-### 2. Flat ergonomics are a facade concern; each facade projects its own shape, statically
+### 2. Whether call sites must qualify is decided by the target, not the contract
 
-A multi-namespace facade (Postgres) exposes the qualified surface — call sites qualify (`db.sql.public.users`). A single-namespace facade (SQLite) exposes its sole namespace directly, so flat `db.sql.users` / `db.orm.User` work.
+Each facade projects its surface by whether its **target** supports more than one namespace — independently of how many namespaces a given contract actually declares:
 
-There is **no shared, descriptor-driven projection**. The discriminator (`defaultNamespaceId`) is an authoring-time fact, deliberately absent from the runtime descriptor and the emitted contract (TML-2766), so a facade cannot read it at runtime. Each facade already knows its own target, so it states its shape directly.
+- A target that supports multiple namespaces (Postgres) exposes the qualified surface. Call sites name the namespace (`db.sql.public.users`) **even when the contract declares only a single namespace**.
+- A target that supports a single namespace (SQLite, Mongo) exposes that namespace's tables and models directly, so access is flat (`db.sql.users`).
+
+A target declares which it is through its descriptor's default namespace: the unbound sentinel marks a single-namespace target; any concrete default (e.g. Postgres's `public`) marks a multi-namespace one. Each facade knows its own target, so it states the right shape directly. There is **no shared, descriptor-driven projection**, and there cannot be one: the discriminator is an authoring-time fact, deliberately absent from the runtime descriptor and the emitted contract (TML-2766), so a facade cannot read it at runtime.
 
 ### 3. Mongo needs no projection
 
@@ -44,8 +47,8 @@ Accessing an unknown namespace, table, or model yields `undefined` at runtime; t
 
 ## Consequences
 
-- **Breaking change (deliberate):** consumers accessing a multi-namespace (Postgres) contract by bare name must qualify with the namespace. Recorded as the `qualify-flat-builder-accessors` upgrade entry (0.12 → 0.13).
-- Single-namespace SQLite/Mongo consumers write flat `db.sql.<table>` / `db.orm.<Model>` with no change.
+- **Breaking change (deliberate):** consumers of a target that supports multiple namespaces (Postgres) must qualify bare-name access with the namespace — including contracts that declare only one namespace. Recorded as the `qualify-flat-builder-accessors` upgrade entry (0.12 → 0.13).
+- Consumers of a single-namespace target (SQLite, Mongo) write flat `db.sql.<table>` / `db.orm.<Model>` with no change.
 - The facade adds no descriptor plumbing, consistent with TML-2766's minimal runtime descriptor.
 
 ---
