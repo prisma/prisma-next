@@ -272,11 +272,13 @@ describe('printPsl', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'role',
-              typeParams: { values: ['USER', 'ADMIN'] },
+          enumTypes: {
+            public: {
+              role: {
+                codecId: 'pg/enum@1',
+                nativeType: 'role',
+                typeParams: { values: ['USER', 'ADMIN'] },
+              },
             },
           },
         },

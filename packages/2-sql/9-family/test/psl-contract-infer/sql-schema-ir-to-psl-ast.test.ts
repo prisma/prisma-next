@@ -96,11 +96,13 @@ describe('sqlSchemaIrToPslAst', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            role_t: {
-              codecId: 'pg/enum@1',
-              nativeType: 'role_t',
-              typeParams: { values: ['admin', 'user'] },
+          enumTypes: {
+            public: {
+              role_t: {
+                codecId: 'pg/enum@1',
+                nativeType: 'role_t',
+                typeParams: { values: ['admin', 'user'] },
+              },
             },
           },
         },
@@ -114,7 +116,7 @@ describe('sqlSchemaIrToPslAst', () => {
     expect(roleField?.typeName).toBe('RoleT');
   });
 
-  it('links columns to enums and emits a null-byte-free @@map for schema-qualified storage keys', () => {
+  it('links columns to enums and emits a clean @@map for schema-nested storage', () => {
     const schemaIR = ir({
       tables: {
         applications: {
@@ -131,11 +133,13 @@ describe('sqlSchemaIrToPslAst', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            ['public\u0000application_kind']: {
-              codecId: 'pg/enum@1',
-              nativeType: 'application_kind',
-              typeParams: { values: ['complete', 'formless'] },
+          enumTypes: {
+            public: {
+              application_kind: {
+                codecId: 'pg/enum@1',
+                nativeType: 'application_kind',
+                typeParams: { values: ['complete', 'formless'] },
+              },
             },
           },
         },
@@ -149,7 +153,6 @@ describe('sqlSchemaIrToPslAst', () => {
     const mapArg = enumDecl?.attributes.find((a) => a.name === 'map')?.args[0];
     const mapValue = mapArg && mapArg.kind === 'positional' ? mapArg.value : '';
     expect(mapValue).toBe('"application_kind"');
-    expect(mapValue).not.toContain('\u0000');
 
     const statusField = flatPslModels(ast)[0]?.fields.find((f) => f.name === 'status');
     expect(statusField?.typeName).toBe('ApplicationKind');

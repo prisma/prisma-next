@@ -8,7 +8,6 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { enumStorageCompoundKey } from '../../src/core/migrations/enum-planning';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import {
   AddEnumValuesCall,
@@ -78,20 +77,25 @@ function makeCollisionContract(
 function makeLiveEnumSchema(
   entries: ReadonlyArray<{ schemaName: string; nativeType: string; values: readonly string[] }>,
 ): SqlSchemaIR {
-  const storageTypes: Record<
+  const enumTypes: Record<
     string,
-    { codecId: string; nativeType: string; typeParams: { values: readonly string[] } }
+    Record<
+      string,
+      { codecId: string; nativeType: string; typeParams: { values: readonly string[] } }
+    >
   > = {};
   for (const entry of entries) {
-    storageTypes[enumStorageCompoundKey(entry.schemaName, entry.nativeType)] = {
+    const bySchema = enumTypes[entry.schemaName] ?? {};
+    bySchema[entry.nativeType] = {
       codecId: PG_ENUM_CODEC_ID,
       nativeType: entry.nativeType,
       typeParams: { values: entry.values },
     };
+    enumTypes[entry.schemaName] = bySchema;
   }
   return {
     tables: {},
-    annotations: { pg: { storageTypes } },
+    annotations: { pg: { enumTypes } },
   };
 }
 
