@@ -131,7 +131,7 @@ const db = sql({
     contract: endContract,
     stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
   }),
-});
+}).public;
 
 export default class M extends Migration {
   override describe() {
