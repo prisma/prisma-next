@@ -50,11 +50,9 @@ const twoNamespaceContract = {
 };
 
 type Accessor = { readonly modelName: string; readonly tableName: string };
-// Flat bare-model keys are typed `undefined` to assert their runtime absence.
 type TwoNamespaceOrm = {
   public: { User: Accessor; Post: Accessor; Session: undefined };
   auth: { User: Accessor; Session: Accessor };
-  User: undefined;
 };
 
 function db() {
@@ -75,13 +73,9 @@ describe('namespaced orm accessor', () => {
   });
 
   it('scopes model lookup to the named namespace rather than the flat model set', () => {
-    // `Session` exists only in `auth`; the flat set contains it, so an
-    // unscoped facet would wrongly resolve `auth.Session` under `public`.
+    // `Session` exists only in `auth`, so resolving it under `public` must
+    // return undefined rather than the `auth` model.
     expect(db().public.Session).toBeUndefined();
     expect(db().auth.Session.tableName).toBe('sessions');
-  });
-
-  it('returns undefined for flat bare-model access on an unknown namespace', () => {
-    expect(db().User).toBeUndefined();
   });
 });

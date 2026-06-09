@@ -39,28 +39,26 @@ import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 export type SqliteTargetId = 'sqlite';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
-type UnboundSqlFacet<TContract extends Contract<SqlStorage>> =
+type UnboundSql<TContract extends Contract<SqlStorage>> =
   Db<TContract>[typeof UNBOUND_NAMESPACE_ID];
-type UnboundOrmFacet<TContract extends Contract<SqlStorage>> =
+type UnboundOrm<TContract extends Contract<SqlStorage>> =
   OrmClient<TContract>[typeof UNBOUND_NAMESPACE_ID];
 
-function unboundFacet<TFacet>(builderOutput: {
-  readonly [UNBOUND_NAMESPACE_ID]?: unknown;
-}): TFacet {
-  return blindCast<TFacet, 'the unbound-namespace facet always exists on a sqlite builder output'>(
+function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
+  return blindCast<T, 'the unbound namespace always exists on a sqlite builder output'>(
     builderOutput[UNBOUND_NAMESPACE_ID],
   );
 }
 
 export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>>
   extends TransactionContext {
-  readonly sql: UnboundSqlFacet<TContract>;
-  readonly orm: UnboundOrmFacet<TContract>;
+  readonly sql: UnboundSql<TContract>;
+  readonly orm: UnboundOrm<TContract>;
 }
 
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
-  readonly sql: UnboundSqlFacet<TContract>;
-  readonly orm: UnboundOrmFacet<TContract>;
+  readonly sql: UnboundSql<TContract>;
+  readonly orm: UnboundOrm<TContract>;
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<SqliteTargetId>;
@@ -72,7 +70,7 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
     CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
   >(
     declaration: D,
-    callback: (sql: UnboundSqlFacet<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+    callback: (sql: UnboundSql<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
   ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
   transaction<R>(fn: (tx: SqliteTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
   close(): Promise<void>;
@@ -140,7 +138,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   const rawCodecInferer = stack.adapter.rawCodecInferer;
   const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
 
-  const sql: UnboundSqlFacet<TContract> = unboundFacet(
+  const sql: UnboundSql<TContract> = unboundNamespace(
     sqlBuilder<TContract>({ context, rawCodecInferer }),
   );
   let runtimeInstance: Runtime | undefined;
@@ -206,7 +204,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     return runtimeInstance;
   };
 
-  const orm: UnboundOrmFacet<TContract> = unboundFacet(
+  const orm: UnboundOrm<TContract> = unboundNamespace(
     ormBuilder({
       context,
       runtime: {
@@ -264,7 +262,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
     >(
       declaration: D,
-      callback: (sql: UnboundSqlFacet<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+      callback: (sql: UnboundSql<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
     ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
       return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
     },
@@ -277,14 +275,14 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
         return Promise.reject(err);
       }
       return withTransaction(runtime, (txCtx) => {
-        const txSql: UnboundSqlFacet<TContract> = unboundFacet(
+        const txSql: UnboundSql<TContract> = unboundNamespace(
           sqlBuilder<TContract>({
             context,
             rawCodecInferer,
           }),
         );
 
-        const txOrm: UnboundOrmFacet<TContract> = unboundFacet(
+        const txOrm: UnboundOrm<TContract> = unboundNamespace(
           ormBuilder({
             runtime: {
               execute(plan) {
