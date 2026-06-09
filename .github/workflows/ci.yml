@@ -2,6 +2,7 @@ name: CI (PR)
 
 on:
   pull_request:
+  merge_group:
 
 # Least-privilege GITHUB_TOKEN: only repo checkout needs a scope here. The
 # pnpm/Turbo caches (actions/cache) use the runner's cache runtime token, not
@@ -10,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
