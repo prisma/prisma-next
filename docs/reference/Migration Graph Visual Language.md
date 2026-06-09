@@ -1,14 +1,15 @@
-# tier-3 `migration graph` — hand-drawn layout mockups
+# Migration Graph Rendering — Visual Language
 
-Design conversation artifact. These are **hand-drawn**, not generated — the point
-is to settle the visual language before coding the renderer. Hashes/names are real,
-taken from `prototype/gallery.md` (the fixture topologies).
+The locked visual vocabulary for the Tier-3 `migration graph` / `list` / `status`
+renderer: the glyph alphabet, lane/column layout, and the worked picture for each
+fixture topology. Companion to the [architecture](./12.%20Migration%20Graph%20Rendering.md);
+this file is the glyph/layout contract, that file is the model behind it. The
+pictures use real fixture hashes/names.
 
-Carries forward the device from the original
-`migration-graph-display-scenarios.md` draft: **a direction arrow in the edge's own
+The core device: **a direction arrow in the edge's own
 lane** (`↑` forward, `↓` rollback).
 
-> **Color extension (TML-2773, slice `lane-colors-and-legend`).** These mockups are
+> **Color extension.** These mockups are
 > drawn **monochrome** — every layout rule below must read unambiguously without
 > color (rule 4 is explicit about this: the lane that owns the label carries the
 > arrow, so a wide fan is unambiguous in monochrome). On top of that monochrome-

@@ -205,11 +205,11 @@ None of these are in scope for this project. The project's claim is "the structu
 
 ## Sequencing constraints
 
-This project depends on no other shaping-stage projects in the umbrella. It is the most independent of the four constituents and can land first.
+This project has no *build*-stage dependency on the other umbrella projects — the code can land first.
 
 It does *not* depend on [TML-2459](../target-extensible-ir/spec.md) (TML-2459 is about IR; this project is about runtime). The two projects are siblings — the same three-layer recipe at two different concerns — but they share no code path, so they can land in either order.
 
-It does *not* depend on [postgres-rls](../postgres-rls/spec.md) (RLS is the static contract side; this project is the dynamic runtime side). They can run in parallel.
+**Its proof depends on [postgres-rls](../postgres-rls/spec.md), though.** RLS is the static contract side and this is the dynamic runtime side, so the *code* is independent — but the whole point of the below-middleware raw-connection accessor is that a `SET LOCAL role` issued through it gates access, and demonstrating that requires RLS policies + roles to enforce against. So this project's end-to-end validation follows `postgres-rls`, even though implementation can start in parallel.
 
 It does *not* depend on [cross-contract-refs](../cross-contract-refs/spec.md).
 
