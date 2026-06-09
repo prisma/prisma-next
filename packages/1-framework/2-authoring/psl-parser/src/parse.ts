@@ -1,7 +1,10 @@
 import type { PslDiagnosticCode } from '@prisma-next/framework-components/psl-ast';
+import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { type Range, SourceFile } from './source-file';
+import { DocumentAst } from './syntax/ast/declarations';
 import type { GreenNode } from './syntax/green';
 import { GreenNodeBuilder } from './syntax/green-builder';
+import { createSyntaxTree } from './syntax/red';
 import type { SyntaxKind } from './syntax/syntax-kind';
 import { type Token, Tokenizer, type TokenKind } from './tokenizer';
 
@@ -9,6 +12,12 @@ export interface ParseDiagnostic {
   readonly code: PslDiagnosticCode;
   readonly message: string;
   readonly range: Range;
+}
+
+export interface ParseResult {
+  readonly document: DocumentAst;
+  readonly diagnostics: readonly ParseDiagnostic[];
+  readonly sourceFile: SourceFile;
 }
 
 const TRIVIA_KINDS: ReadonlySet<TokenKind> = new Set<TokenKind>([
@@ -61,6 +70,7 @@ export interface ParserCursor {
   bump(): Token;
   captureBalancedBraces(): void;
   recoverToSyncPoint(): void;
+  flushTrivia(): void;
   diagnostic(code: PslDiagnosticCode, message: string, tokenIndex: number): void;
 }
 
@@ -171,6 +181,10 @@ class Cursor implements ParserCursor {
       this.#builder.token(token.kind, token.text);
       this.#pos++;
     }
+  }
+
+  flushTrivia(): void {
+    this.#flushTrivia();
   }
 
   diagnostic(code: PslDiagnosticCode, message: string, tokenIndex: number): void {
@@ -387,4 +401,289 @@ function parseQualifierSegments(cursor: ParserCursor, separator: 'Colon' | 'Dot'
       parseIdentifier(cursor);
     }
   }
+}
+
+const UNTERMINATED_BLOCK = 'PSL_UNTERMINATED_BLOCK';
+const UNSUPPORTED_TOP_LEVEL_BLOCK = 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK';
+const INVALID_NAMESPACE_BLOCK = 'PSL_INVALID_NAMESPACE_BLOCK';
+const INVALID_MODEL_MEMBER = 'PSL_INVALID_MODEL_MEMBER';
+const INVALID_ENUM_MEMBER = 'PSL_INVALID_ENUM_MEMBER';
+const INVALID_TYPES_MEMBER = 'PSL_INVALID_TYPES_MEMBER';
+const INVALID_EXTENSION_BLOCK_MEMBER = 'PSL_INVALID_EXTENSION_BLOCK_MEMBER';
+
+type MemberParser = (cursor: ParserCursor) => void;
+
+interface DocumentState {
+  topLevelTypesSeen: boolean;
+}
+
+/**
+ * Drives the recursive descent over a full PSL document. Tokenizes via the
+ * substrate cursor, builds a complete green/red tree wrapped as a
+ * {@link DocumentAst}, collects every syntactic {@link ParseDiagnostic}, and
+ * never throws — malformed input yields diagnostics and a recovered tree, not
+ * an exception.
+ */
+export function parse(source: string): ParseResult {
+  const cursor = createParserCursor(source);
+  const green = parseDocument(cursor);
+  const root = createSyntaxTree(green);
+  const document = DocumentAst.cast(root) ?? new DocumentAst(root);
+  return { document, diagnostics: cursor.diagnostics, sourceFile: cursor.sourceFile };
+}
+
+function parseDocument(cursor: ParserCursor): GreenNode {
+  cursor.startNode('Document');
+  const state: DocumentState = { topLevelTypesSeen: false };
+  while (cursor.peekKind() !== 'Eof') {
+    parseDeclaration(cursor, false, state);
+  }
+  cursor.flushTrivia(); // attach trailing trivia so the round-trip stays lossless
+  return cursor.finishNode();
+}
+
+/**
+ * Recognises one top-level (or namespace-body) declaration. Recognition is
+ * keyword + bounded `peekKind` lookahead: `model`/`enum`/`namespace` need a name
+ * then `{`; `type {` is a types block while `type Ident {` is a composite type;
+ * any other `kw [Ident] {` is a generic block. Anything else is unsupported.
+ */
+function parseDeclaration(
+  cursor: ParserCursor,
+  insideNamespace: boolean,
+  state: DocumentState,
+): void {
+  if (cursor.peekKind() === 'Ident') {
+    const keyword = cursor.peekToken().text;
+    if (keyword === 'model' && nameThenBrace(cursor)) {
+      parseNamedBlock(cursor, 'ModelDeclaration', parseModelMember);
+      return;
+    }
+    if (keyword === 'enum' && nameThenBrace(cursor)) {
+      parseNamedBlock(cursor, 'EnumDeclaration', parseEnumMember);
+      return;
+    }
+    if (keyword === 'namespace' && nameThenBrace(cursor)) {
+      parseNamespace(cursor, insideNamespace, state);
+      return;
+    }
+    if (keyword === 'type') {
+      if (cursor.peekKind(1) === 'LBrace') {
+        parseTypesBlock(cursor, insideNamespace, state);
+        return;
+      }
+      if (cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace') {
+        parseNamedBlock(cursor, 'CompositeTypeDeclaration', parseModelMember);
+        return;
+      }
+    } else if (keyword !== 'model' && keyword !== 'enum' && keyword !== 'namespace') {
+      if (cursor.peekKind(1) === 'LBrace') {
+        parseGenericBlock(cursor, false);
+        return;
+      }
+      if (cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace') {
+        parseGenericBlock(cursor, true);
+        return;
+      }
+    }
+  }
+  parseUnsupportedTopLevel(cursor);
+}
+
+function nameThenBrace(cursor: ParserCursor): boolean {
+  return cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace';
+}
+
+function parseNamedBlock(cursor: ParserCursor, kind: SyntaxKind, parseMember: MemberParser): void {
+  cursor.startNode(kind);
+  cursor.bump(); // keyword
+  parseIdentifier(cursor); // name
+  parseBlockBody(cursor, parseMember);
+  cursor.finishNode();
+}
+
+function parseGenericBlock(cursor: ParserCursor, hasName: boolean): void {
+  cursor.startNode('BlockDeclaration');
+  cursor.bump(); // keyword
+  if (hasName) {
+    parseIdentifier(cursor);
+  }
+  parseBlockBody(cursor, parseKeyValueMember);
+  cursor.finishNode();
+}
+
+function parseNamespace(
+  cursor: ParserCursor,
+  insideNamespace: boolean,
+  state: DocumentState,
+): void {
+  const keywordIndex = cursor.currentSignificantIndex();
+  cursor.startNode('Namespace');
+  cursor.bump(); // namespace
+  const name = cursor.peekKind() === 'Ident' ? cursor.peekToken().text : '';
+  if (cursor.peekKind() === 'Ident') {
+    parseIdentifier(cursor);
+  }
+  if (insideNamespace) {
+    cursor.diagnostic(INVALID_NAMESPACE_BLOCK, 'Namespace blocks may not nest', keywordIndex);
+  } else if (name === UNSPECIFIED_PSL_NAMESPACE_ID) {
+    cursor.diagnostic(
+      INVALID_NAMESPACE_BLOCK,
+      'Namespace name is reserved for the parser-synthesised bucket',
+      keywordIndex,
+    );
+  }
+  parseBlockBody(cursor, (inner) => parseDeclaration(inner, true, state));
+  cursor.finishNode();
+}
+
+function parseTypesBlock(
+  cursor: ParserCursor,
+  insideNamespace: boolean,
+  state: DocumentState,
+): void {
+  const keywordIndex = cursor.currentSignificantIndex();
+  cursor.startNode('TypesBlock');
+  if (insideNamespace) {
+    cursor.diagnostic(
+      INVALID_NAMESPACE_BLOCK,
+      '`types` blocks must be declared at the document top level',
+      keywordIndex,
+    );
+  } else if (state.topLevelTypesSeen) {
+    cursor.diagnostic(
+      INVALID_TYPES_MEMBER,
+      'Only one top-level `types` block is allowed',
+      keywordIndex,
+    );
+  } else {
+    state.topLevelTypesSeen = true;
+  }
+  cursor.bump(); // type
+  parseBlockBody(cursor, parseNamedTypeMember);
+  cursor.finishNode();
+}
+
+/**
+ * Parses a `{ … }` block body: consumes the braces, dispatches each member to
+ * `parseMember` until the closing brace or EOF, and flags an unclosed block.
+ * Every `parseMember` consumes at least one significant token, so the loop
+ * always terminates.
+ */
+function parseBlockBody(cursor: ParserCursor, parseMember: MemberParser): void {
+  const braceIndex = cursor.currentSignificantIndex();
+  cursor.bump(); // LBrace
+  for (;;) {
+    const kind = cursor.peekKind();
+    if (kind === 'RBrace' || kind === 'Eof') break;
+    parseMember(cursor);
+  }
+  if (cursor.peekKind() === 'RBrace') {
+    cursor.bump();
+  } else {
+    cursor.diagnostic(UNTERMINATED_BLOCK, 'Block is not closed before end of input', braceIndex);
+  }
+}
+
+function parseUnsupportedTopLevel(cursor: ParserCursor): void {
+  cursor.diagnostic(
+    UNSUPPORTED_TOP_LEVEL_BLOCK,
+    'Unsupported top-level declaration',
+    cursor.currentSignificantIndex(),
+  );
+  cursor.bump();
+  cursor.recoverToSyncPoint();
+}
+
+function parseModelMember(cursor: ParserCursor): void {
+  const kind = cursor.peekKind();
+  if (kind === 'DoubleAt') {
+    parseAttribute(cursor);
+    return;
+  }
+  if (kind === 'Ident') {
+    parseField(cursor);
+    return;
+  }
+  invalidMember(cursor, INVALID_MODEL_MEMBER, 'Invalid model member');
+}
+
+function parseEnumMember(cursor: ParserCursor): void {
+  const kind = cursor.peekKind();
+  if (kind === 'DoubleAt') {
+    parseAttribute(cursor);
+    return;
+  }
+  if (kind === 'Ident') {
+    parseEnumValue(cursor);
+    return;
+  }
+  invalidMember(cursor, INVALID_ENUM_MEMBER, 'Invalid enum member');
+}
+
+function parseNamedTypeMember(cursor: ParserCursor): void {
+  if (cursor.peekKind() === 'Ident') {
+    parseNamedType(cursor);
+    return;
+  }
+  invalidMember(cursor, INVALID_TYPES_MEMBER, 'Invalid types block member');
+}
+
+function parseKeyValueMember(cursor: ParserCursor): void {
+  if (cursor.peekKind() === 'Ident') {
+    parseKeyValue(cursor);
+    return;
+  }
+  invalidMember(cursor, INVALID_EXTENSION_BLOCK_MEMBER, 'Invalid block entry');
+}
+
+function invalidMember(cursor: ParserCursor, code: PslDiagnosticCode, message: string): void {
+  cursor.diagnostic(code, message, cursor.currentSignificantIndex());
+  cursor.bump(); // consume the offending token so the member loop makes progress
+  cursor.recoverToSyncPoint();
+}
+
+function parseField(cursor: ParserCursor): void {
+  cursor.startNode('FieldDeclaration');
+  parseIdentifier(cursor); // name
+  parseTypeAnnotation(cursor);
+  while (cursor.peekKind() === 'At') {
+    parseAttribute(cursor);
+  }
+  cursor.finishNode();
+}
+
+function parseEnumValue(cursor: ParserCursor): void {
+  cursor.startNode('EnumValueDeclaration');
+  parseIdentifier(cursor); // name
+  while (cursor.peekKind() === 'At') {
+    parseAttribute(cursor);
+  }
+  cursor.finishNode();
+}
+
+function parseNamedType(cursor: ParserCursor): void {
+  cursor.startNode('NamedTypeDeclaration');
+  parseIdentifier(cursor); // name
+  if (cursor.peekKind() === 'Equals') {
+    cursor.bump();
+  }
+  parseTypeAnnotation(cursor);
+  while (cursor.peekKind() === 'At') {
+    parseAttribute(cursor);
+  }
+  cursor.finishNode();
+}
+
+function parseKeyValue(cursor: ParserCursor): void {
+  cursor.startNode('KeyValuePair');
+  parseIdentifier(cursor); // key
+  if (cursor.peekKind() === 'Equals') {
+    cursor.bump();
+  }
+  const value = parseExpression(cursor);
+  if (!value && cursor.peekKind() === 'LBrace') {
+    cursor.captureBalancedBraces();
+  }
+  cursor.finishNode();
 }
