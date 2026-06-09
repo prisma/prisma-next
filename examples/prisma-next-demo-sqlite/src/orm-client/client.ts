@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { orm } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Runtime } from '@prisma-next/sql-runtime';
@@ -7,5 +8,7 @@ import { db } from '../prisma/db';
 const context = db.context as ExecutionContext<Contract>;
 
 export function createOrmClient(runtime: Runtime) {
-  return orm({ runtime, context });
+  // The ORM surface is always qualified; alias to the unbound namespace facet
+  // (single-namespace sqlite) so models are reached flat.
+  return orm({ runtime, context })[UNBOUND_NAMESPACE_ID];
 }
