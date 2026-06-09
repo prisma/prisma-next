@@ -50,10 +50,12 @@ const twoNamespaceContract = {
 };
 
 type Accessor = { readonly modelName: string; readonly tableName: string };
+// The orm client is namespace-facets only; flat by-bare-model keys are gone.
+// They are modelled here as `undefined` to assert their runtime absence.
 type TwoNamespaceOrm = {
   public: { User: Accessor; Post: Accessor; Session: undefined };
   auth: { User: Accessor; Session: Accessor };
-  User: Accessor;
+  User: undefined;
 };
 
 function db() {
@@ -80,11 +82,11 @@ describe('namespaced orm accessor', () => {
     expect(db().auth.Session.tableName).toBe('sessions');
   });
 
-  it('throws on flat bare-name access against a multi-namespace contract (bare=default deferred)', () => {
-    // With a required, leading namespace the flat surface resolves the sole
-    // domain namespace; a multi-namespace contract has no sole namespace, so
-    // bare access throws until bare=default lands. Namespace-qualified access
-    // (db().public.User) remains the supported path.
-    expect(() => db().User).toThrow(/exactly one domain namespace/);
+  it('no longer exposes a flat by-bare-model surface — flat access yields undefined', () => {
+    // The flat fallback branch was removed: a bare model name is not a namespace
+    // key, so the proxy resolves to `undefined` (rather than resolving the sole
+    // namespace or throwing). Namespace-qualified access (db().public.User) is
+    // the sole supported path.
+    expect(db().User).toBeUndefined();
   });
 });

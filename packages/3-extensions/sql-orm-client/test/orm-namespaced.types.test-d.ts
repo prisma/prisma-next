@@ -6,13 +6,18 @@ import { createMockRuntime, getTestContext, type TestContract } from './helpers'
 
 const db = orm({ runtime: createMockRuntime(), context: getTestContext() });
 
-test('the namespace facet exposes its models as the same collection as the flat surface', () => {
-  expectTypeOf(db.public.User).toEqualTypeOf(db.User);
-  expectTypeOf(db.public.Post).toEqualTypeOf(db.Post);
+test('the namespace facet exposes its models', () => {
+  expectTypeOf(db.public).toHaveProperty('User');
+  expectTypeOf(db.public).toHaveProperty('Post');
 });
 
-test('the flat surface is retained alongside the namespace facet', () => {
-  expectTypeOf(db.User).toEqualTypeOf(db.public.User);
+test('the flat by-bare-model surface is gone — namespace selection is mandatory', () => {
+  // @ts-expect-error 'User' is a model, not a declared domain namespace: the
+  // flat by-bare-model accessor was removed, so `orm.<Model>` is no longer a
+  // key on OrmClient. Reach models via their namespace facet (`orm.public.User`).
+  db.User;
+  // @ts-expect-error 'Post' is a model, not a declared domain namespace.
+  db.Post;
 });
 
 test('an undeclared namespace id is not a key on the typed surface', () => {

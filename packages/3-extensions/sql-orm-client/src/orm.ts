@@ -1,17 +1,9 @@
-import {
-  type Contract,
-  domainModelsAtDefaultNamespace,
-  soleDomainNamespaceId,
-} from '@prisma-next/contract/types';
+import { type Contract, domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { blindCast } from '@prisma-next/utils/casts';
 import { Collection } from './collection';
-import {
-  domainModelNames,
-  domainModelNamesInNamespace,
-  domainModelTableInNamespace,
-} from './storage-resolution';
+import { domainModelNamesInNamespace, domainModelTableInNamespace } from './storage-resolution';
 import type {
   CollectionContext,
   CollectionModelName,
@@ -50,13 +42,6 @@ type ModelCollection<
   ? Collection<TContract, ModelName, InferRootRow<TContract, ModelName>>
   : CustomCollectionForKey<Collections, ModelName>;
 
-type ModelCollectionMap<
-  TContract extends Contract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass>>,
-> = {
-  [K in ModelNames<TContract>]: ModelCollection<TContract, Collections, K>;
-};
-
 type NamespaceModelNames<
   TContract extends Contract<SqlStorage>,
   NsId extends keyof TContract['domain']['namespaces'],
@@ -81,12 +66,13 @@ type NamespacedClientMap<
   [Ns in keyof TContract['domain']['namespaces']]: OrmNamespace<TContract, Collections, Ns>;
 };
 
-// Additive intersection: the flat by-bare-name surface retained alongside a
-// per-namespace facet keyed by domain namespace id.
+// Per-namespace facets keyed by domain namespace id. Namespace selection is
+// mandatory — there is no flat by-bare-name accessor at the builder layer;
+// flat ergonomics are recovered at the facade by aliasing to a namespace facet.
 type OrmClient<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
-> = ModelCollectionMap<TContract, Collections> & NamespacedClientMap<TContract, Collections>;
+> = NamespacedClientMap<TContract, Collections>;
 
 export function orm<
   TContract extends Contract<SqlStorage>,
@@ -95,7 +81,6 @@ export function orm<
   const { runtime, collections, context } = options;
   const contract = context.contract;
   const ctx: CollectionContext<TContract> = { runtime, context };
-  const modelNames = new Set(domainModelNames(contract));
   const collectionRegistry = createCollectionRegistry(contract, collections);
 
   type AnyCollection = Collection<TContract, string, unknown, CollectionTypeState>;
@@ -121,18 +106,7 @@ export function orm<
     });
   }
 
-  const flatCache = new Map<string, AnyCollection>();
   const namespaceFacets = new Map<string, object>();
-
-  function flatCollection(modelName: string): AnyCollection {
-    const cached = flatCache.get(modelName);
-    if (cached) {
-      return cached;
-    }
-    const collection = buildCollection(soleDomainNamespaceId(contract.domain), modelName);
-    flatCache.set(modelName, collection);
-    return collection;
-  }
 
   function namespaceFacet(namespaceId: string): object {
     const cached = namespaceFacets.get(namespaceId);
@@ -181,13 +155,7 @@ export function orm<
         return namespaceFacet(prop);
       }
 
-      if (!modelNames.has(prop)) {
-        throw new Error(
-          `No model found for '${prop}'. Available models: ${[...modelNames].join(', ')}`,
-        );
-      }
-
-      return flatCollection(prop);
+      return undefined;
     },
   });
 }
