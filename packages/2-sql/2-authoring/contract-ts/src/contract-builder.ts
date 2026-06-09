@@ -337,7 +337,7 @@ type LiteralEnums<E extends Record<string, EnumTypeHandle>> = string extends key
 
 // Merges enum handles authored on the scaffold definition with those returned
 // from the factory callback. Either side may be the widened default (empty).
-type MergeEnums<
+export type MergeEnums<
   ScaffoldEnums extends Record<string, EnumTypeHandle>,
   FactoryEnums extends Record<string, EnumTypeHandle>,
 > = LiteralEnums<ScaffoldEnums> & LiteralEnums<FactoryEnums>;

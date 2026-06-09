@@ -8,6 +8,7 @@ import type {
   ComposedAuthoringHelpers,
   ContractInput,
   EnumTypeHandle,
+  MergeEnums,
   ModelLike,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { buildBoundContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -49,7 +50,7 @@ type PostgresBaseScaffold<
     Record<never, never>,
     ExtensionPacks
   >,
-  'family' | 'target' | 'types' | 'models'
+  'family' | 'target' | 'types' | 'models' | 'enums'
 >;
 
 type PostgresDefinition<
@@ -67,6 +68,8 @@ type PostgresScaffold<
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Enums extends EnumsConstraint,
 > = PostgresBaseScaffold<ExtensionPacks> & {
+  readonly types?: never;
+  readonly models?: never;
   readonly enums?: Enums;
 };
 
@@ -87,15 +90,16 @@ export function defineContract<
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
-  const Enums extends EnumsConstraint = Record<never, never>,
+  const ScaffoldEnums extends EnumsConstraint = Record<never, never>,
+  const FactoryEnums extends EnumsConstraint = Record<never, never>,
 >(
-  scaffold: PostgresScaffold<ExtensionPacks, Enums>,
+  scaffold: PostgresScaffold<ExtensionPacks, ScaffoldEnums>,
   factory: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, ExtensionPacks>) => {
     readonly types?: Types;
     readonly models?: Models;
-    readonly enums?: Enums;
+    readonly enums?: FactoryEnums;
   },
-): PostgresResult<Types, Models, ExtensionPacks, Enums>;
+): PostgresResult<Types, Models, ExtensionPacks, MergeEnums<ScaffoldEnums, FactoryEnums>>;
 
 // Implementation — delegates to buildBoundContract which pre-binds family/target,
 // carrying zero casts at this layer.
