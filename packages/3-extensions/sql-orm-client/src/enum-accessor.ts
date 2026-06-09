@@ -1,18 +1,18 @@
-import type { ContractEnum } from '@prisma-next/contract/types';
+import type { ContractEnum, JsonValue } from '@prisma-next/contract/types';
 
 export interface EnumAccessor {
-  readonly values: readonly string[];
+  readonly values: readonly JsonValue[];
   readonly names: readonly string[];
-  readonly members: Readonly<Record<string, string>>;
-  has(v: string): boolean;
-  nameOf(v: string): string | undefined;
-  ordinalOf(v: string): number;
+  readonly members: Readonly<Record<string, JsonValue>>;
+  has(v: JsonValue): boolean;
+  nameOf(v: JsonValue): string | undefined;
+  ordinalOf(v: JsonValue): number;
 }
 
 export function createEnumAccessor(contractEnum: ContractEnum): EnumAccessor {
   const values = Object.freeze(contractEnum.members.map((m) => m.value));
   const names = Object.freeze(contractEnum.members.map((m) => m.name));
-  const members: Readonly<Record<string, string>> = Object.freeze(
+  const members: Readonly<Record<string, JsonValue>> = Object.freeze(
     Object.fromEntries(contractEnum.members.map((m) => [m.name, m.value])),
   );
 
@@ -24,9 +24,9 @@ export function createEnumAccessor(contractEnum: ContractEnum): EnumAccessor {
     values,
     names,
     members,
-    has: (v: string) => valueSet.has(v),
-    nameOf: (v: string) => valueToName.get(v),
-    ordinalOf: (v: string) => valueToOrdinal.get(v) ?? -1,
+    has: (v: JsonValue) => valueSet.has(v),
+    nameOf: (v: JsonValue) => valueToName.get(v),
+    ordinalOf: (v: JsonValue) => valueToOrdinal.get(v) ?? -1,
   };
 }
 

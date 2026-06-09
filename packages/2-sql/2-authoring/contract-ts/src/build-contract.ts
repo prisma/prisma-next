@@ -73,6 +73,17 @@ function encodeDefaultLiteralValue(
   return value as JsonValue;
 }
 
+function encodeEnumValue(value: unknown, codecId: string, codecLookup?: CodecLookup): JsonValue {
+  const codec = codecLookup?.get(codecId);
+  if (codec) {
+    return codec.encodeJson(value);
+  }
+  return blindCast<
+    JsonValue,
+    'no codec lookup at build time: enum member value is already JSON-safe'
+  >(value);
+}
+
 function encodeColumnDefault(
   defaultInput: ColumnDefault,
   codecId: string,
@@ -688,7 +699,10 @@ export function buildSqlContractFromDefinition(
     }
     domainSlot[enumName] = {
       codecId: handle.codecId,
-      members: handle.enumMembers.map((m) => ({ name: m.name, value: String(m.value) })),
+      members: handle.enumMembers.map((m) => ({
+        name: m.name,
+        value: encodeEnumValue(m.value, handle.codecId, codecLookup),
+      })),
     };
 
     let storageSlot = storageValueSetsByNs[nsId];
@@ -698,7 +712,7 @@ export function buildSqlContractFromDefinition(
     }
     storageSlot[enumName] = {
       kind: 'value-set',
-      values: handle.values.map(String),
+      values: handle.values.map((v) => encodeEnumValue(v, handle.codecId, codecLookup)),
     };
   }
 

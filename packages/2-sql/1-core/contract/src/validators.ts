@@ -140,7 +140,9 @@ const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
  */
 export const StorageValueSetSchema = type({
   kind: "'value-set'",
-  values: type.string.array().readonly(),
+  values: type('string | number | boolean | null | unknown[] | Record<string, unknown>')
+    .array()
+    .readonly(),
 });
 
 /**
@@ -152,7 +154,7 @@ export const ContractEnumSchema = type({
   codecId: 'string',
   members: type({
     name: 'string',
-    value: 'string',
+    value: 'string | number | boolean | null | unknown[] | Record<string, unknown>',
   })
     .array()
     .readonly(),
