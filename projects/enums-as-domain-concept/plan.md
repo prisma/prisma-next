@@ -5,16 +5,33 @@
 
 ## At a glance
 
-Five slices in a substrate-then-parallel-realization-then-cleanup shape: a contract
-substrate slice lands the two-plane enum shape; three independent slices then run in
-parallel — the Postgres check-constraint **enforcement** (TML-2851), the enum **member
-defaults** (TML-2855, split out of the realization slice for review coherence), and the
-application **read surface** (TML-2852, typing + `db.enums` + ordering); a final cutover
-slice flips PSL `enum` + authoring to the new shape and
-deletes the native machinery. The substrate slice is purely **additive** (the new
-representation lands *dark*; native stays the default), so every intermediate merge stays
-green. One stack thread (additive substrate → cutover) with a parallel pair in the
-middle.
+Five slices: a contract **substrate** slice (TML-2850) lands the two-plane enum shape; the
+Postgres check-constraint **enforcement** (TML-2851) and the application **read surface**
+(TML-2852, typing + `db.enums` + ordering) build on it; the enum **member defaults**
+(TML-2855) close the last parity gap; and the **cutover** (TML-2853) repoints PSL `enum` +
+default authoring onto the new shape and deletes the native machinery in one atomic PR.
+
+The cutover is **parity-gated, not deferred for its own sake**: `enum` is one keyword, so
+the flip must be atomic, and it can only land once the new shape does everything native
+does — enforcement (✅ TML-2851), emit-time typing (TML-2852), and member defaults
+(TML-2855). The new shape lands additively until then, but the span it sits *dark* (built,
+yet not the meaning of `enum`) is a **cost to minimise, not a virtue**: dark slices defer
+integration risk and hide breakage — slice 3 merged green while not working through emit.
+So we close the last parity gap (TML-2855) and cut over **immediately after**, rather than
+treating the cutover as a distant finale.
+
+## Current status & next (sequencing decision)
+
+- **Done:** TML-2850 (substrate), TML-2851 (enforcement).
+- **In review:** TML-2852 (read surface) — includes the emit-time value-union narrowing
+  that closes a typing-parity gap with native enums.
+- **Next (promoted):** **TML-2855 (member defaults)** — the last parity prerequisite for
+  the cutover — then **TML-2853 (cutover)** directly behind it.
+- **Why this changed from the original plan:** 2855/2853 were parked as a distant finale
+  behind an "additive/dark, every merge green" framing. In practice the dark window caused
+  recurring confusion (everyone reasons from "`enum` *is* the new concept"; the code says
+  "native until the last PR") and hid a real bug. We keep the atomic cutover but pull it
+  forward so the dark window shrinks to near-zero.
 
 ## Composition
 
@@ -96,7 +113,12 @@ middle.
     client — disjoint from group A's migration/planner surface. Out of scope: server-side
     enforcement and defaults (now TML-2855, parallel group C).
 
-### Parallel group C — enum member defaults (split from group A; independent; builds on slice 1)
+### Enum member defaults — **PROMOTED to the immediate next slice** (was parallel group C)
+
+> Originally specced as an independent parallel slice; now the next thing to build,
+> because it is the **last parity prerequisite** before the cutover can land. Independent
+> of enforcement (TML-2851); builds only on slice 1.
+
 
 - **Slice `enum-member-defaults`** — Linear: [TML-2855](https://linear.app/prisma-company/issue/TML-2855)
   - **Outcome:** `@default(Role.member)` works end-to-end — an `enumMember` `ColumnDefault`
@@ -131,12 +153,15 @@ middle.
   migration DDL path and the query/typing path do not collide, so the
   "different-surface slices parallelise; same-adapter slices serialise" heuristic applies
   in favour of parallel.
-- **Slice 4 is the atomic cutover (transitional-shape constraint).** `enum` is one
-  keyword; it cannot mean both native and the new shape at once. So the new representation
-  lands *dark* in slice 1 (additive — native stays the default and the only thing PSL
-  `enum` lowers to), realization (slice 2) and typing (slice 3) build against it, and only
-  slice 4 flips PSL `enum`/authoring to the new shape **and** deletes native in a single
-  PR. The flip requires slice 2 (so migrations understand the new shape the instant
-  authoring emits it) and follows slice 3 (so reads are typed when the shape goes live).
-  Sequencing the flip last also regenerates the canonical fixtures exactly once. This is
-  the project's only non-additive merge; every prior slice leaves `main` green.
+- **The cutover (TML-2853) is one atomic, parity-gated flip — landed as soon as parity
+  exists, not last for its own sake.** `enum` is one keyword; it cannot mean both native
+  and the new shape at once, so the repoint + native-delete is a single PR. That PR can
+  only land once the new shape reaches parity with native: enforcement (TML-2851, ✅),
+  emit-time typing (TML-2852 — native enums narrow on emit, so cutting over earlier would
+  regress typing), and member defaults (TML-2855 — native supports `@default`). The flip
+  also regenerates the canonical fixtures exactly once. **Correction to the original
+  framing:** the long additive/*dark* runway was treated as a benefit ("every prior slice
+  leaves `main` green"); it is a cost — it deferred all integration risk to the end and let
+  slice 3 merge green while broken through emit. So TML-2855 is **promoted to the immediate
+  next slice** and the cutover stacks directly behind it, shrinking the dark window to
+  near-zero. The cutover remains the project's only non-additive merge.
