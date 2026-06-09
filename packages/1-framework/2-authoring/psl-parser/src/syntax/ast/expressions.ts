@@ -71,12 +71,22 @@ export class StringLiteralExprAst implements AstNode {
     const tok = this.token();
     if (!tok) return undefined;
     const raw = tok.text.slice(1, -1);
-    return raw
-      .replace(/\\n/g, '\n')
-      .replace(/\\r/g, '\r')
-      .replace(/\\t/g, '\t')
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, '\\');
+    return raw.replace(/\\(.)/g, (_match, char: string) => {
+      switch (char) {
+        case 'n':
+          return '\n';
+        case 'r':
+          return '\r';
+        case 't':
+          return '\t';
+        case '"':
+          return '"';
+        case '\\':
+          return '\\';
+        default:
+          return `\\${char}`;
+      }
+    });
   }
 
   static cast(node: SyntaxNode): StringLiteralExprAst | undefined {

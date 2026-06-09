@@ -365,6 +365,26 @@ describe('StringLiteralExprAst', () => {
     expect(expr.value()).toBe('line1\nline2\ttab');
   });
 
+  it('decodes an escaped backslash as a literal backslash, not the following escape', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('StringLiteralExpr');
+    // PSL source: "test\\n" — a literal backslash followed by 'n', not a newline
+    b.token('StringLiteral', '"test\\\\n"');
+    const root = createSyntaxTree(b.finishNode());
+    const expr = StringLiteralExprAst.cast(root)!;
+    expect(expr.value()).toBe('test\\n');
+  });
+
+  it('unescapes escaped quotes', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('StringLiteralExpr');
+    // PSL source: "a\"b"
+    b.token('StringLiteral', '"a\\"b"');
+    const root = createSyntaxTree(b.finishNode());
+    const expr = StringLiteralExprAst.cast(root)!;
+    expect(expr.value()).toBe('a"b');
+  });
+
   it('returns undefined when token missing', () => {
     const b = new GreenNodeBuilder();
     b.startNode('StringLiteralExpr');
