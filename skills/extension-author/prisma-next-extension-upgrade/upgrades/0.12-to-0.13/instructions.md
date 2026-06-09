@@ -44,11 +44,12 @@ the existing Postgres facade. Purely additive public surface backed by
 the unchanged SQL runtime `withTransaction` helper; existing extension
 code is unaffected. Incidental substrate diff only.
 
-TML-2838: vitest configs in `packages/3-extensions/postgres` and
-`packages/3-extensions/supabase` now pass `--no-memory-protection-keys`
-to the test worker forks to stop a V8 WASM-teardown crash on Linux CI.
-Test-harness only — no runtime, contract, or public-API change.
-Incidental substrate diff only.
+TML-2838: the temporary `--no-memory-protection-keys` test-harness
+workaround has been removed from the `packages/3-extensions/{postgres,supabase}`
+vitest configs now that the PGlite WASM-teardown crash is fixed upstream
+in `@prisma/dev` 0.24.12 (which pulls in the `@prisma/streams-local` worker
+-termination fix). Test-harness only — no runtime, contract, or public-API
+change. Incidental substrate diff only.
 
 TML-2500 M4: `packages/3-extensions/supabase/README.md` link updated
 from the old project spec to the canonical ecosystem-extensions doc and

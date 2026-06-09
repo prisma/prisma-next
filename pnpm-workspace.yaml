@@ -15,7 +15,7 @@ allowBuilds:
 blockExoticSubdeps: true
 
 catalog:
-  '@prisma/dev': 0.24.11
+  '@prisma/dev': 0.24.12
   '@types/node': 25.9.1
   '@types/pg': 8.20.0
   arktype: ^2.2.0
@@ -33,11 +33,13 @@ cleanupUnusedCatalogs: true
 
 minimumReleaseAge: 1440
 
-# First-party Prisma package: the release-age cooldown defends against
-# compromised third-party releases, so we exempt @prisma/dev to adopt its
-# fixes promptly (e.g. the WAL-teardown crash fix in 0.24.11).
+# First-party Prisma packages: the release-age cooldown defends against
+# compromised third-party releases, so we exempt @prisma/dev (and its
+# @prisma/streams-local dependency) to adopt fixes promptly — e.g. the
+# WAL-teardown crash fix completed in @prisma/dev 0.24.12.
 minimumReleaseAgeExclude:
   - '@prisma/dev'
+  - '@prisma/streams-local'
 
 trustPolicy: no-downgrade
 

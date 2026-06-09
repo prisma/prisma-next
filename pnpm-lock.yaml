@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@prisma/dev':
-      specifier: 0.24.11
-      version: 0.24.11
+      specifier: 0.24.12
+      version: 0.24.12
     '@types/node':
       specifier: 25.9.1
       version: 25.9.1
@@ -248,7 +248,7 @@ importers:
         version: link:../../packages/0-config/tsconfig
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.24.11(typescript@5.9.3)
+        version: 0.24.12(typescript@5.9.3)
       '@size-limit/file':
         specifier: ^12.1.0
         version: 12.1.0(size-limit@12.1.0(jiti@2.7.0))
@@ -734,7 +734,7 @@ importers:
         version: link:../../packages/1-framework/3-tooling/vite-plugin-contract-emit
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.24.11(typescript@5.9.3)
+        version: 0.24.12(typescript@5.9.3)
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
@@ -1025,7 +1025,7 @@ importers:
         version: link:../../packages/1-framework/3-tooling/vite-plugin-contract-emit
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.24.11(typescript@5.9.3)
+        version: 0.24.12(typescript@5.9.3)
       '@react-router/dev':
         specifier: ^7.15.1
         version: 7.15.1(@react-router/serve@7.16.0(react-router@7.16.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.9.1)(jiti@2.7.0)(lightningcss@1.32.0)(react-router@7.16.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(tsx@4.22.4)(typescript@5.9.3)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))(wrangler@4.92.0(@cloudflare/workers-types@4.20260515.1))(yaml@2.8.4)
@@ -4748,7 +4748,7 @@ importers:
         version: link:../../packages/0-config/tsdown
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.24.11(typescript@5.9.3)
+        version: 0.24.12(typescript@5.9.3)
       '@types/pg':
         specifier: 'catalog:'
         version: 8.20.0
@@ -6018,8 +6018,8 @@ packages:
   '@prisma/debug@7.2.0':
     resolution: {integrity: sha512-YSGTiSlBAVJPzX4ONZmMotL+ozJwQjRmZweQNIq/ER0tQJKJynNkRB3kyvt37eOfsbMCXk3gnLF6J9OJ4QWftw==}
 
-  '@prisma/dev@0.24.11':
-    resolution: {integrity: sha512-mD2XfRvqZkxZ7bTXq/kOFVPUaYi8W4aNdGiY2ne8qCDvJK7veL9YZ9gb7BH3Bpzy1Dw4bOYmRrjFvxp5OHZpJA==}
+  '@prisma/dev@0.24.12':
+    resolution: {integrity: sha512-bR0IJHoVi9kYpqWHwvQo/RnnstQpYgdDRUYh1daqF+XxVNZGz+siXh3n3/3LqSAzlvLhCT3rUChJYkUNvxkkkw==}
 
   '@prisma/get-platform@7.2.0':
     resolution: {integrity: sha512-k1V0l0Td1732EHpAfi2eySTezyllok9dXb6UQanajkJQzPUGi3vO2z7jdkz67SypFTdmbnyGYxvEvYZdZsMAVA==}
@@ -6030,8 +6030,8 @@ packages:
   '@prisma/query-plan-executor@7.2.0':
     resolution: {integrity: sha512-EOZmNzcV8uJ0mae3DhTsiHgoNCuu1J9mULQpGCh62zN3PxPTd+qI9tJvk5jOst8WHKQNwJWR3b39t0XvfBB0WQ==}
 
-  '@prisma/streams-local@0.1.9':
-    resolution: {integrity: sha512-lI6YwthIykOXwHPgxgdfQTavc5fiTy03nRjlZeBSVK+NNp/KAX6yqN46H5gZ6BSlu+7dt+BlL8UuubUkhes2fg==}
+  '@prisma/streams-local@0.1.10':
+    resolution: {integrity: sha512-n6HALshO+IkmlYpYFZBQnjD3NXuwY7p4gH+6sJr6BIHKmKNZK1hsSUddLMlZQE5LLHpe+nwVb9S9h/RZJ15CTw==}
     engines: {bun: '>=1.2.0', node: '>=22.0.0'}
 
   '@quansync/fs@1.0.0':
@@ -11046,7 +11046,7 @@ snapshots:
 
   '@prisma/debug@7.2.0': {}
 
-  '@prisma/dev@0.24.11(typescript@5.9.3)':
+  '@prisma/dev@0.24.12(typescript@5.9.3)':
     dependencies:
       '@electric-sql/pglite': 0.4.3
       '@electric-sql/pglite-socket': 0.1.3(@electric-sql/pglite@0.4.3)
@@ -11054,7 +11054,7 @@ snapshots:
       '@hono/node-server': 1.19.14(hono@4.11.4)
       '@prisma/get-platform': 7.2.0
       '@prisma/query-plan-executor': 7.2.0
-      '@prisma/streams-local': 0.1.9
+      '@prisma/streams-local': 0.1.10
       foreground-child: 3.3.1
       get-port-please: 3.2.0
       hono: 4.11.4
@@ -11078,7 +11078,7 @@ snapshots:
 
   '@prisma/query-plan-executor@7.2.0': {}
 
-  '@prisma/streams-local@0.1.9':
+  '@prisma/streams-local@0.1.10':
     dependencies:
       ajv: 8.20.0
       better-result: 2.9.2
