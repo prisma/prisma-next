@@ -75,7 +75,13 @@ describe('sql', () => {
     const d = db();
     expect(d.users).toBeDefined();
     expect(d.posts).toBeDefined();
-    expect((d as Record<string, unknown>)['nonexistent']).toBeUndefined();
+  });
+
+  it('fails fast naming the namespace on an unknown table (FR11)', () => {
+    const d = db();
+    expect(() => (d as Record<string, unknown>)['nonexistent']).toThrow(
+      /No table 'nonexistent' in namespace 'public'/,
+    );
   });
 });
 

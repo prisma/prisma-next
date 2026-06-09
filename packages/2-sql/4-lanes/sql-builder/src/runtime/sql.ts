@@ -29,23 +29,36 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
   const { storage } = context.contract;
 
   return new Proxy({} as Db<C>, {
-    get(_target, prop: string) {
-      if (Object.hasOwn(storage.namespaces, prop)) {
-        const namespaceId = prop;
-        return new Proxy(
-          {},
-          {
-            get(_facetTarget, tableName: string) {
-              const table = resolveTableInNamespace(storage, namespaceId, tableName);
-              if (table) {
-                return new TableProxyImpl(tableName, table, tableName, ctx, namespaceId);
-              }
-              return undefined;
-            },
-          },
+    get(_target, prop: string | symbol) {
+      if (typeof prop !== 'string') {
+        return undefined;
+      }
+      if (!Object.hasOwn(storage.namespaces, prop)) {
+        throw new Error(
+          `Unknown namespace '${prop}'. Available namespaces: ${Object.keys(storage.namespaces).join(', ')}`,
         );
       }
-      return undefined;
+      const namespaceId = prop;
+      return new Proxy(
+        {},
+        {
+          get(_facetTarget, tableName: string | symbol) {
+            if (typeof tableName !== 'string') {
+              return undefined;
+            }
+            const table = resolveTableInNamespace(storage, namespaceId, tableName);
+            if (table) {
+              return new TableProxyImpl(tableName, table, tableName, ctx, namespaceId);
+            }
+            const availableTables = Object.keys(
+              storage.namespaces[namespaceId]?.entries.table ?? {},
+            );
+            throw new Error(
+              `No table '${tableName}' in namespace '${namespaceId}'. Available tables: ${availableTables.join(', ')}`,
+            );
+          },
+        },
+      );
     },
   });
 }

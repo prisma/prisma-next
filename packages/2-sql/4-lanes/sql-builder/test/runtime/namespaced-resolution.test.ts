@@ -50,7 +50,8 @@ const stubInferer = { inferCodec: () => 'pg/text@1' };
 
 type TableHandle = { buildAst(): TableSource };
 // The builder surface is namespace-facets only; flat by-bare-name keys are
-// gone. They are modelled here as `undefined` to assert their runtime absence.
+// gone. They are modelled here as `undefined` because they are not part of the
+// typed surface; at runtime accessing them fails fast (see the FR11 tests).
 type TwoNamespaceDb = {
   public: { users: TableHandle; sessions: undefined };
   auth: { users: TableHandle; sessions: TableHandle };
@@ -74,20 +75,21 @@ describe('namespaced table resolution', () => {
     expect(db().auth.users.buildAst().namespaceId).toBe('auth');
   });
 
-  it('scopes table lookup to the named namespace rather than scanning across namespaces', () => {
-    // `sessions` exists only in `auth`; a cross-namespace scan would wrongly
-    // resolve it under `public`.
-    expect(db().public.sessions).toBeUndefined();
+  it('scopes table lookup to the named namespace and fails fast on a foreign table (FR11)', () => {
+    // `sessions` exists only in `auth`; rather than silently resolve it under
+    // `public` (a cross-namespace scan) or return undefined, the facet fails
+    // fast naming the namespace.
+    expect(() => db().public.sessions).toThrow(/No table 'sessions' in namespace 'public'/);
     expect(db().auth.sessions.buildAst().namespaceId).toBe('auth');
   });
 
-  it('no longer exposes a flat by-bare-name surface — flat access yields undefined', () => {
+  it('fails fast naming the unknown namespace on flat bare-name access (FR11)', () => {
     // The flat fallback branch was removed: a bare table name is not a namespace
-    // key, so the proxy resolves to `undefined` (rather than resolving a unique
-    // name or throwing on a shared one). This holds whether the bare name is
-    // unique to one namespace (`posts`) or shared across namespaces (`users`).
-    // Tables are reached only through their namespace facet.
-    expect(db().posts).toBeUndefined();
-    expect(db().users).toBeUndefined();
+    // key, so flat access is an unknown-namespace access. It fails fast naming
+    // the bare name (whether unique to one namespace — `posts` — or shared
+    // across namespaces — `users`) rather than returning undefined. Tables are
+    // reached only through their namespace facet.
+    expect(() => db().posts).toThrow(/Unknown namespace 'posts'/);
+    expect(() => db().users).toThrow(/Unknown namespace 'users'/);
   });
 });

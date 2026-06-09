@@ -82,11 +82,11 @@ describe('namespaced orm accessor', () => {
     expect(db().auth.Session.tableName).toBe('sessions');
   });
 
-  it('no longer exposes a flat by-bare-model surface — flat access yields undefined', () => {
+  it('fails fast naming the unknown namespace on flat bare-model access (FR11)', () => {
     // The flat fallback branch was removed: a bare model name is not a namespace
-    // key, so the proxy resolves to `undefined` (rather than resolving the sole
-    // namespace or throwing). Namespace-qualified access (db().public.User) is
-    // the sole supported path.
-    expect(db().User).toBeUndefined();
+    // key, so flat access is an unknown-namespace access. It fails fast naming
+    // the bare name rather than returning undefined. Namespace-qualified access
+    // (db().public.User) is the sole supported path.
+    expect(() => db().User).toThrow(/Unknown namespace 'User'/);
   });
 });

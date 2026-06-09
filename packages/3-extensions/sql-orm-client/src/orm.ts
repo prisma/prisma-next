@@ -151,11 +151,13 @@ export function orm<
         return undefined;
       }
 
-      if (Object.hasOwn(contract.domain.namespaces, prop)) {
-        return namespaceFacet(prop);
+      if (!Object.hasOwn(contract.domain.namespaces, prop)) {
+        throw new Error(
+          `Unknown namespace '${prop}'. Available namespaces: ${Object.keys(contract.domain.namespaces).join(', ')}`,
+        );
       }
 
-      return undefined;
+      return namespaceFacet(prop);
     },
   });
 }
