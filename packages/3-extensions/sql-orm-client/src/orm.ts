@@ -3,7 +3,6 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { blindCast } from '@prisma-next/utils/casts';
 import { Collection } from './collection';
-import { buildEnumsMapForNamespace, type EnumAccessor } from './enum-accessor';
 import { domainModelNamesInNamespace, domainModelTableInNamespace } from './storage-resolution';
 import type {
   CollectionContext,
@@ -21,44 +20,6 @@ export interface OrmOptions<
   readonly collections?: Collections;
   readonly context: ExecutionContext<TContract>;
 }
-
-const ENUMS_RESERVED_KEY = 'enums';
-
-type Present<T> = Exclude<T, undefined>;
-
-// A domain enum entry as carried in `domain.namespaces[ns].enum[name]`: an
-// ordered member tuple. The no-emit (built) path preserves the literal member
-// values so the derived accessor keeps its literal `values`/`names`/`members`.
-type EnumMemberEntry = { readonly name: string; readonly value: unknown };
-type EnumEntry = { readonly members: readonly EnumMemberEntry[] };
-
-type EnumEntryValues<Entry extends EnumEntry> = {
-  readonly [I in keyof Entry['members']]: Entry['members'][I] extends EnumMemberEntry
-    ? Entry['members'][I]['value']
-    : never;
-};
-
-type EnumEntryNames<Entry extends EnumEntry> = {
-  readonly [I in keyof Entry['members']]: Entry['members'][I] extends EnumMemberEntry
-    ? Entry['members'][I]['name']
-    : never;
-};
-
-type EnumEntryMembers<Entry extends EnumEntry> = {
-  readonly [M in Entry['members'][number] as M['name']]: M['value'];
-};
-
-// The runtime accessor shape for one enum, with literal `values`/`names`/
-// `members` derived from the entry's member tuple. Mirrors `EnumAccessor`'s
-// runtime surface and the authoring `EnumTypeHandle` accessor.
-type ContractEnumAccessor<Entry extends EnumEntry> = {
-  readonly values: EnumEntryValues<Entry>;
-  readonly names: EnumEntryNames<Entry>;
-  readonly members: EnumEntryMembers<Entry>;
-  has(v: EnumEntryValues<Entry>[number]): boolean;
-  nameOf(v: EnumEntryValues<Entry>[number]): string | undefined;
-  ordinalOf(v: EnumEntryValues<Entry>[number]): number;
-};
 
 type ModelNames<TContract extends Contract<SqlStorage>> = CollectionModelName<TContract>;
 
@@ -86,57 +47,16 @@ type NamespaceModelNames<
   NsId extends keyof TContract['domain']['namespaces'],
 > = keyof TContract['domain']['namespaces'][NsId]['models'] & string & ModelNames<TContract>;
 
-// The per-namespace enum accessors exposed on the facet under the reserved
-// `enums` key. Each namespace exposes only its own enums (the IR's
-// `domain.namespaces[ns].enum`), so the same enum name in two namespaces
-// resolves to each namespace's own accessor.
-//
-// Two type carriers feed this, one per emission path:
-//   - Emitted contracts carry the literal enum entries under
-//     `domain.namespaces[ns].enum`; each maps to a `ContractEnumAccessor`.
-//   - The no-emit (built) contract carries them flat on `enumAccessors`
-//     (already accessor-shaped, literal-preserving), since its built domain
-//     type does not narrow `namespaces[ns].enum`. All authored enums land in
-//     the single built namespace, so exposing the flat map on the facet is
-//     correct there.
-// Only `SqlContractResult` carries `enumAccessors`; emitted contracts never
-// do, so the two carriers never overlap.
-type NamespaceEnumAccessors<
-  TContract extends Contract<SqlStorage>,
-  NsId extends keyof TContract['domain']['namespaces'],
-> = EnumEntriesToAccessors<NamespaceEnumEntries<TContract['domain']['namespaces'][NsId]>> &
-  BuiltEnumAccessorsOf<TContract>;
-
-type EnumEntriesToAccessors<Enums> = {
-  readonly [K in keyof Enums]: Enums[K] extends EnumEntry ? ContractEnumAccessor<Enums[K]> : never;
-};
-
-type BuiltEnumAccessorsOf<TContract> = TContract extends {
-  readonly enumAccessors: infer A;
-}
-  ? A
-  : Record<never, never>;
-
-type NamespaceEnumEntries<TNamespace> = TNamespace extends {
-  readonly enum?: infer E;
-}
-  ? unknown extends E
-    ? Record<never, never>
-    : Present<E>
-  : Record<never, never>;
-
 // The model collections of a single domain namespace, keyed by bare model
-// name, plus the reserved `enums` accessor. Lets callers reach a model by its
-// namespace coordinate (`orm.<ns>.<Model>`) and that namespace's enums via
-// `orm.<ns>.enums.<Name>`.
+// name. Lets callers reach a model by its namespace coordinate
+// (`orm.<ns>.<Model>`). Enums are not adjacent to models here — they live on
+// the `db.enums` facade member, lane-agnostic contract metadata.
 export type OrmNamespace<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
   NsId extends keyof TContract['domain']['namespaces'],
 > = {
   [K in NamespaceModelNames<TContract, NsId>]: ModelCollection<TContract, Collections, K>;
-} & {
-  readonly enums: NamespaceEnumAccessors<TContract, NsId>;
 };
 
 type NamespacedClientMap<
@@ -191,26 +111,13 @@ export function orm<
       return cached;
     }
     const facetModelNames = new Set(domainModelNamesInNamespace(contract, namespaceId));
-    // `enums` is a reserved accessor on every namespace facet. A domain model
-    // literally named `enums` would be shadowed by it, so reject that contract
-    // rather than silently hiding the model.
-    if (facetModelNames.has(ENUMS_RESERVED_KEY)) {
-      throw new Error(
-        `Domain model '${ENUMS_RESERVED_KEY}' in namespace '${namespaceId}' collides with the reserved enum accessor; rename the model.`,
-      );
-    }
     const facetCache = new Map<string, AnyCollection>();
-    let enumsMap: Readonly<Record<string, EnumAccessor>> | undefined;
     const facet = new Proxy(
       {},
       {
         get(_facetTarget, modelProp: string | symbol): unknown {
           if (typeof modelProp !== 'string') {
             return undefined;
-          }
-          if (modelProp === ENUMS_RESERVED_KEY) {
-            enumsMap ??= Object.freeze(buildEnumsMapForNamespace(contract.domain, namespaceId));
-            return enumsMap;
           }
           if (!facetModelNames.has(modelProp)) {
             return undefined;

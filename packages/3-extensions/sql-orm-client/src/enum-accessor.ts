@@ -1,4 +1,5 @@
-import type { ContractEnum, JsonValue } from '@prisma-next/contract/types';
+import type { Contract, ContractEnum, JsonValue } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 
 /**
  * Runtime view of a domain enum, built at the client from the emitted
@@ -63,3 +64,109 @@ export function buildEnumsMapForNamespace(
   }
   return result;
 }
+
+/**
+ * Build the enum-accessor map for every namespace of a domain, keyed by
+ * namespace id then enum name. This is the lane-agnostic enum surface the
+ * `db.enums` facade member exposes: enums are contract metadata, the same
+ * whether reached through the sql lane or the orm lane, so the facade builds
+ * this once and projects it per target.
+ */
+export function buildNamespacedEnums(domain: {
+  readonly namespaces: Readonly<
+    Record<string, { readonly enum?: Readonly<Record<string, ContractEnum>> }>
+  >;
+}): Record<string, Record<string, EnumAccessor>> {
+  const result: Record<string, Record<string, EnumAccessor>> = {};
+  for (const namespaceId of Object.keys(domain.namespaces)) {
+    result[namespaceId] = buildEnumsMapForNamespace(domain, namespaceId);
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Type-level projection of the namespaced enum surface.
+//
+// These types derive the literal-preserving accessor shape from the contract,
+// hung off the `db.enums` facade map (`db.enums.<ns>.<Name>`). They are the
+// same accessors the runtime builds above, but typed from the two emission
+// paths:
+//   - Emitted contracts carry the literal enum entries under
+//     `domain.namespaces[ns].enum`; each maps to a `ContractEnumAccessor`.
+//   - The no-emit (built) contract carries them flat on `enumAccessors`
+//     (already accessor-shaped, literal-preserving), since its built domain
+//     type does not narrow `namespaces[ns].enum`. All authored enums land in
+//     the single built namespace, so exposing the flat map per namespace is
+//     correct there.
+// Only `SqlContractResult` carries `enumAccessors`; emitted contracts never
+// do, so the two carriers never overlap.
+// ---------------------------------------------------------------------------
+
+type Present<T> = Exclude<T, undefined>;
+
+// A domain enum entry as carried in `domain.namespaces[ns].enum[name]`: an
+// ordered member tuple. The no-emit (built) path preserves the literal member
+// values so the derived accessor keeps its literal `values`/`names`/`members`.
+type EnumMemberEntry = { readonly name: string; readonly value: unknown };
+type EnumEntry = { readonly members: readonly EnumMemberEntry[] };
+
+type EnumEntryValues<Entry extends EnumEntry> = {
+  readonly [I in keyof Entry['members']]: Entry['members'][I] extends EnumMemberEntry
+    ? Entry['members'][I]['value']
+    : never;
+};
+
+type EnumEntryNames<Entry extends EnumEntry> = {
+  readonly [I in keyof Entry['members']]: Entry['members'][I] extends EnumMemberEntry
+    ? Entry['members'][I]['name']
+    : never;
+};
+
+type EnumEntryMembers<Entry extends EnumEntry> = {
+  readonly [M in Entry['members'][number] as M['name']]: M['value'];
+};
+
+// The runtime accessor shape for one enum, with literal `values`/`names`/
+// `members` derived from the entry's member tuple. Mirrors `EnumAccessor`'s
+// runtime surface and the authoring `EnumTypeHandle` accessor.
+export type ContractEnumAccessor<Entry extends EnumEntry> = {
+  readonly values: EnumEntryValues<Entry>;
+  readonly names: EnumEntryNames<Entry>;
+  readonly members: EnumEntryMembers<Entry>;
+  has(v: EnumEntryValues<Entry>[number]): boolean;
+  nameOf(v: EnumEntryValues<Entry>[number]): string | undefined;
+  ordinalOf(v: EnumEntryValues<Entry>[number]): number;
+};
+
+type EnumEntriesToAccessors<Enums> = {
+  readonly [K in keyof Enums]: Enums[K] extends EnumEntry ? ContractEnumAccessor<Enums[K]> : never;
+};
+
+type BuiltEnumAccessorsOf<TContract> = TContract extends {
+  readonly enumAccessors: infer A;
+}
+  ? A
+  : Record<never, never>;
+
+type NamespaceEnumEntries<TNamespace> = TNamespace extends {
+  readonly enum?: infer E;
+}
+  ? unknown extends E
+    ? Record<never, never>
+    : Present<E>
+  : Record<never, never>;
+
+// The per-namespace enum accessors. Each namespace exposes only its own enums
+// (the IR's `domain.namespaces[ns].enum`), so the same enum name in two
+// namespaces resolves to each namespace's own accessor.
+export type NamespaceEnumAccessors<
+  TContract extends Contract<SqlStorage>,
+  NsId extends keyof TContract['domain']['namespaces'],
+> = EnumEntriesToAccessors<NamespaceEnumEntries<TContract['domain']['namespaces'][NsId]>> &
+  BuiltEnumAccessorsOf<TContract>;
+
+// The lane-agnostic enum surface exposed on the `db.enums` facade member: a
+// namespace-keyed map projected per target exactly like `db.sql` / `db.orm`.
+export type NamespacedEnums<TContract extends Contract<SqlStorage>> = {
+  readonly [Ns in keyof TContract['domain']['namespaces']]: NamespaceEnumAccessors<TContract, Ns>;
+};

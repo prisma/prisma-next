@@ -1,4 +1,11 @@
 export { Collection } from '../collection';
+export type {
+  ContractEnumAccessor,
+  EnumAccessor,
+  NamespacedEnums,
+  NamespaceEnumAccessors,
+} from '../enum-accessor';
+export { buildNamespacedEnums } from '../enum-accessor';
 export { all, and, not, or } from '../filters';
 export { GroupedCollection } from '../grouped-collection';
 export { createModelAccessor } from '../model-accessor';
