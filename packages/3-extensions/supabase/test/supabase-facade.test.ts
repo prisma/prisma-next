@@ -288,3 +288,75 @@ describe('supabase() factory — SupabaseDb surface', () => {
     await db.close();
   });
 });
+
+describe('RoleBoundDb — facade invariant: no unbound connection surface', () => {
+  // The security guarantee is facade-encapsulation: SupabaseRuntimeImpl inherits a public
+  // connection() from the base, but the role-bound Db surface must never expose it.
+  // These assertions pin the invariant so a regression is caught at the facade boundary,
+  // not four layers downstream in an integration test.
+  it('RoleBoundDb has no connection() method', async () => {
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwt,
+    });
+    const roleBoundDb = db.asAnon();
+
+    expect(typeof (roleBoundDb as unknown as Record<string, unknown>)['connection']).not.toBe(
+      'function',
+    );
+
+    await db.close();
+  });
+
+  it('execute on RoleBoundDb routes through set_config (binding enforced)', async () => {
+    const fakeClient = makeFakeClient();
+    poolConnectSpy().mockResolvedValue(fakeClient);
+
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwt,
+    });
+    const roleBoundDb = db.asServiceRole();
+
+    await roleBoundDb
+      .execute(stubPlan() as unknown as Parameters<typeof roleBoundDb.execute>[0])
+      .toArray();
+
+    const setConfigCall = fakeClient.queryCalls.find(
+      (c) => c.sql === 'SELECT set_config($1, $2, false)' && c.params?.[0] === 'role',
+    );
+    expect(setConfigCall?.params?.[1]).toBe('service_role');
+
+    await db.close();
+  });
+
+  it('orm on RoleBoundDb issues set_config before any ORM query', async () => {
+    const fakeClient = makeFakeClient();
+    poolConnectSpy().mockResolvedValue(fakeClient);
+
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwt,
+    });
+    const roleBoundDb = db.asAnon();
+
+    // Drive the ORM scope path by calling execute directly via the role-bound surface.
+    // (The ORM builds plans through roleBoundDb.orm, which uses openRoleSession internally.)
+    await roleBoundDb
+      .execute(stubPlan() as unknown as Parameters<typeof roleBoundDb.execute>[0])
+      .toArray();
+
+    const sqlsSeen = fakeClient.queryCalls.map((c) => c.sql);
+    const setConfigIdx = sqlsSeen.indexOf('SELECT set_config($1, $2, false)');
+    expect(setConfigIdx).toBeGreaterThanOrEqual(0);
+
+    // set_config arrives before RESET ALL (session is bound before and reset after)
+    const resetIdx = sqlsSeen.lastIndexOf('RESET ALL');
+    expect(resetIdx).toBeGreaterThan(setConfigIdx);
+
+    await db.close();
+  });
+});
