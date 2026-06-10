@@ -6,10 +6,10 @@ import type {
   AsyncIterableResult,
   RuntimeExecuteOptions,
 } from '@prisma-next/framework-components/runtime';
-import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
+import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
+import { orm } from '@prisma-next/sql-orm-client';
 import type { RawSqlTag } from '@prisma-next/sql-relational-core/expression';
 import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -38,7 +38,7 @@ import { SupabaseRuntimeImpl } from './supabase-runtime';
 
 export type SupabaseTargetId = 'postgres';
 
-type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
+type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof orm<TContract>>;
 
 export class SupabaseConfigError extends Error {
   override readonly name = 'SupabaseConfigError';
@@ -255,8 +255,8 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
   }
 
   function buildRoleBoundDb(binding: SupabaseRoleBinding): RoleBoundDb<TContract> {
-    const roleSql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
-    const roleOrm: OrmClient<TContract> = ormBuilder({
+    const roleSql: Db<TContract> = sql<TContract>({ context, rawCodecInferer });
+    const roleOrm: OrmClient<TContract> = orm({
       runtime: {
         execute(plan) {
           return runtime.executeWithRole(plan, binding);

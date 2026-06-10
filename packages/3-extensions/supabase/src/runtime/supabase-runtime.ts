@@ -10,6 +10,7 @@ import type {
   RuntimeConnection,
   RuntimeTransaction,
 } from '@prisma-next/sql-runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 
 export interface SupabaseRuntime extends PostgresRuntime {}
 
@@ -63,8 +64,14 @@ export class SupabaseRuntimeImpl<
         options?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
         return self.executePreparedAgainstQueryable(
-          ps as PreparedStatementImpl<Params, Row>,
-          params as Record<string, unknown>,
+          blindCast<
+            PreparedStatementImpl<Params, Row>,
+            'PreparedStatement is PreparedStatementImpl; the impl class is the only concrete form'
+          >(ps),
+          blindCast<
+            Record<string, unknown>,
+            'params are structurally Record<string, unknown> at runtime'
+          >(params),
           conn,
           { ...options, scope: 'connection' },
         );
@@ -94,8 +101,14 @@ export class SupabaseRuntimeImpl<
             options?: RuntimeExecuteOptions,
           ): AsyncIterableResult<Row> {
             return self.executePreparedAgainstQueryable(
-              ps as PreparedStatementImpl<Params, Row>,
-              params as Record<string, unknown>,
+              blindCast<
+                PreparedStatementImpl<Params, Row>,
+                'PreparedStatement is PreparedStatementImpl; the impl class is the only concrete form'
+              >(ps),
+              blindCast<
+                Record<string, unknown>,
+                'params are structurally Record<string, unknown> at runtime'
+              >(params),
               tx,
               { ...options, scope: 'transaction' },
             );
