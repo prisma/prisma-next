@@ -41,6 +41,7 @@ describe('offset tracking', () => {
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
+      a.b
       .c
       ~
       "

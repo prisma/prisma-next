@@ -39,6 +39,7 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
       "
       model User {
                  ~
+        id Int
       "
     `);
     expect(result.document).toBeInstanceOf(DocumentAst);
@@ -69,6 +70,7 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
       "
       model {
       ~~~~~
+      }
       "
     `);
     const decls = Array.from(result.document.declarations());
@@ -101,8 +103,11 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     );
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      namespace outer {
       namespace inner {
       ~~~~~~~~~
+      }
+      }
       "
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -118,6 +123,7 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
       "
       namespace __unspecified__ {
       ~~~~~~~~~
+      }
       "
     `);
   });
@@ -130,8 +136,11 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     );
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      namespace outer {
       type {
       ~~~~
+      }
+      }
       "
     `);
   });
@@ -142,8 +151,11 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(message).toBe('Invalid model member declaration "123"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      model M {
         123
         ~~~
+        id Int
+      }
       "
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -155,8 +167,11 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(message).toBe('Invalid enum value declaration "123"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      enum E {
         123
         ~~~
+        OK
+      }
       "
     `);
   });
@@ -167,8 +182,11 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(message).toBe('Invalid types declaration "123"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      type {
         123
         ~~~
+        Ok = Int
+      }
       "
     `);
   });
@@ -182,8 +200,11 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(message).toBe('Invalid block entry');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      datasource db {
         123
         ~~~
+        provider = "x"
+      }
       "
     `);
   });
@@ -197,8 +218,10 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(message).toBe('Expected "=" after "provider"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      datasource db {
         provider "x"
         ~~~~~~~~
+      }
       "
     `);
     const decl = Array.from(result.document.declarations())[0];
@@ -220,8 +243,10 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(message).toBe('Expected "=" after "provider"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      datasource db {
         provider
         ~~~~~~~~
+      }
       "
     `);
     const decl = Array.from(result.document.declarations())[0];
@@ -240,8 +265,10 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(message).toBe('Expected "=" after "UserId"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
+      type {
         UserId Int
         ~~~~~~
+      }
       "
     `);
     const decl = Array.from(result.document.declarations())[0];
@@ -264,6 +291,7 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
       "
       model {
       ~~~~~
+      }
       "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
@@ -306,6 +334,7 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
       "
       enum {
       ~~~~
+      }
       "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
@@ -348,6 +377,7 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
       "
       namespace {
       ~~~~~~~~~
+      }
       "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(NamespaceDeclarationAst);

@@ -33,20 +33,23 @@ export function printTree(node: GreenNode): string {
 }
 
 /**
- * Underline a diagnostic span with `~`, reading the source line(s) from
- * `sourceFile.text`. A zero-length span underlines a single position.
+ * Render the whole source, underlining the diagnostic span with `~`. Every
+ * line of `sourceFile.text` is emitted in order; beneath each line the span
+ * covers (`range.start.line..range.end.line`), a `~`-underline marks the
+ * span's columns on that line. A zero-length span underlines a single column.
  */
 export function highlight(sourceFile: SourceFile, range: Range): string {
   const lines = sourceFile.text.split('\n');
   const rendered: string[] = [];
-  for (let line = range.start.line; line <= range.end.line; line++) {
+  for (let line = 0; line < lines.length; line++) {
     const lineText = lines[line] ?? '';
+    rendered.push(lineText);
+    if (line < range.start.line || line > range.end.line) {
+      continue;
+    }
     const from = line === range.start.line ? range.start.character : 0;
     const to = line === range.end.line ? range.end.character : lineText.length;
-    const isOnlyLine = range.start.line === range.end.line;
-    const width = isOnlyLine && to === from ? 1 : Math.max(to - from, 0);
-    rendered.push(lineText);
-    rendered.push(`${' '.repeat(from)}${'~'.repeat(width)}`);
+    rendered.push(`${' '.repeat(from)}${'~'.repeat(Math.max(1, to - from))}`);
   }
   // Lead with a newline so Vitest's inline-snapshot serializer puts the
   // opening quote on its own line, keeping the source line and `~` underline
