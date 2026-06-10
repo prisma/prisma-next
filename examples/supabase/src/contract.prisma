@@ -1,7 +1,15 @@
+// use prisma-next
 namespace public {
   model Profile {
     id       String @id @default(uuid())
     username String
+    owner_id String
     @@map("profile")
+  }
+
+  policy_select profile_owner_read {
+    target = Profile
+    roles  = [authenticated]
+    using  = "owner_id::uuid = auth.uid()"
   }
 }

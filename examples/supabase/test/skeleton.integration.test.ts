@@ -153,6 +153,18 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
           `Expected a createTable op for public.profile; got: ${JSON.stringify(opIds)}`,
         ).toBe(true);
 
+        // The plan must include ENABLE RLS + CREATE POLICY for public.profile.
+        const hasEnableRls = opIds.some((id) => id.startsWith('rowLevelSecurity.public.profile'));
+        expect(
+          hasEnableRls,
+          `Expected ENABLE RLS op for public.profile; got: ${JSON.stringify(opIds)}`,
+        ).toBe(true);
+        const hasCreatePolicy = opIds.some((id) => id.startsWith('rlsPolicy.profile.'));
+        expect(
+          hasCreatePolicy,
+          `Expected CREATE POLICY op for profile; got: ${JSON.stringify(opIds)}`,
+        ).toBe(true);
+
         // The plan must emit ZERO ops targeting auth or storage schemas.
         const authOrStorageOps = operations.filter((op) => {
           const id = op.id.toLowerCase();
@@ -224,7 +236,10 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       try {
         const rows = await insertAndReadProfile(runtime, 'alice');
         expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ username: 'alice' });
+        expect(rows[0]).toMatchObject({
+          username: 'alice',
+          owner_id: '00000000-0000-0000-0000-000000000000',
+        });
         expect(typeof rows[0]?.id).toBe('string');
       } finally {
         await db.close();

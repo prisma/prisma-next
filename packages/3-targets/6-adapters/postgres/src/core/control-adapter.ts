@@ -166,7 +166,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
     }
     const { rlsPolicies: actualPolicies = [] } = readPostgresSchemaIrAnnotations(schema);
-    const managedActual = actualPolicies.filter((p) => p.prismaManaged);
+    // Scope to tables present in the projected schema: after projectSchemaToSpace
+    // prunes tables owned by other spaces, the remaining table names are the ones
+    // this space is responsible for. Policies on pruned tables belong to other spaces.
+    const schemaTableNames = new Set(Object.keys(schema.tables));
+    const managedActual = actualPolicies.filter(
+      (p) => p.prismaManaged && schemaTableNames.has(p.tableName),
+    );
     return diffNodes(expectedPolicies, managedActual);
   }
 

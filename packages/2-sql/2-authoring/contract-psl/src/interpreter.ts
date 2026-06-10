@@ -2228,25 +2228,42 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
-  // Wrap createNamespace to inject extension entities into each namespace input
-  // so the target factory can route them to the appropriate entry slots.
-  // The optional enumTypes second argument is forwarded unchanged — the wrapper
-  // only enriches the first argument.
+  // Resolve the namespace factory: explicit input.createNamespace takes priority,
+  // then fall back to createNamespace contributed by the target pack's authoring.
+  // The target pack carries createNamespace so the generic PSL path (no explicit
+  // factory supplied) still produces target-typed namespace instances when extension
+  // entities are present. No target-specific symbol is named here — we access only
+  // the string key "createNamespace" on the authoring object.
+  type AuthoringWithCreateNamespace = AuthoringContributions & {
+    readonly createNamespace?: (
+      input: SqlNamespaceTablesInput,
+      enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+    ) => Namespace;
+  };
+  const targetCreateNamespace = blindCast<
+    AuthoringWithCreateNamespace | undefined,
+    'target pack may carry createNamespace in its authoring contributions'
+  >(input.target.authoring)?.createNamespace;
+  const effectiveCreateNamespace = input.createNamespace ?? targetCreateNamespace;
+
+  // Wrap the effective createNamespace to inject extension entities into each
+  // namespace input so the target factory can route them to the appropriate
+  // entry slots. The optional enumTypes second argument is forwarded unchanged.
   const createNamespaceWithExtensions =
-    input.createNamespace !== undefined
+    effectiveCreateNamespace !== undefined
       ? (
           nsInput: SqlNamespaceTablesInput,
           enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
         ) => {
           const entities = namespaceExtensionEntities.get(nsInput.id);
           if (entities === undefined) {
-            return input.createNamespace!(nsInput, enumTypes);
+            return effectiveCreateNamespace(nsInput, enumTypes);
           }
           const extended: SqlNamespaceTablesInput = {
             ...nsInput,
             entries: { ...nsInput.entries, extensionEntities: entities },
           };
-          return input.createNamespace!(extended, enumTypes);
+          return effectiveCreateNamespace(extended, enumTypes);
         }
       : undefined;
 

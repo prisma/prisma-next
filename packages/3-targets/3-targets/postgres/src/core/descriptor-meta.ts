@@ -6,6 +6,7 @@ import {
   postgresAuthoringTypes,
 } from './authoring';
 import { postgresTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
+import { postgresCreateNamespace } from './postgres-schema';
 
 const postgresTargetDescriptorMetaBase = {
   ...postgresTargetDescriptorMetaRuntime,
@@ -15,6 +16,7 @@ const postgresTargetDescriptorMetaBase = {
     field: postgresAuthoringFieldPresets,
     entityTypes: postgresAuthoringEntityTypes,
     pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
+    createNamespace: postgresCreateNamespace,
   },
 } as const;
 

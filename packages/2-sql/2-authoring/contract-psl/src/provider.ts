@@ -87,6 +87,8 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         const document = parsePslDocument({
           schema,
           sourceId: schemaPath,
+          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
+          codecLookup: context.codecLookup,
         });
 
         const scalarTypeDescriptors = buildColumnDescriptorMap(

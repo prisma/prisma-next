@@ -1,7 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import {
   computeContentHash,
   normalizePredicate,
@@ -52,7 +52,15 @@ function externalPolicy(): PostgresRlsPolicy {
 
 function schemaWithPolicies(policies: PostgresRlsPolicy[]): SqlSchemaIR {
   return {
-    tables: {},
+    tables: {
+      [TABLE_NAME]: {
+        name: TABLE_NAME,
+        columns: {},
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      } as unknown as SqlTableIR,
+    },
     annotations: { pg: { rlsPolicies: policies } },
   };
 }
