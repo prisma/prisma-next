@@ -367,11 +367,13 @@ describe('printPsl', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            user_role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'user_role',
-              typeParams: { values: ['USER', 'ADMIN'] },
+          enumTypes: {
+            public: {
+              user_role: {
+                codecId: 'pg/enum@1',
+                nativeType: 'user_role',
+                typeParams: { values: ['USER', 'ADMIN'] },
+              },
             },
           },
         },
@@ -389,16 +391,18 @@ describe('printPsl', () => {
       tables: {},
       annotations: {
         pg: {
-          storageTypes: {
-            user_role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'user_role',
-              typeParams: { values: ['USER'] },
-            },
-            UserRole: {
-              codecId: 'pg/enum@1',
-              nativeType: 'UserRole',
-              typeParams: { values: ['ADMIN'] },
+          enumTypes: {
+            public: {
+              user_role: {
+                codecId: 'pg/enum@1',
+                nativeType: 'user_role',
+                typeParams: { values: ['USER'] },
+              },
+              UserRole: {
+                codecId: 'pg/enum@1',
+                nativeType: 'UserRole',
+                typeParams: { values: ['ADMIN'] },
+              },
             },
           },
         },
