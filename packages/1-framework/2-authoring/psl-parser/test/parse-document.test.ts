@@ -478,6 +478,60 @@ describe('parse() round-trips lossless schemas', () => {
     expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
     expect(decls[1]).toBeInstanceOf(EnumDeclarationAst);
   });
+
+  it('round-trips unicode identifiers losslessly', () => {
+    const source = 'model 用户 {\n  имя String\n  café Int\n}';
+    const result = parse(source);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+    expect(result.diagnostics).toEqual([]);
+    const decls = Array.from(result.document.declarations());
+    expect(decls).toHaveLength(1);
+    const model = decls[0];
+    expect(model).toBeInstanceOf(ModelDeclarationAst);
+    if (!(model instanceof ModelDeclarationAst)) return;
+    expect(model.name()?.token()?.text).toBe('用户');
+    const fields = Array.from(model.fields());
+    expect(fields.map((f) => f.name()?.token()?.text)).toEqual(['имя', 'café']);
+  });
+});
+
+describe('parse() treats declaration keywords as contextual, not reserved', () => {
+  it('parses `model` as a model name', () => {
+    const source = 'model model {\n  id Int\n}';
+    const result = parse(source);
+    expect(result.diagnostics).toEqual([]);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+    const decls = Array.from(result.document.declarations());
+    expect(decls).toHaveLength(1);
+    const model = decls[0];
+    expect(model).toBeInstanceOf(ModelDeclarationAst);
+    if (!(model instanceof ModelDeclarationAst)) return;
+    expect(model.name()?.token()?.text).toBe('model');
+  });
+
+  it('parses `model` as a field name', () => {
+    const source = 'model User {\n  model String\n}';
+    const result = parse(source);
+    expect(result.diagnostics).toEqual([]);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+    const model = Array.from(result.document.declarations())[0];
+    expect(model).toBeInstanceOf(ModelDeclarationAst);
+    if (!(model instanceof ModelDeclarationAst)) return;
+    const fields = Array.from(model.fields());
+    expect(fields.map((f) => f.name()?.token()?.text)).toEqual(['model']);
+  });
+
+  it('parses `model` and `enum` as enum values', () => {
+    const source = 'enum Role {\n  model\n  enum\n}';
+    const result = parse(source);
+    expect(result.diagnostics).toEqual([]);
+    expect(greenText(result.document.syntax.green)).toBe(source);
+    const decl = Array.from(result.document.declarations())[0];
+    expect(decl).toBeInstanceOf(EnumDeclarationAst);
+    if (!(decl instanceof EnumDeclarationAst)) return;
+    const values = Array.from(decl.values());
+    expect(values.map((v) => v.name()?.token()?.text)).toEqual(['model', 'enum']);
+  });
 });
 
 function codes(source: string): readonly string[] {
