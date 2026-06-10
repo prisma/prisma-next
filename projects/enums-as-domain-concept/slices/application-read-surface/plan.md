@@ -94,6 +94,26 @@ sonnet-mid; reviewer: opus.
   (the committed demo fixture is PSL-mode where `priority` is plain `String` — the new enum
   is TS-authored only until PSL `enum` repoints at the cutover, TML-2853).
 
+### Dispatch 5: enums move into the namespace facet — `db.<ns>.enums.<Name>` (R6 revision)
+
+- **Why this exists:** D2 shipped `db.enums` as a flat root accessor, specced when the
+  client root was flat. TML-2816 (merged from main) made the client root
+  **namespace-keyed** (`db.<ns>.<Model>` via per-namespace facets), which left `db.enums`
+  as the one root key that isn't a namespace, shadowing any namespace literally named
+  `enums` — and the flat `buildEnumsMap` silently last-write-wins when two namespaces
+  declare the same enum name. Decision (operator + query team, 2026-06-10): enums live
+  **inside the namespace facet** — `db.orm.public.enums.Priority` on postgres;
+  unbound-namespace targets (sqlite, mongo) get `db.orm.enums.Role` for free via the
+  existing per-facade unbound projection. This matches the IR (`domain.namespaces[ns].enum`)
+  and fixes the cross-namespace collision.
+- **Outcome:** the root `enums` accessor is gone; each namespace facet exposes `enums`
+  (reserved name) resolving only that namespace's enums, typed per-namespace (literal
+  tuples preserved on both the no-emit and emitted paths). A model named `enums` is
+  rejected with a clear error rather than silently shadowed. The demo, facades, and all
+  enum proofs are updated; the sqlite facade's `unboundNamespace` widening reverts if the
+  removed root intersection was its only cause. Design notes record the decision and the
+  reserved-name rule as the template for future client-side entity-accessor maps.
+
 ## Open items (orchestrator-routed; not D1/D2/D3 blockers)
 
 - **Triplicated model/column type-level resolution.** `FindModelForTable` /
