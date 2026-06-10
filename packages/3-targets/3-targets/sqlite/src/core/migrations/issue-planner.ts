@@ -35,6 +35,8 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { CONTROL_TABLE_NAMES } from '../control-tables';
@@ -282,6 +284,12 @@ function sqliteDefaultToDdlColumnDefault(
       // here; the renderer also has a defensive guard for the same case.
       if (columnDefault.expression === 'autoincrement()') return undefined;
       return new FunctionColumnDefault(columnDefault.expression);
+    default: {
+      const exhaustive: never = columnDefault;
+      throw new Error(
+        `sqliteDefaultToDdlColumnDefault: unhandled kind "${blindCast<{ kind: string }, 'exhaustiveness: surface the unhandled default kind'>(exhaustive).kind}"`,
+      );
+    }
   }
 }
 
@@ -344,9 +352,9 @@ export function tableToDdlParts(
         columns: fk.source.columns,
         refTable: fk.target.tableName,
         refColumns: fk.target.columns,
-        ...(fk.name !== undefined ? { name: fk.name } : {}),
-        ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
-        ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
+        ...ifDefined('name', fk.name),
+        ...ifDefined('onDelete', fk.onDelete),
+        ...ifDefined('onUpdate', fk.onUpdate),
       }),
     );
   }
