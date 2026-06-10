@@ -303,6 +303,7 @@ export function resolveFieldType(
   switch (type.kind) {
     case 'scalar': {
       let outputResolved: string | undefined;
+      let inputResolved: string | undefined;
       const inlineTypeParams =
         type.typeParams && Object.keys(type.typeParams).length > 0 ? type.typeParams : undefined;
       const effectiveTypeParams = inlineTypeParams ?? resolvedTypeParams;
@@ -311,11 +312,15 @@ export function resolveFieldType(
         if (rendered && isSafeTypeExpression(rendered)) {
           outputResolved = rendered;
         }
+        const renderedInput = codecLookup.renderInputTypeFor?.(type.codecId, effectiveTypeParams);
+        if (renderedInput && isSafeTypeExpression(renderedInput)) {
+          inputResolved = renderedInput;
+        }
       }
       const codecAccessor = `CodecTypes[${serializeValue(type.codecId)}]`;
       return {
         output: applyModifiers(outputResolved ?? `${codecAccessor}['output']`, field),
-        input: applyModifiers(`${codecAccessor}['input']`, field),
+        input: applyModifiers(inputResolved ?? `${codecAccessor}['input']`, field),
       };
     }
     case 'valueObject':

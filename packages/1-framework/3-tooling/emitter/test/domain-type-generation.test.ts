@@ -1123,6 +1123,40 @@ describe('resolveFieldType', () => {
     expect(result.output).toBe('Char<36>');
     expect(result.input).toBe("CodecTypes['pg/char@1']['input']");
   });
+
+  it('uses renderInputType for the input side when the codec renders one (enum literal union)', () => {
+    const union = "'a' | 'b'";
+    const lookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => union,
+      renderInputTypeFor: () => union,
+    };
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/enum@1', typeParams: { values: ['a', 'b'] } },
+    };
+    const result = resolveFieldType(field, lookup);
+    expect(result.output).toBe(union);
+    expect(result.input).toBe(union);
+  });
+
+  it('falls back to the codec input type when the lookup renders no custom input', () => {
+    const lookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => "'a' | 'b'",
+    };
+    const field: ContractField = {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'pg/enum@1', typeParams: { values: ['a', 'b'] } },
+    };
+    const result = resolveFieldType(field, lookup);
+    expect(result.output).toBe("'a' | 'b'");
+    expect(result.input).toBe("CodecTypes['pg/enum@1']['input']");
+  });
 });
 
 describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {

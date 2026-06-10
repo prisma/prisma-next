@@ -864,6 +864,11 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<EnumParams> {
   override renderOutputType(params: EnumParams): string | undefined {
     return pgEnumRenderOutputType(params);
   }
+  // Enum writes accept the same literal member union as reads, so create/update
+  // call sites get exhaustiveness checking instead of widening to `string`.
+  override renderInputType(params: EnumParams): string | undefined {
+    return pgEnumRenderOutputType(params);
+  }
   override factory(_params: EnumParams): (ctx: CodecInstanceContext) => PgEnumCodec {
     return () => new PgEnumCodec(this);
   }
