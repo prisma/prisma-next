@@ -11,6 +11,7 @@ import {
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
+import { Priority } from '../prisma/contract';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
 import { createOrmClient } from '../src/orm-client/client';
 import { ormClientCreateUser } from '../src/orm-client/create-user';
@@ -170,35 +171,35 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
       id: seededPostIds.older,
       title: 'Older post',
       userId: seededUserIds.admin,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-01T10:00:00.000Z'),
     },
     {
       id: seededPostIds.newer,
       title: 'Newer post',
       userId: seededUserIds.admin,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-02T10:00:00.000Z'),
     },
     {
       id: seededPostIds.memberNote,
       title: 'Other user note',
       userId: seededUserIds.member,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-03T10:00:00.000Z'),
     },
     {
       id: seededPostIds.adminDeepDive,
       title: 'Admin deep dive post',
       userId: seededUserIds.adminTwo,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-04T10:00:00.000Z'),
     },
     {
       id: seededPostIds.adminZebra,
       title: 'Zebra post note',
       userId: seededUserIds.adminTwo,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-01-05T10:00:00.000Z'),
     },
   ];
@@ -215,7 +216,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
       id: embeddingPostIds.reference,
       title: 'Reference post',
       userId: seededUserIds.admin,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-02-01T10:00:00.000Z'),
       embedding: makeVector([1, 0, 0]),
     },
@@ -223,7 +224,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
       id: embeddingPostIds.similar1,
       title: 'Very similar post',
       userId: seededUserIds.member,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-02-02T10:00:00.000Z'),
       embedding: makeVector([0.95, 0.05, 0]),
     },
@@ -231,7 +232,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
       id: embeddingPostIds.similar2,
       title: 'Somewhat similar post',
       userId: seededUserIds.adminTwo,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-02-03T10:00:00.000Z'),
       embedding: makeVector([0.7, 0.3, 0]),
     },
@@ -239,7 +240,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
       id: embeddingPostIds.dissimilar,
       title: 'Dissimilar post',
       userId: seededUserIds.admin,
-      priority: 'low' as const,
+      priority: Priority.members.Low,
       createdAt: new Date('2024-02-04T10:00:00.000Z'),
       embedding: makeVector([-0.5, -0.5, 0]),
     },

@@ -15,6 +15,7 @@
  */
 import 'dotenv/config';
 
+import { Priority } from '../prisma/contract';
 import { loadAppConfig } from '../src/app-config';
 import { createOrmClient } from '../src/orm-client/client';
 import { db } from '../src/prisma/db';
@@ -94,7 +95,7 @@ async function main() {
           {
             title: 'First Post',
             userId: alice.id,
-            priority: 'low',
+            priority: Priority.members.Low,
             embedding: generateEmbedding(1),
             createdAt: new Date(),
           },
@@ -108,7 +109,7 @@ async function main() {
           {
             title: 'Second Post',
             userId: alice.id,
-            priority: 'high',
+            priority: Priority.members.High,
             embedding: generateEmbedding(2),
             createdAt: new Date(),
           },
@@ -122,7 +123,7 @@ async function main() {
           {
             title: 'Third Post',
             userId: bob.id,
-            priority: 'urgent',
+            priority: Priority.members.Urgent,
             embedding: generateEmbedding(3),
             createdAt: new Date(),
           },

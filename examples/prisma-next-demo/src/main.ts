@@ -66,6 +66,8 @@
  * - enum-priority [limit]       Prove PSL-authored Priority enum through the emitted contract:
  *                              db.enums.public.Priority.values (declaration order), typed
  *                              Post.priority read, and ORDER BY returning low→high→urgent
+ * - enum-priority-filter [member] [limit]
+ *                              Filter posts by a named Priority member using enum member accessor
  * - budget-violation           Demo budget enforcement error
  * - guardrail-delete           Demo AST lint blocking DELETE without WHERE
  *
@@ -100,7 +102,11 @@ import { db } from './prisma/db';
 import { crossAuthorSimilarity } from './queries/cross-author-similarity';
 import { deleteWithoutWhere } from './queries/delete-without-where';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
-import { getPostsByPriority, getPriorityEnumFromEmit } from './queries/get-posts-by-priority';
+import {
+  getPostsByPriority,
+  getPostsByPriorityMember,
+  getPriorityEnumFromEmit,
+} from './queries/get-posts-by-priority';
 import { getUserByEmailPrepared } from './queries/get-user-by-email-prepared';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
@@ -499,6 +505,13 @@ async function main() {
       const posts = await getPostsByPriority(limit);
       console.log(`\nPosts ordered by priority (${posts.length} rows):`);
       console.log(JSON.stringify(posts, null, 2));
+    } else if (cmd === 'enum-priority-filter') {
+      const [memberName, limitStr] = args;
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const member = (memberName ?? 'Low') as 'Low' | 'High' | 'Urgent';
+      const posts = await getPostsByPriorityMember(member, limit);
+      console.log(`Posts with priority=${member} (${posts.length} rows):`);
+      console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'guardrail-delete') {
       console.log('Running DELETE without WHERE to demonstrate AST-based lint guardrail...');
       try {
@@ -533,7 +546,7 @@ async function main() {
           'users-paginate [cursor] [limit] | users-paginate-back <cursor> [limit] | ' +
           'similarity-search <vec> [limit] | cross-author-similarity [limit] | raw-sql-demo [limit] | ' +
           'cache-demo-user <userId> | cache-demo-users [limit] | cache-demo-sql [limit] | ' +
-          'enum-priority [limit] | budget-violation | guardrail-delete]',
+          'enum-priority [limit] | enum-priority-filter [member] [limit] | budget-violation | guardrail-delete]',
       );
       process.exit(1);
     }
