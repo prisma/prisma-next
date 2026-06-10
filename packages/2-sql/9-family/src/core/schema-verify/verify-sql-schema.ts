@@ -1300,6 +1300,12 @@ function resolveContractColumnTypeMetadata(
     return contractColumn;
   }
 
+  // Value-set columns carry typeRef pointing to the value-set name, not storage.types.
+  // The codec, nativeType, and typeParams are already correct on the column itself.
+  if (contractColumn.valueSet) {
+    return contractColumn;
+  }
+
   const referencedType = storageTypes[contractColumn.typeRef];
   if (!referencedType) {
     const columnLabel = context

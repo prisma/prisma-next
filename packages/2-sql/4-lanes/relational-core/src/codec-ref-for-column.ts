@@ -45,7 +45,14 @@ export function codecRefForStorageColumn(
         }
       }
     }
-    if (!instance) return undefined;
+    if (!instance) {
+      // Value-set columns carry typeRef pointing to a valueSet entry, not storage.types.
+      // The column already has the correct codecId, so return it directly.
+      if (columnDef.valueSet !== undefined) {
+        return { codecId: columnDef.codecId };
+      }
+      return undefined;
+    }
     if (isPostgresEnumStorageEntry(instance)) {
       // Canonical path: the entry is a live `PostgresEnumType` IR
       // instance reached through the per-target serializer's
