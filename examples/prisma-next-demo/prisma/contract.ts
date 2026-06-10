@@ -37,7 +37,7 @@ export const contract = defineContract(
         id: field.id.uuidv4(),
         title: field.text(),
         userId: field.uuid(),
-        priority: field.namedType(Priority),
+        priority: field.namedType(Priority).default(Priority.members.Low),
         createdAt: field.temporal.createdAt(),
         updatedAt: field.temporal.updatedAt(),
         embedding: field.namedType(types.Embedding1536).optional(),
