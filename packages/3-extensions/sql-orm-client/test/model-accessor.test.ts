@@ -19,7 +19,6 @@ import {
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
 import {
-  buildManyToManyContract,
   buildMixedPolyContract,
   getTestContext,
   getTestContract,
@@ -583,165 +582,107 @@ describe('createModelAccessor', () => {
 
   describe('M:N relation filters via junction', () => {
     it('some() emits EXISTS through junction (single-key)', () => {
-      const contract = buildManyToManyContract({
-        junctionTable: 'parent_children',
-        parentColumns: ['parent_id'],
-        childColumns: ['child_id'],
-        targetColumns: ['id'],
-      });
-      const accessor = createModelAccessor(
-        { ...getTestContext(), contract } as never,
-        'public',
-        'Parent',
-      ) as unknown as Record<string, { some: (pred?: unknown) => unknown }>;
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { some: (pred?: unknown) => unknown }
+      >;
 
-      const expr = accessor['children']!.some() as ExistsExpr;
+      const expr = accessor['tags']!.some() as ExistsExpr;
 
       expect(expr.notExists).toBe(false);
-      expect(expr.subquery.from).toEqual(TableSource.named('children', undefined, 'public'));
+      expect(expr.subquery.from).toEqual(TableSource.named('tags', undefined, 'public'));
       expect(expr.subquery.joins).toEqual([
         JoinAst.inner(
-          TableSource.named('parent_children', undefined, 'public'),
-          BinaryExpr.eq(
-            ColumnRef.of('parent_children', 'child_id'),
-            ColumnRef.of('children', 'id'),
-          ),
+          TableSource.named('user_tags', undefined, 'public'),
+          BinaryExpr.eq(ColumnRef.of('user_tags', 'tag_id'), ColumnRef.of('tags', 'id')),
         ),
       ]);
       expect(expr.subquery.where).toEqual(
-        BinaryExpr.eq(ColumnRef.of('parent_children', 'parent_id'), ColumnRef.of('parents', 'id')),
+        BinaryExpr.eq(ColumnRef.of('user_tags', 'user_id'), ColumnRef.of('users', 'id')),
       );
     });
 
     it('some(pred) AND-s junction correlation with predicate', () => {
-      const contract = buildManyToManyContract({
-        junctionTable: 'parent_children',
-        parentColumns: ['parent_id'],
-        childColumns: ['child_id'],
-        targetColumns: ['id'],
-      });
-      const accessor = createModelAccessor(
-        { ...getTestContext(), contract } as never,
-        'public',
-        'Parent',
-      ) as unknown as Record<string, { some: (pred: (c: unknown) => unknown) => unknown }>;
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { some: (pred: (c: unknown) => unknown) => unknown }
+      >;
 
-      const expr = accessor['children']!.some((c: unknown) =>
-        (c as Record<string, { eq: (v: unknown) => unknown }>)['id']!.eq(42),
+      const expr = accessor['tags']!.some((c: unknown) =>
+        (c as Record<string, { eq: (v: unknown) => unknown }>)['name']!.eq('Rust'),
       ) as ExistsExpr;
 
       expect(expr.notExists).toBe(false);
       expect(expr.subquery.where).toEqual(
         AndExpr.of([
-          BinaryExpr.eq(
-            ColumnRef.of('parent_children', 'parent_id'),
-            ColumnRef.of('parents', 'id'),
-          ),
-          BinaryExpr.eq(
-            ColumnRef.of('children', 'id'),
-            ParamRef.of(42, { codec: { codecId: 'pg/int4@1' } }),
-          ),
+          BinaryExpr.eq(ColumnRef.of('user_tags', 'user_id'), ColumnRef.of('users', 'id')),
+          BinaryExpr.eq(ColumnRef.of('tags', 'name'), paramRef('tags', 'name', 'Rust')),
         ]),
       );
     });
 
     it('none() emits NOT EXISTS through junction', () => {
-      const contract = buildManyToManyContract({
-        junctionTable: 'parent_children',
-        parentColumns: ['parent_id'],
-        childColumns: ['child_id'],
-        targetColumns: ['id'],
-      });
-      const accessor = createModelAccessor(
-        { ...getTestContext(), contract } as never,
-        'public',
-        'Parent',
-      ) as unknown as Record<string, { none: (pred?: unknown) => unknown }>;
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { none: (pred?: unknown) => unknown }
+      >;
 
-      const expr = accessor['children']!.none() as ExistsExpr;
+      const expr = accessor['tags']!.none() as ExistsExpr;
       expect(expr.notExists).toBe(true);
       expect(expr.subquery.where).toEqual(
-        BinaryExpr.eq(ColumnRef.of('parent_children', 'parent_id'), ColumnRef.of('parents', 'id')),
+        BinaryExpr.eq(ColumnRef.of('user_tags', 'user_id'), ColumnRef.of('users', 'id')),
       );
     });
 
     it('every(pred) emits NOT EXISTS(… AND NOT(pred)) through junction', () => {
-      const contract = buildManyToManyContract({
-        junctionTable: 'parent_children',
-        parentColumns: ['parent_id'],
-        childColumns: ['child_id'],
-        targetColumns: ['id'],
-      });
-      const accessor = createModelAccessor(
-        { ...getTestContext(), contract } as never,
-        'public',
-        'Parent',
-      ) as unknown as Record<string, { every: (pred: (c: unknown) => unknown) => unknown }>;
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { every: (pred: (c: unknown) => unknown) => unknown }
+      >;
 
-      const expr = accessor['children']!.every((c: unknown) =>
-        (c as Record<string, { eq: (v: unknown) => unknown }>)['id']!.eq(99),
+      const expr = accessor['tags']!.every((c: unknown) =>
+        (c as Record<string, { eq: (v: unknown) => unknown }>)['name']!.eq('Rust'),
       ) as ExistsExpr;
 
       expect(expr.notExists).toBe(true);
       expect(expr.subquery.where).toEqual(
         AndExpr.of([
-          BinaryExpr.eq(
-            ColumnRef.of('parent_children', 'parent_id'),
-            ColumnRef.of('parents', 'id'),
-          ),
+          BinaryExpr.eq(ColumnRef.of('user_tags', 'user_id'), ColumnRef.of('users', 'id')),
           new NotExpr(
-            BinaryExpr.eq(
-              ColumnRef.of('children', 'id'),
-              ParamRef.of(99, { codec: { codecId: 'pg/int4@1' } }),
-            ),
+            BinaryExpr.eq(ColumnRef.of('tags', 'name'), paramRef('tags', 'name', 'Rust')),
           ),
         ]),
       );
     });
 
     it('every({}) is vacuously true for M:N relations', () => {
-      const contract = buildManyToManyContract({
-        junctionTable: 'parent_children',
-        parentColumns: ['parent_id'],
-        childColumns: ['child_id'],
-        targetColumns: ['id'],
-      });
-      const accessor = createModelAccessor(
-        { ...getTestContext(), contract } as never,
-        'public',
-        'Parent',
-      ) as unknown as Record<string, { every: (pred: unknown) => unknown }>;
+      const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+        string,
+        { every: (pred: unknown) => unknown }
+      >;
 
-      expect(accessor['children']!.every({})).toEqual(AndExpr.true());
+      expect(accessor['tags']!.every({})).toEqual(AndExpr.true());
     });
 
     it('some() emits EXISTS with composite-key AND-ed junction join', () => {
-      const contract = buildManyToManyContract({
-        junctionTable: 'parent_children',
-        parentColumns: ['tenant_id', 'parent_id'],
-        childColumns: ['tenant_id', 'child_id'],
-        targetColumns: ['tenant_id', 'id'],
-        localFields: ['tenant_id', 'id'],
-      });
-      const accessor = createModelAccessor(
-        { ...getTestContext(), contract } as never,
-        'public',
-        'Parent',
-      ) as unknown as Record<string, { some: () => unknown }>;
+      const accessor = createModelAccessor(context, 'public', 'Project') as unknown as Record<
+        string,
+        { some: () => unknown }
+      >;
 
-      const expr = accessor['children']!.some() as ExistsExpr;
+      const expr = accessor['related']!.some() as ExistsExpr;
 
       expect(expr.subquery.joins).toEqual([
         JoinAst.inner(
-          TableSource.named('parent_children', undefined, 'public'),
+          TableSource.named('project_links', undefined, 'public'),
           AndExpr.of([
             BinaryExpr.eq(
-              ColumnRef.of('parent_children', 'tenant_id'),
-              ColumnRef.of('children', 'tenant_id'),
+              ColumnRef.of('project_links', 'dst_tenant_id'),
+              ColumnRef.of('related__child', 'tenant_id'),
             ),
             BinaryExpr.eq(
-              ColumnRef.of('parent_children', 'child_id'),
-              ColumnRef.of('children', 'id'),
+              ColumnRef.of('project_links', 'dst_id'),
+              ColumnRef.of('related__child', 'id'),
             ),
           ]),
         ),
@@ -749,14 +690,99 @@ describe('createModelAccessor', () => {
       expect(expr.subquery.where).toEqual(
         AndExpr.of([
           BinaryExpr.eq(
-            ColumnRef.of('parent_children', 'tenant_id'),
-            ColumnRef.of('parents', 'tenant_id'),
+            ColumnRef.of('project_links', 'src_tenant_id'),
+            ColumnRef.of('projects', 'tenant_id'),
           ),
+          BinaryExpr.eq(ColumnRef.of('project_links', 'src_id'), ColumnRef.of('projects', 'id')),
+        ]),
+      );
+    });
+
+    function contractWithProjectRelatedThrough(
+      patch: (through: Record<string, unknown>) => Record<string, unknown>,
+    ) {
+      return withPatchedDomainModels(getTestContract(), (models) => {
+        const project = models['Project'] as {
+          relations: Record<string, { through: Record<string, unknown> }>;
+        };
+        const related = project.relations['related']!;
+
+        return {
+          ...models,
+          Project: {
+            ...project,
+            relations: {
+              ...project.relations,
+              related: {
+                ...related,
+                through: patch(related.through),
+              },
+            },
+          },
+        };
+      });
+    }
+
+    it('aliases the related table for self-referential M:N predicates', () => {
+      const accessor = createModelAccessor(context, 'public', 'Project') as unknown as Record<
+        string,
+        { some: (pred: (c: unknown) => unknown) => unknown }
+      >;
+
+      const expr = accessor['related']!.some((c: unknown) =>
+        (c as Record<string, { eq: (v: unknown) => unknown }>)['name']!.eq('Apollo'),
+      ) as ExistsExpr;
+
+      expect(expr.subquery.from).toEqual(TableSource.named('projects', 'related__child', 'public'));
+      expect(expr.subquery.projection).toEqual([
+        ProjectionItem.of('_exists', ColumnRef.of('related__child', 'tenant_id')),
+      ]);
+      expect(expr.subquery.where).toEqual(
+        AndExpr.of([
+          AndExpr.of([
+            BinaryExpr.eq(
+              ColumnRef.of('project_links', 'src_tenant_id'),
+              ColumnRef.of('projects', 'tenant_id'),
+            ),
+            BinaryExpr.eq(ColumnRef.of('project_links', 'src_id'), ColumnRef.of('projects', 'id')),
+          ]),
           BinaryExpr.eq(
-            ColumnRef.of('parent_children', 'parent_id'),
-            ColumnRef.of('parents', 'id'),
+            ColumnRef.of('related__child', 'name'),
+            paramRef('projects', 'name', 'Apollo'),
           ),
         ]),
+      );
+    });
+
+    it('throws when M:N join metadata column counts differ', () => {
+      const contract = contractWithProjectRelatedThrough((through) => ({
+        ...through,
+        targetColumns: ['tenant_id'],
+      }));
+      const accessor = createModelAccessor(
+        { ...context, contract },
+        'public',
+        'Project',
+      ) as unknown as Record<string, { some: () => unknown }>;
+
+      expect(() => accessor['related']!.some()).toThrow(
+        /Relation metadata has mismatched join column counts/,
+      );
+    });
+
+    it('throws when M:N join metadata omits a paired column', () => {
+      const contract = contractWithProjectRelatedThrough((through) => ({
+        ...through,
+        childColumns: ['dst_tenant_id', ''],
+      }));
+      const accessor = createModelAccessor(
+        { ...context, contract },
+        'public',
+        'Project',
+      ) as unknown as Record<string, { some: () => unknown }>;
+
+      expect(() => accessor['related']!.some()).toThrow(
+        /Relation metadata is missing a join column pair/,
       );
     });
   });
