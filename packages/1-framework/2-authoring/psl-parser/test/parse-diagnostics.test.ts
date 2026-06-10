@@ -10,7 +10,7 @@ import {
   TypesBlockAst,
 } from '../src/syntax/ast/declarations';
 import type { GreenElement } from '../src/syntax/green';
-import { highlight } from './support';
+import { highlight, printTree } from './support';
 
 function greenText(element: GreenElement): string {
   if (element.type === 'token') return element.text;
@@ -46,19 +46,19 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
-  it('reports an unsupported top-level declaration with the offending name', () => {
+  it('commits a bare non-reserved identifier to a malformed custom declaration', () => {
     const source = 'oops';
-    const { result, message, diagnostic } = diagnosticFor(
-      source,
-      'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
-    );
-    expect(message).toBe('Unsupported top-level declaration "oops"');
+    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
+    expect(message).toBe('Expected "{" to open the "oops" block');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       oops
-      ~~~~
+          ~
       "
     `);
+    const decls = Array.from(result.document.declarations());
+    expect(decls).toHaveLength(1);
+    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
@@ -122,7 +122,7 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       namespace __unspecified__ {
-      ~~~~~~~~~
+                ~~~~~~~~~~~~~~~
       }
       "
     `);
@@ -305,7 +305,7 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       model User
-      ~~~~~
+                ~
       "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
@@ -348,7 +348,7 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       enum Color
-      ~~~~
+                ~
       "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
@@ -391,7 +391,7 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       namespace outer
-      ~~~~~~~~~
+                     ~
       "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(NamespaceDeclarationAst);
@@ -419,7 +419,7 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       type Address
-      ~~~~
+                  ~
       "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(
@@ -445,28 +445,38 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
   it('keeps parsing later declarations after a malformed reserved header', () => {
     const source = 'model User\nmodel Order {\n}';
     const result = parse(source);
-    expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_DECLARATION');
+    const diagnostic = result.diagnostics.find((d) => d.code === 'PSL_INVALID_DECLARATION');
+    expect(diagnostic).toBeDefined();
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        ModelDeclaration
+          Ident "model"
+          Whitespace " "
+          Identifier
+            Ident "User"
+        Newline "\\n"
+        ModelDeclaration
+          Ident "model"
+          Whitespace " "
+          Identifier
+            Ident "Order"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          RBrace "}""
+    `);
+    expect(highlight(result.sourceFile, diagnostic!.range)).toMatchInlineSnapshot(`
+      "
+      model User
+                ~
+      model Order {
+      }
+      "
+    `);
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(2);
     expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
     expect(decls[1]).toBeInstanceOf(ModelDeclarationAst);
-    expect(greenText(result.document.syntax.green)).toBe(source);
-  });
-
-  it('still reports a bare non-reserved identifier as an unsupported declaration', () => {
-    const source = 'datasource';
-    const { result, message, diagnostic } = diagnosticFor(
-      source,
-      'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
-    );
-    expect(message).toBe('Unsupported top-level declaration "datasource"');
-    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "
-      datasource
-      ~~~~~~~~~~
-      "
-    `);
-    expect(result.diagnostics.map((d) => d.code)).not.toContain('PSL_INVALID_DECLARATION');
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 });
