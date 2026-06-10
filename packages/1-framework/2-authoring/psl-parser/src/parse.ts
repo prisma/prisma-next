@@ -377,7 +377,7 @@ const INVALID_EXTENSION_BLOCK_MEMBER = 'PSL_INVALID_EXTENSION_BLOCK_MEMBER';
 
 type MemberParser = (cursor: Cursor) => void;
 
-interface DocumentState {
+export interface DocumentState {
   topLevelTypesSeen: boolean;
 }
 
@@ -406,73 +406,103 @@ function parseDocument(cursor: Cursor): GreenNode {
   return cursor.finishNode();
 }
 
+const RESERVED_BLOCK_KEYWORDS: ReadonlySet<string> = new Set([
+  'model',
+  'enum',
+  'namespace',
+  'type',
+]);
+
+function keywordIs(cursor: Cursor, keyword: string): boolean {
+  return cursor.peekKind() === 'Ident' && cursor.peekToken().text === keyword;
+}
+
 /**
- * Recognises one top-level (or namespace-body) declaration. Recognition is
- * keyword + bounded `peekKind` lookahead: `model`/`enum`/`namespace` need a name
- * then `{`; `type {` is a types block while `type Ident {` is a composite type;
- * any other `kw [Ident] {` is a generic block. Anything else is unsupported.
+ * Recognises one top-level (or namespace-body) declaration as an ordered list of
+ * alternatives composed with `??`. Each alternative owns its discriminating
+ * `peekKind`/`peekToken` lookahead and is a no-op on non-match: it returns
+ * `undefined` having consumed and mutated nothing, so the forward-only cursor is
+ * never left half-consumed by a rejected alternative. The first alternative to
+ * commit wins; when none match, the input is recovered as an unsupported
+ * declaration. Recovery runs via the `if (!node)` tail rather than as a `??`
+ * arm, because it appends raw tokens to the open parent instead of returning a
+ * child node.
  */
 function parseDeclaration(cursor: Cursor, insideNamespace: boolean, state: DocumentState): void {
-  if (cursor.peekKind() === 'Ident') {
-    const keyword = cursor.peekToken().text;
-    if (keyword === 'model' && nameThenBrace(cursor)) {
-      parseNamedBlock(cursor, 'ModelDeclaration', parseModelMember);
-      return;
-    }
-    if (keyword === 'enum' && nameThenBrace(cursor)) {
-      parseNamedBlock(cursor, 'EnumDeclaration', parseEnumMember);
-      return;
-    }
-    if (keyword === 'namespace' && nameThenBrace(cursor)) {
-      parseNamespace(cursor, insideNamespace, state);
-      return;
-    }
-    if (keyword === 'type') {
-      if (cursor.peekKind(1) === 'LBrace') {
-        parseTypesBlock(cursor, insideNamespace, state);
-        return;
-      }
-      if (cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace') {
-        parseNamedBlock(cursor, 'CompositeTypeDeclaration', parseModelMember);
-        return;
-      }
-    } else if (keyword !== 'model' && keyword !== 'enum' && keyword !== 'namespace') {
-      if (cursor.peekKind(1) === 'LBrace') {
-        parseGenericBlock(cursor, false);
-        return;
-      }
-      if (cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace') {
-        parseGenericBlock(cursor, true);
-        return;
-      }
-    }
+  const node =
+    parseModel(cursor) ??
+    parseEnum(cursor) ??
+    parseNamespace(cursor, insideNamespace, state) ??
+    parseTypesBlock(cursor, insideNamespace, state) ??
+    parseCompositeType(cursor) ??
+    parseGenericBlock(cursor);
+  if (!node) {
+    parseUnsupportedTopLevel(cursor);
   }
-  parseUnsupportedTopLevel(cursor);
 }
 
 function nameThenBrace(cursor: Cursor): boolean {
   return cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace';
 }
 
-function parseNamedBlock(cursor: Cursor, kind: SyntaxKind, parseMember: MemberParser): void {
+function parseNamedBlock(cursor: Cursor, kind: SyntaxKind, parseMember: MemberParser): GreenNode {
   cursor.startNode(kind);
   cursor.bump(); // keyword
   parseIdentifier(cursor); // name
   parseBlockBody(cursor, parseMember);
-  cursor.finishNode();
+  return cursor.finishNode();
 }
 
-function parseGenericBlock(cursor: Cursor, hasName: boolean): void {
+export function parseModel(cursor: Cursor): GreenNode | undefined {
+  if (!(keywordIs(cursor, 'model') && nameThenBrace(cursor))) return undefined;
+  return parseNamedBlock(cursor, 'ModelDeclaration', parseModelMember);
+}
+
+export function parseEnum(cursor: Cursor): GreenNode | undefined {
+  if (!(keywordIs(cursor, 'enum') && nameThenBrace(cursor))) return undefined;
+  return parseNamedBlock(cursor, 'EnumDeclaration', parseEnumMember);
+}
+
+export function parseCompositeType(cursor: Cursor): GreenNode | undefined {
+  if (
+    !(
+      keywordIs(cursor, 'type') &&
+      cursor.peekKind(1) === 'Ident' &&
+      cursor.peekKind(2) === 'LBrace'
+    )
+  ) {
+    return undefined;
+  }
+  return parseNamedBlock(cursor, 'CompositeTypeDeclaration', parseModelMember);
+}
+
+/**
+ * Matches an unreserved `Ident` block keyword followed by `{` (anonymous) or
+ * `Ident {` (named). Excluding the reserved keywords (`model`/`enum`/
+ * `namespace`/`type`) is what preserves the behaviour where a malformed reserved
+ * block (e.g. `model {` with no name) falls through to the unsupported-
+ * declaration recovery rather than being captured as a generic block.
+ */
+export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident') return undefined;
+  if (RESERVED_BLOCK_KEYWORDS.has(cursor.peekToken().text)) return undefined;
+  const hasName = cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace';
+  if (!hasName && cursor.peekKind(1) !== 'LBrace') return undefined;
   cursor.startNode('BlockDeclaration');
   cursor.bump(); // keyword
   if (hasName) {
     parseIdentifier(cursor);
   }
   parseBlockBody(cursor, parseKeyValueMember);
-  cursor.finishNode();
+  return cursor.finishNode();
 }
 
-function parseNamespace(cursor: Cursor, insideNamespace: boolean, state: DocumentState): void {
+export function parseNamespace(
+  cursor: Cursor,
+  insideNamespace: boolean,
+  state: DocumentState,
+): GreenNode | undefined {
+  if (!(keywordIs(cursor, 'namespace') && nameThenBrace(cursor))) return undefined;
   const keywordMark = cursor.mark();
   cursor.startNode('Namespace');
   cursor.bump(); // namespace
@@ -494,10 +524,15 @@ function parseNamespace(cursor: Cursor, insideNamespace: boolean, state: Documen
     );
   }
   parseBlockBody(cursor, (inner) => parseDeclaration(inner, true, state));
-  cursor.finishNode();
+  return cursor.finishNode();
 }
 
-function parseTypesBlock(cursor: Cursor, insideNamespace: boolean, state: DocumentState): void {
+export function parseTypesBlock(
+  cursor: Cursor,
+  insideNamespace: boolean,
+  state: DocumentState,
+): GreenNode | undefined {
+  if (!(keywordIs(cursor, 'type') && cursor.peekKind(1) === 'LBrace')) return undefined;
   const keywordMark = cursor.mark();
   cursor.startNode('TypesBlock');
   if (insideNamespace) {
@@ -517,7 +552,7 @@ function parseTypesBlock(cursor: Cursor, insideNamespace: boolean, state: Docume
   }
   cursor.bump(); // type
   parseBlockBody(cursor, parseNamedTypeMember);
-  cursor.finishNode();
+  return cursor.finishNode();
 }
 
 /**
@@ -552,58 +587,55 @@ function parseUnsupportedTopLevel(cursor: Cursor): void {
   cursor.recoverToSyncPoint();
 }
 
+/**
+ * Block-attribute alternative shared by model and enum members: matches a
+ * leading `@@` (yielding a `ModelAttribute`) and is a no-op on anything else. The
+ * `@@`-vs-`@` distinction is preserved exactly — single-`@` attributes belong to
+ * fields and enum values and are parsed inside `parseField`/`parseEnumValue`.
+ */
+export function parseBlockAttribute(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'DoubleAt') return undefined;
+  return parseAttribute(cursor);
+}
+
 function parseModelMember(cursor: Cursor): void {
-  const kind = cursor.peekKind();
-  if (kind === 'DoubleAt') {
-    parseAttribute(cursor);
-    return;
+  const node = parseBlockAttribute(cursor) ?? parseField(cursor);
+  if (!node) {
+    invalidMember(
+      cursor,
+      INVALID_MODEL_MEMBER,
+      `Invalid model member declaration "${cursor.peekToken().text}"`,
+    );
   }
-  if (kind === 'Ident') {
-    parseField(cursor);
-    return;
-  }
-  invalidMember(
-    cursor,
-    INVALID_MODEL_MEMBER,
-    `Invalid model member declaration "${cursor.peekToken().text}"`,
-  );
 }
 
 function parseEnumMember(cursor: Cursor): void {
-  const kind = cursor.peekKind();
-  if (kind === 'DoubleAt') {
-    parseAttribute(cursor);
-    return;
+  const node = parseBlockAttribute(cursor) ?? parseEnumValue(cursor);
+  if (!node) {
+    invalidMember(
+      cursor,
+      INVALID_ENUM_MEMBER,
+      `Invalid enum value declaration "${cursor.peekToken().text}"`,
+    );
   }
-  if (kind === 'Ident') {
-    parseEnumValue(cursor);
-    return;
-  }
-  invalidMember(
-    cursor,
-    INVALID_ENUM_MEMBER,
-    `Invalid enum value declaration "${cursor.peekToken().text}"`,
-  );
 }
 
 function parseNamedTypeMember(cursor: Cursor): void {
-  if (cursor.peekKind() === 'Ident') {
-    parseNamedType(cursor);
-    return;
+  const node = parseNamedType(cursor);
+  if (!node) {
+    invalidMember(
+      cursor,
+      INVALID_TYPES_MEMBER,
+      `Invalid types declaration "${cursor.peekToken().text}"`,
+    );
   }
-  invalidMember(
-    cursor,
-    INVALID_TYPES_MEMBER,
-    `Invalid types declaration "${cursor.peekToken().text}"`,
-  );
 }
 
 function parseKeyValueMember(cursor: Cursor): void {
-  if (cursor.peekKind() === 'Ident') {
-    parseKeyValue(cursor);
-    return;
+  const node = parseKeyValue(cursor);
+  if (!node) {
+    invalidMember(cursor, INVALID_EXTENSION_BLOCK_MEMBER, 'Invalid block entry');
   }
-  invalidMember(cursor, INVALID_EXTENSION_BLOCK_MEMBER, 'Invalid block entry');
 }
 
 function invalidMember(cursor: Cursor, code: PslDiagnosticCode, message: string): void {
@@ -612,26 +644,29 @@ function invalidMember(cursor: Cursor, code: PslDiagnosticCode, message: string)
   cursor.recoverToSyncPoint();
 }
 
-function parseField(cursor: Cursor): void {
+export function parseField(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('FieldDeclaration');
   parseIdentifier(cursor); // name
   parseTypeAnnotation(cursor);
   while (cursor.peekKind() === 'At') {
     parseAttribute(cursor);
   }
-  cursor.finishNode();
+  return cursor.finishNode();
 }
 
-function parseEnumValue(cursor: Cursor): void {
+export function parseEnumValue(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('EnumValueDeclaration');
   parseIdentifier(cursor); // name
   while (cursor.peekKind() === 'At') {
     parseAttribute(cursor);
   }
-  cursor.finishNode();
+  return cursor.finishNode();
 }
 
-function parseNamedType(cursor: Cursor): void {
+export function parseNamedType(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('NamedTypeDeclaration');
   parseIdentifier(cursor); // name
   if (cursor.peekKind() === 'Equals') {
@@ -641,10 +676,11 @@ function parseNamedType(cursor: Cursor): void {
   while (cursor.peekKind() === 'At') {
     parseAttribute(cursor);
   }
-  cursor.finishNode();
+  return cursor.finishNode();
 }
 
-function parseKeyValue(cursor: Cursor): void {
+export function parseKeyValue(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('KeyValuePair');
   parseIdentifier(cursor); // key
   if (cursor.peekKind() === 'Equals') {
@@ -654,5 +690,5 @@ function parseKeyValue(cursor: Cursor): void {
   if (!value && cursor.peekKind() === 'LBrace') {
     cursor.captureBalancedBraces();
   }
-  cursor.finishNode();
+  return cursor.finishNode();
 }
