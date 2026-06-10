@@ -186,6 +186,16 @@ export interface AuthoringPslBlockDescriptor {
   readonly discriminator: string;
   readonly name: { readonly required: boolean };
   readonly parameters: Record<string, PslBlockParam>;
+  /**
+   * When `true`, the generic validator does not emit
+   * `PSL_EXTENSION_UNKNOWN_PARAMETER` for keys absent from `parameters`.
+   * Unknown parameters are still captured as raw-value stubs by the parser
+   * — the consuming interpreter is responsible for validating them.
+   *
+   * Use this for blocks whose parameter keys are user-defined (e.g. enum
+   * member names), not a fixed set.
+   */
+  readonly allowAdditionalParameters?: boolean;
 }
 
 export type AuthoringPslBlockDescriptorNamespace = {

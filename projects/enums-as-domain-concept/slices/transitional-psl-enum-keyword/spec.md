@@ -41,32 +41,36 @@ keyword whose whole point is to die. Operator may override before dispatch.
 Four surfaces; the only genuinely new piece is grammar (and the cutover needs that
 grammar anyway).
 
-**1. Grammar — psl-parser (`packages/1-framework/2-authoring/psl-parser/src/parser.ts`).**
-A dedicated `enum2` block parse alongside the native `enum` parse (~line 148), producing
-a **distinct AST node kind** (e.g. `PslEnum2` with members `{ name, rawValue?, span }`)
-so the native `PslEnum` AST is untouched. Three grammar elements:
+**1. Grammar — NO enum2-specific parser logic (amended 2026-06-10, operator review on
+PR #805).** `enum2 <Name> { … }` rides the **existing generic extension-block grammar**
+(parser.ts ~224): the block keyword is just the extension-block keyword, and members
+are the generic `key = value` parameter lines (`Low = "low"`), captured raw exactly as
+extension blocks already capture parameter values. The RHS is the codec's
+**JSON-encoded value** (validated in the interpreter, never the parser); a bare member
+(`Low`) defaults to the member name for string-input codecs; no `@map` on members (the
+design notes reject `@map` for member values as a plane miscategorization).
 
-- Block keyword: `enum2 <Name> {`.
-- Member syntax: `Name = <literal>` — the RHS is the codec's **JSON-encoded value**,
-  captured raw (validated later against the codec, not in the parser). The `= value` is
-  optional: it defaults to the member name for string-input codecs. No `@map` on
-  members (that is native-enum vocabulary; the design notes reject `@map` for member
-  values as a plane miscategorization).
-- Block attribute: `@@type("<codec-id>")`, reusing the existing block-attribute parse
-  the native enum already has (~lines 500–550).
-
-Not the generic extension-block path (parser.ts ~224): extension blocks parse
-`key = value` member lines but do **not** support `@@` block attributes, and `@@type` is
-required here. A dedicated parse matches how `enum` works today and gives precise spans
-for diagnostics.
+The one parser change permitted is **generic**: extension blocks gain `@@attr(...)`
+block-attribute support (so `@@type("<codec-id>")` parses inside any contributed
+block), plus whatever generic gaps the member semantics force into the open (ordered
+parameter entries, duplicate-key diagnostics) — each landed as a capability of the
+extension-block grammar itself, never as an enum2 special case. The original
+dedicated-parse decision (`parseEnum2Block`, the `PslEnum2` AST kind) is reverted; the
+first PR round built it on the mistaken premise that the `@@`-attribute gap justified a
+bespoke production.
 
 **2. Interpreter — contract-psl (`packages/2-sql/2-authoring/contract-psl/src/interpreter.ts`).**
 A parallel `processEnum2Declarations` next to the native `processEnumDeclarations`
 (line 312). Per `enum2` declaration it:
 
-- Looks up the **`entityTypes.enum2`** contribution via `getAuthoringEntity`
-  (`psl-column-resolution.ts:90`); a missing contribution is a clean
-  target-doesn't-support-this diagnostic (the native-enum precedent, interpreter.ts:323).
+- Consumes the `enum2`-keyword extension blocks from the parsed document (amended: no
+  `entityTypes.enum2` contribution and no presence-signal stub — the registration was a
+  category error mirroring native enum's genuinely-Postgres-specific entry; the domain
+  enum is target-agnostic and support falls out of codec resolution, which already
+  fails with a clean unknown-codec diagnostic on a target that lacks the codec). If the
+  extension-block machinery requires a block descriptor for the `enum2` keyword to
+  avoid an unrecognized-block diagnostic, register it at the framework/SQL-family
+  level, not per target.
 - Validates `@@type` is present (required, never inferred — validation error if absent)
   and resolves the codec id through the codec lookup.
 - Validates each member RHS with `JSON.parse` + `codec.decodeJson` — the existing
@@ -91,13 +95,11 @@ already calls it). From there **everything is the merged TS-path lowering**: dom
 `valueSet` refs (448–471), and the check constraint derived from the column's
 `valueSet` (561–568). Zero new lowering code.
 
-**3. Postgres pack (`packages/3-targets/3-targets/postgres/src/core/authoring.ts`).**
-Register the `enum2` entry in `postgresAuthoringEntityTypes` (next to the native `enum`
-entry, lines 43–53). Its job differs from native's (which fabricates a
-`PostgresEnumStorageEntry`): the `enum2` contribution marks the target as supporting
-the block and binds it to the target's codec set. Exact factory I/O shape is a
-dispatch-time call; the contract is (a) absence ⇒ clean diagnostic, (b) presence
-supplies what the interpreter needs to resolve the `@@type` codec id.
+**3. No per-target registration (amended 2026-06-10).** The Postgres
+`entityTypes.enum2` entry from the first PR round is deleted. enum2 is a
+framework-level surface available on every target whose codec set resolves the
+`@@type` codec id; any block descriptor the extension-block machinery needs lives at
+the framework/SQL-family level (component 2).
 
 **4. Demo (`examples/prisma-next-demo`).** Author `enum2 Priority` (the same three
 members the TS-path `Priority` in `prisma/contract.ts` has) in
@@ -108,6 +110,12 @@ narrowing); add the migration under `migrations/app/` (new `Priority` value-set 
 enum **through the emitted contract** — typed read (`'low' | 'high' | 'urgent'`),
 `db.enums.public.Priority.values`, and an `ORDER BY priority` that returns
 declaration order. This is the proof the slice ships live, not dark.
+
+Amended per PR #805 review: the demo's seeds, integration-test fixtures, and queries
+use the enum itself (`Priority.members.Low` / the `db.enums` accessor), never raw
+`'low'` literals; and the demo command includes a query that **filters by a live
+member value** (`WHERE priority = Priority.members.High`) — the most common real-world
+usage must be in the proof.
 
 ## Coherence rationale
 

@@ -7,6 +7,9 @@ export type {
   PslBlockParamValue,
   PslDiagnosticCode,
   PslExtensionBlock,
+  PslExtensionBlockAttribute,
+  PslExtensionBlockAttributeArg,
+  PslExtensionBlockParamBare,
   PslExtensionBlockParamList,
   PslExtensionBlockParamOption,
   PslExtensionBlockParamRef,
@@ -40,7 +43,7 @@ export interface PslDefaultLiteralValue {
 
 export type PslDefaultValue = PslDefaultFunctionValue | PslDefaultLiteralValue;
 
-export type PslAttributeTarget = 'field' | 'model' | 'enum' | 'enum2' | 'namedType';
+export type PslAttributeTarget = 'field' | 'model' | 'enum' | 'namedType';
 
 export interface PslAttributePositionalArgument {
   readonly kind: 'positional';
@@ -154,22 +157,6 @@ export interface PslEnum {
   readonly span: PslSpan;
 }
 
-export interface PslEnum2Value {
-  readonly kind: 'enum2Value';
-  readonly name: string;
-  /** Raw captured RHS text (e.g. `"low"` or `1`). Absent when the member has no `= value`. */
-  readonly rawValue?: string;
-  readonly span: PslSpan;
-}
-
-export interface PslEnum2 {
-  readonly kind: 'enum2';
-  readonly name: string;
-  readonly values: readonly PslEnum2Value[];
-  readonly attributes: readonly PslAttribute[];
-  readonly span: PslSpan;
-}
-
 /**
  * A reusable group of fields embedded in a model (a `type Name { … }` block) —
  * e.g. a MongoDB embedded document or a Postgres composite type. Unlike
@@ -218,12 +205,7 @@ export interface PslTypesBlock {
 export const UNSPECIFIED_PSL_NAMESPACE_ID = '__unspecified__';
 
 /** A value in {@link PslNamespace.entries}: a built-in entity node or an extension-contributed {@link PslExtensionBlock}. */
-export type PslNamespaceEntry =
-  | PslModel
-  | PslEnum
-  | PslEnum2
-  | PslCompositeType
-  | PslExtensionBlock;
+export type PslNamespaceEntry = PslModel | PslEnum | PslCompositeType | PslExtensionBlock;
 
 /**
  * A namespace block, or the parser's synthesised `__unspecified__` bucket for
@@ -243,8 +225,6 @@ export interface PslNamespace {
   readonly models: readonly PslModel[];
   /** Built-in enums, from `entries['enum']`. */
   readonly enums: readonly PslEnum[];
-  /** Built-in enum2 blocks, from `entries['enum2']`. */
-  readonly enum2s: readonly PslEnum2[];
   /** Built-in composite types, from `entries['compositeType']`. */
   readonly compositeTypes: readonly PslCompositeType[];
   readonly span: PslSpan;
@@ -284,12 +264,6 @@ class PslNamespaceNode implements PslNamespace {
     );
   }
 
-  get enum2s(): readonly PslEnum2[] {
-    return blindCast<readonly PslEnum2[], 'entries[enum2] holds only PslEnum2 by construction'>(
-      Object.values(this.entries['enum2'] ?? {}),
-    );
-  }
-
   get compositeTypes(): readonly PslCompositeType[] {
     return blindCast<
       readonly PslCompositeType[],
@@ -318,7 +292,6 @@ export function makePslNamespaceEntries(
   enums: readonly PslEnum[],
   compositeTypes: readonly PslCompositeType[],
   extensionBlocks: readonly PslExtensionBlock[],
-  enum2s: readonly PslEnum2[] = [],
 ): Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>> {
   const container: Record<string, Readonly<Record<string, PslNamespaceEntry>>> = {};
 
@@ -336,14 +309,6 @@ export function makePslNamespaceEntries(
       map[e.name] = e;
     }
     container['enum'] = Object.freeze(map);
-  }
-
-  if (enum2s.length > 0) {
-    const map: Record<string, PslEnum2> = {};
-    for (const e of enum2s) {
-      map[e.name] = e;
-    }
-    container['enum2'] = Object.freeze(map);
   }
 
   if (compositeTypes.length > 0) {
@@ -400,17 +365,6 @@ export function flatPslEnums(ast: PslDocumentAst): readonly PslEnum[] {
 }
 
 /**
- * Returns all enum2 blocks from every namespace in document order.
- */
-export function flatPslEnum2s(ast: PslDocumentAst): readonly PslEnum2[] {
-  return ast.namespaces.flatMap((ns) =>
-    blindCast<PslEnum2[], 'enum2 kind map contains only PslEnum2 by construction'>(
-      Object.values(ns.entries['enum2'] ?? {}),
-    ),
-  );
-}
-
-/**
  * Returns all composite types from every namespace in document order.
  */
 export function flatPslCompositeTypes(ast: PslDocumentAst): readonly PslCompositeType[] {
@@ -433,7 +387,6 @@ export function flatPslCompositeTypes(ast: PslDocumentAst): readonly PslComposit
 export const BUILTIN_PSL_KIND_KEYS: ReadonlySet<string> = new Set([
   'model',
   'enum',
-  'enum2',
   'compositeType',
 ]);
 
@@ -441,7 +394,7 @@ export const BUILTIN_PSL_KIND_KEYS: ReadonlySet<string> = new Set([
  * Returns all extension-contributed blocks in the given namespace, in
  * insertion order (the order the parser encountered them in the source).
  *
- * Reads from `namespace.entries`, skipping the three built-in kind keys
+ * Reads from `namespace.entries`, skipping the built-in kind keys
  * (`'model'`, `'enum'`, `'compositeType'`). All remaining kind maps contain
  * only `PslExtensionBlock` nodes by construction (see `makePslNamespaceEntries`).
  */

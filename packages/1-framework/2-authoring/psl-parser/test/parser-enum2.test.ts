@@ -1,11 +1,26 @@
-import type { PslEnum2, PslEnum2Value } from '@prisma-next/framework-components/psl-ast';
 import {
-  flatPslEnum2s,
   flatPslEnums,
   flatPslModels,
+  namespacePslExtensionBlocks,
+  type PslExtensionBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import { describe, expect, it } from 'vitest';
 import { parsePslDocument } from '../src/parser';
+
+const enum2Descriptor = {
+  kind: 'pslBlock' as const,
+  keyword: 'enum2',
+  discriminator: 'enum2',
+  name: { required: true },
+  parameters: {},
+  allowAdditionalParameters: true,
+};
+
+const pslBlockDescriptors = { enum2: enum2Descriptor };
+
+function flatEnum2s(ast: Parameters<typeof namespacePslExtensionBlocks>[0][]): PslExtensionBlock[] {
+  return ast.flatMap((ns) => namespacePslExtensionBlocks(ns).filter((b) => b.kind === 'enum2'));
+}
 
 describe('parsePslDocument — enum2 blocks', () => {
   it('parses bare members (no = value)', () => {
@@ -17,21 +32,20 @@ enum2 Priority {
   Urgent
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const enums = flatPslEnum2s(result.ast);
+    const enums = flatEnum2s(result.ast.namespaces);
     expect(enums).toHaveLength(1);
     const priority = enums[0];
     expect(priority?.kind).toBe('enum2');
     expect(priority?.name).toBe('Priority');
-    expect(priority?.values).toHaveLength(3);
-    expect(priority?.values[0]).toMatchObject({ kind: 'enum2Value', name: 'Low' });
-    expect(priority?.values[0]).not.toHaveProperty('rawValue');
-    expect(priority?.values[1]).toMatchObject({ kind: 'enum2Value', name: 'High' });
-    expect(priority?.values[2]).toMatchObject({ kind: 'enum2Value', name: 'Urgent' });
+    expect(Object.keys(priority?.parameters ?? {})).toHaveLength(3);
+    expect(priority?.parameters['Low']?.kind).toBe('bare');
+    expect(priority?.parameters['High']?.kind).toBe('bare');
+    expect(priority?.parameters['Urgent']?.kind).toBe('bare');
   });
 
   it('parses = value members with string literals', () => {
@@ -43,17 +57,16 @@ enum2 Priority {
   Urgent = "urgent"
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const enums = flatPslEnum2s(result.ast);
-    const priority = enums[0];
-    expect(priority?.values).toHaveLength(3);
-    expect(priority?.values[0]).toMatchObject({ name: 'Low', rawValue: '"low"' });
-    expect(priority?.values[1]).toMatchObject({ name: 'High', rawValue: '"high"' });
-    expect(priority?.values[2]).toMatchObject({ name: 'Urgent', rawValue: '"urgent"' });
+    const priority = flatEnum2s(result.ast.namespaces)[0];
+    expect(Object.keys(priority?.parameters ?? {})).toHaveLength(3);
+    expect(priority?.parameters['Low']).toMatchObject({ kind: 'value', raw: '"low"' });
+    expect(priority?.parameters['High']).toMatchObject({ kind: 'value', raw: '"high"' });
+    expect(priority?.parameters['Urgent']).toMatchObject({ kind: 'value', raw: '"urgent"' });
   });
 
   it('parses = value members with number literals', () => {
@@ -65,16 +78,15 @@ enum2 Priority {
   Urgent = 3
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const enums = flatPslEnum2s(result.ast);
-    const priority = enums[0];
-    expect(priority?.values[0]).toMatchObject({ name: 'Low', rawValue: '1' });
-    expect(priority?.values[1]).toMatchObject({ name: 'High', rawValue: '2' });
-    expect(priority?.values[2]).toMatchObject({ name: 'Urgent', rawValue: '3' });
+    const priority = flatEnum2s(result.ast.namespaces)[0];
+    expect(priority?.parameters['Low']).toMatchObject({ kind: 'value', raw: '1' });
+    expect(priority?.parameters['High']).toMatchObject({ kind: 'value', raw: '2' });
+    expect(priority?.parameters['Urgent']).toMatchObject({ kind: 'value', raw: '3' });
   });
 
   it('parses mixed bare and valued members in one block', () => {
@@ -87,20 +99,17 @@ enum2 Mixed {
   Also = 42
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const enums = flatPslEnum2s(result.ast);
-    const mixed = enums[0];
-    expect(mixed?.values).toHaveLength(4);
-    expect(mixed?.values[0]).toMatchObject({ name: 'Bare' });
-    expect(mixed?.values[0]).not.toHaveProperty('rawValue');
-    expect(mixed?.values[1]).toMatchObject({ name: 'Assigned', rawValue: '"assigned"' });
-    expect(mixed?.values[2]).toMatchObject({ name: 'AlsoBare' });
-    expect(mixed?.values[2]).not.toHaveProperty('rawValue');
-    expect(mixed?.values[3]).toMatchObject({ name: 'Also', rawValue: '42' });
+    const mixed = flatEnum2s(result.ast.namespaces)[0];
+    expect(Object.keys(mixed?.parameters ?? {})).toHaveLength(4);
+    expect(mixed?.parameters['Bare']?.kind).toBe('bare');
+    expect(mixed?.parameters['Assigned']).toMatchObject({ kind: 'value', raw: '"assigned"' });
+    expect(mixed?.parameters['AlsoBare']?.kind).toBe('bare');
+    expect(mixed?.parameters['Also']).toMatchObject({ kind: 'value', raw: '42' });
   });
 
   it('captures the @@type block attribute', () => {
@@ -111,15 +120,12 @@ enum2 Status {
   Inactive = "inactive"
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
-    const enums = flatPslEnum2s(result.ast);
-    const status = enums[0];
-    expect(status?.attributes).toHaveLength(1);
-    expect(status?.attributes[0]).toMatchObject({
-      kind: 'attribute',
-      target: 'enum2',
+    const status = flatEnum2s(result.ast.namespaces)[0];
+    expect(status?.blockAttributes).toHaveLength(1);
+    expect(status?.blockAttributes[0]).toMatchObject({
       name: 'type',
       args: [{ kind: 'positional', value: '"pg/text@1"' }],
     });
@@ -144,7 +150,7 @@ model Post {
   role     NativeRole
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
@@ -154,7 +160,7 @@ model Post {
     expect(nativeEnums[0]?.name).toBe('NativeRole');
     expect(nativeEnums[0]?.kind).toBe('enum');
 
-    const enum2s = flatPslEnum2s(result.ast);
+    const enum2s = flatEnum2s(result.ast.namespaces);
     expect(enum2s).toHaveLength(1);
     expect(enum2s[0]?.name).toBe('Priority');
     expect(enum2s[0]?.kind).toBe('enum2');
@@ -170,15 +176,14 @@ enum2 Priority {
   High = "high"
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const enums = flatPslEnum2s(result.ast);
-    const priority = enums[0];
-    expect(priority?.attributes).toHaveLength(0);
-    expect(priority?.values).toHaveLength(2);
+    const priority = flatEnum2s(result.ast.namespaces)[0];
+    expect(priority?.blockAttributes).toHaveLength(0);
+    expect(Object.keys(priority?.parameters ?? {})).toHaveLength(2);
   });
 
   it('captures a raw value that contains @map( as a substring', () => {
@@ -188,47 +193,31 @@ enum2 Status {
   Foo = "@map(x)"
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const enums = flatPslEnum2s(result.ast);
-    expect(enums[0]?.values[0]).toMatchObject({ name: 'Foo', rawValue: '"@map(x)"' });
+    const status = flatEnum2s(result.ast.namespaces)[0];
+    expect(status?.parameters['Foo']).toMatchObject({ kind: 'value', raw: '"@map(x)"' });
   });
 
-  it('produces a diagnostic when @map appears on an enum2 member', () => {
-    const schema = `
-enum2 Status {
-  @@type("pg/text@1")
-  Active @map("active_db")
-}
-`;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
-
-    expect(result.ok).toBe(false);
-    expect(result.diagnostics.some((d) => d.code === 'PSL_INVALID_ENUM2_MEMBER')).toBe(true);
-    expect(result.diagnostics.find((d) => d.code === 'PSL_INVALID_ENUM2_MEMBER')?.message).toMatch(
-      /@map/,
-    );
-  });
-
-  it('produces a span-accurate diagnostic for a malformed member line', () => {
+  it('produces a diagnostic for a malformed member line', () => {
     const schema = `
 enum2 Status {
   @@type("pg/text@1")
   not a valid line = here
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(false);
-    const diag = result.diagnostics.find((d) => d.code === 'PSL_INVALID_ENUM2_MEMBER');
+    const diag = result.diagnostics.find((d) => d.code === 'PSL_INVALID_EXTENSION_BLOCK_MEMBER');
     expect(diag).toBeDefined();
     expect(diag?.span.start.line).toBe(4);
   });
 
-  it('carries accurate spans on enum2 values', () => {
+  it('carries accurate spans on enum2 parameter values', () => {
     const schema = `
 enum2 Priority {
   @@type("pg/text@1")
@@ -236,13 +225,12 @@ enum2 Priority {
   High = "high"
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
-    const enums = flatPslEnum2s(result.ast);
-    const values = enums[0]?.values ?? [];
-    expect(values[0]?.span.start.line).toBe(4);
-    expect(values[1]?.span.start.line).toBe(5);
+    const priority = flatEnum2s(result.ast.namespaces)[0];
+    expect(priority?.parameters['Low']?.span.start.line).toBe(4);
+    expect(priority?.parameters['High']?.span.start.line).toBe(5);
   });
 
   it('carries span on the whole enum2 block', () => {
@@ -252,41 +240,54 @@ enum2 Priority {
   Low  = "low"
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
 
     expect(result.ok).toBe(true);
-    const enums = flatPslEnum2s(result.ast);
-    const priority = enums[0];
+    const priority = flatEnum2s(result.ast.namespaces)[0];
     expect(priority?.span.start.line).toBe(2);
     expect(priority?.span.end.line).toBe(5);
   });
 
-  it('PslEnum2Value type has the expected shape', () => {
+  it('PslExtensionBlock type has the expected shape for enum2', () => {
     const schema = `
 enum2 Priority {
   @@type("pg/text@1")
   Low = "low"
 }
 `;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
     expect(result.ok).toBe(true);
-    const value: PslEnum2Value | undefined = flatPslEnum2s(result.ast)[0]?.values[0];
-    expect(value?.kind).toBe('enum2Value');
-    expect(value?.name).toBe('Low');
-    expect(value?.rawValue).toBe('"low"');
-  });
-
-  it('PslEnum2 type has the expected shape', () => {
-    const schema = `
-enum2 Priority {
-  @@type("pg/text@1")
-  Low = "low"
-}
-`;
-    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
-    expect(result.ok).toBe(true);
-    const e: PslEnum2 | undefined = flatPslEnum2s(result.ast)[0];
+    const e: PslExtensionBlock | undefined = flatEnum2s(result.ast.namespaces)[0];
     expect(e?.kind).toBe('enum2');
     expect(e?.name).toBe('Priority');
+    expect(e?.parameters['Low']).toMatchObject({ kind: 'value', raw: '"low"' });
+  });
+
+  it('emits PSL_EXTENSION_DUPLICATE_PARAMETER for duplicate member names', () => {
+    const schema = `
+enum2 Priority {
+  @@type("pg/text@1")
+  Low = "low"
+  Low = "low-again"
+}
+`;
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma', pslBlockDescriptors });
+
+    expect(result.diagnostics.some((d) => d.code === 'PSL_EXTENSION_DUPLICATE_PARAMETER')).toBe(
+      true,
+    );
+    const priority = flatEnum2s(result.ast.namespaces)[0];
+    expect(priority?.parameters['Low']).toMatchObject({ kind: 'value', raw: '"low"' });
+  });
+
+  it('emits PSL_UNSUPPORTED_TOP_LEVEL_BLOCK when pslBlockDescriptors is omitted', () => {
+    const schema = `
+enum2 Priority {
+  Low = "low"
+}
+`;
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+
+    expect(result.diagnostics.some((d) => d.code === 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK')).toBe(true);
   });
 });
