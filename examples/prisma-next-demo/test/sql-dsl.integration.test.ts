@@ -6,10 +6,13 @@
  * VP1 of the Runtime pipeline project.
  */
 
+import postgres from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import type { Contract } from '../src/prisma/contract.d';
+import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import { crossAuthorSimilarity } from '../src/queries/cross-author-similarity';
 import { initTestDatabase } from './utils/control-client';
@@ -18,7 +21,12 @@ const context = db.context;
 const { contract } = context;
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  return db.connect({ url: connectionString });
+  const client = postgres<Contract>({
+    contractJson,
+    url: connectionString,
+    extensions: db.stack.extensionPacks,
+  });
+  return client.connect();
 }
 
 const seededUserIds = {

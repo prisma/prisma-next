@@ -40,7 +40,12 @@ const context = db.context;
 const { contract } = context;
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  return db.connect({ url: connectionString });
+  const client = postgres<Contract>({
+    contractJson,
+    url: connectionString,
+    extensions: db.stack.extensionPacks,
+  });
+  return client.connect();
 }
 
 async function getRuntimeWithMiddleware(
