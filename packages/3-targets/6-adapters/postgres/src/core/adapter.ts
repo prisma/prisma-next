@@ -13,7 +13,6 @@ import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expressio
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { PostgresControlAdapter } from './control-adapter';
-import { renderLoweredDdl } from './ddl-renderer';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -75,7 +74,9 @@ class PostgresAdapterImpl
     context: LowererContext<PostgresContract>,
   ): PostgresLoweredStatement {
     if (isDdlNode(ast)) {
-      return renderLoweredDdl(ast);
+      throw new Error(
+        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecutableStatement().',
+      );
     }
     return renderLoweredSql(ast, context.contract, this.codecLookup);
   }

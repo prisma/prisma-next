@@ -13,7 +13,7 @@ const adapter: SqlControlAdapter<'postgres'> = new PostgresControlAdapter();
 
 async function bootstrap(driver: PostgresControlDriver): Promise<void> {
   for (const ddl of adapter.bootstrapControlTableQueries()) {
-    const lowered = adapter.lower(ddl, { contract: undefined });
+    const lowered = await adapter.lowerToExecutableStatement(ddl, { contract: undefined });
     await driver.query(lowered.sql);
   }
 }

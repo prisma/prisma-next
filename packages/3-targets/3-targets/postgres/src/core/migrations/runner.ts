@@ -18,7 +18,7 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
-import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
+import type { ExecutableStatement } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -295,13 +295,13 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     if (schemaQuery === undefined) {
       throw new Error('Postgres control-table bootstrap must include CREATE SCHEMA');
     }
-    await this.executeStatement(driver, this.family.lowerAst(schemaQuery, lowererContext));
+    await this.executeStatement(driver, await this.family.lowerAst(schemaQuery, lowererContext));
     const legacyDetection = await this.detectLegacyMarkerShape(driver);
     if (!legacyDetection.ok) {
       return legacyDetection;
     }
     for (const query of tableQueries) {
-      await this.executeStatement(driver, this.family.lowerAst(query, lowererContext));
+      await this.executeStatement(driver, await this.family.lowerAst(query, lowererContext));
     }
     return okVoid();
   }
@@ -702,7 +702,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
   private async executeStatement(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    statement: LoweredStatement,
+    statement: ExecutableStatement,
   ): Promise<void> {
     if (statement.params.length > 0) {
       await driver.query(statement.sql, statement.params);

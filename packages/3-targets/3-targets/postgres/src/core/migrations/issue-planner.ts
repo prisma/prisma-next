@@ -26,9 +26,9 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { CodecRef, DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
-import { blindCast } from '@prisma-next/utils/casts';
 import * as contractFree from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
@@ -58,7 +58,6 @@ import {
 import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { buildExpectedFormatType } from './planner-sql-checks';
-import { resolveColumnTypeMetadata } from './planner-type-resolution';
 import {
   type CallMigrationStrategy,
   postgresPlannerStrategies,
@@ -67,6 +66,7 @@ import {
   type StrategyContext,
   tableAt,
 } from './planner-strategies';
+import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export type { CallMigrationStrategy, StrategyContext };
 

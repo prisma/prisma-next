@@ -2,9 +2,8 @@ import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contr
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { extractCodecLookup } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, extractCodecLookup } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
@@ -22,7 +21,6 @@ import type {
   MarkerReadResult,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
-import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import type {
   PrimaryKey,
   SqlColumnIR,
@@ -33,6 +31,7 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -44,7 +43,6 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-u
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
-import { renderLoweredDdl } from './ddl-renderer';
 import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
 import {
   decodeSqliteMarkerRow,
@@ -158,7 +156,9 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    */
   lower(ast: AnyQueryAst | SqliteDdlNode, context: LowererContext<unknown>): LoweredStatement {
     if (isDdlNode(ast)) {
-      return renderLoweredDdl(ast);
+      throw new Error(
+        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecutableStatement().',
+      );
     }
     return renderLoweredSql(ast, context.contract as SqliteContract);
   }
@@ -681,6 +681,10 @@ async function sqliteRenderDdlColumnDefault(
 ): Promise<string> {
   if (def.kind === 'function') {
     if (def.expression === 'autoincrement()') return '';
+    // SQLite has no `now()` function; the contract canonicalizes
+    // `CURRENT_TIMESTAMP` / `datetime('now')` to `now()`, so map it back to a
+    // valid SQLite expression on the way out.
+    if (def.expression === 'now()') return "DEFAULT (datetime('now'))";
     return `DEFAULT (${def.expression})`;
   }
   if (codecRef !== undefined) {

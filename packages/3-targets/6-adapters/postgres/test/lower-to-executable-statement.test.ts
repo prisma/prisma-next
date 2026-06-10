@@ -131,29 +131,7 @@ describe('PostgresControlAdapter.lowerToExecutableStatement — DDL literal defa
   });
 });
 
-describe('PostgresControlAdapter.lower output is unchanged after D1', () => {
-  it('produces the same SQL as before for a CREATE TABLE with literal defaults', () => {
-    const ast = new PostgresCreateTable({
-      table: 'defaults',
-      columns: [
-        col('a', 'text', { default: lit('x') }),
-        col('b', 'int', { default: lit(7) }),
-        col('c', 'boolean', { default: lit(true) }),
-        col('d', 'text', { default: lit(null) }),
-        col('e', 'timestamptz', { default: fn('now()') }),
-        col('f', 'uuid', { default: fn('gen_random_uuid()') }),
-      ],
-    });
-    const lowered = adapter.lower(ast, ctx);
-    expect(lowered.sql).toContain(`"a" text DEFAULT 'x'`);
-    expect(lowered.sql).toContain('"b" int DEFAULT 7');
-    expect(lowered.sql).toContain('"c" boolean DEFAULT true');
-    expect(lowered.sql).toContain('"d" text DEFAULT NULL');
-    expect(lowered.sql).toContain('"e" timestamptz DEFAULT (now())');
-    expect(lowered.sql).toContain('"f" uuid DEFAULT (gen_random_uuid())');
-    expect(lowered.params).toEqual([]);
-  });
-
+describe('PostgresControlAdapter.lowerToExecutableStatement — guards', () => {
   it('throws when a numeric literal default is non-finite (NaN / ±Infinity)', async () => {
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       const ast = new PostgresCreateTable({

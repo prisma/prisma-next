@@ -106,6 +106,18 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
     expect(result.sql).toContain(`"ts" TEXT DEFAULT (datetime('now'))`);
     expect(result.sql).toContain('"id" INTEGER');
     expect(result.sql).not.toContain('autoincrement');
+  });
+
+  it("maps the canonical now() function default to SQLite's datetime('now')", async () => {
+    const ast = new SqliteCreateTable({
+      table: 't',
+      columns: [col('created_at', 'TEXT', { default: fn('now()') })],
+    });
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    // SQLite has no now(); the contract canonicalizes CURRENT_TIMESTAMP to
+    // now(), which must map back to a valid SQLite expression at apply time.
+    expect(result.sql).toContain(`"created_at" TEXT DEFAULT (datetime('now'))`);
+    expect(result.sql).not.toContain('(now())');
     expect(result.params).toEqual([]);
   });
 
@@ -142,27 +154,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — guards', () => {
   });
 });
 
-describe('SqliteControlAdapter.lower output is unchanged after D1', () => {
-  it('produces the same SQL as before for a CREATE TABLE with literal defaults', () => {
-    const ast = new SqliteCreateTable({
-      table: 'defaults',
-      columns: [
-        col('a', 'TEXT', { default: lit('x') }),
-        col('b', 'INTEGER', { default: lit(7) }),
-        col('c', 'INTEGER', { default: lit(true) }),
-        col('d', 'TEXT', { default: lit(null) }),
-        col('e', 'TEXT', { default: fn("datetime('now')") }),
-      ],
-    });
-    const lowered = adapter.lower(ast, ctx);
-    expect(lowered.sql).toContain(`"a" TEXT DEFAULT 'x'`);
-    expect(lowered.sql).toContain('"b" INTEGER DEFAULT 7');
-    expect(lowered.sql).toContain('"c" INTEGER DEFAULT 1');
-    expect(lowered.sql).toContain('"d" TEXT DEFAULT NULL');
-    expect(lowered.sql).toContain(`"e" TEXT DEFAULT (datetime('now'))`);
-    expect(lowered.params).toEqual([]);
-  });
-
+describe('SqliteControlAdapter.lowerToExecutableStatement — codec routing + DDL shape', () => {
   it('routes a codec-bearing literal default through codec.encode (not raw type-branching)', async () => {
     const codecAdapter = new SqliteControlAdapter(transformingLookup);
     const ast = new SqliteCreateTable({
@@ -177,5 +169,18 @@ describe('SqliteControlAdapter.lower output is unchanged after D1', () => {
     const result = await codecAdapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`DEFAULT 'ENC:PLAINTEXT'`);
     expect(result.sql).not.toContain('plaintext');
+  });
+
+  it('renders IF NOT EXISTS with quoted identifiers (bootstrap control-table shape)', async () => {
+    const ast = new SqliteCreateTable({
+      table: '_prisma_marker',
+      ifNotExists: true,
+      columns: [col('space', 'TEXT', { notNull: true, primaryKey: true })],
+    });
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    expect(result.sql).toBe(
+      'CREATE TABLE IF NOT EXISTS "_prisma_marker" (\n  "space" TEXT NOT NULL PRIMARY KEY\n)',
+    );
+    expect(result.params).toEqual([]);
   });
 });

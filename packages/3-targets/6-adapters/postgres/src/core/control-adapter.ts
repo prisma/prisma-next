@@ -65,7 +65,6 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
-import { renderLoweredDdl } from './ddl-renderer';
 import {
   introspectPostgresEnumTypes,
   type PostgresEnumStorageTypeAnnotation,
@@ -168,7 +167,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   lower(ast: AnyQueryAst | PostgresDdlNode, context: LowererContext<unknown>): LoweredStatement {
     if (isDdlNode(ast)) {
-      return renderLoweredDdl(ast);
+      throw new Error(
+        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecutableStatement().',
+      );
     }
     return renderLoweredSql(ast, context.contract as PostgresContract, this.codecLookup);
   }

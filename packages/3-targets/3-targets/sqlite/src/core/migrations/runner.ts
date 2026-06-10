@@ -16,7 +16,7 @@ import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { LoweredStatement } from '@prisma-next/sql-relational-core/ast';
+import type { ExecutableStatement } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -313,7 +313,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     }
     const lowererContext = { contract };
     for (const query of this.family.bootstrapControlTableQueries()) {
-      await this.executeStatement(driver, this.family.lowerAst(query, lowererContext));
+      await this.executeStatement(driver, await this.family.lowerAst(query, lowererContext));
     }
     return okVoid();
   }
@@ -667,7 +667,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
   private async executeStatement(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
-    statement: LoweredStatement,
+    statement: ExecutableStatement,
   ): Promise<void> {
     if (statement.params.length > 0) {
       await driver.query(statement.sql, statement.params);

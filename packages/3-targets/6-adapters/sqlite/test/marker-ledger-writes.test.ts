@@ -168,7 +168,7 @@ describe('SqliteControlAdapter marker/ledger writes (end-to-end)', () => {
   async function withDb(fn: (driver: ReturnType<typeof createMemoryDriver>) => Promise<void>) {
     const driver = createMemoryDriver();
     for (const ddl of adapter.bootstrapControlTableQueries()) {
-      const lowered = adapter.lower(ddl, { contract: undefined });
+      const lowered = await adapter.lowerToExecutableStatement(ddl, { contract: undefined });
       await driver.query(lowered.sql);
     }
     try {
