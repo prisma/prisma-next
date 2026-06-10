@@ -1,3 +1,3 @@
-# False positive: hardcoded FAKE test-only JWT secret in the supabase facade unit tests
+# False positive: hardcoded FAKE test-only JWT signing key in the supabase facade unit tests
 # ("test-secret-that-is-long-enough-for-hs256" — used to sign in-test HS256 tokens).
-577b422b731e7538f5d1f0a2e810514a313a53e5:packages/3-extensions/supabase/test/supabase-facade.test.ts:generic-api-key:49
+841c301b6872ba949d081fcaa4450d08d212627b:packages/3-extensions/supabase/test/supabase-facade.test.ts:generic-api-key:49
