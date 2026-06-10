@@ -40,7 +40,8 @@ describe('offset tracking', () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
-      ".c
+      "
+      .c
       ~"
     `);
   });
@@ -409,7 +410,8 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
     expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
-      "a.b.c
+      "
+      a.b.c
          ~"
     `);
   });
@@ -424,7 +426,8 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
     expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
-      "a:b:c
+      "
+      a:b:c
          ~"
     `);
   });
@@ -441,7 +444,8 @@ describe('parseAttribute fault tolerance', () => {
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
     expect(diagnostics[0]!.message).toBe('Attribute name expected');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
-      "@
+      "
+      @
       ~"
     `);
   });
@@ -456,7 +460,8 @@ describe('parseAttribute fault tolerance', () => {
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
     expect(diagnostics[0]!.message).toBe('Attribute name expected after "."');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
-      "@ns.
+      "
+      @ns.
           ~"
     `);
   });
@@ -539,7 +544,8 @@ describe('argument-position object literal', () => {
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
     expect(diagnostics[0]!.message).toBe('Unterminated object literal');
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
-      "{ a: 1
+      "
+      { a: 1
       ~"
     `);
   });

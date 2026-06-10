@@ -36,7 +36,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_UNTERMINATED_BLOCK');
     expect(message).toBe('Unterminated block declaration');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "model User {
+      "
+      model User {
                  ~"
     `);
     expect(result.document).toBeInstanceOf(DocumentAst);
@@ -51,7 +52,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     );
     expect(message).toBe('Unsupported top-level declaration "oops"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "oops
+      "
+      oops
       ~~~~"
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -62,7 +64,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected a name after "model"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "model {
+      "
+      model {
       ~~~~~"
     `);
     const decls = Array.from(result.document.declarations());
@@ -79,7 +82,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     );
     expect(message).toBe('Unsupported top-level declaration "§"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "§
+      "
+      §
       ~"
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -92,7 +96,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
       'Recursive "namespace inner" block is not allowed; namespace blocks may not nest',
     );
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "namespace inner {
+      "
+      namespace inner {
       ~~~~~~~~~"
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -105,7 +110,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
       'Namespace name "__unspecified__" is reserved for the parser-synthesised bucket for top-level declarations',
     );
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "namespace __unspecified__ {
+      "
+      namespace __unspecified__ {
       ~~~~~~~~~"
     `);
   });
@@ -117,7 +123,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
       '`types` blocks must be declared at the document top level, not inside a namespace block',
     );
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "type {
+      "
+      type {
       ~~~~"
     `);
   });
@@ -127,7 +134,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_MODEL_MEMBER');
     expect(message).toBe('Invalid model member declaration "123"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "  123
+      "
+        123
         ~~~"
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -138,7 +146,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_ENUM_MEMBER');
     expect(message).toBe('Invalid enum value declaration "123"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "  123
+      "
+        123
         ~~~"
     `);
   });
@@ -148,7 +157,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_TYPES_MEMBER');
     expect(message).toBe('Invalid types declaration "123"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "  123
+      "
+        123
         ~~~"
     `);
   });
@@ -161,7 +171,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     );
     expect(message).toBe('Invalid block entry');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "  123
+      "
+        123
         ~~~"
     `);
   });
@@ -174,7 +185,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     );
     expect(message).toBe('Expected "=" after "provider"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "  provider "x"
+      "
+        provider "x"
         ~~~~~~~~"
     `);
     const decl = Array.from(result.document.declarations())[0];
@@ -195,7 +207,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     );
     expect(message).toBe('Expected "=" after "provider"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "  provider
+      "
+        provider
         ~~~~~~~~"
     `);
     const decl = Array.from(result.document.declarations())[0];
@@ -213,7 +226,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_TYPES_MEMBER');
     expect(message).toBe('Expected "=" after "UserId"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "  UserId Int
+      "
+        UserId Int
         ~~~~~~"
     `);
     const decl = Array.from(result.document.declarations())[0];
@@ -233,7 +247,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected a name after "model"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "model {
+      "
+      model {
       ~~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
@@ -245,7 +260,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected "{" to open the "model" block');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "model User
+      "
+      model User
       ~~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
@@ -257,7 +273,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected a name after "model"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "model
+      "
+      model
       ~~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
@@ -269,7 +286,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected a name after "enum"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "enum {
+      "
+      enum {
       ~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
@@ -281,7 +299,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected "{" to open the "enum" block');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "enum Color
+      "
+      enum Color
       ~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
@@ -293,7 +312,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected a name after "enum"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "enum
+      "
+      enum
       ~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
@@ -305,7 +325,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected a name after "namespace"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "namespace {
+      "
+      namespace {
       ~~~~~~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(NamespaceDeclarationAst);
@@ -317,7 +338,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected "{" to open the "namespace" block');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "namespace outer
+      "
+      namespace outer
       ~~~~~~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(NamespaceDeclarationAst);
@@ -329,7 +351,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected a name after "namespace"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "namespace
+      "
+      namespace
       ~~~~~~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(NamespaceDeclarationAst);
@@ -341,7 +364,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected "{" to open the "type" block');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "type Address
+      "
+      type Address
       ~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(
@@ -355,7 +379,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
     expect(message).toBe('Expected "{" to open the "type" block');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "type
+      "
+      type
       ~~~~"
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(TypesBlockAst);
@@ -381,7 +406,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     );
     expect(message).toBe('Unsupported top-level declaration "datasource"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
-      "datasource
+      "
+      datasource
       ~~~~~~~~~~"
     `);
     expect(result.diagnostics.map((d) => d.code)).not.toContain('PSL_INVALID_DECLARATION');

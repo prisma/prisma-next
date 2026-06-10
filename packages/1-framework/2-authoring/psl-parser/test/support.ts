@@ -48,5 +48,8 @@ export function highlight(sourceFile: SourceFile, range: Range): string {
     rendered.push(lineText);
     rendered.push(`${' '.repeat(from)}${'~'.repeat(width)}`);
   }
-  return rendered.join('\n');
+  // Lead with a newline so Vitest's inline-snapshot serializer puts the
+  // opening quote on its own line, keeping the source line and `~` underline
+  // at the same indentation (otherwise the quote shifts the first line right).
+  return `\n${rendered.join('\n')}`;
 }
