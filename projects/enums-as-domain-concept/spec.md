@@ -372,7 +372,15 @@ behavior.
 - **R5 — Typed input.** Write payloads accept only the value union; an invalid literal is
   a compile error (negative type-test); a valid one compiles.
 - **R6 — Runtime introspection.** `db.enums.Role.values` returns the ordered tuple at
-  runtime and is literal-typed; `.members.<Name>` and `.ordinalOf` work.
+  runtime and is literal-typed; `.members.<Name>` and `.ordinalOf` work. The literal
+  typing must hold **through the emitted contract**, not only on the no-emit path: the
+  emitter types the domain `enum` block in `contract.d.ts` so that an emitted-contract
+  consumer gets `db.enums.<ns>.<Name>.values` as the literal tuple and
+  `.members.<Name>` as the literal value — not `JsonValue`. (Gap found 2026-06-10
+  during TML-2882: the emitter narrows enum *column/field* types but omits the domain
+  `enum` block from `contract.d.ts`, so emitted-path accessor members type-widen to
+  `JsonValue` while runtime values are correct. Same verify-through-emit failure class
+  as the TML-2852 D4 escape; the fix is the same pattern applied to the enum entity.)
 - **R7 — Migration & verification.** Adding/removing a value is a check + value-set
   drop/recreate (no type rebuild); verification compares the contract's expected check
   against the live database and reports a mismatch (replacing the deleted native-enum
