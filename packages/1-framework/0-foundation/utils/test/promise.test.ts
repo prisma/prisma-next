@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { isThenable } from '../src/promise';
 
+const thenKey = 'then';
+
 describe('isThenable', () => {
   it('returns true for a native Promise', () => {
     expect(isThenable(Promise.resolve(1))).toBe(true);
   });
 
   it('returns true for a custom thenable', () => {
-    // biome-ignore lint/suspicious/noThenProperty: intentional thenable fixture for isThenable tests
-    const thenable = { then: () => {} };
+    const thenable: Record<string, unknown> = { [thenKey]: () => {} };
     expect(isThenable(thenable)).toBe(true);
   });
 
@@ -21,8 +22,7 @@ describe('isThenable', () => {
   });
 
   it('returns false when then is not a function', () => {
-    // biome-ignore lint/suspicious/noThenProperty: intentional thenable fixture for isThenable tests
-    const notAThenable = { then: 'not a function' };
+    const notAThenable: Record<string, unknown> = { [thenKey]: 'not a function' };
     expect(isThenable(notAThenable)).toBe(false);
   });
 });
