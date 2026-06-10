@@ -44,12 +44,9 @@ type UnboundSql<TContract extends Contract<SqlStorage>> =
 type UnboundOrm<TContract extends Contract<SqlStorage>> =
   OrmClient<TContract>[typeof UNBOUND_NAMESPACE_ID];
 
-function unboundNamespace<T>(builderOutput: object): T {
-  const indexable = blindCast<Record<string, unknown>, 'builder outputs are indexable objects'>(
-    builderOutput,
-  );
+function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
   return blindCast<T, 'the unbound namespace always exists on a sqlite builder output'>(
-    indexable[UNBOUND_NAMESPACE_ID],
+    builderOutput[UNBOUND_NAMESPACE_ID],
   );
 }
 

@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
-import { buildEnumsMap, createEnumAccessor } from '../src/enum-accessor';
+import { buildEnumsMapForNamespace, createEnumAccessor } from '../src/enum-accessor';
 import { orm } from '../src/orm';
 import { createMockRuntime } from './helpers';
 
@@ -110,8 +110,8 @@ describe('createEnumAccessor()', () => {
   });
 });
 
-describe('buildEnumsMap()', () => {
-  it('collects enums from all namespaces', () => {
+describe('buildEnumsMapForNamespace()', () => {
+  it('collects only the requested namespace enums', () => {
     const domain = {
       namespaces: {
         public: {
@@ -120,44 +120,66 @@ describe('buildEnumsMap()', () => {
       },
     };
 
-    const map = buildEnumsMap(domain);
+    const map = buildEnumsMapForNamespace(domain, 'public');
     expect(Object.keys(map).sort()).toEqual(['Role', 'Status']);
     expect(map['Role']?.values).toEqual(['user', 'admin']);
     expect(map['Status']?.values).toEqual(['active', 'inactive', 'pending']);
   });
 
-  it('returns an empty map when no namespaces have enums', () => {
+  it('returns an empty map when the namespace has no enums', () => {
     const domain = {
       namespaces: {
         public: { enum: {} },
       },
     };
 
-    const map = buildEnumsMap(domain);
-    expect(map).toEqual({});
+    expect(buildEnumsMapForNamespace(domain, 'public')).toEqual({});
   });
 
-  it('merges enums from multiple namespaces', () => {
+  it('returns an empty map for an unknown namespace', () => {
     const domain = {
       namespaces: {
         public: { enum: { Role: roleEnum } },
-        audit: { enum: { Status: statusEnum } },
       },
     };
 
-    const map = buildEnumsMap(domain);
-    expect(Object.keys(map).sort()).toEqual(['Role', 'Status']);
+    expect(buildEnumsMapForNamespace(domain, 'audit')).toEqual({});
+  });
+
+  it('keeps same-named enums in different namespaces separate', () => {
+    const domain = {
+      namespaces: {
+        public: { enum: { Role: roleEnum } },
+        audit: { enum: { Role: statusEnum } },
+      },
+    };
+
+    expect(buildEnumsMapForNamespace(domain, 'public')['Role']?.values).toEqual(['user', 'admin']);
+    expect(buildEnumsMapForNamespace(domain, 'audit')['Role']?.values).toEqual([
+      'active',
+      'inactive',
+      'pending',
+    ]);
   });
 });
 
-type EnumContract = Contract<SqlStorage> & {
-  readonly enumAccessors: {
-    readonly Role: ReturnType<typeof createEnumAccessor>;
-    readonly Status: ReturnType<typeof createEnumAccessor>;
+// A literal-keyed domain so `db.public` is a literal facet (not an index
+// signature), letting the runtime assertions below use dot access.
+type EnumContract = Omit<Contract<SqlStorage>, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly public: {
+        readonly models: Record<never, never>;
+        readonly enum: {
+          readonly Role: typeof roleEnum;
+          readonly Status: typeof statusEnum;
+        };
+      };
+    };
   };
 };
 
-describe('orm().enums', () => {
+describe('orm().<ns>.enums', () => {
   function ormWithEnums() {
     const contract = {
       domain: {
@@ -170,22 +192,55 @@ describe('orm().enums', () => {
     return orm({ runtime: createMockRuntime(), context });
   }
 
-  it('resolves db.enums.<Name> to the enum accessor', () => {
+  it('resolves db.<ns>.enums.<Name> to the enum accessor', () => {
     const db = ormWithEnums();
-    expect(db.enums.Role.values).toEqual(['user', 'admin']);
-    expect(db.enums.Status.values).toEqual(['active', 'inactive', 'pending']);
+    expect(db.public.enums.Role.values).toEqual(['user', 'admin']);
+    expect(db.public.enums.Status.values).toEqual(['active', 'inactive', 'pending']);
   });
 
-  it('exposes the member accessors and helpers through db.enums', () => {
+  it('exposes the member accessors and helpers through db.<ns>.enums', () => {
     const db = ormWithEnums();
-    expect(db.enums.Role.members['User']).toBe('user');
-    expect(db.enums.Role.has('admin')).toBe(true);
-    expect(db.enums.Role.nameOf('user')).toBe('User');
-    expect(db.enums.Role.ordinalOf('admin')).toBe(1);
+    expect(db.public.enums.Role.members['User']).toBe('user');
+    expect(db.public.enums.Role.has('admin')).toBe(true);
+    expect(db.public.enums.Role.nameOf('user')).toBe('User');
+    expect(db.public.enums.Role.ordinalOf('admin')).toBe(1);
   });
 
   it('returns the same enums object on repeated access', () => {
     const db = ormWithEnums();
-    expect(db.enums).toBe(db.enums);
+    expect(db.public.enums).toBe(db.public.enums);
+  });
+
+  it('resolves same-named enums per namespace, not last-write-wins', () => {
+    const contract = {
+      domain: {
+        namespaces: {
+          public: { models: {}, enum: { Role: roleEnum } },
+          audit: { models: {}, enum: { Role: statusEnum } },
+        },
+      },
+    } as unknown as EnumContract;
+    const context = { contract } as unknown as ExecutionContext<EnumContract>;
+    const db = orm({ runtime: createMockRuntime(), context });
+
+    expect(db.public.enums.Role.values).toEqual(['user', 'admin']);
+    expect(
+      (db as unknown as { audit: { enums: { Role: { values: unknown } } } }).audit.enums.Role
+        .values,
+    ).toEqual(['active', 'inactive', 'pending']);
+  });
+
+  it('rejects a domain model named `enums` that would shadow the accessor', () => {
+    const contract = {
+      domain: {
+        namespaces: {
+          public: { models: { enums: {} }, enum: { Role: roleEnum } },
+        },
+      },
+    } as unknown as EnumContract;
+    const context = { contract } as unknown as ExecutionContext<EnumContract>;
+    const db = orm({ runtime: createMockRuntime(), context });
+
+    expect(() => db.public).toThrow(/reserved enum accessor/);
   });
 });

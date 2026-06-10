@@ -68,38 +68,45 @@ const db = orm({
   context: {} as unknown as ExecutionContext<typeof enumContract>,
 });
 
-// ---------------------------------------------------------------------------
-// db.enums.<Name>.values is the ordered literal tuple, not string[]
-// ---------------------------------------------------------------------------
-
-test('db.enums.Role.values is the literal value tuple', () => {
-  expectTypeOf(db.enums.Role.values).toEqualTypeOf<readonly ['user', 'admin']>();
-});
-
-test('db.enums.Role.values is not a widened string[]', () => {
-  expectTypeOf(db.enums.Role.values).not.toEqualTypeOf<readonly string[]>();
-});
-
-test('db.enums.Status.values preserves declaration order as a literal tuple', () => {
-  expectTypeOf(db.enums.Status.values).toEqualTypeOf<readonly ['active', 'inactive']>();
-});
+// The no-emit (built) contract types its domain namespaces loosely (index
+// signature), so the `public` facet is reached with bracket access and a
+// non-null guard — the same shape the demo's `createOrmClient` uses. The enum
+// accessor surface lives on the facet under the reserved `enums` key.
+type PublicFacet = NonNullable<(typeof db)['public']>;
+const publicEnums = {} as PublicFacet['enums'];
 
 // ---------------------------------------------------------------------------
-// db.enums.<Name>.members.<Name> resolves to the member value literal
+// <facet>.enums.<Name>.values is the ordered literal tuple, not string[]
 // ---------------------------------------------------------------------------
 
-test('db.enums.Role.members.User is the value literal', () => {
-  expectTypeOf(db.enums.Role.members.User).toEqualTypeOf<'user'>();
+test('facet.enums.Role.values is the literal value tuple', () => {
+  expectTypeOf(publicEnums.Role.values).toEqualTypeOf<readonly ['user', 'admin']>();
 });
 
-test('db.enums.Role.members.Admin is the value literal', () => {
-  expectTypeOf(db.enums.Role.members.Admin).toEqualTypeOf<'admin'>();
+test('facet.enums.Role.values is not a widened string[]', () => {
+  expectTypeOf(publicEnums.Role.values).not.toEqualTypeOf<readonly string[]>();
+});
+
+test('facet.enums.Status.values preserves declaration order as a literal tuple', () => {
+  expectTypeOf(publicEnums.Status.values).toEqualTypeOf<readonly ['active', 'inactive']>();
 });
 
 // ---------------------------------------------------------------------------
-// db.enums.<Name>.names is the literal name tuple
+// <facet>.enums.<Name>.members.<Name> resolves to the member value literal
 // ---------------------------------------------------------------------------
 
-test('db.enums.Role.names is the literal name tuple', () => {
-  expectTypeOf(db.enums.Role.names).toEqualTypeOf<readonly ['User', 'Admin']>();
+test('facet.enums.Role.members.User is the value literal', () => {
+  expectTypeOf(publicEnums.Role.members.User).toEqualTypeOf<'user'>();
+});
+
+test('facet.enums.Role.members.Admin is the value literal', () => {
+  expectTypeOf(publicEnums.Role.members.Admin).toEqualTypeOf<'admin'>();
+});
+
+// ---------------------------------------------------------------------------
+// <facet>.enums.<Name>.names is the literal name tuple
+// ---------------------------------------------------------------------------
+
+test('facet.enums.Role.names is the literal name tuple', () => {
+  expectTypeOf(publicEnums.Role.names).toEqualTypeOf<readonly ['User', 'Admin']>();
 });

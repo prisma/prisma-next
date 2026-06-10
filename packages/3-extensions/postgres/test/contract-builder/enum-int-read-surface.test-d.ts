@@ -21,7 +21,8 @@
 // value but does NOT emit/migrate, so the numeric guard never fires.
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { CreateInput, DefaultModelRow } from '@prisma-next/sql-orm-client';
+import { type CreateInput, type DefaultModelRow, orm } from '@prisma-next/sql-orm-client';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { expectTypeOf, test } from 'vitest';
 import { defineContract, enumType, member } from '../../src/exports/contract-builder';
 
@@ -60,17 +61,21 @@ test('int-enum read field is not widened to JsonValue', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. db.enums accessor keeps the literal int tuple.
+// 2. db.<ns>.enums accessor keeps the literal int tuple.
 // ---------------------------------------------------------------------------
 
-type Accessors = typeof contract extends { enumAccessors: infer A } ? A : never;
-type LevelValues = Accessors extends { Level: { values: infer V } } ? V : never;
+const db = orm({
+  runtime: {} as never,
+  context: {} as unknown as ExecutionContext<typeof contract>,
+});
+type PublicEnums = NonNullable<(typeof db)['public']>['enums'];
+type LevelValues = PublicEnums extends { Level: { values: infer V } } ? V : never;
 
-test('db.enums int tuple keeps its literal declaration order', () => {
+test('db.<ns>.enums int tuple keeps its literal declaration order', () => {
   expectTypeOf<LevelValues>().toEqualTypeOf<readonly [1, 10]>();
 });
 
-test('db.enums int tuple is not widened to readonly number[]', () => {
+test('db.<ns>.enums int tuple is not widened to readonly number[]', () => {
   expectTypeOf<LevelValues>().not.toEqualTypeOf<readonly number[]>();
 });
 

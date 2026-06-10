@@ -36,7 +36,10 @@ export const sql = sqlBuilder<typeof contract>({
 }).public;
 
 export function createOrmClient(runtime: Runtime) {
-  return orm({
+  // The no-emit contract types its domain namespaces loosely, so narrow the
+  // `public` facet with a runtime guard rather than a cast. Enums now live on
+  // the facet under the reserved `enums` key (`facet.enums.Priority`).
+  const client = orm({
     runtime,
     context,
     collections: {
@@ -44,4 +47,9 @@ export function createOrmClient(runtime: Runtime) {
       Post: PostCollection,
     },
   });
+  const publicNs = client['public'];
+  if (publicNs === undefined) {
+    throw new Error("ORM client is missing the 'public' namespace");
+  }
+  return publicNs;
 }

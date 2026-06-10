@@ -15,10 +15,11 @@ export async function getPostsByPriority(runtime: Runtime) {
 
 /**
  * Returns the declaration-ordered runtime surface for the `Priority` enum via
- * `db.enums`, demonstrating that the value tuple and helpers are reachable from
- * the orm client.
+ * the namespace facet's reserved `enums` accessor (`facet.enums.Priority`),
+ * demonstrating that the value tuple and helpers are reachable from the orm
+ * client.
  */
 export function getPriorityEnum(runtime: Runtime) {
-  const db = createOrmClient(runtime);
-  return db.enums.Priority;
+  const publicNs = createOrmClient(runtime);
+  return publicNs.enums.Priority;
 }

@@ -40,17 +40,25 @@ export function createEnumAccessor(contractEnum: ContractEnum): EnumAccessor {
   };
 }
 
-export function buildEnumsMap(domain: {
-  readonly namespaces: Readonly<
-    Record<string, { readonly enum?: Readonly<Record<string, ContractEnum>> }>
-  >;
-}): Record<string, EnumAccessor> {
+/**
+ * Build the enum-accessor map for a single namespace, keyed by enum name.
+ * Each namespace facet exposes only its own enums — the IR keys enums under
+ * `domain.namespaces[ns].enum`, so the same name in two namespaces resolves
+ * independently rather than colliding in one flat map.
+ */
+export function buildEnumsMapForNamespace(
+  domain: {
+    readonly namespaces: Readonly<
+      Record<string, { readonly enum?: Readonly<Record<string, ContractEnum>> }>
+    >;
+  },
+  namespaceId: string,
+): Record<string, EnumAccessor> {
   const result: Record<string, EnumAccessor> = {};
-  for (const namespace of Object.values(domain.namespaces)) {
-    if (namespace.enum) {
-      for (const [name, contractEnum] of Object.entries(namespace.enum)) {
-        result[name] = createEnumAccessor(contractEnum);
-      }
+  const namespace = domain.namespaces[namespaceId];
+  if (namespace?.enum) {
+    for (const [name, contractEnum] of Object.entries(namespace.enum)) {
+      result[name] = createEnumAccessor(contractEnum);
     }
   }
   return result;
