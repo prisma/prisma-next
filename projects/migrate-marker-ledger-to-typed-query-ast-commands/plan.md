@@ -81,7 +81,7 @@ Concrete scope to be ported in Phase 2 (sized at pickup):
 - PG: remaining column ops (`DropColumn`, `AlterColumnType`, `SetNotNull`, `DropNotNull`, `SetDefault`, `DropDefault`); constraint ALTERs (`AddPrimaryKey`, `AddUnique`, `AddForeignKey`, `DropConstraint`); indexes (`CreateIndex`, `DropIndex`); types/db (`CreateEnumType`, `AddEnumValues`, `DropEnumType`, `RenameType`, `CreateExtension`); `DropTable`.
 - SQLite: column ops (`AddColumn`, `DropColumn`); indexes (`CreateIndex`, `DropIndex`); `DropTable`; `RecreateTable` (the table-rebuild pattern).
 - Mongo: remaining `MongoMigrationPlanner` ops not covered in slice 6.
-- Cross-cutting: precheck/postcheck `SELECT to_regclass(...)` introspection — currently hand-built raw SQL in every op's `toOp()` — moves to query AST + lower. One pass after all ops migrated.
+- Cross-cutting: precheck/postcheck verification SELECTs — currently hand-built raw SQL in every op's `toOp()` — move to query AST + lower. **Carved out as its own explicitly-deferred slice** (`typed-migration-verification-queries`, detailed below) by operator decision on the #768 review; needs the contract-free builder to grow aggregate + comparison projection first.
 - ADR ("DDL as a target-contributed query-AST kind + adapter DDL-lowering seam") + subsystem-doc updates (Adapters & Targets, Migration System).
 - **Finish applying the execution-plane stack-construction pattern to the control plane (TML-2856).** The execution plane already has the right pattern: `createExecutionStack` builds the adapter and driver from their descriptors **once**, and the orchestrator holds those instances and threads them to whatever needs them. The control plane is being moved onto the same shape.
 
@@ -100,7 +100,15 @@ Concrete scope to be ported in Phase 2 (sized at pickup):
 - the other `operations/*.ts` builders (`enums.ts`, `indexes.ts`, `columns.ts`, `constraints.ts`, `raw.ts`) — deleted as their ops adopt `toOp()`.
 No free string-gluing Op-builder should survive the planner-adoption phase.
 
-**Also for demolition: raw SQL in `*Call.toOp()` precheck/postcheck.** The idempotency-probe introspection (`SELECT to_regclass(...) IS NULL`, etc.) is still hand-built raw SQL in every op's `toOp()`. It's deferred by the slice spec and is cross-cutting (every op), but it's the same "express, don't concatenate" violation — these are `SELECT`s and should be expressed via the query AST + lowered like the `execute` step. Follow-up across all ops.
+#### Carved-out slice — `typed-migration-verification-queries` (deferred, explicit)
+
+The precheck/postcheck idempotency probes in every op's `*Call.toOp()` are still **hand-built raw SQL** — SQLite uses `SELECT COUNT(*) … FROM sqlite_master WHERE type='table' AND name='…'`; Postgres uses `SELECT to_regclass(…) IS NULL` / `IS NOT NULL`. These are `SELECT`s and are the same "express, don't concatenate" violation the project exists to eliminate; they should be query-AST nodes lowered through the adapter like the `execute` step.
+
+This was raised concretely on the slice-5 review (#768, the SQLite `CreateTableCall` prechecks) and **explicitly deferred by the operator to a following slice** — we are not expanding the two large in-flight PRs (#768 SQLite adoption, `codec-routed-ddl-defaults` #794; ~8k LOC combined) to absorb it. It is deliberately carved out of the "don't-decompose-Phase-2" rule as a single named follow-up because its scope is now concrete.
+
+**Substrate this slice must build first (finding from the #768 review).** The verification queries are *not* expressible through the contract-free builder as it stands. The query AST already models `COUNT` (`AggregateExpr`, `AggregateExpr.count(expr)` in `relational-core/src/ast/types.ts`), but the contract-free builder's projection surface is **column-only**: `CfSelectQuery.select(...)` accepts `ColumnProxy` items (`col.toProjectionItem()`) with no way to project an aggregate or a `COUNT(*) = 0` boolean comparison. So this slice's load-bearing work is extending the contract-free builder with **aggregate projection** (`count(*)`) and **comparison/boolean projection** (so `COUNT(*) = 0` is expressible), then routing every op's precheck/postcheck through it. The catalog table is just a string source (`table('sqlite_master')`, or the Postgres `to_regclass` equivalent) — no contract is involved; the only gap is builder expressiveness, not a design wall.
+
+Scope: one cross-cutting pass across all ops in all three targets, after the per-target adoption shapes (Phase 1) are settled.
 
 ## Dependencies (external)
 
