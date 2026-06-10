@@ -21,6 +21,15 @@ changes:
       anyMatch: true
 ---
 
+<!--
+TML-2838: the temporary `--no-memory-protection-keys` test-harness workaround
+has been removed from every PGlite-backed vitest config (including
+`packages/3-extensions/{postgres,supabase}`) now that the WAL-teardown crash is
+fixed upstream in `@prisma/dev` 0.24.12 (which pulls in the
+`@prisma/streams-local` worker-termination fix). Test-harness only — no
+runtime, contract, or public-API change. Incidental substrate diff only.
+-->
+
 # 0.13 → 0.14 — Extension-author upgrade instructions
 
 ## `qualify-flat-builder-accessors`
