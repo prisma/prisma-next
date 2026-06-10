@@ -1,4 +1,4 @@
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -159,6 +159,10 @@ function resolveColumnTypeMetadata(
  * `checkConstraintPlanCallStrategy` (migration planning) so all three agree on
  * the resolved values and the error behavior on a missing reference.
  */
+function allStrings(values: readonly JsonValue[]): values is readonly string[] {
+  return values.every((value) => typeof value === 'string');
+}
+
 export function resolveValueSetValues(
   ref: { readonly namespaceId: string; readonly name: string },
   storage: SqlStorage,
@@ -176,7 +180,16 @@ export function resolveValueSetValues(
       `resolveValueSetValues: value-set "${ref.name}" not found in namespace "${ref.namespaceId}" (${contextLabel})`,
     );
   }
-  return valueSet.values;
+  // Only TEXT enums ship a CHECK-constraint round-trip in this slice. A
+  // non-string value-set is a numeric enum, whose CHECK rendering/verification
+  // is future work; fail loudly rather than emit a wrong numeric-as-text check.
+  const values = valueSet.values;
+  if (!allStrings(values)) {
+    throw new Error(
+      `resolveValueSetValues: value-set "${ref.name}" in namespace "${ref.namespaceId}" has a non-string value; numeric-enum CHECK constraints are not yet supported (${contextLabel})`,
+    );
+  }
+  return values;
 }
 
 /**

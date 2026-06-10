@@ -2,6 +2,7 @@ export type {
   ComposedAuthoringHelpers,
   ContractInput,
   ContractModelBuilder,
+  MergeEnums,
   ModelLike,
   ScalarFieldBuilder,
 } from '../contract-builder';
@@ -25,5 +26,12 @@ export type {
   UniqueConstraintNode,
 } from '../contract-definition';
 export type { TargetFieldRef } from '../contract-dsl';
-export type { EnumMember, EnumTypeHandle } from '../enum-type';
-export { enumType, member } from '../enum-type';
+export type { ExtractCodecTypesFromPack } from '../contract-types';
+export type {
+  BoundEnumType,
+  CodecInput,
+  CodecTypeMap,
+  EnumMember,
+  EnumTypeHandle,
+} from '../enum-type';
+export { bindEnumType, enumType, member } from '../enum-type';

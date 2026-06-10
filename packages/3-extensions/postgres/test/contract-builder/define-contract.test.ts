@@ -1,6 +1,6 @@
 import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
-import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import { describe, expect, it } from 'vitest';
+import { defineContract, field, model } from '../../src/exports/contract-builder';
 
 const textColumn = {
   codecId: 'sql/char@1' as const,
