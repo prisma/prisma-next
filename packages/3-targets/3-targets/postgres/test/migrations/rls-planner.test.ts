@@ -3,7 +3,7 @@
  * - Fresh contract → CREATE TABLE + ENABLE RLS + CREATE POLICY ordering
  * - Edit (same-prefix, different hash) → CREATE new + DROP old
  * - Different-prefix actual policy → not dropped
- * - Two same-prefix policies both in contract → neither dropped
+ * - Same-prefix sibling still in contract → not dropped when the other sibling is created
  * - F06: additive-only policy filters the replace-drop but keeps create/enable
  */
 
@@ -311,7 +311,12 @@ describe('RLS planner same-prefix replace', () => {
     expect(opIds).not.toContain(`rlsPolicy.${TABLE_NAME}.other_aaaabbbb.drop`);
   });
 
-  it('does not drop either policy when two same-prefix policies are both in the contract', () => {
+  it('does not drop a same-prefix sibling that is still in the contract', () => {
+    // Contract has both policyA and policyB (same prefix).
+    // DB only has policyA — so policyB is `missing` and triggers a CREATE.
+    // During same-prefix drop scanning for policyB's CREATE, policyA matches
+    // the prefix but IS in expectedNames — the !expectedNames guard must
+    // protect it from being dropped.
     const policyA = new PostgresRlsPolicy({
       name: 'p_read_aaaaaaaa',
       prefix: 'p_read',
@@ -336,8 +341,8 @@ describe('RLS planner same-prefix replace', () => {
     const contract = buildContractWith([policyA, policyB]);
     const planner = createPostgresMigrationPlanner(stubLowerer);
 
-    // Both in contract and both already in DB — diffNodes sees them as present; no diff calls.
-    const schema = schemaWith([policyA, policyB], true);
+    // Only policyA is in the DB — policyB is missing, so the drop loop runs.
+    const schema = schemaWith([policyA], true);
     const DB_UPDATE_POLICY = {
       allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
     };
@@ -354,8 +359,11 @@ describe('RLS planner same-prefix replace', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
-    const dropIds = result.plan.operations.map((op) => op.id).filter((id) => id.endsWith('.drop'));
-    expect(dropIds).toHaveLength(0);
+    const opIds = result.plan.operations.map((op) => op.id);
+    // policyB is missing — a CREATE must be emitted
+    expect(opIds).toContain(`rlsPolicy.${TABLE_NAME}.p_read_bbbbbbbb`);
+    // policyA shares the same prefix but is still in the contract — must not be dropped
+    expect(opIds).not.toContain(`rlsPolicy.${TABLE_NAME}.p_read_aaaaaaaa.drop`);
   });
 
   it('F06: additive-only policy passes create/enable but filters the replace-drop', () => {

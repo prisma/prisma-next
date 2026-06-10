@@ -967,7 +967,7 @@ export function planIssues(
   // Extra calls (e.g. same-prefix replace-drop) are filtered silently when
   // disallowed: they are best-effort cleanup and do not cause a hard failure.
   // The schema drifts (old + new coexist) and verify-drift catches it.
-  let gatedExtra = (options.extraBucketableCalls ?? []) as PostgresOpFactoryCall[];
+  let gatedExtra: readonly PostgresOpFactoryCall[] = options.extraBucketableCalls ?? [];
   if (policyProvided) {
     const keepIfAllowed = (bucket: PostgresOpFactoryCall[]) => (call: PostgresOpFactoryCall) => {
       if (allowed.includes(call.operationClass)) {
