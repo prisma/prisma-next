@@ -1,3 +1,5 @@
+import type { SchemaDiffIssue } from './schema-diff';
+
 export const VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001';
 export const VERIFY_CODE_HASH_MISMATCH = 'PN-RUN-3002';
 export const VERIFY_CODE_TARGET_MISMATCH = 'PN-RUN-3003';
@@ -137,7 +139,7 @@ export interface VerifyDatabaseSchemaResult {
       readonly totalNodes: number;
     };
     /** Generic extension issues (e.g. RLS policy drift) contributed by the target adapter. */
-    readonly extensionIssues: readonly import('./schema-diff').SchemaDiffIssue[];
+    readonly extensionIssues: readonly SchemaDiffIssue[];
   };
   readonly meta?: {
     readonly configPath?: string;
