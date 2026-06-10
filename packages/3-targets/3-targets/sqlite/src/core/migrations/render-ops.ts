@@ -11,7 +11,10 @@ import type { SqlitePlanTargetDetails } from './planner-target-details';
 type Op = SqlMigrationPlanOperation<SqlitePlanTargetDetails>;
 
 function assertSqliteOp(op: MigrationPlanOperation, callFactoryName: string): asserts op is Op {
-  const targetId = (op as Partial<Op>).target?.id;
+  const targetId = blindCast<
+    { target?: { id?: string } },
+    'op.target is present on concrete SqlMigrationPlanOperation but absent on the framework MigrationPlanOperation base'
+  >(op).target?.id;
   if (targetId !== 'sqlite') {
     throw new Error(
       `renderOps: expected sqlite op but got target.id="${String(targetId)}" for op.id="${op.id}" (factoryName="${callFactoryName}"). An OpFactoryCall produced an op for a different target on the sqlite planner path; check the call's target binding.`,

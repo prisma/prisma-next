@@ -13,7 +13,9 @@ import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
 
 const stubLowerer: ExecuteRequestLowerer = {
-  lower: () => ({ sql: '', params: [] }),
+  lower: () => {
+    throw new Error('lower() called on stubLowerer — planner must use lowerToExecuteRequest()');
+  },
   lowerToExecuteRequest: async () => ({ sql: '', params: [] }),
 };
 

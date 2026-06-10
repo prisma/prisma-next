@@ -75,7 +75,7 @@ class PostgresAdapterImpl
   ): PostgresLoweredStatement {
     if (isDdlNode(ast)) {
       throw new Error(
-        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
+        'lower() does not lower DDL on the runtime adapter — DDL lowering is a control-plane concern handled by the control adapter.',
       );
     }
     return renderLoweredSql(ast, context.contract, this.codecLookup);

@@ -1,7 +1,7 @@
-import {
-  type AnyQueryAst,
-  type ContractCodecRegistry,
-  type LoweredStatement,
+import type {
+  AnyQueryAst,
+  ContractCodecRegistry,
+  LoweredStatement,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   createAstCodecRegistry,
