@@ -403,6 +403,146 @@ export function buildStiPolyContract(): TestContract {
   return deserializeTestContract(raw);
 }
 
+type RawColumn = { nativeType: string; codecId: string; nullable: boolean; default?: unknown };
+
+/**
+ * Builds a minimal M:N contract with Parent <-> Child via a junction table.
+ * Used by unit tests that assert M:N include and nested-write behavior.
+ */
+export function buildManyToManyContract(opts: {
+  junctionTable: string;
+  parentColumns: string[];
+  childColumns: string[];
+  targetColumns: string[];
+  localFields?: string[];
+  extraColumns?: Record<string, RawColumn>;
+}): FrameworkContract<SqlStorage> {
+  const {
+    junctionTable,
+    parentColumns,
+    childColumns,
+    targetColumns,
+    localFields = ['id'],
+    extraColumns = {},
+  } = opts;
+
+  const junctionStorageColumns: Record<string, RawColumn> = {};
+  for (const col of parentColumns) {
+    junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+  }
+  for (const col of childColumns) {
+    junctionStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+  }
+  for (const [name, col] of Object.entries(extraColumns)) {
+    junctionStorageColumns[name] = col;
+  }
+
+  const parentStorageColumns: Record<string, RawColumn> = {};
+  for (const col of localFields) {
+    parentStorageColumns[col] = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };
+  }
+
+  const parentStorageFields: Record<string, { column: string }> = {};
+  for (const col of localFields) {
+    parentStorageFields[col] = { column: col };
+  }
+
+  const parentFields: Record<
+    string,
+    { nullable: boolean; type: { kind: string; codecId: string } }
+  > = {};
+  for (const col of localFields) {
+    parentFields[col] = { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } };
+  }
+
+  return {
+    domain: {
+      namespaces: {
+        public: {
+          id: 'public',
+          models: {
+            Parent: {
+              fields: parentFields,
+              relations: {
+                children: {
+                  to: { model: 'Child', namespace: 'public' },
+                  cardinality: 'N:M',
+                  on: { localFields, targetFields: targetColumns },
+                  through: {
+                    table: junctionTable,
+                    namespaceId: 'public',
+                    parentColumns,
+                    childColumns,
+                    targetColumns,
+                  },
+                },
+              },
+              storage: { namespaceId: 'public', table: 'parents', fields: parentStorageFields },
+            },
+            Child: {
+              fields: Object.fromEntries(
+                targetColumns.map((col) => [
+                  col,
+                  { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+                ]),
+              ),
+              relations: {},
+              storage: {
+                namespaceId: 'public',
+                table: 'children',
+                fields: Object.fromEntries(targetColumns.map((col) => [col, { column: col }])),
+              },
+            },
+            Junction: {
+              fields: {},
+              relations: {},
+              storage: { namespaceId: 'public', table: junctionTable, fields: {} },
+            },
+          },
+        },
+      },
+    },
+    storage: {
+      namespaces: {
+        public: {
+          id: 'public',
+          entries: {
+            table: {
+              parents: {
+                columns: parentStorageColumns,
+                primaryKey: { columns: localFields },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              children: {
+                columns: Object.fromEntries(
+                  targetColumns.map((col) => [
+                    col,
+                    { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  ]),
+                ),
+                primaryKey: { columns: targetColumns },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              [junctionTable]: {
+                columns: junctionStorageColumns,
+                primaryKey: { columns: [...parentColumns, ...childColumns] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      },
+    },
+    capabilities: {},
+  } as unknown as FrameworkContract<SqlStorage>;
+}
+
 export function createMockRuntime(): MockRuntime {
   const executions: MockExecution[] = [];
   let nextResult: Record<string, unknown>[][] = [];

@@ -451,7 +451,7 @@ describe('mutation-executor', () => {
       targetColumns: ['id'],
     });
     const runtime = createMockRuntime();
-    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }], []]);
+    runtime.setNextResults([[{ id: 10 }], [{ id: 1 }], [{ id: 10 }], []]);
 
     const created = await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
@@ -519,7 +519,12 @@ describe('mutation-executor', () => {
       localFields: ['tenant_id', 'id'],
     });
     const runtime = createMockRuntime();
-    runtime.setNextResults([[{ tenant_id: 7, id: 1 }], [{ tenant_id: 7, id: 10 }], []]);
+    runtime.setNextResults([
+      [{ tenant_id: 7, id: 10 }],
+      [{ tenant_id: 7, id: 1 }],
+      [{ tenant_id: 7, id: 10 }],
+      [],
+    ]);
 
     await executeNestedCreateMutation({
       context: { ...getTestContext(), contract },
@@ -540,6 +545,82 @@ describe('mutation-executor', () => {
       >
     )[0]!;
     expect(Object.keys(link).sort()).toEqual(['child_id', 'parent_id', 'tenant_id']);
+  });
+
+  it('executeNestedCreateMutation() rejects mismatched junction parent-column metadata', async () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id', 'tenant_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    });
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1 }]]);
+
+    await expect(
+      executeNestedCreateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        namespaceId: 'public',
+        modelName: 'Parent',
+        data: {
+          id: 1,
+          children: (children: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+            children.connect({ id: 10 }),
+        } as never,
+      }),
+    ).rejects.toThrow(/parentColumns.*localColumns/);
+  });
+
+  it('executeNestedCreateMutation() rejects mismatched junction target-column metadata', async () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id', 'tenant_id'],
+      targetColumns: ['id'],
+    });
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }]]);
+
+    await expect(
+      executeNestedCreateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        namespaceId: 'public',
+        modelName: 'Parent',
+        data: {
+          id: 1,
+          children: (children: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+            children.connect({ id: 10 }),
+        } as never,
+      }),
+    ).rejects.toThrow(/childColumns.*targetColumns/);
+  });
+
+  it('executeNestedCreateMutation() rejects conflicting values for shared junction columns', async () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['tenant_id'],
+      childColumns: ['tenant_id'],
+      targetColumns: ['tenant_id'],
+      localFields: ['tenant_id'],
+    });
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ tenant_id: 8 }], [{ tenant_id: 7 }], [{ tenant_id: 8 }]]);
+
+    await expect(
+      executeNestedCreateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        namespaceId: 'public',
+        modelName: 'Parent',
+        data: {
+          tenant_id: 7,
+          children: (children: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+            children.connect({ tenant_id: 8 }),
+        } as never,
+      }),
+    ).rejects.toThrow(/conflicting values for junction column "tenant_id"/);
   });
 
   it('executeNestedUpdateMutation() routes M:N connect through a junction INSERT', async () => {
@@ -569,6 +650,39 @@ describe('mutation-executor', () => {
     expect((runtime.executions.at(-1)!.plan as { params: readonly unknown[] }).params).toEqual([
       1, 10,
     ]);
+  });
+
+  it('executeNestedUpdateMutation() wraps duplicate M:N connect errors', async () => {
+    const contract = buildManyToManyContract({
+      junctionTable: 'parent_child',
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    });
+    const runtime = createMockRuntime();
+    const execute = runtime.execute.bind(runtime);
+    vi.spyOn(runtime, 'execute').mockImplementation((plan) => {
+      const ast = (plan as { ast?: { kind: string; table?: { name: string } } }).ast;
+      if (ast?.kind === 'insert' && ast.table?.name === 'parent_child') {
+        throw new Error('duplicate key value violates unique constraint "parent_child_pkey"');
+      }
+      return execute(plan);
+    });
+    runtime.setNextResults([[{ id: 1 }], [{ id: 10 }]]);
+
+    await expect(
+      executeNestedUpdateMutation({
+        context: { ...getTestContext(), contract },
+        runtime,
+        namespaceId: 'public',
+        modelName: 'Parent',
+        filters: [BinaryExpr.eq(ColumnRef.of('parents', 'id'), LiteralExpr.of(1))],
+        data: {
+          children: (children: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+            children.connect({ id: 10 }),
+        } as never,
+      }),
+    ).rejects.toThrow(/relation "children" already exists/);
   });
 
   it('executeNestedUpdateMutation() routes M:N disconnect through a junction DELETE', async () => {
@@ -671,6 +785,48 @@ describe('mutation-executor', () => {
     ).rejects.toThrow(
       /Cannot `connect` on relation `roles`: its junction `user_roles` has required column\(s\) `level`/,
     );
+  });
+
+  it('executeNestedCreateMutation() allows M:N connect when required payload has an execution default', async () => {
+    const contract = {
+      ...getTestContract(),
+      execution: {
+        ...getTestContract().execution,
+        mutations: {
+          defaults: [
+            ...(getTestContract().execution?.mutations.defaults ?? []),
+            {
+              ref: { table: 'user_roles', column: 'level' },
+              onCreate: { kind: 'generator', id: 'test-level' },
+            },
+          ],
+        },
+      },
+    } as unknown as TestContract;
+    const runtime = createMockRuntime();
+    runtime.setNextResults([
+      [{ id: 'admin' }],
+      [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+      [{ id: 'admin' }],
+      [],
+    ]);
+
+    await executeNestedCreateMutation({
+      context: { ...getTestContext(), contract },
+      runtime,
+      namespaceId: 'public',
+      modelName: 'User',
+      data: {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        roles: (roles: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+          roles.connect({ id: 'admin' }),
+      } as never,
+    });
+
+    const insert = findJunctionDml(runtime, 'insert', 'user_roles');
+    expect(insert.kind).toBe('insert');
   });
 
   it('executeNestedUpdateMutation() allows disconnect on junction with required payload columns', async () => {

@@ -42,7 +42,6 @@ import type {
   MutationUpdateInput,
   RelationCardinalityTag,
   RelationMutation,
-  RelationMutator,
   RuntimeQueryable,
 } from './types';
 import { emptyState } from './types';
@@ -222,6 +221,14 @@ async function createGraph(
     );
   }
 
+  for (const relationMutation of junctionOwned) {
+    if (relationMutation.mutation.kind === 'disconnect') {
+      throw new Error('disconnect() is only supported in update() nested mutations');
+    }
+
+    await preflightJunctionOwnedCreateMutation(scope, context, relationMutation);
+  }
+
   const parentRow = await insertSingleRow(scope, context, namespaceId, modelName, scalarData);
 
   for (const relationMutation of childOwned) {
@@ -241,10 +248,6 @@ async function createGraph(
   }
 
   for (const relationMutation of junctionOwned) {
-    if (relationMutation.mutation.kind === 'disconnect') {
-      throw new Error('disconnect() is only supported in update() nested mutations');
-    }
-
     await applyJunctionOwnedMutation(
       scope,
       context,
@@ -277,7 +280,7 @@ async function updateFirstGraph(
     contract,
     namespaceId,
     modelName,
-    input as Record<string, unknown>,
+    blindCast<Record<string, unknown>, 'mutation update input is a plain object payload'>(input),
   );
   const { parentOwned, childOwned, junctionOwned } = partitionByOwnership(parsed.relationMutations);
 
@@ -313,7 +316,10 @@ async function updateFirstGraph(
       context,
       namespaceId,
       modelName,
-      pkFilter as MutationUpdateInput<Contract<SqlStorage>, string>,
+      blindCast<
+        MutationUpdateInput<Contract<SqlStorage>, string>,
+        'primary key filter is a mutation update criterion'
+      >(pkFilter),
     );
     if (!pkWhere) {
       throw new Error(`Failed to build primary key filter for model "${modelName}"`);
@@ -395,7 +401,7 @@ function parseMutationInput(
     }
 
     const mutator = createRelationMutator<Contract<SqlStorage>, string>();
-    const mutation = value(mutator as RelationMutator<Contract<SqlStorage>, string>);
+    const mutation = value(mutator);
     if (!isRelationMutationDescriptor(mutation)) {
       throw new Error(
         `Relation field "${fieldName}" on model "${modelName}" returned an invalid mutation descriptor`,
@@ -487,7 +493,10 @@ async function applyParentOwnedMutation(
       context,
       relation.relatedNamespaceId,
       relation.relatedModelName,
-      row as MutationCreateInput<Contract<SqlStorage>, string>,
+      blindCast<
+        MutationCreateInput<Contract<SqlStorage>, string>,
+        'relation create row is a nested mutation create input'
+      >(row),
     );
     copyRelatedValuesToParent(
       contract,
@@ -512,7 +521,7 @@ async function applyParentOwnedMutation(
     context,
     relation.relatedNamespaceId,
     relation.relatedModelName,
-    criterion as Record<string, unknown>,
+    blindCast<Record<string, unknown>, 'relation connect criterion is a plain object'>(criterion),
   );
   if (!relatedRow) {
     throw new Error(
@@ -577,7 +586,9 @@ async function applyChildOwnedMutation(
   if (mutation.kind === 'create') {
     for (const childInput of mutation.data) {
       const payload = {
-        ...(childInput as Record<string, unknown>),
+        ...blindCast<Record<string, unknown>, 'child create input is a plain object payload'>(
+          childInput,
+        ),
       };
 
       for (const [childColumn, parentValue] of parentValues.entries()) {
@@ -595,7 +606,10 @@ async function applyChildOwnedMutation(
         context,
         relation.relatedNamespaceId,
         relation.relatedModelName,
-        payload as MutationCreateInput<Contract<SqlStorage>, string>,
+        blindCast<
+          MutationCreateInput<Contract<SqlStorage>, string>,
+          'child-owned payload is a nested mutation create input'
+        >(payload),
       );
     }
     return;
@@ -607,7 +621,10 @@ async function applyChildOwnedMutation(
         context,
         relation.relatedNamespaceId,
         relation.relatedModelName,
-        criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
+        blindCast<
+          MutationUpdateInput<Contract<SqlStorage>, string>,
+          'child-owned connect criterion is a mutation update filter'
+        >(criterion),
       );
       if (!criterionWhere) {
         throw new Error(
@@ -655,7 +672,10 @@ async function applyChildOwnedMutation(
       context,
       relation.relatedNamespaceId,
       relation.relatedModelName,
-      criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
+      blindCast<
+        MutationUpdateInput<Contract<SqlStorage>, string>,
+        'child-owned disconnect criterion is a mutation update filter'
+      >(criterion),
     );
     if (!criterionWhere) {
       throw new Error(
@@ -694,14 +714,7 @@ async function applyJunctionOwnedMutation(
     parentRow,
   );
 
-  if (mutation.kind === 'create' || mutation.kind === 'connect') {
-    if (through.requiredPayloadColumns.length > 0) {
-      const cols = through.requiredPayloadColumns.map((c) => `\`${c}\``).join(', ');
-      throw new Error(
-        `Cannot \`${mutation.kind}\` on relation \`${relation.relationName}\`: its junction \`${through.table}\` has required column(s) ${cols} the relation API can't populate. Use the \`${relation.relatedModelName}\` model directly or the SQL builder.`,
-      );
-    }
-  }
+  assertJunctionPayloadWritable(relation, mutation.kind);
 
   if (mutation.kind === 'create') {
     for (const childInput of mutation.data) {
@@ -715,7 +728,7 @@ async function applyJunctionOwnedMutation(
         ),
       );
       const targetPkValues = readJunctionTargetValues(contract, relation, relatedRow);
-      await insertJunctionLink(scope, context, through, parentPkValues, targetPkValues);
+      await insertJunctionLink(scope, context, relation, parentPkValues, targetPkValues, 'create');
     }
     return;
   }
@@ -729,7 +742,7 @@ async function applyJunctionOwnedMutation(
         'connect',
         criterion,
       );
-      await insertJunctionLink(scope, context, through, parentPkValues, targetPkValues);
+      await insertJunctionLink(scope, context, relation, parentPkValues, targetPkValues, 'connect');
     }
     return;
   }
@@ -750,6 +763,42 @@ async function applyJunctionOwnedMutation(
     );
     await deleteJunctionLink(scope, context, through, parentPkValues, targetPkValues);
   }
+}
+
+async function preflightJunctionOwnedCreateMutation(
+  scope: RuntimeScope,
+  context: ExecutionContext,
+  relationMutation: JunctionParsedRelationMutation,
+): Promise<void> {
+  const { relation, mutation } = relationMutation;
+  assertJunctionMetadataShape(relation);
+  assertJunctionPayloadWritable(relation, mutation.kind);
+
+  if (mutation.kind !== 'connect') {
+    return;
+  }
+
+  for (const criterion of mutation.criteria) {
+    await resolveJunctionTargetValues(scope, context, relation, 'connect', criterion);
+  }
+}
+
+function assertJunctionPayloadWritable(
+  relation: JunctionRelationDefinition,
+  mutationKind: RelationMutation<Contract<SqlStorage>, string>['kind'],
+): void {
+  const through = relation.through;
+  if (
+    (mutationKind !== 'create' && mutationKind !== 'connect') ||
+    through.requiredPayloadColumns.length === 0
+  ) {
+    return;
+  }
+
+  const cols = through.requiredPayloadColumns.map((c) => `\`${c}\``).join(', ');
+  throw new Error(
+    `Cannot \`${mutationKind}\` on relation \`${relation.relationName}\`: its junction \`${through.table}\` has required column(s) ${cols} the relation API can't populate. Use the \`${relation.relatedModelName}\` model directly or the SQL builder.`,
+  );
 }
 
 async function resolveJunctionTargetValues(
@@ -782,12 +831,15 @@ function readJunctionParentValues(
   parentRow: Record<string, unknown>,
 ): Map<string, unknown> {
   const values = new Map<string, unknown>();
+  assertJunctionParentMetadataLength(relation);
 
   for (let i = 0; i < relation.through.parentColumns.length; i++) {
     const junctionColumn = relation.through.parentColumns[i];
     const parentColumn = relation.localColumns[i];
-    if (!junctionColumn || !parentColumn) {
-      continue;
+    if (junctionColumn === undefined || parentColumn === undefined) {
+      throw new Error(
+        `Relation "${relation.relationName}" has incomplete junction metadata for parent columns`,
+      );
     }
 
     const parentFieldName = toFieldName(contract, parentNamespaceId, parentModelName, parentColumn);
@@ -810,12 +862,15 @@ function readJunctionTargetValues(
   relatedRow: Record<string, unknown>,
 ): Map<string, unknown> {
   const values = new Map<string, unknown>();
+  assertJunctionTargetMetadataLength(relation);
 
   for (let i = 0; i < relation.through.childColumns.length; i++) {
     const junctionColumn = relation.through.childColumns[i];
     const targetColumn = relation.through.targetColumns[i];
-    if (!junctionColumn || !targetColumn) {
-      continue;
+    if (junctionColumn === undefined || targetColumn === undefined) {
+      throw new Error(
+        `Relation "${relation.relationName}" has incomplete junction metadata for target columns`,
+      );
     }
 
     const targetFieldName = toFieldName(
@@ -837,25 +892,118 @@ function readJunctionTargetValues(
   return values;
 }
 
+function assertJunctionMetadataLength(
+  relation: JunctionRelationDefinition,
+  throughColumnName: string,
+  throughColumns: readonly string[],
+  pairedColumnName: string,
+  pairedColumns: readonly string[],
+): void {
+  if (throughColumns.length === pairedColumns.length) {
+    return;
+  }
+
+  throw new Error(
+    `Relation "${relation.relationName}" has invalid junction metadata: ${throughColumnName} has ${throughColumns.length} column(s), but ${pairedColumnName} has ${pairedColumns.length}`,
+  );
+}
+
+function assertJunctionParentMetadataLength(relation: JunctionRelationDefinition): void {
+  assertJunctionMetadataLength(
+    relation,
+    'parentColumns',
+    relation.through.parentColumns,
+    'localColumns',
+    relation.localColumns,
+  );
+}
+
+function assertJunctionTargetMetadataLength(relation: JunctionRelationDefinition): void {
+  assertJunctionMetadataLength(
+    relation,
+    'childColumns',
+    relation.through.childColumns,
+    'targetColumns',
+    relation.through.targetColumns,
+  );
+}
+
+function assertJunctionMetadataShape(relation: JunctionRelationDefinition): void {
+  assertJunctionParentMetadataLength(relation);
+  assertJunctionTargetMetadataLength(relation);
+}
+
+function writeJunctionColumn(
+  junctionRow: Record<string, unknown>,
+  through: JunctionThrough,
+  column: string,
+  value: unknown,
+): void {
+  if (Object.hasOwn(junctionRow, column) && !Object.is(junctionRow[column], value)) {
+    throw new Error(
+      `Cannot write junction "${through.table}": conflicting values for junction column "${column}"`,
+    );
+  }
+
+  junctionRow[column] = value;
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  if ('code' in error) {
+    const code = error.code;
+    if (code === '23505' || code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      return true;
+    }
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('duplicate key') ||
+    message.includes('unique constraint') ||
+    message.includes('unique violation') ||
+    message.includes('constraint failed')
+  );
+}
+
 async function insertJunctionLink(
   scope: RuntimeScope,
   context: ExecutionContext,
-  through: JunctionThrough,
+  relation: JunctionRelationDefinition,
   parentPkValues: Map<string, unknown>,
   targetPkValues: Map<string, unknown>,
+  mutationKind: 'create' | 'connect',
 ): Promise<void> {
+  const through = relation.through;
   const junctionRow: Record<string, unknown> = {};
   for (const [column, value] of parentPkValues.entries()) {
-    junctionRow[column] = value;
+    writeJunctionColumn(junctionRow, through, column, value);
   }
   for (const [column, value] of targetPkValues.entries()) {
-    junctionRow[column] = value;
+    writeJunctionColumn(junctionRow, through, column, value);
   }
 
   const compiled = compileInsertCount(context.contract, through.namespaceId, through.table, [
     junctionRow,
   ]);
-  await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
+  try {
+    await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
+  } catch (error) {
+    if (mutationKind === 'connect' && isUniqueConstraintError(error)) {
+      throw new Error(
+        `connect() nested mutation for relation "${relation.relationName}" already exists; the junction link is already present`,
+        { cause: error },
+      );
+    }
+    throw error;
+  }
 }
 
 async function deleteJunctionLink(
@@ -984,7 +1132,10 @@ async function findRowByCriterion(
     context,
     namespaceId,
     modelName,
-    criterion as MutationUpdateInput<Contract<SqlStorage>, string>,
+    blindCast<
+      MutationUpdateInput<Contract<SqlStorage>, string>,
+      'criterion object is a mutation update filter'
+    >(criterion),
   );
   if (!whereExpr) {
     throw new Error(`Nested connect for model "${modelName}" requires non-empty criterion`);
