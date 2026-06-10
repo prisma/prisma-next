@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from '../src/parse';
 import {
+  BlockDeclarationAst,
   CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
@@ -123,6 +124,51 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     const { message, span } = diagnosticFor(source, 'PSL_INVALID_EXTENSION_BLOCK_MEMBER');
     expect(message).toBe('Invalid block entry');
     expect(span).toBe('123');
+  });
+
+  it('reports a generic-block entry missing its "=", anchored on the key, keeping the pair', () => {
+    const source = 'datasource db {\n  provider "x"\n}';
+    const { result, message, span } = diagnosticFor(source, 'PSL_INVALID_EXTENSION_BLOCK_MEMBER');
+    expect(message).toBe('Expected "=" after "provider"');
+    expect(span).toBe('provider');
+    const decl = Array.from(result.document.declarations())[0];
+    expect(decl).toBeInstanceOf(BlockDeclarationAst);
+    if (decl instanceof BlockDeclarationAst) {
+      const entries = Array.from(decl.entries());
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.key()?.token()?.text).toBe('provider');
+    }
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
+  it('reports a bare generic-block key with no value as a missing "="', () => {
+    const source = 'datasource db {\n  provider\n}';
+    const { result, message, span } = diagnosticFor(source, 'PSL_INVALID_EXTENSION_BLOCK_MEMBER');
+    expect(message).toBe('Expected "=" after "provider"');
+    expect(span).toBe('provider');
+    const decl = Array.from(result.document.declarations())[0];
+    expect(decl).toBeInstanceOf(BlockDeclarationAst);
+    if (decl instanceof BlockDeclarationAst) {
+      const entries = Array.from(decl.entries());
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.key()?.token()?.text).toBe('provider');
+    }
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
+  it('reports a types-block member missing its "=", anchored on the name', () => {
+    const source = 'type {\n  UserId Int\n}';
+    const { result, message, span } = diagnosticFor(source, 'PSL_INVALID_TYPES_MEMBER');
+    expect(message).toBe('Expected "=" after "UserId"');
+    expect(span).toBe('UserId');
+    const decl = Array.from(result.document.declarations())[0];
+    expect(decl).toBeInstanceOf(TypesBlockAst);
+    if (decl instanceof TypesBlockAst) {
+      const named = Array.from(decl.declarations());
+      expect(named).toHaveLength(1);
+      expect(named[0]!.name()?.token()?.text).toBe('UserId');
+    }
+    expect(greenText(result.document.syntax.green)).toBe(source);
   });
 });
 

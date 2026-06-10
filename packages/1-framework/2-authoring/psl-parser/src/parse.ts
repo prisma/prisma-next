@@ -711,9 +711,13 @@ export function parseEnumValue(cursor: Cursor): GreenNode | undefined {
 export function parseNamedType(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('NamedTypeDeclaration');
+  const nameMark = cursor.mark();
+  const nameText = cursor.peekToken().text;
   parseIdentifier(cursor); // name
   if (cursor.peekKind() === 'Equals') {
     cursor.bump();
+  } else {
+    cursor.diagnostic('PSL_INVALID_TYPES_MEMBER', `Expected "=" after "${nameText}"`, nameMark);
   }
   parseTypeAnnotation(cursor);
   while (cursor.peekKind() === 'At') {
@@ -725,9 +729,17 @@ export function parseNamedType(cursor: Cursor): GreenNode | undefined {
 export function parseKeyValue(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
   cursor.startNode('KeyValuePair');
+  const keyMark = cursor.mark();
+  const keyText = cursor.peekToken().text;
   parseIdentifier(cursor); // key
   if (cursor.peekKind() === 'Equals') {
     cursor.bump();
+  } else {
+    cursor.diagnostic(
+      'PSL_INVALID_EXTENSION_BLOCK_MEMBER',
+      `Expected "=" after "${keyText}"`,
+      keyMark,
+    );
   }
   const value = parseExpression(cursor);
   if (!value && cursor.peekKind() === 'LBrace') {
