@@ -15,6 +15,8 @@ import type {
   PslDiagnosticCode,
   PslDocumentAst,
   PslEnum,
+  PslEnum2,
+  PslEnum2Value,
   PslEnumValue,
   PslExtensionBlock,
   PslExtensionBlockParamValue,
@@ -81,6 +83,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     name: string;
     models: PslModel[];
     enums: PslEnum[];
+    enum2s: PslEnum2[];
     compositeTypes: PslCompositeType[];
     extensionBlocks: PslExtensionBlock[];
     span: PslSpan | undefined;
@@ -98,6 +101,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
         name,
         models: [],
         enums: [],
+        enum2s: [],
         compositeTypes: [],
         extensionBlocks: [],
         span: spanIfNew,
@@ -155,6 +159,21 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
             createTrimmedLineSpan(context, lineIndex),
           );
           acc.enums.push(parseEnumBlock(context, name, bounds));
+        }
+        lineIndex = bounds.endLine + 1;
+        continue;
+      }
+
+      const enum2Match = line.match(/^enum2\s+([A-Za-z_]\w*)\s*\{$/);
+      if (enum2Match) {
+        const bounds = findBlockBounds(context, lineIndex);
+        const name = enum2Match[1] ?? '';
+        if (name.length > 0) {
+          const acc = getOrCreateNamespace(
+            currentNamespaceName,
+            createTrimmedLineSpan(context, lineIndex),
+          );
+          acc.enum2s.push(parseEnum2Block(context, name, bounds));
         }
         lineIndex = bounds.endLine + 1;
         continue;
@@ -331,6 +350,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       name === UNSPECIFIED_PSL_NAMESPACE_ID &&
       acc.models.length === 0 &&
       acc.enums.length === 0 &&
+      acc.enum2s.length === 0 &&
       acc.compositeTypes.length === 0 &&
       acc.extensionBlocks.length === 0
     ) {
@@ -369,6 +389,7 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
           acc.enums,
           acc.compositeTypes,
           acc.extensionBlocks,
+          acc.enum2s,
         ),
         span: acc.span ?? documentSpan,
       }),
@@ -552,6 +573,103 @@ function parseEnumBlock(context: ParserContext, name: string, bounds: BlockBound
     attributes,
     span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
   };
+}
+
+function parseEnum2Block(context: ParserContext, name: string, bounds: BlockBounds): PslEnum2 {
+  const values: PslEnum2Value[] = [];
+  const attributes: PslAttribute[] = [];
+
+  for (let lineIndex = bounds.startLine + 1; lineIndex < bounds.endLine; lineIndex += 1) {
+    const raw = context.lines[lineIndex] ?? '';
+    const line = stripInlineComment(raw).trim();
+    if (line.length === 0) {
+      continue;
+    }
+
+    if (line.startsWith('@@')) {
+      const attribute = parseEnum2Attribute(context, line, lineIndex);
+      if (attribute) {
+        attributes.push(attribute);
+      }
+      continue;
+    }
+
+    if (line.includes('@map(')) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_ENUM2_MEMBER',
+        message: `enum2 member "${line}" must not use @map; assign the storage value with "= <value>" instead`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    const valueWithAssign = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+    if (valueWithAssign) {
+      values.push({
+        kind: 'enum2Value',
+        name: valueWithAssign[1] ?? '',
+        rawValue: (valueWithAssign[2] ?? '').trim(),
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    const bareName = line.match(/^([A-Za-z_]\w*)$/);
+    if (bareName) {
+      values.push({
+        kind: 'enum2Value',
+        name: bareName[1] ?? '',
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ENUM2_MEMBER',
+      message: `Invalid enum2 member declaration "${line}"`,
+      span: createTrimmedLineSpan(context, lineIndex),
+    });
+  }
+
+  return {
+    kind: 'enum2',
+    name,
+    values,
+    attributes,
+    span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
+  };
+}
+
+function parseEnum2Attribute(
+  context: ParserContext,
+  line: string,
+  lineIndex: number,
+): PslAttribute | undefined {
+  const rawLine = context.lines[lineIndex] ?? '';
+  const tokenParse = extractAttributeTokensWithSpans(
+    context,
+    lineIndex,
+    line,
+    firstNonWhitespaceColumn(rawLine),
+  );
+  if (!tokenParse.ok || tokenParse.tokens.length !== 1) {
+    pushDiagnostic(context, {
+      code: 'PSL_INVALID_ENUM2_MEMBER',
+      message: `Invalid enum2 attribute syntax "${line}"`,
+      span: createTrimmedLineSpan(context, lineIndex),
+    });
+    return undefined;
+  }
+  const token = tokenParse.tokens[0];
+  if (!token) {
+    return undefined;
+  }
+  return parseAttributeToken(context, {
+    token: token.text,
+    target: 'enum2',
+    lineIndex,
+    span: token.span,
+  });
 }
 
 /**
@@ -1082,8 +1200,9 @@ function parseAttributeToken(
     readonly span: PslSpan;
   },
 ): PslAttribute | undefined {
-  const expectsBlockPrefix = input.target === 'model' || input.target === 'enum';
-  const targetLabel = input.target === 'enum' ? 'Enum' : 'Model';
+  const expectsBlockPrefix =
+    input.target === 'model' || input.target === 'enum' || input.target === 'enum2';
+  const targetLabel = input.target === 'enum' || input.target === 'enum2' ? 'Enum' : 'Model';
   if (expectsBlockPrefix && !input.token.startsWith('@@')) {
     pushDiagnostic(context, {
       code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',

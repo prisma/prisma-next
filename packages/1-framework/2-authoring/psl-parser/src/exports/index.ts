@@ -14,6 +14,8 @@ export type {
   PslDiagnosticCode,
   PslDocumentAst,
   PslEnum,
+  PslEnum2,
+  PslEnum2Value,
   PslEnumValue,
   PslField,
   PslFieldAttribute,
@@ -26,5 +28,6 @@ export type {
   PslTypeConstructorCall,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
+export { flatPslEnum2s } from '@prisma-next/framework-components/psl-ast';
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
 export { parsePslDocument } from '../parser';
