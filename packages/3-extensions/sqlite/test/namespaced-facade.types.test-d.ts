@@ -6,9 +6,9 @@ import type { Contract } from './fixtures/namespaced-contract';
 declare const db: SqliteClient<Contract>;
 
 test('db.sql exposes the flat surface via the unbound-namespace alias', () => {
-  expectTypeOf(db.sql.users).toEqualTypeOf<TableProxy<Contract, 'users'>>();
+  expectTypeOf(db.sql.users).toEqualTypeOf<TableProxy<Contract, '__unbound__', 'users'>>();
   expectTypeOf<Namespace<Contract, '__unbound__'>['users']>().toEqualTypeOf<
-    TableProxy<Contract, 'users'>
+    TableProxy<Contract, '__unbound__', 'users'>
   >();
 });
 
@@ -25,5 +25,5 @@ test('an undeclared key is not on db.sql or db.orm', () => {
 
 test('prepare callback receives the flat (unbound-facet) sql surface', () => {
   type PrepareSql = Parameters<Parameters<SqliteClient<Contract>['prepare']>[1]>[0];
-  expectTypeOf<PrepareSql['users']>().toEqualTypeOf<TableProxy<Contract, 'users'>>();
+  expectTypeOf<PrepareSql['users']>().toEqualTypeOf<TableProxy<Contract, '__unbound__', 'users'>>();
 });
