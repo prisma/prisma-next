@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   instantiateExecutionStack: vi.fn(),
   SqliteRuntime: vi.fn(),
+  runtimeInstances: [] as unknown[],
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   withTransaction: vi.fn(),
@@ -28,7 +29,16 @@ vi.mock('@prisma-next/sql-runtime', () => ({
 }));
 
 vi.mock('../src/runtime/sqlite-runtime', () => ({
-  SqliteRuntime: mocks.SqliteRuntime,
+  // Delegating mock: the spy is invoked as a plain function (so per-test
+  // mockReturnValue/mockImplementation work), its return value becomes the
+  // instance shape, and every constructed instance is registered for
+  // identity assertions.
+  SqliteRuntime: class {
+    constructor(options: unknown) {
+      Object.assign(this, mocks.SqliteRuntime(options));
+      mocks.runtimeInstances.push(this);
+    }
+  },
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -67,6 +77,7 @@ describe('sqlite transaction()', () => {
   beforeEach(() => {
     mocks.instantiateExecutionStack.mockReset();
     mocks.SqliteRuntime.mockReset();
+    mocks.runtimeInstances.length = 0;
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.withTransaction.mockReset();
@@ -101,7 +112,7 @@ describe('sqlite transaction()', () => {
       connect: mocks.driverConnect,
       close: mocks.driverClose,
     });
-    mocks.SqliteRuntime.mockImplementation(() => ({ id: 'runtime-instance' }));
+    mocks.SqliteRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
     mocks.orm.mockReturnValue({ lane: 'orm' });
@@ -126,7 +137,7 @@ describe('sqlite transaction()', () => {
 
     expect(mocks.withTransaction).toHaveBeenCalledOnce();
     expect(mocks.withTransaction).toHaveBeenCalledWith(
-      mocks.SqliteRuntime.mock.results[0]?.value,
+      mocks.runtimeInstances[0],
       expect.any(Function),
     );
     expect(result).toBe('tx-value');
