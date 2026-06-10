@@ -24,6 +24,18 @@ changes:
       anyMatch: true
 ---
 
+<!--
+TML-2852: the enum read surface. `enumType`-authored enums become first-class in
+application code — an enum-restricted field's value union flows into the static
+read/write types of both query lanes, `db.<namespace>.enums.<Name>` exposes the
+enum at runtime (per-namespace facet accessor), and `ORDER BY` on an enum column
+sorts by declaration order. Purely additive and opt-in: PSL `enum` stays native
+until the cutover, so only `enumType`-authored contracts exercise it, and
+`fixtures:check` is byte-identical for every existing contract. No user-side
+action — the examples/ diff is the new feature's demonstration. Incidental
+substrate diff only.
+-->
+
 # 0.13 → 0.14 — User upgrade instructions
 
 ## `qualify-flat-builder-accessors`
