@@ -214,7 +214,7 @@ The corresponding source files:
 
 - `src/orm-client/find-user-by-id-cached.ts` — `db.User.first({ id }, (meta) => meta.annotate(cacheAnnotation({ ttl })))`
 - `src/orm-client/get-users-cached.ts` — `db.User.take(n).all((meta) => meta.annotate(cacheAnnotation({ ttl, key? })))`
-- `src/queries/get-users-cached.ts` — `db.sql.user.select(...).annotate(cacheAnnotation({ ttl })).build()`
+- `src/queries/get-users-cached.ts` — `db.sql.public.user.select(...).annotate(cacheAnnotation({ ttl })).build()`
 
 Relevant points:
 

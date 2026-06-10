@@ -117,11 +117,11 @@ withTempDir(({ createTempDir }) => {
         const filled = injectMigrationSqlDbSetup(scaffold)
           .replace(
             "() => placeholder('migrate-status-values:check')",
-            "() => db.user.select('id').where((f, fns) => fns.notIn(f.status, ['active', 'archived'])).limit(1)",
+            "() => db.public.user.select('id').where((f, fns) => fns.notIn(f.status, ['active', 'archived'])).limit(1)",
           )
           .replace(
             "() => placeholder('migrate-status-values:run')",
-            `() => db.user.update({ status: '${REMAPPED_STATUS}' }).where((f, fns) => fns.notIn(f.status, ['active', 'archived']))`,
+            `() => db.public.user.update({ status: '${REMAPPED_STATUS}' }).where((f, fns) => fns.notIn(f.status, ['active', 'archived']))`,
           );
         expect(filled).not.toContain('placeholder(');
         expect(filled).toContain('const db = sql(');

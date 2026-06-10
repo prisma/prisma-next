@@ -6,19 +6,19 @@
 
 The Supabase integration is delivered through six framework-primitive projects + one integration project. The framework primitives are independent of each other; all depend on the target-extensible IR foundation (TML-2459) — `explicit-namespace-dsl` specifically on its runtime-qualification slice (TML-2605). The integration project depends on all of them.
 
-Status reflects the state as of the last planning pass (2026-06-04); keep it current as constituents land.
+Status reflects the state as of the last planning pass (2026-06-08); keep it current as constituents land.
 
 | Project | Concern | Status | Linear |
 |---|---|---|---|
 | target-extensible-ir-namespaces | Polymorphic Contract IR + Schema IR; `Namespace` framework concept; within-contract cross-namespace FKs | ✅ **Done & closed** (incl. runtime-qualification TML-2605; project dir removed) | [TML-2459](https://linear.app/prisma-company/issue/TML-2459) |
-| [control-policy](../control-policy/spec.md) | Framework primitive: `control` field + `ControlPolicy` enum (`managed`/`tolerated`/`external`/`observed`); verifier/planner dispatch tables | ✅ **Effectively done** — slices 1–5 shipped; slice 6 (`@@control` PSL) in flight | [TML-2493](https://linear.app/prisma-company/issue/TML-2493) |
-| [cross-contract-refs](../cross-contract-refs/spec.md) | FK references across contract-space boundaries; brand machinery; `supabase:auth.User` PSL grammar; dependency graph + namespace ownership | 🔜 **Next up** (lane 2) — fully unblocked | [TML-2500](https://linear.app/prisma-company/issue/TML-2500) |
-| [postgres-rls](../postgres-rls/spec.md) | RLS policies + Postgres roles as target-only IR; `.rls(...)` TS surface + `policy <name> { ... }` PSL surface; content-addressed wire names; verifier + planner | Shaped — follows cross-contract-refs; PSL side gated on TML-2537 | [TML-2501](https://linear.app/prisma-company/issue/TML-2501) |
+| control-policy | Framework primitive: `control` field + `ControlPolicy` enum (`managed`/`tolerated`/`external`/`observed`); verifier/planner dispatch tables | ✅ **Done & closed** (fully landed incl. `@@control` PSL; design in ADR 224; project dir removed) | [TML-2493](https://linear.app/prisma-company/issue/TML-2493) |
+| [cross-contract-refs](../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md) | FK references across contract-space boundaries; brand machinery; `supabase:auth.AuthUser` PSL grammar; dependency graph + namespace ownership | ✅ **Done & closed** (M1 #745, M2 #752, M3a #756, M3b #765; project dir removed) | [TML-2500](https://linear.app/prisma-company/issue/TML-2500) |
+| [postgres-rls](../postgres-rls/spec.md) | RLS policies + Postgres roles as target-only IR; `.rls(...)` TS surface + `policy <name> { ... }` PSL surface; content-addressed wire names; verifier + planner | 🚧 **In progress (Will)** — fully unblocked (cross-contract-refs + PSL-block substrate both landed) | [TML-2501](https://linear.app/prisma-company/issue/TML-2501) |
 | [runtime-target-layer](../runtime-target-layer/spec.md) | Export `SqlRuntime`; new `PostgresRuntime extends SqlRuntime`; `withRawConnection` below-middleware accessor; transaction primitive formalisation | Shaped — short interleave (~50–100 LOC core), independent | [TML-2502](https://linear.app/prisma-company/issue/TML-2502) |
 | [explicit-namespace-dsl](../explicit-namespace-dsl/spec.md) | Namespace-aware DSL/ORM query surface (`db.sql.<ns>.<table>`, `db.<ns>.<Model>`); disambiguates colliding cross-namespace names (`auth.users` vs `public.users`); additive on the default-namespace fallback | 🚧 **In progress (Serhii)** — **launch blocker** | [TML-2550](https://linear.app/prisma-company/issue/TML-2550) |
-| [extension-supabase](../extension-supabase/spec.md) | `@prisma-next/extension-supabase` package: shipped contract, typed handles, pack descriptor, `SupabaseRuntime`, example app | 🔜 **M1 + skeleton starting** (lane 1) | [TML-2503](https://linear.app/prisma-company/issue/TML-2503) |
+| [extension-supabase](../extension-supabase/spec.md) | `@prisma-next/extension-supabase` package: shipped contract, typed handles, pack descriptor, `SupabaseRuntime`, example app | 🚧 **M1 + skeleton in progress** ([TML-2834](https://linear.app/prisma-company/issue/TML-2834)) | [TML-2503](https://linear.app/prisma-company/issue/TML-2503) |
 
-The PSL-block substrate [target-contributed-psl-blocks](../target-contributed-psl-blocks/spec.md) (TML-2537, in flight) is not a constituent but is on the critical path: it gates `postgres-rls`'s PSL `policy {}` surface (PSL authoring is must-have for launch).
+The PSL-block substrate `target-contributed-psl-blocks` ([TML-2537](https://linear.app/prisma-company/issue/TML-2537)) is not a constituent but was on the critical path: ✅ **landed** (substrate + close-out; project dir removed), so `postgres-rls`'s PSL `policy {}` surface is now unblocked. Note: the substrate uses **per-operation keywords** (`policy_select` / `policy_insert` / …) rather than a single conditional `policy { operation = … }` block — postgres-rls's PSL grammar must align with that shape.
 
 ### Dependency graph
 
@@ -51,19 +51,19 @@ The PSL-block substrate [target-contributed-psl-blocks](../target-contributed-ps
                                 └─────────────────────────┘
 ```
 
-The three control-policy-dependent middle-tier projects (`cross-contract-refs`, `postgres-rls`, `runtime-target-layer`) can ship in any order once `target-extensible-ir` reaches M5b and `control-policy` lands. `explicit-namespace-dsl` runs on a parallel track: it depends only on the runtime-qualification slice (TML-2605) of `target-extensible-ir`, not on `control-policy`, so it can be built alongside them. `extension-supabase` consumes all four — and it **cannot ship without `explicit-namespace-dsl`**, because a Supabase app addresses tables in `auth.*` and `public.*` that collide by bare name (both schemas have a `users` table); without the namespace-aware query surface there is no way to reach `auth.users`, and everything collapses into a single namespace. That is the user-facing fudge the integration must not ship.
+The control-policy-dependent middle-tier projects (`cross-contract-refs`, `postgres-rls`, `runtime-target-layer`) could originally ship in any order once `target-extensible-ir` reached M5b and `control-policy` landed — but a dependency has since emerged: **`runtime-target-layer`'s proof depends on `postgres-rls`** (demonstrating below-middleware role binding requires RLS policies + roles to enforce against), so its end-to-end validation follows `postgres-rls` even though its code is independent. `explicit-namespace-dsl` runs on a parallel track: it depends only on the runtime-qualification slice (TML-2605) of `target-extensible-ir`, not on `control-policy`, so it can be built alongside them. `extension-supabase` consumes all four — and it **cannot ship without `explicit-namespace-dsl`**, because a Supabase app addresses tables in `auth.*` and `public.*` that collide by bare name (both schemas have a `users` table); without the namespace-aware query surface there is no way to reach `auth.users`, and everything collapses into a single namespace. That is the user-facing fudge the integration must not ship.
 
 ## Walking skeleton — the incremental example
 
 The integration is delivered against a **walking skeleton**: a single *runnable* example app, stood up early and grown one feature at a time, that serves as the continuous integration surface across all the independent lanes. Rather than building the canonical example as a big-bang at the end of `extension-supabase`, we stand it up at the start and make "wire your feature into the running example" a **definition-of-done clause on every constituent**. A seam mismatch between two projects then surfaces the day it's introduced, not at integration time.
 
 - **Location:** `examples/supabase` (top-level, alongside the other example apps — *not* under the package). The package itself stays at `packages/3-extensions/supabase/`.
-- **Stood up by:** `extension-supabase` **M1**, which only needs the already-landed foundation + `control-policy`. M1 ships `/pack` + `/contract` (hand-authored Supabase contract + typed handles); the skeleton runs on the stock `@prisma-next/postgres/runtime` factory. The Supabase `/runtime` subpath (`SupabaseRuntime`, `asUser`/`asAnon`/`asServiceRole`) is deferred to M2 — the skeleton does not need it to be runnable.
+- **Stood up by:** `extension-supabase` **M1**, which only needs the already-landed foundation + `control-policy`. M1 ships `/pack` + the **PSL-authored** Supabase contract (`defaultControl: 'external'`); the skeleton runs on the stock `@prisma-next/postgres/runtime` factory. **No `/contract` typed-handles subpath in M1** (re-cut 2026-06-05): it has no consumer in the skeleton, and cross-space model refs + roles are settled inside `cross-contract-refs` / `postgres-rls` — the hand-shipped `ModelHandle`/`RoleRef` export may not exist in its sketched form (see [C5](decisions.md)/[C13](decisions.md)). The Supabase `/runtime` subpath (`SupabaseRuntime`, `asUser`/`asAnon`/`asServiceRole`) is deferred to M2 — the skeleton does not need it to be runnable.
 - **Grows as each constituent lands:**
 
   | Constituent lands | The running example gains |
   |---|---|
-  | `extension-supabase` M1 | Loads the Supabase contract; `Profile` in `public`; basic query against `public.*` on the stock Postgres runtime. |
+  | `extension-supabase` M1 | Loads the Supabase contract and proves the **`external`** machinery end-to-end: migrates the composed contract against a DB seeded with the `auth.*`/`storage.*` tables, asserting the planner emits no DDL for them and the verifier confirms them present (not just a bare `public.*` query). |
   | `runtime-target-layer` | `/runtime` runs on a real `PostgresRuntime` (then `SupabaseRuntime` at M2). |
   | `cross-contract-refs` | `Profile.userId → auth.User.id` FK with cascade; planner emits qualified `REFERENCES "auth"."users"`. |
   | `postgres-rls` | `.rls([…])` / `policy {}` policies on `Profile`; verifier diffs `pg_policies`. Enforcement proven via manual `SET ROLE` until the runtime lands. |
@@ -83,16 +83,21 @@ This separation also answers "how do we test RLS before the runtime exists": **p
 
 ## Running order (current sequencing)
 
-The foundation + `control-policy` are done, so the remaining work is highly parallel. Capacity: Will runs ~2 concurrent lanes alongside [target-contributed-psl-blocks](../target-contributed-psl-blocks/spec.md) (TML-2537) in flight; Serhii owns `explicit-namespace-dsl`.
+The foundation, `control-policy`, `cross-contract-refs`, and the PSL-block substrate are all done, so the remaining work is highly parallel. Capacity: Will runs ~2 concurrent lanes (currently on `postgres-rls`); Serhii owns `explicit-namespace-dsl`.
 
-1. **Lane 1 — `extension-supabase` M1 + walking skeleton.** Stands up `examples/supabase` on the stock Postgres runtime and authors `bootstrapSupabaseShim`. Unblocked by the done foundation + control-policy alone.
-2. **Lane 2 — `cross-contract-refs`.** Chosen *before* `postgres-rls` despite RLS being the longer/riskier pole: within a single serial lane, order doesn't change total wall-clock, and cross-contract-refs is **fully unblocked end-to-end** whereas RLS's must-have PSL surface is gated on TML-2537 (step 3). Doing cross-contract-refs first lets TML-2537 finish in parallel, so `postgres-rls` can then run TS + PSL in one clean pass instead of stalling mid-project. It also lands the contract-aggregate/brand machinery the rest leans on, and delivers the headline `Profile → auth.User` FK early — validating the skeleton with something real before wading into the riskier RLS work.
-3. **In flight (Will) — [`target-contributed-psl-blocks`](../target-contributed-psl-blocks/spec.md) (TML-2537).** Not a constituent but on the critical path: it's the PSL-block extensibility substrate that lets the Postgres pack contribute the `policy {}` keyword, so it **gates `postgres-rls`'s PSL surface** (PSL authoring is must-have for launch). Landing it is the pivot that lets step 4 run as a single TS + PSL lane rather than stalling.
-4. **Then — `postgres-rls`** (TS + PSL in one pass) the moment TML-2537 (step 3) lands / a lane frees. **`runtime-target-layer`** is a cheap interleave (~50–100 LOC core) slotted whenever convenient; it's the substrate `SupabaseRuntime` extends in `extension-supabase` M2.
-5. **In parallel throughout — `explicit-namespace-dsl` (Serhii).** The launch blocker; depends only on the landed TML-2605.
-6. **Integration — `extension-supabase` M2→M4.** Role binding (`asUser`/`asAnon`/`asServiceRole`), the live-query RLS e2e, real-Supabase acceptance, close-out.
+**Done:**
 
-"Longest pole first" is the right call for *parallel* lanes, so `postgres-rls` should move onto its own lane as early as one frees — which coincides with TML-2537 (step 3) landing.
+- ✅ **`cross-contract-refs`.** Landed the contract-aggregate/brand machinery and the headline `Profile → auth.User` cross-contract FK. (Was deliberately sequenced before `postgres-rls`: fully unblocked end-to-end while RLS's PSL surface was still gated on the substrate below, and it lands machinery the rest leans on.)
+- ✅ **`target-contributed-psl-blocks` (TML-2537).** The PSL-block extensibility substrate that lets the Postgres pack contribute `policy_*` keywords. It was the pivot that unblocks `postgres-rls`'s PSL surface — now landed, so RLS can run TS + PSL in one pass.
+
+**Active / remaining:**
+
+1. **Lane — `postgres-rls`** (Will, in progress). Now fully unblocked (both its dependencies above landed), so it runs TS + PSL together. Its PSL grammar must align with the substrate's **per-operation keyword** shape (`policy_select` / `policy_insert` / …), not a single conditional `policy { operation = … }` block.
+2. **After `postgres-rls` — `runtime-target-layer`.** The code is small and mechanical (~50–100 LOC core: export `SqlRuntime`, add `PostgresRuntime`, add `withRawConnection`) and can be *written* anytime, but **proving it works depends on `postgres-rls`**: the payoff of below-middleware role binding is that a `SET LOCAL role` gates access, and demonstrating that needs real RLS policies + roles to enforce against. So its proof / DoD follows `postgres-rls`. It's the substrate `SupabaseRuntime` extends in `extension-supabase` M2.
+3. **In parallel throughout — `explicit-namespace-dsl` (Serhii).** The launch blocker; depends only on the landed TML-2605.
+4. **Lane 1 / integration — `extension-supabase`.** M1 + walking skeleton in progress ([TML-2834](https://linear.app/prisma-company/issue/TML-2834)); then M2→M4: role binding (`asUser`/`asAnon`/`asServiceRole`), the live-query RLS e2e, real-Supabase acceptance, close-out.
+
+With the substrate landed, `postgres-rls` already holds its own lane — the "longest pole" now simply runs to completion in parallel with Serhii's launch blocker and the `extension-supabase` skeleton.
 
 ## What's in the umbrella directory
 
@@ -125,7 +130,7 @@ The `decisions.md` log retains the canonical record of all decisions reached dur
 2. Read [`overview.md`](overview.md) for the end-to-end narrative — how the constituent projects compose into a Supabase-using Prisma Next app.
 3. Skim [`example/`](example/) — the design-artifact example app. It's intentionally not implementation-ready; it informed the design surface.
 4. Identify which constituent project is closest to your work. Read its `spec.md`. The spec is self-contained except for references back to `decisions.md` and to sibling specs.
-5. Read the corresponding `plan.md` for the milestone structure.
+5. Read the corresponding `plan.md` for the slice structure.
 6. [`deferred.md`](deferred.md) is short — worth skimming so you don't propose deferred work.
 
 ## Close-out

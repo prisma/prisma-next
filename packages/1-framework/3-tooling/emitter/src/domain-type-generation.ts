@@ -1,5 +1,6 @@
 import type {
   ContractField,
+  ContractManyToManyRelation,
   ContractModel,
   ContractValueObject,
   CrossReference,
@@ -147,6 +148,21 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
       const targetFields = on.targetFields.map((f) => serializeValue(f)).join(', ');
       parts.push(
         `readonly on: { readonly localFields: readonly [${localFields}]; readonly targetFields: readonly [${targetFields}] }`,
+      );
+    }
+
+    if (relObj['cardinality'] === 'N:M') {
+      const { through } = blindCast<
+        ContractManyToManyRelation,
+        'contract JSON schema-validated before serialization; cardinality N:M check above confirms the junction variant carries through'
+      >(relObj);
+      const table = serializeValue(through.table);
+      const namespaceId = serializeValue(through.namespaceId);
+      const parentColumns = through.parentColumns.map((c) => serializeValue(c)).join(', ');
+      const childColumns = through.childColumns.map((c) => serializeValue(c)).join(', ');
+      const targetColumns = through.targetColumns.map((c) => serializeValue(c)).join(', ');
+      parts.push(
+        `readonly through: { readonly table: ${table}; readonly namespaceId: ${namespaceId}; readonly parentColumns: readonly [${parentColumns}]; readonly childColumns: readonly [${childColumns}]; readonly targetColumns: readonly [${targetColumns}] }`,
       );
     }
 

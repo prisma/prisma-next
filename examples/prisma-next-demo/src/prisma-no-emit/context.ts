@@ -33,7 +33,7 @@ export const context = createExecutionContext({
 export const sql = sqlBuilder<typeof contract>({
   context,
   rawCodecInferer: { inferCodec: () => 'pg/text' },
-});
+}).public;
 
 export function createOrmClient(runtime: Runtime) {
   return orm({

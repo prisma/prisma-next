@@ -63,7 +63,7 @@ describe('telemetry POST /events', () => {
   }
 
   async function fetchRows() {
-    return db.orm.TelemetryEvent.all();
+    return db.orm.public.TelemetryEvent.all();
   }
 
   async function fetchSingleRow() {

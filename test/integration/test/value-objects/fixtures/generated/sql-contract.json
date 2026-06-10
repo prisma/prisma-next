@@ -2,163 +2,172 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:vo-sql-test-profile-hash",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "shop": {
       "model": "Shop",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
-  "storage": {
-    "storageHash": "sha256:vo-sql-test-storage-hash",
+  "domain": {
     "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
-        "entries": {
-          "table": {
-            "shop": {
-            "columns": {
+      "public": {
+        "models": {
+          "Shop": {
+            "fields": {
               "id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
                 "nullable": false,
-                "default": {
-                  "kind": "function",
-                  "expression": "autoincrement()"
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "location": {
+                "nullable": false,
+                "type": {
+                  "kind": "valueObject",
+                  "name": "Address"
                 }
               },
               "name": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "location": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": false
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
               },
               "notes": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": true
+                "nullable": true,
+                "type": {
+                  "kind": "valueObject",
+                  "name": "Address"
+                }
               }
             },
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": [],
-            "indexes": [],
-            "foreignKeys": []
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "location": {
+                  "column": "location"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "notes": {
+                  "column": "notes"
+                }
+              },
+              "namespaceId": "public",
+              "table": "shop"
+            }
+          }
+        },
+        "valueObjects": {
+          "Address": {
+            "fields": {
+              "city": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "street": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "zip": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
             }
           }
         }
       }
     }
   },
-  "execution": {
-    "executionHash": "sha256:vo-sql-test-execution-hash",
-    "mutations": {
-      "defaults": []
-    }
+  "storage": {
+    "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "table": {}
+        },
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema"
+      },
+      "public": {
+        "entries": {
+          "table": {
+            "shop": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "location": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "notes": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
+      }
+    },
+    "storageHash": "sha256:42bb55b36779510808a1d0fa1d97deace3348341de7dbca7a5a5ee8a4c021aba"
   },
   "capabilities": {
     "postgres": {
-      "defaults.autoincrement": true,
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
       "returning": true
     },
     "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
       "returning": true
     }
   },
   "extensionPacks": {},
   "meta": {},
-  "domain": {
-    "namespaces": {
-      "__unbound__": {
-        "models": {
-          "Shop": {
-            "fields": {
-              "id": {
-                "type": {
-                  "kind": "scalar",
-                  "codecId": "pg/int4@1"
-                },
-                "nullable": false
-              },
-              "name": {
-                "type": {
-                  "kind": "scalar",
-                  "codecId": "pg/text@1"
-                },
-                "nullable": false
-              },
-              "location": {
-                "type": {
-                  "kind": "valueObject",
-                  "name": "Location"
-                },
-                "nullable": false
-              },
-              "notes": {
-                "type": {
-                  "kind": "valueObject",
-                  "name": "Location"
-                },
-                "nullable": true
-              }
-            },
-            "relations": {},
-            "storage": {
-              "table": "shop",
-              "namespaceId": "__unbound__",
-              "fields": {
-                "id": {
-                  "column": "id"
-                },
-                "name": {
-                  "column": "name"
-                },
-                "location": {
-                  "column": "location"
-                },
-                "notes": {
-                  "column": "notes"
-                }
-              }
-            }
-          }
-        },
-        "valueObjects": {
-          "Location": {
-            "fields": {
-              "street": {
-                "type": {
-                  "kind": "scalar",
-                  "codecId": "pg/text@1"
-                },
-                "nullable": false
-              },
-              "city": {
-                "type": {
-                  "kind": "scalar",
-                  "codecId": "pg/text@1"
-                },
-                "nullable": false
-              },
-              "zip": {
-                "type": {
-                  "kind": "scalar",
-                  "codecId": "pg/text@1"
-                },
-                "nullable": false
-              }
-            }
-          }
-        }
-      }
-    }
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
   }
 }

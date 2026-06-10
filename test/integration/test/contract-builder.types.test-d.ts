@@ -90,7 +90,7 @@ test('ResultType inference works identically to fixture contract', () => {
   const context = createTestContext(validatedBuilderContract, adapter);
 
   const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-  const _plan = db.user.select('id', 'email', 'createdAt').build();
+  const _plan = db.public.user.select('id', 'email', 'createdAt').build();
 
   type BuilderRow = ResultType<typeof _plan>;
 
@@ -102,7 +102,7 @@ test('ResultType inference works identically to fixture contract', () => {
     context: fixtureContext,
     rawCodecInferer: { inferCodec: () => 'pg/text' },
   });
-  const _fixturePlan = fixtureDb['user']!.select('id', 'email', 'createdAt').build();
+  const _fixturePlan = fixtureDb.public['user']!.select('id', 'email', 'createdAt').build();
 
   type FixtureRow = ResultType<typeof _fixturePlan>;
 
@@ -400,7 +400,7 @@ test('codec type inference via type option', () => {
   const context = createTestContext(validated, createStubAdapter());
 
   const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-  const _plan = db.user.select('id', 'email', 'createdAt').build();
+  const _plan = db.public.user.select('id', 'email', 'createdAt').build();
 
   type Row = ResultType<typeof _plan>;
 
@@ -469,7 +469,7 @@ test('arktypeJson and jsonbColumn currently resolve to never in no-emit type pat
   });
 
   const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-  const _plan = db.event.select('payload', 'meta').build();
+  const _plan = db.public.event.select('payload', 'meta').build();
 
   type Row = ResultType<typeof _plan>;
 
@@ -566,27 +566,27 @@ const enumDb = sql({
 });
 
 test('read: non-null text enum is exactly the value union (no | null)', () => {
-  const plan = enumDb.account.select('role').build();
+  const plan = enumDb.public.account.select('role').build();
   type Row = ResultType<typeof plan>;
   expectTypeOf<Row['role']>().toEqualTypeOf<'user' | 'admin'>();
   expectTypeOf<Row['role']>().not.toEqualTypeOf<string>();
 });
 
 test('read: nullable text enum is value union | null', () => {
-  const plan = enumDb.account.select('status').build();
+  const plan = enumDb.public.account.select('status').build();
   type Row = ResultType<typeof plan>;
   expectTypeOf<Row['status']>().toEqualTypeOf<'active' | 'inactive' | null>();
 });
 
 test('read: non-null int-backed enum narrows to its int value union (not number)', () => {
-  const plan = enumDb.account.select('priority').build();
+  const plan = enumDb.public.account.select('priority').build();
   type Row = ResultType<typeof plan>;
   expectTypeOf<Row['priority']>().toEqualTypeOf<1 | 10>();
   expectTypeOf<Row['priority']>().not.toEqualTypeOf<number>();
 });
 
 test('read: non-enum fields keep their codec output, unchanged from main', () => {
-  const plan = enumDb.account.select('id', 'email', 'createdAt').build();
+  const plan = enumDb.public.account.select('id', 'email', 'createdAt').build();
   type Row = ResultType<typeof plan>;
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
@@ -594,15 +594,19 @@ test('read: non-enum fields keep their codec output, unchanged from main', () =>
 });
 
 test('write: enum insert accepts the value union and rejects out-of-union literals', () => {
-  enumDb.account.insert([{ id: 1, email: 'a@b.c', role: 'user', priority: 1 }]);
-  enumDb.account.insert([{ id: 2, email: 'a@b.c', role: 'admin', status: 'active', priority: 10 }]);
-  enumDb.account.insert([{ id: 3, email: 'a@b.c', role: 'user', status: null, priority: 10 }]);
+  enumDb.public.account.insert([{ id: 1, email: 'a@b.c', role: 'user', priority: 1 }]);
+  enumDb.public.account.insert([
+    { id: 2, email: 'a@b.c', role: 'admin', status: 'active', priority: 10 },
+  ]);
+  enumDb.public.account.insert([
+    { id: 3, email: 'a@b.c', role: 'user', status: null, priority: 10 },
+  ]);
 
-  enumDb.account.insert([
+  enumDb.public.account.insert([
     // @ts-expect-error 'nope' is not a Role member value.
     { id: 4, email: 'a@b.c', role: 'nope', priority: 1 },
   ]);
-  enumDb.account.insert([
+  enumDb.public.account.insert([
     // @ts-expect-error 99 is not a PriorityInt member value.
     { id: 5, email: 'a@b.c', role: 'user', priority: 99 },
   ]);

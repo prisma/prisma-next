@@ -48,6 +48,7 @@ describe('query plan mutations', () => {
     const contract = withReturningCapability(getTestContract());
     const plan = compileInsertReturning(
       contract,
+      'public',
       'users',
       [
         { id: 10, name: 'Alice', email: 'alice@example.com' },
@@ -91,7 +92,7 @@ describe('query plan mutations', () => {
 
   it('compileInsertCount() keeps explicit empty rows for all-default batch inserts', () => {
     const contract = getTestContract();
-    const plan = compileInsertCount(contract, 'users', [{}, {}]);
+    const plan = compileInsertCount(contract, 'public', 'users', [{}, {}]);
 
     assertInsertAst(plan.ast);
     expect(plan.params).toEqual([]);
@@ -102,6 +103,7 @@ describe('query plan mutations', () => {
     const contract = withReturningCapability(getTestContract());
     const plan = compileUpsertReturning(
       contract,
+      'public',
       'users',
       { id: 10, name: 'Alice', email: 'alice@example.com' },
       {},
@@ -120,7 +122,7 @@ describe('query plan mutations', () => {
   it('compileInsertReturning() rejects empty rows array', () => {
     const contract = withReturningCapability(getTestContract());
 
-    expect(() => compileInsertReturning(contract, 'users', [], undefined)).toThrow(
+    expect(() => compileInsertReturning(contract, 'public', 'users', [], undefined)).toThrow(
       'at least one row',
     );
   });
@@ -128,13 +130,14 @@ describe('query plan mutations', () => {
   it('compileInsertCount() rejects empty rows array', () => {
     const contract = getTestContract();
 
-    expect(() => compileInsertCount(contract, 'users', [])).toThrow('at least one row');
+    expect(() => compileInsertCount(contract, 'public', 'users', [])).toThrow('at least one row');
   });
 
   it('compileUpsertReturning() produces DoUpdateSetConflictAction with correct params when update is non-empty', () => {
     const contract = withReturningCapability(getTestContract());
     const plan = compileUpsertReturning(
       contract,
+      'public',
       'users',
       { id: 10, name: 'Alice', email: 'alice@example.com' },
       { name: 'Updated Alice' },
@@ -156,6 +159,7 @@ describe('query plan mutations', () => {
       const contract = withReturningCapability(getTestContract());
       const plans = compileInsertReturningSplit(
         contract,
+        'public',
         'users',
         [
           { id: 1, name: 'Alice', email: 'a@a.com' },
@@ -172,6 +176,7 @@ describe('query plan mutations', () => {
       const contract = withReturningCapability(getTestContract());
       const plans = compileInsertReturningSplit(
         contract,
+        'public',
         'users',
         [
           { id: 1, name: 'Alice', email: 'a@a.com' },
@@ -190,6 +195,7 @@ describe('query plan mutations', () => {
       const contract = withReturningCapability(getTestContract());
       const plans = compileInsertReturningSplit(
         contract,
+        'public',
         'users',
         [
           { id: 1, name: 'Alice', email: 'a@a.com' },
@@ -205,6 +211,7 @@ describe('query plan mutations', () => {
       const contract = withReturningCapability(getTestContract());
       const plans = compileInsertReturningSplit(
         contract,
+        'public',
         'users',
         [
           { id: 1, name: 'Alice', email: 'a@a.com' },
@@ -225,6 +232,7 @@ describe('query plan mutations', () => {
       const contract = withReturningCapability(getTestContract());
       const plans = compileInsertReturningSplit(
         contract,
+        'public',
         'users',
         [
           { id: 1, name: 'Alice', email: 'a@a.com', invited_by_id: undefined },
@@ -241,6 +249,7 @@ describe('query plan mutations', () => {
       const contract = withReturningCapability(getTestContract());
       const plans = compileInsertReturningSplit(
         contract,
+        'public',
         'users',
         [{ id: 1, name: 'Alice', email: 'a@a.com' }],
         undefined,
@@ -254,7 +263,7 @@ describe('query plan mutations', () => {
   describe('compileInsertCountSplit()', () => {
     it('produces a single plan when all rows have the same columns', () => {
       const contract = getTestContract();
-      const plans = compileInsertCountSplit(contract, 'users', [
+      const plans = compileInsertCountSplit(contract, 'public', 'users', [
         { id: 1, name: 'Alice', email: 'a@a.com' },
         { id: 2, name: 'Bob', email: 'b@b.com' },
       ]);
@@ -263,7 +272,7 @@ describe('query plan mutations', () => {
 
     it('splits rows with different column sets', () => {
       const contract = getTestContract();
-      const plans = compileInsertCountSplit(contract, 'users', [
+      const plans = compileInsertCountSplit(contract, 'public', 'users', [
         { id: 1, name: 'Alice', email: 'a@a.com' },
         { id: 2, name: 'Bob', email: 'b@b.com', invited_by_id: 1 },
       ]);
@@ -272,7 +281,7 @@ describe('query plan mutations', () => {
 
     it('preserves input order over minimizing group count', () => {
       const contract = getTestContract();
-      const plans = compileInsertCountSplit(contract, 'users', [
+      const plans = compileInsertCountSplit(contract, 'public', 'users', [
         { id: 1, name: 'A', email: 'a@a.com' },
         { id: 2, name: 'B', email: 'b@b.com', invited_by_id: 1 },
         { id: 3, name: 'C', email: 'c@c.com' },
@@ -284,12 +293,12 @@ describe('query plan mutations', () => {
   it('compileUpdateCount() and compileDeleteCount() omit WHERE when filters are empty', () => {
     const contract = getTestContract();
 
-    const updatePlan = compileUpdateCount(contract, 'users', { name: 'Alice' }, []);
+    const updatePlan = compileUpdateCount(contract, 'public', 'users', { name: 'Alice' }, []);
     expect(updatePlan.ast.kind).toBe('update');
     expect((updatePlan.ast as UpdateAst).where).toBeUndefined();
     expect(updatePlan.params).toEqual(['Alice']);
 
-    const deletePlan = compileDeleteCount(contract, 'users', []);
+    const deletePlan = compileDeleteCount(contract, 'public', 'users', []);
     expect(deletePlan.ast.kind).toBe('delete');
     expect((deletePlan.ast as DeleteAst).where).toBeUndefined();
     expect(deletePlan.params).toEqual([]);
@@ -298,14 +307,16 @@ describe('query plan mutations', () => {
   describe('split helpers reject empty rows', () => {
     it('compileInsertReturningSplit() rejects an empty rows array', () => {
       const contract = withReturningCapability(getTestContract());
-      expect(() => compileInsertReturningSplit(contract, 'users', [], undefined)).toThrowError(
-        /at least one row/,
-      );
+      expect(() =>
+        compileInsertReturningSplit(contract, 'public', 'users', [], undefined),
+      ).toThrowError(/at least one row/);
     });
 
     it('compileInsertCountSplit() rejects an empty rows array', () => {
       const contract = getTestContract();
-      expect(() => compileInsertCountSplit(contract, 'users', [])).toThrowError(/at least one row/);
+      expect(() => compileInsertCountSplit(contract, 'public', 'users', [])).toThrowError(
+        /at least one row/,
+      );
     });
   });
 
@@ -324,6 +335,7 @@ describe('query plan mutations', () => {
       const contract = withReturningCapability(getTestContract());
       const plan = compileUpdateReturning(
         contract,
+        'public',
         'users',
         { name: 'Alice' },
         [eqOnUserId(7)],
@@ -336,18 +348,26 @@ describe('query plan mutations', () => {
 
     it('compileUpdateCount() preserves WHERE when filters are present', () => {
       const contract = getTestContract();
-      const plan = compileUpdateCount(contract, 'users', { name: 'Bob' }, [eqOnUserId(9)]);
+      const plan = compileUpdateCount(contract, 'public', 'users', { name: 'Bob' }, [
+        eqOnUserId(9),
+      ]);
       expect((plan.ast as UpdateAst).where).toBeDefined();
       expect(plan.params).toEqual(['Bob', 9]);
     });
 
     it('compileDeleteReturning() preserves WHERE when filters are present and omits when empty', () => {
       const contract = withReturningCapability(getTestContract());
-      const planWithWhere = compileDeleteReturning(contract, 'users', [eqOnUserId(3)], undefined);
+      const planWithWhere = compileDeleteReturning(
+        contract,
+        'public',
+        'users',
+        [eqOnUserId(3)],
+        undefined,
+      );
       expect((planWithWhere.ast as DeleteAst).where).toBeDefined();
       expect(planWithWhere.params).toEqual([3]);
 
-      const planNoWhere = compileDeleteReturning(contract, 'users', [], undefined);
+      const planNoWhere = compileDeleteReturning(contract, 'public', 'users', [], undefined);
       expect((planNoWhere.ast as DeleteAst).where).toBeUndefined();
       expect(planNoWhere.params).toEqual([]);
     });
@@ -356,29 +376,29 @@ describe('query plan mutations', () => {
   describe('table/column resolution errors', () => {
     it('compileUpdateCount() rejects an unknown table', () => {
       const contract = getTestContract();
-      expect(() => compileUpdateCount(contract, 'missing_table', { name: 'X' }, [])).toThrowError(
-        /Unknown table "missing_table"/,
-      );
+      expect(() =>
+        compileUpdateCount(contract, 'public', 'missing_table', { name: 'X' }, []),
+      ).toThrowError(/Unknown table "missing_table"/);
     });
 
     it('compileUpdateCount() rejects an unknown column for the table', () => {
       const contract = getTestContract();
       expect(() =>
-        compileUpdateCount(contract, 'users', { not_a_real_column: 'X' }, []),
+        compileUpdateCount(contract, 'public', 'users', { not_a_real_column: 'X' }, []),
       ).toThrowError(/Unknown column "not_a_real_column" in table "users"/);
     });
 
     it('compileInsertCount() rejects an unknown table', () => {
       const contract = getTestContract();
-      expect(() => compileInsertCount(contract, 'missing_table', [{ id: 1 }])).toThrowError(
-        /Unknown table "missing_table"/,
-      );
+      expect(() =>
+        compileInsertCount(contract, 'public', 'missing_table', [{ id: 1 }]),
+      ).toThrowError(/Unknown table "missing_table"/);
     });
 
     it('compileInsertCount() rejects an unknown column on an insert row', () => {
       const contract = getTestContract();
       expect(() =>
-        compileInsertCount(contract, 'users', [{ id: 1, not_a_real_column: 'X' }]),
+        compileInsertCount(contract, 'public', 'users', [{ id: 1, not_a_real_column: 'X' }]),
       ).toThrowError(/Unknown column "not_a_real_column" in table "users"/);
     });
   });

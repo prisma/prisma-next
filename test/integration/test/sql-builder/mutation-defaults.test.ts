@@ -9,7 +9,7 @@ describe('integration: mutation defaults', { timeout: timeouts.databaseOperation
     const row = await runtime()
       .execute(
         db()
-          .articles.insert([{ title: 'Hello' }])
+          .public.articles.insert([{ title: 'Hello' }])
           .returning('id', 'title')
           .build(),
       )
@@ -26,7 +26,7 @@ describe('integration: mutation defaults', { timeout: timeouts.databaseOperation
     const row = await runtime()
       .execute(
         db()
-          .articles.insert([{ id: explicitId, title: 'Explicit' }])
+          .public.articles.insert([{ id: explicitId, title: 'Explicit' }])
           .returning('id', 'title')
           .build(),
       )

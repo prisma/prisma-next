@@ -7,7 +7,7 @@ describe('integration: ilike (adapter operation)', { timeout: timeouts.databaseO
   it('ilike filters case-insensitively in WHERE', async () => {
     const rows = await runtime().execute(
       db()
-        .users.select('id', 'name')
+        .public.users.select('id', 'name')
         .where((f, fns) => fns.ilike(f.name, '%alice%'))
         .build(),
     );
@@ -18,7 +18,7 @@ describe('integration: ilike (adapter operation)', { timeout: timeouts.databaseO
   it('ilike returns no rows when pattern does not match', async () => {
     const rows = await runtime().execute(
       db()
-        .users.select('id')
+        .public.users.select('id')
         .where((f, fns) => fns.ilike(f.name, '%zzz%'))
         .build(),
     );
@@ -33,7 +33,7 @@ describe('integration: extension functions', { timeout: timeouts.databaseOperati
     const row = await runtime()
       .execute(
         db()
-          .posts.select('id')
+          .public.posts.select('id')
           .select('distance', (f, fns) => fns.cosineDistance(f.embedding, [1, 0, 0]))
           .where((f, fns) => fns.eq(f.id, 1))
           .build(),
@@ -48,7 +48,7 @@ describe('integration: extension functions', { timeout: timeouts.databaseOperati
     // post 3 has embedding [0,0,1] → distance to [1,0,0] is ~1 (orthogonal)
     const rows = await runtime().execute(
       db()
-        .posts.select('id')
+        .public.posts.select('id')
         .where((f, fns) => fns.lt(fns.cosineDistance(f.embedding, [1, 0, 0]), 0.5))
         .build(),
     );
@@ -60,7 +60,7 @@ describe('integration: extension functions', { timeout: timeouts.databaseOperati
     const row = await runtime()
       .execute(
         db()
-          .posts.select('id')
+          .public.posts.select('id')
           .select('similarity', (f, fns) => fns.cosineSimilarity(f.embedding, [1, 0, 0]))
           .where((f, fns) => fns.eq(f.id, 1))
           .build(),
@@ -75,7 +75,7 @@ describe('integration: extension functions', { timeout: timeouts.databaseOperati
     // post 3 has embedding [0,0,1] → similarity to [1,0,0] is ~0 (orthogonal)
     const rows = await runtime().execute(
       db()
-        .posts.select('id')
+        .public.posts.select('id')
         .where((f, fns) => fns.gt(fns.cosineSimilarity(f.embedding, [1, 0, 0]), 0.5))
         .build(),
     );

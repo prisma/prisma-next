@@ -3,7 +3,7 @@ import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('orderBy with select alias', () => {
-  const ordered = db.users
+  const ordered = db.public.users
     .select('authorName', (f) => f.name)
     .orderBy('authorName', { direction: 'desc', nulls: 'last' })
     .build();
@@ -12,7 +12,7 @@ test('orderBy with select alias', () => {
 });
 
 test('orderBy with expression referencing alias', () => {
-  const orderedExpr = db.users
+  const orderedExpr = db.public.users
     .select('authorName', (f) => f.name)
     .orderBy((f) => f.authorName, { direction: 'asc' })
     .build();
@@ -21,7 +21,7 @@ test('orderBy with expression referencing alias', () => {
 });
 
 test('orderBy with scope field not in select', () => {
-  const orderedScope = db.users.select('name').orderBy('id').build();
+  const orderedScope = db.public.users.select('name').orderBy('id').build();
 
   expectTypeOf(orderedScope).toEqualTypeOf<SqlQueryPlan<{ name: string }>>();
 });

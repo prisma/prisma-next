@@ -111,7 +111,7 @@ test('sql-builder: column output types for enum fields come from FieldOutputType
 test('sql-builder insert: non-nullable enum field rejects out-of-union literal', () => {
   const db = null as unknown as EnumDb;
 
-  db.User.insert([
+  db.__unbound__.User.insert([
     {
       // @ts-expect-error 'nope' is not in the 'user' | 'admin' union
       role: 'nope',
@@ -122,8 +122,8 @@ test('sql-builder insert: non-nullable enum field rejects out-of-union literal',
 test('sql-builder insert: in-union literal is accepted', () => {
   const db = null as unknown as EnumDb;
 
-  db.User.insert([{ role: 'user' }]);
-  db.User.insert([{ role: 'admin' }]);
-  db.User.insert([{ role: 'user', status: 'active' }]);
-  db.User.insert([{ role: 'user', status: null }]);
+  db.__unbound__.User.insert([{ role: 'user' }]);
+  db.__unbound__.User.insert([{ role: 'admin' }]);
+  db.__unbound__.User.insert([{ role: 'user', status: 'active' }]);
+  db.__unbound__.User.insert([{ role: 'user', status: null }]);
 });

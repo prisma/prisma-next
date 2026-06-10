@@ -5,6 +5,7 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
@@ -115,7 +116,7 @@ function expandParameterizedTypeSql(
   column: Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): string | null {
-  if (!column.typeParams) {
+  if (!column.typeParams || Object.keys(column.typeParams).length === 0) {
     return null;
   }
 
@@ -141,7 +142,7 @@ function expandParameterizedTypeSql(
   const expanded = hooks.expandNativeType({
     nativeType: column.nativeType,
     codecId: column.codecId,
-    typeParams: column.typeParams,
+    ...ifDefined('typeParams', column.typeParams),
   });
 
   return expanded !== column.nativeType ? expanded : null;

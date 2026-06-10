@@ -4,7 +4,7 @@ import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('extension function in select expression', () => {
-  const withDistance = db.posts
+  const withDistance = db.public.posts
     .select('id')
     .select('distance', (f, fns) => fns.cosineDistance(f.embedding, f.embedding))
     .build();
@@ -13,7 +13,7 @@ test('extension function in select expression', () => {
 });
 
 test('extension function in orderBy', () => {
-  const ordered = db.posts
+  const ordered = db.public.posts
     .select('id', 'title')
     .orderBy((f, fns) => fns.cosineDistance(f.embedding, [1, 2, 3]))
     .build();
@@ -22,7 +22,7 @@ test('extension function in orderBy', () => {
 });
 
 test('extension function composed with builtins in where', () => {
-  const filtered = db.posts
+  const filtered = db.public.posts
     .select('id', 'title')
     .where((f, fns) => fns.lt(fns.cosineDistance(f.embedding, [1, 2, 3]), 0.5))
     .build();
@@ -31,7 +31,7 @@ test('extension function composed with builtins in where', () => {
 });
 
 test('ilike filters text fields in where', () => {
-  const filtered = db.users
+  const filtered = db.public.users
     .select('id', 'name')
     .where((f, fns) => fns.ilike(f.name, '%alice%'))
     .build();
@@ -40,7 +40,7 @@ test('ilike filters text fields in where', () => {
 });
 
 test('ilike returns boolean expression', () => {
-  db.users.select('id').where((f, fns) => {
+  db.public.users.select('id').where((f, fns) => {
     const result = fns.ilike(f.name, '%test%');
     expectTypeOf(result).toExtend<Expression<BooleanCodecType>>();
     return result;

@@ -7,5 +7,5 @@ import { db } from '../prisma/db';
  * SQL: WHERE ST_Within(location, $boundary)
  */
 export function findCafesInNeighborhood(boundary: Geometry) {
-  return db.orm.Cafe.where((c) => c.location.within(boundary)).all();
+  return db.orm.public.Cafe.where((c) => c.location.within(boundary)).all();
 }

@@ -39,13 +39,13 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
     runtime = await db.connect({ url: TEST_DATABASE_URL });
 
     for (const cafe of cafes) {
-      await runtime.execute(db.sql.cafe.insert([cafe]).build());
+      await runtime.execute(db.sql.public.cafe.insert([cafe]).build());
     }
     for (const hood of neighborhoods) {
-      await runtime.execute(db.sql.neighborhood.insert([hood]).build());
+      await runtime.execute(db.sql.public.neighborhood.insert([hood]).build());
     }
     for (const route of routes) {
-      await runtime.execute(db.sql.route.insert([route]).build());
+      await runtime.execute(db.sql.public.route.insert([route]).build());
     }
   }, timeouts.spinUpPpgDev);
 
@@ -54,7 +54,9 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
   });
 
   it('seed data round-trips Point/LineString/Polygon geometry intact', async () => {
-    const cafeRows = await runtime.execute(db.sql.cafe.select('id', 'name', 'location').build());
+    const cafeRows = await runtime.execute(
+      db.sql.public.cafe.select('id', 'name', 'location').build(),
+    );
     expect(cafeRows).toHaveLength(cafes.length);
     const sightglass = cafeRows.find((r) => r.id === SIGHTGLASS.id);
     expect(sightglass?.location).toEqual({
@@ -64,13 +66,15 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
     });
 
     const hoodRows = await runtime.execute(
-      db.sql.neighborhood.select('id', 'name', 'boundary').build(),
+      db.sql.public.neighborhood.select('id', 'name', 'boundary').build(),
     );
     const soma = hoodRows.find((r) => r.id === SOMA.id);
     expect(soma?.boundary.type).toBe('Polygon');
     expect(soma?.boundary.srid).toBe(4326);
 
-    const routeRows = await runtime.execute(db.sql.route.select('id', 'name', 'path').build());
+    const routeRows = await runtime.execute(
+      db.sql.public.route.select('id', 'name', 'path').build(),
+    );
     const market = routeRows.find((r) => r.name === 'Market Street stroll');
     expect(market?.path.type).toBe('LineString');
     expect(market?.path.coordinates).toEqual([

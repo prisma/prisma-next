@@ -120,7 +120,9 @@ type UserCreateInput = CreateInput<EnumContract, 'User'>;
 test('ORM write input: non-nullable enum field rejects out-of-union literal', () => {
   const runtime = createMockRuntime();
   const context = {} as unknown as ExecutionContext<EnumContract>;
-  const collection = new Collection<EnumContract, 'User'>({ runtime, context }, 'User');
+  const collection = new Collection<EnumContract, 'User'>({ runtime, context }, 'User', {
+    namespaceId: '__unbound__',
+  });
 
   // @ts-expect-error 'nope' is not in the 'user' | 'admin' union
   collection.create({

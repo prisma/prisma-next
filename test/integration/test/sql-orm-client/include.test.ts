@@ -58,7 +58,7 @@ function createUsersCollectionWithCapabilities(
   } as typeof base;
 
   const context = { ...getTestContext(), contract };
-  return new Collection({ runtime, context }, 'User');
+  return new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
 }
 
 type NumericPostField = import('@prisma-next/sql-orm-client').NumericFieldNames<

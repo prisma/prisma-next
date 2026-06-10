@@ -20,25 +20,27 @@ import { combineWhereExprs } from './where-utils';
 
 function buildReturningColumns(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   returningColumns: readonly string[] | undefined,
 ): ReadonlyArray<ProjectionItem> {
   const columns =
     returningColumns && returningColumns.length > 0
       ? [...returningColumns]
-      : resolveTableColumns(contract, tableName);
+      : resolveTableColumns(contract, namespaceId, tableName);
 
   return columns.map((column) =>
     ProjectionItem.of(
       column,
       ColumnRef.of(tableName, column),
-      codecRefForStorageColumn(contract.storage, tableName, column),
+      codecRefForStorageColumn(contract.storage, namespaceId, tableName, column),
     ),
   );
 }
 
 function toParamAssignments(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   values: Record<string, unknown>,
 ): {
@@ -46,13 +48,13 @@ function toParamAssignments(
 } {
   const assignments: Record<string, ParamRef> = {};
 
-  const table = storageTableForContract(contract, tableName);
+  const table = storageTableForContract(contract, namespaceId, tableName);
 
   for (const [column, value] of Object.entries(values)) {
     if (!table.columns[column]) {
       throw new Error(`Unknown column "${column}" in table "${tableName}"`);
     }
-    const codec = codecRefForStorageColumn(contract.storage, tableName, column);
+    const codec = codecRefForStorageColumn(contract.storage, namespaceId, tableName, column);
     assignments[column] = ParamRef.of(value, {
       name: column,
       ...ifDefined('codec', codec),
@@ -64,6 +66,7 @@ function toParamAssignments(
 
 function normalizeInsertRows(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): {
@@ -86,7 +89,7 @@ function normalizeInsertRows(
     }
   }
 
-  const table = storageTableForContract(contract, tableName);
+  const table = storageTableForContract(contract, namespaceId, tableName);
 
   const normalizedRows = rows.map((row) => {
     if (orderedColumns.length === 0) {
@@ -99,7 +102,7 @@ function normalizeInsertRows(
         if (!table.columns[column]) {
           throw new Error(`Unknown column "${column}" in table "${tableName}"`);
         }
-        const codec = codecRefForStorageColumn(contract.storage, tableName, column);
+        const codec = codecRefForStorageColumn(contract.storage, namespaceId, tableName, column);
         normalizedRow[column] = ParamRef.of(row[column], {
           name: column,
           ...ifDefined('codec', codec),
@@ -116,25 +119,29 @@ function normalizeInsertRows(
 
 export function compileInsertReturning(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   rows: readonly Record<string, unknown>[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
-  const ast = InsertAst.into(tableSourceForContract(contract, tableName))
+  const { rows: normalizedRows } = normalizeInsertRows(contract, namespaceId, tableName, rows);
+  const ast = InsertAst.into(tableSourceForContract(contract, namespaceId, tableName))
     .withRows(normalizedRows)
-    .withReturning(buildReturningColumns(contract, tableName, returningColumns));
+    .withReturning(buildReturningColumns(contract, namespaceId, tableName, returningColumns));
   const { params } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params);
 }
 
 export function compileInsertCount(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): SqlQueryPlan<Record<string, unknown>> {
-  const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
-  const ast = InsertAst.into(tableSourceForContract(contract, tableName)).withRows(normalizedRows);
+  const { rows: normalizedRows } = normalizeInsertRows(contract, namespaceId, tableName, rows);
+  const ast = InsertAst.into(tableSourceForContract(contract, namespaceId, tableName)).withRows(
+    normalizedRows,
+  );
   const { params } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params);
 }
@@ -179,6 +186,7 @@ function groupRowsByColumnSignature(
 
 export function compileInsertReturningSplit(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   rows: readonly Record<string, unknown>[],
   returningColumns: readonly string[] | undefined,
@@ -187,12 +195,13 @@ export function compileInsertReturningSplit(
     throw new Error('create() requires at least one row');
   }
   return groupRowsByColumnSignature(rows).map((group) =>
-    compileInsertReturning(contract, tableName, group, returningColumns),
+    compileInsertReturning(contract, namespaceId, tableName, group, returningColumns),
   );
 }
 
 export function compileInsertCountSplit(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   rows: readonly Record<string, unknown>[],
 ): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
@@ -200,22 +209,23 @@ export function compileInsertCountSplit(
     throw new Error('createCount() requires at least one row');
   }
   return groupRowsByColumnSignature(rows).map((group) =>
-    compileInsertCount(contract, tableName, group),
+    compileInsertCount(contract, namespaceId, tableName, group),
   );
 }
 
 export function compileUpsertReturning(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   createValues: Record<string, unknown>,
   updateValues: Record<string, unknown>,
   conflictColumns: readonly string[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const createAssignments = toParamAssignments(contract, tableName, createValues);
+  const createAssignments = toParamAssignments(contract, namespaceId, tableName, createValues);
   const hasUpdateValues = Object.keys(updateValues).length > 0;
   const updateAssignments = hasUpdateValues
-    ? toParamAssignments(contract, tableName, updateValues)
+    ? toParamAssignments(contract, namespaceId, tableName, updateValues)
     : undefined;
   const onConflict = updateAssignments
     ? InsertOnConflict.on(
@@ -225,10 +235,10 @@ export function compileUpsertReturning(
         conflictColumns.map((column) => ColumnRef.of(tableName, column)),
       ).doNothing();
 
-  const ast = InsertAst.into(tableSourceForContract(contract, tableName))
+  const ast = InsertAst.into(tableSourceForContract(contract, namespaceId, tableName))
     .withRows([createAssignments.assignments])
     .withOnConflict(onConflict)
-    .withReturning(buildReturningColumns(contract, tableName, returningColumns));
+    .withReturning(buildReturningColumns(contract, namespaceId, tableName, returningColumns));
 
   const { params } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params);
@@ -236,16 +246,17 @@ export function compileUpsertReturning(
 
 export function compileUpdateReturning(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   setValues: Record<string, unknown>,
   filters: readonly AnyExpression[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
-  const { assignments } = toParamAssignments(contract, tableName, setValues);
-  let ast = UpdateAst.table(tableSourceForContract(contract, tableName))
+  const { assignments } = toParamAssignments(contract, namespaceId, tableName, setValues);
+  let ast = UpdateAst.table(tableSourceForContract(contract, namespaceId, tableName))
     .withSet(assignments)
-    .withReturning(buildReturningColumns(contract, tableName, returningColumns));
+    .withReturning(buildReturningColumns(contract, namespaceId, tableName, returningColumns));
   if (where) {
     ast = ast.withWhere(where);
   }
@@ -255,13 +266,16 @@ export function compileUpdateReturning(
 
 export function compileUpdateCount(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   setValues: Record<string, unknown>,
   filters: readonly AnyExpression[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
-  const { assignments } = toParamAssignments(contract, tableName, setValues);
-  let ast = UpdateAst.table(tableSourceForContract(contract, tableName)).withSet(assignments);
+  const { assignments } = toParamAssignments(contract, namespaceId, tableName, setValues);
+  let ast = UpdateAst.table(tableSourceForContract(contract, namespaceId, tableName)).withSet(
+    assignments,
+  );
   if (where) {
     ast = ast.withWhere(where);
   }
@@ -271,13 +285,14 @@ export function compileUpdateCount(
 
 export function compileDeleteReturning(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   filters: readonly AnyExpression[],
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
-  let ast = DeleteAst.from(tableSourceForContract(contract, tableName)).withReturning(
-    buildReturningColumns(contract, tableName, returningColumns),
+  let ast = DeleteAst.from(tableSourceForContract(contract, namespaceId, tableName)).withReturning(
+    buildReturningColumns(contract, namespaceId, tableName, returningColumns),
   );
   if (where) {
     ast = ast.withWhere(where);
@@ -288,11 +303,12 @@ export function compileDeleteReturning(
 
 export function compileDeleteCount(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   filters: readonly AnyExpression[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
-  let ast = DeleteAst.from(tableSourceForContract(contract, tableName));
+  let ast = DeleteAst.from(tableSourceForContract(contract, namespaceId, tableName));
   if (where) {
     ast = ast.withWhere(where);
   }

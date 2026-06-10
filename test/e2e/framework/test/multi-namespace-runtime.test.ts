@@ -204,14 +204,14 @@ describe('multi-namespace runtime', () => {
             [10, 'hello', 1],
           );
 
-          const userSelect = db['user']!.select('id', 'name').build();
+          const userSelect = db['auth']!['user']!.select('id', 'name').build();
           const userSql = adapter.lower(userSelect.ast, {
             contract,
             params: userSelect.params,
           }).sql;
           expect(userSql).toContain('FROM "auth"."user"');
 
-          const noteSelect = db['note']!.select('id', 'body').build();
+          const noteSelect = db['public']!['note']!.select('id', 'body').build();
           const noteSql = adapter.lower(noteSelect.ast, {
             contract,
             params: noteSelect.params,

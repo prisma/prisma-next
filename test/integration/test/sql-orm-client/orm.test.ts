@@ -45,7 +45,7 @@ describe('integration/orm', () => {
           { id: 12, title: 'Published B', userId: 2, views: 300 },
         ]);
 
-        const rows = await db.User.orderBy((user) => user.id.asc())
+        const rows = await db.public.User.orderBy((user) => user.id.asc())
           .include('posts', (posts) => {
             expectPostCollection(posts);
             return posts.published().orderBy((post) => post.id.asc());
@@ -100,7 +100,7 @@ describe('integration/orm', () => {
           { id: 102, body: 'approved', postId: 12 },
         ]);
 
-        const rows = await db.User.orderBy((user) => user.id.asc())
+        const rows = await db.public.User.orderBy((user) => user.id.asc())
           .include('posts', (posts) => {
             expectPostCollection(posts);
             return posts

@@ -22,6 +22,7 @@ import { combineWhereExprs } from './where-utils';
 
 function toAggregateProjection(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   selector: AggregateSelector<unknown>,
 ): { expr: AggregateExpr; codec: CodecRef | undefined } {
@@ -40,7 +41,12 @@ function toAggregateProjection(
   // sum widens (int4 → int8 in Postgres) and avg → numeric; both need
   // target+input-aware mapping that doesn't exist yet, so leave unstamped.
   if (selector.fn === 'min' || selector.fn === 'max') {
-    const codec = codecRefForStorageColumn(contract.storage, tableName, selector.column);
+    const codec = codecRefForStorageColumn(
+      contract.storage,
+      namespaceId,
+      tableName,
+      selector.column,
+    );
     return { expr, codec };
   }
   return { expr, codec: undefined };
@@ -127,6 +133,7 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
 
 export function compileAggregate(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   filters: readonly AnyExpression[],
   aggregateSpec: Record<string, AggregateSelector<unknown>>,
@@ -137,10 +144,12 @@ export function compileAggregate(
   }
 
   const projection: ProjectionItem[] = entries.map(([alias, selector]) => {
-    const { expr, codec } = toAggregateProjection(contract, tableName, selector);
+    const { expr, codec } = toAggregateProjection(contract, namespaceId, tableName, selector);
     return ProjectionItem.of(alias, expr, codec);
   });
-  let ast = SelectAst.from(tableSourceForContract(contract, tableName)).withProjection(projection);
+  let ast = SelectAst.from(tableSourceForContract(contract, namespaceId, tableName)).withProjection(
+    projection,
+  );
   const where = combineWhereExprs(filters);
   if (where) {
     ast = ast.withWhere(where);
@@ -152,6 +161,7 @@ export function compileAggregate(
 
 export function compileGroupedAggregate(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   filters: readonly AnyExpression[],
   groupByColumns: readonly string[],
@@ -172,16 +182,16 @@ export function compileGroupedAggregate(
       ProjectionItem.of(
         column,
         ColumnRef.of(tableName, column),
-        codecRefForStorageColumn(contract.storage, tableName, column),
+        codecRefForStorageColumn(contract.storage, namespaceId, tableName, column),
       ),
     ),
     ...entries.map(([alias, selector]) => {
-      const { expr, codec } = toAggregateProjection(contract, tableName, selector);
+      const { expr, codec } = toAggregateProjection(contract, namespaceId, tableName, selector);
       return ProjectionItem.of(alias, expr, codec);
     }),
   ];
 
-  let ast = SelectAst.from(tableSourceForContract(contract, tableName))
+  let ast = SelectAst.from(tableSourceForContract(contract, namespaceId, tableName))
     .withProjection(projection)
     .withGroupBy(groupByColumns.map((column) => ColumnRef.of(tableName, column)));
   const where = combineWhereExprs(filters);

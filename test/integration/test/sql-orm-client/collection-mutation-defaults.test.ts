@@ -86,7 +86,7 @@ function setupTagCollection(): {
     }),
   });
   const runtime = createMockRuntime();
-  const collection = new Collection({ runtime, context }, 'Tag');
+  const collection = new Collection({ runtime, context }, 'Tag', { namespaceId: 'public' });
   return { collection, runtime, contract };
 }
 

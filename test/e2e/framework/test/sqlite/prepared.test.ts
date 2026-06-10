@@ -1,5 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
@@ -12,7 +13,7 @@ describe('e2e: prepared statements (SQLite)', { timeout: timeouts.databaseOperat
   it('lowers once and reuses across multiple .execute(params) calls', async () => {
     await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const ps = await runtime.prepare({ id: 'sql/int@1' }, (params) =>
-        db.users
+        db[UNBOUND_NAMESPACE_ID].users
           .select('id', 'name')
           .where((f, fns) => fns.eq(f.id, params.id))
           .build(),
@@ -33,7 +34,12 @@ describe('e2e: prepared statements (SQLite)', { timeout: timeouts.databaseOperat
   it('binds prepared params into LIMIT and OFFSET', async () => {
     await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const ps = await runtime.prepare({ take: 'sql/int@1', skip: 'sql/int@1' }, (params) =>
-        db.users.select('id', 'name').orderBy('id').limit(params.take).offset(params.skip).build(),
+        db[UNBOUND_NAMESPACE_ID].users
+          .select('id', 'name')
+          .orderBy('id')
+          .limit(params.take)
+          .offset(params.skip)
+          .build(),
       );
 
       const page1 = await ps.execute(runtime, { take: 2, skip: 0 });
@@ -51,7 +57,7 @@ describe('e2e: prepared statements (SQLite)', { timeout: timeouts.databaseOperat
     await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       await expect(
         runtime.prepare({ id: 'sql/int@1', unused: 'sql/text@1' }, (params) =>
-          db.users
+          db[UNBOUND_NAMESPACE_ID].users
             .select('id', 'name')
             .where((f, fns) => fns.eq(f.id, params.id))
             .build(),

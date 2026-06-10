@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:a760d37e15b9ae7a5e618b75ff69d3e00081bcb44a70e44a3a8850953a9daf5e'>;
+  StorageHashBase<'sha256:1274e9f6ce2c4b3d89de46cd369727b71b1b01ab3844bf5366f86e2ee4cfd02d'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:09bd7caf0ad111e77df2565dce0c4c5b0b784f9d3dfe5c97f969f1016a6b66bb'>;
 export type ProfileHash =
@@ -45,12 +45,17 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Profile: { readonly id: Char<36>; readonly username: CodecTypes['pg/text@1']['output'] };
+  readonly Profile: {
+    readonly id: Char<36>;
+    readonly username: CodecTypes['pg/text@1']['output'];
+    readonly userId: CodecTypes['pg/text@1']['output'];
+  };
 };
 export type FieldInputTypes = {
   readonly Profile: {
     readonly id: CodecTypes['sql/char@1']['input'];
     readonly username: CodecTypes['pg/text@1']['input'];
+    readonly userId: CodecTypes['pg/text@1']['input'];
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -87,14 +92,43 @@ type ContractBase = Omit<
                     readonly codecId: 'pg/text@1';
                     readonly nullable: false;
                   };
+                  readonly userId: {
+                    readonly nativeType: 'uuid';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                    readonly typeRef: 'Uuid';
+                  };
                 };
                 primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [];
+                uniques: readonly [{ readonly columns: readonly ['userId'] }];
                 indexes: readonly [];
-                foreignKeys: readonly [];
+                foreignKeys: readonly [
+                  {
+                    readonly source: {
+                      readonly namespaceId: 'public' & NamespaceId;
+                      readonly tableName: 'profile';
+                      readonly columns: readonly ['userId'];
+                    };
+                    readonly target: {
+                      readonly namespaceId: 'auth' & NamespaceId;
+                      readonly tableName: 'users';
+                      readonly columns: readonly ['id'];
+                    };
+                    readonly constraint: true;
+                    readonly index: true;
+                  },
+                ];
               };
             };
           };
+        };
+      };
+      readonly types: {
+        readonly Uuid: {
+          readonly kind: 'codec-instance';
+          readonly codecId: 'pg/text@1';
+          readonly nativeType: 'uuid';
+          readonly typeParams: Record<string, never>;
         };
       };
       readonly storageHash: StorageHash;
@@ -114,14 +148,19 @@ type ContractBase = Omit<
             readonly nullable: false;
             readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
           };
+          readonly userId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
         };
-        readonly relations: Record<string, never>;
+        readonly relations: { readonly user: never };
         readonly storage: {
           readonly table: 'profile';
           readonly namespaceId: 'public';
           readonly fields: {
             readonly id: { readonly column: 'id' };
             readonly username: { readonly column: 'username' };
+            readonly userId: { readonly column: 'userId' };
           };
         };
       };
@@ -152,14 +191,19 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
             };
-            readonly relations: Record<string, never>;
+            readonly relations: { readonly user: never };
             readonly storage: {
               readonly table: 'profile';
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly username: { readonly column: 'username' };
+                readonly userId: { readonly column: 'userId' };
               };
             };
           };
@@ -189,7 +233,7 @@ type ContractBase = Omit<
       readonly id: 'supabase';
       readonly kind: 'extension';
       readonly targetId: 'postgres';
-      readonly version: '0.12.0';
+      readonly version: '0.13.0';
     };
   };
   readonly execution: {

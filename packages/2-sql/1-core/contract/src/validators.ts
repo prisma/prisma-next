@@ -114,7 +114,7 @@ const StorageTypeInstanceSchema = type
     kind: "'codec-instance'",
     codecId: 'string',
     nativeType: 'string',
-    typeParams: 'Record<string, unknown>',
+    'typeParams?': 'Record<string, unknown>',
   });
 
 /**
@@ -420,16 +420,39 @@ const ModelStorageSchema = type({
   fields: type({ '[string]': ModelStorageFieldSchema }),
 });
 
-const ContractReferenceRelationSchema = type({
+const ContractRelationThroughSchema = type({
+  '+': 'reject',
+  table: 'string',
+  namespaceId: 'string',
+  parentColumns: type.string.array().readonly(),
+  childColumns: type.string.array().readonly(),
+  targetColumns: type.string.array().readonly(),
+});
+
+const ContractRelationOnSchema = type({
+  '+': 'reject',
+  localFields: type.string.array().readonly(),
+  targetFields: type.string.array().readonly(),
+});
+
+const ContractManyToManyRelationSchema = type({
+  '+': 'reject',
+  to: CrossReferenceSchema,
+  cardinality: "'N:M'",
+  on: ContractRelationOnSchema,
+  through: ContractRelationThroughSchema,
+});
+
+const ContractNonJunctionRelationSchema = type({
   '+': 'reject',
   to: CrossReferenceSchema,
   cardinality: "'1:1' | '1:N' | 'N:1'",
-  on: type({
-    '+': 'reject',
-    localFields: type.string.array().readonly(),
-    targetFields: type.string.array().readonly(),
-  }),
+  on: ContractRelationOnSchema,
 });
+
+const ContractReferenceRelationSchema = ContractManyToManyRelationSchema.or(
+  ContractNonJunctionRelationSchema,
+);
 
 const ContractEmbedRelationSchema = type({
   '+': 'reject',

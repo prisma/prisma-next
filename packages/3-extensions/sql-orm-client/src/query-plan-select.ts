@@ -46,6 +46,7 @@ type CursorOrderEntry = {
 
 function buildProjection(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   selectedFields: readonly string[] | undefined,
   tableRef = tableName,
@@ -53,13 +54,13 @@ function buildProjection(
   const columns =
     selectedFields && selectedFields.length > 0
       ? [...selectedFields]
-      : resolveTableColumns(contract, tableName);
+      : resolveTableColumns(contract, namespaceId, tableName);
 
   return columns.map((column) =>
     ProjectionItem.of(
       column,
       ColumnRef.of(tableRef, column),
-      codecRefForStorageColumn(contract.storage, tableName, column),
+      codecRefForStorageColumn(contract.storage, namespaceId, tableName, column),
     ),
   );
 }
@@ -162,6 +163,7 @@ function buildStateWhere(
   state: CollectionState,
   options?: {
     readonly filterTableName?: string;
+    readonly namespaceId?: string | undefined;
   },
 ): AnyExpression | undefined {
   const filterTableName = options?.filterTableName;
@@ -173,7 +175,9 @@ function buildStateWhere(
           filter.rewrite(createTableRefRemapper(filterTableName, tableName)),
         )
       : state.filters;
-  const boundCursorWhere = cursorWhere ? bindWhereExpr(contract, cursorWhere) : undefined;
+  const boundCursorWhere = cursorWhere
+    ? bindWhereExpr(contract, cursorWhere, options?.namespaceId)
+    : undefined;
   const remappedCursorWhere =
     boundCursorWhere && filterTableName && filterTableName !== tableName
       ? boundCursorWhere.rewrite(createTableRefRemapper(filterTableName, tableName))
@@ -311,12 +315,21 @@ function buildChildPolymorphismJoinsAndProjection(
   childTableAlias: string | undefined,
   childTableRef: string,
 ): { joins: ReadonlyArray<JoinAst>; projection: ReadonlyArray<ProjectionItem> } {
-  const polyInfo = resolvePolymorphismInfo(contract, include.relatedModelName);
+  const polyInfo = resolvePolymorphismInfo(
+    contract,
+    include.relatedNamespaceId,
+    include.relatedModelName,
+  );
   if (!polyInfo || polyInfo.mtiVariants.length === 0) {
     return { joins: [], projection: [] };
   }
 
-  const { joins, projection } = buildMtiJoins(contract, polyInfo, include.nested.variantName);
+  const { joins, projection } = buildMtiJoins(
+    contract,
+    include.relatedNamespaceId,
+    polyInfo,
+    include.nested.variantName,
+  );
   if (!childTableAlias) {
     return { joins, projection };
   }
@@ -362,6 +375,7 @@ function buildIncludeChildRowsSelect(
   );
   const childWhere = buildStateWhere(contract, childTableRef, childState, {
     filterTableName: include.relatedTableName,
+    namespaceId: include.relatedNamespaceId,
   });
   const joinExpr = BinaryExpr.eq(
     ColumnRef.of(childTableRef, include.targetColumn),
@@ -400,6 +414,7 @@ function buildIncludeChildRowsSelect(
 
   const scalarProjection = buildProjection(
     contract,
+    include.relatedNamespaceId,
     include.relatedTableName,
     childState.selectedFields,
     childTableRef,
@@ -439,7 +454,12 @@ function buildIncludeChildRowsSelect(
   ];
 
   let childRows = SelectAst.from(
-    tableSourceForContract(contract, include.relatedTableName, childTableAlias),
+    tableSourceForContract(
+      contract,
+      include.relatedNamespaceId,
+      include.relatedTableName,
+      childTableAlias,
+    ),
   )
     .withProjection([...childProjection, ...hiddenOrderProjection])
     .withWhere(whereExpr);
@@ -562,6 +582,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   // the projection.
   const innerScalarProjection = buildProjection(
     contract,
+    include.relatedNamespaceId,
     include.relatedTableName,
     selectedForQuery,
     childTableRef,
@@ -580,7 +601,12 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     childTableRef,
   );
   let baseInner = SelectAst.from(
-    tableSourceForContract(contract, include.relatedTableName, childTableAlias),
+    tableSourceForContract(
+      contract,
+      include.relatedNamespaceId,
+      include.relatedTableName,
+      childTableAlias,
+    ),
   )
     .withProjection([
       ...innerScalarProjection,
@@ -637,6 +663,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   // the underlying table.
   const outerScalarProjection = buildProjection(
     contract,
+    include.relatedNamespaceId,
     include.relatedTableName,
     childState.selectedFields,
     distinctAlias,
@@ -722,6 +749,7 @@ function buildIncludeChildScalarSelect(
   );
   const childWhere = buildStateWhere(contract, childTableRef, state, {
     filterTableName: include.relatedTableName,
+    namespaceId: include.relatedNamespaceId,
   });
   const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
 
@@ -748,7 +776,12 @@ function buildIncludeChildScalarSelect(
       JsonObjectExpr.entry('value', aggregateExpr),
     ]);
     return SelectAst.from(
-      tableSourceForContract(contract, include.relatedTableName, childTableAlias),
+      tableSourceForContract(
+        contract,
+        include.relatedNamespaceId,
+        include.relatedTableName,
+        childTableAlias,
+      ),
     )
       .withProjection([ProjectionItem.of(include.relationName, jsonObjectExpr)])
       .withWhere(whereExpr);
@@ -787,7 +820,12 @@ function buildIncludeChildScalarSelect(
   ];
 
   let inner = SelectAst.from(
-    tableSourceForContract(contract, include.relatedTableName, childTableAlias),
+    tableSourceForContract(
+      contract,
+      include.relatedNamespaceId,
+      include.relatedTableName,
+      childTableAlias,
+    ),
   )
     .withProjection(innerProjection)
     .withWhere(whereExpr);
@@ -1028,11 +1066,19 @@ function buildSelectAst(
     readonly joins?: ReadonlyArray<JoinAst>;
     readonly includeProjection?: ReadonlyArray<ProjectionItem>;
     readonly where?: AnyExpression;
-  } = {},
+    readonly namespaceId: string;
+  },
 ): SelectAst {
-  const scalarProjection = buildProjection(contract, tableName, state.selectedFields);
+  const namespaceId = options.namespaceId;
+  const scalarProjection = buildProjection(
+    contract,
+    namespaceId,
+    tableName,
+    state.selectedFields,
+    tableName,
+  );
   const projection = [...scalarProjection, ...(options.includeProjection ?? [])];
-  const where = options.where ?? buildStateWhere(contract, tableName, state);
+  const where = options.where ?? buildStateWhere(contract, tableName, state, { namespaceId });
 
   // When `.distinct(cols)` is set, wrap the table source in a
   // ROW_NUMBER-based dedup subquery aliased to the original `tableName`.
@@ -1050,9 +1096,9 @@ function buildSelectAst(
   const fromSource: AnyFromSource = usesRowNumberDistinct
     ? DerivedTableSource.as(
         tableName,
-        buildTopLevelDistinctRankedInner(contract, tableName, state, where),
+        buildTopLevelDistinctRankedInner(contract, namespaceId, tableName, state, where),
       )
-    : tableSourceForContract(contract, tableName);
+    : tableSourceForContract(contract, namespaceId, tableName);
 
   let ast = SelectAst.from(fromSource).withProjection(projection);
   if (usesRowNumberDistinct) {
@@ -1088,6 +1134,7 @@ function buildSelectAst(
 
 function buildTopLevelDistinctRankedInner(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   state: CollectionState,
   where: AnyExpression | undefined,
@@ -1099,7 +1146,7 @@ function buildTopLevelDistinctRankedInner(
   // Project every column of the underlying table so outer references
   // (projection, joins, includes' correlations, orderBy) resolve
   // through the derived-subquery alias.
-  const allCols = resolveTableColumns(contract, tableName);
+  const allCols = resolveTableColumns(contract, namespaceId, tableName);
   const allColsProjection = allCols.map((column) =>
     ProjectionItem.of(column, ColumnRef.of(tableName, column)),
   );
@@ -1109,7 +1156,9 @@ function buildTopLevelDistinctRankedInner(
       ? state.orderBy
       : distinctColumnRefs.map((expr) => OrderByItem.asc(expr));
 
-  let inner = SelectAst.from(tableSourceForContract(contract, tableName)).withProjection([
+  let inner = SelectAst.from(
+    tableSourceForContract(contract, namespaceId, tableName),
+  ).withProjection([
     ...allColsProjection,
     ProjectionItem.of(
       '__prisma_distinct_rn',
@@ -1127,12 +1176,13 @@ function buildTopLevelDistinctRankedInner(
 
 function buildMtiJoins(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   polyInfo: PolymorphismInfo,
   variantName: string | undefined,
 ): { joins: JoinAst[]; projection: ProjectionItem[] } {
   const joins: JoinAst[] = [];
   const projection: ProjectionItem[] = [];
-  const pkColumn = resolvePrimaryKeyColumn(contract, polyInfo.baseTable);
+  const pkColumn = resolvePrimaryKeyColumn(contract, namespaceId, polyInfo.baseTable);
 
   const variantsToJoin = variantName
     ? polyInfo.mtiVariants.filter((v) => v.modelName === variantName)
@@ -1146,11 +1196,11 @@ function buildMtiJoins(
     );
     const join =
       joinType === 'inner'
-        ? JoinAst.inner(tableSourceForContract(contract, variant.table), joinOn)
-        : JoinAst.left(tableSourceForContract(contract, variant.table), joinOn);
+        ? JoinAst.inner(tableSourceForContract(contract, namespaceId, variant.table), joinOn)
+        : JoinAst.left(tableSourceForContract(contract, namespaceId, variant.table), joinOn);
     joins.push(join);
 
-    const variantColumns = resolveTableColumns(contract, variant.table);
+    const variantColumns = resolveTableColumns(contract, namespaceId, variant.table);
     for (const col of variantColumns) {
       if (col === pkColumn) continue;
       const alias = `${variant.table}__${col}`;
@@ -1158,7 +1208,7 @@ function buildMtiJoins(
         ProjectionItem.of(
           alias,
           ColumnRef.of(variant.table, col),
-          codecRefForStorageColumn(contract.storage, variant.table, col),
+          codecRefForStorageColumn(contract.storage, namespaceId, variant.table, col),
         ),
       );
     }
@@ -1169,14 +1219,17 @@ function buildMtiJoins(
 
 export function compileSelect(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   state: CollectionState,
   modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const polyInfo = modelName ? resolvePolymorphismInfo(contract, modelName) : undefined;
+  const polyInfo = modelName
+    ? resolvePolymorphismInfo(contract, namespaceId, modelName)
+    : undefined;
   const mtiArtifacts =
     polyInfo && polyInfo.mtiVariants.length > 0
-      ? buildMtiJoins(contract, polyInfo, state.variantName)
+      ? buildMtiJoins(contract, namespaceId, polyInfo, state.variantName)
       : undefined;
 
   const ast = buildSelectAst(
@@ -1187,8 +1240,9 @@ export function compileSelect(
       ? {
           joins: mtiArtifacts.joins,
           includeProjection: mtiArtifacts.projection,
+          namespaceId,
         }
-      : undefined,
+      : { namespaceId },
   );
 
   const { params } = deriveParamsFromAst(ast);
@@ -1197,17 +1251,20 @@ export function compileSelect(
 
 export function compileSelectWithIncludes(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   state: CollectionState,
   modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
   const includeJoins: JoinAst[] = [];
   const includeProjection: ProjectionItem[] = [];
-  const topLevelWhere = buildStateWhere(contract, tableName, state);
+  const topLevelWhere = buildStateWhere(contract, tableName, state, { namespaceId });
 
-  const polyInfo = modelName ? resolvePolymorphismInfo(contract, modelName) : undefined;
+  const polyInfo = modelName
+    ? resolvePolymorphismInfo(contract, namespaceId, modelName)
+    : undefined;
   if (polyInfo && polyInfo.mtiVariants.length > 0) {
-    const mtiArtifacts = buildMtiJoins(contract, polyInfo, state.variantName);
+    const mtiArtifacts = buildMtiJoins(contract, namespaceId, polyInfo, state.variantName);
     includeJoins.push(...mtiArtifacts.joins);
     includeProjection.push(...mtiArtifacts.projection);
   }
@@ -1227,6 +1284,7 @@ export function compileSelectWithIncludes(
     {
       joins: includeJoins,
       includeProjection,
+      namespaceId,
       ...ifDefined('where', topLevelWhere),
     },
   );

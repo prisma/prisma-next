@@ -20,7 +20,7 @@ const polyContext = getPolyTestContext();
 // `reporterId`.
 
 function createTaskCollection(runtime: PgIntegrationRuntime) {
-  return new Collection({ runtime, context: polyContext }, 'Task');
+  return new Collection({ runtime, context: polyContext }, 'Task', { namespaceId: 'public' });
 }
 
 async function setupPolySchema(runtime: PgIntegrationRuntime): Promise<void> {

@@ -165,7 +165,7 @@ describe('integration: rawSql expression in typed builder', {
       // fns.raw is RawSqlTag (always present) because BuiltinFunctions declares it
       // concretely; the callback receives AggregateFunctions<QC>.
       const rows = await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .select('doubled', (f, fns) => fns.raw`${f.views} * 2`.returns('pg/int4@1'))
           .orderBy('id')
@@ -182,7 +182,7 @@ describe('integration: rawSql expression in typed builder', {
       const runtime = buildRuntime();
 
       const rows = await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .select('magic', (_f, fns) => fns.raw`42`.returns('pg/int4@1'))
           .orderBy('id')
@@ -218,7 +218,7 @@ describe('integration: rawSql expression in typed builder', {
       // The middleware's beforeExecute should see it via params.entries().
       // fns.raw is RawSqlTag (non-optional) — callable directly as a template tag.
       await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .where((_f, fns) =>
             fns.gt(
@@ -258,7 +258,7 @@ describe('integration: rawSql expression in typed builder', {
       // Two param() calls: param(10) and param(200).
       // The where clause: both params embedded in rawSql expressions, surfaced via gt/lt.
       await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .where((_f, fns) =>
             fns.and(

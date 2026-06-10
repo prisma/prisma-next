@@ -14,10 +14,19 @@ export function deriveParamsFromAst(ast: AnyQueryAst): {
   };
 }
 
-export function resolveTableColumns(contract: Contract<SqlStorage>, tableName: string): string[] {
+export function resolveTableColumns(
+  contract: Contract<SqlStorage>,
+  namespaceId: string,
+  tableName: string,
+): string[] {
   try {
-    return Object.keys(storageTableForContract(contract, tableName).columns);
-  } catch {
+    return Object.keys(storageTableForContract(contract, namespaceId, tableName).columns);
+  } catch (error) {
+    // Surface the ambiguous-bare-name fail-fast rather than masking it as an
+    // unknown table.
+    if (error instanceof Error && error.message.includes('ambiguous')) {
+      throw error;
+    }
     throw new Error(`Unknown table "${tableName}" in SQL ORM query planner`);
   }
 }

@@ -1,10 +1,10 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
+import { resolveStorageTable } from '@prisma-next/sql-contract/resolve-storage-table';
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
   type SqlStorage,
-  type StorageTable,
 } from '@prisma-next/sql-contract/types';
 
 /**
@@ -17,21 +17,20 @@ import {
  * - non-parameterized column → `{codecId}` with `typeParams` undefined.
  *
  * Returns `undefined` when the table or column is unknown, or when a `typeRef` column references a `storage.types` entry that does not exist.
+ *
+ * `namespaceId` leads the coordinate args and is always supplied: every
+ * model/table sits in an explicit namespace, so the table is resolved strictly
+ * within that namespace (see {@link resolveStorageTable}).
  */
 export function codecRefForStorageColumn(
   storage: SqlStorage,
+  namespaceId: string,
   tableName: string,
   columnName: string,
 ): CodecRef | undefined {
-  let tableDef: StorageTable | undefined;
-  for (const ns of Object.values(storage.namespaces)) {
-    const candidate = ns.entries.table[tableName] as StorageTable | undefined;
-    if (candidate !== undefined) {
-      tableDef = candidate;
-      break;
-    }
-  }
-  if (!tableDef) return undefined;
+  const resolved = resolveStorageTable(storage, tableName, namespaceId);
+  if (resolved === undefined) return undefined;
+  const tableDef = resolved.table;
   const columnDef = tableDef.columns[columnName];
   if (!columnDef) return undefined;
   if (columnDef.typeRef !== undefined) {
@@ -62,11 +61,20 @@ export function codecRefForStorageColumn(
       };
     }
     if (isStorageTypeInstance(instance)) {
-      return { codecId: instance.codecId, typeParams: instance.typeParams as JsonValue };
+      // Empty-state canonicalization: a `StorageTypeInstance` with absent
+      // (or empty) `typeParams` produces a `CodecRef` with no `typeParams`
+      // field. Equivalent to the non-parameterized-column branch below.
+      // Carrying `{}` here would break content-keyed memoisation and trip
+      // the runtime validator against non-parameterized codec descriptors.
+      const instanceParams = instance.typeParams;
+      const hasParamKeys = instanceParams !== undefined && Object.keys(instanceParams).length > 0;
+      return hasParamKeys
+        ? { codecId: instance.codecId, typeParams: instanceParams as JsonValue }
+        : { codecId: instance.codecId };
     }
     return undefined;
   }
-  if (columnDef.typeParams !== undefined) {
+  if (columnDef.typeParams !== undefined && Object.keys(columnDef.typeParams).length > 0) {
     return { codecId: columnDef.codecId, typeParams: columnDef.typeParams as JsonValue };
   }
   return { codecId: columnDef.codecId };

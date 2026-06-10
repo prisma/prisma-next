@@ -16,10 +16,10 @@ import { unboundTables } from './unbound-tables';
 
 describe('query plan meta', () => {
   it('resolves table columns and rejects unknown tables', () => {
-    expect(resolveTableColumns(baseContract, 'users')).toEqual(
+    expect(resolveTableColumns(baseContract, 'public', 'users')).toEqual(
       Object.keys(unboundTables(baseContract.storage)['users']!.columns),
     );
-    expect(() => resolveTableColumns(baseContract, 'missing')).toThrow(
+    expect(() => resolveTableColumns(baseContract, 'public', 'missing')).toThrow(
       'Unknown table "missing" in SQL ORM query planner',
     );
   });

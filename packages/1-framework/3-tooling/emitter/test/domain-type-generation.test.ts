@@ -380,6 +380,59 @@ describe('generateModelRelationsType', () => {
     // the CrossReference for a local relation must not include a `space` property
     expect(result).not.toContain('readonly space:');
   });
+
+  it('emits through literal for N:M relations with junction metadata', () => {
+    const result = generateModelRelationsType({
+      tags: {
+        to: crossRef('Tag'),
+        cardinality: 'N:M',
+        through: {
+          table: 'post_tags',
+          namespaceId: 'public',
+          parentColumns: ['postId'],
+          childColumns: ['tagId'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+    expect(result).toContain("readonly model: 'Tag'");
+    expect(result).toContain("readonly cardinality: 'N:M'");
+    expect(result).toContain('readonly through:');
+    expect(result).toContain("readonly table: 'post_tags'");
+    expect(result).toContain("readonly namespaceId: 'public'");
+    expect(result).toContain("readonly parentColumns: readonly ['postId']");
+    expect(result).toContain("readonly childColumns: readonly ['tagId']");
+    expect(result).toContain("readonly targetColumns: readonly ['id']");
+  });
+
+  it('emits through with multi-column keys', () => {
+    const result = generateModelRelationsType({
+      roles: {
+        to: crossRef('Role'),
+        cardinality: 'N:M',
+        through: {
+          table: 'user_roles',
+          namespaceId: 'public',
+          parentColumns: ['userId', 'tenantId'],
+          childColumns: ['roleId'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+    expect(result).toContain("readonly parentColumns: readonly ['userId', 'tenantId']");
+  });
+
+  it('omits through when not present (non-N:M relations unchanged)', () => {
+    const result = generateModelRelationsType({
+      author: {
+        to: crossRef('User'),
+        cardinality: 'N:1',
+        on: { localFields: ['authorId'], targetFields: ['id'] },
+      },
+    });
+    expect(result).not.toContain('readonly through:');
+    expect(result).toContain("readonly localFields: readonly ['authorId']");
+  });
 });
 
 describe('deduplicateImports', () => {

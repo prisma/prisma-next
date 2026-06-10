@@ -106,7 +106,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
       extensionPacks: [descriptor],
     });
 
-    const columnInstance = context.contractCodecs.forColumn('users', 'field');
+    const columnInstance = context.contractCodecs.forColumn('__unbound__', 'users', 'field');
     expect(columnInstance).toBeDefined();
 
     const columnCtx = instances.find(({ codec }) => codec === columnInstance)?.ctx;
@@ -328,8 +328,8 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     expect((codec as Codec & { meta: { ctxName: string } }).meta.ctxName).toBe('V1536');
 
     // The shared-per-codec invariant: forColumn lookups on either typeRef-sharing column resolve to the very same instance returned by forCodecRef. A regression that re-materialised per-column instances would still pass the existence/name asserts above; identity is what guards against that.
-    const fromDoc = context.contractCodecs.forColumn('Doc', 'embedding');
-    const fromPage = context.contractCodecs.forColumn('Page', 'embedding');
+    const fromDoc = context.contractCodecs.forColumn('__unbound__', 'Doc', 'embedding');
+    const fromPage = context.contractCodecs.forColumn('__unbound__', 'Page', 'embedding');
     expect(fromDoc).toBe(codec);
     expect(fromPage).toBe(codec);
   });
@@ -353,8 +353,8 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
 
     expect(codec).toBeDefined();
     // forColumn on both columns should reach the same instance.
-    expect(context.contractCodecs.forColumn('Doc', 'embedding')).toBe(codec);
-    expect(context.contractCodecs.forColumn('Page', 'embedding')).toBe(codec);
+    expect(context.contractCodecs.forColumn('__unbound__', 'Doc', 'embedding')).toBe(codec);
+    expect(context.contractCodecs.forColumn('__unbound__', 'Page', 'embedding')).toBe(codec);
   });
 
   it('throws RUNTIME.CODEC_DESCRIPTOR_MISSING when the codecId is unknown to the resolver', () => {
@@ -452,7 +452,7 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
     };
   }
 
-  it('forColumn(t, c) and forCodecRef(codecRefForColumn(t, c)) return the same codec instance', () => {
+  it('forColumn(ns, t, c) and forCodecRef(codecRefForColumn(ns, t, c)) return the same codec instance', () => {
     const { descriptor } = createSharedCodecExtension();
     const contract = contractWith({
       users: { codecId: 'test/shared@1', nativeType: 'shared' },
@@ -462,8 +462,8 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
       extensionPacks: [descriptor],
     });
 
-    const fromColumn = context.contractCodecs.forColumn('users', 'field');
-    const ref = context.codecDescriptors.codecRefForColumn('users', 'field');
+    const fromColumn = context.contractCodecs.forColumn('__unbound__', 'users', 'field');
+    const ref = context.codecDescriptors.codecRefForColumn('__unbound__', 'users', 'field');
     expect(ref).toBeDefined();
     const fromRef = context.contractCodecs.forCodecRef(ref!);
 
@@ -482,8 +482,8 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
       extensionPacks: [descriptor],
     });
 
-    const usersInstance = context.contractCodecs.forColumn('users', 'field');
-    const ordersInstance = context.contractCodecs.forColumn('orders', 'field');
+    const usersInstance = context.contractCodecs.forColumn('__unbound__', 'users', 'field');
+    const ordersInstance = context.contractCodecs.forColumn('__unbound__', 'orders', 'field');
 
     expect(usersInstance).toBeDefined();
     expect(ordersInstance).toBe(usersInstance);

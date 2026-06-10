@@ -48,7 +48,7 @@ describe('rate-limited POST /events', () => {
   }
 
   async function countRows(): Promise<number> {
-    return (await db.orm.TelemetryEvent.all()).length;
+    return (await db.orm.public.TelemetryEvent.all()).length;
   }
 
   it('ignores client-supplied x-forwarded-for by default and keys on the socket address', async () => {

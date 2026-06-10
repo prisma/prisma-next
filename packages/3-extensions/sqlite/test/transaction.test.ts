@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createContract } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   createSqlExecutionStack: vi.fn(),
   withTransaction: vi.fn(),
   sqlBuilder: vi.fn(),
+  orm: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
   driverClose: vi.fn(),
@@ -31,7 +33,7 @@ vi.mock('@prisma-next/sql-builder/runtime', () => ({
 }));
 
 vi.mock('@prisma-next/sql-orm-client', () => ({
-  orm: vi.fn(() => ({ lane: 'orm' })),
+  orm: mocks.orm,
 }));
 
 vi.mock('@prisma-next/family-sql/ir', () => ({
@@ -70,6 +72,7 @@ describe('sqlite transaction()', () => {
     mocks.driverClose.mockReset();
     mocks.deserializeContract.mockReset();
     mocks.sqlBuilder.mockReset();
+    mocks.orm.mockReset();
 
     mocks.createExecutionContext.mockReturnValue({
       contract,
@@ -98,6 +101,7 @@ describe('sqlite transaction()', () => {
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
+    mocks.orm.mockReturnValue({ lane: 'orm' });
     mocks.withTransaction.mockImplementation(
       async (_runtime: unknown, fn: (ctx: unknown) => unknown) => {
         const mockTxCtx = {
@@ -130,8 +134,8 @@ describe('sqlite transaction()', () => {
     let callCount = 0;
     mocks.sqlBuilder.mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return { lane: 'sql' };
-      return txSqlProxy;
+      if (callCount === 1) return { [UNBOUND_NAMESPACE_ID]: { lane: 'sql' } };
+      return { [UNBOUND_NAMESPACE_ID]: txSqlProxy };
     });
 
     const db = sqlite({
@@ -150,14 +154,13 @@ describe('sqlite transaction()', () => {
   });
 
   it('transaction() provides orm on the transaction context', async () => {
-    const { orm: ormMock } = await import('@prisma-next/sql-orm-client');
     const txOrmProxy = { lane: 'tx-orm' };
     let ormCallCount = 0;
-    vi.mocked(ormMock).mockImplementation((() => {
+    mocks.orm.mockImplementation(() => {
       ormCallCount++;
-      if (ormCallCount === 1) return { lane: 'orm' };
-      return txOrmProxy;
-    }) as unknown as typeof ormMock);
+      if (ormCallCount === 1) return { [UNBOUND_NAMESPACE_ID]: { lane: 'orm' } };
+      return { [UNBOUND_NAMESPACE_ID]: txOrmProxy };
+    });
 
     const db = sqlite({
       contract,

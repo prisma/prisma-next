@@ -188,7 +188,7 @@ const downtownViewport = bboxPolygon([-122.425, 37.775, -122.4, 37.8], 4326);
 
 Every example lives in `src/queries/` and each file documents its SQL
 shape in a header comment. Five of the six are expressed with the ORM
-collection surface (`db.orm.Cafe`, `db.orm.Route`, `db.orm.Neighborhood`)
+collection surface (`db.orm.public.Cafe`, `db.orm.public.Route`, `db.orm.public.Neighborhood`)
 — the PostGIS extension hangs `.contains` / `.within` / `.intersects` /
 `.intersectsBbox` / `.distanceSphere` / `.distance` / `.dwithin` directly
 on geometry fields, so spatial predicates compose with the usual
@@ -197,7 +197,7 @@ on geometry fields, so spatial predicates compose with the usual
 `findCafesNearPoint` is the exception: it projects a computed
 `meters` column alongside the model fields, which only the SQL builder
 expresses cleanly today (the ORM collection surface doesn't expose
-arbitrary expression projection). That query stays on `db.sql.cafe`.
+arbitrary expression projection). That query stays on `db.sql.public.cafe`.
 
 All queries assume `db` is already connected:
 

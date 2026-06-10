@@ -53,6 +53,7 @@ export interface IncludeCombine<ResultShape extends Record<string, unknown>>
 export interface IncludeExpr {
   readonly relationName: string;
   readonly relatedModelName: string;
+  readonly relatedNamespaceId: string;
   readonly relatedTableName: string;
   readonly targetColumn: string;
   readonly localColumn: string;
@@ -106,7 +107,7 @@ export interface CollectionTypeState {
   readonly variantName: string | undefined;
 }
 
-export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'M:N';
+export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'N:M';
 
 export type DefaultCollectionTypeState = {
   readonly hasOrderBy: false;

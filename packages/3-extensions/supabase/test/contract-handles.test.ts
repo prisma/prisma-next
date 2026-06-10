@@ -136,10 +136,7 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
     const fks = profileTable?.foreignKeys;
     expect(fks).toHaveLength(1);
     const fk = fks![0]!;
-    // Access via record to avoid the BuiltStorageTables narrow type which omits spaceId.
-    // At runtime the FK target is a ForeignKeyReference instance that carries spaceId.
-    const target = fk.target as Record<string, unknown>;
-    expect(target['spaceId']).toBe('supabase');
+    expect(fk.target.spaceId).toBe('supabase');
     expect(fk.target.namespaceId).toBe('auth');
     expect(fk.target.tableName).toBe('users');
     expect(fk.target.columns).toEqual(['id']);

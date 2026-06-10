@@ -64,6 +64,69 @@ const Tag = model('Tag', {
   },
 }).sql({ table: 'tags' });
 
+const UserTag = model('UserTag', {
+  fields: {
+    userId: field.column(int4Column).column('user_id'),
+    tagId: field.column(textColumn).column('tag_id'),
+    note: field.column(textColumn).optional(),
+    createdAt: field.column(textColumn).column('created_at').defaultSql('now()'),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id([fields.userId, fields.tagId]),
+  }))
+  .sql({ table: 'user_tags' });
+
+const Role = model('Role', {
+  fields: {
+    id: field.generated(uuidv4()).id(),
+    name: field.column(textColumn).unique(),
+  },
+}).sql({ table: 'roles' });
+
+const UserRole = model('UserRole', {
+  fields: {
+    userId: field.column(int4Column).column('user_id'),
+    roleId: field.column(textColumn).column('role_id'),
+    level: field.column(int4Column),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id([fields.userId, fields.roleId]),
+  }))
+  .sql({ table: 'user_roles' });
+
+const ProjectBase = model('Project', {
+  fields: {
+    tenantId: field.column(int4Column).column('tenant_id'),
+    id: field.column(int4Column),
+    name: field.column(textColumn),
+  },
+}).attributes(({ fields, constraints }) => ({
+  id: constraints.id([fields.tenantId, fields.id]),
+}));
+
+const Project = ProjectBase.relations({
+  related: rel.manyToMany(() => ProjectBase, {
+    through: () => ProjectLink,
+    from: ['srcTenantId', 'srcId'],
+    to: ['dstTenantId', 'dstId'],
+  }),
+}).sql({ table: 'projects' });
+
+const ProjectLink = model('ProjectLink', {
+  fields: {
+    srcTenantId: field.column(int4Column).column('src_tenant_id'),
+    srcId: field.column(int4Column).column('src_id'),
+    dstTenantId: field.column(int4Column).column('dst_tenant_id'),
+    dstId: field.column(int4Column).column('dst_id'),
+  },
+})
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id([fields.srcTenantId, fields.srcId, fields.dstTenantId, fields.dstId]),
+  }))
+  .sql({ table: 'project_links' });
+
 const Post = PostBase.relations({
   comments: rel.hasMany(() => Comment, { by: 'postId' }),
   author: rel.belongsTo(UserBase, { from: 'userId', to: 'id' }).sql({ fk: {} }),
@@ -74,6 +137,16 @@ const User = UserBase.relations({
   invitedBy: rel.belongsTo(UserBase, { from: 'invitedById', to: 'id' }).sql({ fk: {} }),
   posts: rel.hasMany(() => Post, { by: 'userId' }),
   profile: rel.hasOne(() => Profile, { by: 'userId' }),
+  tags: rel.manyToMany(() => Tag, {
+    through: () => UserTag,
+    from: 'userId',
+    to: 'tagId',
+  }),
+  roles: rel.manyToMany(() => Role, {
+    through: () => UserRole,
+    from: 'userId',
+    to: 'roleId',
+  }),
 }).sql({ table: 'users' });
 
 const baseContract = defineContract({
@@ -85,6 +158,11 @@ const baseContract = defineContract({
     Profile,
     Article,
     Tag,
+    UserTag,
+    Role,
+    UserRole,
+    Project,
+    ProjectLink,
   },
 });
 

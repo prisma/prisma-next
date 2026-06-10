@@ -77,7 +77,11 @@ export class TableProxyImpl<
     this.#tableName = tableName;
     this.#table = table;
     this.#namespaceId = namespaceId;
-    this.#scope = tableToScope(alias, table, { storage: ctx.storage, tableName });
+    this.#scope = tableToScope(alias, table, {
+      storage: ctx.storage,
+      tableName,
+      namespaceId,
+    });
     this.#fromSource = tableSourceForProxy(tableName, alias, namespaceId);
   }
 
@@ -174,7 +178,14 @@ export class TableProxyImpl<
   }
 
   insert(rows: ReadonlyArray<Record<string, unknown>>): InsertQuery<QC, AvailableScope, EmptyRow> {
-    return new InsertQueryImpl(this.#fromSource, this.#table, this.#scope, rows, this.ctx);
+    return new InsertQueryImpl(
+      this.#fromSource,
+      this.#namespaceId,
+      this.#table,
+      this.#scope,
+      rows,
+      this.ctx,
+    );
   }
 
   update(
@@ -194,6 +205,7 @@ export class TableProxyImpl<
       );
       const setExpressions = buildSetExpressions(
         callbackExprs,
+        this.#namespaceId,
         this.#table,
         this.#tableName,
         'update',
@@ -203,6 +215,7 @@ export class TableProxyImpl<
     }
     const setExpressions = buildParamValues(
       setOrCallback,
+      this.#namespaceId,
       this.#table,
       this.#tableName,
       'update',

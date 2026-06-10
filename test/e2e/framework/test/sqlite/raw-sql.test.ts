@@ -8,6 +8,7 @@ import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import { param } from '@prisma-next/sql-relational-core/expression';
@@ -97,7 +98,10 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
   });
 
   const adapter = sqliteRawCodecInferer;
-  const db: Db<Contract> = sql<Contract>({ context, rawCodecInferer: adapter });
+  const db = sql<Contract>({
+    context,
+    rawCodecInferer: adapter,
+  });
 
   return {
     db,
@@ -131,7 +135,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
 
       // posts.views values: 100, 50, 200, 10 — doubled they become 200, 100, 400, 20.
       const rows = await harness.runtime.execute(
-        harness.db.posts
+        harness.db[UNBOUND_NAMESPACE_ID].posts
           .select('id')
           .select('doubled', (f, fns) => fns.raw`${f.views} * 2`.returns('sqlite/integer@1'))
           .orderBy('id')
@@ -147,7 +151,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
       cleanup = harness.close;
 
       const rows = await harness.runtime.execute(
-        harness.db.posts
+        harness.db[UNBOUND_NAMESPACE_ID].posts
           .select('id')
           .select('magic', (_f, fns) => fns.raw`42`.returns('sqlite/integer@1'))
           .orderBy('id')
@@ -181,7 +185,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
       // After lowering, the plan carries one ParamRef (value 50, codec sqlite/integer@1).
       // The middleware's beforeExecute should see it via params.entries().
       await harness.runtime.execute(
-        harness.db.posts
+        harness.db[UNBOUND_NAMESPACE_ID].posts
           .select('id')
           .where((_f, fns) =>
             fns.gt(
@@ -217,7 +221,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
 
       // Two param() calls: param(10) and param(200).
       await harness.runtime.execute(
-        harness.db.posts
+        harness.db[UNBOUND_NAMESPACE_ID].posts
           .select('id')
           .where((_f, fns) =>
             fns.and(

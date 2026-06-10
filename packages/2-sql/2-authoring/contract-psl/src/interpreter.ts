@@ -82,6 +82,8 @@ import {
   buildModelMappings,
   collectResolvedFields,
   type ModelNameMapping,
+  type ModelNamespaceEntry,
+  modelCoordinateKey,
   type ResolvedField,
 } from './psl-field-resolution';
 import {
@@ -594,6 +596,12 @@ interface BuildModelNodeInput {
   readonly model: PslModel;
   readonly mapping: ModelNameMapping;
   readonly modelMappings: ReadonlyMap<string, ModelNameMapping>;
+  /**
+   * Model mappings keyed by `(namespaceId, modelName)` coordinate. Used to
+   * resolve a namespace-qualified relation target (`auth.User`) to the exact
+   * model even when the bare name is shared across namespaces.
+   */
+  readonly modelMappingsByCoordinate: ReadonlyMap<string, ModelNameMapping>;
   readonly modelNames: Set<string>;
   readonly compositeTypeNames: ReadonlySet<string>;
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
@@ -1166,19 +1174,23 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
-    if (fieldTypeNamespaceId !== undefined) {
-      const resolvedTargetNamespaceId = input.modelNamespaceIds.get(fieldTypeName);
-      const normalizedQualifier =
-        fieldTypeNamespaceId === 'unbound' ? '__unbound__' : fieldTypeNamespaceId;
-      if (resolvedTargetNamespaceId !== normalizedQualifier) {
-        diagnostics.push({
-          code: 'PSL_INVALID_RELATION_TARGET',
-          message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${qualifiedTypeName}"`,
-          sourceId,
-          span: relationAttribute.field.span,
-        });
-        continue;
-      }
+    const normalizedQualifier =
+      fieldTypeNamespaceId === undefined
+        ? undefined
+        : fieldTypeNamespaceId === 'unbound'
+          ? '__unbound__'
+          : fieldTypeNamespaceId;
+    if (
+      normalizedQualifier !== undefined &&
+      !input.modelMappingsByCoordinate.has(modelCoordinateKey(normalizedQualifier, fieldTypeName))
+    ) {
+      diagnostics.push({
+        code: 'PSL_INVALID_RELATION_TARGET',
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${qualifiedTypeName}"`,
+        sourceId,
+        span: relationAttribute.field.span,
+      });
+      continue;
     }
 
     const parsedRelation = parseRelationAttribute({
@@ -1201,7 +1213,12 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
-    const targetMapping = input.modelMappings.get(fieldTypeName);
+    const targetMapping =
+      normalizedQualifier !== undefined
+        ? input.modelMappingsByCoordinate.get(
+            modelCoordinateKey(normalizedQualifier, fieldTypeName),
+          )
+        : input.modelMappings.get(fieldTypeName);
     if (!targetMapping) {
       diagnostics.push({
         code: 'PSL_INVALID_RELATION_TARGET',
@@ -1269,7 +1286,10 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         })
       : undefined;
 
-    const targetNamespaceId = input.modelNamespaceIds.get(targetMapping.model.name);
+    const targetNamespaceId =
+      normalizedQualifier !== undefined
+        ? normalizedQualifier
+        : input.modelNamespaceIds.get(targetMapping.model.name);
     foreignKeyNodes.push({
       columns: localColumns,
       references: {
@@ -1289,6 +1309,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       declaringTableName: tableName,
       targetModelName: targetMapping.model.name,
       targetTableName: targetMapping.tableName,
+      ...ifDefined('targetNamespaceId', targetNamespaceId),
       ...ifDefined('relationName', parsedRelation.relationName),
       localColumns,
       referencedColumns,
@@ -1528,16 +1549,20 @@ function resolvePolymorphism(
 ): Record<string, ContractModel> {
   let patched = models;
 
+  const coordinateFor = (modelName: string): string =>
+    modelCoordinateKey(modelNamespaceIds.get(modelName) ?? defaultNamespaceId, modelName);
+
   // STI variant columns were materialised onto the base storage table so the
   // variants' `storage.fields` resolve. They are storage-only on the base — the
   // domain field belongs to the variant — so strip them from the base model's
   // domain + storage field maps (the table column, built upstream, stays).
   for (const [baseName, fieldNames] of stiBaseFieldsByBase) {
-    const baseModel = patched[baseName];
+    const baseKey = coordinateFor(baseName);
+    const baseModel = patched[baseKey];
     if (!baseModel || fieldNames.length === 0) continue;
     patched = {
       ...patched,
-      [baseName]: stripStorageOnlyDomainFields(baseModel, fieldNames),
+      [baseKey]: stripStorageOnlyDomainFields(baseModel, fieldNames),
     };
   }
 
@@ -1552,7 +1577,7 @@ function resolvePolymorphism(
       continue;
     }
 
-    const model = patched[modelName];
+    const model = patched[coordinateFor(modelName)];
     if (!model) continue;
 
     if (!Object.hasOwn(model.fields, decl.fieldName)) {
@@ -1597,7 +1622,7 @@ function resolvePolymorphism(
 
     patched = {
       ...patched,
-      [modelName]: { ...model, discriminator: { field: decl.fieldName }, variants },
+      [coordinateFor(modelName)]: { ...model, discriminator: { field: decl.fieldName }, variants },
     };
   }
 
@@ -1626,7 +1651,7 @@ function resolvePolymorphism(
       continue;
     }
 
-    const variantModel = patched[variantName];
+    const variantModel = patched[coordinateFor(variantName)];
     if (!variantModel) continue;
 
     const baseMapping = modelMappings.get(baseDecl.baseName);
@@ -1646,7 +1671,7 @@ function resolvePolymorphism(
 
     patched = {
       ...patched,
-      [variantName]: stripStorageOnlyDomainFields(
+      [coordinateFor(variantName)]: stripStorageOnlyDomainFields(
         patchedVariant,
         syntheticPkFieldsByVariant.get(variantName) ?? [],
       ),
@@ -1883,6 +1908,7 @@ export function interpretPslDocumentToSqlContract(
   // remains the input to the rest of the interpreter so non-namespace
   // concerns stay structurally identical to before.
   const models: PslModel[] = [];
+  const modelEntries: ModelNamespaceEntry[] = [];
   const modelNamespaceIds = new Map<string, string>();
   for (const namespace of input.document.ast.namespaces) {
     const resolvedNamespaceId = resolveNamespaceIdForSqlTarget({
@@ -1891,11 +1917,13 @@ export function interpretPslDocumentToSqlContract(
     });
     for (const model of namespace.models) {
       models.push(model);
+      modelEntries.push({ model, namespaceId: resolvedNamespaceId });
       if (resolvedNamespaceId !== undefined) {
         modelNamespaceIds.set(model.name, resolvedNamespaceId);
       }
     }
   }
+  const defaultNamespaceId = input.target.defaultNamespaceId;
   // Top-level enums (the __unspecified__ bucket) route to `storageTypes`;
   // enums inside a named namespace block route to `namespaceTypes[nsId]`.
   const topLevelEnums = input.document.ast.namespaces
@@ -1992,7 +2020,20 @@ export function interpretPslDocumentToSqlContract(
 
   const storageTypes = { ...enumResult.storageTypes, ...namedTypeResult.storageTypes };
 
-  const modelMappings = buildModelMappings(models, diagnostics, sourceId);
+  const modelMappingsByCoordinate = buildModelMappings(
+    modelEntries,
+    defaultNamespaceId,
+    diagnostics,
+    sourceId,
+  );
+  // Bare-name view for unqualified relation targets and polymorphism, where
+  // resolution is by bare model name. When a bare name is shared across
+  // namespaces this collapses to the last entry; qualified relation targets
+  // and per-model lowering use the coordinate-keyed map above instead.
+  const modelMappings = new Map<string, ModelNameMapping>();
+  for (const mapping of modelMappingsByCoordinate.values()) {
+    modelMappings.set(mapping.model.name, mapping);
+  }
   const modelNodes: ModelNode[] = [];
   const fkRelationMetadata: FkRelationMetadata[] = [];
   const backrelationCandidates: ModelBackrelationCandidate[] = [];
@@ -2001,8 +2042,9 @@ export function interpretPslDocumentToSqlContract(
   // modelRelations after local back-relation matching so they bypass that step.
   const crossSpaceRelationsByModel = new Map<string, RelationNode[]>();
 
-  for (const model of models) {
-    const mapping = modelMappings.get(model.name);
+  for (const { model, namespaceId } of modelEntries) {
+    const coordinate = modelCoordinateKey(namespaceId ?? defaultNamespaceId, model.name);
+    const mapping = modelMappingsByCoordinate.get(coordinate);
     if (!mapping) {
       continue;
     }
@@ -2010,6 +2052,7 @@ export function interpretPslDocumentToSqlContract(
       model,
       mapping,
       modelMappings,
+      modelMappingsByCoordinate,
       modelNames,
       compositeTypeNames,
       enumTypeDescriptors: allEnumTypeDescriptors,
@@ -2026,15 +2069,12 @@ export function interpretPslDocumentToSqlContract(
       diagnostics,
       modelNamespaceIds,
     });
-    const resolvedNamespaceId = modelNamespaceIds.get(model.name);
     modelNodes.push(
-      resolvedNamespaceId !== undefined
-        ? { ...result.modelNode, namespaceId: resolvedNamespaceId }
-        : result.modelNode,
+      namespaceId !== undefined ? { ...result.modelNode, namespaceId } : result.modelNode,
     );
     fkRelationMetadata.push(...result.fkRelationMetadata);
     backrelationCandidates.push(...result.backrelationCandidates);
-    modelResolvedFields.set(model.name, result.resolvedFields);
+    modelResolvedFields.set(coordinate, result.resolvedFields);
     if (result.crossSpaceRelations.length > 0) {
       const existing = crossSpaceRelationsByModel.get(model.name) ?? [];
       crossSpaceRelationsByModel.set(model.name, [...existing, ...result.crossSpaceRelations]);
@@ -2135,15 +2175,17 @@ export function interpretPslDocumentToSqlContract(
     })),
   });
 
+  // Keyed by `(namespaceId, modelName)` coordinate so two models that share a
+  // bare name across namespaces stay distinct through the patch/polymorphism
+  // passes; only a genuine same-namespace duplicate is an error.
   const modelsForPatch: Record<string, ContractModel> = {};
-  for (const namespaceSlice of Object.values(contract.domain.namespaces)) {
+  for (const [namespaceId, namespaceSlice] of Object.entries(contract.domain.namespaces)) {
     for (const [modelName, model] of Object.entries(namespaceSlice.models)) {
-      if (Object.hasOwn(modelsForPatch, modelName)) {
-        throw new Error(
-          `duplicate model name "${modelName}" across domain namespaces during PSL interpretation`,
-        );
+      const coordinate = modelCoordinateKey(namespaceId, modelName);
+      if (Object.hasOwn(modelsForPatch, coordinate)) {
+        throw new Error(`duplicate model "${namespaceId}.${modelName}" during PSL interpretation`);
       }
-      modelsForPatch[modelName] = model;
+      modelsForPatch[coordinate] = model;
     }
   }
   let patchedModels = patchModelDomainFields(modelsForPatch, modelResolvedFields);
@@ -2188,7 +2230,7 @@ export function interpretPslDocumentToSqlContract(
             models: Object.fromEntries(
               Object.entries(namespaceSlice.models).map(([modelName, model]) => [
                 modelName,
-                patchedModels[modelName] ?? model,
+                patchedModels[modelCoordinateKey(namespaceId, modelName)] ?? model,
               ]),
             ),
             ...(namespaceSlice.valueObjects !== undefined

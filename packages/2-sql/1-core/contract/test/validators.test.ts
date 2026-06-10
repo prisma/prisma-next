@@ -188,6 +188,53 @@ describe('SQL contract validators', () => {
       };
       expect(() => validateModel(modelWithoutRelations)).not.toThrow();
     });
+
+    const modelWithRelation = (relation: unknown) => ({
+      storage: {
+        table: 'parent',
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        fields: { id: { column: 'id' } },
+      },
+      fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+      relations: { rel: relation },
+    });
+
+    const through = {
+      table: 'parent_child',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      parentColumns: ['parent_id'],
+      childColumns: ['child_id'],
+      targetColumns: ['id'],
+    };
+
+    it('validates an N:M relation carrying through', () => {
+      const valid = modelWithRelation({
+        to: { model: 'Child', namespace: UNBOUND_NAMESPACE_ID },
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['id'] },
+        through,
+      });
+      expect(() => validateModel(valid)).not.toThrow();
+    });
+
+    it('rejects an N:M relation without through', () => {
+      const invalid = modelWithRelation({
+        to: { model: 'Child', namespace: UNBOUND_NAMESPACE_ID },
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['id'] },
+      });
+      expect(() => validateModel(invalid)).toThrow();
+    });
+
+    it('rejects a non-N:M relation carrying through', () => {
+      const invalid = modelWithRelation({
+        to: { model: 'Child', namespace: UNBOUND_NAMESPACE_ID },
+        cardinality: 'N:1',
+        on: { localFields: ['parentId'], targetFields: ['id'] },
+        through,
+      });
+      expect(() => validateModel(invalid)).toThrow();
+    });
   });
 
   describe('validateSqlContractFully', () => {
