@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   Cursor,
-  type DocumentState,
   parse,
   parseBlockAttribute,
   parseEnum,
@@ -641,9 +640,12 @@ describe('parse() declaration-level diagnostics', () => {
     }
   });
 
-  it('flags a second top-level types block', () => {
+  it('parses two top-level types blocks without a uniqueness diagnostic', () => {
     const source = 'type {\n}\ntype {\n}';
-    expect(codes(source)).toContain('PSL_INVALID_TYPES_MEMBER');
+    expect(codes(source)).not.toContain('PSL_INVALID_TYPES_MEMBER');
+    const decls = Array.from(parse(source).document.declarations());
+    expect(decls).toHaveLength(2);
+    expect(decls.every((d) => d instanceof TypesBlockAst)).toBe(true);
     expect(greenText(greenRoot(source))).toBe(source);
   });
 
@@ -676,10 +678,6 @@ describe('parse() declaration-level diagnostics', () => {
  * rejection, draining the remaining stream must reproduce the whole source
  * byte-for-byte (nothing dropped) and no diagnostic may have been emitted.
  */
-function freshState(): DocumentState {
-  return { topLevelTypesSeen: false };
-}
-
 function expectNoOpReject(source: string, run: (cursor: Cursor) => GreenNode | undefined): void {
   const cursor = new Cursor(source);
   expect(run(cursor)).toBeUndefined();
@@ -702,11 +700,11 @@ describe('ordered-alternative parsers are no-ops on non-match', () => {
   });
 
   it('parseNamespace rejects a non-namespace keyword without consuming', () => {
-    expectNoOpReject('model User {', (cursor) => parseNamespace(cursor, false, freshState()));
+    expectNoOpReject('model User {', (cursor) => parseNamespace(cursor, false));
   });
 
   it('parseTypeDeclaration rejects a non-type keyword without consuming', () => {
-    expectNoOpReject('model User {', (cursor) => parseTypeDeclaration(cursor, false, freshState()));
+    expectNoOpReject('model User {', (cursor) => parseTypeDeclaration(cursor, false));
   });
 
   it('parseGenericBlock rejects a reserved keyword so it falls through to recovery', () => {

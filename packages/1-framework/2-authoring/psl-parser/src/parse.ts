@@ -366,10 +366,6 @@ function parseQualifierSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): voi
 
 type MemberParser = (cursor: Cursor) => void;
 
-export interface DocumentState {
-  topLevelTypesSeen: boolean;
-}
-
 /**
  * Drives the recursive descent over a full PSL document. Tokenizes via the
  * substrate cursor, builds a complete green/red tree wrapped as a
@@ -387,9 +383,8 @@ export function parse(source: string): ParseResult {
 
 function parseDocument(cursor: Cursor): GreenNode {
   cursor.startNode('Document');
-  const state: DocumentState = { topLevelTypesSeen: false };
   while (cursor.peekKind() !== 'Eof') {
-    parseDeclaration(cursor, false, state);
+    parseDeclaration(cursor, false);
   }
   cursor.flushTrivia(); // attach trailing trivia so the round-trip stays lossless
   return cursor.finishNode();
@@ -417,12 +412,12 @@ function keywordIs(cursor: Cursor, keyword: string): boolean {
  * arm, because it appends raw tokens to the open parent instead of returning a
  * child node.
  */
-function parseDeclaration(cursor: Cursor, insideNamespace: boolean, state: DocumentState): void {
+function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
   const node =
     parseModel(cursor) ??
     parseEnum(cursor) ??
-    parseNamespace(cursor, insideNamespace, state) ??
-    parseTypeDeclaration(cursor, insideNamespace, state) ??
+    parseNamespace(cursor, insideNamespace) ??
+    parseTypeDeclaration(cursor, insideNamespace) ??
     parseGenericBlock(cursor);
   if (!node) {
     parseUnsupportedTopLevel(cursor);
@@ -520,11 +515,7 @@ export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
-export function parseNamespace(
-  cursor: Cursor,
-  insideNamespace: boolean,
-  state: DocumentState,
-): GreenNode | undefined {
+export function parseNamespace(cursor: Cursor, insideNamespace: boolean): GreenNode | undefined {
   if (!keywordIs(cursor, 'namespace')) return undefined;
   const keywordMark = cursor.mark();
   cursor.startNode('Namespace');
@@ -548,7 +539,7 @@ export function parseNamespace(
     );
   }
   finishReservedHeader(cursor, 'namespace', keywordMark, hasName, () =>
-    parseBlockBody(cursor, (inner) => parseDeclaration(inner, true, state)),
+    parseBlockBody(cursor, (inner) => parseDeclaration(inner, true)),
   );
   return cursor.finishNode();
 }
@@ -560,12 +551,11 @@ export function parseNamespace(
  * (`type { … }`). Either branch commits the kind on the keyword — a missing
  * brace (or, for the composite branch, a present name with no brace) yields a
  * `PSL_INVALID_DECLARATION`, not an unsupported-declaration. The `types` branch
- * preserves the document-top-level and single-block constraints.
+ * preserves the document-top-level constraint.
  */
 export function parseTypeDeclaration(
   cursor: Cursor,
   insideNamespace: boolean,
-  state: DocumentState,
 ): GreenNode | undefined {
   if (!keywordIs(cursor, 'type')) return undefined;
   if (cursor.peekKind(1) === 'Ident') {
@@ -579,14 +569,6 @@ export function parseTypeDeclaration(
       '`types` blocks must be declared at the document top level, not inside a namespace block',
       keywordMark,
     );
-  } else if (state.topLevelTypesSeen) {
-    cursor.diagnostic(
-      'PSL_INVALID_TYPES_MEMBER',
-      'Only one top-level `types` block is allowed per document',
-      keywordMark,
-    );
-  } else {
-    state.topLevelTypesSeen = true;
   }
   cursor.bump(); // type
   if (cursor.peekKind() === 'LBrace') {

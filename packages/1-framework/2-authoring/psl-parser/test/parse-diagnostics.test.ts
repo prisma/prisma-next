@@ -96,13 +96,6 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(span).toBe('type');
   });
 
-  it('reports a second top-level types block', () => {
-    const source = 'type {\n}\ntype {\n}';
-    const { message, span } = diagnosticFor(source, 'PSL_INVALID_TYPES_MEMBER');
-    expect(message).toBe('Only one top-level `types` block is allowed per document');
-    expect(span).toBe('type');
-  });
-
   it('reports a malformed model member with the offending token', () => {
     const source = 'model M {\n  123\n  id Int\n}';
     const { result, message, span } = diagnosticFor(source, 'PSL_INVALID_MODEL_MEMBER');
