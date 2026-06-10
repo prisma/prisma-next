@@ -3,7 +3,7 @@ import type { SqlMiddleware } from '@prisma-next/sql-runtime';
 import type { Contract } from '../contract';
 import contractJson from '../contract.json' with { type: 'json' };
 
-export const fixtureJwtSigningKey = 'supabase-test-secret-that-is-long-enough-for-hs256';
+export const fixtureJwt = 'fixture-jwt-signing-input-not-a-real-credential';
 
 export async function createDb(
   url: string,
@@ -12,7 +12,7 @@ export async function createDb(
   return supabase<Contract>({
     contractJson,
     url,
-    jwtSecret: process.env['SUPABASE_JWT_SECRET'] ?? fixtureJwtSigningKey,
+    jwtSecret: process.env['SUPABASE_JWT_SECRET'] ?? fixtureJwt,
     ...options,
   });
 }

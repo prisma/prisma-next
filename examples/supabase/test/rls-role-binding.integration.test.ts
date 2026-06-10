@@ -28,12 +28,12 @@ import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils
 import { SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import contractJson from '../src/contract.json' with { type: 'json' };
-import { createDb, fixtureJwtSigningKey } from '../src/prisma/db';
+import { createDb, fixtureJwt } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
 async function signJwt(
   payload: Record<string, unknown>,
-  secret = fixtureJwtSigningKey,
+  secret = fixtureJwt,
   expiresIn = '1h',
 ): Promise<string> {
   const key = new TextEncoder().encode(secret);
@@ -310,7 +310,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       try {
         const expiredJwt = await signJwt(
           { sub: crypto.randomUUID(), role: 'authenticated' },
-          fixtureJwtSigningKey,
+          fixtureJwt,
           '-1s',
         );
         await expect(db.asUser(expiredJwt)).rejects.toThrow(InvalidJwtError);

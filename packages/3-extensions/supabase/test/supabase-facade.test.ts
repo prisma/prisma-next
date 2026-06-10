@@ -46,7 +46,7 @@ function stubPlan(): SqlQueryPlan {
 type SpyPool = typeof Pool & { _connectSpy: ReturnType<typeof vi.fn> };
 
 const contract = createContract<SqlStorage>();
-const fixtureJwtSigningKey = 'test-secret-that-is-long-enough-for-hs256';
+const fixtureJwt = 'fixture-jwt-signing-input-not-a-real-credential';
 
 function poolConnectSpy() {
   return (Pool as unknown as SpyPool)._connectSpy;
@@ -54,7 +54,7 @@ function poolConnectSpy() {
 
 async function makeJwt(
   payload: Record<string, unknown>,
-  secret = fixtureJwtSigningKey,
+  secret = fixtureJwt,
   expiresIn = '1h',
 ): Promise<string> {
   const key = new TextEncoder().encode(secret);
@@ -98,7 +98,7 @@ describe('supabase() factory — config validation', () => {
       supabase({
         contract,
         url: 'postgres://localhost/db',
-        jwtSecret: fixtureJwtSigningKey,
+        jwtSecret: fixtureJwt,
         jwksUrl: 'https://example.com/.well-known/jwks.json',
       } as unknown as Parameters<typeof supabase<typeof contract>>[0]),
     ).rejects.toThrow(SupabaseConfigError);
@@ -120,7 +120,7 @@ describe('supabase() factory — asUser', () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
 
     const roleBoundDb = await db.asUser(jwt);
@@ -139,7 +139,7 @@ describe('supabase() factory — asUser', () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
 
     await expect(db.asUser(jwt)).rejects.toThrow(InvalidJwtError);
@@ -149,15 +149,11 @@ describe('supabase() factory — asUser', () => {
   });
 
   it('rejects with InvalidJwtError for an expired JWT', async () => {
-    const jwt = await makeJwt(
-      { sub: 'user-1', role: 'authenticated' },
-      fixtureJwtSigningKey,
-      '-1s',
-    );
+    const jwt = await makeJwt({ sub: 'user-1', role: 'authenticated' }, fixtureJwt, '-1s');
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
 
     await expect(db.asUser(jwt)).rejects.toThrow(InvalidJwtError);
@@ -175,7 +171,7 @@ describe('supabase() factory — behavioral binding via set_config', () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
     const roleBoundDb = await db.asUser(jwt);
 
@@ -203,7 +199,7 @@ describe('supabase() factory — behavioral binding via set_config', () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
     const roleBoundDb = await db.asUser(jwt);
 
@@ -224,7 +220,7 @@ describe('supabase() factory — behavioral binding via set_config', () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
     const roleBoundDb = db.asAnon();
 
@@ -247,7 +243,7 @@ describe('supabase() factory — behavioral binding via set_config', () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
     const roleBoundDb = db.asServiceRole();
 
@@ -269,7 +265,7 @@ describe('supabase() factory — SupabaseDb surface', () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
 
     const dbAny = db as unknown as Record<string, unknown>;
@@ -283,7 +279,7 @@ describe('supabase() factory — SupabaseDb surface', () => {
     const db = await supabase({
       contract,
       url: 'postgres://localhost/db',
-      jwtSecret: fixtureJwtSigningKey,
+      jwtSecret: fixtureJwt,
     });
 
     expect(db.context).toBeDefined();
