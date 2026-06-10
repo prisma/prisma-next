@@ -4,7 +4,7 @@
 
 ## Summary
 
-The project ships in four PRs sequenced contract → runtime → example → polish, and is the home of the **walking skeleton** — the runnable `examples/supabase` app that every other constituent wires into as it lands (strategy + growth table in the [umbrella README](../supabase-integration/README.md) §"Walking skeleton"; decisions [C13/C14](../supabase-integration/decisions.md)). M1 scaffolds the `@prisma-next/extension-supabase` package (subpath exports, hand-authored `contract.json`, `contract.d.ts`, branded `/contract` handles, the `/pack` descriptor) **and stands up the skeleton** running on the stock `@prisma-next/postgres/runtime`; the Supabase `/runtime` subpath is deferred to M2, so M1 is unblocked by the foundation + control-policy alone. M2 builds the runtime facade: `SupabaseRuntime extends PostgresRuntime`, JWT validation (sync via `jwtSecret`, async warmup via `jwksUrl`), `SupabaseDb` with `asUser` / `asAnon` / `asServiceRole`, `RoleBoundDb` extending `Db` with `transaction(...)`, the `SET LOCAL` + implicit-transaction plumbing wired through `withRawConnection`. M3 finalizes the (by-then incrementally-grown) `examples/supabase` app and adds the live-query RLS-enforcement e2e that depends on M2's role binding, running on the hermetic PGlite + Supabase-shim lane. M4 closes out documentation, the real-Supabase acceptance lane, and the umbrella decisions log.
+The project ships in four PRs sequenced contract → runtime → example → polish, and is the home of the **walking skeleton** — the runnable `examples/supabase` app that every other constituent wires into as it lands (strategy + growth table in the [umbrella README](../supabase-integration/README.md) §"Walking skeleton"; decisions [C13/C14](../supabase-integration/decisions.md)). M1 scaffolds the `@prisma-next/extension-supabase` package (subpath exports, hand-authored `contract.json`, `contract.d.ts`, branded `/contract` handles, the `/pack` descriptor) **and stands up the skeleton** running on the stock `@prisma-next/postgres/runtime`; the Supabase `/runtime` subpath is deferred to M2, so M1 is unblocked by the foundation + control-policy alone. M2's runtime facade — `SupabaseRuntimeImpl`, the async `supabase()` factory, JWT validation, `SupabaseDb`, and `RoleBoundDb` with role binding via session-coupled connections — **shipped under runtime-target-layer ([ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md))**; the remaining runtime-related work is wiring the example app onto `supabase()` (folded into M3). M3 finalizes the (by-then incrementally-grown) `examples/supabase` app and adds the live-query RLS-enforcement e2e that depends on M2's role binding, running on the hermetic PGlite + Supabase-shim lane. M4 closes out documentation, the real-Supabase acceptance lane, and the umbrella decisions log.
 
 **Spec:** [`projects/extension-supabase/spec.md`](spec.md)
 **Linear:** _(to be created — see project tracker in umbrella `projects/supabase-integration/README.md`)_
@@ -17,7 +17,7 @@ This project is the integration layer; it consumes **all four** sibling projects
 - **[control-policy](../control-policy/spec.md)** — the `external` control-policy value the shipped contract uses by default.
 - **[cross-contract-refs](../cross-contract-refs/spec.md)** — brand machinery the typed handles consume.
 - **[postgres-rls](../postgres-rls/spec.md)** — `.rls(...)` authoring + `PostgresRole` IR + verifier algorithm.
-- **[runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)** — `PostgresRuntime` base class + `withRawConnection` accessor.
+- **[runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)** — the `SqlRuntimeBase` family seam + per-target `*RuntimeImpl` classes, and the session-coupled-connection role binding (`set_config(role/claims)` + `RESET ALL`). It also shipped the `SupabaseRuntimeImpl` + `supabase()` façade this project consumes.
 
 Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy** → **cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer** → **this project** (the integration / launch).
 
@@ -46,33 +46,11 @@ The four PRs below correspond to the four slices (M1–M4). Each slice is one PR
 
 **Validation:** AC1 (subpath resolves, bundle budget) verified for `/pack`; the skeleton migrates the composed contract against a shim-seeded PGlite DB with `auth.*`/`storage.*` correctly handled as `external`, and the `public.profile` round-trip runs on the stock runtime. AC2/AC3 (cross-contract FK + RLS authoring) and AC4 onwards land with their constituents / M2.
 
-### M2 — Runtime facade (`SupabaseRuntime`, role binding, SET LOCAL)
+### M2 — Runtime facade — ✅ shipped under runtime-target-layer (ADR 230)
 
-**Goal:** the runtime facade is live. `supabase({...})` returns a `SupabaseDb`; `asUser(jwt)` / `asAnon()` / `asServiceRole()` produce role-bound `Db` instances; queries through role-bound `Db`s issue `SET LOCAL role` + `SET LOCAL request.jwt.claims` below user middleware in an implicit transaction.
+The Supabase runtime facade — `SupabaseRuntimeImpl`, the async `supabase({...})` factory, `asUser` / `asAnon` / `asServiceRole`, `SupabaseDb` / `RoleBoundDb`, JWT validation (`InvalidJwtError`), and the role binding itself — **shipped under the runtime-target-layer project**, not here. Role binding is enforced by **session-coupled connections** (`SupabaseRuntimeImpl` runs `set_config('role'/'request.jwt.claims', …, false)` on the query's connection below the middleware chain and `RESET ALL`s on release), and the no-bypass guarantee is **façade encapsulation** (the role-bound `Db` exposes no unbound `connection()`) — see [ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) for the mechanism, class hierarchy, and the RLS-through-ORM acceptance test. The earlier sketch on this line (a `SupabaseRuntime extends PostgresRuntime` class overriding `execute()` to issue `SET LOCAL` via a `withRawConnection` accessor) was superseded by that design and never shipped.
 
-**Tasks:**
-
-- [ ] Add `class SupabaseRuntime extends PostgresRuntime` in `src/runtime/index.ts`. Constructor: validates `jwtSecret` xor `jwksUrl` configuration, warms up JWKS if `jwksUrl` is set, forwards `contractJson` / `url` / `pool` / `middleware` to `super(...)`.
-- [ ] Override the runtime's execute path: wrap the base execute in `withTransaction(() => withRawConnection(conn => { conn.exec("SET LOCAL role = '...'"); conn.exec("SET LOCAL request.jwt.claims = '...'"); return super.execute(plan); }))`.
-- [ ] Implement JWT validation using the chosen library (recommend `jose`):
-  - Symmetric secret path: HS256 / HS512 validation via `jwtSecret`. Sub-millisecond.
-  - Asymmetric / JWKS path: RS256 etc. via JWKS endpoint. Cache the signing key warmed up at factory time.
-  - Validation includes signature, expiry, optional audience, optional issuer. Failure throws `InvalidJwtError` with typed `reason`.
-- [ ] Implement `SupabaseDb` and `RoleBoundDb` interfaces. `SupabaseDb` exposes only `asUser`, `asAnon`, `asServiceRole`. `RoleBoundDb` extends `Db` and adds `transaction<R>(fn)`.
-- [ ] `RoleBoundDb.transaction()` opens one transaction with one `SET LOCAL`; the closure body runs against `tx` pinned to the same connection; commit/rollback at closure exit. Reuses the base `withTransaction` from the runtime-target-layer project.
-- [ ] Export `supabase` as the default factory from `/runtime`. Export `SupabaseRuntime` class as named export. Export `InvalidJwtError` class as named export.
-- [ ] Unit tests:
-  - JWT validation success (HS256 + RS256+JWKS).
-  - JWT validation failure modes: malformed, expired, mis-signed, wrong audience, wrong issuer — each yields the typed reason.
-  - `db.asUser(badJwt)` throws synchronously; no connection acquired.
-  - `db.asUser(goodJwt)` returns a `RoleBoundDb`.
-  - `SupabaseDb` doesn't expose `.sql.from(...)` at the top level (type-level assertion via a `// @ts-expect-error` test).
-- [ ] Integration tests against PGlite seeded with `bootstrapSupabaseShim(client)` (from M1):
-  - Statement sequence on `asUser(jwt).sql.from(...).execute()` is `BEGIN; SET LOCAL role; SET LOCAL request.jwt.claims; <query>; COMMIT;`. Verified by hooking the connection and recording statements.
-  - User middleware sees only the logical query (the `BEGIN` / `SET LOCAL` / `COMMIT` statements are invisible). Verified by a logging middleware in the test fixture.
-  - `asUser(jwt).transaction(async (tx) => { tx.sql..., tx.sql... })` issues one BEGIN + one SET LOCAL + two queries + one COMMIT.
-
-**Validation:** AC4, AC5, AC6, AC7 verified.
+The only runtime-related work left for this project is consuming the shipped façade in the example app's `db.ts` (`supabase({...})` in place of the stock postgres runtime) — folded into M3.
 
 ### M3 — Finalize the example app + live-query RLS-enforcement e2e
 
@@ -107,7 +85,7 @@ The four PRs below correspond to the four slices (M1–M4). Each slice is one PR
 
 **Tasks:**
 
-- [ ] Polish the package's top-level README: describe the role-binding model, the `SET LOCAL`-below-middleware security property, the JWT validation modes (secret vs JWKS), the implicit-transaction guarantee, the unsupported scope (PostgREST interop, edge runtimes, Supabase Realtime, ergonomic storage uploads).
+- [ ] Polish the package's top-level README: describe the role-binding model, the below-middleware session-coupled-connection security property (`set_config` on the query's connection, no unbound path through the role-bound `Db`; see ADR 230), the JWT validation modes (secret vs JWKS), and the unsupported scope (PostgREST interop, edge runtimes, Supabase Realtime, ergonomic storage uploads).
 - [ ] Launch-blocking acceptance test (manual, not in CI): provision a real Supabase project; run the example app against it; verify all four handler flows work end-to-end (anon read, authenticated update-own, service-role admin read, JWT failure). Document the test run's evidence in the launch announcement.
 - [ ] Update the extension-authoring skill (TML-2492) to reference this package as the canonical example. Cross-link from the skill into the package's source.
 - [ ] Update [umbrella `decisions.md`](../supabase-integration/decisions.md) marking all relevant decisions (A1–A8 RLS surface, B1–B6 PSL surface, C1–C12 cross-cutting) as ✅ shipped, with links to merged PRs. Mark umbrella offcuts (OC1, OC2, OC3, OC4) as having follow-up tickets where applicable.
