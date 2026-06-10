@@ -114,6 +114,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           ),
           controlMutationDefaults: context.controlMutationDefaults,
           ...ifDefined('createNamespace', options.createNamespace),
+          codecLookup: context.codecLookup,
         });
         if (!interpreted.ok) {
           return interpreted;

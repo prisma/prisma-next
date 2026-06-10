@@ -9,6 +9,7 @@ import type {
   ContractModel,
   ContractValueObject,
   ControlPolicy,
+  JsonValue,
 } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
 import type {
@@ -17,6 +18,7 @@ import type {
   AuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringEntityType } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
@@ -29,6 +31,7 @@ import type {
   PslAttribute,
   PslCompositeType,
   PslEnum,
+  PslEnum2,
   PslField,
   PslModel,
   PslNamedTypeDeclaration,
@@ -43,6 +46,8 @@ import {
 } from '@prisma-next/sql-contract/types';
 import {
   buildSqlContractFromDefinition,
+  type EnumTypeHandle,
+  enumType,
   type FieldNode,
   type ForeignKeyNode,
   type IndexNode,
@@ -59,6 +64,7 @@ import {
   getAttribute,
   getNamedArgument,
   getPositionalArgument,
+  getPositionalArgumentEntry,
   mapFieldNamesToColumns,
   parseAttributeFieldList,
   parseConstraintMapArgument,
@@ -124,6 +130,7 @@ export interface InterpretPslDocumentToSqlContractInput {
    * `SqlUnboundNamespace` singleton.
    */
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly codecLookup?: CodecLookup;
 }
 
 function buildComposedExtensionPackRefs(
@@ -375,6 +382,192 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   return { storageTypes, enumTypeDescriptors };
 }
 
+interface ProcessEnum2DeclarationsInput {
+  readonly enum2s: readonly PslEnum2[];
+  readonly sourceId: string;
+  readonly enum2EntityDescriptor: AuthoringEntityTypeDescriptor | undefined;
+  readonly entityContext: AuthoringEntityContext;
+  readonly codecLookup: CodecLookup | undefined;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}
+
+function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
+  readonly enumHandles: Record<string, EnumTypeHandle>;
+  readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
+} {
+  const enumHandles: Record<string, EnumTypeHandle> = {};
+  const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
+
+  if (input.enum2s.length === 0) {
+    return { enumHandles, enumTypeDescriptors };
+  }
+
+  if (!input.enum2EntityDescriptor) {
+    for (const decl of input.enum2s) {
+      input.diagnostics.push({
+        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
+        message: `enum2 "${decl.name}" requires the active target pack to contribute an enum2 entity-type helper`,
+        sourceId: input.sourceId,
+        span: decl.span,
+      });
+    }
+    return { enumHandles, enumTypeDescriptors };
+  }
+
+  for (const decl of input.enum2s) {
+    const typeAttr = getAttribute(decl.attributes, 'type');
+    if (!typeAttr) {
+      input.diagnostics.push({
+        code: 'PSL_ENUM2_MISSING_TYPE',
+        message: `enum2 "${decl.name}" is missing a @@type("codecId") attribute`,
+        sourceId: input.sourceId,
+        span: decl.span,
+      });
+      continue;
+    }
+
+    const rawCodecArg = getPositionalArgument(typeAttr);
+    const codecId = rawCodecArg !== undefined ? parseQuotedStringLiteral(rawCodecArg) : undefined;
+    if (!codecId) {
+      input.diagnostics.push({
+        code: 'PSL_ENUM2_MISSING_TYPE',
+        message: `enum2 "${decl.name}" @@type attribute must have a quoted codec id argument`,
+        sourceId: input.sourceId,
+        span: typeAttr.span,
+      });
+      continue;
+    }
+
+    const nativeType = input.codecLookup?.targetTypesFor(codecId)?.[0];
+    if (nativeType === undefined) {
+      const typeArgEntry = getPositionalArgumentEntry(typeAttr);
+      input.diagnostics.push({
+        code: 'PSL_EXTENSION_INVALID_VALUE',
+        message: `enum2 "${decl.name}" @@type references unknown codec "${codecId}"`,
+        sourceId: input.sourceId,
+        span: typeArgEntry?.span ?? typeAttr.span,
+      });
+      continue;
+    }
+
+    const codec = input.codecLookup?.get(codecId);
+
+    const seenNames = new Set<string>();
+    const seenValues = new Set<string>();
+    const members: { name: string; value: unknown }[] = [];
+    let memberError = false;
+
+    for (const member of decl.values) {
+      if (seenNames.has(member.name)) {
+        input.diagnostics.push({
+          code: 'PSL_ENUM2_DUPLICATE_MEMBER_NAME',
+          message: `enum2 "${decl.name}": duplicate member name "${member.name}"`,
+          sourceId: input.sourceId,
+          span: member.span,
+        });
+        memberError = true;
+        continue;
+      }
+      seenNames.add(member.name);
+
+      let value: unknown;
+      if (member.rawValue === undefined) {
+        if (codec !== undefined) {
+          try {
+            value = codec.decodeJson(member.name);
+          } catch {
+            input.diagnostics.push({
+              code: 'PSL_ENUM2_BARE_MEMBER_NON_STRING_CODEC',
+              message: `enum2 "${decl.name}" member "${member.name}" has no value and codec "${codecId}" does not accept a bare name as input`,
+              sourceId: input.sourceId,
+              span: member.span,
+            });
+            memberError = true;
+            continue;
+          }
+        } else {
+          value = member.name;
+        }
+      } else {
+        let jsonValue: unknown;
+        try {
+          jsonValue = JSON.parse(member.rawValue);
+        } catch {
+          input.diagnostics.push({
+            code: 'PSL_EXTENSION_INVALID_VALUE',
+            message: `enum2 "${decl.name}" member "${member.name}" value "${member.rawValue}" is not valid JSON`,
+            sourceId: input.sourceId,
+            span: member.span,
+          });
+          memberError = true;
+          continue;
+        }
+
+        if (codec !== undefined) {
+          try {
+            value = codec.decodeJson(
+              blindCast<JsonValue, 'JSON.parse returns a JsonValue-compatible value'>(jsonValue),
+            );
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            input.diagnostics.push({
+              code: 'PSL_EXTENSION_INVALID_VALUE',
+              message: `enum2 "${decl.name}" member "${member.name}" was rejected by codec "${codecId}": ${reason}`,
+              sourceId: input.sourceId,
+              span: member.span,
+            });
+            memberError = true;
+            continue;
+          }
+        } else {
+          value = jsonValue;
+        }
+      }
+
+      const valueKey = String(value);
+      if (seenValues.has(valueKey)) {
+        input.diagnostics.push({
+          code: 'PSL_ENUM2_DUPLICATE_MEMBER_VALUE',
+          message: `enum2 "${decl.name}": duplicate member value "${valueKey}"`,
+          sourceId: input.sourceId,
+          span: member.span,
+        });
+        memberError = true;
+        continue;
+      }
+      seenValues.add(valueKey);
+      members.push({ name: member.name, value });
+    }
+
+    if (memberError) continue;
+
+    if (members.length === 0) {
+      input.diagnostics.push({
+        code: 'PSL_ENUM2_MISSING_TYPE',
+        message: `enum2 "${decl.name}" must have at least one member`,
+        sourceId: input.sourceId,
+        span: decl.span,
+      });
+      continue;
+    }
+
+    const handle = enumType(
+      decl.name,
+      { codecId, nativeType },
+      ...members.map((m) => ({ name: m.name, value: m.value })),
+    );
+
+    enumHandles[decl.name] = handle;
+    enumTypeDescriptors.set(decl.name, {
+      codecId,
+      nativeType,
+      typeRef: decl.name,
+    });
+  }
+
+  return { enumHandles, enumTypeDescriptors };
+}
+
 interface ResolveNamedTypeDeclarationsInput {
   readonly declarations: readonly PslNamedTypeDeclaration[];
   readonly sourceId: string;
@@ -619,6 +812,7 @@ interface BuildModelNodeInput {
   readonly diagnostics: ContractSourceDiagnostic[];
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
+  readonly enum2Handles?: ReadonlyMap<string, EnumTypeHandle>;
 }
 
 interface BuildModelNodeResult {
@@ -1320,14 +1514,19 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     modelNode: {
       modelName: model.name,
       tableName,
-      fields: resolvedFields.map((resolvedField) => ({
-        fieldName: resolvedField.field.name,
-        columnName: resolvedField.columnName,
-        descriptor: resolvedField.descriptor,
-        nullable: resolvedField.field.optional,
-        ...ifDefined('default', resolvedField.defaultValue),
-        ...ifDefined('executionDefaults', resolvedField.executionDefaults),
-      })),
+      fields: resolvedFields.map((resolvedField) => {
+        const typeRef = resolvedField.descriptor.typeRef;
+        const enumHandle = typeRef !== undefined ? input.enum2Handles?.get(typeRef) : undefined;
+        return {
+          fieldName: resolvedField.field.name,
+          columnName: resolvedField.columnName,
+          descriptor: resolvedField.descriptor,
+          nullable: resolvedField.field.optional,
+          ...ifDefined('default', resolvedField.defaultValue),
+          ...ifDefined('executionDefaults', resolvedField.executionDefaults),
+          ...(enumHandle !== undefined ? { enumTypeHandle: enumHandle } : {}),
+        };
+      }),
       ...ifDefined('id', primaryKey),
       ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
       ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
@@ -2006,6 +2205,56 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
+  const topLevelEnum2s = input.document.ast.namespaces
+    .filter((ns) => ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME)
+    .flatMap((ns) => ns.enum2s);
+  for (const ns of input.document.ast.namespaces) {
+    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME || ns.enum2s.length === 0) continue;
+    for (const decl of ns.enum2s) {
+      diagnostics.push({
+        code: 'PSL_ENUM2_NAMESPACE_NOT_SUPPORTED',
+        message: `enum2 "${decl.name}" inside namespace "${ns.name}" is not supported; declare enum2 at the top level`,
+        sourceId,
+        span: decl.span,
+      });
+    }
+  }
+
+  const enum2EntityDescriptor = getAuthoringEntity(input.authoringContributions, ['enum2']);
+  const enum2Result = processEnum2Declarations({
+    enum2s: topLevelEnum2s,
+    sourceId,
+    enum2EntityDescriptor,
+    entityContext: enumEntityContext,
+    codecLookup: input.codecLookup,
+    diagnostics,
+  });
+
+  const collidingEnum2Names = new Set<string>();
+  for (const [name, descriptor] of enum2Result.enumTypeDescriptors) {
+    if (allEnumTypeDescriptors.has(name)) {
+      collidingEnum2Names.add(name);
+      const collision = topLevelEnum2s.find((e) => e.name === name);
+      diagnostics.push({
+        code: 'PSL_ENUM2_DUPLICATE_TYPE_NAME',
+        message: `enum2 "${name}" collides with an existing type name; each type name must be unique`,
+        sourceId,
+        ...ifDefined('span', collision?.span),
+      });
+    } else {
+      allEnumTypeDescriptors.set(name, descriptor);
+    }
+  }
+
+  const validEnum2Handles: Record<string, EnumTypeHandle> = {};
+  for (const [name, handle] of Object.entries(enum2Result.enumHandles)) {
+    if (!collidingEnum2Names.has(name)) {
+      validEnum2Handles[name] = handle;
+    }
+  }
+
+  const enum2HandlesByName = new Map(Object.entries(validEnum2Handles));
+
   const namedTypeResult = resolveNamedTypeDeclarations({
     declarations: input.document.ast.types?.declarations ?? [],
     sourceId,
@@ -2068,6 +2317,7 @@ export function interpretPslDocumentToSqlContract(
       sourceId,
       diagnostics,
       modelNamespaceIds,
+      ...(enum2HandlesByName.size > 0 ? { enum2Handles: enum2HandlesByName } : {}),
     });
     modelNodes.push(
       namespaceId !== undefined ? { ...result.modelNode, namespaceId } : result.modelNode,
@@ -2162,6 +2412,7 @@ export function interpretPslDocumentToSqlContract(
     ...(Object.keys(namespaceEnumStorageTypes).length > 0
       ? { namespaceTypes: namespaceEnumStorageTypes }
       : {}),
+    ...(Object.keys(validEnum2Handles).length > 0 ? { enums: validEnum2Handles } : {}),
     ...ifDefined('createNamespace', input.createNamespace),
     models: stiColumnModelNodes.map((model) => ({
       ...model,
@@ -2233,6 +2484,7 @@ export function interpretPslDocumentToSqlContract(
                 patchedModels[modelCoordinateKey(namespaceId, modelName)] ?? model,
               ]),
             ),
+            ...(namespaceSlice.enum !== undefined ? { enum: namespaceSlice.enum } : {}),
             ...(namespaceSlice.valueObjects !== undefined
               ? { valueObjects: namespaceSlice.valueObjects }
               : {}),
