@@ -18,14 +18,24 @@ jobs:
     name: DCO
     runs-on: ubuntu-latest
     steps:
+      # On merge_group the only commit in range is the synthetic squash commit
+      # the queue generates; it is authored by the merge actor and carries no
+      # sign-off, so there is nothing to validate. Sign-off was already enforced
+      # on the pull_request event before the PR became eligible to enqueue. The
+      # job still runs so the required "DCO" check is present on the queue SHA.
+      - name: Sign-off already verified on the pull request
+        if: github.event_name == 'merge_group'
+        run: echo "Sign-off enforced on the pull_request event; queue commit is synthetic."
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: github.event_name == 'pull_request'
         with:
           persist-credentials: false
           fetch-depth: 0
       - name: Check sign-off on every commit
+        if: github.event_name == 'pull_request'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "$BASE_SHA" "$HEAD_SHA"
