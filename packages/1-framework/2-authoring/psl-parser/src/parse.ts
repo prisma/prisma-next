@@ -100,7 +100,7 @@ export class Cursor {
 
   startNode(kind: SyntaxKind): void {
     if (this.#depth > 0) {
-      this.#flushTrivia();
+      this.flushTrivia();
     }
     this.#builder.startNode(kind);
     this.#depth++;
@@ -112,7 +112,7 @@ export class Cursor {
   }
 
   bump(): Token {
-    this.#flushTrivia();
+    this.flushTrivia();
     const token = this.#tokenizer.peek();
     if (token.kind === 'Eof') return token;
     this.#builder.token(token.kind, token.text);
@@ -121,7 +121,7 @@ export class Cursor {
   }
 
   captureBalancedBraces(): void {
-    this.#flushTrivia();
+    this.flushTrivia();
     let depth = 0;
     for (;;) {
       const token = this.#tokenizer.peek();
@@ -149,7 +149,12 @@ export class Cursor {
   }
 
   flushTrivia(): void {
-    this.#flushTrivia();
+    for (;;) {
+      const token = this.#tokenizer.peek();
+      if (!TRIVIA_KINDS.has(token.kind)) return;
+      this.#builder.token(token.kind, token.text);
+      this.#advance();
+    }
   }
 
   diagnostic(code: PslDiagnosticCode, message: string, mark: DiagnosticMark): void {
@@ -163,15 +168,6 @@ export class Cursor {
         end: this.#sourceFile.positionAt(end),
       },
     });
-  }
-
-  #flushTrivia(): void {
-    for (;;) {
-      const token = this.#tokenizer.peek();
-      if (!TRIVIA_KINDS.has(token.kind)) return;
-      this.#builder.token(token.kind, token.text);
-      this.#advance();
-    }
   }
 
   #advance(): void {
