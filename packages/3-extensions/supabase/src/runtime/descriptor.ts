@@ -2,9 +2,13 @@ import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import packageJson from '../../package.json' with { type: 'json' };
 
 /**
- * Runtime extension descriptor for the Supabase pack. Satisfies the runtime
- * contract-requirements check for contracts that declare `extensionPacks:
- * [supabasePack]`; the `supabase()` factory registers it automatically.
+ * Tells the runtime that the Supabase pack's runtime component is available.
+ *
+ * When a contract declares the Supabase pack, the runtime checks that a
+ * matching descriptor has been registered. Without this, loading a Supabase
+ * contract errors with "pack runtime component missing". The `supabase()`
+ * factory registers this descriptor automatically — app code never needs to
+ * reference it directly.
  */
 export const supabaseRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   kind: 'extension' as const,

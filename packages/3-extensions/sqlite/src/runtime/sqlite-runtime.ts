@@ -3,7 +3,11 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { type Runtime, SqlRuntimeBase } from '@prisma-next/sql-runtime';
 
 /**
- * SQLite target runtime. The named dependency surface; the class `SqliteRuntimeImpl` is exported solely as an extension seam.
+ * The SQLite runtime interface. App code depends on this — `sqlite()` returns it
+ * and `Runtime` (the common interface) is the everyday parameter type.
+ *
+ * `SqliteRuntimeImpl` is the implementing class. It is exported so that other
+ * extensions can subclass it; app code never references it directly.
  */
 export interface SqliteRuntime extends Runtime {}
 
