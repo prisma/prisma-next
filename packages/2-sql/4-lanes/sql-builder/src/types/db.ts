@@ -38,19 +38,31 @@ export type TableInAnyNamespace<C extends TableProxyContract, Name extends strin
     : never;
 }[keyof C['storage']['namespaces']];
 
+// The exact storage table at a single namespace coordinate. Resolving through
+// the coordinate (rather than the cross-namespace `UnboundTables` union) keeps
+// a bare table name shared across namespaces resolving to each namespace's own
+// table — no per-namespace column intersection.
+export type NamespaceTable<
+  C extends TableProxyContract,
+  NsId extends string,
+  Name extends string,
+> = C['storage']['namespaces'][NsId]['entries']['table'][Name];
+
 // The tables of a single storage namespace, keyed by bare table name. Lets
 // callers reach a table by its namespace coordinate (`db.<ns>.<table>`) when
-// the same bare name is declared in more than one namespace.
+// the same bare name is declared in more than one namespace. The `NsId`
+// coordinate is threaded into each `TableProxy` so its column/field resolution
+// is a function of `(NsId, Name)`, not `Name` alone.
 export type Namespace<
   C extends TableProxyContract,
-  NsId extends keyof C['storage']['namespaces'],
+  NsId extends string & keyof C['storage']['namespaces'],
 > = {
   readonly [Name in keyof TablesInNamespace<C['storage']['namespaces'][NsId]> & string]: TableProxy<
-    C,
+    C, NsId,
     Name
   >;
 };
 
 export type Db<C extends TableProxyContract> = {
-  readonly [Ns in keyof C['storage']['namespaces']]: Namespace<C, Ns>;
+  readonly [Ns in keyof C['storage']['namespaces'] & string]: Namespace<C, Ns>;
 };
