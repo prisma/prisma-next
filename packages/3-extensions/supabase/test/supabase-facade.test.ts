@@ -46,7 +46,7 @@ function stubPlan(): SqlQueryPlan {
 type SpyPool = typeof Pool & { _connectSpy: ReturnType<typeof vi.fn> };
 
 const contract = createContract<SqlStorage>();
-const JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
+const fixtureJwtSigningKey = 'test-secret-that-is-long-enough-for-hs256';
 
 function poolConnectSpy() {
   return (Pool as unknown as SpyPool)._connectSpy;
@@ -54,7 +54,7 @@ function poolConnectSpy() {
 
 async function makeJwt(
   payload: Record<string, unknown>,
-  secret = JWT_SECRET,
+  secret = fixtureJwtSigningKey,
   expiresIn = '1h',
 ): Promise<string> {
   const key = new TextEncoder().encode(secret);
@@ -98,7 +98,7 @@ describe('supabase() factory — config validation', () => {
       supabase({
         contract,
         url: 'postgres://localhost/db',
-        jwtSecret: JWT_SECRET,
+        jwtSecret: fixtureJwtSigningKey,
         jwksUrl: 'https://example.com/.well-known/jwks.json',
       } as unknown as Parameters<typeof supabase<typeof contract>>[0]),
     ).rejects.toThrow(SupabaseConfigError);
@@ -117,7 +117,11 @@ describe('supabase() factory — config validation', () => {
 describe('supabase() factory — asUser', () => {
   it('resolves a RoleBoundDb for a valid HS256 JWT', async () => {
     const jwt = await makeJwt({ sub: 'user-1', role: 'authenticated' });
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
 
     const roleBoundDb = await db.asUser(jwt);
 
@@ -132,7 +136,11 @@ describe('supabase() factory — asUser', () => {
       { sub: 'user-1', role: 'authenticated' },
       'wrong-secret-that-is-long-enough',
     );
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
 
     await expect(db.asUser(jwt)).rejects.toThrow(InvalidJwtError);
     // No pg activity — pool.connect never called
@@ -141,8 +149,16 @@ describe('supabase() factory — asUser', () => {
   });
 
   it('rejects with InvalidJwtError for an expired JWT', async () => {
-    const jwt = await makeJwt({ sub: 'user-1', role: 'authenticated' }, JWT_SECRET, '-1s');
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const jwt = await makeJwt(
+      { sub: 'user-1', role: 'authenticated' },
+      fixtureJwtSigningKey,
+      '-1s',
+    );
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
 
     await expect(db.asUser(jwt)).rejects.toThrow(InvalidJwtError);
     expect(poolConnectSpy()).not.toHaveBeenCalled();
@@ -156,7 +172,11 @@ describe('supabase() factory — behavioral binding via set_config', () => {
     poolConnectSpy().mockResolvedValue(fakeClient);
 
     const jwt = await makeJwt({ sub: 'user-1', role: 'authenticated' });
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
     const roleBoundDb = await db.asUser(jwt);
 
     await roleBoundDb
@@ -180,7 +200,11 @@ describe('supabase() factory — behavioral binding via set_config', () => {
     poolConnectSpy().mockResolvedValue(fakeClient);
 
     const jwt = await makeJwt({ sub: 'user-1', role: 'authenticated' });
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
     const roleBoundDb = await db.asUser(jwt);
 
     await roleBoundDb
@@ -197,7 +221,11 @@ describe('supabase() factory — behavioral binding via set_config', () => {
     const fakeClient = makeFakeClient();
     poolConnectSpy().mockResolvedValue(fakeClient);
 
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
     const roleBoundDb = db.asAnon();
 
     await roleBoundDb
@@ -216,7 +244,11 @@ describe('supabase() factory — behavioral binding via set_config', () => {
     const fakeClient = makeFakeClient();
     poolConnectSpy().mockResolvedValue(fakeClient);
 
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
     const roleBoundDb = db.asServiceRole();
 
     await roleBoundDb
@@ -234,7 +266,11 @@ describe('supabase() factory — behavioral binding via set_config', () => {
 
 describe('supabase() factory — SupabaseDb surface', () => {
   it('has no top-level sql or orm', async () => {
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
 
     const dbAny = db as unknown as Record<string, unknown>;
     expect(dbAny['sql']).toBeUndefined();
@@ -244,7 +280,11 @@ describe('supabase() factory — SupabaseDb surface', () => {
   });
 
   it('exposes context and stack', async () => {
-    const db = await supabase({ contract, url: 'postgres://localhost/db', jwtSecret: JWT_SECRET });
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwtSigningKey,
+    });
 
     expect(db.context).toBeDefined();
     expect(db.stack).toBeDefined();
