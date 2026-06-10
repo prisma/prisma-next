@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   Cursor,
   type ParseDiagnostic,
+  parseArrayLiteral,
   parseAttribute,
   parseAttributeArg,
   parseAttributeArgList,
+  parseBooleanLiteralExpr,
   parseExpression,
+  parseFunctionCall,
+  parseIdentifierExpr,
+  parseNumberLiteralExpr,
+  parseStringLiteralExpr,
   parseTypeAnnotation,
 } from '../src/parse';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
@@ -523,5 +529,43 @@ describe('argument-position object literal', () => {
     const source = '{ a: { b: 1 } }';
     const { node } = parse(source, parseAttributeArg);
     expect(greenText(node)).toBe(source);
+  });
+});
+
+function expectNoOpReject(source: string, run: (cursor: Cursor) => GreenNode | undefined): void {
+  const cursor = new Cursor(source);
+  expect(run(cursor)).toBeUndefined();
+  expect(cursor.diagnostics).toEqual([]);
+  cursor.startNode('Document');
+  while (cursor.peekKind() !== 'Eof') {
+    cursor.bump();
+  }
+  cursor.flushTrivia();
+  expect(greenText(cursor.finishNode())).toBe(source);
+}
+
+describe('expression alternatives are no-ops on non-match', () => {
+  it('parseStringLiteralExpr rejects a non-string token without consuming', () => {
+    expectNoOpReject('42', parseStringLiteralExpr);
+  });
+
+  it('parseNumberLiteralExpr rejects a non-number token without consuming', () => {
+    expectNoOpReject('"hi"', parseNumberLiteralExpr);
+  });
+
+  it('parseArrayLiteral rejects a non-bracket token without consuming', () => {
+    expectNoOpReject('foo', parseArrayLiteral);
+  });
+
+  it('parseFunctionCall rejects an identifier with no following paren without consuming', () => {
+    expectNoOpReject('foo', parseFunctionCall);
+  });
+
+  it('parseBooleanLiteralExpr rejects a non-boolean identifier without consuming', () => {
+    expectNoOpReject('foo', parseBooleanLiteralExpr);
+  });
+
+  it('parseIdentifierExpr rejects a non-identifier token without consuming', () => {
+    expectNoOpReject('42', parseIdentifierExpr);
   });
 });

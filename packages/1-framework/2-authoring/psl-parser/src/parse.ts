@@ -188,38 +188,51 @@ function parseIdentifier(cursor: Cursor): void {
  * `{…}` object literal as balanced raw tokens).
  */
 export function parseExpression(cursor: Cursor): GreenNode | undefined {
-  const kind = cursor.peekKind();
-  if (kind === 'StringLiteral') {
-    cursor.startNode('StringLiteralExpr');
-    cursor.bump();
-    return cursor.finishNode();
-  }
-  if (kind === 'NumberLiteral') {
-    cursor.startNode('NumberLiteralExpr');
-    cursor.bump();
-    return cursor.finishNode();
-  }
-  if (kind === 'LBracket') {
-    return parseArrayLiteral(cursor);
-  }
-  if (kind === 'Ident') {
-    if (cursor.peekKind(1) === 'LParen') {
-      return parseFunctionCall(cursor);
-    }
-    const text = cursor.peekToken().text;
-    if (text === 'true' || text === 'false') {
-      cursor.startNode('BooleanLiteralExpr');
-      cursor.bump();
-      return cursor.finishNode();
-    }
-    cursor.startNode('Identifier');
-    cursor.bump();
-    return cursor.finishNode();
-  }
-  return undefined;
+  return (
+    parseStringLiteralExpr(cursor) ??
+    parseNumberLiteralExpr(cursor) ??
+    parseArrayLiteral(cursor) ??
+    parseFunctionCall(cursor) ??
+    parseBooleanLiteralExpr(cursor) ??
+    parseIdentifierExpr(cursor)
+  );
 }
 
-function parseArrayLiteral(cursor: Cursor): GreenNode {
+export function parseStringLiteralExpr(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'StringLiteral') return undefined;
+  cursor.startNode('StringLiteralExpr');
+  cursor.bump();
+  return cursor.finishNode();
+}
+
+export function parseNumberLiteralExpr(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'NumberLiteral') return undefined;
+  cursor.startNode('NumberLiteralExpr');
+  cursor.bump();
+  return cursor.finishNode();
+}
+
+// Ordering among the `Ident`-leading alternatives is load-bearing: the
+// `LParen` lookahead of `parseFunctionCall` must win before the boolean check,
+// so `true(` stays a function call named `true` rather than a boolean literal.
+export function parseBooleanLiteralExpr(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident') return undefined;
+  const text = cursor.peekToken().text;
+  if (text !== 'true' && text !== 'false') return undefined;
+  cursor.startNode('BooleanLiteralExpr');
+  cursor.bump();
+  return cursor.finishNode();
+}
+
+export function parseIdentifierExpr(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident') return undefined;
+  cursor.startNode('Identifier');
+  cursor.bump();
+  return cursor.finishNode();
+}
+
+export function parseArrayLiteral(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'LBracket') return undefined;
   cursor.startNode('ArrayLiteral');
   cursor.bump(); // LBracket
   while (cursor.peekKind() !== 'RBracket' && cursor.peekKind() !== 'Eof') {
@@ -237,7 +250,8 @@ function parseArrayLiteral(cursor: Cursor): GreenNode {
   return cursor.finishNode();
 }
 
-function parseFunctionCall(cursor: Cursor): GreenNode {
+export function parseFunctionCall(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident' || cursor.peekKind(1) !== 'LParen') return undefined;
   cursor.startNode('FunctionCall');
   parseIdentifier(cursor);
   parseParenArgs(cursor);
