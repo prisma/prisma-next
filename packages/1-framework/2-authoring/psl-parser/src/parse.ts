@@ -44,26 +44,7 @@ export interface DiagnosticMark {
  * primitive. Trivia is flushed into the enclosing open node, so every child
  * node spans exactly its first through last significant token.
  */
-export interface ParserCursor {
-  readonly diagnostics: readonly ParseDiagnostic[];
-  readonly sourceFile: SourceFile;
-  peekKind(ahead?: number): TokenKind;
-  peekToken(ahead?: number): Token;
-  mark(): DiagnosticMark;
-  startNode(kind: SyntaxKind): void;
-  finishNode(): GreenNode;
-  bump(): Token;
-  captureBalancedBraces(): void;
-  recoverToSyncPoint(): void;
-  flushTrivia(): void;
-  diagnostic(code: PslDiagnosticCode, message: string, mark: DiagnosticMark): void;
-}
-
-export function createParserCursor(source: string): ParserCursor {
-  return new Cursor(source);
-}
-
-class Cursor implements ParserCursor {
+export class Cursor {
   readonly #tokenizer: Tokenizer;
   readonly #sourceFile: SourceFile;
   readonly #builder = new GreenNodeBuilder();
@@ -201,7 +182,7 @@ class Cursor implements ParserCursor {
 const INVALID_QUALIFIED_TYPE = 'PSL_INVALID_QUALIFIED_TYPE';
 const INVALID_ATTRIBUTE_SYNTAX = 'PSL_INVALID_ATTRIBUTE_SYNTAX';
 
-function parseIdentifier(cursor: ParserCursor): void {
+function parseIdentifier(cursor: Cursor): void {
   cursor.startNode('Identifier');
   cursor.bump();
   cursor.finishNode();
@@ -213,7 +194,7 @@ function parseIdentifier(cursor: ParserCursor): void {
  * recognised expression (the caller decides how to recover — e.g. capturing a
  * `{…}` object literal as balanced raw tokens).
  */
-export function parseExpression(cursor: ParserCursor): GreenNode | undefined {
+export function parseExpression(cursor: Cursor): GreenNode | undefined {
   const kind = cursor.peekKind();
   if (kind === 'StringLiteral') {
     cursor.startNode('StringLiteralExpr');
@@ -245,7 +226,7 @@ export function parseExpression(cursor: ParserCursor): GreenNode | undefined {
   return undefined;
 }
 
-function parseArrayLiteral(cursor: ParserCursor): GreenNode {
+function parseArrayLiteral(cursor: Cursor): GreenNode {
   cursor.startNode('ArrayLiteral');
   cursor.bump(); // LBracket
   while (cursor.peekKind() !== 'RBracket' && cursor.peekKind() !== 'Eof') {
@@ -263,7 +244,7 @@ function parseArrayLiteral(cursor: ParserCursor): GreenNode {
   return cursor.finishNode();
 }
 
-function parseFunctionCall(cursor: ParserCursor): GreenNode {
+function parseFunctionCall(cursor: Cursor): GreenNode {
   cursor.startNode('FunctionCall');
   parseIdentifier(cursor);
   parseParenArgs(cursor);
@@ -275,7 +256,7 @@ function parseFunctionCall(cursor: ParserCursor): GreenNode {
  * currently open node (a `FunctionCall` or an `AttributeArgList`), consuming the
  * surrounding parentheses.
  */
-function parseParenArgs(cursor: ParserCursor): void {
+function parseParenArgs(cursor: Cursor): void {
   cursor.bump(); // LParen
   while (cursor.peekKind() !== 'RParen' && cursor.peekKind() !== 'Eof') {
     parseAttributeArg(cursor);
@@ -290,7 +271,7 @@ function parseParenArgs(cursor: ParserCursor): void {
   }
 }
 
-export function parseAttributeArg(cursor: ParserCursor): GreenNode {
+export function parseAttributeArg(cursor: Cursor): GreenNode {
   cursor.startNode('AttributeArg');
   if (cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'Colon') {
     parseIdentifier(cursor); // argument name
@@ -300,7 +281,7 @@ export function parseAttributeArg(cursor: ParserCursor): GreenNode {
   return cursor.finishNode();
 }
 
-function parseArgValue(cursor: ParserCursor): void {
+function parseArgValue(cursor: Cursor): void {
   const value = parseExpression(cursor);
   if (!value && cursor.peekKind() === 'LBrace') {
     // No SyntaxKind models an object literal; capture it as balanced raw tokens
@@ -309,13 +290,13 @@ function parseArgValue(cursor: ParserCursor): void {
   }
 }
 
-export function parseAttributeArgList(cursor: ParserCursor): GreenNode {
+export function parseAttributeArgList(cursor: Cursor): GreenNode {
   cursor.startNode('AttributeArgList');
   parseParenArgs(cursor);
   return cursor.finishNode();
 }
 
-export function parseAttribute(cursor: ParserCursor): GreenNode {
+export function parseAttribute(cursor: Cursor): GreenNode {
   const isBlockAttribute = cursor.peekKind() === 'DoubleAt';
   const attributeMark = cursor.mark();
   cursor.startNode(isBlockAttribute ? 'ModelAttribute' : 'FieldAttribute');
@@ -343,7 +324,7 @@ export function parseAttribute(cursor: ParserCursor): GreenNode {
   return cursor.finishNode();
 }
 
-export function parseTypeAnnotation(cursor: ParserCursor): GreenNode {
+export function parseTypeAnnotation(cursor: Cursor): GreenNode {
   cursor.startNode('TypeAnnotation');
   if (cursor.peekKind() === 'Ident' && cursor.peekKind(1) === 'LParen') {
     parseFunctionCall(cursor); // inline constructor, e.g. Vector(1536)
@@ -371,7 +352,7 @@ export function parseTypeAnnotation(cursor: ParserCursor): GreenNode {
  * `PSL_INVALID_QUALIFIED_TYPE` pointed at the offending separator, while still
  * consuming the segment so the subtree (and the round-trip) stays intact.
  */
-function parseQualifierSegments(cursor: ParserCursor, separator: 'Colon' | 'Dot'): void {
+function parseQualifierSegments(cursor: Cursor, separator: 'Colon' | 'Dot'): void {
   let seen = 0;
   while (cursor.peekKind() === separator) {
     seen++;
@@ -398,7 +379,7 @@ const INVALID_ENUM_MEMBER = 'PSL_INVALID_ENUM_MEMBER';
 const INVALID_TYPES_MEMBER = 'PSL_INVALID_TYPES_MEMBER';
 const INVALID_EXTENSION_BLOCK_MEMBER = 'PSL_INVALID_EXTENSION_BLOCK_MEMBER';
 
-type MemberParser = (cursor: ParserCursor) => void;
+type MemberParser = (cursor: Cursor) => void;
 
 interface DocumentState {
   topLevelTypesSeen: boolean;
@@ -412,14 +393,14 @@ interface DocumentState {
  * an exception.
  */
 export function parse(source: string): ParseResult {
-  const cursor = createParserCursor(source);
+  const cursor = new Cursor(source);
   const green = parseDocument(cursor);
   const root = createSyntaxTree(green);
   const document = DocumentAst.cast(root) ?? new DocumentAst(root);
   return { document, diagnostics: cursor.diagnostics, sourceFile: cursor.sourceFile };
 }
 
-function parseDocument(cursor: ParserCursor): GreenNode {
+function parseDocument(cursor: Cursor): GreenNode {
   cursor.startNode('Document');
   const state: DocumentState = { topLevelTypesSeen: false };
   while (cursor.peekKind() !== 'Eof') {
@@ -435,11 +416,7 @@ function parseDocument(cursor: ParserCursor): GreenNode {
  * then `{`; `type {` is a types block while `type Ident {` is a composite type;
  * any other `kw [Ident] {` is a generic block. Anything else is unsupported.
  */
-function parseDeclaration(
-  cursor: ParserCursor,
-  insideNamespace: boolean,
-  state: DocumentState,
-): void {
+function parseDeclaration(cursor: Cursor, insideNamespace: boolean, state: DocumentState): void {
   if (cursor.peekKind() === 'Ident') {
     const keyword = cursor.peekToken().text;
     if (keyword === 'model' && nameThenBrace(cursor)) {
@@ -477,11 +454,11 @@ function parseDeclaration(
   parseUnsupportedTopLevel(cursor);
 }
 
-function nameThenBrace(cursor: ParserCursor): boolean {
+function nameThenBrace(cursor: Cursor): boolean {
   return cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace';
 }
 
-function parseNamedBlock(cursor: ParserCursor, kind: SyntaxKind, parseMember: MemberParser): void {
+function parseNamedBlock(cursor: Cursor, kind: SyntaxKind, parseMember: MemberParser): void {
   cursor.startNode(kind);
   cursor.bump(); // keyword
   parseIdentifier(cursor); // name
@@ -489,7 +466,7 @@ function parseNamedBlock(cursor: ParserCursor, kind: SyntaxKind, parseMember: Me
   cursor.finishNode();
 }
 
-function parseGenericBlock(cursor: ParserCursor, hasName: boolean): void {
+function parseGenericBlock(cursor: Cursor, hasName: boolean): void {
   cursor.startNode('BlockDeclaration');
   cursor.bump(); // keyword
   if (hasName) {
@@ -499,11 +476,7 @@ function parseGenericBlock(cursor: ParserCursor, hasName: boolean): void {
   cursor.finishNode();
 }
 
-function parseNamespace(
-  cursor: ParserCursor,
-  insideNamespace: boolean,
-  state: DocumentState,
-): void {
+function parseNamespace(cursor: Cursor, insideNamespace: boolean, state: DocumentState): void {
   const keywordMark = cursor.mark();
   cursor.startNode('Namespace');
   cursor.bump(); // namespace
@@ -528,11 +501,7 @@ function parseNamespace(
   cursor.finishNode();
 }
 
-function parseTypesBlock(
-  cursor: ParserCursor,
-  insideNamespace: boolean,
-  state: DocumentState,
-): void {
+function parseTypesBlock(cursor: Cursor, insideNamespace: boolean, state: DocumentState): void {
   const keywordMark = cursor.mark();
   cursor.startNode('TypesBlock');
   if (insideNamespace) {
@@ -561,7 +530,7 @@ function parseTypesBlock(
  * Every `parseMember` consumes at least one significant token, so the loop
  * always terminates.
  */
-function parseBlockBody(cursor: ParserCursor, parseMember: MemberParser): void {
+function parseBlockBody(cursor: Cursor, parseMember: MemberParser): void {
   const braceMark = cursor.mark();
   cursor.bump(); // LBrace
   for (;;) {
@@ -576,7 +545,7 @@ function parseBlockBody(cursor: ParserCursor, parseMember: MemberParser): void {
   }
 }
 
-function parseUnsupportedTopLevel(cursor: ParserCursor): void {
+function parseUnsupportedTopLevel(cursor: Cursor): void {
   const offending = cursor.peekToken().text;
   const message =
     cursor.peekKind(1) === 'LBrace'
@@ -587,7 +556,7 @@ function parseUnsupportedTopLevel(cursor: ParserCursor): void {
   cursor.recoverToSyncPoint();
 }
 
-function parseModelMember(cursor: ParserCursor): void {
+function parseModelMember(cursor: Cursor): void {
   const kind = cursor.peekKind();
   if (kind === 'DoubleAt') {
     parseAttribute(cursor);
@@ -604,7 +573,7 @@ function parseModelMember(cursor: ParserCursor): void {
   );
 }
 
-function parseEnumMember(cursor: ParserCursor): void {
+function parseEnumMember(cursor: Cursor): void {
   const kind = cursor.peekKind();
   if (kind === 'DoubleAt') {
     parseAttribute(cursor);
@@ -621,7 +590,7 @@ function parseEnumMember(cursor: ParserCursor): void {
   );
 }
 
-function parseNamedTypeMember(cursor: ParserCursor): void {
+function parseNamedTypeMember(cursor: Cursor): void {
   if (cursor.peekKind() === 'Ident') {
     parseNamedType(cursor);
     return;
@@ -633,7 +602,7 @@ function parseNamedTypeMember(cursor: ParserCursor): void {
   );
 }
 
-function parseKeyValueMember(cursor: ParserCursor): void {
+function parseKeyValueMember(cursor: Cursor): void {
   if (cursor.peekKind() === 'Ident') {
     parseKeyValue(cursor);
     return;
@@ -641,13 +610,13 @@ function parseKeyValueMember(cursor: ParserCursor): void {
   invalidMember(cursor, INVALID_EXTENSION_BLOCK_MEMBER, 'Invalid block entry');
 }
 
-function invalidMember(cursor: ParserCursor, code: PslDiagnosticCode, message: string): void {
+function invalidMember(cursor: Cursor, code: PslDiagnosticCode, message: string): void {
   cursor.diagnostic(code, message, cursor.mark());
   cursor.bump(); // consume the offending token so the member loop makes progress
   cursor.recoverToSyncPoint();
 }
 
-function parseField(cursor: ParserCursor): void {
+function parseField(cursor: Cursor): void {
   cursor.startNode('FieldDeclaration');
   parseIdentifier(cursor); // name
   parseTypeAnnotation(cursor);
@@ -657,7 +626,7 @@ function parseField(cursor: ParserCursor): void {
   cursor.finishNode();
 }
 
-function parseEnumValue(cursor: ParserCursor): void {
+function parseEnumValue(cursor: Cursor): void {
   cursor.startNode('EnumValueDeclaration');
   parseIdentifier(cursor); // name
   while (cursor.peekKind() === 'At') {
@@ -666,7 +635,7 @@ function parseEnumValue(cursor: ParserCursor): void {
   cursor.finishNode();
 }
 
-function parseNamedType(cursor: ParserCursor): void {
+function parseNamedType(cursor: Cursor): void {
   cursor.startNode('NamedTypeDeclaration');
   parseIdentifier(cursor); // name
   if (cursor.peekKind() === 'Equals') {
@@ -679,7 +648,7 @@ function parseNamedType(cursor: ParserCursor): void {
   cursor.finishNode();
 }
 
-function parseKeyValue(cursor: ParserCursor): void {
+function parseKeyValue(cursor: Cursor): void {
   cursor.startNode('KeyValuePair');
   parseIdentifier(cursor); // key
   if (cursor.peekKind() === 'Equals') {

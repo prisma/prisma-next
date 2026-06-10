@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createParserCursor,
+  Cursor,
   type ParseDiagnostic,
   parseAttribute,
   parseAttributeArg,
@@ -33,7 +33,7 @@ describe('offset tracking', () => {
 
 describe('peekKind', () => {
   it('reports upcoming significant kinds without consuming or emitting trivia', () => {
-    const cursor = createParserCursor('  model User');
+    const cursor = new Cursor('  model User');
     expect(cursor.peekKind()).toBe('Ident');
     expect(cursor.peekKind(1)).toBe('Ident');
     // repeated peeks are stable — nothing was consumed
@@ -51,7 +51,7 @@ describe('peekKind', () => {
 
 describe('recoverToSyncPoint', () => {
   it('appends raw tokens up to the next Newline and stops before it', () => {
-    const cursor = createParserCursor('broken stuff\nnext');
+    const cursor = new Cursor('broken stuff\nnext');
     cursor.startNode('Document');
     cursor.recoverToSyncPoint();
     const node = cursor.finishNode();
@@ -60,7 +60,7 @@ describe('recoverToSyncPoint', () => {
   });
 
   it('stops before the enclosing RBrace', () => {
-    const cursor = createParserCursor('junk}');
+    const cursor = new Cursor('junk}');
     cursor.startNode('Document');
     cursor.recoverToSyncPoint();
     const node = cursor.finishNode();
@@ -69,7 +69,7 @@ describe('recoverToSyncPoint', () => {
   });
 
   it('stops at Eof', () => {
-    const cursor = createParserCursor('only garbage here');
+    const cursor = new Cursor('only garbage here');
     cursor.startNode('Document');
     cursor.recoverToSyncPoint();
     const node = cursor.finishNode();
@@ -78,8 +78,8 @@ describe('recoverToSyncPoint', () => {
   });
 });
 
-function parse(source: string, run: (cursor: ReturnType<typeof createParserCursor>) => GreenNode) {
-  const cursor = createParserCursor(source);
+function parse(source: string, run: (cursor: Cursor) => GreenNode) {
+  const cursor = new Cursor(source);
   const node = run(cursor);
   return { node, diagnostics: cursor.diagnostics, cursor };
 }
@@ -448,10 +448,7 @@ describe('parseTypeAnnotation well-formed', () => {
   });
 });
 
-function offendingOffset(
-  cursor: ReturnType<typeof createParserCursor>,
-  diagnostic: ParseDiagnostic,
-) {
+function offendingOffset(cursor: Cursor, diagnostic: ParseDiagnostic) {
   return cursor.sourceFile.offsetAt(diagnostic.range.start);
 }
 
