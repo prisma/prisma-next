@@ -247,24 +247,38 @@ export class Collection<
    */
   where(
     fn: (
-      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName'], State['nsId']>,
     ) => WhereDirectInput,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(input: WhereDirectInput): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
-    fn: (model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg,
+    fn: (
+      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName'], State['nsId']>,
+    ) => WhereArg,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
-    filters: ShorthandWhereFilter<TContract, ModelName>,
+    filters: ShorthandWhereFilter<TContract, ModelName, State['nsId']>,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
     input:
       | WhereDirectInput
       | ((
-          model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+          model: VariantAwareModelAccessor<
+            TContract,
+            ModelName,
+            State['variantName'],
+            State['nsId']
+          >,
         ) => WhereDirectInput)
-      | ((model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg)
-      | ShorthandWhereFilter<TContract, ModelName>,
+      | ((
+          model: VariantAwareModelAccessor<
+            TContract,
+            ModelName,
+            State['variantName'],
+            State['nsId']
+          >,
+        ) => WhereArg)
+      | ShorthandWhereFilter<TContract, ModelName, State['nsId']>,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>> {
     const whereArg =
       typeof input === 'function'
@@ -1047,18 +1061,25 @@ export class Collection<
   ): Promise<Row | null>;
   async first(
     filter: (
-      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>,
+      model: VariantAwareModelAccessor<TContract, ModelName, State['variantName'], State['nsId']>,
     ) => WhereArg,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null>;
   async first(
-    filter: ShorthandWhereFilter<TContract, ModelName>,
+    filter: ShorthandWhereFilter<TContract, ModelName, State['nsId']>,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null>;
   async first(
     filter?:
-      | ((model: VariantAwareModelAccessor<TContract, ModelName, State['variantName']>) => WhereArg)
-      | ShorthandWhereFilter<TContract, ModelName>,
+      | ((
+          model: VariantAwareModelAccessor<
+            TContract,
+            ModelName,
+            State['variantName'],
+            State['nsId']
+          >,
+        ) => WhereArg)
+      | ShorthandWhereFilter<TContract, ModelName, State['nsId']>,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null> {
     const scoped =
@@ -1177,17 +1198,17 @@ export class Collection<
    * constituent SQL statement issued for the related rows.
    */
   async create(
-    data: ResolvedCreateInput<TContract, ModelName, State['variantName']>,
+    data: ResolvedCreateInput<TContract, ModelName, State['variantName'], State['nsId']>,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<Row>;
   async create(
-    data: MutationCreateInputWithRelations<TContract, ModelName>,
+    data: MutationCreateInputWithRelations<TContract, ModelName, State['nsId']>,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<Row>;
   async create(
     data:
-      | ResolvedCreateInput<TContract, ModelName, State['variantName']>
-      | MutationCreateInputWithRelations<TContract, ModelName>,
+      | ResolvedCreateInput<TContract, ModelName, State['variantName'], State['nsId']>
+      | MutationCreateInputWithRelations<TContract, ModelName, State['nsId']>,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<Row> {
     assertReturningCapability(this.contract, 'create()');
@@ -1223,7 +1244,7 @@ export class Collection<
     }
 
     const rows = await this.#createAllWithAnnotations(
-      [data as ResolvedCreateInput<TContract, ModelName, State['variantName']>],
+      [data as ResolvedCreateInput<TContract, ModelName, State['variantName'], State['nsId']>],
       annotationsMap,
     );
     const created = rows[0];
@@ -1262,7 +1283,7 @@ export class Collection<
    * compiled insert plan.
    */
   createAll(
-    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName'], State['nsId']>[],
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): AsyncIterableResult<Row> {
     return this.#createAllWithAnnotations(
@@ -1272,7 +1293,7 @@ export class Collection<
   }
 
   #createAllWithAnnotations(
-    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName'], State['nsId']>[],
     annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
   ): AsyncIterableResult<Row> {
     if (data.length === 0) {
@@ -1716,7 +1737,9 @@ export class Collection<
    * statement issued for the related rows.
    */
   async update(
-    data: State['hasWhere'] extends true ? MutationUpdateInput<TContract, ModelName> : never,
+    data: State['hasWhere'] extends true
+      ? MutationUpdateInput<TContract, ModelName, State['nsId']>
+      : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<Row | null> {
     assertReturningCapability(this.contract, 'update()');
@@ -1760,7 +1783,7 @@ export class Collection<
       const narrowed = scoped.#clone({ filters: [identityWhere] });
       const rows = await narrowed.#updateAllWithAnnotations(
         data as State['hasWhere'] extends true
-          ? Partial<DefaultModelRow<TContract, ModelName>>
+          ? Partial<DefaultModelRow<TContract, ModelName, State['nsId']>>
           : never,
         annotationsMap,
       );
@@ -1794,7 +1817,9 @@ export class Collection<
    * `MetaBuilder<'write'>` for attaching typed annotations.
    */
   updateAll(
-    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    data: State['hasWhere'] extends true
+      ? Partial<DefaultModelRow<TContract, ModelName, State['nsId']>>
+      : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): AsyncIterableResult<Row> {
     return this.#updateAllWithAnnotations(
@@ -1804,7 +1829,9 @@ export class Collection<
   }
 
   #updateAllWithAnnotations(
-    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    data: State['hasWhere'] extends true
+      ? Partial<DefaultModelRow<TContract, ModelName, State['nsId']>>
+      : never,
     annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
   ): AsyncIterableResult<Row> {
     assertReturningCapability(this.contract, 'updateAll()');

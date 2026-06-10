@@ -8,8 +8,10 @@ import type {
   CollectionContext,
   CollectionModelName,
   CollectionTypeState,
+  DefaultCollectionTypeState,
   InferRootRow,
   RuntimeQueryable,
+  WithNsId,
 } from './types';
 
 export interface OrmOptions<
@@ -34,16 +36,22 @@ type CustomCollectionForKey<
     : never
   : never;
 
-// The `NsId` coordinate is threaded into `InferRootRow` so the collection's row
-// resolves the model's fields within its namespace (per-namespace domain block
-// + nested `FieldOutputTypes[NsId]`), rather than the flat first-name-wins map.
+// The `NsId` coordinate is threaded into the collection (and its `InferRootRow`)
+// so the read row AND the create/update/where input types resolve the model's
+// fields within its namespace (per-namespace domain block + nested
+// `FieldOutputTypes[NsId]`), rather than the flat first-name-wins map.
 type ModelCollection<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
   NsId extends string,
   ModelName extends ModelNames<TContract>,
 > = [CustomCollectionForKey<Collections, ModelName>] extends [never]
-  ? Collection<TContract, ModelName, InferRootRow<TContract, ModelName, NsId>>
+  ? Collection<
+      TContract,
+      ModelName,
+      InferRootRow<TContract, ModelName, NsId>,
+      WithNsId<DefaultCollectionTypeState, NsId>
+    >
   : CustomCollectionForKey<Collections, ModelName>;
 
 type NamespaceModelNames<
