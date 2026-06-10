@@ -5,33 +5,40 @@
 
 ## At a glance
 
-Five slices: a contract **substrate** slice (TML-2850) lands the two-plane enum shape; the
+Six slices: a contract **substrate** slice (TML-2850) lands the two-plane enum shape; the
 Postgres check-constraint **enforcement** (TML-2851) and the application **read surface**
-(TML-2852, typing + `db.enums` + ordering) build on it; the enum **member defaults**
-(TML-2855) close the last parity gap; and the **cutover** (TML-2853) repoints PSL `enum` +
-default authoring onto the new shape and deletes the native machinery in one atomic PR.
+(TML-2852, typing + `db.enums` + ordering + emit-time value-union narrowing) build on it;
+a **transitional PSL block** (TML-2882, placeholder spelling `enum2`) makes the new
+mechanism authorable through PSL additively and exercises it end-to-end in the demo's real
+emitted-contract app; the enum **member defaults** (TML-2855) close the last parity gap;
+and the **cutover** (TML-2853) points `enum` at the already-live lowering, retires the
+transitional keyword, migrates remaining native enums, and deletes the native machinery.
 
-The cutover is **parity-gated, not deferred for its own sake**: `enum` is one keyword, so
-the flip must be atomic, and it can only land once the new shape does everything native
-does — enforcement (✅ TML-2851), emit-time typing (TML-2852), and member defaults
-(TML-2855). The new shape lands additively until then, but the span it sits *dark* (built,
-yet not the meaning of `enum`) is a **cost to minimise, not a virtue**: dark slices defer
-integration risk and hide breakage — slice 3 merged green while not working through emit.
-So we close the last parity gap (TML-2855) and cut over **immediately after**, rather than
-treating the cutover as a distant finale.
+The original constraint — `enum` is one keyword, so activation had to wait for one atomic
+flip at the very end — is dissolved by the transitional keyword: **activation happens
+additively at TML-2882**, where the new mechanism goes live through the product path
+(PSL → emit → app) with native untouched. The dark window (built but unreachable through
+PSL) ends there, not at the cutover. The cutover stays a single atomic PR, but its job
+shrinks to **consolidation**: rename + migrate + delete, with the risky new lowering
+already proven in production use.
 
 ## Current status & next (sequencing decision)
 
 - **Done:** TML-2850 (substrate), TML-2851 (enforcement).
-- **In review:** TML-2852 (read surface) — includes the emit-time value-union narrowing
-  that closes a typing-parity gap with native enums.
-- **Next (promoted):** **TML-2855 (member defaults)** — the last parity prerequisite for
-  the cutover — then **TML-2853 (cutover)** directly behind it.
-- **Why this changed from the original plan:** 2855/2853 were parked as a distant finale
-  behind an "additive/dark, every merge green" framing. In practice the dark window caused
-  recurring confusion (everyone reasons from "`enum` *is* the new concept"; the code says
-  "native until the last PR") and hid a real bug. We keep the atomic cutover but pull it
-  forward so the dark window shrinks to near-zero.
+- **In review:** TML-2852 (read surface) — typed-read machinery, demonstrated via the
+  demo's no-emit workflow; includes the emit-time value-union narrowing that makes
+  emitted contracts carry the union.
+- **Next:** **TML-2882 (transitional PSL `enum2` block)** — the new mechanism becomes
+  PSL-authorable and goes live in the demo's real emitted-contract app.
+- **Then:** **TML-2855 (member defaults)** — its PSL `@default(member)` surface attaches
+  to a real PSL enum field once TML-2882 lands — and **TML-2853 (cutover)** directly
+  behind it, now reduced to rename + migrate + delete.
+- **Why this changed from the original plan:** the cutover was first parked as a distant
+  finale behind an "additive/dark, every merge green" framing; the dark window caused
+  recurring confusion and hid a real bug (the read surface merged green while broken
+  through emit). We first pulled the cutover forward; the transitional keyword goes
+  further and removes the need to wait at all — the feature activates additively, and
+  the cutover becomes pure consolidation.
 
 ## Composition
 
@@ -62,22 +69,48 @@ treating the cutover as a distant finale.
      stays the default and is untouched; **PSL `enum` is not repointed in this slice** (it
      keeps lowering to native — repoint is the slice-4 cutover).
 
-2. **Slice `delete-native-enum-machinery`** — Linear: [TML-2853](https://linear.app/prisma-company/issue/TML-2853)
-   - **Outcome (cutover + delete):** PSL `enum` and the default authoring switch to
-     producing the new domain-enum + value-set shape; canonical fixtures regenerate to the
-     `valueSet` + check form; the native Postgres enum machinery (spec § What this
-     replaces) is deleted. Build, type-checks, and `fixtures:check` pass; no
-     `postgres-enum` discriminator or `PostgresEnumType` remains; the no-bare-cast ratchet
-     is clean.
-   - **Builds on:** Slice `check-constraint-realization` (TML-2851) — the flip requires
-     migrations/verification to understand the new shape the instant authoring emits it.
-     Sequenced after slice 3 (TML-2852) too, so reads are typed when the shape goes live
-     and fixtures regenerate exactly once.
-   - **Hands to:** A single enum path — the project's end state.
-   - **Focus:** flip the PSL `enum` lowering + default authoring from native to the new
-     shape; regenerate canonical fixtures to the `valueSet` + check form; delete the
-     enumerated native machinery; confirm `fixtures:check` and the cast ratchet. The single
-     atomic cutover — native and new coexist only up to this PR.
+2. **Slice `transitional-psl-enum-keyword`** — Linear: [TML-2882](https://linear.app/prisma-company/issue/TML-2882)
+   - **Outcome (activation, additive):** a new top-level PSL block — placeholder spelling
+     `enum2`, final transitional name settled at spec time — lowers to the new shape
+     (domain `enum` + storage `valueSet` + field/column `valueSet` ref + check), reusing
+     the TS-path lowering. Native `enum` is untouched. The demo authors `enum2 Priority`
+     in its PSL schema; the emitted `contract.d.ts` carries the value union; `main.ts`
+     consumes it (typed reads, `db.enums`, declaration-order `ORDER BY`) through the real
+     emitted-contract workflow, with the migration adding the check. **This is where the
+     new mechanism goes live through the product path** — no cutover required.
+   - **Builds on:** Slice 1's lowering (TML-2850); slice 3's emit-time narrowing
+     (TML-2852), so the emitted contract types the enum field as its union.
+   - **Hands to:** TML-2855 (PSL `@default(member)` attaches to a real PSL enum field)
+     and TML-2853 (the cutover becomes consolidation — see below).
+   - **Focus:** psl-parser — the `enum2` block keyword, member `Name = value` syntax (RHS
+     is the codec's JSON-encoded value), and the `@@type("codec-id")` block attribute (the
+     member-value grammar is the one genuinely new piece; the cutover needs it anyway).
+     contract-psl interpreter — a parallel declaration-processing path that looks up an
+     `entityTypes.enum2` contribution and reuses the existing domain + value-set lowering;
+     field resolution is unchanged (by-name descriptor map). Postgres pack — register the
+     `enum2` entity-type factory. Demo — PSL `enum2 Priority`, re-emitted artifacts,
+     migration, and a `main.ts` command consuming the enum through the emitted contract.
+     ~500 lines + tests. **Out:** member defaults (TML-2855); the rename + native deletion
+     (TML-2853); numeric-codec SQL rendering (stays guarded).
+
+3. **Slice `delete-native-enum-machinery`** — Linear: [TML-2853](https://linear.app/prisma-company/issue/TML-2853)
+   - **Outcome (consolidation: rename + migrate + delete):** PSL `enum` points at the same
+     lowering the transitional keyword already exercises live; the transitional keyword is
+     retired; remaining native enums (e.g. the demo's `user_type`) migrate to the
+     `valueSet` + check form; canonical fixtures regenerate once; the native Postgres enum
+     machinery (spec § What this replaces) is deleted. Build, type-checks, and
+     `fixtures:check` pass; no `postgres-enum` discriminator or `PostgresEnumType`
+     remains; the no-bare-cast ratchet is clean.
+   - **Builds on:** TML-2851 (migrations/verification understand the new shape),
+     TML-2852 (typed reads through emit), TML-2882 (the PSL lowering exists and is proven
+     live — the cutover no longer builds it), TML-2855 (member-default parity).
+   - **Hands to:** A single enum path under the single `enum` keyword — the project's end
+     state.
+   - **Focus:** repoint `enum` to the transitional block's lowering and retire the
+     transitional keyword; migrate remaining native-enum usages; regenerate canonical
+     fixtures; delete the enumerated native machinery; confirm `fixtures:check` and the
+     cast ratchet. Still the project's only non-additive merge — but now a rename +
+     migrate + delete with no new mechanism risk.
 
 ### Parallel group A — Postgres realization (independent of group B; builds on slice 1)
 
@@ -113,11 +146,12 @@ treating the cutover as a distant finale.
     client — disjoint from group A's migration/planner surface. Out of scope: server-side
     enforcement and defaults (now TML-2855, parallel group C).
 
-### Enum member defaults — **PROMOTED to the immediate next slice** (was parallel group C)
+### Enum member defaults — follows the transitional PSL block (was parallel group C)
 
-> Originally specced as an independent parallel slice; now the next thing to build,
-> because it is the **last parity prerequisite** before the cutover can land. Independent
-> of enforcement (TML-2851); builds only on slice 1.
+> Originally specced as an independent parallel slice, then promoted to next; now
+> sequenced **after TML-2882** so its PSL `@default(member)` surface attaches to a real
+> PSL enum field instead of being TS-only. Still the **last parity prerequisite** before
+> the cutover. Independent of enforcement (TML-2851); builds on slice 1 + TML-2882.
 
 
 - **Slice `enum-member-defaults`** — Linear: [TML-2855](https://linear.app/prisma-company/issue/TML-2855)
@@ -153,15 +187,20 @@ treating the cutover as a distant finale.
   migration DDL path and the query/typing path do not collide, so the
   "different-surface slices parallelise; same-adapter slices serialise" heuristic applies
   in favour of parallel.
-- **The cutover (TML-2853) is one atomic, parity-gated flip — landed as soon as parity
-  exists, not last for its own sake.** `enum` is one keyword; it cannot mean both native
-  and the new shape at once, so the repoint + native-delete is a single PR. That PR can
-  only land once the new shape reaches parity with native: enforcement (TML-2851, ✅),
-  emit-time typing (TML-2852 — native enums narrow on emit, so cutting over earlier would
-  regress typing), and member defaults (TML-2855 — native supports `@default`). The flip
-  also regenerates the canonical fixtures exactly once. **Correction to the original
-  framing:** the long additive/*dark* runway was treated as a benefit ("every prior slice
-  leaves `main` green"); it is a cost — it deferred all integration risk to the end and let
-  slice 3 merge green while broken through emit. So TML-2855 is **promoted to the immediate
-  next slice** and the cutover stacks directly behind it, shrinking the dark window to
-  near-zero. The cutover remains the project's only non-additive merge.
+- **The transitional PSL block (TML-2882) activates the feature additively and ends the
+  dark window early.** The original constraint — `enum` is one keyword, so the new shape
+  could not be PSL-reachable until one atomic flip at the very end — is dissolved by a
+  parallel transitional keyword. The new mechanism goes live through the product path
+  (PSL → emit → app) while native `enum` is untouched, so every merge stays green *and*
+  the feature is exercised end-to-end long before the cutover. **Correction to the
+  original framing (kept for the record):** the long additive/*dark* runway was treated
+  as a benefit ("every prior slice leaves `main` green"); it is a cost — it deferred all
+  integration risk to the end and let slice 3 merge green while broken through emit. The
+  first correction pulled the cutover forward; the transitional keyword removes the wait
+  entirely.
+- **The cutover (TML-2853) is consolidation, not activation.** Still one atomic PR (the
+  `enum` keyword repoint, the transitional-keyword retirement, and the native delete
+  belong together), still parity-gated (enforcement TML-2851 ✅, emit typing TML-2852,
+  the live PSL lowering TML-2882, member defaults TML-2855), and still the project's only
+  non-additive merge — but its risky part (the new PSL lowering) is already proven in
+  live use by the time it lands. It also regenerates the canonical fixtures exactly once.
