@@ -167,7 +167,12 @@ function isExecutionPlan(plan: SqlExecutionPlan | SqlQueryPlan): plan is SqlExec
 const noopLogSink = (): void => {};
 const noopLog: Log = { info: noopLogSink, warn: noopLogSink, error: noopLogSink };
 
-export class SqlRuntime<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
+/**
+ * Abstract family-layer base for SQL runtimes. Subclass to build a target runtime
+ * (e.g. `PostgresRuntime`); app code should consume the `Runtime` interface returned
+ * by `createRuntime` and the target factories, never this class.
+ */
+export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
   implements Runtime
 {
@@ -745,6 +750,10 @@ export class SqlRuntime<TContract extends Contract<SqlStorage> = Contract<SqlSto
   }
 }
 
+class DefaultSqlRuntime<
+  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
+> extends SqlRuntime<TContract> {}
+
 function transactionClosedError(): Error {
   return runtimeError(
     'RUNTIME.TRANSACTION_CLOSED',
@@ -865,7 +874,7 @@ export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId 
 ): Runtime {
   const { stackInstance, context, driver, verifyMarker, middleware, mode, log } = options;
 
-  return new SqlRuntime({
+  return new DefaultSqlRuntime({
     context,
     adapter: stackInstance.adapter,
     driver,
