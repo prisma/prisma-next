@@ -96,18 +96,22 @@ export interface DataTransformOptions {
   readonly run: DataTransformClosure | readonly DataTransformClosure[];
 }
 
-export function dataTransform<TContract extends Contract<SqlStorage>>(
+export async function dataTransform<TContract extends Contract<SqlStorage>>(
   contract: TContract,
   name: string,
   options: DataTransformOptions,
   adapter: SqlControlAdapter<'postgres'>,
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
   const runClosures: readonly DataTransformClosure[] = Array.isArray(options.run)
     ? options.run
     : [options.run as DataTransformClosure];
 
-  const checkPlan = options.check ? invokeAndLower(options.check, contract, adapter, name) : null;
-  const runPlans = runClosures.map((closure) => invokeAndLower(closure, contract, adapter, name));
+  const checkPlan = options.check
+    ? await invokeAndLower(options.check, contract, adapter, name)
+    : null;
+  const runPlans = await Promise.all(
+    runClosures.map((closure) => invokeAndLower(closure, contract, adapter, name)),
+  );
 
   const precheck: readonly SqlMigrationPlanOperationStep[] = checkPlan
     ? [
@@ -147,23 +151,16 @@ export function dataTransform<TContract extends Contract<SqlStorage>>(
   };
 }
 
-function invokeAndLower(
+async function invokeAndLower(
   closure: DataTransformClosure,
   contract: Contract<SqlStorage>,
   adapter: SqlControlAdapter<'postgres'>,
   name: string,
-): SqlExecuteRequest {
+): Promise<SqlExecuteRequest> {
   const result = closure();
   const plan = isBuildable(result) ? result.build() : result;
   assertContractMatches(plan, contract, name);
-  const lowered = adapter.lower(plan.ast, { contract });
-  const params = lowered.params.map((slot) => {
-    if (slot.kind === 'literal') return slot.value;
-    throw new Error(
-      `data-transform: bind-site slot '${slot.name}' is not allowed in migration plans`,
-    );
-  });
-  return { sql: lowered.sql, params };
+  return adapter.lowerToExecuteRequest(plan.ast, { contract });
 }
 
 function isBuildable(value: unknown): value is Buildable {

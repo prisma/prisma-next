@@ -1,9 +1,12 @@
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
+import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { pgTable, text } from '@prisma-next/target-postgres/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
 import { describe, expect, it } from 'vitest';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
+import { encodeControlQueryParams } from '../src/core/control-codecs';
 import type { PostgresContract } from '../src/core/types';
 
 const adapter = new PostgresControlAdapter();
@@ -183,5 +186,55 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — guards', () => {
     const result = await adapter.lowerToExecuteRequest(ast, ctx);
     // Built-in lookup has no 'unregistered@1' → fallback inlines the raw value.
     expect(result.sql).toContain(`DEFAULT 'plaintext'`);
+  });
+});
+
+const TEST_CODEC_ID = 'test/transform@1';
+
+const queryTransformingCodec = {
+  id: TEST_CODEC_ID,
+  encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
+  decode: async (wire: unknown) => wire,
+} as unknown as Codec;
+
+const testRegistry: ContractCodecRegistry = {
+  forColumn: () => undefined,
+  forCodecRef: (ref) => {
+    if (ref.codecId === TEST_CODEC_ID) return queryTransformingCodec;
+    throw new Error(`unknown codec ${ref.codecId}`);
+  },
+};
+
+const testTable = pgTable(
+  { name: 'things' },
+  {
+    label: { codecId: TEST_CODEC_ID, nullable: false },
+    name: text(),
+  },
+);
+
+const codecAdapter = new PostgresControlAdapter(transformingLookup);
+
+describe('PostgresControlAdapter.lowerToExecuteRequest — query branch encoding', () => {
+  it('codec-encodes a literal param bound to a transforming-codec column', async () => {
+    const ast = testTable.select(testTable.label).where(testTable.label.eq('plaintext')).build();
+    const lowered = codecAdapter.lower(ast, ctx);
+    const params = await encodeControlQueryParams(lowered, ast, testRegistry);
+    expect(params).not.toContain('plaintext');
+    expect(params).toContain('ENC:PLAINTEXT');
+  });
+
+  it('passes uncodec-d params through unchanged', async () => {
+    const ast = testTable.select(testTable.name).where(testTable.name.eq('raw-value')).build();
+    const lowered = adapter.lower(ast, ctx);
+    const params = await encodeControlQueryParams(lowered, ast);
+    expect(params).toContain('raw-value');
+  });
+
+  it('lowerToExecuteRequest query branch returns an execute request for a plain column', async () => {
+    const ast = testTable.select(testTable.name).where(testTable.name.eq('value')).build();
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
+    expect(result).toHaveProperty('sql');
+    expect(result.params).toContain('value');
   });
 });

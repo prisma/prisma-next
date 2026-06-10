@@ -43,6 +43,7 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-u
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
+import { encodeControlQueryParams } from './control-codecs';
 import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
 import {
   decodeSqliteMarkerRow,
@@ -184,7 +185,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       ast,
       blindCast<SqliteContract, 'Caller must supply matching contract'>(context?.contract),
     );
-    const params = lowered.params.map((p) => (p.kind === 'literal' ? p.value : p.name));
+    const params = await encodeControlQueryParams(lowered, ast);
     return { sql: lowered.sql, params };
   }
 

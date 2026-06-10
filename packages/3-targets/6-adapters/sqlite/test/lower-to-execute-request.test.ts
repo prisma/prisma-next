@@ -1,9 +1,12 @@
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
+import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { sqliteTable, text } from '@prisma-next/target-sqlite/contract-free';
 import { SqliteCreateTable } from '@prisma-next/target-sqlite/ddl';
 import { describe, expect, it } from 'vitest';
 import { SqliteControlAdapter } from '../src/core/control-adapter';
+import { encodeControlQueryParams } from '../src/core/control-codecs';
 import type { SqliteContract } from '../src/core/types';
 
 const adapter = new SqliteControlAdapter();
@@ -182,5 +185,52 @@ describe('SqliteControlAdapter.lowerToExecuteRequest — codec routing + DDL sha
       'CREATE TABLE IF NOT EXISTS "_prisma_marker" (\n  "space" TEXT NOT NULL PRIMARY KEY\n)',
     );
     expect(result.params).toEqual([]);
+  });
+});
+
+const TEST_CODEC_ID = 'test/transform@1';
+
+const transformingQueryCodec: Codec = {
+  id: TEST_CODEC_ID,
+  encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
+  decode: async (wire: unknown) => wire,
+  encodeJson: (v) => v as never,
+  decodeJson: (v) => v as never,
+};
+
+const testRegistry: ContractCodecRegistry = {
+  forColumn: () => undefined,
+  forCodecRef: (ref) => {
+    if (ref.codecId === TEST_CODEC_ID) return transformingQueryCodec;
+    throw new Error(`unknown codec ${ref.codecId}`);
+  },
+};
+
+const testTable = sqliteTable('things', {
+  label: { codecId: TEST_CODEC_ID, nullable: false },
+  name: text(),
+});
+
+describe('SqliteControlAdapter.lowerToExecuteRequest — query branch encoding', () => {
+  it('codec-encodes a literal param bound to a transforming-codec column', async () => {
+    const ast = testTable.select(testTable.label).where(testTable.label.eq('plaintext')).build();
+    const lowered = adapter.lower(ast, ctx);
+    const params = await encodeControlQueryParams(lowered, ast, testRegistry);
+    expect(params).not.toContain('plaintext');
+    expect(params).toContain('ENC:PLAINTEXT');
+  });
+
+  it('passes uncodec-d params through unchanged', async () => {
+    const ast = testTable.select(testTable.name).where(testTable.name.eq('raw-value')).build();
+    const lowered = adapter.lower(ast, ctx);
+    const params = await encodeControlQueryParams(lowered, ast);
+    expect(params).toContain('raw-value');
+  });
+
+  it('lowerToExecuteRequest query branch returns an execute request for a plain column', async () => {
+    const ast = testTable.select(testTable.name).where(testTable.name.eq('value')).build();
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
+    expect(result).toHaveProperty('sql');
+    expect(result.params).toContain('value');
   });
 });

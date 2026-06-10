@@ -65,6 +65,7 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
+import { encodeControlQueryParams } from './control-codecs';
 import {
   introspectPostgresEnumTypes,
   type PostgresEnumStorageTypeAnnotation,
@@ -196,7 +197,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       blindCast<PostgresContract, 'Caller must supply matching contract'>(context?.contract),
       this.codecLookup,
     );
-    const params = lowered.params.map((p) => (p.kind === 'literal' ? p.value : p.name));
+    const params = await encodeControlQueryParams(lowered, ast);
     return { sql: lowered.sql, params };
   }
 

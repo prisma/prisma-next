@@ -2,18 +2,25 @@ import type { Contract } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import { placeholder } from '@prisma-next/errors/migration';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { dataTransform } from '@prisma-next/target-postgres/data-transform';
-import { litParams } from '@prisma-next/test-utils/lowered-params';
+import { pgTable } from '@prisma-next/target-postgres/contract-free';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
+import { encodeControlQueryParams } from '../../src/core/control-codecs';
 
 const CONTRACT_HASH = 'sha256:contract-abc';
 
-const lowerMock = vi.fn();
+const lowerToExecuteRequestMock = vi.fn();
 
 function makeAdapter(): SqlControlAdapter<'postgres'> {
-  return { lower: lowerMock } as unknown as SqlControlAdapter<'postgres'>;
+  return {
+    lowerToExecuteRequest: lowerToExecuteRequestMock,
+  } as unknown as SqlControlAdapter<'postgres'>;
 }
 
 function makeContract(storageHash: string = CONTRACT_HASH): Contract<SqlStorage> {
@@ -37,15 +44,15 @@ function makePlan(storageHash: string = CONTRACT_HASH): SqlQueryPlan {
 
 describe('dataTransform factory', () => {
   beforeEach(() => {
-    lowerMock.mockReset();
+    lowerToExecuteRequestMock.mockReset();
   });
 
-  it('lowers a single run with no check into execute-only steps', () => {
-    lowerMock.mockImplementation(() => ({
+  it('lowers a single run with no check into execute-only steps', async () => {
+    lowerToExecuteRequestMock.mockResolvedValue({
       sql: 'UPDATE users SET email = $1',
-      params: litParams('n/a'),
-    }));
-    const op = dataTransform(
+      params: ['n/a'],
+    });
+    const op = await dataTransform(
       makeContract(),
       'backfill-emails',
       { run: () => makePlan() },
@@ -68,13 +75,12 @@ describe('dataTransform factory', () => {
     });
   });
 
-  it('supports a readonly array of run closures', () => {
+  it('supports a readonly array of run closures', async () => {
     let call = 0;
-    lowerMock.mockImplementation(() => ({
-      sql: `STMT_${call++}`,
-      params: litParams(1, 'x'),
-    }));
-    const op = dataTransform(
+    lowerToExecuteRequestMock.mockImplementation(() =>
+      Promise.resolve({ sql: `STMT_${call++}`, params: [1, 'x'] }),
+    );
+    const op = await dataTransform(
       makeContract(),
       'multi',
       { run: [() => makePlan(), () => makePlan()] },
@@ -87,17 +93,17 @@ describe('dataTransform factory', () => {
     ]);
   });
 
-  it('wraps the check closure into precheck/postcheck with EXISTS / NOT EXISTS', () => {
-    lowerMock
-      .mockImplementationOnce(() => ({
+  it('wraps the check closure into precheck/postcheck with EXISTS / NOT EXISTS', async () => {
+    lowerToExecuteRequestMock
+      .mockResolvedValueOnce({
         sql: 'SELECT 1 FROM users WHERE email IS NULL',
-        params: litParams(),
-      }))
-      .mockImplementation(() => ({
+        params: [],
+      })
+      .mockResolvedValue({
         sql: 'UPDATE users SET email = $1',
-        params: litParams('n/a'),
-      }));
-    const op = dataTransform(
+        params: ['n/a'],
+      });
+    const op = await dataTransform(
       makeContract(),
       'with-check',
       { check: () => makePlan(), run: () => makePlan() },
@@ -119,32 +125,29 @@ describe('dataTransform factory', () => {
     ]);
   });
 
-  it('propagates PN-MIG-2001 when a closure is a placeholder (never reaches the adapter)', () => {
-    lowerMock.mockImplementation(() => {
-      throw new Error('adapter.lower should not be called for placeholder closures');
+  it('propagates PN-MIG-2001 when a closure is a placeholder (never reaches the adapter)', async () => {
+    lowerToExecuteRequestMock.mockResolvedValue({
+      sql: 'X',
+      params: [],
     });
-    expect(() =>
+    await expect(
       dataTransform(
         makeContract(),
         'not-yet-filled',
         { run: () => placeholder('not-yet-filled:run') },
         makeAdapter(),
       ),
-    ).toThrow(
-      expect.objectContaining({
-        code: '2001',
-        domain: 'MIG',
-        meta: { slot: 'not-yet-filled:run' },
-      }),
-    );
+    ).rejects.toMatchObject({
+      code: '2001',
+      domain: 'MIG',
+      meta: { slot: 'not-yet-filled:run' },
+    });
   });
 
-  it('throws PN-MIG-2005 when a plan storageHash does not match the contract', () => {
-    lowerMock.mockImplementation(() => {
-      throw new Error('adapter.lower should not be called when the hash check fails');
-    });
+  it('throws PN-MIG-2005 when a plan storageHash does not match the contract', async () => {
+    lowerToExecuteRequestMock.mockResolvedValue({ sql: 'X', params: [] });
     try {
-      dataTransform(
+      await dataTransform(
         makeContract(),
         'mismatched',
         { run: () => makePlan('sha256:someone-elses-contract') },
@@ -164,13 +167,10 @@ describe('dataTransform factory', () => {
     }
   });
 
-  it('accepts a Buildable by calling build() once', () => {
-    lowerMock.mockImplementation(() => ({
-      sql: 'SELECT 1',
-      params: litParams(1, 'x'),
-    }));
+  it('accepts a Buildable by calling build() once', async () => {
+    lowerToExecuteRequestMock.mockResolvedValue({ sql: 'SELECT 1', params: [1, 'x'] });
     const build = vi.fn(() => makePlan());
-    const op = dataTransform(
+    const op = await dataTransform(
       makeContract(),
       'from-buildable',
       { run: () => ({ build }) },
@@ -180,20 +180,20 @@ describe('dataTransform factory', () => {
     expect(op.execute).toHaveLength(1);
   });
 
-  it('forwards the contract via LowererContext on every adapter.lower call', () => {
+  it('forwards the contract via LowererContext on every adapter.lowerToExecuteRequest call', async () => {
     const contract = makeContract();
     const adapter = makeAdapter();
-    lowerMock.mockReturnValue({ sql: 'X', params: litParams() });
-    dataTransform(contract, 'forwards-contract', { run: () => makePlan() }, adapter);
-    expect(lowerMock).toHaveBeenCalled();
-    for (const [, ctx] of lowerMock.mock.calls) {
+    lowerToExecuteRequestMock.mockResolvedValue({ sql: 'X', params: [] });
+    await dataTransform(contract, 'forwards-contract', { run: () => makePlan() }, adapter);
+    expect(lowerToExecuteRequestMock).toHaveBeenCalled();
+    for (const [, ctx] of lowerToExecuteRequestMock.mock.calls) {
       expect(ctx).toEqual({ contract });
     }
   });
 
-  it('forwards invariantId onto the op when supplied', () => {
-    lowerMock.mockReturnValue({ sql: 'X', params: litParams() });
-    const op = dataTransform(
+  it('forwards invariantId onto the op when supplied', async () => {
+    lowerToExecuteRequestMock.mockResolvedValue({ sql: 'X', params: [] });
+    const op = await dataTransform(
       makeContract(),
       'backfill-emails',
       { invariantId: 'backfill-user-email', run: () => makePlan() },
@@ -202,14 +202,58 @@ describe('dataTransform factory', () => {
     expect(op.invariantId).toBe('backfill-user-email');
   });
 
-  it('omits invariantId when not supplied', () => {
-    lowerMock.mockReturnValue({ sql: 'X', params: litParams() });
-    const op = dataTransform(
+  it('omits invariantId when not supplied', async () => {
+    lowerToExecuteRequestMock.mockResolvedValue({ sql: 'X', params: [] });
+    const op = await dataTransform(
       makeContract(),
       'no-invariant',
       { run: () => makePlan() },
       makeAdapter(),
     );
     expect(op).not.toHaveProperty('invariantId');
+  });
+});
+
+const TEST_CODEC_ID = 'test/transform@1';
+
+const transformingCodec: Codec = {
+  id: TEST_CODEC_ID,
+  encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
+  decode: async (wire: unknown) => wire,
+  encodeJson: (v) => v as never,
+  decodeJson: (v) => v as never,
+};
+
+const transformingLookup: CodecLookup = {
+  ...emptyCodecLookup,
+  get: (id) => (id === TEST_CODEC_ID ? transformingCodec : undefined),
+};
+
+const testRegistry: ContractCodecRegistry = {
+  forColumn: () => undefined,
+  forCodecRef: (ref) => {
+    if (ref.codecId === TEST_CODEC_ID) return transformingCodec;
+    throw new Error(`unknown codec ${ref.codecId}`);
+  },
+};
+
+const testTable = pgTable(
+  { name: 'things' },
+  {
+    label: { codecId: TEST_CODEC_ID, nullable: false },
+  },
+);
+
+const testAdapter = new PostgresControlAdapter(transformingLookup);
+
+describe('dataTransform — codec-encoded params via lowerToExecuteRequest', () => {
+  it('execute step params carry the codec-encoded wire value (not raw JS value)', async () => {
+    const contract = makeContract();
+    const ast = testTable.select(testTable.label).where(testTable.label.eq('plaintext')).build();
+    const lowered = testAdapter.lower(ast, { contract });
+    const params = await encodeControlQueryParams(lowered, ast, testRegistry);
+
+    expect(params).not.toContain('plaintext');
+    expect(params).toContain('ENC:PLAINTEXT');
   });
 });

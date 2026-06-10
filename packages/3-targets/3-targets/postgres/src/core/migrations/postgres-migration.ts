@@ -64,7 +64,7 @@ export abstract class PostgresMigration extends SqlMigration<
     contract: TContract,
     name: string,
     options: DataTransformOptions,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  ): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }
