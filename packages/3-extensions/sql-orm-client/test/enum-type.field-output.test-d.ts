@@ -22,17 +22,23 @@ type EnumCodecTypes = {
   };
 };
 
+// Field-type maps are nested by namespace coordinate; this fixture's models
+// live under the `__unbound__` storage namespace.
 type EnumFieldOutputTypes = {
-  User: {
-    role: 'user' | 'admin';
-    status: 'active' | 'inactive' | null;
+  __unbound__: {
+    User: {
+      role: 'user' | 'admin';
+      status: 'active' | 'inactive' | null;
+    };
   };
 };
 
 type EnumFieldInputTypes = {
-  User: {
-    role: 'user' | 'admin';
-    status: 'active' | 'inactive' | null;
+  __unbound__: {
+    User: {
+      role: 'user' | 'admin';
+      status: 'active' | 'inactive' | null;
+    };
   };
 };
 

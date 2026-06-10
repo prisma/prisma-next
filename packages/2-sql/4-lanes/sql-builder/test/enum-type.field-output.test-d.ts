@@ -15,17 +15,23 @@ type EnumCodecTypes = {
   };
 };
 
+// Field-type maps are nested by namespace coordinate; this fixture's models
+// live under the `__unbound__` storage namespace.
 type EnumFieldOutputTypes = {
-  User: {
-    role: 'user' | 'admin';
-    status: 'active' | 'inactive' | null;
+  __unbound__: {
+    User: {
+      role: 'user' | 'admin';
+      status: 'active' | 'inactive' | null;
+    };
   };
 };
 
 type EnumFieldInputTypes = {
-  User: {
-    role: 'user' | 'admin';
-    status: 'active' | 'inactive' | null;
+  __unbound__: {
+    User: {
+      role: 'user' | 'admin';
+      status: 'active' | 'inactive' | null;
+    };
   };
 };
 
@@ -96,7 +102,7 @@ type EnumDb = Db<EnumContract>;
 // ---------------------------------------------------------------------------
 
 test('sql-builder: column output types for enum fields come from FieldOutputTypes', () => {
-  type QC = import('../src/types/table-proxy').ContractToQC<EnumContract, 'User'>;
+  type QC = import('../src/types/table-proxy').ContractToQC<EnumContract, '__unbound__', 'User'>;
   type RoleOutput = QC['resolvedColumnOutputTypes']['role'];
   type StatusOutput = QC['resolvedColumnOutputTypes']['status'];
 
