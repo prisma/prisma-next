@@ -32,9 +32,13 @@ vi.mock('@prisma-next/sql-builder/runtime', () => ({
   sql: mocks.sqlBuilder,
 }));
 
-vi.mock('@prisma-next/sql-orm-client', () => ({
-  orm: mocks.orm,
-}));
+vi.mock('@prisma-next/sql-orm-client', async (importActual) => {
+  const actual = await importActual<typeof import('@prisma-next/sql-orm-client')>();
+  return {
+    orm: mocks.orm,
+    buildNamespacedEnums: actual.buildNamespacedEnums,
+  };
+});
 
 vi.mock('@prisma-next/target-postgres/runtime', () => ({
   default: { id: 'target-postgres' },
@@ -517,5 +521,58 @@ describe('postgres', () => {
 
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  describe('db.enums (facade)', () => {
+    const roleEnum = {
+      codecId: 'pg/text@1',
+      members: [
+        { name: 'User', value: 'user' },
+        { name: 'Admin', value: 'admin' },
+      ],
+    } as const;
+    const auditRoleEnum = {
+      codecId: 'pg/text@1',
+      members: [
+        { name: 'System', value: 'system' },
+        { name: 'Operator', value: 'operator' },
+      ],
+    } as const;
+
+    function twoNamespaceContract() {
+      return {
+        ...contract,
+        domain: {
+          namespaces: {
+            public: { models: {}, enum: { Role: roleEnum } },
+            audit: { models: {}, enum: { Role: auditRoleEnum } },
+          },
+        },
+      };
+    }
+
+    it('exposes enums per namespace and resolves same-named enums independently', () => {
+      mocks.deserializeContract.mockReturnValue(twoNamespaceContract());
+      const db = postgres({
+        contractJson: {},
+        url: 'postgres://localhost:5432/db',
+      });
+
+      expect(db.enums.public.Role.values).toEqual(['user', 'admin']);
+      expect(db.enums.audit.Role.values).toEqual(['system', 'operator']);
+      expect(db.enums.public.Role.nameOf('admin')).toBe('Admin');
+      expect(db.enums.audit.Role.ordinalOf('operator')).toBe(1);
+    });
+
+    it('builds the enums surface eagerly, without a runtime', () => {
+      mocks.deserializeContract.mockReturnValue(twoNamespaceContract());
+      const db = postgres({
+        contractJson: {},
+        url: 'postgres://localhost:5432/db',
+      });
+
+      expect(db.enums.public.Role.values).toEqual(['user', 'admin']);
+      expect(mocks.createRuntime).not.toHaveBeenCalled();
+    });
   });
 });

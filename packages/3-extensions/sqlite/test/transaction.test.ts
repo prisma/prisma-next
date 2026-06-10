@@ -32,9 +32,13 @@ vi.mock('@prisma-next/sql-builder/runtime', () => ({
   sql: mocks.sqlBuilder,
 }));
 
-vi.mock('@prisma-next/sql-orm-client', () => ({
-  orm: mocks.orm,
-}));
+vi.mock('@prisma-next/sql-orm-client', async (importActual) => {
+  const actual = await importActual<typeof import('@prisma-next/sql-orm-client')>();
+  return {
+    orm: mocks.orm,
+    buildNamespacedEnums: actual.buildNamespacedEnums,
+  };
+});
 
 vi.mock('@prisma-next/family-sql/ir', () => ({
   SqlContractSerializer: class {
