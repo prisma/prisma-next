@@ -11,11 +11,19 @@ import {
   parseFunctionCall,
   parseIdentifierExpr,
   parseNumberLiteralExpr,
+  parseObjectLiteralExpr,
   parseStringLiteralExpr,
   parseTypeAnnotation,
 } from '../src/parse';
+import {
+  AttributeArgAst,
+  NumberLiteralExprAst,
+  ObjectLiteralExprAst,
+  StringLiteralExprAst,
+} from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import { GreenNodeBuilder } from '../src/syntax/green-builder';
+import { createSyntaxTree } from '../src/syntax/red';
 
 function greenText(element: GreenElement): string {
   if (element.type === 'token') return element.text;
@@ -514,21 +522,83 @@ describe('parseAttribute fault tolerance', () => {
 });
 
 describe('argument-position object literal', () => {
-  it('captures an unrecognised object literal as balanced raw tokens so the round-trip holds', () => {
-    const source = '{ a: 1 }';
+  it('parses an object literal argument into an ObjectLiteralExpr queryable via fields()', () => {
+    const source = '{ a: 1, b: "x" }';
     const { node, diagnostics } = parse(source, parseAttributeArg);
 
     expect(node.kind).toBe('AttributeArg');
     expect(greenText(node)).toBe(source);
-    // no node kind is invented; the braces land as raw tokens
-    expect(node.children.every((child) => child.type === 'token')).toBe(true);
     expect(diagnostics).toHaveLength(0);
+
+    const obj = AttributeArgAst.cast(createSyntaxTree(node))!.value();
+    expect(obj).toBeInstanceOf(ObjectLiteralExprAst);
+    if (obj instanceof ObjectLiteralExprAst) {
+      const fields = Array.from(obj.fields());
+      expect(fields).toHaveLength(2);
+      expect(fields[0]!.key()?.token()?.text).toBe('a');
+      expect(fields[0]!.value()).toBeInstanceOf(NumberLiteralExprAst);
+      expect(fields[1]!.key()?.token()?.text).toBe('b');
+      expect(fields[1]!.value()).toBeInstanceOf(StringLiteralExprAst);
+    }
   });
 
-  it('balances nested braces inside the captured object literal', () => {
+  it('parses a nested object literal recursively, round-tripping losslessly', () => {
     const source = '{ a: { b: 1 } }';
-    const { node } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parse(source, parseAttributeArg);
     expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(0);
+
+    const obj = AttributeArgAst.cast(createSyntaxTree(node))!.value();
+    expect(obj).toBeInstanceOf(ObjectLiteralExprAst);
+    if (obj instanceof ObjectLiteralExprAst) {
+      const [field] = Array.from(obj.fields());
+      expect(field!.value()).toBeInstanceOf(ObjectLiteralExprAst);
+    }
+  });
+
+  it('allows a trailing comma', () => {
+    const source = '{ a: 1, }';
+    const { node, diagnostics } = parse(source, parseAttributeArg);
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(0);
+
+    const obj = AttributeArgAst.cast(createSyntaxTree(node))!.value();
+    expect(obj).toBeInstanceOf(ObjectLiteralExprAst);
+    if (obj instanceof ObjectLiteralExprAst) {
+      expect(Array.from(obj.fields())).toHaveLength(1);
+    }
+  });
+
+  it('reports a missing colon but still yields a best-effort node and round-trips', () => {
+    const source = '{ a 1 }';
+    const { node, diagnostics } = parse(source, parseAttributeArg);
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
+    expect(diagnostics[0]!.message).toBe('Expected ":" after "a"');
+    expect(AttributeArgAst.cast(createSyntaxTree(node))!.value()).toBeInstanceOf(
+      ObjectLiteralExprAst,
+    );
+  });
+
+  it('reports a missing value but still yields a best-effort node and round-trips', () => {
+    const source = '{ a: }';
+    const { node, diagnostics } = parse(source, parseAttributeArg);
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
+    expect(diagnostics[0]!.message).toBe('Expected a value after ":"');
+  });
+
+  it('reports an unterminated object literal anchored on the opening brace', () => {
+    const source = '{ a: 1';
+    const { node, diagnostics, cursor } = parse(source, parseAttributeArg);
+    expect(greenText(node)).toBe(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
+    expect(diagnostics[0]!.message).toBe('Unterminated object literal');
+    expect(offendingOffset(cursor, diagnostics[0]!)).toBe(0);
+    expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe('{');
   });
 });
 
@@ -567,5 +637,9 @@ describe('expression alternatives are no-ops on non-match', () => {
 
   it('parseIdentifierExpr rejects a non-identifier token without consuming', () => {
     expectNoOpReject('42', parseIdentifierExpr);
+  });
+
+  it('parseObjectLiteralExpr rejects a non-brace token without consuming', () => {
+    expectNoOpReject('foo', parseObjectLiteralExpr);
   });
 });

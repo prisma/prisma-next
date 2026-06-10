@@ -23,6 +23,8 @@ import {
   BooleanLiteralExprAst,
   FunctionCallAst,
   NumberLiteralExprAst,
+  ObjectFieldAst,
+  ObjectLiteralExprAst,
   StringLiteralExprAst,
 } from '../../src/syntax/ast/expressions';
 import { IdentifierAst } from '../../src/syntax/ast/identifier';
@@ -519,6 +521,138 @@ describe('ArrayLiteralAst', () => {
     expect(arr.rbracket()?.text).toBe(']');
     const elements = Array.from(arr.elements());
     expect(elements).toHaveLength(2);
+  });
+});
+
+describe('ObjectLiteralExprAst', () => {
+  function buildObjectLiteral() {
+    // { name: "x", count: 1 }
+    const b = new GreenNodeBuilder();
+    b.startNode('ObjectLiteralExpr');
+    b.token('LBrace', '{');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('Identifier');
+    b.token('Ident', 'name');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('StringLiteralExpr');
+    b.token('StringLiteral', '"x"');
+    b.finishNode();
+    b.finishNode();
+    b.token('Comma', ',');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('Identifier');
+    b.token('Ident', 'count');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('NumberLiteralExpr');
+    b.token('NumberLiteral', '1');
+    b.finishNode();
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('RBrace', '}');
+    return b.finishNode();
+  }
+
+  it('exposes braces and iterates fields', () => {
+    const root = createSyntaxTree(buildObjectLiteral());
+    const obj = ObjectLiteralExprAst.cast(root)!;
+    expect(obj.lbrace()?.text).toBe('{');
+    expect(obj.rbrace()?.text).toBe('}');
+    expect(Array.from(obj.fields())).toHaveLength(2);
+  });
+
+  it('exposes identifier key, colon, and value per field', () => {
+    const root = createSyntaxTree(buildObjectLiteral());
+    const obj = ObjectLiteralExprAst.cast(root)!;
+    const [first, second] = Array.from(obj.fields());
+    expect(first!.key()).toBeInstanceOf(IdentifierAst);
+    expect(first!.key()?.token()?.text).toBe('name');
+    expect(first!.colon()?.text).toBe(':');
+    expect(first!.value()).toBeInstanceOf(StringLiteralExprAst);
+    expect(second!.key()?.token()?.text).toBe('count');
+    expect(second!.value()).toBeInstanceOf(NumberLiteralExprAst);
+  });
+
+  it('exposes a nested object literal as a field value', () => {
+    // { a: { b: 1 } }
+    const b = new GreenNodeBuilder();
+    b.startNode('ObjectLiteralExpr');
+    b.token('LBrace', '{');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('Identifier');
+    b.token('Ident', 'a');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectLiteralExpr');
+    b.token('LBrace', '{');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('Identifier');
+    b.token('Ident', 'b');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('NumberLiteralExpr');
+    b.token('NumberLiteral', '1');
+    b.finishNode();
+    b.finishNode(); // inner ObjectField
+    b.token('Whitespace', ' ');
+    b.token('RBrace', '}');
+    b.finishNode(); // inner ObjectLiteralExpr
+    b.finishNode(); // outer ObjectField
+    b.token('Whitespace', ' ');
+    b.token('RBrace', '}');
+    const root = createSyntaxTree(b.finishNode());
+    const outer = ObjectLiteralExprAst.cast(root)!;
+    const [field] = Array.from(outer.fields());
+    const inner = field!.value();
+    expect(inner).toBeInstanceOf(ObjectLiteralExprAst);
+    if (inner instanceof ObjectLiteralExprAst) {
+      const [innerField] = Array.from(inner.fields());
+      expect(innerField!.key()?.token()?.text).toBe('b');
+      expect(innerField!.value()).toBeInstanceOf(NumberLiteralExprAst);
+    }
+  });
+
+  it('exposes a string key without mistaking it for the value', () => {
+    // { "k": 1 }
+    const b = new GreenNodeBuilder();
+    b.startNode('ObjectLiteralExpr');
+    b.token('LBrace', '{');
+    b.token('Whitespace', ' ');
+    b.startNode('ObjectField');
+    b.startNode('StringLiteralExpr');
+    b.token('StringLiteral', '"k"');
+    b.finishNode();
+    b.token('Colon', ':');
+    b.token('Whitespace', ' ');
+    b.startNode('NumberLiteralExpr');
+    b.token('NumberLiteral', '1');
+    b.finishNode();
+    b.finishNode();
+    b.token('Whitespace', ' ');
+    b.token('RBrace', '}');
+    const root = createSyntaxTree(b.finishNode());
+    const obj = ObjectLiteralExprAst.cast(root)!;
+    const [field] = Array.from(obj.fields());
+    expect(field!.key()).toBeInstanceOf(StringLiteralExprAst);
+    expect(field!.value()).toBeInstanceOf(NumberLiteralExprAst);
+  });
+
+  it('cast returns undefined for non-matching kind', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('Identifier');
+    b.token('Ident', 'x');
+    const root = createSyntaxTree(b.finishNode());
+    expect(ObjectLiteralExprAst.cast(root)).toBeUndefined();
+    expect(ObjectFieldAst.cast(root)).toBeUndefined();
   });
 });
 

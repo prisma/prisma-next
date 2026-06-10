@@ -13,15 +13,18 @@ import {
   parseNamespace,
   parseTypeDeclaration,
 } from '../src/parse';
+import { AttributeArgListAst, FieldAttributeAst } from '../src/syntax/ast/attributes';
 import {
   BlockDeclarationAst,
   CompositeTypeDeclarationAst,
   DocumentAst,
   EnumDeclarationAst,
+  FieldDeclarationAst,
   ModelDeclarationAst,
   NamespaceDeclarationAst,
   TypesBlockAst,
 } from '../src/syntax/ast/declarations';
+import { ObjectLiteralExprAst } from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import { GreenNodeBuilder } from '../src/syntax/green-builder';
 
@@ -526,14 +529,29 @@ describe('parse() representative multi-construct schema', () => {
 });
 
 describe('parse() round-trips lossless schemas', () => {
-  it('captures an object-literal constructor argument as balanced raw tokens', () => {
+  it('parses an object-literal constructor argument into a queryable ObjectLiteralExpr node', () => {
     const source = 'model M {\n  id Json @default({ a: 1, nested: { b: 2 } })\n}';
     const result = parse(source);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(1);
-    expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
+    const model = decls[0];
+    expect(model).toBeInstanceOf(ModelDeclarationAst);
+    if (!(model instanceof ModelDeclarationAst)) return;
+    const [field] = Array.from(model.fields());
+    expect(field).toBeInstanceOf(FieldDeclarationAst);
+    const [attr] = Array.from(field!.attributes());
+    expect(attr).toBeInstanceOf(FieldAttributeAst);
+    const argList = attr!.argList();
+    expect(argList).toBeInstanceOf(AttributeArgListAst);
+    const [arg] = Array.from(argList!.args());
+    const obj = arg!.value();
+    expect(obj).toBeInstanceOf(ObjectLiteralExprAst);
+    if (!(obj instanceof ObjectLiteralExprAst)) return;
+    const fields = Array.from(obj.fields());
+    expect(fields.map((f) => f.key()?.token()?.text)).toEqual(['a', 'nested']);
+    expect(fields[1]!.value()).toBeInstanceOf(ObjectLiteralExprAst);
   });
 
   it('round-trips a schema with CRLF newlines', () => {
