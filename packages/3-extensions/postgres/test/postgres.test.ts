@@ -539,21 +539,26 @@ describe('postgres', () => {
       ],
     } as const;
 
-    function twoNamespaceContract() {
-      return {
-        ...contract,
-        domain: {
-          namespaces: {
-            public: { models: {}, enum: { Role: roleEnum } },
-            audit: { models: {}, enum: { Role: auditRoleEnum } },
-          },
+    const twoNamespaceDomain = {
+      ...contract,
+      domain: {
+        namespaces: {
+          public: { models: {}, enum: { Role: roleEnum } },
+          audit: { models: {}, enum: { Role: auditRoleEnum } },
         },
-      };
-    }
+      },
+    } as const;
+
+    // A literal-keyed contract so `db.enums.public.Role` is a static facade
+    // proof, not index-signature access. The mock deserializer returns the same
+    // shape at runtime.
+    type TwoNsContract = Contract<SqlStorage> & {
+      readonly domain: (typeof twoNamespaceDomain)['domain'];
+    };
 
     it('exposes enums per namespace and resolves same-named enums independently', () => {
-      mocks.deserializeContract.mockReturnValue(twoNamespaceContract());
-      const db = postgres({
+      mocks.deserializeContract.mockReturnValue(twoNamespaceDomain);
+      const db = postgres<TwoNsContract>({
         contractJson: {},
         url: 'postgres://localhost:5432/db',
       });
@@ -565,8 +570,8 @@ describe('postgres', () => {
     });
 
     it('builds the enums surface eagerly, without a runtime', () => {
-      mocks.deserializeContract.mockReturnValue(twoNamespaceContract());
-      const db = postgres({
+      mocks.deserializeContract.mockReturnValue(twoNamespaceDomain);
+      const db = postgres<TwoNsContract>({
         contractJson: {},
         url: 'postgres://localhost:5432/db',
       });
