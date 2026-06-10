@@ -422,55 +422,89 @@ function parseDeclaration(cursor: Cursor, insideNamespace: boolean, state: Docum
     parseModel(cursor) ??
     parseEnum(cursor) ??
     parseNamespace(cursor, insideNamespace, state) ??
-    parseTypesBlock(cursor, insideNamespace, state) ??
-    parseCompositeType(cursor) ??
+    parseTypeDeclaration(cursor, insideNamespace, state) ??
     parseGenericBlock(cursor);
   if (!node) {
     parseUnsupportedTopLevel(cursor);
   }
 }
 
-function nameThenBrace(cursor: Cursor): boolean {
-  return cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace';
+/**
+ * After a reserved declaration keyword has committed, completes the header: it
+ * parses the block body when the opening brace is present, otherwise emits a
+ * single keyword-anchored `PSL_INVALID_DECLARATION` and recovers to the next
+ * sync point. The diagnostic reports the first missing piece — a missing name
+ * takes precedence over a missing brace — so at most one is emitted per
+ * malformed header.
+ */
+function finishReservedHeader(
+  cursor: Cursor,
+  keyword: string,
+  keywordMark: DiagnosticMark,
+  hasName: boolean,
+  parseBody: () => void,
+): void {
+  const hasBrace = cursor.peekKind() === 'LBrace';
+  if (!hasName) {
+    cursor.diagnostic('PSL_INVALID_DECLARATION', `Expected a name after "${keyword}"`, keywordMark);
+  } else if (!hasBrace) {
+    cursor.diagnostic(
+      'PSL_INVALID_DECLARATION',
+      `Expected "{" to open the "${keyword}" block`,
+      keywordMark,
+    );
+  }
+  if (hasBrace) {
+    parseBody();
+  } else {
+    cursor.recoverToSyncPoint();
+  }
 }
 
-function parseNamedBlock(cursor: Cursor, kind: SyntaxKind, parseMember: MemberParser): GreenNode {
+/**
+ * Parses a reserved block declaration (`model`/`enum`, or the composite-type
+ * branch of `type`) whose keyword has already been matched. The keyword commits
+ * the declaration kind: an optional name is parsed when present, then the header
+ * is completed by `finishReservedHeader`, which flags a missing name or brace.
+ */
+function parseReservedBlock(
+  cursor: Cursor,
+  keyword: string,
+  kind: SyntaxKind,
+  parseMember: MemberParser,
+): GreenNode {
+  const keywordMark = cursor.mark();
   cursor.startNode(kind);
   cursor.bump(); // keyword
-  parseIdentifier(cursor); // name
-  parseBlockBody(cursor, parseMember);
+  const hasName = cursor.peekKind() === 'Ident';
+  if (hasName) {
+    parseIdentifier(cursor);
+  }
+  finishReservedHeader(cursor, keyword, keywordMark, hasName, () =>
+    parseBlockBody(cursor, parseMember),
+  );
   return cursor.finishNode();
 }
 
 export function parseModel(cursor: Cursor): GreenNode | undefined {
-  if (!(keywordIs(cursor, 'model') && nameThenBrace(cursor))) return undefined;
-  return parseNamedBlock(cursor, 'ModelDeclaration', parseModelMember);
+  if (!keywordIs(cursor, 'model')) return undefined;
+  return parseReservedBlock(cursor, 'model', 'ModelDeclaration', parseModelMember);
 }
 
 export function parseEnum(cursor: Cursor): GreenNode | undefined {
-  if (!(keywordIs(cursor, 'enum') && nameThenBrace(cursor))) return undefined;
-  return parseNamedBlock(cursor, 'EnumDeclaration', parseEnumMember);
-}
-
-export function parseCompositeType(cursor: Cursor): GreenNode | undefined {
-  if (
-    !(
-      keywordIs(cursor, 'type') &&
-      cursor.peekKind(1) === 'Ident' &&
-      cursor.peekKind(2) === 'LBrace'
-    )
-  ) {
-    return undefined;
-  }
-  return parseNamedBlock(cursor, 'CompositeTypeDeclaration', parseModelMember);
+  if (!keywordIs(cursor, 'enum')) return undefined;
+  return parseReservedBlock(cursor, 'enum', 'EnumDeclaration', parseEnumMember);
 }
 
 /**
  * Matches an unreserved `Ident` block keyword followed by `{` (anonymous) or
  * `Ident {` (named). Excluding the reserved keywords (`model`/`enum`/
- * `namespace`/`type`) is what preserves the behaviour where a malformed reserved
- * block (e.g. `model {` with no name) falls through to the unsupported-
- * declaration recovery rather than being captured as a generic block.
+ * `namespace`/`type`) is what keeps a malformed reserved block (e.g. `model {`
+ * with no name) routed to its dedicated parser — which commits the declaration
+ * kind on the keyword and reports a `PSL_INVALID_DECLARATION` — rather than
+ * being captured here as a generic block. Generic blocks carry no reserved
+ * keyword (the set is open for extension-contributed blocks), so they stay
+ * discriminated by the opening brace.
  */
 export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
@@ -491,12 +525,13 @@ export function parseNamespace(
   insideNamespace: boolean,
   state: DocumentState,
 ): GreenNode | undefined {
-  if (!(keywordIs(cursor, 'namespace') && nameThenBrace(cursor))) return undefined;
+  if (!keywordIs(cursor, 'namespace')) return undefined;
   const keywordMark = cursor.mark();
   cursor.startNode('Namespace');
   cursor.bump(); // namespace
-  const name = cursor.peekKind() === 'Ident' ? cursor.peekToken().text : '';
-  if (cursor.peekKind() === 'Ident') {
+  const hasName = cursor.peekKind() === 'Ident';
+  const name = hasName ? cursor.peekToken().text : '';
+  if (hasName) {
     parseIdentifier(cursor);
   }
   if (insideNamespace) {
@@ -512,16 +547,30 @@ export function parseNamespace(
       keywordMark,
     );
   }
-  parseBlockBody(cursor, (inner) => parseDeclaration(inner, true, state));
+  finishReservedHeader(cursor, 'namespace', keywordMark, hasName, () =>
+    parseBlockBody(cursor, (inner) => parseDeclaration(inner, true, state)),
+  );
   return cursor.finishNode();
 }
 
-export function parseTypesBlock(
+/**
+ * Parses a `type` declaration. The keyword commits the declaration to one of two
+ * kinds, disambiguated by the next significant token: a following `Ident` is a
+ * composite type (`type Name { … }`), anything else is a `types` block
+ * (`type { … }`). Either branch commits the kind on the keyword — a missing
+ * brace (or, for the composite branch, a present name with no brace) yields a
+ * `PSL_INVALID_DECLARATION`, not an unsupported-declaration. The `types` branch
+ * preserves the document-top-level and single-block constraints.
+ */
+export function parseTypeDeclaration(
   cursor: Cursor,
   insideNamespace: boolean,
   state: DocumentState,
 ): GreenNode | undefined {
-  if (!(keywordIs(cursor, 'type') && cursor.peekKind(1) === 'LBrace')) return undefined;
+  if (!keywordIs(cursor, 'type')) return undefined;
+  if (cursor.peekKind(1) === 'Ident') {
+    return parseReservedBlock(cursor, 'type', 'CompositeTypeDeclaration', parseModelMember);
+  }
   const keywordMark = cursor.mark();
   cursor.startNode('TypesBlock');
   if (insideNamespace) {
@@ -540,7 +589,16 @@ export function parseTypesBlock(
     state.topLevelTypesSeen = true;
   }
   cursor.bump(); // type
-  parseBlockBody(cursor, parseNamedTypeMember);
+  if (cursor.peekKind() === 'LBrace') {
+    parseBlockBody(cursor, parseNamedTypeMember);
+  } else {
+    cursor.diagnostic(
+      'PSL_INVALID_DECLARATION',
+      'Expected "{" to open the "type" block',
+      keywordMark,
+    );
+    cursor.recoverToSyncPoint();
+  }
   return cursor.finishNode();
 }
 
