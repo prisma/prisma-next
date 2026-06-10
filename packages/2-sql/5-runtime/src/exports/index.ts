@@ -54,6 +54,7 @@ export {
   createSqlExecutionStack,
 } from '../sql-context';
 export type {
+  RawSessionConnection,
   Runtime,
   RuntimeConnection,
   RuntimeQueryable,

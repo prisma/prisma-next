@@ -379,6 +379,106 @@ export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contra
     return new AsyncIterableResult(generator());
   }
 
+  /**
+   * Opens a transaction, runs `bootstrap` against a `RawSessionConnection`
+   * (below middleware, same as `executeWithSessionBootstrap`), then invokes
+   * `fn` with a `TransactionContext` whose `execute` calls route through the
+   * middleware chain on the same transaction. Commits on success, rolls back
+   * on error — identical lifecycle discipline to `executeWithSessionBootstrap`.
+   */
+  protected async executeTransactionWithBootstrap<R>(
+    bootstrap: (conn: RawSessionConnection) => Promise<void>,
+    fn: (tx: TransactionContext) => PromiseLike<R>,
+  ): Promise<R> {
+    const conn = await this.driver.acquireConnection();
+    let connectionDisposed = false;
+    const destroyConnection = async (reason: unknown): Promise<void> => {
+      if (connectionDisposed) return;
+      connectionDisposed = true;
+      await conn.destroy(reason).catch(() => undefined);
+    };
+
+    const driverTx = await conn.beginTransaction();
+    let invalidated = false;
+
+    const view: RawSessionConnection = {
+      query: (sql, params) => driverTx.query(sql, params),
+    };
+
+    const self = this;
+    const txContext: TransactionContext = {
+      get invalidated() {
+        return invalidated;
+      },
+      execute<Row>(
+        plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
+        options?: RuntimeExecuteOptions,
+      ): AsyncIterableResult<Row> {
+        return self.executeAgainstQueryable<Row>(plan, driverTx, {
+          ...options,
+          scope: 'transaction',
+        });
+      },
+      executePrepared<Params, Row>(
+        ps: PreparedStatement<Params, Row>,
+        params: Params,
+        options?: RuntimeExecuteOptions,
+      ): AsyncIterableResult<Row> {
+        return self.executePreparedAgainstQueryable<Params, Row>(
+          ps as PreparedStatementImpl<Params, Row>,
+          params as Record<string, unknown>,
+          driverTx,
+          { ...options, scope: 'transaction' },
+        );
+      },
+    };
+
+    try {
+      try {
+        await bootstrap(view);
+        const result = await fn(txContext);
+        invalidated = true;
+        try {
+          await driverTx.commit();
+        } catch (commitError) {
+          try {
+            await driverTx.rollback();
+          } catch {
+            await destroyConnection(commitError);
+          }
+          const wrapped = runtimeError(
+            'RUNTIME.TRANSACTION_COMMIT_FAILED',
+            'Transaction commit failed',
+            { commitError },
+          );
+          wrapped.cause = commitError;
+          throw wrapped;
+        }
+        return result;
+      } catch (error) {
+        if (!invalidated) {
+          try {
+            await driverTx.rollback();
+          } catch (rollbackError) {
+            await destroyConnection(rollbackError);
+            const wrapped = runtimeError(
+              'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
+              'Transaction rollback failed',
+              { rollbackError },
+            );
+            wrapped.cause = error;
+            throw wrapped;
+          }
+        }
+        throw error;
+      }
+    } finally {
+      if (!connectionDisposed) {
+        await conn.release();
+      }
+    }
+  }
+
   private async *streamRows<Row>(
     exec: SqlExecutionPlan,
     decodeContext: DecodeContext,

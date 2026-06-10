@@ -3581,12 +3581,18 @@ importers:
 
   packages/3-extensions/supabase:
     dependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:0.13.0
+        version: link:../../3-targets/6-adapters/postgres
       '@prisma-next/contract':
         specifier: workspace:0.13.0
         version: link:../../1-framework/0-foundation/contract
       '@prisma-next/contract-authoring':
         specifier: workspace:0.13.0
         version: link:../../1-framework/2-authoring/contract
+      '@prisma-next/driver-postgres':
+        specifier: workspace:0.13.0
+        version: link:../../3-targets/7-drivers/postgres
       '@prisma-next/family-sql':
         specifier: workspace:0.13.0
         version: link:../../2-sql/9-family
@@ -3596,6 +3602,12 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:0.13.0
         version: link:../../1-framework/3-tooling/migration
+      '@prisma-next/postgres':
+        specifier: workspace:0.13.0
+        version: link:../postgres
+      '@prisma-next/sql-builder':
+        specifier: workspace:0.13.0
+        version: link:../../2-sql/4-lanes/sql-builder
       '@prisma-next/sql-contract':
         specifier: workspace:0.13.0
         version: link:../../2-sql/1-core/contract
@@ -3605,6 +3617,9 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:0.13.0
         version: link:../../2-sql/1-core/operations
+      '@prisma-next/sql-orm-client':
+        specifier: workspace:0.13.0
+        version: link:../sql-orm-client
       '@prisma-next/sql-relational-core':
         specifier: workspace:0.13.0
         version: link:../../2-sql/4-lanes/relational-core
@@ -3614,6 +3629,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:0.13.0
         version: link:../../2-sql/1-core/schema-ir
+      '@prisma-next/target-postgres':
+        specifier: workspace:0.13.0
+        version: link:../../3-targets/3-targets/postgres
       '@prisma-next/utils':
         specifier: workspace:0.13.0
         version: link:../../1-framework/0-foundation/utils
@@ -3623,28 +3641,22 @@ importers:
       arktype:
         specifier: ^2.2.0
         version: 2.2.0
+      jose:
+        specifier: ^5
+        version: 5.10.0
+      pg:
+        specifier: 'catalog:'
+        version: 8.21.0
     devDependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:0.13.0
-        version: link:../../3-targets/6-adapters/postgres
       '@prisma-next/cli':
         specifier: workspace:0.13.0
         version: link:../../1-framework/3-tooling/cli
-      '@prisma-next/driver-postgres':
-        specifier: workspace:0.13.0
-        version: link:../../3-targets/7-drivers/postgres
       '@prisma-next/operations':
         specifier: workspace:0.13.0
         version: link:../../1-framework/1-core/operations
-      '@prisma-next/postgres':
-        specifier: workspace:0.13.0
-        version: link:../postgres
       '@prisma-next/sql-contract-psl':
         specifier: workspace:0.13.0
         version: link:../../2-sql/2-authoring/contract-psl
-      '@prisma-next/target-postgres':
-        specifier: workspace:0.13.0
-        version: link:../../3-targets/3-targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:0.13.0
         version: link:../../../test/utils
@@ -3657,9 +3669,6 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.20.0
-      pg:
-        specifier: 'catalog:'
-        version: 8.21.0
       tsdown:
         specifier: 'catalog:'
         version: 0.22.1(tsx@4.22.4)(typescript@5.9.3)
@@ -8320,6 +8329,9 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
+
+  jose@5.10.0:
+    resolution: {integrity: sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -13144,6 +13156,8 @@ snapshots:
       istanbul-lib-report: 3.0.1
 
   jiti@2.7.0: {}
+
+  jose@5.10.0: {}
 
   js-tokens@10.0.0: {}
 
