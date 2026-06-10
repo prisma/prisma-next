@@ -19,10 +19,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
-import supabaseExtension, {
-  InvalidJwtError,
-  supabase,
-} from '@prisma-next/extension-supabase/runtime';
+import { InvalidJwtError, supabase } from '@prisma-next/extension-supabase/runtime';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
@@ -159,7 +156,6 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
         contractJson,
         url: connectionString,
         jwtSecret: TEST_JWT_SECRET,
-        extensions: [supabaseExtension],
         middleware: [recorder.middleware],
         verifyMarker: false,
       });
@@ -229,7 +225,6 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
         contractJson,
         url: connectionString,
         jwtSecret: TEST_JWT_SECRET,
-        extensions: [supabaseExtension],
         verifyMarker: false,
       });
 

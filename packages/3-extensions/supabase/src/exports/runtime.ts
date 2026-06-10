@@ -1,19 +1,4 @@
-import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
-
-const supabaseRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
-  kind: 'extension' as const,
-  id: 'supabase',
-  version: '0.12.0',
-  familyId: 'sql' as const,
-  targetId: 'postgres' as const,
-  codecs: () => [],
-  create() {
-    return {
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-    };
-  },
-};
+import { supabaseRuntimeDescriptor } from '../runtime/descriptor';
 
 export default supabaseRuntimeDescriptor;
 

@@ -28,6 +28,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { createRemoteJWKSet, type JWTVerifyResult, jwtVerify } from 'jose';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
+import { supabaseRuntimeDescriptor } from './descriptor';
 import type { SupabaseRoleBinding } from './supabase-runtime';
 import { SupabaseRuntime } from './supabase-runtime';
 
@@ -183,6 +184,15 @@ function toPool<TContract extends Contract<SqlStorage>>(
   return undefined;
 }
 
+function withSupabaseDescriptor(
+  extensions: readonly SqlRuntimeExtensionDescriptor<SupabaseTargetId>[] | undefined,
+): readonly SqlRuntimeExtensionDescriptor<SupabaseTargetId>[] {
+  const packs = extensions ?? [];
+  return packs.some((pack) => pack.id === supabaseRuntimeDescriptor.id)
+    ? packs
+    : [...packs, supabaseRuntimeDescriptor];
+}
+
 export default async function supabase<TContract extends Contract<SqlStorage>>(
   options: SupabaseOptionsWithContract<TContract>,
 ): Promise<SupabaseDb<TContract>>;
@@ -199,7 +209,7 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: options.extensions ?? [],
+    extensionPacks: withSupabaseDescriptor(options.extensions),
   });
 
   const context = createExecutionContext({ contract, stack });
