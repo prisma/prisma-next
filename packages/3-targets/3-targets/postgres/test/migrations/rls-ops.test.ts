@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreatePostgresRlsPolicyCall,
+  DropPostgresRlsPolicyCall,
   EnableRowLevelSecurityCall,
 } from '../../src/core/migrations/op-factory-call';
-import { createRlsPolicy, enableRowLevelSecurity } from '../../src/core/migrations/operations/rls';
+import {
+  createRlsPolicy,
+  dropRlsPolicy,
+  enableRowLevelSecurity,
+} from '../../src/core/migrations/operations/rls';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 
 const basePolicy = new PostgresRlsPolicy({
@@ -103,6 +108,36 @@ describe('enableRowLevelSecurity op', () => {
   });
 });
 
+describe('dropRlsPolicy op', () => {
+  it('emits the correct DROP POLICY DDL', () => {
+    const op = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
+    const executeSql = op.execute[0]?.sql;
+    expect(executeSql).toBe(`DROP POLICY "read_own_profiles_ab12cd34" ON "public"."profiles"`);
+  });
+
+  it('emits precheck asserting policy is present', () => {
+    const op = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
+    const precheckSql = op.precheck[0]?.sql ?? '';
+    expect(precheckSql).toContain('pg_policies');
+    expect(precheckSql).toContain('EXISTS');
+    expect(precheckSql).not.toContain('NOT EXISTS');
+    expect(precheckSql).toContain('read_own_profiles_ab12cd34');
+  });
+
+  it('emits postcheck asserting policy is absent', () => {
+    const op = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
+    const postcheckSql = op.postcheck[0]?.sql ?? '';
+    expect(postcheckSql).toContain('pg_policies');
+    expect(postcheckSql).toContain('NOT EXISTS');
+    expect(postcheckSql).toContain('read_own_profiles_ab12cd34');
+  });
+
+  it('operationClass is destructive', () => {
+    const op = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
+    expect(op.operationClass).toBe('destructive');
+  });
+});
+
 describe('CreatePostgresRlsPolicyCall', () => {
   it('toOp() returns the same DDL as createRlsPolicy()', () => {
     const call = new CreatePostgresRlsPolicyCall('public', 'profiles', basePolicy);
@@ -153,5 +188,32 @@ describe('EnableRowLevelSecurityCall', () => {
   it('operationClass is additive', () => {
     const call = new EnableRowLevelSecurityCall('public', 'profiles');
     expect(call.operationClass).toBe('additive');
+  });
+});
+
+describe('DropPostgresRlsPolicyCall', () => {
+  it('toOp() returns the same DDL as dropRlsPolicy()', () => {
+    const call = new DropPostgresRlsPolicyCall('public', 'profiles', 'read_own_profiles_ab12cd34');
+    const directOp = dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34');
+    expect(call.toOp().execute[0]?.sql).toBe(directOp.execute[0]?.sql);
+  });
+
+  it('renderTypeScript() round-trips the call', () => {
+    const call = new DropPostgresRlsPolicyCall('public', 'profiles', 'read_own_profiles_ab12cd34');
+    const rendered = call.renderTypeScript();
+    expect(rendered).toContain('dropRlsPolicy');
+    expect(rendered).toContain('public');
+    expect(rendered).toContain('profiles');
+    expect(rendered).toContain('read_own_profiles_ab12cd34');
+  });
+
+  it('factoryName is dropRlsPolicy', () => {
+    const call = new DropPostgresRlsPolicyCall('public', 'profiles', 'read_own_profiles_ab12cd34');
+    expect(call.factoryName).toBe('dropRlsPolicy');
+  });
+
+  it('operationClass is destructive', () => {
+    const call = new DropPostgresRlsPolicyCall('public', 'profiles', 'read_own_profiles_ab12cd34');
+    expect(call.operationClass).toBe('destructive');
   });
 });

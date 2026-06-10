@@ -86,6 +86,33 @@ export function createRlsPolicy(
   };
 }
 
+export function dropRlsPolicy(schemaName: string, tableName: string, policyName: string): Op {
+  return {
+    id: `rlsPolicy.${tableName}.${policyName}.drop`,
+    label: `Drop RLS policy "${policyName}" on "${tableName}"`,
+    operationClass: 'destructive',
+    target: targetDetails('rlsPolicy', policyName, schemaName, tableName),
+    precheck: [
+      step(
+        `ensure RLS policy "${policyName}" exists`,
+        rlsPolicyExistsCheck(schemaName, tableName, policyName, true),
+      ),
+    ],
+    execute: [
+      step(
+        `drop RLS policy "${policyName}"`,
+        `DROP POLICY ${quoteIdentifier(policyName)} ON ${qualifyTableName(schemaName, tableName)}`,
+      ),
+    ],
+    postcheck: [
+      step(
+        `verify RLS policy "${policyName}" is absent`,
+        rlsPolicyExistsCheck(schemaName, tableName, policyName, false),
+      ),
+    ],
+  };
+}
+
 export function enableRowLevelSecurity(schemaName: string, tableName: string): Op {
   return {
     id: `rowLevelSecurity.${schemaName}.${tableName}`,

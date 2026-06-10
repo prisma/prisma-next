@@ -60,7 +60,7 @@ import {
 import { createExtension } from './operations/dependencies';
 import { addEnumValues, createEnumType, dropEnumType, renameType } from './operations/enums';
 import { createIndex, dropIndex } from './operations/indexes';
-import { createRlsPolicy, enableRowLevelSecurity } from './operations/rls';
+import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from './operations/rls';
 import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
 import { step, targetDetails } from './operations/shared';
 import { dropTable } from './operations/tables';
@@ -1131,6 +1131,32 @@ export class CreatePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
   }
 }
 
+export class DropPostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'dropRlsPolicy' as const;
+  readonly operationClass = 'destructive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly policyName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string, policyName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.policyName = policyName;
+    this.label = `Drop RLS policy "${policyName}" on "${tableName}"`;
+    this.freeze();
+  }
+
+  toOp(): Op {
+    return dropRlsPolicy(this.schemaName, this.tableName, this.policyName);
+  }
+
+  renderTypeScript(): string {
+    return `dropRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.policyName)})`;
+  }
+}
+
 export class EnableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'enableRowLevelSecurity' as const;
   readonly operationClass = 'additive' as const;
@@ -1181,5 +1207,6 @@ export type PostgresOpFactoryCall =
   | CreateExtensionCall
   | CreateSchemaCall
   | CreatePostgresRlsPolicyCall
+  | DropPostgresRlsPolicyCall
   | EnableRowLevelSecurityCall
   | DataTransformCall;
