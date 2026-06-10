@@ -144,7 +144,7 @@
                 },
                 "valueSet": {
                   "entityKind": "enum",
-                  "name": "Priority",
+                  "entityName": "Priority",
                   "namespaceId": "public",
                   "plane": "domain"
                 }
@@ -578,8 +578,8 @@
                   "column": "priority",
                   "name": "post_priority_check",
                   "valueSet": {
-                    "entityKind": "value-set",
-                    "name": "Priority",
+                    "entityKind": "valueSet",
+                    "entityName": "Priority",
                     "namespaceId": "public",
                     "plane": "storage"
                   }
@@ -614,8 +614,8 @@
                   "nativeType": "text",
                   "nullable": false,
                   "valueSet": {
-                    "entityKind": "value-set",
-                    "name": "Priority",
+                    "entityKind": "valueSet",
+                    "entityName": "Priority",
                     "namespaceId": "public",
                     "plane": "storage"
                   }
@@ -801,7 +801,7 @@
           },
           "valueSet": {
             "Priority": {
-              "kind": "value-set",
+              "kind": "valueSet",
               "values": [
                 "low",
                 "high",
@@ -814,7 +814,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:6eaa28f191dcea1d39893f39cf44790e2187bbb617250e20cd0fee20785f1a0f",
+    "storageHash": "sha256:9b1657a8f40dda814d47ed3d8f4bdf704c0bf057cf6fc23b7b2090ce2748df20",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

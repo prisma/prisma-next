@@ -412,7 +412,7 @@ model User {
       nativeNs?.entries.table?.['user']?.columns?.['role'] as object,
     );
     expect(mixedNs?.entries.valueSet?.['Priority']).toMatchObject({
-      kind: 'value-set',
+      kind: 'valueSet',
       values: ['low', 'high'],
     });
     const mixedDomainNs = mixedResult.value.domain.namespaces['public'];
@@ -442,7 +442,7 @@ model Post {
     if (!result.ok) return;
     const ns = (result.value.storage as unknown as SqlStorage).namespaces['public'];
     expect(ns?.entries.valueSet?.['Priority']).toMatchObject({
-      kind: 'value-set',
+      kind: 'valueSet',
       values: [1, 10],
     });
     const domainNs = result.value.domain.namespaces['public'];

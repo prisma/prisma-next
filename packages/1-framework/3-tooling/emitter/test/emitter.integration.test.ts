@@ -259,7 +259,7 @@ describe('emitter integration', () => {
                   plane: 'domain',
                   entityKind: 'enum',
                   namespaceId: '__unbound__',
-                  name: 'Priority',
+                  entityName: 'Priority',
                 },
               },
               title: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },

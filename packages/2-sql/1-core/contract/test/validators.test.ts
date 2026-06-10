@@ -1,12 +1,15 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createContract } from '@prisma-next/test-utils';
+import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import { CheckConstraint } from '../src/ir/check-constraint';
 import { StorageTable } from '../src/ir/storage-table';
 import type { ReferentialAction, SqlStorage } from '../src/types';
 import {
+  createSqlStorageSchema,
+  StorageValueSetSchema,
   validateModel,
   validateSqlContractFully,
   validateSqlStorageConsistency,
@@ -1116,9 +1119,9 @@ describe('SQL contract validators', () => {
                 column: 'role',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'Role',
+                  entityName: 'Role',
                 },
               }),
             ],
@@ -1146,9 +1149,9 @@ describe('SQL contract validators', () => {
                 column: 'role',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'Role',
+                  entityName: 'Role',
                 },
               }),
             ],
@@ -1165,9 +1168,9 @@ describe('SQL contract validators', () => {
     it('rejects duplicate check constraint definitions (same column + valueSet)', () => {
       const valueSetRef = {
         plane: 'storage' as const,
-        entityKind: 'value-set' as const,
+        entityKind: 'valueSet' as const,
         namespaceId: UNBOUND_NAMESPACE_ID,
-        name: 'Role',
+        entityName: 'Role',
       };
       const s = createContract<SqlStorage>({
         storage: unboundTables({
@@ -1213,9 +1216,9 @@ describe('SQL contract validators', () => {
                 column: 'status',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'Status',
+                  entityName: 'Status',
                 },
               }),
             ],
@@ -1241,9 +1244,9 @@ describe('SQL contract validators', () => {
                 column: 'status',
                 valueSet: {
                   plane: 'storage',
-                  entityKind: 'value-set',
+                  entityKind: 'valueSet',
                   namespaceId: UNBOUND_NAMESPACE_ID,
-                  name: 'Status',
+                  entityName: 'Status',
                 },
               }),
             ],
@@ -1270,6 +1273,66 @@ describe('SQL contract validators', () => {
         models: { User: model('users', { id: { column: 'id' } }) },
       });
       expect(() => validateSqlContractFully(c)).not.toThrow();
+    });
+  });
+
+  describe('ValueSetRef plane-consistency assertion', () => {
+    const storageSchema = createSqlStorageSchema();
+
+    function makeStorageWithCheckRef(ref: Record<string, unknown>) {
+      return {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {
+                users: {
+                  columns: { role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false } },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                  checks: [{ name: 'users_role_check', column: 'role', valueSet: ref }],
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+
+    it('accepts a storage ref where plane matches entityKind', () => {
+      const result = storageSchema(
+        makeStorageWithCheckRef({
+          plane: 'storage',
+          entityKind: 'valueSet',
+          namespaceId: 'public',
+          entityName: 'Role',
+        }),
+      );
+      expect(result).not.toBeInstanceOf(type.errors);
+    });
+
+    it('rejects a storage ref where plane contradicts entityKind', () => {
+      const result = storageSchema(
+        makeStorageWithCheckRef({
+          plane: 'domain',
+          entityKind: 'valueSet',
+          namespaceId: 'public',
+          entityName: 'Role',
+        }),
+      );
+      expect(result).toBeInstanceOf(type.errors);
+    });
+
+    it('StorageValueSetSchema accepts kind valueSet', () => {
+      const result = StorageValueSetSchema({ kind: 'valueSet', values: ['a', 'b'] });
+      expect(result).not.toBeInstanceOf(type.errors);
+    });
+
+    it('StorageValueSetSchema rejects kind value-set', () => {
+      const result = StorageValueSetSchema({ kind: 'value-set', values: ['a', 'b'] });
+      expect(result).toBeInstanceOf(type.errors);
     });
   });
 });

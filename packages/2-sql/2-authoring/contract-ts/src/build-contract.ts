@@ -449,9 +449,9 @@ export function buildSqlContractFromDefinition(
         enumHandle !== undefined
           ? {
               plane: 'storage',
-              entityKind: 'value-set',
+              entityKind: 'valueSet',
               namespaceId: defaultNamespaceId,
-              name: enumHandle.enumName,
+              entityName: enumHandle.enumName,
             }
           : undefined;
       const domainValueSetRef: ValueSetRef | undefined =
@@ -460,7 +460,7 @@ export function buildSqlContractFromDefinition(
               plane: 'domain',
               entityKind: 'enum',
               namespaceId: defaultNamespaceId,
-              name: enumHandle.enumName,
+              entityName: enumHandle.enumName,
             }
           : undefined;
 
@@ -781,7 +781,7 @@ export function buildSqlContractFromDefinition(
       storageValueSetsByNs[nsId] = storageSlot;
     }
     storageSlot[enumName] = {
-      kind: 'value-set',
+      kind: 'valueSet',
       values: handle.values.map((v) => encodeViaCodec(v, handle.codecId, codecLookup)),
     };
   }

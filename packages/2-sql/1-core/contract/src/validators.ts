@@ -80,9 +80,17 @@ const ExecutionSchema = type({
 const ValueSetRefSchema = type({
   plane: "'domain' | 'storage'",
   namespaceId: 'string',
-  entityKind: "'enum' | 'value-set'",
-  name: 'string',
+  entityKind: "'enum' | 'valueSet'",
+  entityName: 'string',
   'spaceId?': 'string',
+}).narrow((ref, ctx) => {
+  const expectedPlane = ref.entityKind === 'enum' ? 'domain' : 'storage';
+  if (ref.plane !== expectedPlane) {
+    return ctx.mustBe(
+      `a ref with plane '${expectedPlane}' when entityKind is '${ref.entityKind}' (got plane '${ref.plane}')`,
+    );
+  }
+  return true;
 });
 
 const StorageColumnSchema = type({
@@ -135,11 +143,11 @@ const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
 
 /**
  * Storage value-set entry under `storage.namespaces[id].entries.valueSet[name]`.
- * Carries a `kind: 'value-set'` discriminator (enumerable, survives JSON) and an
+ * Carries a `kind: 'valueSet'` discriminator (enumerable, survives JSON) and an
  * ordered `values` array of codec-encoded permitted values.
  */
 export const StorageValueSetSchema = type({
-  kind: "'value-set'",
+  kind: "'valueSet'",
   values: type('string | number | boolean | null | unknown[] | Record<string, unknown>')
     .array()
     .readonly(),

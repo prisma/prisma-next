@@ -85,7 +85,7 @@ export class PostgresSchema extends NamespaceBase {
               Object.fromEntries(
                 Object.entries(valueSetInput).map(([k, v]) => [
                   k,
-                  new StorageValueSet({ kind: 'value-set', values: v.values }),
+                  new StorageValueSet({ kind: 'valueSet', values: v.values }),
                 ]),
               ),
             ),

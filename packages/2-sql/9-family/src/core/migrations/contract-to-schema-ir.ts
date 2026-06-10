@@ -164,7 +164,7 @@ function allStrings(values: readonly JsonValue[]): values is readonly string[] {
 }
 
 export function resolveValueSetValues(
-  ref: { readonly namespaceId: string; readonly name: string },
+  ref: { readonly namespaceId: string; readonly entityName: string },
   storage: SqlStorage,
   contextLabel: string,
 ): readonly string[] {
@@ -174,10 +174,10 @@ export function resolveValueSetValues(
       `resolveValueSetValues: namespace "${ref.namespaceId}" not found in storage (${contextLabel})`,
     );
   }
-  const valueSet = ns.entries.valueSet?.[ref.name];
+  const valueSet = ns.entries.valueSet?.[ref.entityName];
   if (!valueSet) {
     throw new Error(
-      `resolveValueSetValues: value-set "${ref.name}" not found in namespace "${ref.namespaceId}" (${contextLabel})`,
+      `resolveValueSetValues: value-set "${ref.entityName}" not found in namespace "${ref.namespaceId}" (${contextLabel})`,
     );
   }
   // Only TEXT enums ship a CHECK-constraint round-trip in this slice. A
@@ -186,7 +186,7 @@ export function resolveValueSetValues(
   const values = valueSet.values;
   if (!allStrings(values)) {
     throw new Error(
-      `resolveValueSetValues: value-set "${ref.name}" in namespace "${ref.namespaceId}" has a non-string value; numeric-enum CHECK constraints are not yet supported (${contextLabel})`,
+      `resolveValueSetValues: value-set "${ref.entityName}" in namespace "${ref.namespaceId}" has a non-string value; numeric-enum CHECK constraints are not yet supported (${contextLabel})`,
     );
   }
   return values;

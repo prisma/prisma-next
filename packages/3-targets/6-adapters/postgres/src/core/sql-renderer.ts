@@ -271,7 +271,7 @@ function resolveEnumOrderValues(
   if (valueSet === undefined) {
     return undefined;
   }
-  return contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.name]
+  return contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.entityName]
     ?.values;
 }
 
@@ -303,7 +303,8 @@ function resolveEnumOrderValuesForIdentifier(
       return undefined;
     }
     resolved =
-      contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.name]?.values;
+      contract.storage.namespaces[valueSet.namespaceId]?.entries.valueSet?.[valueSet.entityName]
+        ?.values;
   }
   return resolved;
 }

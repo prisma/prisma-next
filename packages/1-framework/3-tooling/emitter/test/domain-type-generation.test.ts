@@ -1138,13 +1138,13 @@ describe('resolveFieldType with enum value-set ref', () => {
     plane: 'domain',
     entityKind: 'enum',
     namespaceId: 'public',
-    name: 'Priority',
+    entityName: 'Priority',
   };
 
   function enumResolver(
     values: readonly JsonValue[],
   ): (ref: ValueSetRef) => readonly JsonValue[] | undefined {
-    return (ref) => (ref.name === 'Priority' ? values : undefined);
+    return (ref) => (ref.entityName === 'Priority' ? values : undefined);
   }
 
   it('narrows output and input to a string-member union', () => {
@@ -1195,7 +1195,7 @@ describe('resolveFieldType with enum value-set ref', () => {
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/text@1' },
-      valueSet: { ...priorityRef, name: 'Unknown' },
+      valueSet: { ...priorityRef, entityName: 'Unknown' },
     };
     const result = resolveFieldType(field, undefined, undefined, enumResolver(['low', 'high']));
     expect(result.output).toBe("CodecTypes['pg/text@1']['output']");
@@ -1218,7 +1218,7 @@ describe('generateBothFieldTypesMaps with resolveEnumValues', () => {
     plane: 'domain',
     entityKind: 'enum',
     namespaceId: 'public',
-    name: 'Priority',
+    entityName: 'Priority',
   };
 
   it('narrows an enum-backed field across both maps', () => {
@@ -1236,7 +1236,7 @@ describe('generateBothFieldTypesMaps with resolveEnumValues', () => {
       },
     };
     const resolveEnumValues = (ref: ValueSetRef): readonly JsonValue[] | undefined =>
-      ref.name === 'Priority' ? ['low', 'high', 'urgent'] : undefined;
+      ref.entityName === 'Priority' ? ['low', 'high', 'urgent'] : undefined;
     const result = generateBothFieldTypesMaps(models, undefined, undefined, resolveEnumValues);
     expect(result.output).toContain("readonly priority: 'low' | 'high' | 'urgent'");
     expect(result.input).toContain("readonly priority: 'low' | 'high' | 'urgent'");

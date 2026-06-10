@@ -24,9 +24,9 @@ const SCHEMA_NAME = 'public';
 function makeValueSetRef() {
   return {
     plane: 'storage' as const,
-    entityKind: 'value-set' as const,
+    entityKind: 'valueSet' as const,
     namespaceId: UNBOUND_NAMESPACE_ID,
-    name: VALUE_SET_NAME,
+    entityName: VALUE_SET_NAME,
   };
 }
 
@@ -55,7 +55,7 @@ function makeContractWithCheck(values: readonly string[]): Contract<SqlStorage> 
       },
       valueSet: {
         [VALUE_SET_NAME]: new StorageValueSet({
-          kind: 'value-set',
+          kind: 'valueSet',
           values: values as string[],
         }),
       },
