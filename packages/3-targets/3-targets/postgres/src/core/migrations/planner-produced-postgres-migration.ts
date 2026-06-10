@@ -24,7 +24,7 @@
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   MigrationPlanWithAuthoringSurface,
   OpFactoryCall,
@@ -42,13 +42,13 @@ export class TypeScriptRenderablePostgresMigration
   readonly #calls: readonly OpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #spaceId: string;
-  readonly #lowerer: DdlDriverLowerer | undefined;
+  readonly #lowerer: ExecutableStatementLowerer | undefined;
 
   constructor(
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
-    lowerer?: DdlDriverLowerer,
+    lowerer?: ExecutableStatementLowerer,
   ) {
     super();
     this.#calls = calls;

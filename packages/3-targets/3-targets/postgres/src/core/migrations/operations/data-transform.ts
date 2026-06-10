@@ -61,8 +61,8 @@ import type {
   SqlMigrationPlanOperationStep,
 } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import type { SerializedQueryPlan } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ExecutableStatement } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresPlanTargetDetails } from '../planner-target-details';
@@ -152,7 +152,7 @@ function invokeAndLower(
   contract: Contract<SqlStorage>,
   adapter: SqlControlAdapter<'postgres'>,
   name: string,
-): SerializedQueryPlan {
+): ExecutableStatement {
   const result = closure();
   const plan = isBuildable(result) ? result.build() : result;
   assertContractMatches(plan, contract, name);

@@ -15,7 +15,7 @@ import type {
 import type {
   AnyQueryAst,
   DdlNode,
-  DriverStatement,
+  ExecutableStatement,
   LoweredStatement,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
@@ -36,14 +36,14 @@ export interface Lowerer {
 /**
  * Extends {@link Lowerer} with async codec-routed DDL lowering. Control
  * adapters implement this; the planner's `CreateTableCall.toOp` and
- * `CreateSchemaCall.toOp` accept it to produce parameterised DDL statements
+ * `CreateSchemaCall.toOp` accept it to produce executable DDL statements
  * with literal defaults encoded through their codec.
  */
-export interface DdlDriverLowerer extends Lowerer {
-  lowerToDriverStatement(
+export interface ExecutableStatementLowerer extends Lowerer {
+  lowerToExecutableStatement(
     ast: AnyQueryAst | DdlNode,
     context: LowererContext<unknown>,
-  ): Promise<DriverStatement>;
+  ): Promise<ExecutableStatement>;
 }
 
 /**
@@ -53,7 +53,8 @@ export interface DdlDriverLowerer extends Lowerer {
  * @template TTarget - The target ID (e.g., 'postgres', 'mysql')
  */
 export interface SqlControlAdapter<TTarget extends string = string>
-  extends ControlAdapterInstance<'sql', TTarget> {
+  extends ControlAdapterInstance<'sql', TTarget>,
+    ExecutableStatementLowerer {
   /**
    * Reads the contract marker for `space` from the database, returning
    * `null` if no marker row exists for that space (or if the marker
@@ -233,32 +234,6 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * `sign` — excludes the ledger table.
    */
   bootstrapSignMarkerQueries(): readonly DdlNode[];
-
-  /**
-   * Lower a SQL query AST into a target-flavored `{ sql, params }` payload.
-   *
-   * Migration tooling (e.g. the `dataTransform` operation) needs to materialize
-   * SQL at emit/plan time without instantiating the runtime adapter. The control
-   * adapter's `lower` is byte-equivalent to the runtime adapter's `lower` for the
-   * same AST and contract, ensuring planned SQL matches what the runtime would
-   * emit.
-   */
-  lower(ast: AnyQueryAst | DdlNode, context: LowererContext<unknown>): LoweredStatement;
-
-  /**
-   * Lower an AST all the way to a driver-ready statement. Encodes every literal
-   * value through its column's codec and substitutes inline those that grammar
-   * forbids parameterizing (e.g. DDL `DEFAULT` clauses on PG/SQLite).
-   *
-   * Independent of `lower()` — does its own AST walk and produces `DriverStatement`
-   * directly. The runtime query path continues to use `lower()` + the runtime
-   * middleware lifecycle; this method exists for the control plane path that
-   * persists migration ops directly to ops.json with no middleware sandwich.
-   */
-  lowerToDriverStatement(
-    ast: AnyQueryAst | DdlNode,
-    context: LowererContext<unknown>,
-  ): Promise<DriverStatement>;
 }
 
 /**

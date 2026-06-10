@@ -1,10 +1,7 @@
 /**
- * Byte-parity proof: `CreateTableCall.toOp(lowerer).execute[0].sql` produces
- * the same SQL as the pre-slice `createTable` operation from the internal
- * tables module, which uses a different code path (`SqliteTableSpec` →
- * `renderColumnDefinition` / `renderCreateTableSql`). Both paths are given
- * independently-authored representations of the same table shape so a drift
- * in either renderer is visible as a test failure.
+ * Pins the SQL output of `CreateTableCall.toOp(lowerer)` for the supported
+ * column/constraint shapes. Each test verifies `execute[0].sql` matches the
+ * expected DDL string for a representative schema fragment.
  */
 
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
@@ -45,7 +42,7 @@ async function newPathSql(
   return sql;
 }
 
-describe('CreateTableCall byte-parity with pre-slice createTable', () => {
+describe('CreateTableCall lowering output', () => {
   it('simple table: NOT NULL and nullable columns, no constraints', async () => {
     const tableName = 'tags';
 

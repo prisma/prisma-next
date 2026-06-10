@@ -7,13 +7,13 @@ import type { SqliteContract } from '../src/core/types';
 const adapter = new SqliteControlAdapter();
 const ctx = { contract: {} as SqliteContract };
 
-describe('SqliteControlAdapter.lowerToDriverStatement — DDL literal defaults', () => {
+describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaults', () => {
   it('inlines a string default with single-quoting (no cast suffix)', async () => {
     const ast = new SqliteCreateTable({
       table: 't',
       columns: [col('name', 'TEXT', { default: lit('hello') })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"name" TEXT DEFAULT 'hello'`);
     expect(result.sql).not.toContain('::');
     expect(result.params).toEqual([]);
@@ -25,7 +25,7 @@ describe('SqliteControlAdapter.lowerToDriverStatement — DDL literal defaults',
       table: 'events',
       columns: [col('created_at', 'TEXT', { default: lit(date) })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"created_at" TEXT DEFAULT '2025-06-01T00:00:00.000Z'`);
     expect(result.sql).not.toContain('::');
     expect(result.params).toEqual([]);
@@ -36,7 +36,7 @@ describe('SqliteControlAdapter.lowerToDriverStatement — DDL literal defaults',
       table: 'counters',
       columns: [col('n', 'INTEGER', { default: lit(9007199254740991) })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain('"n" INTEGER DEFAULT 9007199254740991');
     expect(result.params).toEqual([]);
   });
@@ -49,7 +49,7 @@ describe('SqliteControlAdapter.lowerToDriverStatement — DDL literal defaults',
         col('disabled', 'INTEGER', { default: lit(false) }),
       ],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain('"active" INTEGER DEFAULT 1');
     expect(result.sql).toContain('"disabled" INTEGER DEFAULT 0');
     expect(result.params).toEqual([]);
@@ -60,7 +60,7 @@ describe('SqliteControlAdapter.lowerToDriverStatement — DDL literal defaults',
       table: 't',
       columns: [col('meta', 'TEXT', { default: lit({ key: 'val' }) })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"meta" TEXT DEFAULT '{"key":"val"}'`);
     expect(result.sql).not.toContain('::');
     expect(result.params).toEqual([]);
@@ -71,7 +71,7 @@ describe('SqliteControlAdapter.lowerToDriverStatement — DDL literal defaults',
       table: 't',
       columns: [col('opt', 'TEXT', { default: lit(null) })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain('"opt" TEXT DEFAULT NULL');
     expect(result.params).toEqual([]);
   });
@@ -84,7 +84,7 @@ describe('SqliteControlAdapter.lowerToDriverStatement — DDL literal defaults',
         col('id', 'INTEGER', { default: fn('autoincrement()') }),
       ],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"ts" TEXT DEFAULT (datetime('now'))`);
     expect(result.sql).toContain('"id" INTEGER');
     expect(result.sql).not.toContain('autoincrement');
@@ -96,9 +96,31 @@ describe('SqliteControlAdapter.lowerToDriverStatement — DDL literal defaults',
       table: 't',
       columns: [col('name', 'TEXT', { default: lit("O'Brien") })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"name" TEXT DEFAULT 'O''Brien'`);
     expect(result.params).toEqual([]);
+  });
+});
+
+describe('SqliteControlAdapter.lowerToExecutableStatement — guards', () => {
+  it('throws when a numeric literal default is non-finite (NaN / ±Infinity)', async () => {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const ast = new SqliteCreateTable({
+        table: 'defaults',
+        columns: [col('x', 'INTEGER', { default: lit(value) })],
+      });
+      await expect(adapter.lowerToExecutableStatement(ast, ctx)).rejects.toThrow(
+        /non-finite number wire value/,
+      );
+    }
+  });
+
+  it('throws when a Date literal default is invalid', async () => {
+    const ast = new SqliteCreateTable({
+      table: 'defaults',
+      columns: [col('x', 'TEXT', { default: lit(new Date('not-a-date')) })],
+    });
+    await expect(adapter.lowerToExecutableStatement(ast, ctx)).rejects.toThrow(/invalid Date/);
   });
 });
 

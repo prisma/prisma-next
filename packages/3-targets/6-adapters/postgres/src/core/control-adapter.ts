@@ -25,7 +25,7 @@ import type {
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
-  DriverStatement,
+  ExecutableStatement,
   FunctionColumnDefault,
   LiteralColumnDefault,
   LoweredStatement,
@@ -180,12 +180,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * placeholders; wire values go in `params`. Does NOT call `this.lower()` —
    * independent implementation.
    */
-  async lowerToDriverStatement(
+  async lowerToExecutableStatement(
     ast: AnyQueryAst | PostgresDdlNode,
     context: LowererContext<unknown>,
-  ): Promise<DriverStatement> {
+  ): Promise<ExecutableStatement> {
     if (isDdlNode(ast)) {
-      return pgRenderDdlDriverStatement(blindCast<PostgresDdlNode, 'isDdlNode guard'>(ast));
+      return pgRenderDdlExecutableStatement(blindCast<PostgresDdlNode, 'isDdlNode guard'>(ast));
     }
     const lowered = renderLoweredSql(
       ast,
@@ -1401,7 +1401,7 @@ function extractQuotedLiterals(listBody: string): readonly string[] | undefined 
   const values = [...listBody.matchAll(pattern)].map((m) => (m[1] ?? '').replace(/''/g, "'"));
   return values.length > 0 ? values : undefined;
 // ---------------------------------------------------------------------------
-// pgRenderDdlDriverStatement — independent DDL walker for lowerToDriverStatement
+// pgRenderDdlExecutableStatement — independent DDL walker for lowerToExecutableStatement
 // ---------------------------------------------------------------------------
 
 function pgIsTextLikeNativeType(nativeType: string): boolean {
@@ -1424,13 +1424,18 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
   if (typeof wire === 'number') {
     if (!Number.isFinite(wire)) {
       throw new Error(
-        `pgRenderDdlDriverStatement: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+        `pgRenderDdlExecutableStatement: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
       );
     }
     return String(wire);
   }
   if (typeof wire === 'bigint') return String(wire);
   if (wire instanceof Date) {
+    if (Number.isNaN(wire.getTime())) {
+      throw new Error(
+        `pgRenderDdlExecutableStatement: invalid Date value cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+      );
+    }
     const quoted = `'${escapeLiteral(wire.toISOString())}'`;
     return pgIsTextLikeNativeType(nativeType) ? quoted : `${quoted}::${nativeType}`;
   }
@@ -1442,14 +1447,14 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
     const hex = Array.from(wire)
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
-    return `'\\x${hex}'::bytea`;
+    return `'\\x${hex}'::${nativeType}`;
   }
   if (typeof wire === 'object') {
     const quoted = `'${escapeLiteral(JSON.stringify(wire))}'`;
     return `${quoted}::${nativeType}`;
   }
   throw new Error(
-    `pgRenderDdlDriverStatement: unexpected wire type "${typeof wire}" for native type "${nativeType}"`,
+    `pgRenderDdlExecutableStatement: unexpected wire type "${typeof wire}" for native type "${nativeType}"`,
   );
 }
 
@@ -1506,8 +1511,8 @@ function pgRenderDdlConstraint(constraint: DdlTableConstraint): string {
   return `UNIQUE (${cols})`;
 }
 
-class PgDdlDriverStatementVisitor implements PostgresDdlVisitor<DriverStatement> {
-  createTable(node: PostgresCreateTable): DriverStatement {
+class PgDdlExecutableStatementVisitor implements PostgresDdlVisitor<ExecutableStatement> {
+  createTable(node: PostgresCreateTable): ExecutableStatement {
     const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
     const tableRef = node.schema
       ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
@@ -1522,7 +1527,7 @@ class PgDdlDriverStatementVisitor implements PostgresDdlVisitor<DriverStatement>
     };
   }
 
-  createSchema(node: PostgresCreateSchema): DriverStatement {
+  createSchema(node: PostgresCreateSchema): ExecutableStatement {
     const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
     return {
       sql: `CREATE SCHEMA ${ifNotExists}${quoteIdentifier(node.schema)}`,
@@ -1531,6 +1536,6 @@ class PgDdlDriverStatementVisitor implements PostgresDdlVisitor<DriverStatement>
   }
 }
 
-function pgRenderDdlDriverStatement(ast: PostgresDdlNode): DriverStatement {
-  return ast.accept(new PgDdlDriverStatementVisitor());
+function pgRenderDdlExecutableStatement(ast: PostgresDdlNode): ExecutableStatement {
+  return ast.accept(new PgDdlExecutableStatementVisitor());
 }

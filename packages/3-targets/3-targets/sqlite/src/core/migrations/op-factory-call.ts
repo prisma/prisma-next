@@ -14,7 +14,7 @@ import type {
   MigrationOperationClass,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
-import type { DdlDriverLowerer, Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecutableStatementLowerer, Lowerer } from '@prisma-next/family-sql/control-adapter';
 import type { OpFactoryCall as FrameworkOpFactoryCall } from '@prisma-next/framework-components/control';
 import type {
   AnyDdlColumnDefault,
@@ -22,6 +22,7 @@ import type {
   DdlTableConstraint,
 } from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
+import { ifDefined } from '@prisma-next/utils/defined';
 import * as contractFreeDdl from '../../contract-free/ddl';
 import { escapeLiteral } from '../sql-utils';
 import { addColumn, dropColumn } from './operations/columns';
@@ -138,7 +139,7 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  async toOp(lowerer?: DdlDriverLowerer): Promise<Op> {
+  async toOp(lowerer?: ExecutableStatementLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
         `CreateTableCall.toOp: a DDL lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
@@ -147,9 +148,9 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
     const ddlNode = contractFreeDdl.createTable({
       table: this.tableName,
       columns: this.columns,
-      ...(this.constraints ? { constraints: this.constraints } : {}),
+      ...ifDefined('constraints', this.constraints),
     });
-    const statement = await lowerer.lowerToDriverStatement(ddlNode, { contract: {} });
+    const statement = await lowerer.lowerToExecutableStatement(ddlNode, { contract: {} });
     const tableName = this.tableName;
     const escapedName = escapeLiteral(tableName);
     return {

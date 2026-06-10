@@ -1,10 +1,11 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   MigrationPlanOperation,
   OpFactoryCall,
 } from '@prisma-next/framework-components/control';
 import { blindCast } from '@prisma-next/utils/casts';
+import { isThenable } from '@prisma-next/utils/promise';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -27,14 +28,14 @@ function assertPostgresOp(op: MigrationPlanOperation, callFactoryName: string): 
 
 export function renderOps(
   calls: readonly OpFactoryCall[],
-  lowerer?: DdlDriverLowerer,
+  lowerer?: ExecutableStatementLowerer,
 ): (Op | Promise<Op>)[] {
   return calls.map((c) => {
     const opOrPromise = blindCast<
-      { toOp(lowerer?: DdlDriverLowerer): Op | Promise<Op> },
-      'PG OpFactoryCall.toOp accepts an optional DdlDriverLowerer; the framework interface omits it because not all targets need a lowerer — the PG target overrides with this extended signature'
+      { toOp(lowerer?: ExecutableStatementLowerer): Op | Promise<Op> },
+      'PG OpFactoryCall.toOp accepts an optional ExecutableStatementLowerer; the framework interface omits it because not all targets need a lowerer — the PG target overrides with this extended signature'
     >(c).toOp(lowerer);
-    if (opOrPromise instanceof Promise) {
+    if (isThenable(opOrPromise)) {
       return opOrPromise.then((op) => {
         assertPostgresOp(op, c.factoryName);
         return op;

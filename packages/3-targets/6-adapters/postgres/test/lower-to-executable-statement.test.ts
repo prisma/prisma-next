@@ -7,13 +7,13 @@ import type { PostgresContract } from '../src/core/types';
 const adapter = new PostgresControlAdapter();
 const ctx = { contract: {} as PostgresContract };
 
-describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults', () => {
+describe('PostgresControlAdapter.lowerToExecutableStatement — DDL literal defaults', () => {
   it('inlines a string default with single-quoting and ::nativeType cast on non-text columns', async () => {
     const ast = new PostgresCreateTable({
       table: 'events',
       columns: [col('status', 'my_enum', { default: lit('active') })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"status" my_enum DEFAULT 'active'::my_enum`);
     expect(result.params).toEqual([]);
   });
@@ -23,7 +23,7 @@ describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults
       table: 't',
       columns: [col('note', 'text', { default: lit('hello') })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"note" text DEFAULT 'hello'`);
     expect(result.sql).not.toContain('::');
     expect(result.params).toEqual([]);
@@ -35,7 +35,7 @@ describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults
       table: 'events',
       columns: [col('created_at', 'timestamptz', { default: lit(date) })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(
       `"created_at" timestamptz DEFAULT '2025-06-01T00:00:00.000Z'::timestamptz`,
     );
@@ -48,7 +48,7 @@ describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults
       table: 'counters',
       columns: [col('big', 'int8', { default: lit(9007199254740991) })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain('"big" int8 DEFAULT 9007199254740991');
     expect(result.params).toEqual([]);
   });
@@ -61,7 +61,7 @@ describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults
         col('disabled', 'boolean', { default: lit(false) }),
       ],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain('"active" boolean DEFAULT true');
     expect(result.sql).toContain('"disabled" boolean DEFAULT false');
     expect(result.params).toEqual([]);
@@ -72,7 +72,7 @@ describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults
       table: 't',
       columns: [col('meta', 'jsonb', { default: lit({ key: 'val' }) })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"meta" jsonb DEFAULT '{"key":"val"}'::jsonb`);
     expect(result.params).toEqual([]);
   });
@@ -82,7 +82,7 @@ describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults
       table: 't',
       columns: [col('opt', 'uuid', { default: lit(null) })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain('"opt" uuid DEFAULT NULL');
     expect(result.params).toEqual([]);
   });
@@ -95,7 +95,7 @@ describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults
         col('ts', 'timestamptz', { default: fn('now()') }),
       ],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain('"id" uuid DEFAULT (gen_random_uuid())');
     expect(result.sql).toContain('"ts" timestamptz DEFAULT (now())');
     expect(result.params).toEqual([]);
@@ -106,7 +106,7 @@ describe('PostgresControlAdapter.lowerToDriverStatement — DDL literal defaults
       table: 't',
       columns: [col('name', 'text', { default: lit("O'Brien") })],
     });
-    const result = await adapter.lowerToDriverStatement(ast, ctx);
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
     expect(result.sql).toContain(`"name" text DEFAULT 'O''Brien'`);
     expect(result.params).toEqual([]);
   });
@@ -141,9 +141,17 @@ describe('PostgresControlAdapter.lower output is unchanged after D1', () => {
         table: 'defaults',
         columns: [col('x', 'double precision', { default: lit(value) })],
       });
-      await expect(adapter.lowerToDriverStatement(ast, ctx)).rejects.toThrow(
+      await expect(adapter.lowerToExecutableStatement(ast, ctx)).rejects.toThrow(
         /non-finite number wire value/,
       );
     }
+  });
+
+  it('throws when a Date literal default is invalid', async () => {
+    const ast = new PostgresCreateTable({
+      table: 'defaults',
+      columns: [col('x', 'timestamptz', { default: lit(new Date('not-a-date')) })],
+    });
+    await expect(adapter.lowerToExecutableStatement(ast, ctx)).rejects.toThrow(/invalid Date/);
   });
 });

@@ -22,7 +22,7 @@
 
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { DdlDriverLowerer, Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecutableStatementLowerer, Lowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   MigrationOperationClass,
@@ -36,6 +36,7 @@ import type {
 import { FunctionColumnDefault, LiteralColumnDefault } from '@prisma-next/sql-relational-core/ast';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import * as contractFreeDdl from '../../contract-free/ddl';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
@@ -213,7 +214,7 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  async toOp(lowerer?: DdlDriverLowerer): Promise<Op> {
+  async toOp(lowerer?: ExecutableStatementLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
         `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
@@ -223,9 +224,9 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
       ...(this.schemaName !== UNBOUND_NAMESPACE_ID ? { schema: this.schemaName } : {}),
       table: this.tableName,
       columns: this.columns,
-      ...(this.constraints ? { constraints: this.constraints } : {}),
+      ...ifDefined('constraints', this.constraints),
     });
-    const statement = await lowerer.lowerToDriverStatement(ddlNode, { contract: {} });
+    const statement = await lowerer.lowerToExecutableStatement(ddlNode, { contract: {} });
     const schemaName = this.schemaName;
     const tableName = this.tableName;
     return {
@@ -1022,14 +1023,14 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  async toOp(lowerer?: DdlDriverLowerer): Promise<Op> {
+  async toOp(lowerer?: ExecutableStatementLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
         `CreateSchemaCall.toOp: a DDL lowerer is required on the Postgres planner path (schema "${this.schemaName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
       );
     }
     const ddlNode = contractFreeDdl.createSchema({ schema: this.schemaName, ifNotExists: true });
-    const statement = await lowerer.lowerToDriverStatement(ddlNode, { contract: {} });
+    const statement = await lowerer.lowerToExecutableStatement(ddlNode, { contract: {} });
     const schemaName = this.schemaName;
     return {
       id: `schema.${schemaName}`,

@@ -12,7 +12,7 @@ import {
   planFieldEventOperations,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
-import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -53,7 +53,7 @@ type VerifySqlSchemaOptionsWithComponents = Parameters<typeof verifySqlSchema>[0
 };
 
 export function createPostgresMigrationPlanner(
-  lowerer: DdlDriverLowerer,
+  lowerer: ExecutableStatementLowerer,
 ): PostgresMigrationPlanner {
   return new PostgresMigrationPlanner(lowerer);
 }
@@ -90,9 +90,9 @@ export type PostgresPlanResult =
  * authoring surface.
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
-  readonly #lowerer: DdlDriverLowerer | undefined;
+  readonly #lowerer: ExecutableStatementLowerer | undefined;
 
-  constructor(lowerer?: DdlDriverLowerer) {
+  constructor(lowerer?: ExecutableStatementLowerer) {
     this.#lowerer = lowerer;
   }
 

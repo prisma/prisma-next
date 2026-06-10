@@ -1,5 +1,5 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   MigrationPlanWithAuthoringSurface,
   OpFactoryCall,
@@ -25,14 +25,14 @@ export class TypeScriptRenderableSqliteMigration
   readonly #meta: MigrationMeta;
   readonly #destination: SqliteMigrationDestinationInfo;
   readonly #spaceId: string;
-  readonly #lowerer: DdlDriverLowerer | undefined;
+  readonly #lowerer: ExecutableStatementLowerer | undefined;
 
   constructor(
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
     destination?: SqliteMigrationDestinationInfo,
-    lowerer?: DdlDriverLowerer,
+    lowerer?: ExecutableStatementLowerer,
   ) {
     super();
     this.#calls = calls;

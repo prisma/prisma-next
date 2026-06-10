@@ -5,5 +5,5 @@
     "outDir": "dist"
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["dist", "test/migrations/create-table-call-byte-parity.test.ts"]
+  "exclude": ["dist", "test/migrations/create-table-call-lowering.test.ts"]
 }

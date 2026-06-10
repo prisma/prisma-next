@@ -11,7 +11,7 @@ import type {
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
-  DriverStatement,
+  ExecutableStatement,
   FunctionColumnDefault,
   LiteralColumnDefault,
   LoweredStatement,
@@ -150,12 +150,12 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * query ASTs, params are kept as `?` placeholders; wire values go in
    * `params`. Does NOT call `this.lower()` — independent implementation.
    */
-  async lowerToDriverStatement(
+  async lowerToExecutableStatement(
     ast: AnyQueryAst | SqliteDdlNode,
     context: LowererContext<unknown>,
-  ): Promise<DriverStatement> {
+  ): Promise<ExecutableStatement> {
     if (isDdlNode(ast)) {
-      return sqliteRenderDdlDriverStatement(blindCast<SqliteDdlNode, 'isDdlNode guard'>(ast));
+      return sqliteRenderDdlExecutableStatement(blindCast<SqliteDdlNode, 'isDdlNode guard'>(ast));
     }
     const lowered = renderLoweredSql(
       ast,
@@ -617,15 +617,29 @@ function mapSqliteReferentialAction(rule: string): SqlReferentialAction | undefi
 }
 
 // ---------------------------------------------------------------------------
-// sqliteRenderDdlDriverStatement — independent DDL walker for lowerToDriverStatement
+// sqliteRenderDdlExecutableStatement — independent DDL walker for lowerToExecutableStatement
 // ---------------------------------------------------------------------------
 
 function sqliteInlineLiteral(wire: unknown): string {
   if (wire === null) return 'NULL';
   if (typeof wire === 'boolean') return wire ? '1' : '0';
-  if (typeof wire === 'number') return String(wire);
+  if (typeof wire === 'number') {
+    if (!Number.isFinite(wire)) {
+      throw new Error(
+        `sqliteRenderDdlExecutableStatement: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal`,
+      );
+    }
+    return String(wire);
+  }
   if (typeof wire === 'bigint') return String(wire);
-  if (wire instanceof Date) return `'${escapeLiteral(wire.toISOString())}'`;
+  if (wire instanceof Date) {
+    if (Number.isNaN(wire.getTime())) {
+      throw new Error(
+        'sqliteRenderDdlExecutableStatement: invalid Date value cannot be emitted as a DEFAULT literal',
+      );
+    }
+    return `'${escapeLiteral(wire.toISOString())}'`;
+  }
   if (typeof wire === 'string') return `'${escapeLiteral(wire)}'`;
   if (wire instanceof Uint8Array) {
     const hex = Array.from(wire)
@@ -634,7 +648,7 @@ function sqliteInlineLiteral(wire: unknown): string {
     return `X'${hex}'`;
   }
   if (typeof wire === 'object') return `'${escapeLiteral(JSON.stringify(wire))}'`;
-  throw new Error(`sqliteRenderDdlDriverStatement: unexpected wire type "${typeof wire}"`);
+  throw new Error(`sqliteRenderDdlExecutableStatement: unexpected wire type "${typeof wire}"`);
 }
 
 function sqliteRenderDdlColumnDefault(def: LiteralColumnDefault | FunctionColumnDefault): string {
@@ -690,8 +704,8 @@ function sqliteRenderDdlConstraint(constraint: DdlTableConstraint): string {
   return `UNIQUE (${cols})`;
 }
 
-class SqliteDdlDriverStatementVisitor implements SqliteDdlVisitor<DriverStatement> {
-  createTable(node: SqliteCreateTable): DriverStatement {
+class SqliteDdlExecutableStatementVisitor implements SqliteDdlVisitor<ExecutableStatement> {
+  createTable(node: SqliteCreateTable): ExecutableStatement {
     const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
     const tableRef = quoteIdentifier(node.table);
     const columnDefs = node.columns.map(sqliteRenderDdlColumn);
@@ -705,6 +719,6 @@ class SqliteDdlDriverStatementVisitor implements SqliteDdlVisitor<DriverStatemen
   }
 }
 
-function sqliteRenderDdlDriverStatement(ast: SqliteDdlNode): DriverStatement {
-  return ast.accept(new SqliteDdlDriverStatementVisitor());
+function sqliteRenderDdlExecutableStatement(ast: SqliteDdlNode): ExecutableStatement {
+  return ast.accept(new SqliteDdlExecutableStatementVisitor());
 }

@@ -1,4 +1,4 @@
-import type { DdlDriverLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
 import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import { describe, expect, it } from 'vitest';
 import {
@@ -16,10 +16,10 @@ import type {
   SqliteTableSpec,
 } from '../../src/core/migrations/operations/shared';
 
-function stubLowerer(sql: string): DdlDriverLowerer {
+function stubLowerer(sql: string): ExecutableStatementLowerer {
   return {
     lower: () => Object.freeze({ sql, params: Object.freeze([]) }),
-    lowerToDriverStatement: async () => Object.freeze({ sql, params: Object.freeze([]) }),
+    lowerToExecutableStatement: async () => Object.freeze({ sql, params: Object.freeze([]) }),
   };
 }
 
@@ -71,7 +71,7 @@ describe('CreateTableCall', () => {
 
   it('passes columns and constraints to the lowerer', async () => {
     const received: unknown[] = [];
-    const capturingLowerer: DdlDriverLowerer = {
+    const capturingLowerer: ExecutableStatementLowerer = {
       lower: (ast) => {
         received.push(ast);
         return Object.freeze({
@@ -79,7 +79,7 @@ describe('CreateTableCall', () => {
           params: Object.freeze([]),
         });
       },
-      lowerToDriverStatement: async (ast) => {
+      lowerToExecutableStatement: async (ast) => {
         received.push(ast);
         return Object.freeze({
           sql: 'CREATE TABLE "user" (\n  "id" INTEGER PRIMARY KEY AUTOINCREMENT\n)',

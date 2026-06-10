@@ -47,7 +47,6 @@ export type {
   MigrationRunnerSuccessValue,
   MigrationScaffoldContext,
   OpFactoryCall,
-  SerializedQueryPlan,
   TargetMigrationsCapability,
 } from '../control/control-migration-types';
 export type {

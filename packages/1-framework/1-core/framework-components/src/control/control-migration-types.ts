@@ -75,24 +75,6 @@ export interface MigrationMetadata {
  */
 export type MigrationOperationClass = 'additive' | 'widening' | 'destructive' | 'data';
 
-// ============================================================================
-// Serialized Query Plan
-// ============================================================================
-
-/**
- * A lowered query statement as stored in ops.json.
- * Contains the SQL string and parameter values — ready for execution.
- * Lowering from query builder AST to SQL happens at verify time.
- *
- * The Postgres `dataTransform` factory uses this shape internally to
- * carry the user's lowered `check`/`run` plans before wrapping them
- * into precheck/execute/postcheck steps on the unified migration op.
- */
-export interface SerializedQueryPlan {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-}
-
 /**
  * Policy defining which operation classes are allowed during a migration.
  */
