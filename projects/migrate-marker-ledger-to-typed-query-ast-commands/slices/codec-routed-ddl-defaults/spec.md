@@ -193,3 +193,67 @@ After D2/D3, the renderer's `defaultVisitor.literal` on both targets is dead cod
 - Originating bug: TML-2859 (slice 5 / SQLite CreateTable adoption) review finding F1 — byte-parity test caught SQLite's broken `defaultVisitor.literal`; investigation confirmed PG has the same shape.
 - Related: TML-2754 (PG planner adoption — shipped with the type-branching bug); TML-2859 (SQLite planner adoption — ships with same transitional state in PR #768); TML-2861 (`::jsonb` cast — its `isTextLikeNativeType` heuristic stays in the existing renderer for the runtime path; the new path inside `lowerToDriverStatement` reimplements the same decision); TML-2866 (`DdlColumn.type` smuggling — orthogonal).
 - ADR reference: ADR 195 ("Planner IR with two renderers") — the `*Call` IR layer this slice operates within. Mongo's `MongoMigrationStep` is the working precedent the slice mirrors for SQL.
+
+---
+
+## Spec amendment — 2026-06-09 (review round)
+
+The three-pass review of PR #794 (artifacts under [`reviews/pr-794/`](reviews/pr-794/)) plus maintainer review surfaced one defining gap and several design corrections. This amendment supersedes the matching parts of the original design.
+
+### The gap: the codec was never wired
+
+`lowerToDriverStatement` shipped with hand-rolled type-branching (`pgInlineLiteral` / `sqliteInlineLiteral`) on raw JS values — the mini-codec the slice set out to eliminate, relocated and bug-fixed but not replaced. Output-pinning tests could not catch this because builtin codecs are byte-identical to the type-branching for every tested case; the divergence only appears with extension codecs (pgvector, encrypted columns, custom domains).
+
+Root cause: the DDL AST carries no codec identity. `DdlColumn` has `name`/`type`/`notNull`/`primaryKey`/`default` — no `codecRef` — and `*Call.toOp` passes `{ contract: {} }`, so the walker has nothing to resolve a codec with.
+
+### Codec resolution: explicit `codecRef` on the DDL AST
+
+The query AST already solved this problem: every column-bound `ParamRef` carries a `CodecRef`, and the contract-free query path requires `param(value, { codecId })` for non-wire-compatible values. The DDL AST mirrors that pattern:
+
+- `DdlColumn` gains an optional `codecRef: CodecRef`.
+- The planner populates it from `StorageColumn.codecId` (+ typeParams) at `toDdlColumn` / `tableToDdlParts` time.
+- `lowerToExecutableStatement` resolves the codec via `codecLookup.forCodecRef(column.codecRef)` and `await codec.encode(default.value, {})`; the wire result is inlined with the existing quoting/cast logic.
+- **Fallback rule (contract-free authoring):** when `codecRef` is absent (user-authored `col()` calls), literal defaults follow `RawSqlLiteral` semantics — wire-compatible scalars (string / number / boolean / bigint / null / Uint8Array / Date) inline via the existing branching. This is the documented contract for codec-less defaults, not an accident.
+
+The `{ contract: {} }` placeholder dies: the lowering context's `contract` becomes genuinely optional for the DDL path and callers omit it.
+
+### Renames (review probe: "Driver" is not a discriminator)
+
+The property that matters is executability — all values encoded, nothing left to transform:
+
+- `DriverStatement` → **`ExecutableStatement`**
+- `lowerToDriverStatement` → **`lowerToExecutableStatement`**
+- `DdlDriverLowerer` → **`ExecutableStatementLowerer`**, and `SqlControlAdapter` **extends** it (deleting the duplicated method declaration).
+
+`SerializedQueryPlan` (framework-components) is subsumed by `ExecutableStatement`: its only production consumer is PG `data-transform.ts` (target layer), and the type's `sql` field never belonged in the framework. The framework declaration is deleted; the consumer imports `ExecutableStatement` from relational-core.
+
+### Operations memoization (review F1)
+
+`PlannerProduced*Migration.operations` re-runs `renderOps` → `toOp` → `lowerToExecutableStatement` on every property access; synth, stripOperations, and the runner each trigger an independent lowering. Deterministic codecs hide this; a nondeterministic codec (encrypted columns) would make `displayOps` and the executed SQL diverge. The getter memoizes: lower once, cache the array.
+
+### `lower()` stops accepting DDL; old DDL renderer deleted (resolves AC9 decisively)
+
+The only remaining production `lower()`-for-DDL callers are the marker/ledger bootstrap loops (`control-instance.ts` lowers `bootstrapSignMarkerQueries()` / `bootstrapControlTableQueries()` DDL nodes — both already in async context) and the `lowerAst` pass-through on the family control instance. These migrate to `lowerToExecutableStatement`. Then:
+
+- `lower()` throws on DDL nodes with a message naming `lowerToExecutableStatement`.
+- The old DDL rendering path (`renderLoweredDdl` + `defaultVisitor` + helpers) is deleted from both adapters — including the TML-2859 D5 literal branch the original DoD wanted gone (AC9) and the TML-2861 `isTextLikeNativeType` copy that moved into the new walker.
+
+One DDL walker per adapter, not two.
+
+### Fixtures (resolves AC10's vacuous green)
+
+End-to-end migration fixtures gain literal-default coverage: Date, bigint, and JSON defaults, plus **one extension-codec default** — the only case that distinguishes codec routing from type-branching.
+
+### Quick wins folded in from review
+
+`isThenable` helper replacing `instanceof Promise` (2 sites); `ifDefined` for conditional spreads; delete the mechanical re-export parity tests; SQLite `renderOps` target assertion (parity with PG); non-finite-number guard in `sqliteInlineLiteral` (parity with PG); invalid-`Date` guard before `toISOString()`; `Uint8Array` inline cast uses the column's native type rather than hardcoded `::bytea`; byte-parity test renamed to what it proves.
+
+### Revised done-when (delta to the original list)
+
+- `ExecutableStatement` / `lowerToExecutableStatement` / `ExecutableStatementLowerer` names throughout; `SqlControlAdapter extends ExecutableStatementLowerer`; `SerializedQueryPlan` deleted from framework-components.
+- `DdlColumn.codecRef` populated by the planner; `lowerToExecutableStatement` encodes literal defaults through the resolved codec; fallback rule documented and tested.
+- No `{ contract: {} }` call sites remain.
+- `PlannerProduced*Migration.operations` memoized.
+- `lower()` rejects DDL nodes; old DDL renderer paths deleted from both adapters; marker/ledger bootstrap lowers via `lowerToExecutableStatement`.
+- Fixtures cover Date / bigint / JSON / extension-codec defaults end-to-end.
+- Original AC4 (step `params` contract) satisfied by the `ExecutableStatement` composition.

@@ -85,3 +85,44 @@ Three dispatches. D1 is purely additive substrate (new type + new adapter method
 - **Implementer model tier per dispatch:** sonnet (mechanical refactor + adapter implementation).
 - **Time-box per dispatch:** 90 min wall-clock; surface if not done at 90 min.
 - **Tool-call budget per dispatch:** 200 max before committing intermediate state.
+
+---
+
+## Plan amendment — 2026-06-09 (review round)
+
+The PR #794 three-pass review + maintainer review (see [`reviews/pr-794/`](reviews/pr-794/) and the spec's 2026-06-09 amendment) found that codec routing — the slice's named outcome — was not implemented: `lowerToDriverStatement` type-branches on raw values instead of encoding through the column's codec. Three more dispatches close the slice properly.
+
+### Dispatch 4: Mechanical sweep — renames, interface fix, subsumption, quick wins
+
+- **Outcome:**
+  - `DriverStatement` → `ExecutableStatement`; `lowerToDriverStatement` → `lowerToExecutableStatement`; `DdlDriverLowerer` → `ExecutableStatementLowerer`. All call sites, tests, and doc comments follow.
+  - `SqlControlAdapter extends ExecutableStatementLowerer`; the duplicated `lowerToDriverStatement` declaration inside `SqlControlAdapter` is deleted.
+  - `SerializedQueryPlan` deleted from `framework-components/control`; its single consumer (PG `operations/data-transform.ts`) imports `ExecutableStatement` from relational-core instead.
+  - Quick wins: `isThenable` helper in `@prisma-next/utils` replacing both `instanceof Promise` sites (`sql-migration.ts`, PG `render-ops.ts`); `ifDefined` for the conditional constraint spreads in both targets' `CreateTableCall.toOp`; delete `packages/3-extensions/sqlite/test/migration/re-export.test.ts` (and the PG twin if present); SQLite `renderOps` gains the target-id assertion PG has; `sqliteInlineLiteral` gains the non-finite-number guard PG has; both inline-literal helpers guard invalid `Date` before `toISOString()`; PG `Uint8Array` inline cast uses the column's native type instead of hardcoded `::bytea`; byte-parity test renamed to describe what it pins.
+- **Builds on:** PR #794 head (`736060a96`).
+- **Hands to:** D5 + D6 (final names in place; no further renames downstream).
+- **Focus:** Mechanical only. No codec wiring (D5). No bootstrap migration or walker deletion (D6).
+
+### Dispatch 5: Codec wiring — `codecRef` on the IR, encode in the walker, memoize, fixtures
+
+- **Outcome:**
+  - `DdlColumn` gains optional `codecRef: CodecRef`. Planner populates it from `StorageColumn.codecId` (+ typeParams) in both targets' `toDdlColumn` / `tableToDdlParts`.
+  - `lowerToExecutableStatement`'s DDL walkers resolve `column.codecRef` via `codecLookup.forCodecRef` and `await codec.encode(default.value, {})`; the wire result feeds the existing inline-literal helpers. Fallback when `codecRef` absent: current wire-scalar branching (documented RawSqlLiteral-equivalent rule).
+  - `{ contract: {} }` call sites removed; lowering-context `contract` optional for DDL.
+  - `PlannerProduced*Migration.operations` memoized (lower once, cache).
+  - Fixtures: end-to-end migration coverage for Date / bigint / JSON defaults plus one extension-codec default (the case that distinguishes codec routing from branching).
+- **Builds on:** D4 (final names).
+- **Hands to:** Slice DoD on the codec dimension. D6 independent.
+
+### Dispatch 6: Bootstrap migration + `lower()` rejects DDL + old walker deletion
+
+- **Outcome:**
+  - Marker/ledger bootstrap loops in `control-instance.ts` (and the `lowerAst` pass-through surface) migrate from `lower()` to `lowerToExecutableStatement` (already async context).
+  - `lower()` throws on DDL nodes naming `lowerToExecutableStatement` as the replacement.
+  - Old DDL renderer paths (`renderLoweredDdl`, `defaultVisitor`, helpers) deleted from both adapters — resolves original AC9 decisively.
+- **Builds on:** D4 (names). Parallel-safe with D5 (different files except the adapters' class bodies — run sequentially to be safe).
+- **Hands to:** Slice DoD complete; re-review.
+
+### Sequencing
+
+D4 → D5 → D6, sequential (D5/D6 both touch the adapter classes; avoid merge friction).
