@@ -1,22 +1,16 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import {
   APP_SPACE_ID,
   assembleAuthoringContributions,
 } from '@prisma-next/framework-components/control';
-import { namespacePslExtensionBlocks } from '@prisma-next/framework-components/psl-ast';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import {
-  computeContentHash,
-  normalizePredicate,
-} from '@prisma-next/target-postgres/rls-canonicalize';
-import {
   PostgresRlsPolicy,
-  PostgresRole,
   PostgresSchema,
+  postgresCreateNamespace,
 } from '@prisma-next/target-postgres/types';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -53,7 +47,7 @@ namespace public {
 `;
 
 // ============================================================================
-// PSL → contract helpers
+// PSL → contract
 // ============================================================================
 
 function buildScalarTypeDescriptors(): ReadonlyMap<
@@ -72,79 +66,6 @@ function buildScalarTypeDescriptors(): ReadonlyMap<
   return result;
 }
 
-/**
- * Lower the `policy_select` extension blocks in the parsed namespace
- * into `PostgresRlsPolicy` instances, keyed by wire name.
- */
-function lowerExtensionBlocksToRlsPolicies(
-  namespaceId: string,
-  extensionBlocks: ReturnType<typeof namespacePslExtensionBlocks>,
-): Record<string, PostgresRlsPolicy> {
-  const policies: Record<string, PostgresRlsPolicy> = {};
-
-  for (const block of extensionBlocks) {
-    if (block.kind !== 'postgres-rls-policy') {
-      continue;
-    }
-
-    const prefix = block.name;
-
-    const targetParam = block.parameters['target'];
-    const targetModelName =
-      targetParam && typeof targetParam === 'object' && 'kind' in targetParam
-        ? (targetParam as { kind: string; identifier?: string }).kind === 'ref'
-          ? ((targetParam as { identifier?: string }).identifier ?? '')
-          : ''
-        : '';
-    const tableName = targetModelName.charAt(0).toLowerCase() + targetModelName.slice(1);
-
-    const rolesParam = block.parameters['roles'];
-    const roles: string[] =
-      rolesParam &&
-      typeof rolesParam === 'object' &&
-      'kind' in rolesParam &&
-      (rolesParam as { kind: string }).kind === 'list'
-        ? ((rolesParam as { items?: unknown[] }).items ?? []).flatMap((item) => {
-            const i = item as { kind?: string; identifier?: string };
-            return i.kind === 'ref' && typeof i.identifier === 'string' ? [i.identifier] : [];
-          })
-        : [];
-
-    const usingParam = block.parameters['using'];
-    const usingRaw =
-      usingParam && typeof usingParam === 'object' && 'kind' in usingParam
-        ? (usingParam as { kind: string; raw?: string }).kind === 'value'
-          ? ((usingParam as { raw?: string }).raw ?? '')
-          : ''
-        : '';
-    const using =
-      usingRaw.startsWith('"') && usingRaw.endsWith('"') && usingRaw.length >= 2
-        ? usingRaw.slice(1, -1)
-        : usingRaw;
-
-    const wireHash = computeContentHash({
-      using: normalizePredicate(using),
-      roles: [...roles].sort(),
-      operation: 'select',
-      permissive: true,
-    });
-    const wireName = `${prefix}_${wireHash}`;
-
-    policies[wireName] = new PostgresRlsPolicy({
-      name: wireName,
-      prefix,
-      tableName,
-      namespaceId,
-      operation: 'select',
-      roles: [...roles].sort(),
-      using,
-      permissive: true,
-    });
-  }
-
-  return policies;
-}
-
 function buildPslContract() {
   const assembled = assembleAuthoringContributions([postgresTargetDescriptor]);
 
@@ -158,39 +79,21 @@ function buildPslContract() {
     codecLookup,
   });
 
-  // Pre-lower extension blocks per namespace so the createNamespace factory
-  // can inject them into the PostgresSchema.
-  const rlsPoliciesByNamespace = new Map<string, Record<string, PostgresRlsPolicy>>();
-  for (const ns of document.ast.namespaces) {
-    const blocks = namespacePslExtensionBlocks(ns);
-    if (blocks.length > 0) {
-      rlsPoliciesByNamespace.set(ns.name, lowerExtensionBlocksToRlsPolicies(ns.name, blocks));
-    }
-  }
-
-  // The role entity is not yet declarable in PSL (no `role <name> {}` block
-  // descriptor exists), so we construct it directly.
-  const appUserRole = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
-
   return interpretPslDocumentToSqlContract({
     document,
-    target: postgresTargetDescriptor as unknown as TargetPackRef<'sql', 'postgres'>,
+    target: {
+      kind: 'target' as const,
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      id: 'postgres',
+      version: postgresTargetDescriptor.version,
+      capabilities: {},
+      defaultNamespaceId: 'public',
+    },
     scalarTypeDescriptors,
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
-    createNamespace: (input: SqlNamespaceTablesInput) => {
-      const policies = rlsPoliciesByNamespace.get(input.id) ?? {};
-      const role = input.id === 'public' ? { [appUserRole.name]: appUserRole } : {};
-      return new PostgresSchema({
-        id: input.id,
-        entries: {
-          table: input.entries.table,
-          type: {},
-          role,
-          rlsPolicy: policies,
-        },
-      });
-    },
+    createNamespace: postgresCreateNamespace,
   });
 }
 
@@ -212,7 +115,7 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
     if (database) await database.close();
   }, testTimeout);
 
-  it('PSL lowers to a contract with rlsPolicy and role entries in the public namespace', () => {
+  it('PSL lowers to a contract with an rlsPolicy entry in the public namespace', () => {
     const result = buildPslContract();
 
     expect(result.ok).toBe(true);
@@ -233,11 +136,6 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
     expect(policy.using).toBe("owner_id = current_setting('app.uid')::int");
     expect(policy.prefix).toBe('p_read');
     expect(policy.name).toMatch(/^p_read_[0-9a-f]{8}$/);
-
-    expect(Object.keys(ns.entries.role)).toHaveLength(1);
-    const role = ns.entries.role['app_user']!;
-    expect(role).toBeInstanceOf(PostgresRole);
-    expect(role.name).toBe('app_user');
   });
 
   it(
