@@ -4,7 +4,6 @@ import {
   type DocumentState,
   parse,
   parseBlockAttribute,
-  parseCompositeType,
   parseEnum,
   parseEnumValue,
   parseField,
@@ -13,7 +12,7 @@ import {
   parseModel,
   parseNamedType,
   parseNamespace,
-  parseTypesBlock,
+  parseTypeDeclaration,
 } from '../src/parse';
 import {
   BlockDeclarationAst,
@@ -694,24 +693,20 @@ function expectNoOpReject(source: string, run: (cursor: Cursor) => GreenNode | u
 }
 
 describe('ordered-alternative parsers are no-ops on non-match', () => {
-  it('parseModel rejects a malformed model keyword without consuming', () => {
-    expectNoOpReject('model {', parseModel);
+  it('parseModel rejects a non-model keyword without consuming', () => {
+    expectNoOpReject('enum Color {', parseModel);
   });
 
-  it('parseEnum rejects a malformed enum keyword without consuming', () => {
-    expectNoOpReject('enum {', parseEnum);
+  it('parseEnum rejects a non-enum keyword without consuming', () => {
+    expectNoOpReject('model User {', parseEnum);
   });
 
-  it('parseNamespace rejects a nameless namespace without consuming', () => {
-    expectNoOpReject('namespace {', (cursor) => parseNamespace(cursor, false, freshState()));
+  it('parseNamespace rejects a non-namespace keyword without consuming', () => {
+    expectNoOpReject('model User {', (cursor) => parseNamespace(cursor, false, freshState()));
   });
 
-  it('parseTypesBlock rejects a composite-type shape without consuming', () => {
-    expectNoOpReject('type Foo {', (cursor) => parseTypesBlock(cursor, false, freshState()));
-  });
-
-  it('parseCompositeType rejects a types-block shape without consuming', () => {
-    expectNoOpReject('type {', parseCompositeType);
+  it('parseTypeDeclaration rejects a non-type keyword without consuming', () => {
+    expectNoOpReject('model User {', (cursor) => parseTypeDeclaration(cursor, false, freshState()));
   });
 
   it('parseGenericBlock rejects a reserved keyword so it falls through to recovery', () => {
