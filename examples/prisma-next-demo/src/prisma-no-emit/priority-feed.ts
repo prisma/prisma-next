@@ -1,5 +1,5 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { createOrmClient, sql } from './context';
+import { enums, sql } from './context';
 
 /**
  * Reads posts ordered by their `Priority` enum column. The enum's declaration
@@ -15,11 +15,16 @@ export async function getPostsByPriority(runtime: Runtime) {
 
 /**
  * Returns the declaration-ordered runtime surface for the `Priority` enum via
- * the namespace facet's reserved `enums` accessor (`facet.enums.Priority`),
- * demonstrating that the value tuple and helpers are reachable from the orm
- * client.
+ * the `db.enums` facade member (`enums.public.Priority`), demonstrating that
+ * the value tuple and helpers are reachable as lane-agnostic contract metadata.
  */
-export function getPriorityEnum(runtime: Runtime) {
-  const publicNs = createOrmClient(runtime);
-  return publicNs.enums.Priority;
+export function getPriorityEnum() {
+  // The no-emit contract types its domain namespaces loosely (index
+  // signature), so `enums['public']` is reached with bracket access and a
+  // runtime guard rather than a cast — the same shape `createOrmClient` uses.
+  const publicEnums = enums['public'];
+  if (publicEnums === undefined) {
+    throw new Error("Contract is missing the 'public' namespace enums");
+  }
+  return publicEnums.Priority;
 }

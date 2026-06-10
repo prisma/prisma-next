@@ -60,9 +60,9 @@ describe('TS-authored enum on the demo contract (Post.priority)', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contract });
-        const { runtime, close } = await openRuntime(connectionString);
+        const { close } = await openRuntime(connectionString);
         try {
-          const priority = getPriorityEnum(runtime);
+          const priority = getPriorityEnum();
           expect(priority.values).toEqual(['low', 'high', 'urgent']);
           expect(priority.names).toEqual(['Low', 'High', 'Urgent']);
           expect(priority.members.Urgent).toBe('urgent');

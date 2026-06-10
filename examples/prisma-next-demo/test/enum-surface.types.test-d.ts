@@ -1,7 +1,6 @@
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { expectTypeOf, test } from 'vitest';
-import type { contract } from '../prisma/contract';
-import { sql } from '../src/prisma-no-emit/context';
+import { type enums, sql } from '../src/prisma-no-emit/context';
 
 type Priority = 'low' | 'high' | 'urgent';
 
@@ -25,7 +24,6 @@ test('writing Post.priority only accepts the value union', () => {
 });
 
 test('db.enums value tuple keeps its literal declaration order', () => {
-  type Accessors = typeof contract extends { enumAccessors: infer A } ? A : never;
-  type Values = Accessors extends { Priority: { values: infer V } } ? V : never;
+  type Values = (typeof enums)['public']['Priority']['values'];
   expectTypeOf<Values>().toEqualTypeOf<readonly ['low', 'high', 'urgent']>();
 });

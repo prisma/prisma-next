@@ -3,10 +3,11 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
-import { orm } from '@prisma-next/sql-orm-client';
+import { buildNamespacedEnums, type NamespacedEnums, orm } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 import { contract } from '../../prisma/contract';
 import { PostCollection, UserCollection } from '../orm-client/collections';
 
@@ -35,10 +36,17 @@ export const sql = sqlBuilder<typeof contract>({
   rawCodecInferer: { inferCodec: () => 'pg/text' },
 }).public;
 
+// Enums are lane-agnostic contract metadata. The no-emit path has no facade
+// to hang `db.enums` on, so build the namespace-keyed map directly from the
+// contract — the same surface the postgres facade exposes as `db.enums`.
+export const enums = blindCast<
+  NamespacedEnums<typeof contract>,
+  'buildNamespacedEnums returns the namespace-keyed accessor map this contract types'
+>(Object.freeze(buildNamespacedEnums(validatedContract.domain)));
+
 export function createOrmClient(runtime: Runtime) {
   // The no-emit contract types its domain namespaces loosely, so narrow the
-  // `public` facet with a runtime guard rather than a cast. Enums now live on
-  // the facet under the reserved `enums` key (`facet.enums.Priority`).
+  // `public` facet with a runtime guard rather than a cast.
   const client = orm({
     runtime,
     context,
