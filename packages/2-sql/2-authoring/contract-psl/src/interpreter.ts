@@ -709,6 +709,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     diagnostics,
     sourceId,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
+    ...(input.enum2Handles ? { enum2Handles: input.enum2Handles } : {}),
   });
 
   const inlineIdFields = resolvedFields.filter((field) => field.isId);
