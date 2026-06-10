@@ -1301,8 +1301,12 @@ export type MutationUpdateInput<
 > = Partial<DefaultModelRow<TContract, ModelName, NsId>> &
   RelationMutationFields<TContract, ModelName>;
 
-type ModelRelations<TContract extends Contract<SqlStorage>, ModelName extends string> =
-  ModelDef<TContract, ModelName> extends { readonly relations: infer R }
+type ModelRelations<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  NsId extends string = never,
+> =
+  ModelDef<TContract, ModelName, NsId> extends { readonly relations: infer R }
     ? R extends Record<string, unknown>
       ? R
       : Record<string, never>
@@ -1318,25 +1322,28 @@ type ExactRecord<T> =
 export type RelationsOf<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = ExactRecord<ModelRelations<TContract, ModelName>>;
+  NsId extends string = never,
+> = ExactRecord<ModelRelations<TContract, ModelName, NsId>>;
 
 export type RelationNames<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = (string extends keyof RelationsOf<TContract, ModelName>
+  NsId extends string = never,
+> = (string extends keyof RelationsOf<TContract, ModelName, NsId>
   ? never
   : {
       // Filter out relation keys whose type is `never` — those are cross-space
       // relations (Option B): declared in the contract but non-navigable via
       // `include`. Emitting the relation as `never` in the `.d.ts` and
       // excluding it here makes `include('relName')` a compile error.
-      [K in keyof RelationsOf<TContract, ModelName>]: RelationsOf<
+      [K in keyof RelationsOf<TContract, ModelName, NsId>]: RelationsOf<
         TContract,
-        ModelName
+        ModelName,
+        NsId
       >[K] extends never
         ? never
         : K;
-    }[keyof RelationsOf<TContract, ModelName>]) &
+    }[keyof RelationsOf<TContract, ModelName, NsId>]) &
   string;
 
 type RelationModelName<Relation> = Relation extends {
@@ -1349,11 +1356,35 @@ export type RelatedModelName<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
+  NsId extends string = never,
 > =
-  RelationsOf<TContract, ModelName> extends infer Rels
+  RelationsOf<TContract, ModelName, NsId> extends infer Rels
     ? Rels extends Record<string, unknown>
       ? RelName extends keyof Rels
         ? RelationModelName<Rels[RelName]>
+        : never
+      : never
+    : never;
+
+// The namespace coordinate the relation's target model lives in, read from the
+// relation's `to.namespace`. Lets a relation reached through an explicit
+// namespace facet resolve its included row at the target namespace rather than
+// the parent facet's. Without a facet coordinate (`never`) it stays `never` so
+// the included row resolves through the same default path as before — a
+// non-facet collection's include shape is unchanged.
+export type RelationTargetNamespace<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+  NsId extends string = never,
+> = [NsId] extends [never]
+  ? never
+  : RelationsOf<TContract, ModelName, NsId> extends infer Rels
+    ? Rels extends Record<string, unknown>
+      ? RelName extends keyof Rels
+        ? Rels[RelName] extends { readonly to: { readonly namespace: infer N extends string } }
+          ? N
+          : never
         : never
       : never
     : never;
@@ -1368,8 +1399,9 @@ export type RelationCardinality<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
+  NsId extends string = never,
 > =
-  RelationsOf<TContract, ModelName> extends infer Rels
+  RelationsOf<TContract, ModelName, NsId> extends infer Rels
     ? Rels extends Record<string, unknown>
       ? RelName extends keyof Rels
         ? RelationCardinalityFromRelation<Rels[RelName]>
@@ -1429,10 +1461,15 @@ type IsToOneRelationNullable<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
+  NsId extends string = never,
 > =
-  ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? NamespaceTableDef<TContract, TableName> extends infer Table extends StorageTable
-      ? RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
+  ModelTableName<TContract, ModelName, NsId> extends infer TableName extends string
+    ? NamespaceTableDef<
+        TContract,
+        TableName,
+        ResolvedNsId<TContract, ModelName, NsId>
+      > extends infer Table extends StorageTable
+      ? RelationsOf<TContract, ModelName, NsId> extends infer Rels extends Record<string, unknown>
         ? RelName extends keyof Rels
           ? RelationLocalFieldColumns<
               TContract,
@@ -1453,12 +1490,20 @@ export type IncludeRelationValue<
   ModelName extends string,
   RelName extends string,
   IncludedRow,
+  NsId extends string = never,
 > =
-  RelationCardinality<TContract, ModelName, RelName> extends '1:1' | 'N:1'
-    ? IsToOneRelationNullable<TContract, ModelName, RelName> extends true
+  RelationCardinality<TContract, ModelName, RelName, NsId> extends '1:1' | 'N:1'
+    ? IsToOneRelationNullable<TContract, ModelName, RelName, NsId> extends true
       ? IncludedRow | null
       : IncludedRow
     : IncludedRow[];
 
-export type CollectionModelName<TContract extends Contract<SqlStorage>> =
-  keyof ModelsOf<TContract> & string;
+// The union of model names across every domain namespace. Reading the flat
+// `ModelsOf` map instead collapses to the *intersection* of names when
+// namespaces declare different models (a union of object types keys to its
+// shared keys), which would drop a model unique to one namespace under a
+// same-bare-name collision.
+export type CollectionModelName<TContract extends Contract<SqlStorage>> = {
+  [Ns in keyof TContract['domain']['namespaces']]: keyof TContract['domain']['namespaces'][Ns]['models'] &
+    string;
+}[keyof TContract['domain']['namespaces']];
