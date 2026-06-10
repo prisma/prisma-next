@@ -7,7 +7,7 @@
 
 ## At a glance
 
-Three slices. Slice 1 makes **SELECT policies dependable end-to-end** — full lifecycle (create, change, remove), drift makes `db verify` fail, proven in the Supabase example app. Slice 2 makes **drift handling correct per variation** and introduces the **policy→role traversal** that seeds the dependency graph. Slice 3 extends everything to **the other policy types**.
+Four slices. Slice 1 makes **SELECT policies dependable end-to-end** — full lifecycle (create, change, remove), drift makes `db verify` fail, proven in the Supabase example app. Slice 2 makes **drift handling correct per variation** and introduces the **policy→role traversal** that seeds the dependency graph. Slice 3 extends everything to **the other policy types**. Slice 4 adds the **TypeScript authoring surface** with PSL parity.
 
 RLS rides the generic schema-diff architecture (unchanged — see § Architecture decisions): generic differ + `{coordinate, outcome}` issues; zero RLS symbols in framework/SQL-family; content-addressed wire names; side-by-side with the untouched legacy relational verifier/planner. The relational port and dependency-aware planner ordering remain independent follow-on projects.
 
@@ -42,9 +42,17 @@ Everything slices 1–2 made dependable for SELECT works for **INSERT / UPDATE /
 - PSL `policy_insert | policy_update | policy_delete | policy_all` block descriptors lowering through the same generic interpreter pass; `withCheck` handling (INSERT/UPDATE) end-to-end; the lifecycle + drift behaviors from slices 1–2 verified per type (the content-hash already covers operation + withCheck, so this is descriptors + DDL rendering + per-type e2e, not new architecture).
 - **DoD (operator-observable):** the slice-1 example-app scenario repeated with an UPDATE-own policy (`using` + `withCheck`): a user can update only their own row; editing/removing/drifting behaves exactly as for SELECT.
 
+### Slice 4 — `typescript-authoring` · _(Linear: see § Linear sync)_
+
+A developer can author the same policies in **TypeScript** instead of PSL, with identical results.
+
+- Top-level Postgres-contributed policy helpers taking the model handle (the decided surface — the `enum`/`entityTypes` mechanism, invisible to SQLite/Mongo authors; **not** a model-builder method; rationale in [`specs/design-rls-authoring-surface.md`](specs/design-rls-authoring-surface.md)). Settles the still-open **per-operation (`policySelect(…)`) vs single-array** helper-signature decision at slice pickup.
+- The `ref()` predicate helper (reads `{namespaceId, tableName}` off `extensionModel(…)` handles so predicates track renames); model-level RLS enable/disable; duplicate-prefix/name diagnostics.
+- **TS/PSL parity test:** the same policies authored both ways lower to structurally identical IR with identical wire names.
+- **DoD (operator-observable):** the slice-1 example-app scenario authored in TS instead of PSL behaves identically (filtered rows, lifecycle, drift→verify-fails); the parity test pins identical contracts.
+
 ## Not in this project's plan-of-record (operator cut, 2026-06-10)
 
-- **TypeScript authoring surface** (the `policySelect(Profile, …)` helpers + `ref()` predicate helper) — dropped from the current cut; PSL is the authoring surface this project delivers. Revisit after slice 3 if wanted.
 - **Cross-space role-ref *validation* / role authoring** — roles are external (platform-provided; shim-seeded in tests); policies reference them by name. The substrate's cross-space pass-through stands; real role-ref validation arrives with slice 2's role traversal only to the extent of "referenced role exists in the DB," not authoring-time cross-space resolution.
 - Independent follow-on projects (unchanged, filed in Linear): **A** — port the 25 legacy relational verifier kinds onto the generic differ; **B** — dependency-aware generic planner ordering (slice 2's policy→role edges are its seed).
 
@@ -59,4 +67,4 @@ Everything slices 1–2 made dependable for SELECT works for **INSERT / UPDATE /
 
 ## Linear sync
 
-TML-2868 → `select-policies-dependable` (re-scoped; PR #771 continues under it). TML-2869 → `drift-handled-correctly`. TML-2870 → `all-policy-types`. TML-2871 → canceled (its contents split: example-app skeleton → slice 1; role existence → slice 2; cross-space role validation → dropped). Blocking: 2869 blockedBy 2868; 2870 blockedBy 2869.
+TML-2868 → `select-policies-dependable` (re-scoped; PR #771 continues under it). TML-2869 → `drift-handled-correctly`. TML-2870 → `all-policy-types`. [TML-2883](https://linear.app/prisma-company/issue/TML-2883) → `typescript-authoring` (slice 4, re-added 2026-06-10). TML-2871 → canceled (contents split: example-app skeleton → slice 1; role existence → slice 2; cross-space role validation → dropped). Blocking: 2869 blockedBy 2868; 2870 blockedBy 2869; 2883 blockedBy 2870.
