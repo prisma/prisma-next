@@ -11,9 +11,9 @@
 
 1. ✅ Abstract `SqlRuntime` seam (rename from `SqlRuntimeImpl`) + upgrade declaration.
 2. ✅ `executeWithSessionBootstrap` + `RawSessionConnection` + 14 lifecycle/below-middleware tests (folded from #793).
-3. Target-layer construction: `PostgresRuntime` + `SqliteRuntime` (identity concretions in their target packages); `postgres()`/`postgres-serverless`/`sqlite()` construct them; **delete `createRuntime` + `DefaultSqlRuntime`**; migrate package tests + e2e/integration utils + demo app; extend the upgrade declaration (breaking change).
-4. Supabase consumer: barrel-export `RawSessionConnection`; `SupabaseRuntime extends PostgresRuntime`; `supabase()` façade (`asUser`/`asAnon`/`asServiceRole`, JWT validation via jwtSecret/JWKS, `RoleBoundDb` with `transaction()`); replaces the M1 stub.
-5. Acceptance + docs: raw-SQL RLS policy in the `examples/supabase` skeleton fixture; assert ORM query via `asUser` sees only owner rows, `asServiceRole` sees all, middleware never sees `SET LOCAL`; revise ADR to as-built mechanism; update subsystem doc.
+3. ✅ Target-layer construction: `PostgresRuntime` + `SqliteRuntime` (identity concretions in their target packages); `postgres()`/`postgres-serverless`/`sqlite()` construct them; **delete `createRuntime` + `DefaultSqlRuntime`**; migrate package tests + e2e/integration utils + demo app; extend the upgrade declaration (breaking change).
+4. ✅ Supabase consumer: barrel-export `RawSessionConnection`; `SupabaseRuntime extends PostgresRuntime`; `supabase()` façade (`asUser`/`asAnon`/`asServiceRole`, JWT validation via jwtSecret/JWKS, `RoleBoundDb` with `transaction()`); replaces the M1 stub.
+5. ✅ Acceptance + docs: raw-SQL RLS policy in the `examples/supabase` skeleton fixture; assert ORM query via `asUser` sees only owner rows, `asServiceRole` sees all, middleware never sees `SET LOCAL`; revise ADR to as-built mechanism; update subsystem doc.
 
 ## Composition (original 4-slice record; outcomes unchanged, PR packaging superseded by the stages above)
 
