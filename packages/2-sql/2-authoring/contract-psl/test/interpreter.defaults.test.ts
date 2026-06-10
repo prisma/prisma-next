@@ -298,6 +298,35 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     },
   } as const;
 
+  it('lowers boolean literal defaults into the storage contract', () => {
+    const document = parsePslDocument({
+      schema: `model Flags {
+  id Int @id
+  enabled Boolean @default(true)
+  disabled Boolean @default(false)
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(unboundTables(storage)['flags']?.columns['enabled']?.default).toEqual({
+      kind: 'literal',
+      value: true,
+    });
+    expect(unboundTables(storage)['flags']?.columns['disabled']?.default).toEqual({
+      kind: 'literal',
+      value: false,
+    });
+  });
+
   it('lowers temporal.updatedAt() to create and update execution defaults', () => {
     const document = parsePslDocument({
       schema: `model Timestamped {
