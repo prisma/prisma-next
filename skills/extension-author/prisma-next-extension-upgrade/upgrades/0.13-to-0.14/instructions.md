@@ -34,6 +34,14 @@ changes:
 ---
 
 <!--
+TML-2867: codec-routed DDL defaults. The pgvector extension test files were updated
+to await lazy plan operations (`Promise.all(result.plan.operations)`) and to use
+`PostgresControlAdapter` instead of the removed `createPostgresAdapter`. The
+`packages/3-extensions/postgres re-export test` deletion was already declared by
+TML-2859 above. No extension-author API change. Incidental substrate diff only.
+-->
+
+<!--
 TML-2859: SQLite createTable authoring method. The free `createTable` function from
 `@prisma-next/sqlite/migration` is now a protected method on the `SqliteMigration`
 base class. The `createTable` re-export test in `packages/3-extensions/sqlite/` was
