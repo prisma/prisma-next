@@ -594,21 +594,21 @@ function parseEnum2Block(context: ParserContext, name: string, bounds: BlockBoun
       continue;
     }
 
-    if (line.includes('@map(')) {
-      pushDiagnostic(context, {
-        code: 'PSL_INVALID_ENUM2_MEMBER',
-        message: `enum2 member "${line}" must not use @map; assign the storage value with "= <value>" instead`,
-        span: createTrimmedLineSpan(context, lineIndex),
-      });
-      continue;
-    }
-
     const valueWithAssign = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
     if (valueWithAssign) {
       values.push({
         kind: 'enum2Value',
         name: valueWithAssign[1] ?? '',
         rawValue: (valueWithAssign[2] ?? '').trim(),
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      continue;
+    }
+
+    if (line.includes('@map(')) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_ENUM2_MEMBER',
+        message: `enum2 member "${line}" must not use @map; assign the storage value with "= <value>" instead`,
         span: createTrimmedLineSpan(context, lineIndex),
       });
       continue;

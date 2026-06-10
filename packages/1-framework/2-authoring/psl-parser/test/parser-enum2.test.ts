@@ -181,6 +181,22 @@ enum2 Priority {
     expect(priority?.values).toHaveLength(2);
   });
 
+  it('captures a raw value that contains @map( as a substring', () => {
+    const schema = `
+enum2 Status {
+  @@type("pg/text@1")
+  Foo = "@map(x)"
+}
+`;
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+
+    const enums = flatPslEnum2s(result.ast);
+    expect(enums[0]?.values[0]).toMatchObject({ name: 'Foo', rawValue: '"@map(x)"' });
+  });
+
   it('produces a diagnostic when @map appears on an enum2 member', () => {
     const schema = `
 enum2 Status {
