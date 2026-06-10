@@ -19,6 +19,7 @@
 //   2. Explicit .select() used in most tests.
 //   3. At least one test uses implicit/default selection (no .select()).
 
+import { and } from '@prisma-next/sql-orm-client';
 import { describe, expect, it } from 'vitest';
 import { createUsersCollection, timeouts, withCollectionRuntime } from './integration-helpers';
 import { seedTags, seedUsers, seedUserTags } from './runtime-helpers';
@@ -99,6 +100,44 @@ describe('integration/mn-filter', () => {
           { id: 1, name: 'Alice' },
           { id: 2, name: 'Bob' },
         ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'some: composes with a scalar where predicate (explicit select, whole-row toEqual)',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Alice', email: 'alice.without-rust@example.com' },
+          { id: 3, name: 'Bob', email: 'bob@example.com' },
+        ]);
+        await seedTags(runtime, [
+          { id: TAG_RUST, name: 'Rust' },
+          { id: TAG_TS, name: 'TypeScript' },
+        ]);
+        await seedUserTags(runtime, [
+          { userId: 1, tagId: TAG_RUST },
+          { userId: 2, tagId: TAG_TS },
+          { userId: 3, tagId: TAG_RUST },
+        ]);
+
+        const rows = await users
+          .select('id', 'name', 'email')
+          .where((u) =>
+            and(
+              u.name.eq('Alice'),
+              u.tags.some((t) => t.name.eq('Rust')),
+            ),
+          )
+          .orderBy((u) => u.id.asc())
+          .all();
+
+        expect(rows).toEqual([{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
       });
     },
     timeouts.spinUpPpgDev,
