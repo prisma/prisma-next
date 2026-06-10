@@ -467,6 +467,43 @@ describe('role + rlsPolicy round-trip', () => {
     expect(() => serializer.deserializeContract(input)).toThrow();
   });
 
+  it('serialized rlsPolicy does not contain prismaManaged', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithRolesAndPolicies();
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+
+    const ns = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    const selectPolicy = ns.entries.rlsPolicy['posts_select_own_a1b2c3d4'];
+    const insertPolicy = ns.entries.rlsPolicy['posts_insert_restrictive_b5c6d7e8'];
+
+    expect(selectPolicy).toEqual({
+      kind: 'postgres-rls-policy',
+      name: 'posts_select_own_a1b2c3d4',
+      prefix: 'posts_select_own',
+      tableName: 'posts',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      operation: 'select',
+      roles: ['app_user'],
+      using: 'user_id = current_user_id()',
+      permissive: true,
+    });
+    expect(insertPolicy).toEqual({
+      kind: 'postgres-rls-policy',
+      name: 'posts_insert_restrictive_b5c6d7e8',
+      prefix: 'posts_insert_restrictive',
+      tableName: 'posts',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      operation: 'insert',
+      roles: ['app_user', 'admin'],
+      using: 'user_id = current_user_id()',
+      withCheck: 'user_id = current_user_id()',
+      permissive: false,
+    });
+  });
+
   it('rejects a malformed rlsPolicy entry (missing permissive)', () => {
     const serializer = new PostgresContractSerializer();
     const input = createSqlContract({

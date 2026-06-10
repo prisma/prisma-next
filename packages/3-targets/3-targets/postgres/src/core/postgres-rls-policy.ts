@@ -31,6 +31,9 @@ export interface PostgresRlsPolicyInput {
    * `true` when the DB policy's wire name matches its own content hash — i.e.
    * it was created by Prisma. Set by introspection; `false` for externally-managed
    * policies (name not matching body hash) and for authored policies.
+   *
+   * Non-enumerable so it is excluded from JSON serialization — this is an
+   * introspection-only signal, not an authored contract property.
    */
   readonly prismaManaged?: boolean;
 }
@@ -54,7 +57,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
   declare readonly using?: string;
   declare readonly withCheck?: string;
   readonly permissive: boolean;
-  readonly prismaManaged: boolean;
+  declare readonly prismaManaged: boolean;
 
   constructor(input: PostgresRlsPolicyInput) {
     super();
@@ -67,7 +70,12 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     if (input.using !== undefined) this.using = input.using;
     if (input.withCheck !== undefined) this.withCheck = input.withCheck;
     this.permissive = input.permissive;
-    this.prismaManaged = input.prismaManaged ?? false;
+    Object.defineProperty(this, 'prismaManaged', {
+      value: input.prismaManaged ?? false,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
     freezeNode(this);
   }
 
