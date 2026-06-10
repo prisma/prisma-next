@@ -56,6 +56,8 @@ import { insertAndReadProfile } from '../src/handlers';
 import { db } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
+const POLICY_WIRE_NAME = 'profile_owner_read_dc40c58a';
+
 // Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
 // external-contract migrate/verify + the public.profile round-trip — which is green and
 // stable. Later constituents (cross-contract-refs, postgres-rls, explicit-namespace-dsl)
@@ -262,6 +264,162 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
     // The test does seed + materialise + dbInit (plan + apply) + dbVerify + connect
     // runtime + insert + read — substantially more than just spinning up the DB.
     // 4× the spin-up budget gives cold CI workers headroom.
+    timeouts.spinUpPpgDev * 4,
+  );
+});
+
+describe.sequential('supabase RLS behavioral e2e — filtering + drift-fails-verify', () => {
+  let database: Awaited<ReturnType<typeof createDevDatabase>>;
+  let migrationsDir: string;
+  let client: ReturnType<typeof createControlClient>;
+
+  beforeEach(async () => {
+    database = await createDevDatabase();
+    migrationsDir = await mkdtemp(join(tmpdir(), 'supabase-rls-e2e-'));
+
+    await withClient(database.connectionString, async (pgClient) => {
+      await bootstrapSupabaseShim(pgClient);
+    });
+
+    const space = supabasePack.contractSpace;
+    if (!space) throw new Error('supabasePack must declare a contractSpace');
+    await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+      contract: space.contractJson,
+      contractDts: '// supabase extension contract space\n',
+      headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
+    });
+
+    client = createControlClient({
+      family: sql,
+      target: postgres,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
+      extensionPacks: [supabasePack],
+    });
+
+    await client.connect(database.connectionString);
+
+    const applyResult = await client.dbInit({
+      contract: contractJson,
+      mode: 'apply',
+      migrationsDir,
+    });
+    if (!applyResult.ok) {
+      throw new Error(
+        `db init apply failed: ${applyResult.failure.summary}\n\n${JSON.stringify(applyResult.failure, null, 2)}`,
+      );
+    }
+  }, timeouts.spinUpPpgDev * 4);
+
+  afterEach(async () => {
+    await client.close();
+    if (database) await database.close();
+    if (migrationsDir) await rm(migrationsDir, { recursive: true, force: true });
+  }, timeouts.spinUpPpgDev);
+
+  it(
+    'A — RLS filters rows under authenticated role + jwt GUC',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+
+      // Insert two rows as superuser (bypasses RLS).
+      await withClient(connectionString, async (pgClient) => {
+        await pgClient.query(
+          'INSERT INTO public.profile (id, username, owner_id) VALUES ($1, $2, $3), ($4, $5, $6)',
+          [
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            'alice',
+            ownerA,
+            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            'bob',
+            ownerB,
+          ],
+        );
+        // authenticated role needs SELECT privilege to read the table under RLS.
+        await pgClient.query('GRANT SELECT ON public.profile TO authenticated');
+      });
+
+      // Under SET ROLE authenticated + ownerA jwt, only alice's row is visible.
+      // PostgREST pattern: set the JWT claims GUC as superuser first (session-
+      // level, is_local=false so it persists across statement boundaries), then
+      // switch to the authenticated role for the actual query.
+      await withClient(connectionString, async (pgClient) => {
+        await pgClient.query(
+          `SELECT set_config('request.jwt.claims', '{"sub":"${ownerA}"}', false)`,
+        );
+        await pgClient.query('SET ROLE authenticated');
+
+        const result = await pgClient.query<{
+          id: string;
+          username: string;
+          owner_id: string;
+        }>('SELECT id, username, owner_id FROM public.profile');
+
+        await pgClient.query('RESET ROLE');
+
+        expect(result.rows).toHaveLength(1);
+        expect(result.rows[0]).toEqual({
+          id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          username: 'alice',
+          owner_id: ownerA,
+        });
+      });
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'B — out-of-band DROP POLICY makes dbVerify schema result ok:false naming the policy',
+    async () => {
+      const { connectionString } = database;
+
+      // Drop the policy out-of-band as superuser.
+      await withClient(connectionString, async (pgClient) => {
+        await pgClient.query(`DROP POLICY "${POLICY_WIRE_NAME}" ON public.profile`);
+      });
+
+      const deserializedContract = new PostgresContractSerializer().deserializeContract(
+        contractJson,
+      );
+      const verifyResult = await client.dbVerify({
+        contract: deserializedContract,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+
+      // The operation itself succeeds (connectivity, markers ok); the schema
+      // verification result for the app space carries the policy failure.
+      expect(
+        verifyResult.ok,
+        `dbVerify operation failed unexpectedly: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+
+      if (verifyResult.ok) {
+        const appSchemaResult = verifyResult.value.schemaResults.get('app');
+        expect(
+          appSchemaResult,
+          `Expected 'app' space in schemaResults; got keys: ${[...verifyResult.value.schemaResults.keys()].join(', ')}`,
+        ).toBeDefined();
+
+        expect(
+          appSchemaResult?.ok,
+          `Expected app schema result ok:false after DROP POLICY; extensionIssues: ${JSON.stringify(appSchemaResult?.schema.extensionIssues)}`,
+        ).toBe(false);
+
+        const policyIssue = appSchemaResult?.schema.extensionIssues.find(
+          (issue) => issue.coordinate.entityName === POLICY_WIRE_NAME,
+        );
+        expect(
+          policyIssue,
+          `Expected extensionIssue naming '${POLICY_WIRE_NAME}'; got: ${JSON.stringify(appSchemaResult?.schema.extensionIssues)}`,
+        ).toBeDefined();
+        expect(policyIssue?.outcome).toBe('missing');
+      }
+    },
     timeouts.spinUpPpgDev * 4,
   );
 });
