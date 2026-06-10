@@ -1,4 +1,4 @@
-import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import type {
   ExtractCodecTypes,
@@ -507,7 +507,7 @@ type VariantRow<
   }
     ? V extends Record<string, { readonly value: string }>
       ? {
-          [VK in keyof V]: VK extends string & keyof ModelsOf<TContract>
+          [VK in keyof V]: VK extends string & CollectionModelName<TContract>
             ? Simplify<
                 Omit<DefaultModelRow<TContract, ModelName, NsId>, DiscField> &
                   DefaultModelRow<TContract, VK, NsId> &
@@ -546,7 +546,7 @@ export type VariantModelRow<
     readonly variants: infer V;
   }
     ? V extends Record<string, { readonly value: string }>
-      ? VariantName extends keyof V & string & keyof ModelsOf<TContract>
+      ? VariantName extends keyof V & string & CollectionModelName<TContract>
         ? Simplify<
             Omit<DefaultModelRow<TContract, ModelName, NsId>, DiscField> &
               DefaultModelRow<TContract, VariantName, NsId> &
@@ -622,8 +622,6 @@ export type ShorthandWhereFilter<
     | undefined;
 }>;
 
-type ModelsOf<TContract extends Contract<SqlStorage>> = ContractModelDefinitions<TContract>;
-
 // The model map at an explicit namespace coordinate (the per-namespace domain
 // block). Used by the facet resolution path so same-named models across
 // namespaces resolve to each namespace's own model.
@@ -639,17 +637,26 @@ type NamespaceModelsOf<
     : Record<string, never>
   : Record<string, never>;
 
-// Resolve a model definition. With an explicit namespace coordinate it reads
-// the per-namespace domain block; without one (`never`) it falls back to the
-// flat model map (first-name-wins) for non-facet / single-namespace callers.
+// The model definition for `ModelName` found by scanning every domain namespace
+// block — never the flat cross-namespace model map. For a single-namespace
+// contract this is exactly the sole namespace's model (byte-for-byte identical
+// to the old flat read); under a same-bare-name collision it unions the
+// same-named models.
+type ScannedModelDef<TContract extends Contract<SqlStorage>, ModelName extends string> = {
+  [Ns in keyof TContract['domain']['namespaces']]: ModelName extends keyof TContract['domain']['namespaces'][Ns]['models']
+    ? TContract['domain']['namespaces'][Ns]['models'][ModelName]
+    : never;
+}[keyof TContract['domain']['namespaces']];
+
+// Resolve a model definition. With an explicit namespace coordinate it reads the
+// per-namespace domain block; without one (`never`) it scans every namespace
+// block (flat-map-free) for non-facet / single-namespace callers.
 type ModelDef<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   NsId extends string = never,
 > = [NsId] extends [never]
-  ? ModelName extends keyof ModelsOf<TContract>
-    ? ModelsOf<TContract>[ModelName]
-    : never
+  ? ScannedModelDef<TContract, ModelName>
   : ModelName extends keyof NamespaceModelsOf<TContract, NsId>
     ? NamespaceModelsOf<TContract, NsId>[ModelName]
     : never;
@@ -1214,12 +1221,14 @@ type RelationMutationFields<
 }>;
 
 type AllModelRelationEntries<TContract extends Contract<SqlStorage>> = {
-  [M in keyof ModelsOf<TContract>]: ModelsOf<TContract>[M] extends {
-    readonly relations: infer R extends Record<string, unknown>;
-  }
-    ? R[keyof R]
-    : never;
-}[keyof ModelsOf<TContract>];
+  [Ns in keyof TContract['domain']['namespaces']]: {
+    [M in keyof TContract['domain']['namespaces'][Ns]['models']]: TContract['domain']['namespaces'][Ns]['models'][M] extends {
+      readonly relations: infer R extends Record<string, unknown>;
+    }
+      ? R[keyof R]
+      : never;
+  }[keyof TContract['domain']['namespaces'][Ns]['models']];
+}[keyof TContract['domain']['namespaces']];
 
 type RelationDefWithTargetFields = {
   readonly to: { readonly model: string };
