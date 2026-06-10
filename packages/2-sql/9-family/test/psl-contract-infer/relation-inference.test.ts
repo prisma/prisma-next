@@ -341,6 +341,14 @@ describe('inferRelations', () => {
 
   it('falls back to table names and creates parent relation state when the model map is incomplete', () => {
     const tables: Record<string, SqlTableIR> = {
+      user: {
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
       audit: {
         name: 'audit',
         columns: {

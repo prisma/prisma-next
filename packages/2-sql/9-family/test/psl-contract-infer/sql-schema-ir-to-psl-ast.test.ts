@@ -79,6 +79,43 @@ describe('sqlSchemaIrToPslAst', () => {
     expect(userField?.attributes.some((a) => a.name === 'relation')).toBe(true);
   });
 
+  it('omits relation fields for foreign keys whose referenced table was not inferred', () => {
+    const schemaIR = ir({
+      tables: {
+        accounts: {
+          name: 'accounts',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            owner_id: { name: 'owner_id', nativeType: 'int4', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          // FK references `users`, which lives in an excluded schema (auth) and
+          // is absent from the inferred tables — e.g. Supabase public → auth.users.
+          foreignKeys: [
+            {
+              columns: ['owner_id'],
+              referencedTable: 'users',
+              referencedColumns: ['id'],
+              name: 'accounts_owner_id_fkey',
+              onDelete: 'cascade',
+            },
+          ],
+          uniques: [],
+          indexes: [],
+        },
+      },
+    });
+
+    const ast = sqlSchemaIrToPslAst(schemaIR);
+    const accounts = flatPslModels(ast).find((m) => m.name === 'Accounts');
+    // Scalar FK column is preserved.
+    expect(accounts?.fields.find((f) => f.name === 'ownerId')).toBeDefined();
+    // No dangling relation navigation field to the un-inferred `users` model.
+    expect(accounts?.fields.some((f) => f.attributes.some((a) => a.name === 'relation'))).toBe(
+      false,
+    );
+  });
+
   it('emits enum declarations and field references for pg/enum codec annotations', () => {
     const schemaIR = ir({
       tables: {
