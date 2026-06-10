@@ -704,14 +704,21 @@ type FieldChannelType<
       ? null
       : never);
 
+// Nested by namespace coordinate (`{ [ns]: { [model]: { [field]: type } } }`)
+// to mirror the emitter's namespace-nested `FieldOutputTypes` (and the
+// `TypeMaps` constraint). The TS authoring path lumps every model under the
+// target's default storage namespace (see `BuiltStorage`), so the per-model
+// field-type map nests under that same coordinate.
 type FieldChannelTypes<Definition, Channel extends 'output' | 'input'> = {
-  readonly [ModelName in ModelNames<Definition>]: {
-    readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldChannelType<
-      Definition,
-      ModelName,
-      FieldName,
-      Channel
-    >;
+  readonly [Ns in DefaultStorageNamespaceId<Definition>]: {
+    readonly [ModelName in ModelNames<Definition>]: {
+      readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldChannelType<
+        Definition,
+        ModelName,
+        FieldName,
+        Channel
+      >;
+    };
   };
 };
 
