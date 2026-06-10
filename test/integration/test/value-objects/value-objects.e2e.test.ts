@@ -4,7 +4,7 @@ import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { mongoOrm } from '@prisma-next/mongo-orm';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { orm as sqlOrm } from '@prisma-next/sql-orm-client';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
@@ -142,7 +142,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
           if (!driver) throw new Error('Driver missing');
           await driver.connect({ kind: 'pgClient', client });
 
-          const runtime = new PostgresRuntime({
+          const runtime = new PostgresRuntimeImpl({
             context,
             adapter: stackInstance.adapter,
             driver,

@@ -8,7 +8,7 @@ import {
   instantiateExecutionStack,
   type RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { param } from '@prisma-next/sql-relational-core/expression';
 import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
@@ -146,7 +146,7 @@ describe('integration: rawSql expression in typed builder', {
   });
 
   function buildRuntime(middleware?: readonly SqlMiddleware[]): Runtime {
-    return new PostgresRuntime({
+    return new PostgresRuntimeImpl({
       context,
       adapter: stackInstance.adapter,
       driver,

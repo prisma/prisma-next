@@ -18,7 +18,7 @@ import {
   createSqlExecutionStack,
   type Runtime,
 } from '@prisma-next/sql-runtime';
-import { SqliteRuntime } from '@prisma-next/sqlite/runtime';
+import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 
 export interface SqliteTestContext<TContract extends Contract<SqlStorage>> {
@@ -194,7 +194,7 @@ async function createSqliteRuntime<TContract extends Contract<SqlStorage>>(
   const driver = stackInstance.driver!;
   await driver.connect({ kind: 'path', path: dbPath });
 
-  const runtime = new SqliteRuntime({
+  const runtime = new SqliteRuntimeImpl({
     context,
     adapter: stackInstance.adapter,
     driver,

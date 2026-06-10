@@ -4,7 +4,7 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -94,7 +94,7 @@ export async function createPgIntegrationRuntime(
       }
       await driver.connect({ kind: 'pgPool', pool });
 
-      const realRuntime = new PostgresRuntime({
+      const realRuntime = new PostgresRuntimeImpl({
         context,
         adapter: stackInstance.adapter,
         driver,

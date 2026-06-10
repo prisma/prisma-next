@@ -10,7 +10,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
@@ -183,7 +183,7 @@ describe('multi-namespace runtime', () => {
           const driver = postgresDriver.create();
           await driver.connect({ kind: 'pgPool', pool });
 
-          const runtime = new PostgresRuntime({
+          const runtime = new PostgresRuntimeImpl({
             context,
             adapter: stackInstance.adapter,
             driver,

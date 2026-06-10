@@ -7,7 +7,7 @@ import {
   instantiateExecutionStack,
   type RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import {
   AndExpr,
@@ -159,7 +159,7 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
   });
 
   function buildRuntime(middleware: SqlMiddleware[], log?: Log): Runtime {
-    return new PostgresRuntime({
+    return new PostgresRuntimeImpl({
       context,
       adapter: stackInstance.adapter,
       driver,

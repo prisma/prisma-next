@@ -3,7 +3,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
@@ -127,7 +127,7 @@ export function setupIntegrationTest() {
     const driver = stackInstance.driver!;
     await driver.connect({ kind: 'pgClient', client });
 
-    runtime = new PostgresRuntime({
+    runtime = new PostgresRuntimeImpl({
       context,
       adapter: stackInstance.adapter,
       driver,

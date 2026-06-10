@@ -6,7 +6,7 @@ import type {
 } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Log,
@@ -79,7 +79,7 @@ export async function createTestRuntime(
     throw error;
   }
 
-  return new PostgresRuntime({
+  return new PostgresRuntimeImpl({
     context,
     adapter: stackInstance.adapter,
     driver,
