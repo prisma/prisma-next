@@ -120,23 +120,6 @@ export class Cursor {
     return token;
   }
 
-  captureBalancedBraces(): void {
-    this.flushTrivia();
-    let depth = 0;
-    for (;;) {
-      const token = this.#tokenizer.peek();
-      if (token.kind === 'Eof') return;
-      this.#builder.token(token.kind, token.text);
-      this.#advance();
-      if (token.kind === 'LBrace') {
-        depth++;
-      } else if (token.kind === 'RBrace') {
-        depth--;
-        if (depth <= 0) return;
-      }
-    }
-  }
-
   recoverToSyncPoint(): void {
     for (;;) {
       const token = this.#tokenizer.peek();
@@ -184,14 +167,14 @@ function parseIdentifier(cursor: Cursor): void {
 /**
  * Parses a single expression in argument or element position. Returns the
  * produced node, or `undefined` when the next significant token does not start a
- * recognised expression (the caller decides how to recover — e.g. capturing a
- * `{…}` object literal as balanced raw tokens).
+ * recognised expression (the caller decides how to recover).
  */
 export function parseExpression(cursor: Cursor): GreenNode | undefined {
   return (
     parseStringLiteralExpr(cursor) ??
     parseNumberLiteralExpr(cursor) ??
     parseArrayLiteral(cursor) ??
+    parseObjectLiteralExpr(cursor) ??
     parseFunctionCall(cursor) ??
     parseBooleanLiteralExpr(cursor) ??
     parseIdentifierExpr(cursor)
@@ -250,6 +233,52 @@ export function parseArrayLiteral(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
+export function parseObjectLiteralExpr(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'LBrace') return undefined;
+  const braceMark = cursor.mark();
+  cursor.startNode('ObjectLiteralExpr');
+  cursor.bump(); // LBrace
+  while (cursor.peekKind() !== 'RBrace' && cursor.peekKind() !== 'Eof') {
+    parseObjectField(cursor);
+    if (cursor.peekKind() === 'Comma') {
+      cursor.bump();
+    } else {
+      break;
+    }
+  }
+  if (cursor.peekKind() === 'RBrace') {
+    cursor.bump();
+  } else {
+    cursor.diagnostic('PSL_INVALID_OBJECT_LITERAL', 'Unterminated object literal', braceMark);
+  }
+  return cursor.finishNode();
+}
+
+export function parseObjectField(cursor: Cursor): GreenNode {
+  cursor.startNode('ObjectField');
+  const keyText = cursor.peekToken().text;
+  if (cursor.peekKind() === 'Ident') {
+    parseIdentifier(cursor); // identifier key
+  } else if (cursor.peekKind() === 'StringLiteral') {
+    parseStringLiteralExpr(cursor); // string key
+  }
+  if (cursor.peekKind() === 'Colon') {
+    cursor.bump(); // Colon
+    const value = parseExpression(cursor);
+    if (!value) {
+      cursor.diagnostic('PSL_INVALID_OBJECT_LITERAL', 'Expected a value after ":"', cursor.mark());
+    }
+  } else {
+    cursor.diagnostic(
+      'PSL_INVALID_OBJECT_LITERAL',
+      `Expected ":" after "${keyText}"`,
+      cursor.mark(),
+    );
+    parseExpression(cursor); // best-effort: consume a value if one follows
+  }
+  return cursor.finishNode();
+}
+
 export function parseFunctionCall(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident' || cursor.peekKind(1) !== 'LParen') return undefined;
   cursor.startNode('FunctionCall');
@@ -289,12 +318,7 @@ export function parseAttributeArg(cursor: Cursor): GreenNode {
 }
 
 function parseArgValue(cursor: Cursor): void {
-  const value = parseExpression(cursor);
-  if (!value && cursor.peekKind() === 'LBrace') {
-    // No SyntaxKind models an object literal; capture it as balanced raw tokens
-    // so the round-trip still holds and the value is simply left uninterpreted.
-    cursor.captureBalancedBraces();
-  }
+  parseExpression(cursor);
 }
 
 export function parseAttributeArgList(cursor: Cursor): GreenNode {
@@ -741,9 +765,6 @@ export function parseKeyValue(cursor: Cursor): GreenNode | undefined {
       keyMark,
     );
   }
-  const value = parseExpression(cursor);
-  if (!value && cursor.peekKind() === 'LBrace') {
-    cursor.captureBalancedBraces();
-  }
+  parseExpression(cursor);
   return cursor.finishNode();
 }
