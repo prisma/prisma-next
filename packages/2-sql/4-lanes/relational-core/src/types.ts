@@ -1,10 +1,6 @@
-import type { Contract, ContractModelDefinitions } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { ParamSpec } from '@prisma-next/operations';
-import type {
-  ExtractFieldOutputTypes,
-  SqlStorage,
-  StorageColumn,
-} from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type { ColumnRef, ParamRef } from './ast/types';
 import type { ExecutionContext } from './query-lane-context';
@@ -13,11 +9,31 @@ import type { SqlExecutionPlan } from './sql-execution-plan';
 export type Expr = ColumnRef | ParamRef;
 
 /**
- * Extracts the model name for a given table by iterating models to find the one
- * whose `storage.table` matches.
+ * The application-domain models declared within a single namespace coordinate,
+ * read from the per-namespace `domain` block the emitter stamps for each
+ * namespace. Resolving here keeps table/column resolution anchored to the
+ * namespace the caller asked for, rather than a flat cross-namespace view that
+ * collapses same-named tables across namespaces.
  */
-type ExtractTableToModel<TContract extends Contract<SqlStorage>, TableName extends string> =
-  ContractModelDefinitions<TContract> extends infer Models extends Record<string, unknown>
+type NamespaceModels<
+  TContract extends Contract<SqlStorage>,
+  NsId extends string,
+> = TContract['domain']['namespaces'][NsId] extends {
+  readonly models: infer Models extends Record<string, unknown>;
+}
+  ? Models
+  : never;
+
+/**
+ * Extracts the model name for a given table within a namespace coordinate by
+ * finding the namespace's model whose `storage.table` matches.
+ */
+type ExtractTableToModel<
+  TContract extends Contract<SqlStorage>,
+  NsId extends string,
+  TableName extends string,
+> =
+  NamespaceModels<TContract, NsId> extends infer Models extends Record<string, unknown>
     ? {
         [M in keyof Models & string]: Models[M] extends {
           readonly storage: { readonly table: TableName };
@@ -28,16 +44,18 @@ type ExtractTableToModel<TContract extends Contract<SqlStorage>, TableName exten
     : never;
 
 /**
- * Extracts the field name for a given column by finding the field in
- * `model.storage.fields` whose `column` matches.
+ * Extracts the field name for a given column within a namespace coordinate by
+ * finding the field in the namespace model's `storage.fields` whose `column`
+ * matches.
  */
 type ExtractColumnToField<
   TContract extends Contract<SqlStorage>,
+  NsId extends string,
   TableName extends string,
   ColumnName extends string,
 > =
-  ExtractTableToModel<TContract, TableName> extends infer ModelName extends string
-    ? ContractModelDefinitions<TContract> extends infer Models extends Record<string, unknown>
+  ExtractTableToModel<TContract, NsId, TableName> extends infer ModelName extends string
+    ? NamespaceModels<TContract, NsId> extends infer Models extends Record<string, unknown>
       ? ModelName & keyof Models extends infer MKey extends string
         ? Models[MKey] extends {
             readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
@@ -51,6 +69,33 @@ type ExtractColumnToField<
         : never
       : never
     : never;
+
+/**
+ * The storage column metadata for a column within a namespace coordinate, read
+ * from the per-namespace `storage` block. Resolves to `never` when the table or
+ * column is absent in that namespace — so a column unique to another namespace
+ * does not leak in through a flat cross-namespace view.
+ */
+type NamespaceStorageColumn<
+  TContract extends Contract<SqlStorage>,
+  NsId extends string,
+  TableName extends string,
+  ColumnName extends string,
+> = TContract['storage']['namespaces'][NsId] extends {
+  readonly entries: { readonly table: infer Tables extends Record<string, unknown> };
+}
+  ? TableName extends keyof Tables
+    ? Tables[TableName] extends {
+        readonly columns: infer Columns extends Record<string, unknown>;
+      }
+      ? ColumnName extends keyof Columns
+        ? Columns[ColumnName] extends StorageColumn
+          ? Columns[ColumnName]
+          : never
+        : never
+      : never
+    : never
+  : never;
 
 type FallbackCodecLookup<
   ColumnMeta extends StorageColumn,
@@ -126,25 +171,39 @@ export type OperationsForTypeId<TypeId extends string, Operations extends Operat
       ? Operations[TypeId]
       : Record<string, never>;
 
+/**
+ * Resolves the JavaScript output type of a column addressed by an explicit
+ * namespace coordinate.
+ *
+ * Resolution is anchored to the per-namespace contract blocks: the storage
+ * column metadata comes from `storage.namespaces[NsId]` and the model/field
+ * mapping from `domain.namespaces[NsId]`. The output type is derived from the
+ * column's `codecId` via `CodecTypes` — the per-namespace storage column is the
+ * source of truth, so a bare table name shared across namespaces resolves to
+ * each namespace's own column. A column absent in the namespace resolves to
+ * `never`.
+ */
 export type ComputeColumnJsType<
   TContract extends Contract<SqlStorage>,
+  NsId extends string,
   TableName extends string,
   ColumnName extends string,
-  ColumnMeta extends StorageColumn,
   CodecTypes extends Record<string, { readonly output: unknown }>,
 > =
-  ExtractTableToModel<TContract, TableName> extends infer ModelName
-    ? [ModelName] extends [never]
-      ? FallbackCodecLookup<ColumnMeta, CodecTypes>
-      : ModelName extends string
-        ? ExtractColumnToField<TContract, TableName, ColumnName> extends infer FieldName
-          ? [FieldName] extends [never]
+  NamespaceStorageColumn<TContract, NsId, TableName, ColumnName> extends infer ColumnMeta
+    ? [ColumnMeta] extends [never]
+      ? never
+      : ColumnMeta extends StorageColumn
+        ? ExtractTableToModel<TContract, NsId, TableName> extends infer ModelName
+          ? [ModelName] extends [never]
             ? FallbackCodecLookup<ColumnMeta, CodecTypes>
-            : FieldName extends string
-              ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
-                ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
-                  ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
-                  : never
+            : ModelName extends string
+              ? ExtractColumnToField<TContract, NsId, TableName, ColumnName> extends infer FieldName
+                ? [FieldName] extends [never]
+                  ? FallbackCodecLookup<ColumnMeta, CodecTypes>
+                  : FieldName extends string
+                    ? FallbackCodecLookup<ColumnMeta, CodecTypes>
+                    : never
                 : never
               : never
           : never
