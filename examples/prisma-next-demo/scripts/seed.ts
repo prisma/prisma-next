@@ -94,6 +94,7 @@ async function main() {
           {
             title: 'First Post',
             userId: alice.id,
+            priority: 'low',
             embedding: generateEmbedding(1),
             createdAt: new Date(),
           },
@@ -107,6 +108,7 @@ async function main() {
           {
             title: 'Second Post',
             userId: alice.id,
+            priority: 'high',
             embedding: generateEmbedding(2),
             createdAt: new Date(),
           },
@@ -120,6 +122,7 @@ async function main() {
           {
             title: 'Third Post',
             userId: bob.id,
+            priority: 'urgent',
             embedding: generateEmbedding(3),
             createdAt: new Date(),
           },

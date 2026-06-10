@@ -36,7 +36,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:edba56e25b42baed0f3f04458dd6858374d594056c4b023a8fcea2a73d8d2668'>;
+  StorageHashBase<'sha256:ab50cca9eadd5727aa91cf94a1fd3910efbd8d1c5b8da6526c32ced6bc377a97'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:bbd4de834012acc185636e3aaecfe13c9bef57de6c256e3e9ba03a4cec7cb08e'>;
 export type ProfileHash =
@@ -74,7 +74,6 @@ export type FieldOutputTypes = {
     readonly id: Char<36>;
     readonly title: CodecTypes['pg/text@1']['output'];
     readonly userId: CodecTypes['pg/text@1']['output'];
-    readonly priority: 'low' | 'high' | 'urgent';
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
     readonly embedding: Vector<1536> | null;
   };
@@ -109,7 +108,6 @@ export type FieldInputTypes = {
     readonly id: CodecTypes['sql/char@1']['input'];
     readonly title: CodecTypes['pg/text@1']['input'];
     readonly userId: CodecTypes['pg/text@1']['input'];
-    readonly priority: 'low' | 'high' | 'urgent';
     readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
     readonly embedding: CodecTypes['pg/vector@1']['input'] | null;
   };
@@ -247,12 +245,6 @@ type ContractBase = Omit<
                     readonly nativeType: 'text';
                     readonly codecId: 'pg/text@1';
                     readonly nullable: false;
-                  };
-                  readonly priority: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                    readonly typeRef: 'Priority';
                   };
                   readonly createdAt: {
                     readonly nativeType: 'timestamptz';
@@ -478,10 +470,6 @@ type ContractBase = Omit<
             readonly nullable: false;
             readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
           };
-          readonly priority: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          };
           readonly createdAt: {
             readonly nullable: false;
             readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
@@ -508,7 +496,6 @@ type ContractBase = Omit<
             readonly id: { readonly column: 'id' };
             readonly title: { readonly column: 'title' };
             readonly userId: { readonly column: 'userId' };
-            readonly priority: { readonly column: 'priority' };
             readonly createdAt: { readonly column: 'createdAt' };
             readonly embedding: { readonly column: 'embedding' };
           };
@@ -717,10 +704,6 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
-              readonly priority: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
@@ -747,7 +730,6 @@ type ContractBase = Omit<
                 readonly id: { readonly column: 'id' };
                 readonly title: { readonly column: 'title' };
                 readonly userId: { readonly column: 'userId' };
-                readonly priority: { readonly column: 'priority' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly embedding: { readonly column: 'embedding' };
               };
