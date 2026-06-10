@@ -214,4 +214,56 @@ describe.sequential('RLS verify extension issues', () => {
     expect(issue?.coordinate.entityKind).toBe('rlsPolicy');
     expect(issue?.coordinate.entityName).toBe(policy.name);
   });
+
+  it('verify result is ok:false when a declared policy is absent from the database', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = buildContractWithPolicy();
+
+    const noPolicySchema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: {
+          [TABLE_NAME]: new StorageTable({
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        type: {},
+        rlsPolicy: {},
+      },
+    });
+    const noPolicyContract: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:rls-verify-no-policy-2'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:rls-verify-no-policy-2'),
+        namespaces: { [UNBOUND_NAMESPACE_ID]: noPolicySchema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+    await applyContract(driver!, noPolicyContract);
+
+    const schema = await familyInstance.introspect({ driver: driver!, contract });
+    const result = familyInstance.verifySchema({
+      contract,
+      schema,
+      strict: false,
+      frameworkComponents,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.schema.extensionIssues[0]?.message).toContain(policy.name);
+  });
 });

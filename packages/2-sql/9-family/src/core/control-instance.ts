@@ -688,8 +688,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const extensionIssues =
         controlAdapter.collectExtensionIssues?.(contract, options.schema) ?? [];
       if (extensionIssues.length === 0) return sqlResult;
+      const issueCount = extensionIssues.length;
       return {
         ...sqlResult,
+        ok: false,
+        code: sqlResult.code ?? 'PN-RUN-3010',
+        summary: `Database schema does not satisfy contract (${issueCount} extension issue${issueCount === 1 ? '' : 's'})`,
         schema: { ...sqlResult.schema, extensionIssues },
       };
     },

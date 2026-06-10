@@ -600,6 +600,38 @@ describe('formatSchemaVerifyOutput', () => {
 
     expect(stripped).toContain('⚠');
   });
+
+  it('renders extension issues with their message, naming each drifted policy', () => {
+    const policyWireName = 'read_own_profiles_abc12345';
+    const result: VerifyDatabaseSchemaResult = {
+      ...createResult(),
+      ok: false,
+      summary: 'Database schema does not satisfy contract (1 extension issue)',
+      schema: {
+        ...createResult().schema,
+        extensionIssues: [
+          {
+            coordinate: {
+              plane: 'storage',
+              entityKind: 'rlsPolicy',
+              namespaceId: 'public',
+              entityName: policyWireName,
+            },
+            outcome: 'missing',
+            message: `missing: rlsPolicy '${policyWireName}' in namespace 'public'`,
+          },
+        ],
+      },
+    };
+    const flags = parseGlobalFlags({ 'no-color': true });
+
+    const output = formatSchemaVerifyOutput(result, flags);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain(policyWireName);
+    expect(stripped).toContain('Extension issues');
+    expect(stripped).toContain('✖ Database schema does not satisfy contract (1 extension issue)');
+  });
 });
 
 describe('formatSchemaVerifyJson', () => {

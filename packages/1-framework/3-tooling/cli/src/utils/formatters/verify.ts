@@ -539,6 +539,15 @@ export function formatSchemaVerifyOutput(
   });
   lines.push(...treeLines);
 
+  // Extension issues (e.g. RLS drift) — always render when present.
+  if (result.schema.extensionIssues.length > 0) {
+    lines.push('');
+    lines.push(formatRed('Extension issues:'));
+    for (const issue of result.schema.extensionIssues) {
+      lines.push(`  ${formatRed('✖')} ${issue.message}`);
+    }
+  }
+
   // Add counts and timings in verbose mode
   if (isVerbose(flags, 1)) {
     lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
