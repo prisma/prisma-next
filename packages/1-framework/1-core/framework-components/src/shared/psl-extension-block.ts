@@ -36,6 +36,15 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_TYPES_MEMBER'
   | 'PSL_INVALID_QUALIFIED_TYPE'
   /**
+   * A reserved declaration keyword (`model`/`enum`/`namespace`/`type`) that
+   * committed the declaration kind on the keyword alone but is missing its name
+   * and/or opening brace. The recursive-descent parser produces a best-effort
+   * typed node for the malformed header and reports this code rather than
+   * `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`, which is reserved for a genuinely unknown
+   * top-level keyword.
+   */
+  | 'PSL_INVALID_DECLARATION'
+  /**
    * A malformed line inside an extension-contributed top-level block body, or
    * a structurally invalid element inside a `list` parameter value.
    *
