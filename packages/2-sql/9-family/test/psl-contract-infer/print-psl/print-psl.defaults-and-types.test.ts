@@ -54,7 +54,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Post {
         id          Int      @id @default(autoincrement())
@@ -96,7 +97,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
         Email = String @db.VarChar(255)
@@ -151,7 +153,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
         Value = Decimal @db.Numeric(10, 2)
@@ -213,7 +216,8 @@ describe('printPsl', () => {
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
         Email = String @db.VarChar(255)
@@ -285,7 +289,8 @@ describe('printPsl', () => {
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
         Role2 = String @db.VarChar(32)
@@ -340,7 +345,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model GeoData {
         id       Int                      @id
@@ -375,7 +381,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
         Id = String @db.Uuid
@@ -428,7 +435,8 @@ describe('printPsl', () => {
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
         BookedOn = DateTime @db.Date
@@ -486,7 +494,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Data {
         id        Int      @id
@@ -522,7 +531,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Counter {
         id BigInt @id @default(9223372036854776000)

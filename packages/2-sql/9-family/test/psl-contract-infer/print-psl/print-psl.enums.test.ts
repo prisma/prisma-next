@@ -37,7 +37,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum UserRole {
         USER
@@ -99,7 +100,8 @@ describe('printPsl', () => {
     // `'in-progress'`). `READY` is already a valid PSL identifier and
     // matches its storage label, so no `@map` is needed there.
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum DeploymentStatus {
         READY
@@ -155,7 +157,8 @@ describe('printPsl', () => {
     // `value` and so carries a per-member `@map("!!!")` to preserve the
     // original storage label across the parse-print round-trip.
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum Role {
         value @map("!!!")

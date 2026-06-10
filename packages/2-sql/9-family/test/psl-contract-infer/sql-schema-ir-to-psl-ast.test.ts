@@ -223,7 +223,8 @@ describe('sqlSchemaIrToPslAst', () => {
 
     const out = printPsl(sqlSchemaIrToPslAst(schemaIR));
     expect(out).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model User {
         id    Int     @id
