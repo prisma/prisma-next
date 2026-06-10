@@ -26,7 +26,7 @@ import {
 } from '../src/syntax/ast/declarations';
 import { ObjectLiteralExprAst } from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
-import { GreenNodeBuilder } from '../src/syntax/green-builder';
+import { printTree } from './support';
 
 function greenText(element: GreenElement): string {
   if (element.type === 'token') return element.text;
@@ -42,42 +42,32 @@ describe('parse() well-formed document conformance', () => {
     const source = 'model User {\n  id Int @id\n}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('ModelDeclaration');
-    b.token('Ident', 'model');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'User');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('FieldDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'id');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'Int');
-    b.finishNode();
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.startNode('FieldAttribute');
-    b.token('At', '@');
-    b.startNode('Identifier');
-    b.token('Ident', 'id');
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        ModelDeclaration
+          Ident "model"
+          Whitespace " "
+          Identifier
+            Ident "User"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          FieldDeclaration
+            Identifier
+              Ident "id"
+            Whitespace " "
+            TypeAnnotation
+              Identifier
+                Ident "Int"
+            Whitespace " "
+            FieldAttribute
+              At "@"
+              Identifier
+                Ident "id"
+          Newline "\\n"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -86,42 +76,32 @@ describe('parse() well-formed document conformance', () => {
     const source = 'model User {\n  id Int\n@@map\n}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('ModelDeclaration');
-    b.token('Ident', 'model');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'User');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('FieldDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'id');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'Int');
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.startNode('ModelAttribute');
-    b.token('DoubleAt', '@@');
-    b.startNode('Identifier');
-    b.token('Ident', 'map');
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        ModelDeclaration
+          Ident "model"
+          Whitespace " "
+          Identifier
+            Ident "User"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          FieldDeclaration
+            Identifier
+              Ident "id"
+            Whitespace " "
+            TypeAnnotation
+              Identifier
+                Ident "Int"
+          Newline "\\n"
+          ModelAttribute
+            DoubleAt "@@"
+            Identifier
+              Ident "map"
+          Newline "\\n"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -130,36 +110,28 @@ describe('parse() well-formed document conformance', () => {
     const source = 'enum Role {\n  ADMIN\n  USER\n}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('EnumDeclaration');
-    b.token('Ident', 'enum');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'Role');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('EnumValueDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'ADMIN');
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('EnumValueDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'USER');
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        EnumDeclaration
+          Ident "enum"
+          Whitespace " "
+          Identifier
+            Ident "Role"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          EnumValueDeclaration
+            Identifier
+              Ident "ADMIN"
+          Newline "\\n"
+          Whitespace "  "
+          EnumValueDeclaration
+            Identifier
+              Ident "USER"
+          Newline "\\n"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -168,39 +140,29 @@ describe('parse() well-formed document conformance', () => {
     const source = 'enum Role {ADMIN @map@@map}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('EnumDeclaration');
-    b.token('Ident', 'enum');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'Role');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.startNode('EnumValueDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'ADMIN');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.startNode('FieldAttribute');
-    b.token('At', '@');
-    b.startNode('Identifier');
-    b.token('Ident', 'map');
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.startNode('ModelAttribute');
-    b.token('DoubleAt', '@@');
-    b.startNode('Identifier');
-    b.token('Ident', 'map');
-    b.finishNode();
-    b.finishNode();
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        EnumDeclaration
+          Ident "enum"
+          Whitespace " "
+          Identifier
+            Ident "Role"
+          Whitespace " "
+          LBrace "{"
+          EnumValueDeclaration
+            Identifier
+              Ident "ADMIN"
+            Whitespace " "
+            FieldAttribute
+              At "@"
+              Identifier
+                Ident "map"
+          ModelAttribute
+            DoubleAt "@@"
+            Identifier
+              Ident "map"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -209,33 +171,26 @@ describe('parse() well-formed document conformance', () => {
     const source = 'type {\n  UserId = Int\n}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('TypesBlock');
-    b.token('Ident', 'type');
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('NamedTypeDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'UserId');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('Equals', '=');
-    b.token('Whitespace', ' ');
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'Int');
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        TypesBlock
+          Ident "type"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          NamedTypeDeclaration
+            Identifier
+              Ident "UserId"
+            Whitespace " "
+            Equals "="
+            Whitespace " "
+            TypeAnnotation
+              Identifier
+                Ident "Int"
+          Newline "\\n"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -244,40 +199,31 @@ describe('parse() well-formed document conformance', () => {
     const source = 'type {\n  UserId = Int @db\n}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('TypesBlock');
-    b.token('Ident', 'type');
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('NamedTypeDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'UserId');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('Equals', '=');
-    b.token('Whitespace', ' ');
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'Int');
-    b.finishNode();
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.startNode('FieldAttribute');
-    b.token('At', '@');
-    b.startNode('Identifier');
-    b.token('Ident', 'db');
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        TypesBlock
+          Ident "type"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          NamedTypeDeclaration
+            Identifier
+              Ident "UserId"
+            Whitespace " "
+            Equals "="
+            Whitespace " "
+            TypeAnnotation
+              Identifier
+                Ident "Int"
+            Whitespace " "
+            FieldAttribute
+              At "@"
+              Identifier
+                Ident "db"
+          Newline "\\n"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -286,35 +232,28 @@ describe('parse() well-formed document conformance', () => {
     const source = 'datasource db {\n  provider = "postgresql"\n}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('BlockDeclaration');
-    b.token('Ident', 'datasource');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'db');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('Newline', '\n');
-    b.token('Whitespace', '  ');
-    b.startNode('KeyValuePair');
-    b.startNode('Identifier');
-    b.token('Ident', 'provider');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('Equals', '=');
-    b.token('Whitespace', ' ');
-    b.startNode('StringLiteralExpr');
-    b.token('StringLiteral', '"postgresql"');
-    b.finishNode();
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        BlockDeclaration
+          Ident "datasource"
+          Whitespace " "
+          Identifier
+            Ident "db"
+          Whitespace " "
+          LBrace "{"
+          Newline "\\n"
+          Whitespace "  "
+          KeyValuePair
+            Identifier
+              Ident "provider"
+            Whitespace " "
+            Equals "="
+            Whitespace " "
+            StringLiteralExpr
+              StringLiteral "\\"postgresql\\""
+          Newline "\\n"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -323,38 +262,28 @@ describe('parse() well-formed document conformance', () => {
     const source = 'type Address {street String@@map}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('CompositeTypeDeclaration');
-    b.token('Ident', 'type');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'Address');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.startNode('FieldDeclaration');
-    b.startNode('Identifier');
-    b.token('Ident', 'street');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'String');
-    b.finishNode();
-    b.finishNode();
-    b.finishNode();
-    b.startNode('ModelAttribute');
-    b.token('DoubleAt', '@@');
-    b.startNode('Identifier');
-    b.token('Ident', 'map');
-    b.finishNode();
-    b.finishNode();
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        CompositeTypeDeclaration
+          Ident "type"
+          Whitespace " "
+          Identifier
+            Ident "Address"
+          Whitespace " "
+          LBrace "{"
+          FieldDeclaration
+            Identifier
+              Ident "street"
+            Whitespace " "
+            TypeAnnotation
+              Identifier
+                Ident "String"
+          ModelAttribute
+            DoubleAt "@@"
+            Identifier
+              Ident "map"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -363,48 +292,38 @@ describe('parse() well-formed document conformance', () => {
     const source = 'namespace auth {model User{}enum Role{}extend Something{}}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('Namespace');
-    b.token('Ident', 'namespace');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'auth');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.startNode('ModelDeclaration');
-    b.token('Ident', 'model');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'User');
-    b.finishNode();
-    b.token('LBrace', '{');
-    b.token('RBrace', '}');
-    b.finishNode();
-    b.startNode('EnumDeclaration');
-    b.token('Ident', 'enum');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'Role');
-    b.finishNode();
-    b.token('LBrace', '{');
-    b.token('RBrace', '}');
-    b.finishNode();
-    b.startNode('BlockDeclaration');
-    b.token('Ident', 'extend');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'Something');
-    b.finishNode();
-    b.token('LBrace', '{');
-    b.token('RBrace', '}');
-    b.finishNode();
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        Namespace
+          Ident "namespace"
+          Whitespace " "
+          Identifier
+            Ident "auth"
+          Whitespace " "
+          LBrace "{"
+          ModelDeclaration
+            Ident "model"
+            Whitespace " "
+            Identifier
+              Ident "User"
+            LBrace "{"
+            RBrace "}"
+          EnumDeclaration
+            Ident "enum"
+            Whitespace " "
+            Identifier
+              Ident "Role"
+            LBrace "{"
+            RBrace "}"
+          BlockDeclaration
+            Ident "extend"
+            Whitespace " "
+            Identifier
+              Ident "Something"
+            LBrace "{"
+            RBrace "}"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });
@@ -413,32 +332,26 @@ describe('parse() well-formed document conformance', () => {
     const source = 'model User {}\nenum Role {}';
     const result = parse(source);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('Document');
-    b.startNode('ModelDeclaration');
-    b.token('Ident', 'model');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'User');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('RBrace', '}');
-    b.finishNode();
-    b.token('Newline', '\n');
-    b.startNode('EnumDeclaration');
-    b.token('Ident', 'enum');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'Role');
-    b.finishNode();
-    b.token('Whitespace', ' ');
-    b.token('LBrace', '{');
-    b.token('RBrace', '}');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(result.document.syntax.green).toEqual(expected);
+    expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
+      "Document
+        ModelDeclaration
+          Ident "model"
+          Whitespace " "
+          Identifier
+            Ident "User"
+          Whitespace " "
+          LBrace "{"
+          RBrace "}"
+        Newline "\\n"
+        EnumDeclaration
+          Ident "enum"
+          Whitespace " "
+          Identifier
+            Ident "Role"
+          Whitespace " "
+          LBrace "{"
+          RBrace "}""
+    `);
     expect(greenText(result.document.syntax.green)).toBe(source);
     expect(result.diagnostics).toEqual([]);
   });

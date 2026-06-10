@@ -22,8 +22,8 @@ import {
   StringLiteralExprAst,
 } from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
-import { GreenNodeBuilder } from '../src/syntax/green-builder';
 import { createSyntaxTree } from '../src/syntax/red';
+import { printTree } from './support';
 
 function greenText(element: GreenElement): string {
   if (element.type === 'token') return element.text;
@@ -103,15 +103,12 @@ describe('parseAttribute well-formed', () => {
     const source = '@id';
     const { node, diagnostics } = parse(source, parseAttribute);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('FieldAttribute');
-    b.token('At', '@');
-    b.startNode('Identifier');
-    b.token('Ident', 'id');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "FieldAttribute
+        At "@"
+        Identifier
+          Ident "id""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -120,19 +117,15 @@ describe('parseAttribute well-formed', () => {
     const source = '@db.VarChar';
     const { node, diagnostics } = parse(source, parseAttribute);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('FieldAttribute');
-    b.token('At', '@');
-    b.startNode('Identifier');
-    b.token('Ident', 'db');
-    b.finishNode();
-    b.token('Dot', '.');
-    b.startNode('Identifier');
-    b.token('Ident', 'VarChar');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "FieldAttribute
+        At "@"
+        Identifier
+          Ident "db"
+        Dot "."
+        Identifier
+          Ident "VarChar""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -141,28 +134,21 @@ describe('parseAttribute well-formed', () => {
     const source = '@default(autoincrement())';
     const { node, diagnostics } = parse(source, parseAttribute);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('FieldAttribute');
-    b.token('At', '@');
-    b.startNode('Identifier');
-    b.token('Ident', 'default');
-    b.finishNode();
-    b.startNode('AttributeArgList');
-    b.token('LParen', '(');
-    b.startNode('AttributeArg');
-    b.startNode('FunctionCall');
-    b.startNode('Identifier');
-    b.token('Ident', 'autoincrement');
-    b.finishNode();
-    b.token('LParen', '(');
-    b.token('RParen', ')');
-    b.finishNode();
-    b.finishNode();
-    b.token('RParen', ')');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "FieldAttribute
+        At "@"
+        Identifier
+          Ident "default"
+        AttributeArgList
+          LParen "("
+          AttributeArg
+            FunctionCall
+              Identifier
+                Ident "autoincrement"
+              LParen "("
+              RParen ")"
+          RParen ")""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -171,15 +157,12 @@ describe('parseAttribute well-formed', () => {
     const source = '@@map';
     const { node, diagnostics } = parse(source, parseAttribute);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('ModelAttribute');
-    b.token('DoubleAt', '@@');
-    b.startNode('Identifier');
-    b.token('Ident', 'map');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "ModelAttribute
+        DoubleAt "@@"
+        Identifier
+          Ident "map""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -190,14 +173,11 @@ describe('parseAttributeArg well-formed', () => {
     const source = 'id';
     const { node, diagnostics } = parse(source, parseAttributeArg);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('AttributeArg');
-    b.startNode('Identifier');
-    b.token('Ident', 'id');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "AttributeArg
+        Identifier
+          Ident "id""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -206,23 +186,18 @@ describe('parseAttributeArg well-formed', () => {
     const source = 'fields: [id]';
     const { node, diagnostics } = parse(source, parseAttributeArg);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('AttributeArg');
-    b.startNode('Identifier');
-    b.token('Ident', 'fields');
-    b.finishNode();
-    b.token('Colon', ':');
-    b.token('Whitespace', ' ');
-    b.startNode('ArrayLiteral');
-    b.token('LBracket', '[');
-    b.startNode('Identifier');
-    b.token('Ident', 'id');
-    b.finishNode();
-    b.token('RBracket', ']');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "AttributeArg
+        Identifier
+          Ident "fields"
+        Colon ":"
+        Whitespace " "
+        ArrayLiteral
+          LBracket "["
+          Identifier
+            Ident "id"
+          RBracket "]""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -233,13 +208,11 @@ describe('parseAttributeArgList well-formed', () => {
     const source = '()';
     const { node, diagnostics } = parse(source, parseAttributeArgList);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('AttributeArgList');
-    b.token('LParen', '(');
-    b.token('RParen', ')');
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "AttributeArgList
+        LParen "("
+        RParen ")""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -248,25 +221,19 @@ describe('parseAttributeArgList well-formed', () => {
     const source = '(id, name)';
     const { node, diagnostics } = parse(source, parseAttributeArgList);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('AttributeArgList');
-    b.token('LParen', '(');
-    b.startNode('AttributeArg');
-    b.startNode('Identifier');
-    b.token('Ident', 'id');
-    b.finishNode();
-    b.finishNode();
-    b.token('Comma', ',');
-    b.token('Whitespace', ' ');
-    b.startNode('AttributeArg');
-    b.startNode('Identifier');
-    b.token('Ident', 'name');
-    b.finishNode();
-    b.finishNode();
-    b.token('RParen', ')');
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "AttributeArgList
+        LParen "("
+        AttributeArg
+          Identifier
+            Ident "id"
+        Comma ","
+        Whitespace " "
+        AttributeArg
+          Identifier
+            Ident "name"
+        RParen ")""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -277,21 +244,17 @@ describe('parseExpression well-formed', () => {
     const source = '[id, name]';
     const { node, diagnostics } = parse(source, (c) => parseExpression(c) as GreenNode);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('ArrayLiteral');
-    b.token('LBracket', '[');
-    b.startNode('Identifier');
-    b.token('Ident', 'id');
-    b.finishNode();
-    b.token('Comma', ',');
-    b.token('Whitespace', ' ');
-    b.startNode('Identifier');
-    b.token('Ident', 'name');
-    b.finishNode();
-    b.token('RBracket', ']');
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "ArrayLiteral
+        LBracket "["
+        Identifier
+          Ident "id"
+        Comma ","
+        Whitespace " "
+        Identifier
+          Ident "name"
+        RBracket "]""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -300,16 +263,13 @@ describe('parseExpression well-formed', () => {
     const source = 'autoincrement()';
     const { node, diagnostics } = parse(source, (c) => parseExpression(c) as GreenNode);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('FunctionCall');
-    b.startNode('Identifier');
-    b.token('Ident', 'autoincrement');
-    b.finishNode();
-    b.token('LParen', '(');
-    b.token('RParen', ')');
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "FunctionCall
+        Identifier
+          Ident "autoincrement"
+        LParen "("
+        RParen ")""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -341,14 +301,11 @@ describe('parseTypeAnnotation well-formed', () => {
     const source = 'String';
     const { node, diagnostics } = parse(source, parseTypeAnnotation);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'String');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        Identifier
+          Ident "String""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -357,18 +314,14 @@ describe('parseTypeAnnotation well-formed', () => {
     const source = 'auth.User';
     const { node, diagnostics } = parse(source, parseTypeAnnotation);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'auth');
-    b.finishNode();
-    b.token('Dot', '.');
-    b.startNode('Identifier');
-    b.token('Ident', 'User');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        Identifier
+          Ident "auth"
+        Dot "."
+        Identifier
+          Ident "User""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -377,23 +330,18 @@ describe('parseTypeAnnotation well-formed', () => {
     const source = 'supabase:auth.User?';
     const { node, diagnostics } = parse(source, parseTypeAnnotation);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'supabase');
-    b.finishNode();
-    b.token('Colon', ':');
-    b.startNode('Identifier');
-    b.token('Ident', 'auth');
-    b.finishNode();
-    b.token('Dot', '.');
-    b.startNode('Identifier');
-    b.token('Ident', 'User');
-    b.finishNode();
-    b.token('Question', '?');
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        Identifier
+          Ident "supabase"
+        Colon ":"
+        Identifier
+          Ident "auth"
+        Dot "."
+        Identifier
+          Ident "User"
+        Question "?""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -402,18 +350,14 @@ describe('parseTypeAnnotation well-formed', () => {
     const source = 'supabase:User';
     const { node, diagnostics } = parse(source, parseTypeAnnotation);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'supabase');
-    b.finishNode();
-    b.token('Colon', ':');
-    b.startNode('Identifier');
-    b.token('Ident', 'User');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        Identifier
+          Ident "supabase"
+        Colon ":"
+        Identifier
+          Ident "User""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -422,23 +366,17 @@ describe('parseTypeAnnotation well-formed', () => {
     const source = 'Vector(1536)';
     const { node, diagnostics } = parse(source, parseTypeAnnotation);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('TypeAnnotation');
-    b.startNode('FunctionCall');
-    b.startNode('Identifier');
-    b.token('Ident', 'Vector');
-    b.finishNode();
-    b.token('LParen', '(');
-    b.startNode('AttributeArg');
-    b.startNode('NumberLiteralExpr');
-    b.token('NumberLiteral', '1536');
-    b.finishNode();
-    b.finishNode();
-    b.token('RParen', ')');
-    b.finishNode();
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        FunctionCall
+          Identifier
+            Ident "Vector"
+          LParen "("
+          AttributeArg
+            NumberLiteralExpr
+              NumberLiteral "1536"
+          RParen ")""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
@@ -447,16 +385,13 @@ describe('parseTypeAnnotation well-formed', () => {
     const source = 'String[]';
     const { node, diagnostics } = parse(source, parseTypeAnnotation);
 
-    const b = new GreenNodeBuilder();
-    b.startNode('TypeAnnotation');
-    b.startNode('Identifier');
-    b.token('Ident', 'String');
-    b.finishNode();
-    b.token('LBracket', '[');
-    b.token('RBracket', ']');
-    const expected = b.finishNode();
-
-    expect(node).toEqual(expected);
+    expect(printTree(node)).toMatchInlineSnapshot(`
+      "TypeAnnotation
+        Identifier
+          Ident "String"
+        LBracket "["
+        RBracket "]""
+    `);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
   });
