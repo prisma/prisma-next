@@ -97,9 +97,36 @@ directional invariant.
 ### Typing and surface
 
 Read/write types are the codec's `Output`/`Input` narrowed to the value-set's values
-(`string` → `'user' | 'admin'`). `db.enums.<Name>` exposes the ordered, literal-typed
+(`string` → `'user' | 'admin'`). `db.<ns>.enums.<Name>` exposes the ordered, literal-typed
 value tuple and member accessors. `ORDER BY` follows declaration order, rendered per
 target from the ordered values.
+
+### Client-side entity accessors live on the namespace facet
+
+The enum accessor map lives **inside each namespace facet** under the reserved
+`enums` key, not at the client root: `db.orm.public.enums.Priority` on postgres,
+and `db.orm.enums.Role` on unbound-namespace targets (sqlite, mongo) via the
+existing per-facade unbound projection. Each facet resolves only its own
+namespace's enums (`domain.namespaces[ns].enum`).
+
+Why not a flat root `db.enums`:
+
+- **Namespace-keyed root (TML-2816).** The client root is now keyed by namespace
+  id (`db.<ns>.<Model>`). A root `enums` is the one root key that is not a
+  namespace, and it shadows any namespace literally named `enums`.
+- **Cross-namespace collision.** A flat map merges every namespace's enums into one
+  record, so the same enum name in two namespaces silently last-write-wins.
+  Per-namespace resolution matches the IR (`domain.namespaces[ns].enum`) and keeps
+  same-named enums independent.
+
+**Reserved-name rule.** `enums` is reserved inside a facet. A domain model named
+`enums` would be shadowed by the accessor; it is rejected with a clear error at
+orm-client construction (a runtime guard for now). The matching authoring-time
+diagnostic (PSL/TS builders) lands at the cutover (TML-2853).
+
+This is the template for future client-side entity-accessor maps over IR-modelled
+entities: scope them to the namespace facet under a reserved key, derive them from
+`domain.namespaces[ns].<entity>`, and reject a colliding model name.
 
 ## Alternatives considered
 
@@ -149,9 +176,11 @@ target from the ordered values.
 - **Realization layer** — implement value-set + check at the SQL-family layer
   (MySQL/SQLite inherit) or Postgres-only now? **Working position:** family-layer; the
   structured check is dialect-agnostic.
-- **`db.enums` scope** — local to this project or the first instance of a broader
-  domain-client surface for IR-modelled entities? **Working position:** ship it here,
-  shaped so a later generalization is non-breaking.
+- **`db.<ns>.enums` scope** — local to this project or the first instance of a broader
+  domain-client surface for IR-modelled entities? **Resolved (2026-06-10):** ship it
+  here as the first per-namespace entity-accessor map, shaped so a later generalization
+  is non-breaking; enums live on the namespace facet under the reserved `enums` key (see
+  "Client-side entity accessors live on the namespace facet").
 - **Reference-carrier coupling** — the `valueSet`/default refs track TML-2500 / PR #745;
   if that convention shifts before this lands, these refs shift with it. **Working
   position:** conform to the merged M1 carrier; local refs need no `spaceId`.
