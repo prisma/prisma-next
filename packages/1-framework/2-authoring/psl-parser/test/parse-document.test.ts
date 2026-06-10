@@ -494,14 +494,15 @@ describe('parse() declaration-level diagnostics', () => {
     expect(model).toBeInstanceOf(ModelDeclarationAst);
   });
 
-  it('flags unsupported top-level content and keeps parsing later declarations', () => {
+  it('flags a malformed custom declaration and keeps parsing later declarations', () => {
     const source = 'oops\nmodel User {}';
     const result = parse(source);
-    expect(result.diagnostics.map((d) => d.code)).toContain('PSL_UNSUPPORTED_TOP_LEVEL_BLOCK');
+    expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_DECLARATION');
     expect(greenText(result.document.syntax.green)).toBe(source);
     const decls = Array.from(result.document.declarations());
-    expect(decls).toHaveLength(1);
-    expect(decls[0]).toBeInstanceOf(ModelDeclarationAst);
+    expect(decls).toHaveLength(2);
+    expect(decls[0]).toBeInstanceOf(BlockDeclarationAst);
+    expect(decls[1]).toBeInstanceOf(ModelDeclarationAst);
   });
 
   it('flags a reserved namespace name and keeps parsing', () => {
@@ -640,10 +641,6 @@ describe('ordered-alternative parsers are no-ops on non-match', () => {
 
   it('parseGenericBlock rejects a reserved keyword so it falls through to recovery', () => {
     expectNoOpReject('model {', parseGenericBlock);
-  });
-
-  it('parseGenericBlock rejects an identifier with no following brace', () => {
-    expectNoOpReject('solid plumber', parseGenericBlock);
   });
 
   it('parseBlockAttribute rejects a single-at attribute, preserving the @@-vs-@ split', () => {

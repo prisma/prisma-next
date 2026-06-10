@@ -98,6 +98,16 @@ export class Cursor {
     }
   }
 
+  /**
+   * A zero-width mark at the offset immediately after the last consumed
+   * significant token, before any trailing trivia. Used to anchor a
+   * "something was expected here" diagnostic just past what was actually
+   * parsed (e.g. the `{` missing after a declaration's name).
+   */
+  markAfterLastToken(): DiagnosticMark {
+    return { offset: this.#offset, length: 0 };
+  }
+
   startNode(kind: SyntaxKind): void {
     if (this.#depth > 0) {
       this.flushTrivia();
@@ -484,7 +494,7 @@ function finishReservedHeader(
     cursor.diagnostic(
       'PSL_INVALID_DECLARATION',
       `Expected "{" to open the "${keyword}" block`,
-      keywordMark,
+      cursor.markAfterLastToken(),
     );
   }
   if (hasBrace) {
@@ -530,26 +540,38 @@ export function parseEnum(cursor: Cursor): GreenNode | undefined {
 }
 
 /**
- * Matches an unreserved `Ident` block keyword followed by `{` (anonymous) or
- * `Ident {` (named). Excluding the reserved keywords (`model`/`enum`/
- * `namespace`/`type`) is what keeps a malformed reserved block (e.g. `model {`
- * with no name) routed to its dedicated parser — which commits the declaration
- * kind on the keyword and reports a `PSL_INVALID_DECLARATION` — rather than
- * being captured here as a generic block. Generic blocks carry no reserved
- * keyword (the set is open for extension-contributed blocks), so they stay
- * discriminated by the opening brace.
+ * Matches any unreserved leading `Ident` as a generic block declaration: `kw {`
+ * (anonymous), `kw Ident {` (named), or — when no opening brace follows — a
+ * malformed custom declaration. Excluding the reserved keywords (`model`/`enum`/
+ * `namespace`/`type`) keeps a malformed reserved block (e.g. `model {` with no
+ * name) routed to its dedicated parser. The keyword set for generic blocks is
+ * open (extension-contributed), so a bare identifier with no brace (e.g. `oops`)
+ * is treated as a custom declaration the author has not finished — committing a
+ * `BlockDeclaration` and reporting a missing-brace `PSL_INVALID_DECLARATION`
+ * anchored after the name — rather than as unsupported content. A non-identifier
+ * leading token is not a plausible declaration name and falls through to
+ * `parseUnsupportedTopLevel`.
  */
 export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
-  if (RESERVED_BLOCK_KEYWORDS.has(cursor.peekToken().text)) return undefined;
+  const keyword = cursor.peekToken().text;
+  if (RESERVED_BLOCK_KEYWORDS.has(keyword)) return undefined;
   const hasName = cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace';
-  if (!hasName && cursor.peekKind(1) !== 'LBrace') return undefined;
   cursor.startNode('BlockDeclaration');
   cursor.bump(); // keyword
   if (hasName) {
     parseIdentifier(cursor);
   }
-  parseBlockBody(cursor, parseKeyValueMember);
+  if (cursor.peekKind() === 'LBrace') {
+    parseBlockBody(cursor, parseKeyValueMember);
+  } else {
+    cursor.diagnostic(
+      'PSL_INVALID_DECLARATION',
+      `Expected "{" to open the "${keyword}" block`,
+      cursor.markAfterLastToken(),
+    );
+    cursor.recoverToSyncPoint();
+  }
   return cursor.finishNode();
 }
 
@@ -560,6 +582,7 @@ export function parseNamespace(cursor: Cursor, insideNamespace: boolean): GreenN
   cursor.bump(); // namespace
   const hasName = cursor.peekKind() === 'Ident';
   const name = hasName ? cursor.peekToken().text : '';
+  const nameMark = cursor.mark();
   if (hasName) {
     parseIdentifier(cursor);
   }
@@ -573,7 +596,7 @@ export function parseNamespace(cursor: Cursor, insideNamespace: boolean): GreenN
     cursor.diagnostic(
       'PSL_INVALID_NAMESPACE_BLOCK',
       `Namespace name "${UNSPECIFIED_PSL_NAMESPACE_ID}" is reserved for the parser-synthesised bucket for top-level declarations`,
-      keywordMark,
+      nameMark,
     );
   }
   finishReservedHeader(cursor, 'namespace', keywordMark, hasName, () =>
