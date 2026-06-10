@@ -146,19 +146,20 @@ export type ExtractMongoFieldInputTypes<T> =
  * framework emitter nests `FieldOutputTypes` by namespace id
  * (`{ [ns]: { [model]: { [field]: <refined> } } }`); Mongo is structurally
  * single-namespace, so its refined rows resolve the per-model map under
- * {@link UNBOUND_NAMESPACE_ID}. A pre-nesting (flat, model-keyed) map is read
- * as-is, so a refined row never silently degrades to the codec fallback.
+ * {@link UNBOUND_NAMESPACE_ID}. A map without that coordinate (e.g. a contract
+ * carrying no type maps) resolves to `never`, which the row resolvers read as
+ * "no refined map" and fall back to codec-based inference.
  */
 export type MongoUnboundFieldOutputTypes<T> =
   ExtractMongoFieldOutputTypes<T> extends Record<typeof UNBOUND_NAMESPACE_ID, infer Inner>
     ? Inner
-    : ExtractMongoFieldOutputTypes<T>;
+    : never;
 
 /** Input-side counterpart of {@link MongoUnboundFieldOutputTypes}. */
 export type MongoUnboundFieldInputTypes<T> =
   ExtractMongoFieldInputTypes<T> extends Record<typeof UNBOUND_NAMESPACE_ID, infer Inner>
     ? Inner
-    : ExtractMongoFieldInputTypes<T>;
+    : never;
 
 type ExtractValueObjects<TContract extends Contract> = ContractValueObjectDefinitions<TContract>;
 

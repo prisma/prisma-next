@@ -211,7 +211,7 @@ test('MongoTypeMaps with single param compiles', () => {
 // The emitter nests `FieldOutputTypes`/`FieldInputTypes` by namespace id; Mongo
 // is structurally single-namespace, so its refined per-model map lives under
 // `__unbound__`. A refined (e.g. parameterized) field type carried in the map
-// must survive resolution verbatim, and a pre-nesting flat map must still read.
+// must survive resolution verbatim.
 type RefinedAge = number & { readonly __unit: 'years' };
 
 type MinimalContractWithFieldTypes<TFieldTypes extends Record<string, Record<string, unknown>>> =
@@ -239,7 +239,6 @@ type MinimalContractWithFieldTypes<TFieldTypes extends Record<string, Record<str
   >;
 
 type NestedFieldTypes = { readonly __unbound__: { readonly User: { readonly age: RefinedAge } } };
-type FlatFieldTypes = { readonly User: { readonly age: RefinedAge } };
 
 test('MongoUnboundFieldOutputTypes reads the per-model map under the unbound namespace', () => {
   type Resolved = MongoUnboundFieldOutputTypes<MinimalContractWithFieldTypes<NestedFieldTypes>>;
@@ -249,11 +248,6 @@ test('MongoUnboundFieldOutputTypes reads the per-model map under the unbound nam
 test('MongoUnboundFieldInputTypes reads the per-model map under the unbound namespace', () => {
   type Resolved = MongoUnboundFieldInputTypes<MinimalContractWithFieldTypes<NestedFieldTypes>>;
   expectTypeOf<Resolved>().toEqualTypeOf<{ readonly User: { readonly age: RefinedAge } }>();
-});
-
-test('MongoUnboundFieldOutputTypes reads a flat (pre-nesting) map as-is', () => {
-  type Resolved = MongoUnboundFieldOutputTypes<MinimalContractWithFieldTypes<FlatFieldTypes>>;
-  expectTypeOf<Resolved>().toEqualTypeOf<FlatFieldTypes>();
 });
 
 test('Mongo index and collection option input types stay specific', () => {
