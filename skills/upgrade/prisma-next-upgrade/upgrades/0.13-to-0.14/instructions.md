@@ -22,6 +22,14 @@ changes:
         - "db.sql."
         - "db.orm."
       anyMatch: true
+  - id: sql-runtime-abstract-subclass-seam
+    summary: |
+      `@prisma-next/sql-runtime` now exports `abstract class SqlRuntime` — the
+      family-layer subclass seam for target runtimes (e.g. a future
+      `PostgresRuntime`). This is additive: `createRuntime` and the target
+      factories are unchanged and still return the `Runtime` interface, and the
+      class was previously package-private so no existing code can reference it.
+      No action required.
 ---
 
 # 0.13 → 0.14 — User upgrade instructions
@@ -60,3 +68,7 @@ There is no codemod, because the correct namespace is the one each table or mode
 2. If it is Postgres (`postgres(...)`), insert the namespace segment after `.sql` / `.orm` (and on direct `sql` / `orm` builder calls): use `public` for a standard single-schema project, or the specific schema name for each table/model in a multi-schema contract.
 
 After migrating, run your project's `pnpm typecheck` (or equivalent) — a missed site is a compile error (`Property '<table>' does not exist on type 'Db<…>'`), so the type checker pins every remaining flat access for you.
+
+## `sql-runtime-abstract-subclass-seam`
+
+`@prisma-next/sql-runtime` now exports `abstract class SqlRuntime`, the family-layer base for building target runtimes by subclassing. This is purely additive surface: the class was previously package-private, `createRuntime` and the target factories (`postgres(...)`, `sqlite(...)`) are unchanged, and app code continues to consume the `Runtime` interface they return. **No action required.**
