@@ -1,151 +1,72 @@
-# ADR — Runtime target-layer class
+# ADR — Runtime target layer: session-coupled connections over an abstract family seam
 
-**Status:** Draft (workspace ADR; promoted to `docs/architecture docs/adrs/` at project close-out).
+**Status:** Draft (workspace ADR; promoted to `docs/architecture docs/adrs/` at project close-out). Supersedes two earlier drafts of itself: the original `withRawConnection`/`withTransaction` sketch and the v1 as-built `executeWithSessionBootstrap` design, both rejected in operator review (PR #792, 2026-06-10).
 
-**Related:** [ADR 005 — Thin core, fat targets](../../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md), [`no-target-branches.mdc`](../../../.agents/rules/no-target-branches.mdc), this project's [`spec.md`](../spec.md).
+**Related:** [ADR 005 — Thin core, fat targets](../../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md), [`no-target-branches.mdc`](../../../.agents/rules/no-target-branches.mdc), the interface+factory pattern ([`docs/architecture docs/patterns/interface-plus-factory.md`](../../../docs/architecture%20docs/patterns/interface-plus-factory.md)), this project's [`spec.md`](../spec.md).
 
 ---
 
+## Context
+
+Postgres Row-Level Security is enforced through session state: `role` and `request.jwt.claims` must be set on the connection a query runs on, and nothing user-configurable may be able to observe, reorder, or strip that state. The SQL runtime had no home for this. Its class hierarchy stopped at a package-private family implementation; construction went through a family-level `createRuntime` factory; and the only extension point — user middleware — is exactly the layer that must *not* be able to touch session state.
+
+Three structural gaps, then:
+
+1. **No subclass seam.** Target- or extension-specific runtime behaviour had no class to live in.
+2. **No below-middleware access.** Connection acquisition happened inside the runtime, beneath the middleware chain, with no way for privileged code to reach the raw connection.
+3. **No binding model.** Even given raw access, something must guarantee that *every* query path — single executes, ORM mutation graphs, multi-statement transactions — runs with the binding in force. The project's own first cut failed here: it shipped the capability as a verb (`executeWithSessionBootstrap(plan, bootstrap)`), and final review found the ORM acquiring its own connection scope underneath the bound path — an RLS bypass that failed open. When a binding belongs to a call site, every other call site is a hole.
+
 ## Decision
 
-`SqlRuntime` is exported from `@prisma-next/sql-runtime` as an **abstract class**. Target packages subclass it to produce their concrete runtimes; target factories construct those concrete classes directly. No family-level factory (`createRuntime`) exists.
+### 1. Bare names are interfaces; `Base` names are classes
 
-```
-abstract class RuntimeCore<TQueryPlan, TExecPlan, TMiddleware>    // framework-components
-  ↑ extends
-abstract class SqlRuntime<TContract>                               // sql-runtime (exported)
-  ↑ extends
-class PostgresRuntime<TContract> extends SqlRuntime<TContract>     // @prisma-next/postgres
-class SqliteRuntime<TContract> extends SqlRuntime<TContract>       // @prisma-next/sqlite
+Every layer of the runtime exposes two surfaces: an interface you depend on, and a class you extend. Interfaces carry the bare names; classes carry the `Base` suffix; factories construct `Base` classes and return interfaces, so a concretion never flows into app code as a value.
 
-  ↑ extends
-class SupabaseRuntime<TContract> extends PostgresRuntime<TContract> // @prisma-next/extension-supabase
-```
+| Layer | Interface | Class |
+|---|---|---|
+| Framework | `RuntimeExecutor` | `RuntimeCore` (abstract) |
+| SQL family | the family interface (today `Runtime`) | `SqlRuntimeBase` (abstract) |
+| Target | `PostgresRuntime`, `SqliteRuntime` | `PostgresRuntimeBase`, `SqliteRuntimeBase` |
+| Extension | `SupabaseRuntime` | `SupabaseRuntimeBase extends PostgresRuntimeBase` |
 
-Target factories (`postgres()`, `sqlite()`, `supabase()`) construct their respective concrete classes; app code consumes the `Runtime` interface, not the class hierarchy.
+There is no family-level construction path: `createRuntime` is deleted, and each target factory (`postgres()`, `sqlite()`, `supabase()`) constructs its own `Base` class. Target interfaces begin as empty extensions of the family interface; their value is the named dependency surface, which makes later target-specific surface additive rather than breaking.
 
-Extension authors who need target-specific runtime behaviour subclass the **target** class (e.g. `PostgresRuntime`), not `SqlRuntime` directly.
+### 2. The family base provisions queryables; it does not execute-and-provision in one verb
 
-## Session bootstrap — the protected seam
+`SqlRuntimeBase` exposes two protected seams, deliberately separated:
 
-`SqlRuntime` exposes two `protected` primitives for target subclasses that need to issue SQL below the user middleware chain before the typed query runs:
+- **Provision:** acquire the raw driver connection (`SqlConnection` from the driver contract). The raw connection is already a `SqlQueryable` — SQL issued on it never enters the codec/middleware/telemetry pipeline, which is the below-middleware property — and already carries the lifecycle surface (`release`, `destroy`, `beginTransaction`). No wrapper type is introduced; the earlier `RawSessionConnection` was a redundant narrowing of `SqlQueryable` and is deleted.
+- **Execute:** the existing execute-a-typed-plan-against-a-queryable internal becomes protected, so subclasses run middleware-wrapped plans against connections they provisioned without re-implementing the execute pipeline.
 
-```ts
-// packages/2-sql/5-runtime/src/sql-runtime.ts
+The base knows nothing about sessions, roles, or Supabase.
 
-/**
- * Narrow view of a raw transaction exposed to bootstrap closures.
- * Only query() leaks to the caller — no lifecycle methods.
- */
-export interface RawSessionConnection {
-  query(
-    sql: string,
-    params?: readonly unknown[],
-  ): Promise<{ readonly rows: ReadonlyArray<Record<string, unknown>> }>;
-}
-```
+### 3. Subclasses provide session-coupled connections
 
-```ts
-// Single-query variant: acquire → BEGIN → bootstrap(rawConn) → execute(plan) via middleware → COMMIT/ROLLBACK → release
-protected executeWithSessionBootstrap<Row>(
-  plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
-  bootstrap: (conn: RawSessionConnection) => Promise<void>,
-  options?: RuntimeExecuteOptions,
-): AsyncIterableResult<Row>
+`SupabaseRuntimeBase` composes the two seams into a session: acquire a connection, bind the role onto it once, hand back an object within which *everything* is bound.
 
-// Multi-statement variant: same acquire/BEGIN/bootstrap preamble, then fn(tx) where tx routes through middleware on the same transaction
-protected async executeTransactionWithBootstrap<R>(
-  bootstrap: (conn: RawSessionConnection) => Promise<void>,
-  fn: (tx: TransactionContext) => PromiseLike<R>,
-): Promise<R>
-```
-
-**Why below-middleware matters for security.** User middleware observes the typed `SqlExecutionPlan` flowing through `runWithMiddleware`. Bootstrap SQL runs directly against `RawSessionConnection.query()` on the raw transaction — it is never presented to the user middleware chain. A user cannot observe, reorder, or remove bootstrap SQL by registering middleware. This makes bootstrap SQL structurally non-bypassable, which is the property that makes Postgres RLS enforcement sound.
-
-**Execution order:**
-
-```
-acquire connection
-  └─ BEGIN
-       ├─ bootstrap(RawSessionConnection)  ← raw tx.query(); below user middleware
-       └─ executeAgainstQueryable(plan, tx) ← middleware chain wraps typed execute
-            ├─ intercept?
-            ├─ beforeExecute
-            ├─ runDriver (tx)
-            └─ afterExecute
-  └─ COMMIT (or ROLLBACK on error)
-release connection
-```
-
-## Supabase — the proving case
-
-`SupabaseRuntime` is the first subclass in production. It applies a Postgres role and JWT claims on every execute using `set_config()` in a bootstrap closure:
-
-```ts
-// packages/3-extensions/supabase/src/runtime/supabase-runtime.ts
-export interface SupabaseRoleBinding {
-  readonly role: 'anon' | 'authenticated' | 'service_role';
-  readonly claims?: Record<string, unknown>;
-}
-
-export class SupabaseRuntime<
-  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
-> extends PostgresRuntime<TContract> {
-  executeWithRole<Row>(
-    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
-    binding: SupabaseRoleBinding,
-    options?: RuntimeExecuteOptions,
-  ): AsyncIterableResult<Row> {
-    return this.executeWithSessionBootstrap(
-      plan,
-      (conn: RawSessionConnection) => this.applyRoleBinding(conn, binding),
-      options,
-    );
-  }
-
-  executeRoleTransaction<R>(
-    binding: SupabaseRoleBinding,
-    fn: (tx: TransactionContext) => PromiseLike<R>,
-  ): Promise<R> {
-    return this.executeTransactionWithBootstrap(
-      (conn: RawSessionConnection) => this.applyRoleBinding(conn, binding),
-      fn,
-    );
-  }
-
-  private async applyRoleBinding(
-    conn: RawSessionConnection,
-    binding: SupabaseRoleBinding,
-  ): Promise<void> {
-    await conn.query('SELECT set_config($1, $2, true)', ['role', binding.role]);
-    await conn.query('SELECT set_config($1, $2, true)', [
-      'request.jwt.claims',
-      JSON.stringify(binding.claims ?? {}),
-    ]);
-  }
-}
-```
-
-**`set_config($1, $2, true)` — not `SET LOCAL role = $1`.** Postgres rejects `SET LOCAL role = $1` (parameters are not permitted in `SET` statements). String-building `SET LOCAL role = '${role}'` would be injectable. `SELECT set_config($1, $2, true)` is parameterized, runs inside the transaction (`true` = transaction-local), and is the canonical safe form.
-
-**Role binding lives in bootstrap closures, not in `RuntimeExecuteOptions`.** `RuntimeExecuteOptions` is a cross-family type in `framework-components/runtime`. Embedding a Postgres-specific `role` field there would couple the framework type to a SQL/RLS concept. The bootstrap closure pattern keeps `RuntimeExecuteOptions` clean and puts role semantics where they belong — in the Supabase extension.
-
-The `supabase()` factory constructs one shared `SupabaseRuntime` and produces per-role `RoleBoundDb` instances that call `executeWithRole`/`executeRoleTransaction` with a fixed binding. Binding construction is cheap (no I/O); the connection pool is shared across bindings.
-
-Proven by `examples/supabase/test/rls-role-binding.integration.test.ts`: raw-SQL RLS policy, `asUser` sees only own rows, `asAnon` sees none, `asServiceRole` sees all, recording middleware never sees `set_config` calls.
+- **Bind at open:** `SELECT set_config($1, $2, false)` for `role` and `request.jwt.claims`. Parameterized — `SET role = $1` is invalid Postgres, and string-built SET would be an injection surface. `is_local = false` makes the GUCs session-scoped on that physical connection: that is what makes the object a session rather than a transaction.
+- **Bound by construction:** the session exposes typed execute (via the protected execute seam), transactions (a plain transaction on the bound connection), and the subclass's raw access. There is no unbound route to the underlying connection, so the bypass class from the v1 design cannot be expressed.
+- **Reset on release, destroy on failure:** `release()` issues `RESET ALL` before pooling the connection; a failed reset destroys the connection instead. Pool-poisoning protection is owned by the session lifecycle, not by callers.
+- **Per-operation scope at the façade:** the role-bound `Db` opens a session per execute, per ORM operation (the ORM's `acquireRuntimeScope` acquire/release bracketing receives the session through the shim's `connection()` — the ORM's own scoping machinery becomes the enforcement mechanism), and per explicit transaction block. No connection or transaction is held across application logic.
 
 ## Alternatives considered
 
-**Keep `createRuntime` + a default concrete `SqlRuntimeImpl`.** A factory at the family layer constructs a concrete class the target layer never sees. Rejected: construction at the family layer contradicts thin-core/fat-targets — the family layer doesn't know which target it's serving. It also leaves extension authors with no class to subclass, forcing composition or a re-entrant factory pattern.
-
-**Composition/decorator for `SupabaseRuntime`.** `SupabaseRuntime` holds a base `Runtime` and forwards every method, wrapping `execute` to issue `set_config` first. Rejected: forwarding tax on every new method, `SupabaseRuntime` IS-NOT-A `PostgresRuntime` in any type-safe sense, and the decoration must be updated whenever the `Runtime` interface grows.
-
-**Role/claims via `RuntimeExecuteOptions`.** Add `role?: string; claims?: Record<string, unknown>` fields to `RuntimeExecuteOptions` and let `SqlRuntime.execute` handle them. Rejected: couples a Postgres RLS concept into a cross-family framework type. Middleware compatibility checks (`checkMiddlewareCompatibility`) would need family-specific branches. The per-binding DB object (`RoleBoundDb`) also disappears — callers would specify a role on every call instead of once at binding time.
+- **The v1 verb primitives** (`executeWithSessionBootstrap`, `executeTransactionWithBootstrap` + `RawSessionConnection`) — *shipped, then rejected in review.* Coupling provisioning to execution put the binding on a call site instead of on the connection; the ORM-scope RLS bypass found in final review is the resulting failure mode. Fixing it required amputating the ORM's connection scoping (a band-aid), and "session" leaked into the family base's vocabulary, one altitude too low.
+- **Transaction-local binding (`SET LOCAL` / `set_config(..., true)`) per operation** — Postgres resets it automatically at COMMIT/ROLLBACK, which is attractive, but it forces a transaction around every statement and conflates "transaction" with "session"; the verb API grew directly out of this constraint. The session model trades it for an explicit `RESET ALL`-on-release discipline owned by one lifecycle implementation.
+- **Keep `createRuntime` + a private default concretion** — rejected: a family-level construction path contradicts thin-core/fat-targets, and the exported-concretion variant invited exactly the class-coupling the interface rule exists to prevent.
+- **Composition/decorator for the Supabase runtime** — rejected: a decorator forwards a growing surface by hand and is-not-a Postgres runtime; the domain relationship is subtyping.
+- **Role/claims threaded through `RuntimeExecuteOptions`** — rejected: leaks a SQL-security concept into the cross-family framework type, and per-call options are exactly the "binding at the call site" shape the bypass demonstrated to be fragile.
 
 ## Consequences
 
-- **No family-level `createRuntime` factory.** Target factories are the only construction path. App code that previously passed `Runtime` through doesn't change (it consumed the interface, not the class).
-- **`SqlRuntime` is a public extension point.** Extension authors can subclass `SqlRuntime` directly, bypassing the target layer. Acceptable, but the extension-authoring guide documents that subclassing the target class is the right choice.
-- **Target runtimes are thin today.** `PostgresRuntime` and `SqliteRuntime` are currently identity subclasses — their value is structural (the extension point exists) and will grow as Postgres-specific runtime behaviour lands (prepared-statement caching, `LISTEN`/`NOTIFY`, etc.).
-- **`SupabaseRuntime.executeWithRole` / `executeRoleTransaction` are not on `Runtime`.** They're on `SupabaseRuntime` directly. The `supabase()` factory returns a `SupabaseDb<TContract>` with `asUser`/`asAnon`/`asServiceRole` methods; app code never calls `executeWithRole` directly.
-- **Three-layer pattern is now consistent across IR and runtime.** The IR layer (ADR 225) and the runtime layer follow the same `framework → family → target` shape.
+- RLS enforcement is binding-by-construction: the security review reduces to "can any path reach the connection without going through the session?" — a structural question, not an audit of call sites.
+- Extension authors get one model: depend on bare-name interfaces, extend `Base` classes, provision queryables from the family seam, bind your semantics onto them.
+- The substrate owns two safety disciplines: connection lifecycle (release/destroy) and session hygiene (reset-or-destroy). Both are testable with a recording fake driver against real runtime objects — no self-mocks.
+- Breaking surface relative to 0.13: `SqlRuntimeImpl`/`createRuntime` gone; the family class renamed to `SqlRuntimeBase`; the v1 verbs never ship in a release. Covered by the 0.13→0.14 upgrade declarations.
+
+## Cross-references
+
+- Project spec: [`../spec.md`](../spec.md) — the model, cross-cutting requirements, DoD.
+- Operator review that forced v2: PR #792 inline comments, 2026-06-10.
+- Driver contract: `packages/2-sql/4-lanes/relational-core/src/ast/driver-types.ts` (`SqlConnection`, `SqlQueryable`).
+- ORM connection scoping: `packages/3-extensions/sql-orm-client/src/collection-runtime.ts` (`acquireRuntimeScope`).
