@@ -5,14 +5,21 @@
 
 ## At a glance
 
-Six slices: a contract **substrate** slice (TML-2850) lands the two-plane enum shape; the
-Postgres check-constraint **enforcement** (TML-2851) and the application **read surface**
-(TML-2852, typing + `db.enums` + ordering + emit-time value-union narrowing) build on it;
-a **transitional PSL block** (TML-2882, placeholder spelling `enum2`) makes the new
-mechanism authorable through PSL additively and exercises it end-to-end in the demo's real
-emitted-contract app; the enum **member defaults** (TML-2855) close the last parity gap;
-and the **cutover** (TML-2853) points `enum` at the already-live lowering, retires the
-transitional keyword, migrates remaining native enums, and deletes the native machinery.
+Two tracks. The **SQL track** is six slices: a contract **substrate** slice (TML-2850)
+lands the two-plane enum shape; the Postgres check-constraint **enforcement** (TML-2851)
+and the application **read surface** (TML-2852, typing + `db.enums` + ordering + emit-time
+value-union narrowing) build on it; a **transitional PSL block** (TML-2882, placeholder
+spelling `enum2`) makes the new mechanism authorable through PSL additively and exercises
+it end-to-end in the demo's real emitted-contract app; the enum **member defaults**
+(TML-2855) close the last parity gap; and the **cutover** (TML-2853) points `enum` at the
+already-live lowering, retires the transitional keyword, migrates remaining native enums,
+and deletes the native machinery.
+
+The **Mongo track** is a single complete vertical slice (TML-2884): author → enforce via a
+`$jsonSchema` validator → typed read + `db.enums`, proven end-to-end. It builds only on the
+framework-level domain enum, so it is **fully independent** of the SQL track and the
+cutover, and runs in parallel. Mongo has no native enum and no prior PSL `enum`, so it skips
+the cutover entirely — its `enum` is the domain concept from day one.
 
 The original constraint — `enum` is one keyword, so activation had to wait for one atomic
 flip at the very end — is dissolved by the transitional keyword: **activation happens
@@ -33,6 +40,9 @@ already proven in production use.
 - **Then:** **TML-2855 (member defaults)** — its PSL `@default(member)` surface attaches
   to a real PSL enum field once TML-2882 lands — and **TML-2853 (cutover)** directly
   behind it, now reduced to rename + migrate + delete.
+- **Parallel track (any time):** **TML-2884 (Mongo enums, one vertical slice)** — author →
+  `$jsonSchema` enforce → typed read + `db.enums`, end-to-end. Independent of the SQL track
+  and the cutover; can be picked up whenever there's capacity.
 - **Why this changed from the original plan:** the cutover was first parked as a distant
   finale behind an "additive/dark, every merge green" framing; the dark window caused
   recurring confusion and hid a real bug (the read surface merged green while broken
@@ -165,6 +175,33 @@ already proven in production use.
     PSL `@default(member)` lowering; `buildColumnDefaultSql` rendering. Additive/dark (a union
     extension; opt-in via `enumType` + `.default`). Split from TML-2851 so each is one
     coherent review. Out: the check (TML-2851), reads (TML-2852), the cutover (TML-2853).
+
+### Parallel track — Mongo enums, one complete vertical slice (R10; independent of the SQL track)
+
+- **Slice `mongo-enums-end-to-end`** — Linear: [TML-2884](https://linear.app/prisma-company/issue/TML-2884)
+  - **Why one slice, not split:** authoring without reading proves nothing — a vertical that
+    can't be exercised end-to-end can't be shown to work. This slice goes author → enforce →
+    read in one PR, demonstrated against `mongodb-memory-server`.
+  - **Outcome:** Mongo enums work end-to-end. A Mongo-bound `enumType` / `member` API and PSL
+    `enum` lowering populate `domain.namespaces[ns].enum` and put a `valueSet` ref on the
+    field; the collection's `$jsonSchema` validator gains an `enum` keyword for that field at
+    `validationLevel: strict` (the database rejects out-of-set writes); reads narrow to the
+    value union in the Mongo client; and `db.enums.<ns>.<Name>` is exposed on the Mongo
+    facade. An integration test proves the loop: author a model with an enum field → an
+    out-of-set write is rejected by the validator → an in-set read is typed as the value
+    union → `db.enums` returns the ordered tuple.
+  - **Builds on:** Only the framework-level domain enum (`ContractEnum`) and the existing
+    `EnumAccessor` / `createEnumAccessor` runtime (reused unchanged). **Independent of every
+    SQL slice and of the cutover** — runs in parallel, any time.
+  - **Hands to:** Enums as a domain concept across **both** families — the project's full
+    end state (with the SQL cutover) is one enum concept on SQL and Mongo.
+  - **Focus:** Mongo `enumType`/`member` bound to Mongo codecs (mirrors the Postgres binding)
+    + domain accumulation in `mongo-contract-ts`'s builder + a Mongo PSL `enum` entity-type
+    contribution; the `$jsonSchema` field-`enum` emission in the Mongo JSON-Schema deriver;
+    `InferFieldType` value-union narrowing by `valueSet`; `db.enums` on the `MongoClient`
+    facade (reuse `buildNamespacedEnums`); the `mongodb-memory-server` integration test.
+    **Out:** declaration-order sort (no Mongo schema-level enum-ordinal); member defaults
+    (a Mongo `@default(member)` follow-up if wanted, not this slice); the SQL cutover.
 
 ## Dependencies (external)
 

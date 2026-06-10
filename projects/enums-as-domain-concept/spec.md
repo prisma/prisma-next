@@ -13,12 +13,27 @@ values to a named subset. Every field and column keeps its codec, always; an enu
 field/column additionally carries a `valueSet` restriction. Read types are the codec's
 output narrowed by that restriction.
 
-Storage realizes the restriction as a **named value-set plus a check constraint** —
-never a native `CREATE TYPE … AS ENUM`. The persistence strategy is carried by the
-*structure* (a text column + a value-set + a check), not by a marker field, so changing
-it is a visible contract diff. The native Postgres enum machinery is deleted; because
-the strategy is structural, a native realization can return later as a different storage
-shape (§ Alternatives).
+The domain enum is **target-agnostic** — it lives in the framework's domain plane and
+means the same thing for every target. What differs per target is how storage *realizes*
+the restriction:
+
+- **SQL (Postgres):** a named value-set plus a check constraint — never a native
+  `CREATE TYPE … AS ENUM`. The persistence strategy is carried by the *structure* (a text
+  column + a value-set + a check), not by a marker field, so changing it is a visible
+  contract diff. The native Postgres enum machinery is deleted; because the strategy is
+  structural, a native realization can return later as a different storage shape
+  (§ Alternatives).
+- **Mongo:** a `$jsonSchema` collection validator — the enum field becomes an `enum`
+  keyword inside the collection's JSON-Schema validator (`validationLevel: strict`). No
+  value-set storage entity and no migration-ops parallel are needed; the restriction is a
+  field property in the validator the family already applies. Mongo has no native enum and
+  no prior PSL `enum`, so its `enum` keyword means the domain concept from day one — Mongo
+  needs neither a transitional keyword nor a cutover.
+
+Both targets read the same way: the codec's output narrowed by the `valueSet` restriction
+to the value union, plus a `db.enums.<ns>.<Name>` accessor on the facade. Declaration-order
+`ORDER BY` is SQL-only (Mongo has no schema-level enum-ordinal sort; the ordinal stays
+runtime metadata via `db.enums.<Name>.ordinalOf`).
 
 Everything below is settled design. The implementer builds it; the only open items are
 the sequencing calls in § Decomposition and the items in § Deferred to plan.
@@ -369,6 +384,19 @@ behavior.
   value-set + check; no new `as` casts (no-bare-cast ratchet); no `postgres-enum`
   discriminator or `PostgresEnumType` remains. `valueSet` and default references use the
   same coordinate convention as every other reference site.
+- **R10 — Mongo enums, end-to-end.** The domain enum is realized for the Mongo family as a
+  single **complete vertical**: a Mongo `enumType` / `member` authoring API (target-bound to
+  Mongo codecs) and PSL `enum` lowering populate `domain.namespaces[ns].enum`; the field
+  carries the `valueSet` restriction; the collection's `$jsonSchema` validator gains an
+  `enum` keyword for that field at `validationLevel: strict` (so the database rejects
+  out-of-set writes); reads narrow to the value union in the Mongo client (R4/R5 parity);
+  and `db.enums.<ns>.<Name>` is exposed on the Mongo facade (R6 parity). Proven end-to-end
+  against `mongodb-memory-server` in an example/integration test — author → write-rejected →
+  typed read → `db.enums`. R1–R6 hold for Mongo with the Mongo realization substituted for
+  SQL's; R7 (migration verification) applies via the validator; R8 (declaration-order sort)
+  does not (no schema-level enum-ordinal sort — the ordinal stays runtime metadata).
+  Independent of every SQL slice and of the cutover; Mongo's `enum` is the domain concept
+  from day one (no native to replace, no transitional keyword).
 
 ## Non-goals
 
@@ -378,8 +406,10 @@ behavior.
   schema is scoped to exclude native enums; we do not infer an enum from an arbitrary
   `CHECK (col IN (…))`. (Verifying the contract's own expected check against the live DB
   is in scope — R7.)
-- **Mongo enums** — Mongo has no native enum; enum semantics there are app-side
-  validation.
+- ~~**Mongo enums**~~ — **now in scope (R10).** Originally deferred on the (mistaken)
+  premise that "Mongo has no native enum" — but this project's whole thesis is that an enum
+  *isn't* a native type. The domain enum is framework-level, and Mongo enforces a value-set
+  the same structural way SQL does, via a `$jsonSchema` collection validator. See R10.
 - **A general raw-SQL check-constraint surface** — only the structured value-set check.
 - **Per-enum runtime value validators** — enforcement is the compile-time union plus the
   database check; a runtime re-check is redundant defense
