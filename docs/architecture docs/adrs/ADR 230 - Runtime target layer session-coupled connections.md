@@ -1,8 +1,8 @@
-# ADR — Runtime target layer: session-coupled connections over an abstract family seam
+# ADR 230 — Runtime target layer: session-coupled connections over an abstract family seam
 
-**Status:** Draft (workspace ADR; promoted to `docs/architecture docs/adrs/` at project close-out). Supersedes two earlier drafts of itself: the original `withRawConnection`/`withTransaction` sketch and the v1 as-built `executeWithSessionBootstrap` design, both rejected in operator review (PR #792, 2026-06-10).
+**Status:** Accepted — shipped in PR [#792](https://github.com/prisma/prisma-next/pull/792) (TML-2502), 2026-06-10. Supersedes two earlier in-flight drafts of this design: the original `withRawConnection`/`withTransaction` sketch and the as-built `executeWithSessionBootstrap` verb, both rejected in operator review on the same PR.
 
-**Related:** [ADR 005 — Thin core, fat targets](../../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md), [`no-target-branches.mdc`](../../../.agents/rules/no-target-branches.mdc), the interface+factory pattern ([`docs/architecture docs/patterns/interface-plus-factory.md`](../../../docs/architecture%20docs/patterns/interface-plus-factory.md)), this project's [`spec.md`](../spec.md).
+**Related:** [ADR 005 — Thin Core, Fat Targets](ADR 005 - Thin Core Fat Targets.md), [`no-target-branches.mdc`](../../../.agents/rules/no-target-branches.mdc), the interface+factory pattern ([`../patterns/interface-plus-factory.md`](../patterns/interface-plus-factory.md)).
 
 ---
 
@@ -29,9 +29,9 @@ Every layer of the runtime exposes two surfaces: an interface you depend on, and
 | Target | `PostgresRuntime`, `SqliteRuntime` | `PostgresRuntimeImpl`, `SqliteRuntimeImpl` |
 | Extension | `SupabaseRuntime` | `SupabaseRuntimeImpl extends PostgresRuntimeImpl` |
 
-Two recorded refinements: **(a)** `Impl` classes are exported solely as extension seams — a deliberate relaxation of the classic package-private-`Impl` rule, which cannot hold when `SupabaseRuntimeImpl` (another package) must extend `PostgresRuntimeImpl`; depending on an `Impl` as a type remains forbidden. **(b)** The family interface keeps its existing name `Runtime` rather than being renamed `SqlRuntime`: the rename would touch every consumer of `@prisma-next/sql-runtime` for naming symmetry alone (operator decision). It is the scheme's one naming exception.
+Two recorded refinements: **(a)** `Impl` classes are exported solely as extension seams — a deliberate relaxation of the classic package-private-`Impl` rule, which cannot hold when `SupabaseRuntimeImpl` (another package) must extend `PostgresRuntimeImpl`; depending on an `Impl` as a type remains forbidden. **(b)** The family interface keeps its existing name `Runtime` rather than being renamed `SqlRuntime`: the rename would touch every consumer of `@prisma-next/sql-runtime` for naming symmetry alone. It is the scheme's one naming exception.
 
-There is no family-level construction path: `createRuntime` is deleted, and each target factory (`postgres()`, `sqlite()`, `supabase()`) constructs its own `Base` class. Target interfaces begin as empty extensions of the family interface; their value is the named dependency surface, which makes later target-specific surface additive rather than breaking.
+There is no family-level construction path: `createRuntime` is deleted, and each target factory (`postgres()`, `sqlite()`, `supabase()`) constructs its own concrete class. Target interfaces begin as empty extensions of the family interface; their value is the named dependency surface, which makes later target-specific surface additive rather than breaking.
 
 ### 2. The family base provisions queryables; it does not execute-and-provision in one verb
 
@@ -49,11 +49,11 @@ The base knows nothing about sessions, roles, or Supabase.
 - **Bind at open:** `SELECT set_config($1, $2, false)` for `role` and `request.jwt.claims`. Parameterized — `SET role = $1` is invalid Postgres, and string-built SET would be an injection surface. `is_local = false` makes the GUCs session-scoped on that physical connection: that is what makes the object a session rather than a transaction.
 - **Bound by construction:** the session exposes typed execute (via the protected execute seam), transactions (a plain transaction on the bound connection), and the subclass's raw access. The role-bound `Db` facade exposes no unbound connection-bearing method — the inherited `Runtime.connection()`/`execute()` are unbound and must never be surfaced through the facade. The guarantee is facade-encapsulation, not a type-system constraint on `SupabaseRuntimeImpl` itself.
 - **Reset on release, destroy on failure:** `release()` issues `RESET ALL` before pooling the connection; a failed reset destroys the connection instead. Pool-poisoning protection is owned by the session lifecycle, not by callers.
-- **Per-operation scope at the façade:** the role-bound `Db` opens a session per execute, per ORM operation (the ORM's `acquireRuntimeScope` acquire/release bracketing receives the session through the shim's `connection()` — the ORM's own scoping machinery becomes the enforcement mechanism), and per explicit transaction block. No connection or transaction is held across application logic.
+- **Per-operation scope at the facade:** the role-bound `Db` opens a session per execute, per ORM operation (the ORM's `acquireRuntimeScope` acquire/release bracketing receives the session through the shim's `connection()` — the ORM's own scoping machinery becomes the enforcement mechanism), and per explicit transaction block. No connection or transaction is held across application logic.
 
 ## Alternatives considered
 
-- **The v1 verb primitives** (`executeWithSessionBootstrap`, `executeTransactionWithBootstrap` + `RawSessionConnection`) — *shipped, then rejected in review.* Coupling provisioning to execution put the binding on a call site instead of on the connection; the ORM-scope RLS bypass found in final review is the resulting failure mode. Fixing it required amputating the ORM's connection scoping (a band-aid), and "session" leaked into the family base's vocabulary, one altitude too low.
+- **The verb primitives** (`executeWithSessionBootstrap`, `executeTransactionWithBootstrap` + `RawSessionConnection`) — *built, then rejected in review.* Coupling provisioning to execution put the binding on a call site instead of on the connection; the ORM-scope RLS bypass found in final review is the resulting failure mode. Fixing it required amputating the ORM's connection scoping (a band-aid), and "session" leaked into the family base's vocabulary, one altitude too low. **This is the load-bearing lesson of this ADR: a security binding placed on a call site makes every other call site a hole; bind on the connection/session so every path inherits it by construction.**
 - **Transaction-local binding (`SET LOCAL` / `set_config(..., true)`) per operation** — Postgres resets it automatically at COMMIT/ROLLBACK, which is attractive, but it forces a transaction around every statement and conflates "transaction" with "session"; the verb API grew directly out of this constraint. The session model trades it for an explicit `RESET ALL`-on-release discipline owned by one lifecycle implementation.
 - **Keep `createRuntime` + a private default concretion** — rejected: a family-level construction path contradicts thin-core/fat-targets, and the exported-concretion variant invited exactly the class-coupling the interface rule exists to prevent.
 - **Composition/decorator for the Supabase runtime** — rejected: a decorator forwards a growing surface by hand and is-not-a Postgres runtime; the domain relationship is subtyping.
@@ -61,14 +61,14 @@ The base knows nothing about sessions, roles, or Supabase.
 
 ## Consequences
 
-- RLS enforcement is binding-by-construction: the security review reduces to "can any path reach the connection without going through the facade's session-bound surface?" — a structural question, not an audit of call sites. The invariant to preserve: `RoleBoundDb` exposes no unbound connection-bearing method.
+- RLS enforcement is binding-by-construction: the security review reduces to "can any path reach the connection without going through the facade's session-bound surface?" — a structural question, not an audit of call sites. The invariant to preserve: `RoleBoundDb` exposes no unbound connection-bearing method (locked by a unit + type-level test in `@prisma-next/extension-supabase`).
 - Extension authors get one model: depend on bare-name interfaces, extend `Base` classes, provision queryables from the family seam, bind your semantics onto them.
 - The substrate owns two safety disciplines: connection lifecycle (release/destroy) and session hygiene (reset-or-destroy). Both are testable with a recording fake driver against real runtime objects — no self-mocks.
-- Breaking surface relative to 0.13: `SqlRuntimeImpl`/`createRuntime` gone; the family class renamed to `SqlRuntimeBase` and the target classes to `*RuntimeImpl`; the v1 verbs never ship in a release. Covered by the 0.13→0.14 upgrade declarations.
+- Breaking surface relative to 0.13: `SqlRuntimeImpl`/`createRuntime` gone; the family class renamed to `SqlRuntimeBase` and the target classes to `*RuntimeImpl`. Covered by the 0.13→0.14 upgrade declarations.
 
 ## Cross-references
 
-- Project spec: [`../spec.md`](../spec.md) — the model, cross-cutting requirements, DoD.
-- Operator review that forced v2: PR #792 inline comments, 2026-06-10.
+- Shipped in PR [#792](https://github.com/prisma/prisma-next/pull/792) (TML-2502); the operator review on that PR forced this v2 design.
+- Subsystem reference: [Runtime & Middleware Framework](../subsystems/4. Runtime & Middleware Framework.md).
 - Driver contract: `packages/2-sql/4-lanes/relational-core/src/ast/driver-types.ts` (`SqlConnection`, `SqlQueryable`).
 - ORM connection scoping: `packages/3-extensions/sql-orm-client/src/collection-runtime.ts` (`acquireRuntimeScope`).

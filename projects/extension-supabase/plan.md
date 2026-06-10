@@ -15,7 +15,7 @@ This project is the integration layer; it consumes **all four** sibling projects
 - **[control-policy](../control-policy/spec.md)** — the `external` control-policy value the shipped contract uses by default.
 - **[cross-contract-refs](../cross-contract-refs/spec.md)** — brand machinery the typed handles consume.
 - **[postgres-rls](../postgres-rls/spec.md)** — `.rls(...)` authoring + `PostgresRole` IR + verifier algorithm.
-- **[runtime-target-layer](../runtime-target-layer/spec.md)** — `PostgresRuntime` base class + `withRawConnection` accessor.
+- **[runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)** — `PostgresRuntime` base class + `withRawConnection` accessor.
 
 Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy** → **cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer** → **this project** (the integration / launch).
 

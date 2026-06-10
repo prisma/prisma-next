@@ -14,7 +14,7 @@ Status reflects the state as of the last planning pass (2026-06-08); keep it cur
 | control-policy | Framework primitive: `control` field + `ControlPolicy` enum (`managed`/`tolerated`/`external`/`observed`); verifier/planner dispatch tables | ✅ **Done & closed** (fully landed incl. `@@control` PSL; design in ADR 224; project dir removed) | [TML-2493](https://linear.app/prisma-company/issue/TML-2493) |
 | [cross-contract-refs](../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md) | FK references across contract-space boundaries; brand machinery; `supabase:auth.AuthUser` PSL grammar; dependency graph + namespace ownership | ✅ **Done & closed** (M1 #745, M2 #752, M3a #756, M3b #765; project dir removed) | [TML-2500](https://linear.app/prisma-company/issue/TML-2500) |
 | [postgres-rls](../postgres-rls/spec.md) | RLS policies + Postgres roles as target-only IR; `.rls(...)` TS surface + `policy <name> { ... }` PSL surface; content-addressed wire names; verifier + planner | 🚧 **In progress (Will)** — fully unblocked (cross-contract-refs + PSL-block substrate both landed) | [TML-2501](https://linear.app/prisma-company/issue/TML-2501) |
-| [runtime-target-layer](../runtime-target-layer/spec.md) | Export `SqlRuntime`; new `PostgresRuntime extends SqlRuntime`; `withRawConnection` below-middleware accessor; transaction primitive formalisation | Shaped — short interleave (~50–100 LOC core), independent | [TML-2502](https://linear.app/prisma-company/issue/TML-2502) |
+| [runtime-target-layer](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) | Export `SqlRuntime`; new `PostgresRuntime extends SqlRuntime`; `withRawConnection` below-middleware accessor; transaction primitive formalisation | Shaped — short interleave (~50–100 LOC core), independent | [TML-2502](https://linear.app/prisma-company/issue/TML-2502) |
 | [explicit-namespace-dsl](../explicit-namespace-dsl/spec.md) | Namespace-aware DSL/ORM query surface (`db.sql.<ns>.<table>`, `db.<ns>.<Model>`); disambiguates colliding cross-namespace names (`auth.users` vs `public.users`); additive on the default-namespace fallback | 🚧 **In progress (Serhii)** — **launch blocker** | [TML-2550](https://linear.app/prisma-company/issue/TML-2550) |
 | [extension-supabase](../extension-supabase/spec.md) | `@prisma-next/extension-supabase` package: shipped contract, typed handles, pack descriptor, `SupabaseRuntime`, example app | 🚧 **M1 + skeleton in progress** ([TML-2834](https://linear.app/prisma-company/issue/TML-2834)) | [TML-2503](https://linear.app/prisma-company/issue/TML-2503) |
 
@@ -115,7 +115,7 @@ Three component docs were migrated into the constituent project specs and remove
 Two ADR drafts were migrated alongside:
 
 - `specs/adr-content-addressed-policy-names.md` → [`postgres-rls/specs/`](../postgres-rls/specs/adr-content-addressed-policy-names.md).
-- `specs/adr-runtime-target-layer.md` → [`runtime-target-layer/specs/`](../runtime-target-layer/specs/adr-runtime-target-layer.md).
+- `specs/adr-runtime-target-layer.md` → [`runtime-target-layer/specs/`](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md).
 
 The `decisions.md` log retains the canonical record of all decisions reached during umbrella shaping; constituent specs cite it rather than re-stating its content.
 

@@ -80,6 +80,7 @@ When a dispatch matches one of these shapes, run INVEST again — usually the fi
 
 - **A project whose plan lists 5+ slices.** Probably two projects with one shared umbrella ticket. Re-spec into separate projects with explicit dependencies between them.
 - **A project whose purpose statement keeps growing slice by slice.** The purpose wasn't settled at project-spec time; route back to `drive-specify-project`.
+- **Slices that are really layers of one reviewable change, planned as separate PRs.** If slice N's interim state ships a pattern slice N+1 immediately deletes (e.g. a transitional shim, a placeholder class), the boundary is wrong — that's one PR delivered as a dispatch sequence, not N PRs. Consolidating mid-flight is correct when the slices turn out to share one coherent review; the cost of over-slicing is shipping-then-reverting a shape, plus N× the review/CI/stacking overhead. When you consolidate a multi-slice plan into one PR, the units *inside* that PR are **dispatches** (with reviewer rounds) — there is no "stage" or "milestone" unit in Drive. Slice = one PR; dispatch = one delegated implementation unit; round = one implement→review cycle. Don't invent intermediate vocabulary; it makes the trace and the plan illegible. (Reference: runtime-target-layer / TML-2502 — a 4-slice stacked plan was collapsed to one PR #792 once it was clear each "slice" was a layer of a single reviewable change; the remaining work ran as dispatches on that one slice.)
 
 ## Reference patterns from past slices in this repo
 
