@@ -326,7 +326,8 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
     }
 
     // The migration plan must include both a drop and an add of the check constraint
-    const opIds = v2PlanResult.plan.operations.map((op) => op.id);
+    const resolvedOps = await Promise.all(v2PlanResult.plan.operations);
+    const opIds = resolvedOps.map((op) => op.id);
     expect(opIds).toContain('dropCheckConstraint.User.User_role_check');
     expect(opIds).toContain('checkConstraint.User.User_role_check');
     // Drop must precede add
