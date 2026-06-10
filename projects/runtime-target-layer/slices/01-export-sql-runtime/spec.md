@@ -8,7 +8,15 @@ Rename the private `SqlRuntimeImpl` to `SqlRuntime` and export it from `@prisma-
 
 ## Chosen design
 
-`class SqlRuntimeImpl` → `class SqlRuntime` in `packages/2-sql/5-runtime/src/sql-runtime.ts`, added to the package's export barrel. The symbol appears in exactly four places today (verified):
+**Amended (operator correction, 2026-06-09).** Exporting the *concrete* class broke the repo's interface + factory pattern (consumers depend on the interface, never the implementation — the unexported `Impl` was the enforcement). The corrected shape distinguishes the subclass seam from the consumer surface:
+
+- `export abstract class SqlRuntime` — the extension seam. Carries the full implementation (including the protected hooks); `abstract` makes it un-instantiable, so its only use outside the package is `extends`.
+- `class DefaultSqlRuntime extends SqlRuntime {}` — package-private concrete leaf, NOT exported. The `Impl` role returns under a name that can't be confused with the old symbol.
+- `createRuntime(...): Runtime` constructs `DefaultSqlRuntime` and keeps returning the `Runtime` interface — app consumers never receive the class as a value.
+
+Residual, accepted: an exported abstract class can still be *type-coupled* to (`(rt: SqlRuntime) => …`); that is inherent to having a cross-package subclass seam. Optional follow-on if stronger discouragement is wanted: move the class export to a dedicated subpath (e.g. `/extend`), keeping the main barrel interface-only. Not in this slice.
+
+Original design below (superseded only in the export shape — the rename itself stands). The symbol appears in exactly four places today (verified):
 
 | Location | Change |
 | --- | --- |
@@ -36,9 +44,10 @@ One mechanical rename of a single symbol across its handful of references, plus 
 
 ## Slice-specific done conditions
 
-- [ ] `rg "SqlRuntimeImpl"` returns zero results across the workspace after the rename.
-- [ ] `SqlRuntime` is importable from `@prisma-next/sql-runtime` (present in `src/exports/index.ts`).
-- [ ] No behaviour change: the existing `@prisma-next/sql-runtime` test suite passes unchanged (no test assertions modified beyond the renamed `describe` label).
+- [ ] `rg "SqlRuntimeImpl"` returns zero results in code/tests/docs after the rename (`projects/**` planning records exempt).
+- [ ] `SqlRuntime` is importable from `@prisma-next/sql-runtime` (present in `src/exports/index.ts`) and is `abstract` — `new SqlRuntime(...)` is a compile error outside the package.
+- [ ] `DefaultSqlRuntime` (the concrete leaf) is NOT exported from the package; `createRuntime` constructs it and still returns `Runtime`.
+- [ ] No behaviour change: the existing `@prisma-next/sql-runtime` test suite passes unchanged (no test assertions modified beyond the renamed `describe` label and any test-local instantiation switching to the leaf pattern).
 
 ## Open Questions
 
