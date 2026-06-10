@@ -73,7 +73,8 @@ codec (always) plus a `valueSet` restriction referencing the enum:
       "fields": {
         "id":   { "nullable": false, "codecId": "pg/int4@1" },
         "role": { "nullable": false, "codecId": "pg/text@1",
-                  "valueSet": { "kind": "enum", "namespaceId": "public", "name": "Role" } }
+                  "valueSet": { "plane": "domain", "entityKind": "enum",
+                                "namespaceId": "public", "entityName": "Role" } }
       },
       "relations": {},
       "storage": { "table": "users", "fields": { "id": { "column": "id" }, "role": { "column": "role" } } }
@@ -88,29 +89,32 @@ constraint references it (server-side enforcement). No enum entity in storage:
 
 ```jsonc
 "storage": { "namespaces": { "public": {
-  "valueSet": {
-    "Role": { "values": ["user", "admin"] }
-  },
-  "tables": {
-    "users": {
-      "columns": {
-        "id":   { "nativeType": "int4", "codecId": "pg/int4@1", "nullable": false },
-        "role": {
-          "nativeType": "text",
-          "codecId": "pg/text@1",
-          "nullable": false,
-          "valueSet": { "kind": "valueSet", "namespaceId": "public", "name": "Role" },
-          "default": { "kind": "enumMember",
-                       "enum": { "namespaceId": "public", "name": "Role" },
-                       "member": "Admin" }
-        }
-      },
-      "primaryKey": ["id"],
-      "uniques": [], "indexes": [], "foreignKeys": [],
-      "checks": [
-        { "name": "users_role_check", "column": "role",
-          "valueSet": { "kind": "valueSet", "namespaceId": "public", "name": "Role" } }
-      ]
+  "id": "public",
+  "entries": {
+    "valueSet": {
+      "Role": { "kind": "valueSet", "values": ["user", "admin"] }
+    },
+    "table": {
+      "users": {
+        "columns": {
+          "id":   { "nativeType": "int4", "codecId": "pg/int4@1", "nullable": false },
+          "role": {
+            "nativeType": "text",
+            "codecId": "pg/text@1",
+            "nullable": false,
+            "valueSet": { "plane": "storage", "entityKind": "valueSet",
+                          "namespaceId": "public", "entityName": "Role" },
+            "default": "admin"
+          }
+        },
+        "primaryKey": ["id"],
+        "uniques": [], "indexes": [], "foreignKeys": [],
+        "checks": [
+          { "name": "users_role_check", "column": "role",
+            "valueSet": { "plane": "storage", "entityKind": "valueSet",
+                          "namespaceId": "public", "entityName": "Role" } }
+        ]
+      }
     }
   }
 } } }
@@ -171,26 +175,30 @@ restricted permitted-value set; resolve it for the values. A consumer that only 
 
 ### 2. `valueSet` reference shape
 
-`valueSet` holds a discriminated reference. Its `kind` names the entity-kind of the
-source (and thus the plane): `enum` resolves in the domain plane, `valueSet` in storage.
-The rest is the **space-aware coordinate** from TML-2500 / PR #745: `namespaceId`
-(admitting the `__unbound__` sentinel for single-namespace contracts) and the entity
-`name`, plus an optional `spaceId` **whose presence is the cross-space discriminator**
-(absent ⇒ local, present ⇒ cross-space; no tag field).
+`valueSet` holds the **entity coordinate** (the ADR 221 four-tuple, carried — never
+derived): `plane`, `namespaceId` (admitting the `__unbound__` sentinel for
+single-namespace contracts), `entityKind` (equal to the entries slot key — one
+vocabulary, no translation: `'enum'` for the domain plane's `enum` slot, `'valueSet'`
+for storage's `entries.valueSet`), and `entityName`, plus an optional `spaceId`
+**whose presence is the cross-space discriminator** (absent ⇒ local, present ⇒
+cross-space; no tag field) per TML-2500 / PR #745.
 
 ```jsonc
-{ "kind": "enum",      "namespaceId": "public", "name": "Role" }                       // local domain enum
-{ "kind": "valueSet",  "namespaceId": "public", "name": "Role" }                       // local storage value-set
-{ "kind": "valueSet",  "spaceId": "supabase", "namespaceId": "auth", "name": "Role" }  // cross-space
+{ "plane": "domain",  "entityKind": "enum",     "namespaceId": "public", "entityName": "Role" }  // domain field → domain enum
+{ "plane": "storage", "entityKind": "valueSet", "namespaceId": "public", "entityName": "Role" }  // column/check → storage value-set
+{ "plane": "storage", "entityKind": "valueSet", "spaceId": "supabase",
+  "namespaceId": "auth", "entityName": "Role" }                                                  // cross-space
 ```
 
 References are name-based on the full coordinate (matching PR #745, which keeps FK refs
-name-based and disambiguates by namespace + space, not by a stable entity id). The
-domain field references a domain enum (intra-plane); the storage column/check reference a
-storage value-set (intra-plane); the default references a domain enum (storage → domain,
-allowed by ADR 221's directional invariant). The discriminated `kind` is the extension
-point: future restriction sources (inline sets, ranges) add new variants without
-touching consumers that only test for `valueSet`'s presence.
+name-based and disambiguates by namespace + space, not by a stable entity id). Every
+`valueSet` reference is **intra-plane**: the domain field references a domain enum; the
+storage column/check reference a storage value-set. The directional invariant
+(corrected 2026-06-10 — ADR 221's §115 parenthetical is transposed; erratum pending):
+**domain may reference storage; storage may never reference domain** — the storage
+plane must be consumable in isolation by the migration planner/runner. The
+`entityKind` is the extension point: future restriction sources (inline sets, ranges)
+add new variants without touching consumers that only test for `valueSet`'s presence.
 
 *Satisfies:* R2, R3, R9 (uniform-reference parity).
 
@@ -305,15 +313,20 @@ otherwise.
 
 *Satisfies:* R1, R6.
 
-### 9. Default — `enumMember` variant
+### 9. Default — resolved literal in storage, member intent in domain
 
-A member default is recorded as a new `ColumnDefault` variant referencing the enum
-member: `{ kind: 'enumMember', enum: <coordinate>, member: 'Admin' }`. The `enum`
-coordinate is the component-2 shape (storage → domain reference, permitted by the
-directional invariant). The planner resolves the member to its value and emits
-`DEFAULT '<value>'`. Member-only-ness is enforced where the value is written: the TS DSL
-`.default(Role.members.Admin)` accepts only members; PSL `@default(member)` is checked
-against the enum during lowering, with a diagnostic otherwise.
+(Reworked 2026-06-10 — the original `enumMember` `ColumnDefault` variant carried a
+storage → domain reference, which violates the directional invariant: storage must be
+plannable in isolation. The TML-2851 carrier is removed/redesigned before TML-2855
+persists any default.)
+
+The storage column carries the **resolved literal default** — `DEFAULT 'admin'` is
+plannable from storage alone, with no domain resolution. The member-level intent
+("this default is `Role.Admin`"), where recorded, lives on the **domain field** — a
+domain-side reference, the legal direction. Member-only-ness is enforced where the
+value is written: the TS DSL `.default(Role.members.Admin)` accepts only members and
+lowers to the member's value; PSL `@default(member)` is checked against the enum
+during lowering (diagnostic otherwise) and lowers the same way.
 
 *Satisfies:* R3.
 
@@ -365,7 +378,8 @@ behavior.
   restriction alongside their always-present `codecId`; the check references the same
   value-set.
 - **R3 — Member default.** `field.namedType(Role).default(Role.members.member)` compiles
-  only with members; PSL `@default(member)` lowers to the `enumMember` variant; DDL is
+  only with members; PSL `@default(member)` lowers to the member's **resolved literal**
+  on the storage column (member intent recorded domain-side, per component 9); DDL is
   `DEFAULT '<value>'`. Non-members fail (compile error / lowering diagnostic).
 - **R4 — Typed output.** `findOne(...).role` is statically the value union, not `string`,
   in both the ORM and the query builder (type-tests on each).
@@ -500,10 +514,13 @@ served.
   list across every using site. The named storage value-set, referenced intra-plane,
   keeps the values once per plane while leaving storage self-contained (the reference
   resolves without leaving the storage plane).
-- **A literal default instead of `enumMember`.** Rejected: now that a column openly
-  carries an enum restriction, a default expressed as a member is the natural corollary,
-  and the contract should record that intent. The fixture cost is small (only
-  enum-valued defaults change, and those contracts are being rewritten anyway).
+- **An `enumMember` `ColumnDefault` variant in storage instead of the resolved
+  literal.** Originally chosen ("the contract should record member intent"), then
+  **reversed 2026-06-10**: the variant is a storage → domain reference, which breaks
+  the directional invariant — storage must be plannable in isolation, and resolving a
+  member through the domain plane breaks planner isolation. The storage column carries
+  the resolved literal (component 9); member intent, where recorded, lives on the
+  domain field (the legal direction).
 - **An explicit persistence-strategy marker.** Rejected: the project's convention
   (as in polymorphism and ownership) is that the structure declares the strategy. The
   shape — text column + value-set + check, versus a named-type column — is the strategy;

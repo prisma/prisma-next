@@ -186,16 +186,25 @@ already proven in production use.
 
 
 - **Slice `enum-member-defaults`** — Linear: [TML-2855](https://linear.app/prisma-company/issue/TML-2855)
-  - **Outcome:** `@default(Role.member)` works end-to-end — an `enumMember` `ColumnDefault`
-    variant, the TS `.default(Role.members.x)` + PSL `@default(member)` surfaces, and the
-    Postgres `DEFAULT '<value>'` rendering. Member-only-ness enforced at authoring/lowering.
-  - **Builds on:** Slice 1's `domain…enum` + members. Independent of enforcement (TML-2851) —
-    a default renders a literal; it doesn't need the check.
+  - **Respecced 2026-06-10 (directional-invariant correction, spec §9):** the
+    TML-2851-era `enumMember` `ColumnDefault` variant is a storage → domain reference,
+    which violates the invariant that storage is plannable in isolation. **This
+    slice's first task is to remove/redesign that carrier** (zero persisted instances
+    exist, so it's churn-free) before persisting any default.
+  - **Outcome:** `@default(Role.member)` works end-to-end — the storage column carries
+    the **resolved literal** default (plannable from storage alone, `DEFAULT 'admin'`);
+    member intent, where recorded, lives on the domain field (the legal direction);
+    the TS `.default(Role.members.x)` + PSL `@default(member)` surfaces lower to that
+    shape. Member-only-ness enforced at authoring/lowering.
+  - **Builds on:** Slice 1's `domain…enum` + members; TML-2882's PSL enum field.
+    Independent of enforcement (TML-2851) — a default renders a literal; it doesn't
+    need the check.
   - **Hands to:** Member-default capability, consumed by the cutover (TML-2853).
-  - **Focus:** the `ColumnDefault` `enumMember` variant + validator; TS-DSL `.default(member)`;
-    PSL `@default(member)` lowering; `buildColumnDefaultSql` rendering. Additive/dark (a union
-    extension; opt-in via `enumType` + `.default`). Split from TML-2851 so each is one
-    coherent review. Out: the check (TML-2851), reads (TML-2852), the cutover (TML-2853).
+  - **Focus:** remove the `enumMember` `ColumnDefault` variant + validator (replace
+    with the resolved literal in storage + optional domain-side intent); TS-DSL
+    `.default(member)`; PSL `@default(member)` lowering; `buildColumnDefaultSql`
+    rendering of the literal. Out: the check (TML-2851), reads (TML-2852), the
+    cutover (TML-2853).
 
 ### Parallel track — Mongo enums, one complete vertical slice (R10; independent of the SQL track)
 

@@ -87,12 +87,18 @@ extension-contributed blocks cannot reuse — so the codec rides the existing
 
 ### References
 
-`valueSet` (and the `enumMember` default) carry a discriminated, space-aware coordinate:
-`kind` (the source entity-kind) + `namespaceId` (admitting the `__unbound__` sentinel) +
-`name`, plus an optional `spaceId` whose presence is the cross-space discriminator — the
-TML-2500 / PR #745 carrier convention. Domain → domain and storage → storage references
-are intra-plane; the `enumMember` default is storage → domain, permitted by ADR 221's
-directional invariant.
+`valueSet` carries the entity coordinate — the ADR 221 four-tuple, carried, never
+derived: `plane` + `entityKind` (equal to the entries slot key: `'enum'` / `'valueSet'`
+— one vocabulary, no translation) + `namespaceId` (admitting the `__unbound__`
+sentinel) + `entityName`, plus an optional `spaceId` whose presence is the cross-space
+discriminator (the TML-2500 / PR #745 convention). Every `valueSet` reference is
+intra-plane (domain field → domain enum; storage column/check → storage value-set).
+The directional invariant (corrected 2026-06-10; ADR 221 §115's parenthetical is
+transposed, erratum pending): **domain may reference storage; storage may never
+reference domain** — storage must be consumable in isolation by the migration
+planner/runner. The original `enumMember` default carrier violated this and is
+removed: the storage column carries the resolved literal default; member intent, where
+recorded, lives domain-side.
 
 ### Typing and surface
 
@@ -151,10 +157,12 @@ the facade, and project it per target like `db.sql` / `db.orm`.
   self-contained for DDL. **Rejected because:** it duplicates the list per site. The
   named value-set, referenced intra-plane, keeps values once and storage still resolves
   without leaving its plane.
-- **A literal default instead of an `enumMember` variant.** Attractive: no new
-  `ColumnDefault` shape. **Rejected because:** a column now openly carries an enum
-  restriction, so a member-referenced default is the natural corollary and records
-  intent; the fixture cost is small.
+- **An `enumMember` `ColumnDefault` variant in storage (the original choice, reversed
+  2026-06-10).** Attractive: records member intent in the contract. **Rejected
+  because:** it is a storage → domain reference, violating the directional invariant —
+  the migration planner must resolve defaults from storage alone. The storage column
+  carries the resolved literal; member intent, where recorded, lives on the domain
+  field.
 - **An explicit persistence-strategy marker.** **Rejected because:** the structure
   declares the strategy (as in polymorphism/ownership); a marker would be a second source
   of truth.
