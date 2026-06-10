@@ -6,7 +6,6 @@ import {
 import {
   asNamespaceId,
   type ColumnDefault,
-  type ColumnDefaultLiteralInputValue,
   type Contract,
   type ContractEnum,
   type ContractField,
@@ -63,26 +62,14 @@ type DomainFieldRef =
   | { readonly kind: 'scalar'; readonly many?: boolean }
   | { readonly kind: 'valueObject'; readonly name: string; readonly many?: boolean };
 
-function encodeDefaultLiteralValue(
-  value: ColumnDefaultLiteralInputValue,
-  codecId: string,
-  codecLookup?: CodecLookup,
-): JsonValue {
-  const codec = codecLookup?.get(codecId);
-  if (codec) {
-    return codec.encodeJson(value);
-  }
-  return value as JsonValue;
-}
-
-function encodeEnumValue(value: unknown, codecId: string, codecLookup?: CodecLookup): JsonValue {
+function encodeViaCodec(value: unknown, codecId: string, codecLookup?: CodecLookup): JsonValue {
   const codec = codecLookup?.get(codecId);
   if (codec) {
     return codec.encodeJson(value);
   }
   return blindCast<
     JsonValue,
-    'no codec lookup at build time: enum member value is already JSON-safe'
+    'no codec lookup at build time: literal/enum member value is already JSON-safe'
   >(value);
 }
 
@@ -96,7 +83,7 @@ function encodeColumnDefault(
   }
   return {
     kind: 'literal',
-    value: encodeDefaultLiteralValue(defaultInput.value, codecId, codecLookup),
+    value: encodeViaCodec(defaultInput.value, codecId, codecLookup),
   };
 }
 
@@ -784,7 +771,7 @@ export function buildSqlContractFromDefinition(
       codecId: handle.codecId,
       members: handle.enumMembers.map((m) => ({
         name: m.name,
-        value: encodeEnumValue(m.value, handle.codecId, codecLookup),
+        value: encodeViaCodec(m.value, handle.codecId, codecLookup),
       })),
     };
 
@@ -795,7 +782,7 @@ export function buildSqlContractFromDefinition(
     }
     storageSlot[enumName] = {
       kind: 'value-set',
-      values: handle.values.map((v) => encodeEnumValue(v, handle.codecId, codecLookup)),
+      values: handle.values.map((v) => encodeViaCodec(v, handle.codecId, codecLookup)),
     };
   }
 
