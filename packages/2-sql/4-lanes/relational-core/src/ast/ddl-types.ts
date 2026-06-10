@@ -1,6 +1,7 @@
 import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import { isColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
+import type { CodecRef } from './codec-types';
 import type { AnyParamRef } from './types';
 
 /**
@@ -71,6 +72,8 @@ export class DdlColumn {
   readonly notNull?: boolean | undefined;
   readonly primaryKey?: boolean | undefined;
   readonly default?: AnyDdlColumnDefault | undefined;
+  /** Codec identity for this column. When present, the DDL walker resolves the codec via `codecLookup.get(codecRef.codecId)` and calls `codec.encode(default.value, {})` to obtain the wire value before inlining the literal default into the DDL string. When absent, literal defaults follow RawSqlLiteral wire-scalar semantics (string / number / boolean / bigint / null / Uint8Array / Date inlined directly). */
+  readonly codecRef?: CodecRef | undefined;
 
   constructor(options: {
     readonly name: string;
@@ -78,12 +81,14 @@ export class DdlColumn {
     readonly notNull?: boolean;
     readonly primaryKey?: boolean;
     readonly default?: AnyDdlColumnDefault;
+    readonly codecRef?: CodecRef;
   }) {
     this.name = options.name;
     this.type = options.type;
     this.notNull = options.notNull;
     this.primaryKey = options.primaryKey;
     this.default = options.default;
+    this.codecRef = options.codecRef;
     Object.freeze(this);
   }
 }

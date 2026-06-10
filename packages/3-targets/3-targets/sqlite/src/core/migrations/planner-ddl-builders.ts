@@ -123,7 +123,7 @@ export function isInlineAutoincrementPrimaryKey(table: StorageTable, columnName:
 
 type ResolvedColumnTypeMetadata = Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>;
 
-function resolveColumnTypeMetadata(
+export function resolveColumnTypeMetadata(
   column: StorageColumn,
   storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
 ): ResolvedColumnTypeMetadata {

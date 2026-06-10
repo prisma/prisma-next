@@ -1,3 +1,5 @@
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { SqliteCreateTable } from '@prisma-next/target-sqlite/ddl';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +8,22 @@ import type { SqliteContract } from '../src/core/types';
 
 const adapter = new SqliteControlAdapter();
 const ctx = { contract: {} as SqliteContract };
+
+/**
+ * A codec whose `encode` transforms its input. The raw value never appears
+ * in correct output, so this distinguishes codec routing (walker calls
+ * `encode`, inlines the wire result) from the type-branching fallback.
+ */
+const transformingCodec = {
+  id: 'test/transform@1',
+  encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
+  decode: async (wire: unknown) => wire,
+} as unknown as Codec;
+
+const transformingLookup: CodecLookup = {
+  ...emptyCodecLookup,
+  get: (id) => (id === 'test/transform@1' ? transformingCodec : undefined),
+};
 
 describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaults', () => {
   it('inlines a string default with single-quoting (no cast suffix)', async () => {
@@ -143,5 +161,21 @@ describe('SqliteControlAdapter.lower output is unchanged after D1', () => {
     expect(lowered.sql).toContain('"d" TEXT DEFAULT NULL');
     expect(lowered.sql).toContain(`"e" TEXT DEFAULT (datetime('now'))`);
     expect(lowered.params).toEqual([]);
+  });
+
+  it('routes a codec-bearing literal default through codec.encode (not raw type-branching)', async () => {
+    const codecAdapter = new SqliteControlAdapter(transformingLookup);
+    const ast = new SqliteCreateTable({
+      table: 'secrets',
+      columns: [
+        col('token', 'TEXT', {
+          default: lit('plaintext'),
+          codecRef: { codecId: 'test/transform@1' },
+        }),
+      ],
+    });
+    const result = await codecAdapter.lowerToExecutableStatement(ast, ctx);
+    expect(result.sql).toContain(`DEFAULT 'ENC:PLAINTEXT'`);
+    expect(result.sql).not.toContain('plaintext');
   });
 });

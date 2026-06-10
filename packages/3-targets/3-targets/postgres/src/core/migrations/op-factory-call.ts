@@ -226,7 +226,7 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
       columns: this.columns,
       ...ifDefined('constraints', this.constraints),
     });
-    const statement = await lowerer.lowerToExecutableStatement(ddlNode, { contract: {} });
+    const statement = await lowerer.lowerToExecutableStatement(ddlNode);
     const schemaName = this.schemaName;
     const tableName = this.tableName;
     return {
@@ -1030,7 +1030,7 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
       );
     }
     const ddlNode = contractFreeDdl.createSchema({ schema: this.schemaName, ifNotExists: true });
-    const statement = await lowerer.lowerToExecutableStatement(ddlNode, { contract: {} });
+    const statement = await lowerer.lowerToExecutableStatement(ddlNode);
     const schemaName = this.schemaName;
     return {
       id: `schema.${schemaName}`,

@@ -150,7 +150,7 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
       columns: this.columns,
       ...ifDefined('constraints', this.constraints),
     });
-    const statement = await lowerer.lowerToExecutableStatement(ddlNode, { contract: {} });
+    const statement = await lowerer.lowerToExecutableStatement(ddlNode);
     const tableName = this.tableName;
     const escapedName = escapeLiteral(tableName);
     return {

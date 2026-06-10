@@ -26,6 +26,7 @@ export class TypeScriptRenderableSqliteMigration
   readonly #destination: SqliteMigrationDestinationInfo;
   readonly #spaceId: string;
   readonly #lowerer: ExecutableStatementLowerer | undefined;
+  #operationsCache: readonly (Op | Promise<Op>)[] | undefined;
 
   constructor(
     calls: readonly OpFactoryCall[],
@@ -43,7 +44,8 @@ export class TypeScriptRenderableSqliteMigration
   }
 
   override get operations(): readonly (Op | Promise<Op>)[] {
-    return renderOps(this.#calls, this.#lowerer);
+    this.#operationsCache ??= renderOps(this.#calls, this.#lowerer);
+    return this.#operationsCache;
   }
 
   override describe(): MigrationMeta {

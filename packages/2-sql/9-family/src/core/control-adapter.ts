@@ -42,7 +42,7 @@ export interface Lowerer {
 export interface ExecutableStatementLowerer extends Lowerer {
   lowerToExecutableStatement(
     ast: AnyQueryAst | DdlNode,
-    context: LowererContext<unknown>,
+    context?: LowererContext<unknown>,
   ): Promise<ExecutableStatement>;
 }
 

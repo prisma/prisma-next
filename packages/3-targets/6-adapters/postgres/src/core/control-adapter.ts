@@ -22,6 +22,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
+  CodecRef,
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
@@ -52,7 +53,6 @@ import type {
   PostgresCreateSchema,
   PostgresCreateTable,
   PostgresDdlNode,
-  PostgresDdlVisitor,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import {
@@ -182,14 +182,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   async lowerToExecutableStatement(
     ast: AnyQueryAst | PostgresDdlNode,
-    context: LowererContext<unknown>,
+    context?: LowererContext<unknown>,
   ): Promise<ExecutableStatement> {
     if (isDdlNode(ast)) {
-      return pgRenderDdlExecutableStatement(blindCast<PostgresDdlNode, 'isDdlNode guard'>(ast));
+      return pgRenderDdlExecutableStatement(
+        blindCast<PostgresDdlNode, 'isDdlNode guard'>(ast),
+        this.codecLookup,
+      );
     }
     const lowered = renderLoweredSql(
       ast,
-      blindCast<PostgresContract, 'Caller must supply matching contract'>(context.contract),
+      blindCast<PostgresContract, 'Caller must supply matching contract'>(context?.contract),
       this.codecLookup,
     );
     const params = lowered.params.map((p) => (p.kind === 'literal' ? p.value : p.name));
@@ -1458,23 +1461,38 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
   );
 }
 
-function pgRenderDdlColumnDefault(
+async function pgRenderDdlColumnDefault(
   def: LiteralColumnDefault | FunctionColumnDefault,
   nativeType: string,
-): string {
+  codecLookup: CodecLookup,
+  codecRef: CodecRef | undefined,
+): Promise<string> {
   if (def.kind === 'function') {
     if (def.expression === 'autoincrement()') return '';
     return `DEFAULT (${def.expression})`;
   }
+  if (codecRef !== undefined) {
+    const codec = codecLookup.get(codecRef.codecId);
+    if (codec !== undefined) {
+      const wire = await codec.encode(def.value, {});
+      return `DEFAULT ${pgInlineLiteral(wire, nativeType)}`;
+    }
+  }
+  // Fallback: codec-less literal defaults follow RawSqlLiteral wire-scalar semantics.
   return `DEFAULT ${pgInlineLiteral(def.value, nativeType)}`;
 }
 
-function pgRenderDdlColumn(column: DdlColumn): string {
+async function pgRenderDdlColumn(column: DdlColumn, codecLookup: CodecLookup): Promise<string> {
   const parts = [quoteIdentifier(column.name), column.type];
   if (column.notNull) parts.push('NOT NULL');
   if (column.primaryKey) parts.push('PRIMARY KEY');
   if (column.default) {
-    const clause = pgRenderDdlColumnDefault(column.default, column.type);
+    const clause = await pgRenderDdlColumnDefault(
+      column.default,
+      column.type,
+      codecLookup,
+      column.codecRef,
+    );
     if (clause.length > 0) parts.push(clause);
   }
   return parts.join(' ');
@@ -1511,31 +1529,40 @@ function pgRenderDdlConstraint(constraint: DdlTableConstraint): string {
   return `UNIQUE (${cols})`;
 }
 
-class PgDdlExecutableStatementVisitor implements PostgresDdlVisitor<ExecutableStatement> {
-  createTable(node: PostgresCreateTable): ExecutableStatement {
-    const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
-    const tableRef = node.schema
-      ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
-      : quoteIdentifier(node.table);
-    const columnDefs = node.columns.map(pgRenderDdlColumn);
-    const constraintDefs =
-      node.constraints !== undefined ? node.constraints.map(pgRenderDdlConstraint) : [];
-    const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
-    return {
-      sql: `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`,
-      params: [],
-    };
-  }
-
-  createSchema(node: PostgresCreateSchema): ExecutableStatement {
-    const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
-    return {
-      sql: `CREATE SCHEMA ${ifNotExists}${quoteIdentifier(node.schema)}`,
-      params: [],
-    };
-  }
+async function pgRenderCreateTable(
+  node: PostgresCreateTable,
+  codecLookup: CodecLookup,
+): Promise<ExecutableStatement> {
+  const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+  const tableRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
+    : quoteIdentifier(node.table);
+  const columnDefs = await Promise.all(
+    node.columns.map((col) => pgRenderDdlColumn(col, codecLookup)),
+  );
+  const constraintDefs =
+    node.constraints !== undefined ? node.constraints.map(pgRenderDdlConstraint) : [];
+  const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
+  return {
+    sql: `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`,
+    params: [],
+  };
 }
 
-function pgRenderDdlExecutableStatement(ast: PostgresDdlNode): ExecutableStatement {
-  return ast.accept(new PgDdlExecutableStatementVisitor());
+function pgRenderCreateSchema(node: PostgresCreateSchema): ExecutableStatement {
+  const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+  return {
+    sql: `CREATE SCHEMA ${ifNotExists}${quoteIdentifier(node.schema)}`,
+    params: [],
+  };
+}
+
+async function pgRenderDdlExecutableStatement(
+  ast: PostgresDdlNode,
+  codecLookup: CodecLookup,
+): Promise<ExecutableStatement> {
+  if (ast.kind === 'create-table') {
+    return pgRenderCreateTable(blindCast<PostgresCreateTable, 'kind guard'>(ast), codecLookup);
+  }
+  return pgRenderCreateSchema(blindCast<PostgresCreateSchema, 'kind guard'>(ast));
 }

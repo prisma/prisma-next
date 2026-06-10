@@ -8,7 +8,7 @@
  * remaining issues flow through `mapIssueToCall` for the default case.
  */
 
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   MigrationOperationPolicy,
@@ -24,7 +24,7 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import type { DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
+import type { CodecRef, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import {
   DdlColumn,
   ForeignKeyConstraint,
@@ -59,6 +59,7 @@ import {
   buildColumnDefaultSql,
   buildColumnTypeSql,
   isInlineAutoincrementPrimaryKey,
+  resolveColumnTypeMetadata,
 } from './planner-ddl-builders';
 import {
   type CallMigrationStrategy,
@@ -326,11 +327,32 @@ export function tableToDdlParts(
       return new DdlColumn({ name, type: `${typeSql} PRIMARY KEY AUTOINCREMENT` });
     }
     const colDefault = sqliteDefaultToDdlColumnDefault(column.default);
+    const resolved = resolveColumnTypeMetadata(
+      column,
+      blindCast<
+        Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+        'resolveColumnTypeMetadata declares its storageTypes parameter as mutable Record while the planner stores it readonly; the helper does not mutate, so the readonly→mutable narrowing is sound'
+      >(storageTypes),
+    );
+    const codecRef: CodecRef | undefined = resolved.codecId
+      ? {
+          codecId: resolved.codecId,
+          ...(resolved.typeParams !== undefined
+            ? {
+                typeParams: blindCast<
+                  JsonValue,
+                  'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed (non-undefined) value lands in CodecRef.typeParams which is JsonValue'
+                >(resolved.typeParams),
+              }
+            : {}),
+        }
+      : undefined;
     return new DdlColumn({
       name,
       type: typeSql,
       ...(!column.nullable ? { notNull: true } : {}),
       ...(colDefault !== undefined ? { default: colDefault } : {}),
+      ...(codecRef !== undefined ? { codecRef } : {}),
     });
   });
 

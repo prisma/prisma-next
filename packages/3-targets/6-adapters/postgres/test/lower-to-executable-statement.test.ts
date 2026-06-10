@@ -1,3 +1,5 @@
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +8,23 @@ import type { PostgresContract } from '../src/core/types';
 
 const adapter = new PostgresControlAdapter();
 const ctx = { contract: {} as PostgresContract };
+
+/**
+ * A codec whose `encode` transforms its input (uppercases + prefixes). The
+ * raw value never appears in correct output, so this test distinguishes
+ * codec routing (the walker calls `encode` and inlines the wire result)
+ * from the type-branching fallback (which would inline the raw value).
+ */
+const transformingCodec = {
+  id: 'test/transform@1',
+  encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
+  decode: async (wire: unknown) => wire,
+} as unknown as Codec;
+
+const transformingLookup: CodecLookup = {
+  ...emptyCodecLookup,
+  get: (id) => (id === 'test/transform@1' ? transformingCodec : undefined),
+};
 
 describe('PostgresControlAdapter.lowerToExecutableStatement — DDL literal defaults', () => {
   it('inlines a string default with single-quoting and ::nativeType cast on non-text columns', async () => {
@@ -153,5 +172,38 @@ describe('PostgresControlAdapter.lower output is unchanged after D1', () => {
       columns: [col('x', 'timestamptz', { default: lit(new Date('not-a-date')) })],
     });
     await expect(adapter.lowerToExecutableStatement(ast, ctx)).rejects.toThrow(/invalid Date/);
+  });
+
+  it('routes a codec-bearing literal default through codec.encode (not raw type-branching)', async () => {
+    const codecAdapter = new PostgresControlAdapter(transformingLookup);
+    const ast = new PostgresCreateTable({
+      table: 'secrets',
+      columns: [
+        col('token', 'text', {
+          default: lit('plaintext'),
+          codecRef: { codecId: 'test/transform@1' },
+        }),
+      ],
+    });
+    const result = await codecAdapter.lowerToExecutableStatement(ast, ctx);
+    // The codec transformed 'plaintext' → 'ENC:PLAINTEXT'; the raw value must
+    // NOT appear — that's the difference between routing and type-branching.
+    expect(result.sql).toContain(`DEFAULT 'ENC:PLAINTEXT'`);
+    expect(result.sql).not.toContain('plaintext');
+  });
+
+  it('falls back to raw inlining when the codecRef resolves to no codec', async () => {
+    const ast = new PostgresCreateTable({
+      table: 'secrets',
+      columns: [
+        col('token', 'text', {
+          default: lit('plaintext'),
+          codecRef: { codecId: 'unregistered@1' },
+        }),
+      ],
+    });
+    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    // Built-in lookup has no 'unregistered@1' → fallback inlines the raw value.
+    expect(result.sql).toContain(`DEFAULT 'plaintext'`);
   });
 });

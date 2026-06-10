@@ -3,11 +3,14 @@ import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
+  CodecRef,
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
@@ -19,6 +22,7 @@ import type {
   MarkerReadResult,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
+import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import type {
   PrimaryKey,
   SqlColumnIR,
@@ -33,11 +37,7 @@ import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
 } from '@prisma-next/target-sqlite/contract-free';
-import type {
-  SqliteCreateTable,
-  SqliteDdlNode,
-  SqliteDdlVisitor,
-} from '@prisma-next/target-sqlite/ddl';
+import type { SqliteCreateTable, SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
@@ -113,9 +113,29 @@ type FkAccumulator = {
   onUpdate: string;
 };
 
+function createSqliteBuiltinCodecLookup(): CodecLookup {
+  return extractCodecLookup([
+    {
+      id: 'sqlite-builtin-codecs',
+      types: { codecTypes: { codecDescriptors: Array.from(sqliteCodecRegistry.values()) } },
+    },
+  ]);
+}
+
 export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'sqlite' as const;
+
+  private readonly codecLookup: CodecLookup;
+
+  /**
+   * @param codecLookup - Codec lookup used to resolve codecs for DDL literal-default encoding.
+   *   Defaults to a SQLite-builtins-only lookup when omitted. Stack-aware callers supply
+   *   `stack.codecLookup` so extension codecs are visible to the DDL walker.
+   */
+  constructor(codecLookup?: CodecLookup) {
+    this.codecLookup = codecLookup ?? createSqliteBuiltinCodecLookup();
+  }
 
   readonly normalizeDefault = parseSqliteDefault;
   readonly normalizeNativeType = normalizeSqliteNativeType;
@@ -152,14 +172,17 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    */
   async lowerToExecutableStatement(
     ast: AnyQueryAst | SqliteDdlNode,
-    context: LowererContext<unknown>,
+    context?: LowererContext<unknown>,
   ): Promise<ExecutableStatement> {
     if (isDdlNode(ast)) {
-      return sqliteRenderDdlExecutableStatement(blindCast<SqliteDdlNode, 'isDdlNode guard'>(ast));
+      return sqliteRenderDdlExecutableStatement(
+        blindCast<SqliteDdlNode, 'isDdlNode guard'>(ast),
+        this.codecLookup,
+      );
     }
     const lowered = renderLoweredSql(
       ast,
-      blindCast<SqliteContract, 'Caller must supply matching contract'>(context.contract),
+      blindCast<SqliteContract, 'Caller must supply matching contract'>(context?.contract),
     );
     const params = lowered.params.map((p) => (p.kind === 'literal' ? p.value : p.name));
     return { sql: lowered.sql, params };
@@ -651,15 +674,27 @@ function sqliteInlineLiteral(wire: unknown): string {
   throw new Error(`sqliteRenderDdlExecutableStatement: unexpected wire type "${typeof wire}"`);
 }
 
-function sqliteRenderDdlColumnDefault(def: LiteralColumnDefault | FunctionColumnDefault): string {
+async function sqliteRenderDdlColumnDefault(
+  def: LiteralColumnDefault | FunctionColumnDefault,
+  codecLookup: CodecLookup,
+  codecRef: CodecRef | undefined,
+): Promise<string> {
   if (def.kind === 'function') {
     if (def.expression === 'autoincrement()') return '';
     return `DEFAULT (${def.expression})`;
   }
+  if (codecRef !== undefined) {
+    const codec = codecLookup.get(codecRef.codecId);
+    if (codec !== undefined) {
+      const wire = await codec.encode(def.value, {});
+      return `DEFAULT ${sqliteInlineLiteral(wire)}`;
+    }
+  }
+  // Fallback: codec-less literal defaults follow RawSqlLiteral wire-scalar semantics.
   return `DEFAULT ${sqliteInlineLiteral(def.value)}`;
 }
 
-function sqliteRenderDdlColumn(column: DdlColumn): string {
+async function sqliteRenderDdlColumn(column: DdlColumn, codecLookup: CodecLookup): Promise<string> {
   if (column.type.includes('AUTOINCREMENT')) {
     return `${quoteIdentifier(column.name)} ${column.type}`;
   }
@@ -667,7 +702,7 @@ function sqliteRenderDdlColumn(column: DdlColumn): string {
   if (column.notNull) parts.push('NOT NULL');
   if (column.primaryKey) parts.push('PRIMARY KEY');
   if (column.default) {
-    const clause = sqliteRenderDdlColumnDefault(column.default);
+    const clause = await sqliteRenderDdlColumnDefault(column.default, codecLookup, column.codecRef);
     if (clause.length > 0) parts.push(clause);
   }
   return parts.join(' ');
@@ -704,21 +739,21 @@ function sqliteRenderDdlConstraint(constraint: DdlTableConstraint): string {
   return `UNIQUE (${cols})`;
 }
 
-class SqliteDdlExecutableStatementVisitor implements SqliteDdlVisitor<ExecutableStatement> {
-  createTable(node: SqliteCreateTable): ExecutableStatement {
-    const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
-    const tableRef = quoteIdentifier(node.table);
-    const columnDefs = node.columns.map(sqliteRenderDdlColumn);
-    const constraintDefs =
-      node.constraints !== undefined ? node.constraints.map(sqliteRenderDdlConstraint) : [];
-    const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
-    return {
-      sql: `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`,
-      params: [],
-    };
-  }
-}
-
-function sqliteRenderDdlExecutableStatement(ast: SqliteDdlNode): ExecutableStatement {
-  return ast.accept(new SqliteDdlExecutableStatementVisitor());
+async function sqliteRenderDdlExecutableStatement(
+  ast: SqliteDdlNode,
+  codecLookup: CodecLookup,
+): Promise<ExecutableStatement> {
+  const node = blindCast<SqliteCreateTable, 'SQLite DDL only has create-table'>(ast);
+  const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
+  const tableRef = quoteIdentifier(node.table);
+  const columnDefs = await Promise.all(
+    node.columns.map((col) => sqliteRenderDdlColumn(col, codecLookup)),
+  );
+  const constraintDefs =
+    node.constraints !== undefined ? node.constraints.map(sqliteRenderDdlConstraint) : [];
+  const allDefs = [...columnDefs, ...constraintDefs].join(',\n  ');
+  return {
+    sql: `CREATE TABLE ${ifNotExists}${tableRef} (\n  ${allDefs}\n)`,
+    params: [],
+  };
 }

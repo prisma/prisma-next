@@ -43,6 +43,12 @@ export class TypeScriptRenderablePostgresMigration
   readonly #meta: MigrationMeta;
   readonly #spaceId: string;
   readonly #lowerer: ExecutableStatementLowerer | undefined;
+  #operationsCache:
+    | readonly (
+        | SqlMigrationPlanOperation<PostgresPlanTargetDetails>
+        | Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>
+      )[]
+    | undefined;
 
   constructor(
     calls: readonly OpFactoryCall[],
@@ -61,7 +67,8 @@ export class TypeScriptRenderablePostgresMigration
     | SqlMigrationPlanOperation<PostgresPlanTargetDetails>
     | Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>
   )[] {
-    return renderOps(this.#calls, this.#lowerer);
+    this.#operationsCache ??= renderOps(this.#calls, this.#lowerer);
+    return this.#operationsCache;
   }
 
   override describe(): MigrationMeta {
