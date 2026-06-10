@@ -35,8 +35,8 @@ TML-2852: the enum read surface. Additive surface for `enumType`-authored enums.
 `@prisma-next/postgres/contract-builder` gains `enumType` / `member` exports (the
 Postgres-bound `enumType` constrains member values to the column codec) and the
 factory `defineContract` overload threads a top-level `enums` key;
-`@prisma-next/sql-orm-client` gains the per-namespace `db.<namespace>.enums.<Name>`
-runtime accessor (built from `domain.namespaces[ns].enum`) and value-union
+`@prisma-next/sql-orm-client` gains the lane-agnostic `db.enums.<namespace>.<Name>`
+runtime accessor map (built from `domain.namespaces[ns].enum`) and value-union
 narrowing of enum-restricted fields, plus emit-time narrowing in the emitter from a
 field's `valueSet` ref. All additive — existing exports and the framework SPI are
 unchanged, PSL `enum` stays native until the cutover, and `fixtures:check` is

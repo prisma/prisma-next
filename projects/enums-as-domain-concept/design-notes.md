@@ -97,36 +97,37 @@ directional invariant.
 ### Typing and surface
 
 Read/write types are the codec's `Output`/`Input` narrowed to the value-set's values
-(`string` → `'user' | 'admin'`). `db.<ns>.enums.<Name>` exposes the ordered, literal-typed
+(`string` → `'user' | 'admin'`). `db.enums.<ns>.<Name>` exposes the ordered, literal-typed
 value tuple and member accessors. `ORDER BY` follows declaration order, rendered per
 target from the ordered values.
 
-### Client-side entity accessors live on the namespace facet
+### Client-side entity accessors live on the `db` facade
 
-The enum accessor map lives **inside each namespace facet** under the reserved
-`enums` key, not at the client root: `db.orm.public.enums.Priority` on postgres,
-and `db.orm.enums.Role` on unbound-namespace targets (sqlite, mongo) via the
-existing per-facade unbound projection. Each facet resolves only its own
-namespace's enums (`domain.namespaces[ns].enum`).
+Enums are **contract metadata, lane-agnostic** — the same values whether you reach them
+through the sql lane or the orm lane — so the enum accessor map lives on the **`db`
+facade** alongside `transaction` / `prepare` / `raw` / `context`, not under one lane.
+`db.enums` is a **namespace-keyed map projected per target exactly like `db.sql` /
+`db.orm`**: `db.enums.public.Priority.values` on postgres, and `db.enums.Role.values` on
+unbound-namespace targets (sqlite, mongo) via the existing per-facade unbound projection.
+Each namespace exposes only its own enums (`domain.namespaces[ns].enum`).
 
-Why not a flat root `db.enums`:
+Why the facade, and why namespace-keyed:
 
-- **Namespace-keyed root (TML-2816).** The client root is now keyed by namespace
-  id (`db.<ns>.<Model>`). A root `enums` is the one root key that is not a
-  namespace, and it shadows any namespace literally named `enums`.
+- **Lane-agnostic placement.** Putting enums under `db.orm` (or `db.sql`) buries
+  lane-independent metadata under one lane. The facade is the shared home for things that
+  belong to the contract, not to a query style.
 - **Cross-namespace collision.** A flat map merges every namespace's enums into one
   record, so the same enum name in two namespaces silently last-write-wins.
-  Per-namespace resolution matches the IR (`domain.namespaces[ns].enum`) and keeps
+  Namespace-keyed resolution matches the IR (`domain.namespaces[ns].enum`) and keeps
   same-named enums independent.
 
-**Reserved-name rule.** `enums` is reserved inside a facet. A domain model named
-`enums` would be shadowed by the accessor; it is rejected with a clear error at
-orm-client construction (a runtime guard for now). The matching authoring-time
-diagnostic (PSL/TS builders) lands at the cutover (TML-2853).
+**No reserved-name guard needed.** Because enums sit on the facade, not adjacent to models
+in a namespace facet, a domain model named `enums` no longer collides with the accessor —
+the earlier reserved-name rule is gone.
 
 This is the template for future client-side entity-accessor maps over IR-modelled
-entities: scope them to the namespace facet under a reserved key, derive them from
-`domain.namespaces[ns].<entity>`, and reject a colliding model name.
+entities: build a namespace-keyed map from `domain.namespaces[ns].<entity>`, hang it on
+the facade, and project it per target like `db.sql` / `db.orm`.
 
 ## Alternatives considered
 
@@ -176,11 +177,11 @@ entities: scope them to the namespace facet under a reserved key, derive them fr
 - **Realization layer** — implement value-set + check at the SQL-family layer
   (MySQL/SQLite inherit) or Postgres-only now? **Working position:** family-layer; the
   structured check is dialect-agnostic.
-- **`db.<ns>.enums` scope** — local to this project or the first instance of a broader
+- **`db.enums` scope** — local to this project or the first instance of a broader
   domain-client surface for IR-modelled entities? **Resolved (2026-06-10):** ship it
-  here as the first per-namespace entity-accessor map, shaped so a later generalization
-  is non-breaking; enums live on the namespace facet under the reserved `enums` key (see
-  "Client-side entity accessors live on the namespace facet").
+  here as the first namespace-keyed entity-accessor map, shaped so a later generalization
+  is non-breaking; enums live on the `db` facade as a per-target-projected map (see
+  "Client-side entity accessors live on the `db` facade").
 - **Reference-carrier coupling** — the `valueSet`/default refs track TML-2500 / PR #745;
   if that convention shifts before this lands, these refs shift with it. **Working
   position:** conform to the merged M1 carrier; local refs need no `spaceId`.

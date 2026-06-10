@@ -2,7 +2,7 @@
 
 Parent project: `projects/enums-as-domain-concept/`. Contributes the project's
 **application payoff**: an enum-typed field/column is typed as its value union in
-application code, `db.<ns>.enums` exposes enums at runtime, and `ORDER BY` on an enum
+application code, `db.enums.<ns>` exposes enums at runtime, and `ORDER BY` on an enum
 column sorts by declaration order.
 
 ## At a glance
@@ -10,8 +10,8 @@ column sorts by declaration order.
 Today an enum-restricted column reads and writes as `string`, and there is no runtime
 enum surface. This slice narrows enum I/O to the value union in both the ORM and
 query-builder lanes (`FieldOutputType` resolves the field's `valueSet` to the enum's
-literal value tuple), adds `db.<ns>.enums.<Name>` (ordered values tuple + member
-accessors) on the ORM client, and makes Postgres `ORDER BY` on an enum column sort by declaration
+literal value tuple), adds `db.enums.<ns>.<Name>` (ordered values tuple + member
+accessors) on the `db` facade, and makes Postgres `ORDER BY` on an enum column sort by declaration
 order via `array_position`. All exercised by `enumType`-authored contracts; PSL `enum`
 stays native until the cutover.
 
@@ -46,21 +46,20 @@ Each hop carries an `expectTypeOf` type-test so a widening to `string`/`string[]
 caught where it happens (the project spec's literal-propagation chain: `enumType`
 const-generics → `Definition` → `FieldOutputType` → query I/O types).
 
-**2. `db.<ns>.enums.<Name>` runtime surface (R6).**
-The ORM client (`packages/3-extensions/sql-orm-client/src/orm.ts`) is a Proxy whose
-namespace facets resolve `db.<ns>.<model>` against the namespace's domain models. Each
-facet also resolves a reserved `enums` key: `db.<ns>.enums.<Name>` returns an enum
-accessor built from `contract.domain.namespaces[ns].enum[Name]` (slice-1's ordered
-`{ name, value }` members) for that namespace only. On postgres this is
-`db.orm.public.enums.Priority`; on unbound-namespace targets (sqlite, mongo) the
-per-facade unbound projection surfaces it as `db.orm.enums.Role`. It exposes the shape
-slice-1's `enumType` handle already derives: `.values` (ordered literal tuple),
-`.members.<Name>` → the **value** (`'user'`), `.names`, `.has`, `.nameOf`, `.ordinalOf`.
-This is the first client-side "IR-entity accessor map" (the `table.columns.x`
-precedent), scoped to the namespace facet so a later generalization is non-breaking; a
-domain model named `enums` is rejected rather than shadowed. (D2 first shipped this as a
-flat root `db.enums`; D5 moved it into the facet after TML-2816 made the root
-namespace-keyed — see `design-notes.md`.)
+**2. `db.enums.<ns>.<Name>` runtime surface (R6).**
+Enums are lane-agnostic contract metadata, so `db.enums` is a top-level **`db` facade**
+member — a namespace-keyed map projected per target exactly like `db.sql` / `db.orm`,
+built from `contract.domain.namespaces[ns].enum[Name]` (slice-1's ordered
+`{ name, value }` members). On postgres this is `db.enums.public.Priority`; on
+unbound-namespace targets (sqlite, mongo) the per-facade unbound projection surfaces it as
+`db.enums.Role`. It exposes the shape slice-1's `enumType` handle already derives:
+`.values` (ordered literal tuple), `.members.<Name>` → the **value** (`'user'`),
+`.names`, `.has`, `.nameOf`, `.ordinalOf`. This is the first client-side "IR-entity
+accessor map" (the `table.columns.x` precedent), hung on the facade so a later
+generalization is non-breaking. The namespace-keyed map keeps same-named enums in
+different namespaces independent. (D2 first shipped this as a flat root `db.enums`; D5
+moved it into the orm namespace facet after TML-2816 made the root namespace-keyed; D6
+relocated it to the facade as lane-agnostic metadata — see `design-notes.md`.)
 
 **3. Declaration-order `ORDER BY` — Postgres (R8).**
 In the Postgres renderer (`packages/3-targets/6-adapters/postgres/src/core/sql-renderer.ts`,
@@ -84,10 +83,10 @@ the other two along, so they review together.
 ## Scope
 
 **In:** `FieldOutputType` value-union narrowing for read output **and** write input
-(R4/R5) with literal-propagation type-tests; `db.<ns>.enums.<Name>` on the ORM client
-namespace facet + the enum accessor object (R6); Postgres `array_position` ORDER-BY
+(R4/R5) with literal-propagation type-tests; `db.enums.<ns>.<Name>` on the `db` facade
++ the enum accessor object (R6); Postgres `array_position` ORDER-BY
 rendering for enum columns (R8). Type-tests (`*.test-d.ts`) per hop; runtime tests for
-`db.<ns>.enums`; a PGlite integration test for declaration-order sort.
+`db.enums`; a PGlite integration test for declaration-order sort.
 
 **Out:**
 - Server-side enforcement / check constraints — slice 2 (merged).
@@ -113,9 +112,10 @@ are untouched (declaration-order sort for those targets is future work).
 
 ## ADR pointer
 
-`db.<ns>.enums` introduces the first client-side **IR-entity accessor map**, scoped to
-the namespace facet — the broader pattern the project's `design-notes.md` flags as an
-open question (ship here, generalize later). No ADR is authored in this slice; if the
+`db.enums` introduces the first client-side **IR-entity accessor map**, hung on the
+`db` facade as a per-target-projected namespace-keyed map — the broader pattern the
+project's `design-notes.md` flags as an open question (ship here, generalize later). No
+ADR is authored in this slice; if the
 pattern generalizes beyond enums,
 capture it at project close-out. The typed-narrowing and ORDER-BY mechanisms sit within
 existing patterns — no architectural shift.
@@ -146,8 +146,8 @@ existing patterns — no architectural shift.
    widens the value-set `values` to `string[]`). If a consumer path types off emitted JSON,
    emitting the value-set `values` as a literal tuple is the fallback — confirm at dispatch
    time.
-3. **`db.<ns>.enums` accessor keys.** Working position: keys are member **names**
-   (`db.<ns>.enums.Role.members.User`); the accessor resolves to the member **value**
+3. **`db.enums` accessor keys.** Working position: keys are member **names**
+   (`db.enums.<ns>.Role.members.User`); the accessor resolves to the member **value**
    (`'user'`), matching slice-1's `enumType` handle.
 
 ## References

@@ -114,6 +114,29 @@ sonnet-mid; reviewer: opus.
   removed root intersection was its only cause. Design notes record the decision and the
   reserved-name rule as the template for future client-side entity-accessor maps.
 
+> **Superseded by Dispatch 6** — D5 placed enums *inside* the orm namespace facet
+> (`db.orm.<ns>.enums`). On query-team review (2026-06-10) that's the wrong home: enums
+> are lane-agnostic contract metadata, not an orm-query concern, and being adjacent to
+> models forced a reserved-name guard. D6 relocates them to the facade.
+
+### Dispatch 6: enums move to the facade — `db.enums.<ns>.<Name>` (R6 final placement)
+
+- **Why this exists:** D5 put enums inside the orm namespace facet. The query team pointed
+  out enums are **contract metadata, lane-agnostic** — the same values whether you use the
+  sql lane or the orm lane — so they belong on the **`db` facade** alongside `transaction` /
+  `prepare` / `raw` / `context`, not buried under one lane. This also removes D5's
+  model-named-`enums` collision entirely (enums are no longer adjacent to models in a facet,
+  so no reserved-name guard is needed inside the facet).
+- **Outcome:** `db.enums` is a top-level facade member — a namespace-keyed map projected
+  per-target exactly like `db.sql` / `db.orm`: `db.enums.public.Priority.values` on Postgres,
+  `db.enums.Priority.values` on sqlite/mongo via the existing unbound projection. The orm
+  facet's `enums` member and its reserved-name guard are removed; the per-namespace accessor
+  types and `buildEnumsMapForNamespace` from D5 are reused, attached at the facade instead of
+  the orm facet. Namespace scoping (the cross-namespace collision fix) is preserved. Demo,
+  facades (postgres/sqlite + mongo if present), all enum proofs, the design notes, the slice
+  spec, the PR description, and the upgrade-instruction comments update from
+  `db.<ns>.enums` to `db.enums.<ns>`.
+
 ## Open items (orchestrator-routed; not D1/D2/D3 blockers)
 
 - **Triplicated model/column type-level resolution.** `FindModelForTable` /
