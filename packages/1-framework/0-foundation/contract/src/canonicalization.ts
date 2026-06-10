@@ -146,6 +146,7 @@ function omitDefaults(
       const isModelStorage = matchesPathPattern(currentPath, DOMAIN_MODEL_STORAGE_PATTERN);
 
       const isNullableField = key === 'nullable';
+      const isDefaultLiteralValue = key === 'value' && path[path.length - 1] === 'default';
 
       const isFamilyPreserved = shouldPreserveEmpty?.(currentPath) ?? false;
 
@@ -164,6 +165,7 @@ function omitDefaults(
         !isModelRelations &&
         !isModelStorage &&
         !isNullableField &&
+        !isDefaultLiteralValue &&
         !isFamilyPreserved
       ) {
         continue;
