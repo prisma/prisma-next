@@ -561,7 +561,6 @@ function processEnum2Declarations(input: ProcessEnum2DeclarationsInput): {
     enumTypeDescriptors.set(decl.name, {
       codecId,
       nativeType,
-      typeRef: decl.name,
     });
   }
 
@@ -1515,8 +1514,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       modelName: model.name,
       tableName,
       fields: resolvedFields.map((resolvedField) => {
-        const typeRef = resolvedField.descriptor.typeRef;
-        const enumHandle = typeRef !== undefined ? input.enum2Handles?.get(typeRef) : undefined;
+        const enumHandle = input.enum2Handles?.get(resolvedField.field.typeName);
         return {
           fieldName: resolvedField.field.name,
           columnName: resolvedField.columnName,

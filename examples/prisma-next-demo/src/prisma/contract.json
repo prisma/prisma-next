@@ -613,7 +613,6 @@
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false,
-                  "typeRef": "Priority",
                   "valueSet": {
                     "entityKind": "value-set",
                     "name": "Priority",
@@ -815,7 +814,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:edba56e25b42baed0f3f04458dd6858374d594056c4b023a8fcea2a73d8d2668",
+    "storageHash": "sha256:6eaa28f191dcea1d39893f39cf44790e2187bbb617250e20cd0fee20785f1a0f",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

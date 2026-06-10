@@ -165,18 +165,19 @@ model Post {
     const pslDomainNs = pslResult.value.domain.namespaces['public'];
     const tsDomainNs = (tsContract as unknown as Contract).domain.namespaces['public'];
 
-    expect(pslDomainNs?.enum?.['Priority']).toMatchObject(tsDomainNs?.enum?.['Priority'] as object);
-    expect(pslNs?.entries.valueSet?.['Priority']).toMatchObject(
-      tsNs?.entries.valueSet?.['Priority'] as object,
+    expect(pslDomainNs?.enum?.['Priority']).toEqual(tsDomainNs?.enum?.['Priority']);
+    expect(pslNs?.entries.valueSet?.['Priority']).toEqual(tsNs?.entries.valueSet?.['Priority']);
+    expect(pslDomainNs?.models?.['Post']?.fields?.['priority']).toEqual(
+      tsDomainNs?.models?.['Post']?.fields?.['priority'],
     );
-    expect(pslDomainNs?.models?.['Post']?.fields?.['priority']).toMatchObject(
-      tsDomainNs?.models?.['Post']?.fields?.['priority'] as object,
+    // Strict equality on the storage column catches extra properties (e.g. a stray typeRef).
+    expect(pslNs?.entries.table?.['post']?.columns?.['priority']).toEqual(
+      tsNs?.entries.table?.['post']?.columns?.['priority'],
     );
-    expect(pslNs?.entries.table?.['post']?.columns?.['priority']).toMatchObject(
-      tsNs?.entries.table?.['post']?.columns?.['priority'] as object,
-    );
-    expect(pslNs?.entries.table?.['post']?.checks).toMatchObject(
-      tsNs?.entries.table?.['post']?.checks as object,
+    expect(pslNs?.entries.table?.['post']?.checks).toEqual(tsNs?.entries.table?.['post']?.checks);
+    // Both authoring paths must produce the same storageHash.
+    expect((pslResult.value.storage as unknown as SqlStorage).storageHash).toEqual(
+      (tsContract.storage as unknown as SqlStorage).storageHash,
     );
   });
 });
