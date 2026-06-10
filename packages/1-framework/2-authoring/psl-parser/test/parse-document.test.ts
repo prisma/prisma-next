@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { parse } from '../src/parse';
+import {
+  Cursor,
+  type DocumentState,
+  parse,
+  parseBlockAttribute,
+  parseCompositeType,
+  parseEnum,
+  parseEnumValue,
+  parseField,
+  parseGenericBlock,
+  parseKeyValue,
+  parseModel,
+  parseNamedType,
+  parseNamespace,
+  parseTypesBlock,
+} from '../src/parse';
 import {
   BlockDeclarationAst,
   CompositeTypeDeclarationAst,
@@ -651,5 +666,79 @@ describe('parse() declaration-level diagnostics', () => {
     for (const source of ['', '{', '}', '@@@', 'model', 'type', 'namespace {', '== =']) {
       expect(() => parse(source)).not.toThrow();
     }
+  });
+});
+
+/**
+ * The ordered-alternative dispatch relies on every alternative being a no-op on
+ * non-match: it must return `undefined` having consumed and mutated nothing, so
+ * a rejected alternative leaves the forward-only cursor intact for the next one.
+ * We assert this observationally with the existing cursor API — after the
+ * rejection, draining the remaining stream must reproduce the whole source
+ * byte-for-byte (nothing dropped) and no diagnostic may have been emitted.
+ */
+function freshState(): DocumentState {
+  return { topLevelTypesSeen: false };
+}
+
+function expectNoOpReject(source: string, run: (cursor: Cursor) => GreenNode | undefined): void {
+  const cursor = new Cursor(source);
+  expect(run(cursor)).toBeUndefined();
+  expect(cursor.diagnostics).toEqual([]);
+  cursor.startNode('Document');
+  while (cursor.peekKind() !== 'Eof') {
+    cursor.bump();
+  }
+  cursor.flushTrivia();
+  expect(greenText(cursor.finishNode())).toBe(source);
+}
+
+describe('ordered-alternative parsers are no-ops on non-match', () => {
+  it('parseModel rejects a malformed model keyword without consuming', () => {
+    expectNoOpReject('model {', parseModel);
+  });
+
+  it('parseEnum rejects a malformed enum keyword without consuming', () => {
+    expectNoOpReject('enum {', parseEnum);
+  });
+
+  it('parseNamespace rejects a nameless namespace without consuming', () => {
+    expectNoOpReject('namespace {', (cursor) => parseNamespace(cursor, false, freshState()));
+  });
+
+  it('parseTypesBlock rejects a composite-type shape without consuming', () => {
+    expectNoOpReject('type Foo {', (cursor) => parseTypesBlock(cursor, false, freshState()));
+  });
+
+  it('parseCompositeType rejects a types-block shape without consuming', () => {
+    expectNoOpReject('type {', parseCompositeType);
+  });
+
+  it('parseGenericBlock rejects a reserved keyword so it falls through to recovery', () => {
+    expectNoOpReject('model {', parseGenericBlock);
+  });
+
+  it('parseGenericBlock rejects an identifier with no following brace', () => {
+    expectNoOpReject('solid plumber', parseGenericBlock);
+  });
+
+  it('parseBlockAttribute rejects a single-at attribute, preserving the @@-vs-@ split', () => {
+    expectNoOpReject('@id', parseBlockAttribute);
+  });
+
+  it('parseField rejects a leading double-at member without consuming', () => {
+    expectNoOpReject('@@map', parseField);
+  });
+
+  it('parseEnumValue rejects a leading double-at member without consuming', () => {
+    expectNoOpReject('@@map', parseEnumValue);
+  });
+
+  it('parseNamedType rejects a non-identifier member without consuming', () => {
+    expectNoOpReject('@@index', parseNamedType);
+  });
+
+  it('parseKeyValue rejects a non-identifier entry without consuming', () => {
+    expectNoOpReject('42', parseKeyValue);
   });
 });
