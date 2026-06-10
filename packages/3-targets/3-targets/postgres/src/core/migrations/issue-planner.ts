@@ -29,6 +29,7 @@ import type { CodecRef, DdlColumn, DdlTableConstraint } from '@prisma-next/sql-r
 import * as contractFree from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { PostgresEnumType } from '../postgres-enum-type';
@@ -235,8 +236,8 @@ function toDdlColumn(
     : undefined;
   return contractFree.col(name, typeSql, {
     ...(!column.nullable ? { notNull: true } : {}),
-    ...(ddlDefault ? { default: ddlDefault } : {}),
-    ...(codecRef ? { codecRef } : {}),
+    ...ifDefined('default', ddlDefault),
+    ...ifDefined('codecRef', codecRef),
   });
 }
 
