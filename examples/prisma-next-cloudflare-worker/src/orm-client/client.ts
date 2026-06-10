@@ -1,13 +1,12 @@
-import { orm } from '@prisma-next/sql-orm-client';
+import { orm, type RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import type { Contract } from '../prisma/contract.d';
 import { db } from '../prisma/db';
 import { PostCollection, UserCollection } from './collections';
 
-const context = db.context as ExecutionContext<Contract>;
+const context: ExecutionContext<Contract> = db.context;
 
-export function createOrmClient(runtime: Runtime) {
+export function createOrmClient(runtime: RuntimeQueryable) {
   return orm({
     runtime,
     context,

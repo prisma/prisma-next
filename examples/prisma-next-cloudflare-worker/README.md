@@ -22,7 +22,7 @@ Routes implemented in [`src/worker.ts`](src/worker.ts):
 | `GET /sql/users`    | SQL DSL           | `db.sql.public.user.select(...).limit(?)`                       |
 | `GET /orm/users`    | ORM client        | `User.newestFirst().take(?)`                             |
 | `GET /orm/posts`    | ORM client        | `Post.forUser(?).orderBy(...).take(?)`                   |
-| `GET /tx/commit`    | `withTransaction` | INSERT post + UPDATE user atomically                     |
+| `GET /tx/commit`    | `withTransaction` | Transaction-scoped ORM create/update                     |
 | `GET /tx/rollback`  | `withTransaction` | Throws inside the body; verifies ROLLBACK propagates     |
 | `GET /cursor/large` | Cursor stream     | `for await … break` after N rows; cursor cancels cleanly |
 
@@ -155,7 +155,7 @@ The M1 audit's "this works in `wrangler dev`" claim was empirically validated ag
 
 ## Known limitations
 
-- **Transaction affinity** — every `withTransaction` body must run on the same `runtime` instance (the per-request one). Crossing `runtime` boundaries inside a transaction body is undefined.
+- **Transaction affinity** — every `withTransaction` body must run on the same `runtime` instance (the per-request one). Build ORM clients from the transaction scope (`createOrmClient(tx)`) when ORM calls must participate in that transaction. Crossing `runtime` boundaries inside a transaction body is undefined.
 - **Isolate memory** — large result sets bound through cursor by default (`postgresServerless` enables cursor unconditionally). For ORM `findMany`-style operations the result set is materialised; size your `take(...)` accordingly.
 - **`pg.Pool` not used** — the serverless facade routes through `PostgresDirectDriverImpl` (`pgClient` binding kind). No connection pooling within the isolate; that's Hyperdrive's job in production.
 - **Production `id`** — the committed `wrangler.jsonc` has a zero-stuffed Hyperdrive `id`. Deploy will fail until a real id is wired in (M4).

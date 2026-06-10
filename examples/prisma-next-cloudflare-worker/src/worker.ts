@@ -1,4 +1,5 @@
 import { withTransaction } from '@prisma-next/sql-runtime';
+import type { Char } from '@prisma-next/target-postgres/codec-types';
 import { Client } from 'pg';
 import { createOrmClient } from './orm-client/client';
 import { db } from './prisma/db';
@@ -55,25 +56,22 @@ export default {
       if (!userId) {
         return Response.json({ ok: false, error: 'userId required' }, { status: 400 });
       }
+      if (!isChar36(userId)) {
+        return Response.json({ ok: false, error: 'userId must be 36 characters' }, { status: 400 });
+      }
       const result = await withTransaction(runtime, async (tx) => {
-        await tx.execute(
-          db.sql.public.post
-            .insert([
-              {
-                title: `Post written in tx for ${userId}`,
-                userId,
-                createdAt: new Date(),
-              },
-            ])
-            .build(),
-        );
-        await tx.execute(
-          db.sql.public.user
-            .update({ displayName: newDisplayName })
-            .where((f, fns) => fns.eq(f.id, userId))
-            .build(),
-        );
-        return { committed: true };
+        const title = `Post written in tx for ${userId}`;
+        // Build the ORM client from the transaction scope so ORM writes participate in this transaction.
+        const txOrm = createOrmClient(tx);
+        const post = await txOrm.Post.select('userId', 'title').create({
+          title,
+          userId,
+          createdAt: new Date(),
+        });
+        const user = await txOrm.User.select('id', 'displayName')
+          .where((candidate) => candidate.id.eq(userId))
+          .update({ displayName: newDisplayName });
+        return { committed: true, user, post };
       });
       return Response.json({ ok: true, route: 'tx/commit', ...result });
     }
@@ -179,4 +177,8 @@ function parseLimit(raw: string | null, fallback: number): number {
   if (!raw) return fallback;
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isChar36(value: string): value is Char<36> {
+  return value.length === 36;
 }

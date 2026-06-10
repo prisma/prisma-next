@@ -44,9 +44,22 @@ describe('worker — postgresServerless against Hyperdrive (local)', () => {
   it('withTransaction commits a multi-statement transaction (TC-6, AC-10)', async () => {
     const res = await get(`/tx/commit?userId=${BOB}&displayName=Bob+the+Builder`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean; committed?: boolean };
-    expect(body.ok).toBe(true);
-    expect(body.committed).toBe(true);
+    const body = (await res.json()) as {
+      ok: boolean;
+      committed?: boolean;
+      user?: { id: string; displayName: string };
+      post?: { userId: string; title: string };
+    };
+    expect(body).toEqual({
+      ok: true,
+      route: 'tx/commit',
+      committed: true,
+      user: { id: BOB, displayName: 'Bob the Builder' },
+      post: {
+        userId: BOB,
+        title: `Post written in tx for ${BOB}`,
+      },
+    });
 
     const verify = await get('/sql/users?limit=10');
     const verified = (await verify.json()) as {
