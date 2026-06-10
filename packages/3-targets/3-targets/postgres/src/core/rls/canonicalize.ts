@@ -232,6 +232,146 @@ function stripRedundantCastParens(sql: string): string {
 }
 
 /**
+ * Returns true when `inner` (already lowercased) contains a top-level boolean
+ * operator — AND, OR, or NOT — at depth 0. String literals are skipped so
+ * keywords inside quoted values are not counted. Used to decide whether
+ * `(inner)` is semantically required (when inner has a boolean operator) or
+ * can safely be stripped.
+ */
+function hasTopLevelBooleanOperator(inner: string): boolean {
+  let depth = 0;
+  let i = 0;
+  while (i < inner.length) {
+    const ch = inner[i]!;
+    if (ch === "'") {
+      i++;
+      while (i < inner.length) {
+        if (inner[i] === "'") {
+          i++;
+          if (inner[i] === "'") i++;
+          else break;
+        } else {
+          i++;
+        }
+      }
+      continue;
+    }
+    if (ch === '(') {
+      depth++;
+      i++;
+      continue;
+    }
+    if (ch === ')') {
+      depth--;
+      i++;
+      continue;
+    }
+    if (depth === 0 && /[a-z]/.test(ch)) {
+      if (inner.slice(i).match(/^(and|or|not)\b/)) return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+/**
+ * Strips parens that Postgres adds around each operand of a top-level AND/OR
+ * chain when reprinting compound predicates. For example, Postgres reprints
+ * `a = 1 AND b IS NULL` as `(a = 1) AND (b IS NULL)`. This function removes
+ * those redundant grouping parens so authored and introspected predicates
+ * hash identically.
+ *
+ * Safety rules:
+ * - Only strips `(inner)` when `inner` has no top-level boolean operators
+ *   (AND/OR/NOT) — preserves `(A OR B) AND C` since those parens are
+ *   semantically required.
+ * - Skips `(...)::` — those are cast expressions handled by
+ *   `stripRedundantCastParens`.
+ * - Skips function-call parens (where `(` is preceded by an identifier char).
+ * - Skips parens inside string literals.
+ *
+ * Works on already-lowercased, whitespace-collapsed input.
+ */
+function stripTopLevelAndParens(sql: string): string {
+  let changed = true;
+  let s = sql;
+  while (changed) {
+    changed = false;
+    let out = '';
+    let i = 0;
+    while (i < s.length) {
+      // Pass string literals through verbatim — parens inside are data.
+      if (s[i] === "'") {
+        out += s[i]!;
+        i++;
+        while (i < s.length) {
+          out += s[i]!;
+          if (s[i] === "'") {
+            i++;
+            if (s[i] === "'") {
+              out += s[i]!;
+              i++;
+            } else {
+              break;
+            }
+          } else {
+            i++;
+          }
+        }
+        continue;
+      }
+
+      if (s[i] === '(') {
+        const prevChar = out.length > 0 ? out[out.length - 1]! : '';
+        const isPrecedingIdentChar = prevChar !== '' && /[a-z0-9_$"]/i.test(prevChar);
+        if (!isPrecedingIdentChar) {
+          // Find matching close paren, respecting string literals.
+          let depth = 1;
+          let j = i + 1;
+          while (j < s.length && depth > 0) {
+            if (s[j] === "'") {
+              j++;
+              while (j < s.length) {
+                if (s[j] === "'") {
+                  j++;
+                  if (s[j] === "'") j++;
+                  else break;
+                } else {
+                  j++;
+                }
+              }
+              continue;
+            }
+            if (s[j] === '(') depth++;
+            else if (s[j] === ')') depth--;
+            j++;
+          }
+          if (depth === 0) {
+            const inner = s.slice(i + 1, j - 1).trim();
+            // Do NOT strip if immediately followed by `::` — cast expressions
+            // like `(amount + tax)::int` are handled by stripRedundantCastParens.
+            const followedByCast = s.slice(j, j + 2) === '::';
+            // Only strip when inner has no top-level boolean operators:
+            // (A AND B), (A OR B), (NOT A) are semantically significant parens.
+            if (!followedByCast && !hasTopLevelBooleanOperator(inner)) {
+              out += inner;
+              i = j;
+              changed = true;
+              continue;
+            }
+          }
+        }
+      }
+
+      out += s[i]!;
+      i++;
+    }
+    s = out.replace(/\s+/g, ' ').trim();
+  }
+  return s;
+}
+
+/**
  * Returns true when `sql` (already trimmed) is fully wrapped by the outermost
  * paren pair — i.e. the opening `(` at index 0 matches the closing `)` at
  * the last index.
@@ -263,6 +403,10 @@ function isOuterParenWrapped(sql: string): boolean {
  * 5. Normalize Postgres type cast aliases to their shorthand form
  *    (`::integer` → `::int`, `::boolean` → `::bool`, etc.) so authored and
  *    introspected predicates hash identically.
+ * 6. Strip redundant parens Postgres adds around AND/OR operands when
+ *    reprinting compound predicates — `(a = 1) AND (b IS NULL)` →
+ *    `a = 1 AND b IS NULL`. Only strips when inner has no top-level OR
+ *    (preserves semantics: `(A OR B) AND C` keeps its parens).
  *
  * The normalizer is a stability commitment: any change re-suffixes all wire names.
  */
@@ -276,6 +420,7 @@ export function normalizePredicate(sql: string): string {
 
   result = stripRedundantCastParens(result);
   result = normalizeCastAliases(result);
+  result = stripTopLevelAndParens(result);
 
   return result;
 }

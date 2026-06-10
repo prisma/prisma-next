@@ -165,9 +165,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         }
       }
     }
-    if (expectedPolicies.length === 0) return [];
     const { rlsPolicies: actualPolicies = [] } = readPostgresSchemaIrAnnotations(schema);
-    return diffNodes(expectedPolicies, actualPolicies);
+    const managedActual = actualPolicies.filter((p) => p.prismaManaged);
+    return diffNodes(expectedPolicies, managedActual);
   }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {
@@ -1178,9 +1178,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         permissive,
       });
       const suffix = `_${hash}`;
-      const prefix = row.policyname.endsWith(suffix)
-        ? row.policyname.slice(0, -suffix.length)
-        : row.policyname;
+      const prismaManaged = row.policyname.endsWith(suffix);
+      const prefix = prismaManaged ? row.policyname.slice(0, -suffix.length) : row.policyname;
       return new PostgresRlsPolicy({
         name: `${prefix}_${hash}`,
         prefix,
@@ -1191,6 +1190,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...(row.qual !== null ? { using: normalizePredicate(row.qual) } : {}),
         ...(row.with_check !== null ? { withCheck: normalizePredicate(row.with_check) } : {}),
         permissive,
+        prismaManaged,
       });
     });
 

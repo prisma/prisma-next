@@ -27,6 +27,12 @@ export interface PostgresRlsPolicyInput {
   readonly withCheck?: string;
   /** `true` = `AS PERMISSIVE`, `false` = `AS RESTRICTIVE`. */
   readonly permissive: boolean;
+  /**
+   * `true` when the DB policy's wire name matches its own content hash — i.e.
+   * it was created by Prisma. Set by introspection; `false` for externally-managed
+   * policies (name not matching body hash) and for authored policies.
+   */
+  readonly prismaManaged?: boolean;
 }
 
 /**
@@ -48,6 +54,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
   declare readonly using?: string;
   declare readonly withCheck?: string;
   readonly permissive: boolean;
+  readonly prismaManaged: boolean;
 
   constructor(input: PostgresRlsPolicyInput) {
     super();
@@ -60,6 +67,7 @@ export class PostgresRlsPolicy extends SqlNode implements DiffableNode {
     if (input.using !== undefined) this.using = input.using;
     if (input.withCheck !== undefined) this.withCheck = input.withCheck;
     this.permissive = input.permissive;
+    this.prismaManaged = input.prismaManaged ?? false;
     freezeNode(this);
   }
 

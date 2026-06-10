@@ -46,12 +46,16 @@ describe('normalizePredicate', () => {
       expect(normalizePredicate('(a = b)')).toBe('a = b');
     });
 
-    it('does NOT trim parens that do not wrap the entire expression', () => {
-      expect(normalizePredicate('(a) AND (b)')).toBe('(a) and (b)');
+    it('strips parens around non-boolean sub-expressions in AND chains (Postgres reprint canonicalization)', () => {
+      expect(normalizePredicate('(a) AND (b)')).toBe('a and b');
     });
 
-    it('does NOT trim nested outer parens that are part of a larger expression', () => {
-      expect(normalizePredicate('(a = 1) OR (b = 2)')).toBe('(a = 1) or (b = 2)');
+    it('strips parens around comparison sub-expressions in OR chains', () => {
+      expect(normalizePredicate('(a = 1) OR (b = 2)')).toBe('a = 1 or b = 2');
+    });
+
+    it('preserves parens around boolean sub-expressions: (A OR B) AND C stays intact', () => {
+      expect(normalizePredicate('(a OR b) AND c')).toBe('(a or b) and c');
     });
 
     it('trims multiple enclosing layers', () => {

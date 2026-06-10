@@ -317,18 +317,10 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
 
   // --------------------------------------------------------------------------
   // Scenario 2 — removal fails verify
-  //
-  // PRODUCTION FINDING (halt condition triggered):
-  // collectExtensionIssues in packages/3-targets/6-adapters/postgres/src/core/
-  // control-adapter.ts only reports MISSING declared policies (policy in
-  // contract but absent from DB). It returns [] immediately when the contract
-  // has no policies. Orphaned policies (policy in DB but removed from contract)
-  // are not detected. verifySchema returns ok:true here, not ok:false.
-  // This is the "D13 verdict wiring gap" noted in the dispatch halt conditions.
   // --------------------------------------------------------------------------
 
-  it.fails(
-    'scenario 2: contract with policy removed → verify ok:false, extensionIssues names orphaned p_read_<hashB> [PRODUCTION GAP: orphan detection not implemented]',
+  it(
+    'scenario 2: contract with policy removed → verify ok:false, extensionIssues names orphaned p_read_<hashB>',
     async () => {
       const contractB = buildContractFromPsl(PSL_B);
       const contractNoPolicy = buildContractFromPsl(PSL_NO_POLICY);
@@ -347,9 +339,6 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
         frameworkComponents,
       });
 
-      // collectExtensionIssues returns [] when contract has no policies —
-      // it only checks declared policies against the DB, never orphans.
-      // These assertions document the required behavior; they currently fail.
       expect(verifyResult.ok).toBe(false);
       expect(verifyResult.schema.extensionIssues.length).toBeGreaterThan(0);
 
