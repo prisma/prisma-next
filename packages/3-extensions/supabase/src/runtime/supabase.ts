@@ -254,13 +254,12 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
     const roleSql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
     const roleOrm: OrmClient<TContract> = ormBuilder({
       runtime: {
+        // No connection() on this shim: acquireRuntimeScope then scopes every
+        // ORM operation (mutations and include reads) to this executor, so
+        // every statement runs role-bound. Exposing the raw connection here
+        // would let ORM scopes bypass the role binding.
         execute(plan) {
           return runtime.executeWithRole(plan, binding);
-        },
-        // connection() is provided so the orm shim satisfies RuntimeQueryable;
-        // executes through a raw connection are NOT role-bound (v1 limitation).
-        connection() {
-          return runtime.connection();
         },
       },
       context,

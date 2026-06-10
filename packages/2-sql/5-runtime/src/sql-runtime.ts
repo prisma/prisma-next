@@ -406,6 +406,19 @@ export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contra
     };
 
     const self = this;
+    async function* guardedStream<Row>(
+      inner: AsyncIterable<Row>,
+    ): AsyncGenerator<Row, void, unknown> {
+      if (invalidated) {
+        throw transactionClosedError();
+      }
+      for await (const row of inner) {
+        yield row;
+        if (invalidated) {
+          throw transactionClosedError();
+        }
+      }
+    }
     const txContext: TransactionContext = {
       get invalidated() {
         return invalidated;
@@ -414,21 +427,35 @@ export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contra
         plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
         options?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
-        return self.executeAgainstQueryable<Row>(plan, driverTx, {
-          ...options,
-          scope: 'transaction',
-        });
+        if (invalidated) {
+          throw transactionClosedError();
+        }
+        return new AsyncIterableResult(
+          guardedStream(
+            self.executeAgainstQueryable<Row>(plan, driverTx, {
+              ...options,
+              scope: 'transaction',
+            }),
+          ),
+        );
       },
       executePrepared<Params, Row>(
         ps: PreparedStatement<Params, Row>,
         params: Params,
         options?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
-        return self.executePreparedAgainstQueryable<Params, Row>(
-          ps as PreparedStatementImpl<Params, Row>,
-          params as Record<string, unknown>,
-          driverTx,
-          { ...options, scope: 'transaction' },
+        if (invalidated) {
+          throw transactionClosedError();
+        }
+        return new AsyncIterableResult(
+          guardedStream(
+            self.executePreparedAgainstQueryable<Params, Row>(
+              ps as PreparedStatementImpl<Params, Row>,
+              params as Record<string, unknown>,
+              driverTx,
+              { ...options, scope: 'transaction' },
+            ),
+          ),
         );
       },
     };

@@ -95,11 +95,34 @@ async function applyRlsFixture(connectionString: string): Promise<void> {
     await pg.query('GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role');
     await pg.query('GRANT SELECT ON public.profile TO anon, authenticated');
     await pg.query('GRANT ALL ON public.profile TO service_role');
+    await pg.query('GRANT INSERT ON public.profile TO service_role');
+    await pg.query('GRANT UPDATE ON public.profile TO authenticated');
+
+    // PGlite uses a single connection, so the @prisma/dev WAL drain query
+    // (DELETE FROM "_prisma_dev_wal"."events" RETURNING ...) can fire while one
+    // of our role-bound transactions is active. Each role therefore needs full
+    // rights on the WAL schema — not just INSERT for the capture trigger, but
+    // also DELETE for the drain, EXECUTE for the capture function, and USAGE on
+    // the sequence.
+    await pg.query('GRANT USAGE ON SCHEMA _prisma_dev_wal TO anon, authenticated, service_role');
+    await pg.query(
+      'GRANT ALL ON ALL TABLES IN SCHEMA _prisma_dev_wal TO anon, authenticated, service_role',
+    );
+    await pg.query(
+      'GRANT ALL ON ALL SEQUENCES IN SCHEMA _prisma_dev_wal TO anon, authenticated, service_role',
+    );
+    await pg.query(
+      'GRANT EXECUTE ON FUNCTION _prisma_dev_wal.capture_event() TO anon, authenticated, service_role',
+    );
 
     // RLS
     await pg.query('ALTER TABLE public.profile ENABLE ROW LEVEL SECURITY');
     await pg.query(`
       CREATE POLICY profile_owner_select ON public.profile FOR SELECT TO authenticated
+        USING ("userId" = (current_setting('request.jwt.claims', true)::json->>'sub')::uuid)
+    `);
+    await pg.query(`
+      CREATE POLICY profile_owner_update ON public.profile FOR UPDATE TO authenticated
         USING ("userId" = (current_setting('request.jwt.claims', true)::json->>'sub')::uuid)
     `);
   });
@@ -204,6 +227,84 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
         expect(recorder.sqls.length, 'middleware must have captured ORM queries').toBeGreaterThan(
           0,
         );
+      } finally {
+        await db.close();
+      }
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'asServiceRole ORM create succeeds; asUser ORM update scoped to own row; update against other row affects 0',
+    async () => {
+      const { connectionString } = database;
+
+      await withClient(connectionString, async (pg) => {
+        await bootstrapSupabaseShim(pg);
+      });
+      await runDbInit(connectionString, migrationsDir);
+      await applyRlsFixture(connectionString);
+
+      const userAId = crypto.randomUUID();
+      const userBId = crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      await withClient(connectionString, async (pg) => {
+        await pg.query(
+          'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3), ($4, $5, $3, $3)',
+          [userAId, 'user-a@example.com', now, userBId, 'user-b@example.com'],
+        );
+      });
+
+      const db = await supabase<Contract>({
+        contractJson,
+        url: connectionString,
+        jwtSecret: TEST_JWT_SECRET,
+        verifyMarker: false,
+      });
+
+      try {
+        // service_role can INSERT (BYPASSRLS)
+        const created = await db.asServiceRole().orm.public.Profile.createCount([
+          { userId: userAId, username: 'alice' },
+          { userId: userBId, username: 'bob' },
+        ]);
+        expect(created).toBe(2);
+
+        // Verify rows exist
+        const allRows = await db
+          .asServiceRole()
+          .orm.public.Profile.select('username', 'userId')
+          .all()
+          .toArray();
+        const sorted = [...allRows].sort((a, b) => a.username.localeCompare(b.username));
+        expect(sorted).toEqual([
+          { username: 'alice', userId: userAId },
+          { username: 'bob', userId: userBId },
+        ]);
+
+        // asUser(A) can update their own row
+        const jwtA = await signJwt({ sub: userAId, role: 'authenticated' });
+        const userADb = await db.asUser(jwtA);
+        const updatedCount = await userADb.orm.public.Profile.where({
+          userId: userAId,
+        }).updateCount({ username: 'alice-updated' });
+        expect(updatedCount).toBe(1);
+
+        // asUser(A) update targeting user B's row affects 0 rows (RLS filters it out)
+        const crossUpdatedCount = await userADb.orm.public.Profile.where({
+          userId: userBId,
+        }).updateCount({ username: 'should-not-change' });
+        expect(crossUpdatedCount).toBe(0);
+
+        // Confirm B's username is still 'bob'
+        const bobRows = await db
+          .asServiceRole()
+          .orm.public.Profile.select('username', 'userId')
+          .where({ userId: userBId })
+          .all()
+          .toArray();
+        expect(bobRows).toEqual([{ username: 'bob', userId: userBId }]);
       } finally {
         await db.close();
       }
