@@ -5,9 +5,17 @@
 
 ## At a glance
 
-A stack of 4 slices, delivered in order. Each builds on the previous's hand-off; there is no parallelism worth extracting (every slice consumes the prior's surface, and the only doc work depends on the as-built mechanism settling). Slice 1 is a deliberately minimal no-behaviour-change rename to isolate hot-path regression; slice 2 is the core substrate; slice 3 is the Supabase consumer; slice 4 is the end-to-end proof + durable docs.
+**Consolidated to a single PR (operator decision, 2026-06-10).** The original 4-slice stack over-sliced the work, and the interim shape shipped a transitional pattern (`DefaultSqlRuntime` + surviving `createRuntime`) we had already decided to kill. Everything now lands on one branch (`tml-2878-export-sql-runtime`, PR #792) as one reviewable story: *the SQL runtime family becomes an abstract, target-constructed seam, with a below-middleware session primitive, consumed by the Supabase runtime/façade, proven by RLS-through-ORM in the walking skeleton.* The stages below are build-internal waypoints (each gated green before the next starts), not separate PRs. TML-2879/2880/2881 ship in this PR. #793 closed as superseded (its commits folded in).
 
-## Composition
+### Build stages (one PR, sequential, each gated)
+
+1. ✅ Abstract `SqlRuntime` seam (rename from `SqlRuntimeImpl`) + upgrade declaration.
+2. ✅ `executeWithSessionBootstrap` + `RawSessionConnection` + 14 lifecycle/below-middleware tests (folded from #793).
+3. Target-layer construction: `PostgresRuntime` + `SqliteRuntime` (identity concretions in their target packages); `postgres()`/`postgres-serverless`/`sqlite()` construct them; **delete `createRuntime` + `DefaultSqlRuntime`**; migrate package tests + e2e/integration utils + demo app; extend the upgrade declaration (breaking change).
+4. Supabase consumer: barrel-export `RawSessionConnection`; `SupabaseRuntime extends PostgresRuntime`; `supabase()` façade (`asUser`/`asAnon`/`asServiceRole`, JWT validation via jwtSecret/JWKS, `RoleBoundDb` with `transaction()`); replaces the M1 stub.
+5. Acceptance + docs: raw-SQL RLS policy in the `examples/supabase` skeleton fixture; assert ORM query via `asUser` sees only owner rows, `asServiceRole` sees all, middleware never sees `SET LOCAL`; revise ADR to as-built mechanism; update subsystem doc.
+
+## Composition (original 4-slice record; outcomes unchanged, PR packaging superseded by the stages above)
 
 ### Stack (deliver in order)
 
