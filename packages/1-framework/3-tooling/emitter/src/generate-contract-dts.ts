@@ -15,8 +15,8 @@ import { blindCast } from '@prisma-next/utils/casts';
 import {
   deduplicateImports,
   type EnumValuesResolver,
-  generateBothFieldTypesMaps,
   generateCodecTypeIntersection,
+  generateFieldTypesMapsByNamespace,
   generateHashTypeAliases,
   generateImportLines,
   generateModelsType,
@@ -181,8 +181,19 @@ export function generateContractDts(
         )
       : undefined;
 
-  const fieldTypesMaps = generateBothFieldTypesMaps(
-    modelsRecord,
+  const namespaceModelsForFieldTypes = namespaceEntries.map(
+    ([nsId, ns]) =>
+      [
+        nsId,
+        blindCast<
+          Record<string, ContractModel>,
+          'ns.models is a ContractModel record in the emitted IR'
+        >(ns.models),
+      ] as const,
+  );
+
+  const fieldTypesMaps = generateFieldTypesMapsByNamespace(
+    namespaceModelsForFieldTypes,
     codecLookup,
     resolveFieldTypeParams,
     resolveEnumValues,

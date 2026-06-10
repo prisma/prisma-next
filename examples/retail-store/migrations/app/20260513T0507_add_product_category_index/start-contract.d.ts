@@ -100,139 +100,143 @@ export type InvoiceLineItemInput = {
   readonly lineTotal: CodecTypes['mongo/double@1']['input'];
 };
 export type FieldOutputTypes = {
-  readonly AddToCartEvent: {
-    readonly productId: CodecTypes['mongo/string@1']['output'];
-    readonly brand: CodecTypes['mongo/string@1']['output'];
-  };
-  readonly Cart: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly userId: CodecTypes['mongo/objectId@1']['output'];
-    readonly items: ReadonlyArray<CartItemOutput>;
-  };
-  readonly Event: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly userId: CodecTypes['mongo/string@1']['output'];
-    readonly sessionId: CodecTypes['mongo/string@1']['output'];
-    readonly type: CodecTypes['mongo/string@1']['output'];
-    readonly timestamp: CodecTypes['mongo/date@1']['output'];
-  };
-  readonly Invoice: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly orderId: CodecTypes['mongo/objectId@1']['output'];
-    readonly items: ReadonlyArray<InvoiceLineItemOutput>;
-    readonly subtotal: CodecTypes['mongo/double@1']['output'];
-    readonly tax: CodecTypes['mongo/double@1']['output'];
-    readonly total: CodecTypes['mongo/double@1']['output'];
-    readonly issuedAt: CodecTypes['mongo/date@1']['output'];
-  };
-  readonly Location: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly name: CodecTypes['mongo/string@1']['output'];
-    readonly streetAndNumber: CodecTypes['mongo/string@1']['output'];
-    readonly city: CodecTypes['mongo/string@1']['output'];
-    readonly postalCode: CodecTypes['mongo/string@1']['output'];
-    readonly country: CodecTypes['mongo/string@1']['output'];
-  };
-  readonly Order: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly userId: CodecTypes['mongo/objectId@1']['output'];
-    readonly items: ReadonlyArray<OrderLineItemOutput>;
-    readonly shippingAddress: CodecTypes['mongo/string@1']['output'];
-    readonly type: CodecTypes['mongo/string@1']['output'];
-    readonly statusHistory: ReadonlyArray<StatusEntryOutput>;
-  };
-  readonly Product: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly name: CodecTypes['mongo/string@1']['output'];
-    readonly brand: CodecTypes['mongo/string@1']['output'];
-    readonly code: CodecTypes['mongo/string@1']['output'];
-    readonly description: CodecTypes['mongo/string@1']['output'];
-    readonly primaryCategory: CodecTypes['mongo/string@1']['output'];
-    readonly subCategory: CodecTypes['mongo/string@1']['output'];
-    readonly articleType: CodecTypes['mongo/string@1']['output'];
-    readonly price: PriceOutput;
-    readonly image: ImageOutput;
-  };
-  readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['output'] };
-  readonly User: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly name: CodecTypes['mongo/string@1']['output'];
-    readonly email: CodecTypes['mongo/string@1']['output'];
-    readonly address: AddressOutput | null;
-  };
-  readonly ViewProductEvent: {
-    readonly productId: CodecTypes['mongo/string@1']['output'];
-    readonly subCategory: CodecTypes['mongo/string@1']['output'];
-    readonly brand: CodecTypes['mongo/string@1']['output'];
-    readonly exitMethod: CodecTypes['mongo/string@1']['output'] | null;
+  readonly __unbound__: {
+    readonly AddToCartEvent: {
+      readonly productId: CodecTypes['mongo/string@1']['output'];
+      readonly brand: CodecTypes['mongo/string@1']['output'];
+    };
+    readonly Cart: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly userId: CodecTypes['mongo/objectId@1']['output'];
+      readonly items: ReadonlyArray<CartItemOutput>;
+    };
+    readonly Event: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly userId: CodecTypes['mongo/string@1']['output'];
+      readonly sessionId: CodecTypes['mongo/string@1']['output'];
+      readonly type: CodecTypes['mongo/string@1']['output'];
+      readonly timestamp: CodecTypes['mongo/date@1']['output'];
+    };
+    readonly Invoice: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly orderId: CodecTypes['mongo/objectId@1']['output'];
+      readonly items: ReadonlyArray<InvoiceLineItemOutput>;
+      readonly subtotal: CodecTypes['mongo/double@1']['output'];
+      readonly tax: CodecTypes['mongo/double@1']['output'];
+      readonly total: CodecTypes['mongo/double@1']['output'];
+      readonly issuedAt: CodecTypes['mongo/date@1']['output'];
+    };
+    readonly Location: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly name: CodecTypes['mongo/string@1']['output'];
+      readonly streetAndNumber: CodecTypes['mongo/string@1']['output'];
+      readonly city: CodecTypes['mongo/string@1']['output'];
+      readonly postalCode: CodecTypes['mongo/string@1']['output'];
+      readonly country: CodecTypes['mongo/string@1']['output'];
+    };
+    readonly Order: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly userId: CodecTypes['mongo/objectId@1']['output'];
+      readonly items: ReadonlyArray<OrderLineItemOutput>;
+      readonly shippingAddress: CodecTypes['mongo/string@1']['output'];
+      readonly type: CodecTypes['mongo/string@1']['output'];
+      readonly statusHistory: ReadonlyArray<StatusEntryOutput>;
+    };
+    readonly Product: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly name: CodecTypes['mongo/string@1']['output'];
+      readonly brand: CodecTypes['mongo/string@1']['output'];
+      readonly code: CodecTypes['mongo/string@1']['output'];
+      readonly description: CodecTypes['mongo/string@1']['output'];
+      readonly primaryCategory: CodecTypes['mongo/string@1']['output'];
+      readonly subCategory: CodecTypes['mongo/string@1']['output'];
+      readonly articleType: CodecTypes['mongo/string@1']['output'];
+      readonly price: PriceOutput;
+      readonly image: ImageOutput;
+    };
+    readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['output'] };
+    readonly User: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly name: CodecTypes['mongo/string@1']['output'];
+      readonly email: CodecTypes['mongo/string@1']['output'];
+      readonly address: AddressOutput | null;
+    };
+    readonly ViewProductEvent: {
+      readonly productId: CodecTypes['mongo/string@1']['output'];
+      readonly subCategory: CodecTypes['mongo/string@1']['output'];
+      readonly brand: CodecTypes['mongo/string@1']['output'];
+      readonly exitMethod: CodecTypes['mongo/string@1']['output'] | null;
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly AddToCartEvent: {
-    readonly productId: CodecTypes['mongo/string@1']['input'];
-    readonly brand: CodecTypes['mongo/string@1']['input'];
-  };
-  readonly Cart: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly userId: CodecTypes['mongo/objectId@1']['input'];
-    readonly items: ReadonlyArray<CartItemInput>;
-  };
-  readonly Event: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly userId: CodecTypes['mongo/string@1']['input'];
-    readonly sessionId: CodecTypes['mongo/string@1']['input'];
-    readonly type: CodecTypes['mongo/string@1']['input'];
-    readonly timestamp: CodecTypes['mongo/date@1']['input'];
-  };
-  readonly Invoice: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly orderId: CodecTypes['mongo/objectId@1']['input'];
-    readonly items: ReadonlyArray<InvoiceLineItemInput>;
-    readonly subtotal: CodecTypes['mongo/double@1']['input'];
-    readonly tax: CodecTypes['mongo/double@1']['input'];
-    readonly total: CodecTypes['mongo/double@1']['input'];
-    readonly issuedAt: CodecTypes['mongo/date@1']['input'];
-  };
-  readonly Location: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly name: CodecTypes['mongo/string@1']['input'];
-    readonly streetAndNumber: CodecTypes['mongo/string@1']['input'];
-    readonly city: CodecTypes['mongo/string@1']['input'];
-    readonly postalCode: CodecTypes['mongo/string@1']['input'];
-    readonly country: CodecTypes['mongo/string@1']['input'];
-  };
-  readonly Order: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly userId: CodecTypes['mongo/objectId@1']['input'];
-    readonly items: ReadonlyArray<OrderLineItemInput>;
-    readonly shippingAddress: CodecTypes['mongo/string@1']['input'];
-    readonly type: CodecTypes['mongo/string@1']['input'];
-    readonly statusHistory: ReadonlyArray<StatusEntryInput>;
-  };
-  readonly Product: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly name: CodecTypes['mongo/string@1']['input'];
-    readonly brand: CodecTypes['mongo/string@1']['input'];
-    readonly code: CodecTypes['mongo/string@1']['input'];
-    readonly description: CodecTypes['mongo/string@1']['input'];
-    readonly primaryCategory: CodecTypes['mongo/string@1']['input'];
-    readonly subCategory: CodecTypes['mongo/string@1']['input'];
-    readonly articleType: CodecTypes['mongo/string@1']['input'];
-    readonly price: PriceInput;
-    readonly image: ImageInput;
-  };
-  readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['input'] };
-  readonly User: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly name: CodecTypes['mongo/string@1']['input'];
-    readonly email: CodecTypes['mongo/string@1']['input'];
-    readonly address: AddressInput | null;
-  };
-  readonly ViewProductEvent: {
-    readonly productId: CodecTypes['mongo/string@1']['input'];
-    readonly subCategory: CodecTypes['mongo/string@1']['input'];
-    readonly brand: CodecTypes['mongo/string@1']['input'];
-    readonly exitMethod: CodecTypes['mongo/string@1']['input'] | null;
+  readonly __unbound__: {
+    readonly AddToCartEvent: {
+      readonly productId: CodecTypes['mongo/string@1']['input'];
+      readonly brand: CodecTypes['mongo/string@1']['input'];
+    };
+    readonly Cart: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly userId: CodecTypes['mongo/objectId@1']['input'];
+      readonly items: ReadonlyArray<CartItemInput>;
+    };
+    readonly Event: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly userId: CodecTypes['mongo/string@1']['input'];
+      readonly sessionId: CodecTypes['mongo/string@1']['input'];
+      readonly type: CodecTypes['mongo/string@1']['input'];
+      readonly timestamp: CodecTypes['mongo/date@1']['input'];
+    };
+    readonly Invoice: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly orderId: CodecTypes['mongo/objectId@1']['input'];
+      readonly items: ReadonlyArray<InvoiceLineItemInput>;
+      readonly subtotal: CodecTypes['mongo/double@1']['input'];
+      readonly tax: CodecTypes['mongo/double@1']['input'];
+      readonly total: CodecTypes['mongo/double@1']['input'];
+      readonly issuedAt: CodecTypes['mongo/date@1']['input'];
+    };
+    readonly Location: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly name: CodecTypes['mongo/string@1']['input'];
+      readonly streetAndNumber: CodecTypes['mongo/string@1']['input'];
+      readonly city: CodecTypes['mongo/string@1']['input'];
+      readonly postalCode: CodecTypes['mongo/string@1']['input'];
+      readonly country: CodecTypes['mongo/string@1']['input'];
+    };
+    readonly Order: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly userId: CodecTypes['mongo/objectId@1']['input'];
+      readonly items: ReadonlyArray<OrderLineItemInput>;
+      readonly shippingAddress: CodecTypes['mongo/string@1']['input'];
+      readonly type: CodecTypes['mongo/string@1']['input'];
+      readonly statusHistory: ReadonlyArray<StatusEntryInput>;
+    };
+    readonly Product: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly name: CodecTypes['mongo/string@1']['input'];
+      readonly brand: CodecTypes['mongo/string@1']['input'];
+      readonly code: CodecTypes['mongo/string@1']['input'];
+      readonly description: CodecTypes['mongo/string@1']['input'];
+      readonly primaryCategory: CodecTypes['mongo/string@1']['input'];
+      readonly subCategory: CodecTypes['mongo/string@1']['input'];
+      readonly articleType: CodecTypes['mongo/string@1']['input'];
+      readonly price: PriceInput;
+      readonly image: ImageInput;
+    };
+    readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['input'] };
+    readonly User: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly name: CodecTypes['mongo/string@1']['input'];
+      readonly email: CodecTypes['mongo/string@1']['input'];
+      readonly address: AddressInput | null;
+    };
+    readonly ViewProductEvent: {
+      readonly productId: CodecTypes['mongo/string@1']['input'];
+      readonly subCategory: CodecTypes['mongo/string@1']['input'];
+      readonly brand: CodecTypes['mongo/string@1']['input'];
+      readonly exitMethod: CodecTypes['mongo/string@1']['input'] | null;
+    };
   };
 };
 export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;

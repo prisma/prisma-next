@@ -26,59 +26,63 @@ export type ProfileHash =
 export type CodecTypes = MongoCodecTypes;
 
 export type FieldOutputTypes = {
-  readonly Address: {
-    readonly street: CodecTypes['mongo/string@1']['output'];
-    readonly city: CodecTypes['mongo/string@1']['output'];
-    readonly zip: CodecTypes['mongo/string@1']['output'];
-  };
-  readonly Bug: { readonly severity: CodecTypes['mongo/string@1']['output'] };
-  readonly Comment: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly text: CodecTypes['mongo/string@1']['output'];
-    readonly createdAt: CodecTypes['mongo/date@1']['output'];
-  };
-  readonly Feature: {
-    readonly priority: CodecTypes['mongo/string@1']['output'];
-    readonly targetRelease: CodecTypes['mongo/string@1']['output'];
-  };
-  readonly Task: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly title: CodecTypes['mongo/string@1']['output'];
-    readonly type: CodecTypes['mongo/string@1']['output'];
-    readonly assigneeId: CodecTypes['mongo/objectId@1']['output'];
-  };
-  readonly User: {
-    readonly _id: CodecTypes['mongo/objectId@1']['output'];
-    readonly name: CodecTypes['mongo/string@1']['output'];
-    readonly email: CodecTypes['mongo/string@1']['output'];
+  readonly __unbound__: {
+    readonly Address: {
+      readonly street: CodecTypes['mongo/string@1']['output'];
+      readonly city: CodecTypes['mongo/string@1']['output'];
+      readonly zip: CodecTypes['mongo/string@1']['output'];
+    };
+    readonly Bug: { readonly severity: CodecTypes['mongo/string@1']['output'] };
+    readonly Comment: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly text: CodecTypes['mongo/string@1']['output'];
+      readonly createdAt: CodecTypes['mongo/date@1']['output'];
+    };
+    readonly Feature: {
+      readonly priority: CodecTypes['mongo/string@1']['output'];
+      readonly targetRelease: CodecTypes['mongo/string@1']['output'];
+    };
+    readonly Task: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly title: CodecTypes['mongo/string@1']['output'];
+      readonly type: CodecTypes['mongo/string@1']['output'];
+      readonly assigneeId: CodecTypes['mongo/objectId@1']['output'];
+    };
+    readonly User: {
+      readonly _id: CodecTypes['mongo/objectId@1']['output'];
+      readonly name: CodecTypes['mongo/string@1']['output'];
+      readonly email: CodecTypes['mongo/string@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Address: {
-    readonly street: CodecTypes['mongo/string@1']['input'];
-    readonly city: CodecTypes['mongo/string@1']['input'];
-    readonly zip: CodecTypes['mongo/string@1']['input'];
-  };
-  readonly Bug: { readonly severity: CodecTypes['mongo/string@1']['input'] };
-  readonly Comment: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly text: CodecTypes['mongo/string@1']['input'];
-    readonly createdAt: CodecTypes['mongo/date@1']['input'];
-  };
-  readonly Feature: {
-    readonly priority: CodecTypes['mongo/string@1']['input'];
-    readonly targetRelease: CodecTypes['mongo/string@1']['input'];
-  };
-  readonly Task: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly title: CodecTypes['mongo/string@1']['input'];
-    readonly type: CodecTypes['mongo/string@1']['input'];
-    readonly assigneeId: CodecTypes['mongo/objectId@1']['input'];
-  };
-  readonly User: {
-    readonly _id: CodecTypes['mongo/objectId@1']['input'];
-    readonly name: CodecTypes['mongo/string@1']['input'];
-    readonly email: CodecTypes['mongo/string@1']['input'];
+  readonly __unbound__: {
+    readonly Address: {
+      readonly street: CodecTypes['mongo/string@1']['input'];
+      readonly city: CodecTypes['mongo/string@1']['input'];
+      readonly zip: CodecTypes['mongo/string@1']['input'];
+    };
+    readonly Bug: { readonly severity: CodecTypes['mongo/string@1']['input'] };
+    readonly Comment: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly text: CodecTypes['mongo/string@1']['input'];
+      readonly createdAt: CodecTypes['mongo/date@1']['input'];
+    };
+    readonly Feature: {
+      readonly priority: CodecTypes['mongo/string@1']['input'];
+      readonly targetRelease: CodecTypes['mongo/string@1']['input'];
+    };
+    readonly Task: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly title: CodecTypes['mongo/string@1']['input'];
+      readonly type: CodecTypes['mongo/string@1']['input'];
+      readonly assigneeId: CodecTypes['mongo/objectId@1']['input'];
+    };
+    readonly User: {
+      readonly _id: CodecTypes['mongo/objectId@1']['input'];
+      readonly name: CodecTypes['mongo/string@1']['input'];
+      readonly email: CodecTypes['mongo/string@1']['input'];
+    };
   };
 };
 export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;

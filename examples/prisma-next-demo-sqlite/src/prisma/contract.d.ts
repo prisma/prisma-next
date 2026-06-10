@@ -31,31 +31,35 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Post: {
-    readonly id: CodecTypes['sql/char@1']['output'];
-    readonly title: CodecTypes['sqlite/text@1']['output'];
-    readonly userId: CodecTypes['sql/char@1']['output'];
-    readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['sql/char@1']['output'];
-    readonly email: CodecTypes['sqlite/text@1']['output'];
-    readonly displayName: CodecTypes['sqlite/text@1']['output'];
-    readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+  readonly __unbound__: {
+    readonly Post: {
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly title: CodecTypes['sqlite/text@1']['output'];
+      readonly userId: CodecTypes['sql/char@1']['output'];
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['sql/char@1']['output'];
+      readonly email: CodecTypes['sqlite/text@1']['output'];
+      readonly displayName: CodecTypes['sqlite/text@1']['output'];
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Post: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly title: CodecTypes['sqlite/text@1']['input'];
-    readonly userId: CodecTypes['sql/char@1']['input'];
-    readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly email: CodecTypes['sqlite/text@1']['input'];
-    readonly displayName: CodecTypes['sqlite/text@1']['input'];
-    readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+  readonly __unbound__: {
+    readonly Post: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['sqlite/text@1']['input'];
+      readonly userId: CodecTypes['sql/char@1']['input'];
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly email: CodecTypes['sqlite/text@1']['input'];
+      readonly displayName: CodecTypes['sqlite/text@1']['input'];
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<

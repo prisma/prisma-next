@@ -82,8 +82,14 @@ export function applyFkDefaults(
 export type TypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
   TQueryOperationTypes extends Record<string, unknown> = Record<string, never>,
-  TFieldOutputTypes extends Record<string, Record<string, unknown>> = Record<string, never>,
-  TFieldInputTypes extends Record<string, Record<string, unknown>> = Record<string, never>,
+  TFieldOutputTypes extends Record<string, Record<string, Record<string, unknown>>> = Record<
+    string,
+    never
+  >,
+  TFieldInputTypes extends Record<string, Record<string, Record<string, unknown>>> = Record<
+    string,
+    never
+  >,
 > = {
   readonly codecTypes: TCodecTypes;
   readonly queryOperationTypes: TQueryOperationTypes;
@@ -155,7 +161,7 @@ export type ExtractTypeMapsFromContract<T> = TypeMapsPhantomKey extends keyof T
 export type FieldOutputTypesOf<T> = [T] extends [never]
   ? Record<string, never>
   : T extends { readonly fieldOutputTypes: infer F }
-    ? F extends Record<string, Record<string, unknown>>
+    ? F extends Record<string, Record<string, Record<string, unknown>>>
       ? F
       : Record<string, never>
     : Record<string, never>;
@@ -163,7 +169,7 @@ export type FieldOutputTypesOf<T> = [T] extends [never]
 export type FieldInputTypesOf<T> = [T] extends [never]
   ? Record<string, never>
   : T extends { readonly fieldInputTypes: infer F }
-    ? F extends Record<string, Record<string, unknown>>
+    ? F extends Record<string, Record<string, Record<string, unknown>>>
       ? F
       : Record<string, never>
     : Record<string, never>;

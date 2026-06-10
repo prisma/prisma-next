@@ -45,29 +45,33 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Post: {
-    readonly id: Char<36>;
-    readonly title: CodecTypes['pg/text@1']['output'];
-    readonly userId: CodecTypes['pg/text@1']['output'];
-    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-  };
-  readonly User: {
-    readonly id: Char<36>;
-    readonly email: CodecTypes['pg/text@1']['output'];
-    readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+  readonly public: {
+    readonly Post: {
+      readonly id: Char<36>;
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly User: {
+      readonly id: Char<36>;
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Post: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly title: CodecTypes['pg/text@1']['input'];
-    readonly userId: CodecTypes['pg/text@1']['input'];
-    readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-  };
-  readonly User: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly email: CodecTypes['pg/text@1']['input'];
-    readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+  readonly public: {
+    readonly Post: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly User: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<

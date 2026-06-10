@@ -46,19 +46,23 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Item: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly description: CodecTypes['pg/text@1']['output'];
-    readonly category: CodecTypes['pg/text@1']['output'];
-    readonly rating: CodecTypes['pg/int4@1']['output'];
+  readonly public: {
+    readonly Item: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly description: CodecTypes['pg/text@1']['output'];
+      readonly category: CodecTypes['pg/text@1']['output'];
+      readonly rating: CodecTypes['pg/int4@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Item: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly description: CodecTypes['pg/text@1']['input'];
-    readonly category: CodecTypes['pg/text@1']['input'];
-    readonly rating: CodecTypes['pg/int4@1']['input'];
+  readonly public: {
+    readonly Item: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly description: CodecTypes['pg/text@1']['input'];
+      readonly category: CodecTypes['pg/text@1']['input'];
+      readonly rating: CodecTypes['pg/int4@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<

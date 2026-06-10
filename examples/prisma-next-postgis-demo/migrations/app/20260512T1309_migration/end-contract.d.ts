@@ -51,37 +51,41 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly Cafe: {
-    readonly id: Char<36>;
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly location: Geometry<4326>;
-  };
-  readonly Neighborhood: {
-    readonly id: Char<36>;
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly boundary: Geometry<4326>;
-  };
-  readonly Route: {
-    readonly id: Char<36>;
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly path: Geometry<4326>;
+  readonly public: {
+    readonly Cafe: {
+      readonly id: Char<36>;
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly location: Geometry<4326>;
+    };
+    readonly Neighborhood: {
+      readonly id: Char<36>;
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly boundary: Geometry<4326>;
+    };
+    readonly Route: {
+      readonly id: Char<36>;
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly path: Geometry<4326>;
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Cafe: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly location: CodecTypes['pg/geometry@1']['input'];
-  };
-  readonly Neighborhood: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly boundary: CodecTypes['pg/geometry@1']['input'];
-  };
-  readonly Route: {
-    readonly id: CodecTypes['sql/char@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly path: CodecTypes['pg/geometry@1']['input'];
+  readonly public: {
+    readonly Cafe: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly location: CodecTypes['pg/geometry@1']['input'];
+    };
+    readonly Neighborhood: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly boundary: CodecTypes['pg/geometry@1']['input'];
+    };
+    readonly Route: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly path: CodecTypes['pg/geometry@1']['input'];
+    };
   };
 };
 export type TypeMaps = TypeMapsType<
