@@ -1,13 +1,13 @@
 name: DCO
 
-# Validates the Developer Certificate of Origin sign-off on every commit. Runs
-# on both pull_request and merge_group so the same required "DCO" check is
-# present on the PR (deciding eligibility for the queue) and on the merge queue
-# SHA (deciding whether the queue merges). The probot DCO app only fires on
-# pull_request, which stalled the merge queue; this replaces it.
+# The probot DCO app validates sign-off on the pull_request event but does not
+# run on merge_group, so the required "DCO" check would be absent on the merge
+# queue SHA and the queue would stall. This stub posts the "DCO" check on
+# merge_group; sign-off was already enforced by the app before the PR enqueued.
+# The required check is matched by name ("Any source"), so the app satisfies it
+# on the PR and this stub satisfies it in the queue.
 
 on:
-  pull_request:
   merge_group:
 
 permissions:
@@ -18,40 +18,4 @@ jobs:
     name: DCO
     runs-on: ubuntu-latest
     steps:
-      # On merge_group the only commit in range is the synthetic squash commit
-      # the queue generates; it is authored by the merge actor and carries no
-      # sign-off, so there is nothing to validate. Sign-off was already enforced
-      # on the pull_request event before the PR became eligible to enqueue. The
-      # job still runs so the required "DCO" check is present on the queue SHA.
-      - name: Sign-off already verified on the pull request
-        if: github.event_name == 'merge_group'
-        run: echo "Sign-off enforced on the pull_request event; queue commit is synthetic."
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: github.event_name == 'pull_request'
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Check sign-off on every commit
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin "$BASE_SHA" "$HEAD_SHA"
-          failed=0
-          for sha in $(git rev-list --no-merges "$BASE_SHA".."$HEAD_SHA"); do
-            author_email="$(git show -s --format='%ae' "$sha")"
-            signoffs="$(git show -s --format='%(trailers:key=Signed-off-by,valueonly)' "$sha")"
-            if printf '%s\n' "$signoffs" | grep -qiF "<$author_email>"; then
-              continue
-            fi
-            failed=1
-            subject="$(git show -s --format='%s' "$sha")"
-            echo "::error::Commit $sha ($subject) is missing a 'Signed-off-by' trailer matching the author <$author_email>."
-          done
-          if [ "$failed" -ne 0 ]; then
-            echo "DCO check failed. Sign off your commits with 'git commit -s'."
-            exit 1
-          fi
-          echo "All commits are signed off."
+      - run: echo "Sign-off enforced by the DCO app on the pull request."
