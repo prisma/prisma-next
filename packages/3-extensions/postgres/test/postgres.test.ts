@@ -404,4 +404,62 @@ describe('postgres', () => {
       expect(db.runtime()).toBe(runtimeBefore);
     }
   });
+
+  describe('db.enums (facade)', () => {
+    const roleEnum = {
+      codecId: 'pg/text@1',
+      members: [
+        { name: 'User', value: 'user' },
+        { name: 'Admin', value: 'admin' },
+      ],
+    } as const;
+    const auditRoleEnum = {
+      codecId: 'pg/text@1',
+      members: [
+        { name: 'System', value: 'system' },
+        { name: 'Operator', value: 'operator' },
+      ],
+    } as const;
+
+    const twoNamespaceDomain = {
+      ...contract,
+      domain: {
+        namespaces: {
+          public: { models: {}, enum: { Role: roleEnum } },
+          audit: { models: {}, enum: { Role: auditRoleEnum } },
+        },
+      },
+    } as const;
+
+    // A literal-keyed contract so `db.enums.public.Role` is a static facade
+    // proof, not index-signature access. The mock deserializer returns the same
+    // shape at runtime.
+    type TwoNsContract = Contract<SqlStorage> & {
+      readonly domain: (typeof twoNamespaceDomain)['domain'];
+    };
+
+    it('exposes enums per namespace and resolves same-named enums independently', () => {
+      mocks.deserializeContract.mockReturnValue(twoNamespaceDomain);
+      const db = postgres<TwoNsContract>({
+        contractJson: {},
+        url: 'postgres://localhost:5432/db',
+      });
+
+      expect(db.enums.public.Role.values).toEqual(['user', 'admin']);
+      expect(db.enums.audit.Role.values).toEqual(['system', 'operator']);
+      expect(db.enums.public.Role.nameOf('admin')).toBe('Admin');
+      expect(db.enums.audit.Role.ordinalOf('operator')).toBe(1);
+    });
+
+    it('builds the enums surface eagerly, without a runtime', () => {
+      mocks.deserializeContract.mockReturnValue(twoNamespaceDomain);
+      const db = postgres<TwoNsContract>({
+        contractJson: {},
+        url: 'postgres://localhost:5432/db',
+      });
+
+      expect(db.enums.public.Role.values).toEqual(['user', 'admin']);
+      expect(mocks.createRuntime).not.toHaveBeenCalled();
+    });
+  });
 });

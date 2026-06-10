@@ -49,8 +49,8 @@ type NamespaceModelNames<
 
 // The model collections of a single domain namespace, keyed by bare model
 // name. Lets callers reach a model by its namespace coordinate
-// (`orm.<ns>.<Model>`) when the same bare name is declared in more than one
-// namespace.
+// (`orm.<ns>.<Model>`). Enums are not adjacent to models here — they live on
+// the `db.enums` facade member, lane-agnostic contract metadata.
 export type OrmNamespace<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,

@@ -9,6 +9,8 @@ import {
   type SqlStorage,
   StorageTable,
   type StorageTableInput,
+  StorageValueSet,
+  type StorageValueSetInput,
 } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
@@ -18,6 +20,7 @@ export interface PostgresSchemaInput {
   readonly entries: {
     readonly table: Record<string, StorageTable | StorageTableInput>;
     readonly type: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
+    readonly valueSet?: Record<string, StorageValueSet | StorageValueSetInput>;
   };
 }
 
@@ -50,29 +53,44 @@ export class PostgresSchema extends NamespaceBase {
   readonly entries: Readonly<{
     readonly table: Readonly<Record<string, StorageTable>>;
     readonly type: Readonly<Record<string, PostgresEnumType>>;
+    readonly valueSet?: Readonly<Record<string, StorageValueSet>>;
   }>;
 
   constructor(input: PostgresSchemaInput) {
     super();
     this.id = input.id;
-    this.entries = Object.freeze({
-      table: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.table).map(([k, v]) => [
-            k,
-            v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
-          ]),
-        ),
+    const table = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.entries.table).map(([k, v]) => [
+          k,
+          v instanceof StorageTable ? v : new StorageTable(v as StorageTableInput),
+        ]),
       ),
-      type: Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.entries.type).map(([k, v]) => [
-            k,
-            v instanceof PostgresEnumType ? v : new PostgresEnumType(v as PostgresEnumTypeInput),
-          ]),
-        ),
+    );
+    const type = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.entries.type).map(([k, v]) => [
+          k,
+          v instanceof PostgresEnumType ? v : new PostgresEnumType(v as PostgresEnumTypeInput),
+        ]),
       ),
-    });
+    );
+    const valueSetInput = input.entries.valueSet;
+    this.entries =
+      valueSetInput !== undefined && Object.keys(valueSetInput).length > 0
+        ? Object.freeze({
+            table,
+            type,
+            valueSet: Object.freeze(
+              Object.fromEntries(
+                Object.entries(valueSetInput).map(([k, v]) => [
+                  k,
+                  new StorageValueSet({ kind: 'value-set', values: v.values }),
+                ]),
+              ),
+            ),
+          })
+        : Object.freeze({ table, type });
     Object.defineProperty(this, 'kind', {
       value: 'schema',
       writable: false,
@@ -213,6 +231,7 @@ export function postgresCreateNamespace(
     entries: {
       table: input.entries.table,
       type: (enumTypes ?? {}) as Record<string, PostgresEnumTypeInput>,
+      ...(input.entries.valueSet !== undefined ? { valueSet: input.entries.valueSet } : {}),
     },
   };
   if (input.id === UNBOUND_NAMESPACE_ID) {

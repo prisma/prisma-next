@@ -25,6 +25,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type PolymorphismInfo,
@@ -341,6 +342,79 @@ function buildChildPolymorphismJoinsAndProjection(
   };
 }
 
+/**
+ * Build the correlated WHERE and junction JOIN artifacts for a many-to-many
+ * include. The resulting WHERE correlates the junction to the parent rows
+ * (AND-ed across all column pairs for composite keys). The junction JOIN
+ * connects child rows to the junction via the child columns.
+ */
+function buildManyToManyJunctionArtifacts(
+  parentTableName: string,
+  childTableRef: string,
+  through: NonNullable<IncludeExpr['through']>,
+): {
+  readonly whereExpr: AnyExpression;
+  readonly junctionJoin: JoinAst;
+} {
+  const {
+    table: junctionTable,
+    parentColumns,
+    childColumns,
+    targetColumns,
+    parentLocalColumns,
+    namespaceId,
+  } = through;
+
+  invariant(
+    childColumns.length === targetColumns.length,
+    `M:N junction '${junctionTable}': childColumns (${childColumns.length}) and targetColumns (${targetColumns.length}) must have equal length`,
+  );
+  invariant(
+    parentColumns.length === parentLocalColumns.length,
+    `M:N junction '${junctionTable}': parentColumns (${parentColumns.length}) and parentLocalColumns (${parentLocalColumns.length}) must have equal length`,
+  );
+
+  const joinOnPairs = childColumns.map((junctionCol, i) => {
+    const targetCol = targetColumns[i];
+    assertDefined(
+      targetCol,
+      `M:N junction '${junctionTable}': missing target column at index ${i}`,
+    );
+    return BinaryExpr.eq(
+      ColumnRef.of(junctionTable, junctionCol),
+      ColumnRef.of(childTableRef, targetCol),
+    );
+  });
+  const firstJoinPair = joinOnPairs[0];
+  const joinOn: AnyExpression =
+    joinOnPairs.length === 1 && firstJoinPair ? firstJoinPair : AndExpr.of(joinOnPairs);
+
+  const correlationPairs = parentColumns.map((junctionCol, i) => {
+    const parentLocalCol = parentLocalColumns[i];
+    assertDefined(
+      parentLocalCol,
+      `M:N junction '${junctionTable}': missing parent-local column at index ${i}`,
+    );
+    return BinaryExpr.eq(
+      ColumnRef.of(junctionTable, junctionCol),
+      ColumnRef.of(parentTableName, parentLocalCol),
+    );
+  });
+  const firstCorrelationPair = correlationPairs[0];
+  const whereExpr: AnyExpression =
+    correlationPairs.length === 1 && firstCorrelationPair
+      ? firstCorrelationPair
+      : AndExpr.of(correlationPairs);
+
+  const junctionJoin = JoinAst.inner(
+    TableSource.named(junctionTable, undefined, namespaceId),
+    joinOn,
+    false,
+  );
+
+  return { whereExpr, junctionJoin };
+}
+
 function buildIncludeChildRowsSelect(
   contract: Contract<SqlStorage>,
   parentTableName: string,
@@ -377,11 +451,25 @@ function buildIncludeChildRowsSelect(
     filterTableName: include.relatedTableName,
     namespaceId: include.relatedNamespaceId,
   });
-  const joinExpr = BinaryExpr.eq(
-    ColumnRef.of(childTableRef, include.targetColumn),
-    ColumnRef.of(parentTableName, include.localColumn),
-  );
-  const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
+
+  let whereExpr: AnyExpression;
+  let junctionJoins: JoinAst[] = [];
+
+  if (include.through !== undefined) {
+    const artifacts = buildManyToManyJunctionArtifacts(
+      parentTableName,
+      childTableRef,
+      include.through,
+    );
+    whereExpr = childWhere ? AndExpr.of([artifacts.whereExpr, childWhere]) : artifacts.whereExpr;
+    junctionJoins = [artifacts.junctionJoin];
+  } else {
+    const joinExpr = BinaryExpr.eq(
+      ColumnRef.of(childTableRef, include.targetColumn),
+      ColumnRef.of(parentTableName, include.localColumn),
+    );
+    whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
+  }
 
   // `distinct()` on a non-leaf include cannot be lowered as
   // `SELECT DISTINCT <scalars>, json_agg(<grandchild>) FROM ...`:
@@ -409,6 +497,7 @@ function buildIncludeChildRowsSelect(
       hiddenOrderProjection,
       aggregateOrderBy,
       whereExpr,
+      junctionJoins,
     });
   }
 
@@ -465,6 +554,10 @@ function buildIncludeChildRowsSelect(
     .withWhere(whereExpr);
   if (polyJoinsAndProjection.joins.length > 0) {
     childRows = childRows.withJoins([...polyJoinsAndProjection.joins]);
+  }
+
+  if (junctionJoins.length > 0) {
+    childRows = childRows.withJoins(junctionJoins);
   }
 
   if (childState.distinctOn && childState.distinctOn.length > 0) {
@@ -529,6 +622,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   readonly hiddenOrderProjection: ReadonlyArray<ProjectionItem>;
   readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
   readonly whereExpr: AnyExpression;
+  readonly junctionJoins: ReadonlyArray<JoinAst>;
 }): {
   readonly childRows: SelectAst;
   readonly childProjection: ReadonlyArray<ProjectionItem>;
@@ -545,6 +639,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     hiddenOrderProjection,
     aggregateOrderBy,
     whereExpr,
+    junctionJoins,
   } = options;
   const childState = include.nested;
 
@@ -614,8 +709,9 @@ function buildDistinctNonLeafChildRowsSelect(options: {
       ...hiddenOrderProjection,
     ])
     .withWhere(whereExpr);
-  if (polyJoinsAndProjection.joins.length > 0) {
-    baseInner = baseInner.withJoins([...polyJoinsAndProjection.joins]);
+  const distinctExtraJoins = [...polyJoinsAndProjection.joins, ...junctionJoins];
+  if (distinctExtraJoins.length > 0) {
+    baseInner = baseInner.withJoins(distinctExtraJoins);
   }
 
   // `childState.distinct` is non-empty by the `isDistinctNonLeaf` guard

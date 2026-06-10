@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 
@@ -9,7 +10,7 @@ import { SqlNode } from './sql-node';
 export interface StorageValueSetInput {
   readonly kind: 'value-set';
   /** Ordered permitted values, codec-encoded. Declaration order is preserved. */
-  readonly values: readonly string[];
+  readonly values: readonly JsonValue[];
 }
 
 /**
@@ -32,7 +33,7 @@ export interface StorageValueSetInput {
  */
 export class StorageValueSet extends SqlNode {
   override readonly kind = 'value-set' as const;
-  readonly values: readonly string[];
+  readonly values: readonly JsonValue[];
 
   constructor(input: StorageValueSetInput) {
     super();

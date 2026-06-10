@@ -9,7 +9,6 @@ import {
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { enumStorageCompoundKey } from '@prisma-next/target-postgres/enum-planning';
 import { planIssues } from '@prisma-next/target-postgres/issue-planner';
 import type { CreateTableCall } from '@prisma-next/target-postgres/op-factory-call';
 import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
@@ -67,22 +66,24 @@ function makeSchemaWithEnum(
   values: readonly string[],
   schemaName = UNBOUND_NAMESPACE_ID,
 ): SqlSchemaIR {
-  // Introspection always keys `storageTypes` by the *live* schema name the
-  // adapter walked — the unbound coordinate resolves to `current_schema()`
-  // (`public` here), never the `__unbound__` DDL-emit sentinel.
+  // Introspection nests `enumTypes` by the *live* schema name the adapter
+  // walked — the unbound coordinate resolves to `current_schema()` (`public`
+  // here), never the `__unbound__` DDL-emit sentinel.
   const liveSchema = schemaName === UNBOUND_NAMESPACE_ID ? 'public' : schemaName;
   return {
     tables: {},
     annotations: {
       pg: {
         schema: liveSchema,
-        storageTypes: {
-          [enumStorageCompoundKey(liveSchema, nativeType)]: {
-            kind: 'postgres-enum',
-            codecId: 'pg/enum@1',
-            nativeType,
-            values,
-            typeParams: { values },
+        enumTypes: {
+          [liveSchema]: {
+            [nativeType]: {
+              kind: 'postgres-enum',
+              codecId: 'pg/enum@1',
+              nativeType,
+              values,
+              typeParams: { values },
+            },
           },
         },
       },

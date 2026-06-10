@@ -34,12 +34,31 @@ changes:
 ---
 
 <!--
+TML-2785: the sql-orm-client runtime gained M:N correlated include
+reads — `.include()` of an N:M relation resolves child rows through the
+junction table via a correlated subquery. Internal runtime only; no
+extension API or contract-shape change. No extension-author action
+required.
+
 TML-2838: the temporary `--no-memory-protection-keys` test-harness workaround
 has been removed from every PGlite-backed vitest config (including
 `packages/3-extensions/{postgres,supabase}`) now that the WAL-teardown crash is
 fixed upstream in `@prisma/dev` 0.24.12 (which pulls in the
 `@prisma/streams-local` worker-termination fix). Test-harness only — no
 runtime, contract, or public-API change. Incidental substrate diff only.
+-->
+
+<!--
+TML-2852: the enum read surface. Additive surface for `enumType`-authored enums.
+`@prisma-next/postgres/contract-builder` gains `enumType` / `member` exports (the
+Postgres-bound `enumType` constrains member values to the column codec) and the
+factory `defineContract` overload threads a top-level `enums` key;
+`@prisma-next/sql-orm-client` gains the lane-agnostic `db.enums.<namespace>.<Name>`
+runtime accessor map (built from `domain.namespaces[ns].enum`) and value-union
+narrowing of enum-restricted fields, plus emit-time narrowing in the emitter from a
+field's `valueSet` ref. All additive — existing exports and the framework SPI are
+unchanged, PSL `enum` stays native until the cutover, and `fixtures:check` is
+byte-identical. No extension-author action. Incidental substrate diff only.
 -->
 
 # 0.13 → 0.14 — Extension-author upgrade instructions

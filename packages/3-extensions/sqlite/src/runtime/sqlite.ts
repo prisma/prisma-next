@@ -1,4 +1,5 @@
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
+import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
@@ -43,6 +44,8 @@ type UnboundSql<TContract extends Contract<SqlStorage>> =
   Db<TContract>[typeof UNBOUND_NAMESPACE_ID];
 type UnboundOrm<TContract extends Contract<SqlStorage>> =
   OrmClient<TContract>[typeof UNBOUND_NAMESPACE_ID];
+type UnboundEnums<TContract extends Contract<SqlStorage>> =
+  NamespacedEnums<TContract>[typeof UNBOUND_NAMESPACE_ID];
 
 function unboundNamespace<T>(builderOutput: { readonly [UNBOUND_NAMESPACE_ID]?: unknown }): T {
   return blindCast<T, 'the unbound namespace always exists on a sqlite builder output'>(
@@ -54,11 +57,13 @@ export interface SqliteTransactionContext<TContract extends Contract<SqlStorage>
   extends TransactionContext {
   readonly sql: UnboundSql<TContract>;
   readonly orm: UnboundOrm<TContract>;
+  readonly enums: UnboundEnums<TContract>;
 }
 
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly sql: UnboundSql<TContract>;
   readonly orm: UnboundOrm<TContract>;
+  readonly enums: UnboundEnums<TContract>;
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<SqliteTargetId>;
@@ -141,6 +146,9 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   const sql: UnboundSql<TContract> = unboundNamespace(
     sqlBuilder<TContract>({ context, rawCodecInferer }),
   );
+  const enums: UnboundEnums<TContract> = unboundNamespace(
+    Object.freeze(buildNamespacedEnums(contract.domain)),
+  );
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -221,6 +229,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   return {
     sql,
     orm,
+    enums,
     raw: rawSqlTag,
     context,
     stack,
@@ -299,7 +308,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
         // Spreading would evaluate the getter once and freeze its value.
         const tx: SqliteTransactionContext<TContract> = Object.assign(
           castAs<TransactionContext>(Object.create(txCtx)),
-          { sql: txSql, orm: txOrm },
+          { sql: txSql, orm: txOrm, enums },
         );
 
         return fn(tx);

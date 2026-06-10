@@ -55,6 +55,7 @@ withTempDir(({ createTempDir }) => {
           'Contract written to contract.prisma',
         );
         const inferredPsl = readFileSync(join(ctx.testDir, 'contract.prisma'), 'utf-8');
+        expect(inferredPsl, 'AB.01: inferred psl includes pragma').toContain('// use prisma-next');
         expect(inferredPsl, 'AB.01: infer removes stale field').not.toContain('name');
         expect(inferredPsl, 'AB.01: infer keeps live field').toContain('email String');
 

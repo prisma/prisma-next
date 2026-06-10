@@ -1,6 +1,5 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
-import { enumStorageCompoundKey } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -119,11 +118,13 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(result.annotations?.['pg']).toMatchObject({
-        storageTypes: {
-          [enumStorageCompoundKey('public', 'role')]: {
-            codecId: 'pg/enum@1',
-            nativeType: 'role',
-            typeParams: { values: ['USER', 'ADMIN'] },
+        enumTypes: {
+          public: {
+            role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'role',
+              typeParams: { values: ['USER', 'ADMIN'] },
+            },
           },
         },
       });

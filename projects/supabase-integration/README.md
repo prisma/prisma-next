@@ -22,34 +22,29 @@ The PSL-block substrate `target-contributed-psl-blocks` ([TML-2537](https://line
 
 ### Dependency graph
 
+```mermaid
+flowchart TD
+  foundation["target-extensible-ir (TML-2459)"]
+  control["control-policy (TML-2493)"]
+  ccr["cross-contract-refs (TML-2500)"]
+  rls["postgres-rls (TML-2501)"]
+  rtl["runtime-target-layer (TML-2502)"]
+  ns["explicit-namespace-dsl (TML-2550)"]
+  ext["extension-supabase (integration / launch)"]
+
+  foundation --> control
+  foundation -->|"runtime-qualification slice TML-2605"| ns
+  control --> ccr
+  control --> rls
+  control --> rtl
+  rls -.->|"proof dependency"| rtl
+  ccr --> ext
+  rls --> ext
+  rtl --> ext
+  ns --> ext
 ```
-                        ┌─────────────────────────┐
-                        │ target-extensible-ir    │
-                        │ (TML-2459)              │
-                        └────────────┬────────────┘
-                                     │
-                  ┌──────────────────┴──────────────────┐
-                  ▼                                      ▼
-          ┌───────────────┐               ┌──────────────────────────┐
-          │ control-policy│               │ explicit-namespace-dsl   │
-          │ (TML-2493)    │               │ (TML-2550) — needs the   │
-          └───────┬───────┘               │ runtime-qualification    │
-                  │                        │ slice (TML-2605)         │
-       ┌──────────┼──────────┐            └─────────────┬────────────┘
-       ▼          ▼          ▼                          │
-┌────────────┐┌─────────┐┌────────────────┐            │
-│ cross-     ││postgres-││ runtime-target-│            │
-│ contract-  ││ rls     ││ layer          │            │
-│ refs       ││         ││                │            │
-└──────┬─────┘└────┬────┘└────────┬───────┘            │
-       │           │             │                     │
-       └───────────┴─────────────┴──────────┬──────────┘
-                                             ▼
-                                ┌─────────────────────────┐
-                                │ extension-supabase      │
-                                │ (integration / launch)  │
-                                └─────────────────────────┘
-```
+
+The dashed edge is a proof dependency, not a build dependency: `runtime-target-layer`'s code is independent, but demonstrating its value needs `postgres-rls` (see below).
 
 The control-policy-dependent middle-tier projects (`cross-contract-refs`, `postgres-rls`, `runtime-target-layer`) could originally ship in any order once `target-extensible-ir` reached M5b and `control-policy` landed — but a dependency has since emerged: **`runtime-target-layer`'s proof depends on `postgres-rls`** (demonstrating below-middleware role binding requires RLS policies + roles to enforce against), so its end-to-end validation follows `postgres-rls` even though its code is independent. `explicit-namespace-dsl` runs on a parallel track: it depends only on the runtime-qualification slice (TML-2605) of `target-extensible-ir`, not on `control-policy`, so it can be built alongside them. `extension-supabase` consumes all four — and it **cannot ship without `explicit-namespace-dsl`**, because a Supabase app addresses tables in `auth.*` and `public.*` that collide by bare name (both schemas have a `users` table); without the namespace-aware query surface there is no way to reach `auth.users`, and everything collapses into a single namespace. That is the user-facing fudge the integration must not ship.
 

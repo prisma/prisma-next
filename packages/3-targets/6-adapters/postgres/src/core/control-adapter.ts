@@ -46,7 +46,6 @@ import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import {
   createResolveExistingEnumValues,
-  enumStorageCompoundKey,
   readExistingEnumValues,
   readPostgresSchemaIrAnnotations,
 } from '@prisma-next/target-postgres/enum-planning';
@@ -625,16 +624,18 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
     }
 
-    const mergedStorageTypes: Record<string, PostgresEnumStorageTypeAnnotation> = {};
-    for (let i = 0; i < perSchema.length; i++) {
-      const ir = perSchema[i];
-      const pg = blindCast<
-        { storageTypes?: Record<string, PostgresEnumStorageTypeAnnotation> } | undefined,
+    const mergedEnumTypes: Record<string, Record<string, PostgresEnumStorageTypeAnnotation>> = {};
+    for (const ir of perSchema) {
+      const enumTypes = blindCast<
+        | { enumTypes?: Record<string, Record<string, PostgresEnumStorageTypeAnnotation>> }
+        | undefined,
         'pg annotation envelope index slot'
-      >(ir?.annotations?.['pg'])?.storageTypes;
-      if (!pg) continue;
-      for (const [key, value] of Object.entries(pg)) {
-        mergedStorageTypes[key] = value;
+      >(ir?.annotations?.['pg'])?.enumTypes;
+      if (!enumTypes) continue;
+      for (const [schemaName, byType] of Object.entries(enumTypes)) {
+        const merged = mergedEnumTypes[schemaName] ?? {};
+        Object.assign(merged, byType);
+        mergedEnumTypes[schemaName] = merged;
       }
     }
 
@@ -650,8 +651,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         pg: {
           ...firstPg,
           ...ifDefined(
-            'storageTypes',
-            Object.keys(mergedStorageTypes).length > 0 ? mergedStorageTypes : undefined,
+            'enumTypes',
+            Object.keys(mergedEnumTypes).length > 0 ? mergedEnumTypes : undefined,
           ),
         },
       }),
@@ -1093,20 +1094,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const rawStorageTypes = await introspectPostgresEnumTypes({ driver, schemaName: schema });
-    const storageTypes: Record<string, PostgresEnumStorageTypeAnnotation> = {};
-    for (const [typeName, annotation] of Object.entries(rawStorageTypes)) {
-      storageTypes[enumStorageCompoundKey(schema, typeName)] = annotation;
-    }
+    const rawEnumTypes = await introspectPostgresEnumTypes({ driver, schemaName: schema });
+    const enumTypes: Record<
+      string,
+      Record<string, PostgresEnumStorageTypeAnnotation>
+    > = Object.keys(rawEnumTypes).length > 0 ? { [schema]: rawEnumTypes } : {};
 
     const annotations = {
       pg: {
         schema,
         version: await this.getPostgresVersion(driver),
-        ...ifDefined(
-          'storageTypes',
-          Object.keys(storageTypes).length > 0 ? storageTypes : undefined,
-        ),
+        ...ifDefined('enumTypes', Object.keys(enumTypes).length > 0 ? enumTypes : undefined),
       },
     };
 

@@ -96,11 +96,13 @@ describe('sqlSchemaIrToPslAst', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            role_t: {
-              codecId: 'pg/enum@1',
-              nativeType: 'role_t',
-              typeParams: { values: ['admin', 'user'] },
+          enumTypes: {
+            public: {
+              role_t: {
+                codecId: 'pg/enum@1',
+                nativeType: 'role_t',
+                typeParams: { values: ['admin', 'user'] },
+              },
             },
           },
         },
@@ -112,6 +114,48 @@ describe('sqlSchemaIrToPslAst', () => {
     const enumModel = flatPslModels(ast)[0];
     const roleField = enumModel?.fields.find((f) => f.name === 'role');
     expect(roleField?.typeName).toBe('RoleT');
+  });
+
+  it('links columns to enums and emits a clean @@map for schema-nested storage', () => {
+    const schemaIR = ir({
+      tables: {
+        applications: {
+          name: 'applications',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            status: { name: 'status', nativeType: 'application_kind', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      annotations: {
+        pg: {
+          enumTypes: {
+            public: {
+              application_kind: {
+                codecId: 'pg/enum@1',
+                nativeType: 'application_kind',
+                typeParams: { values: ['complete', 'formless'] },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const ast = sqlSchemaIrToPslAst(schemaIR);
+
+    const enumDecl = flatPslEnums(ast)[0];
+    expect(enumDecl?.name).toBe('ApplicationKind');
+    const mapArg = enumDecl?.attributes.find((a) => a.name === 'map')?.args[0];
+    const mapValue = mapArg && mapArg.kind === 'positional' ? mapArg.value : '';
+    expect(mapValue).toBe('"application_kind"');
+
+    const statusField = flatPslModels(ast)[0]?.fields.find((f) => f.name === 'status');
+    expect(statusField?.typeName).toBe('ApplicationKind');
   });
 
   it('produces a @default(now()) attribute for raw now() defaults', () => {
@@ -223,7 +267,8 @@ describe('sqlSchemaIrToPslAst', () => {
 
     const out = printPsl(sqlSchemaIrToPslAst(schemaIR));
     expect(out).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model User {
         id    Int     @id

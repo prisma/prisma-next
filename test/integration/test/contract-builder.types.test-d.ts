@@ -14,7 +14,14 @@ import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import {
+  defineContract,
+  enumType,
+  field,
+  member,
+  model,
+  rel,
+} from '@prisma-next/sql-contract-ts/contract-builder';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import type { JsonValue } from '@prisma-next/target-postgres/codec-types';
@@ -514,4 +521,93 @@ test('ResolveStandardSchemaOutput falls back to JsonValue without schema', () =>
   type Resolved = ResolveStandardSchemaOutput<Record<never, never>>;
 
   expectTypeOf<Resolved>().toEqualTypeOf<JsonValue>();
+});
+
+// ---------------------------------------------------------------------------
+// Enum value-union narrowing — the behavior spec for read output / write input.
+// Exercised through the real codec types + the full select().build() lane so a
+// widening to string (or a spurious | null on a non-null enum) is caught here.
+// ---------------------------------------------------------------------------
+
+const Role = enumType('Role', textColumn, member('User', 'user'), member('Admin', 'admin'));
+const Status = enumType(
+  'Status',
+  textColumn,
+  member('Active', 'active'),
+  member('Inactive', 'inactive'),
+);
+const PriorityInt = enumType('PriorityInt', int4Column, member('Low', 1), member('High', 10));
+
+const enumContract = defineContract({
+  family: sqlFamilyPack,
+  target: postgresPack,
+  storageHash: 'sha256:test-enum',
+  enums: { Role, Status, PriorityInt },
+  models: {
+    Account: model('Account', {
+      fields: {
+        id: field.column(int4Column).id(),
+        email: field.column(textColumn),
+        createdAt: field.column(timestamptzColumn),
+        role: field.namedType(Role),
+        status: field.namedType(Status).optional(),
+        priority: field.namedType(PriorityInt),
+      },
+    }).sql({ table: 'account' }),
+  },
+});
+
+const enumValidated = new SqlContractSerializer().deserializeContract(
+  enumContract,
+) as typeof enumContract;
+const enumDb = sql({
+  context: createTestContext(enumValidated, createStubAdapter()),
+  rawCodecInferer: { inferCodec: () => 'pg/text' },
+});
+
+test('read: non-null text enum is exactly the value union (no | null)', () => {
+  const plan = enumDb.public.account.select('role').build();
+  type Row = ResultType<typeof plan>;
+  expectTypeOf<Row['role']>().toEqualTypeOf<'user' | 'admin'>();
+  expectTypeOf<Row['role']>().not.toEqualTypeOf<string>();
+});
+
+test('read: nullable text enum is value union | null', () => {
+  const plan = enumDb.public.account.select('status').build();
+  type Row = ResultType<typeof plan>;
+  expectTypeOf<Row['status']>().toEqualTypeOf<'active' | 'inactive' | null>();
+});
+
+test('read: non-null int-backed enum narrows to its int value union (not number)', () => {
+  const plan = enumDb.public.account.select('priority').build();
+  type Row = ResultType<typeof plan>;
+  expectTypeOf<Row['priority']>().toEqualTypeOf<1 | 10>();
+  expectTypeOf<Row['priority']>().not.toEqualTypeOf<number>();
+});
+
+test('read: non-enum fields keep their codec output, unchanged from main', () => {
+  const plan = enumDb.public.account.select('id', 'email', 'createdAt').build();
+  type Row = ResultType<typeof plan>;
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<Date>();
+});
+
+test('write: enum insert accepts the value union and rejects out-of-union literals', () => {
+  enumDb.public.account.insert([{ id: 1, email: 'a@b.c', role: 'user', priority: 1 }]);
+  enumDb.public.account.insert([
+    { id: 2, email: 'a@b.c', role: 'admin', status: 'active', priority: 10 },
+  ]);
+  enumDb.public.account.insert([
+    { id: 3, email: 'a@b.c', role: 'user', status: null, priority: 10 },
+  ]);
+
+  enumDb.public.account.insert([
+    // @ts-expect-error 'nope' is not a Role member value.
+    { id: 4, email: 'a@b.c', role: 'nope', priority: 1 },
+  ]);
+  enumDb.public.account.insert([
+    // @ts-expect-error 99 is not a PriorityInt member value.
+    { id: 5, email: 'a@b.c', role: 'user', priority: 99 },
+  ]);
 });

@@ -25,11 +25,13 @@ describe('printPsl', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            user_role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'user_role',
-              typeParams: { values: ['USER', 'ADMIN', 'MODERATOR'] },
+          enumTypes: {
+            public: {
+              user_role: {
+                codecId: 'pg/enum@1',
+                nativeType: 'user_role',
+                typeParams: { values: ['USER', 'ADMIN', 'MODERATOR'] },
+              },
             },
           },
         },
@@ -37,7 +39,8 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum UserRole {
         USER
@@ -78,12 +81,14 @@ describe('printPsl', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            deployment_status: {
-              codecId: 'pg/enum@1',
-              nativeType: 'deployment_status',
-              typeParams: {
-                values: ['READY', 'in-progress', '2FA', 'default', 'inProgress'],
+          enumTypes: {
+            public: {
+              deployment_status: {
+                codecId: 'pg/enum@1',
+                nativeType: 'deployment_status',
+                typeParams: {
+                  values: ['READY', 'in-progress', '2FA', 'default', 'inProgress'],
+                },
               },
             },
           },
@@ -99,7 +104,8 @@ describe('printPsl', () => {
     // `'in-progress'`). `READY` is already a valid PSL identifier and
     // matches its storage label, so no `@map` is needed there.
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum DeploymentStatus {
         READY
@@ -138,11 +144,13 @@ describe('printPsl', () => {
       },
       annotations: {
         pg: {
-          storageTypes: {
-            Role: {
-              codecId: 'pg/enum@1',
-              nativeType: 'Role',
-              typeParams: { values: ['!!!'] },
+          enumTypes: {
+            public: {
+              Role: {
+                codecId: 'pg/enum@1',
+                nativeType: 'Role',
+                typeParams: { values: ['!!!'] },
+              },
             },
           },
         },
@@ -155,7 +163,8 @@ describe('printPsl', () => {
     // `value` and so carries a per-member `@map("!!!")` to preserve the
     // original storage label across the parse-print round-trip.
     expect(result).toMatchInlineSnapshot(`
-      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum Role {
         value @map("!!!")
