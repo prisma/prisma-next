@@ -20,4 +20,6 @@ export type SyntaxKind =
   | 'ArrayLiteral'
   | 'StringLiteralExpr'
   | 'NumberLiteralExpr'
-  | 'BooleanLiteralExpr';
+  | 'BooleanLiteralExpr'
+  | 'ObjectLiteralExpr'
+  | 'ObjectField';

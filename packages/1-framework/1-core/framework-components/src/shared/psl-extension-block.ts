@@ -56,6 +56,14 @@ export type PslDiagnosticCode =
    */
   | 'PSL_INVALID_EXTENSION_BLOCK_MEMBER'
   /**
+   * A malformed JS-like object literal `{ key: value, … }` in value/argument
+   * position — a field missing its `:`, a field missing its value, or an
+   * unterminated `{`. The recursive-descent parser still produces a best-effort
+   * `ObjectLiteralExpr` node (preserving the lossless round-trip) and reports
+   * this code anchored on the offending token.
+   */
+  | 'PSL_INVALID_OBJECT_LITERAL'
+  /**
    * An unknown parameter key in an extension-contributed block — a key present
    * in the source block but absent from the descriptor's `parameters` map.
    */

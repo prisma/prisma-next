@@ -29,6 +29,8 @@ export {
   castExpression,
   FunctionCallAst,
   NumberLiteralExprAst,
+  ObjectFieldAst,
+  ObjectLiteralExprAst,
   StringLiteralExprAst,
 } from '../syntax/ast/expressions';
 // AST wrappers

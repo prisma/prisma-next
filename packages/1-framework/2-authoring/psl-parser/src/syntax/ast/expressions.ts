@@ -140,12 +140,82 @@ export class BooleanLiteralExprAst implements AstNode {
   }
 }
 
+export class ObjectLiteralExprAst implements AstNode {
+  readonly syntax: SyntaxNode;
+
+  constructor(syntax: SyntaxNode) {
+    this.syntax = syntax;
+  }
+
+  lbrace(): Token | undefined {
+    return findChildToken(this.syntax, 'LBrace');
+  }
+
+  rbrace(): Token | undefined {
+    return findChildToken(this.syntax, 'RBrace');
+  }
+
+  *fields(): Iterable<ObjectFieldAst> {
+    yield* filterChildren(this.syntax, ObjectFieldAst.cast);
+  }
+
+  static cast(node: SyntaxNode): ObjectLiteralExprAst | undefined {
+    return node.kind === 'ObjectLiteralExpr' ? new ObjectLiteralExprAst(node) : undefined;
+  }
+}
+
+export class ObjectFieldAst implements AstNode {
+  readonly syntax: SyntaxNode;
+
+  constructor(syntax: SyntaxNode) {
+    this.syntax = syntax;
+  }
+
+  key(): IdentifierAst | StringLiteralExprAst | undefined {
+    for (const child of this.syntax.children()) {
+      if (!(child instanceof SyntaxNode)) {
+        if (child.kind === 'Colon') break;
+        continue;
+      }
+      return IdentifierAst.cast(child) ?? StringLiteralExprAst.cast(child);
+    }
+    return undefined;
+  }
+
+  colon(): Token | undefined {
+    return findChildToken(this.syntax, 'Colon');
+  }
+
+  value(): ExpressionAst | undefined {
+    if (this.colon()) {
+      let pastColon = false;
+      for (const child of this.syntax.children()) {
+        if (!(child instanceof SyntaxNode)) {
+          if (child.kind === 'Colon') pastColon = true;
+          continue;
+        }
+        if (pastColon) {
+          const expr = castExpression(child);
+          if (expr) return expr;
+        }
+      }
+      return undefined;
+    }
+    return findFirstChild(this.syntax, castExpression);
+  }
+
+  static cast(node: SyntaxNode): ObjectFieldAst | undefined {
+    return node.kind === 'ObjectField' ? new ObjectFieldAst(node) : undefined;
+  }
+}
+
 export type ExpressionAst =
   | FunctionCallAst
   | ArrayLiteralAst
   | StringLiteralExprAst
   | NumberLiteralExprAst
   | BooleanLiteralExprAst
+  | ObjectLiteralExprAst
   | IdentifierAst;
 
 export function castExpression(node: SyntaxNode): ExpressionAst | undefined {
@@ -155,6 +225,7 @@ export function castExpression(node: SyntaxNode): ExpressionAst | undefined {
     StringLiteralExprAst.cast(node) ??
     NumberLiteralExprAst.cast(node) ??
     BooleanLiteralExprAst.cast(node) ??
+    ObjectLiteralExprAst.cast(node) ??
     IdentifierAst.cast(node)
   );
 }
