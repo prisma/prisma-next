@@ -1206,7 +1206,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
     const rlsEnabledByTable: Record<string, boolean> = {};
     for (const row of rlsEnabledResult.rows) {
-      rlsEnabledByTable[row.relname] = row.relrowsecurity;
+      rlsEnabledByTable[`${schema}.${row.relname}`] = row.relrowsecurity;
     }
 
     const annotations = {

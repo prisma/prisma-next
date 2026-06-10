@@ -95,8 +95,8 @@ describe.sequential('RLS introspection', () => {
     const rlsEnabledByTable = pg?.['rlsEnabledByTable'] as Record<string, boolean> | undefined;
 
     expect(rlsEnabledByTable).toBeDefined();
-    expect(rlsEnabledByTable!['rls_on']).toBe(true);
-    expect(rlsEnabledByTable!['rls_off']).toBe(false);
+    expect(rlsEnabledByTable!['public.rls_on']).toBe(true);
+    expect(rlsEnabledByTable!['public.rls_off']).toBe(false);
   });
 
   it('returns roles excluding system roles', {

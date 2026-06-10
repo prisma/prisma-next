@@ -5,6 +5,7 @@
  * - Different-prefix actual policy → not dropped
  * - Same-prefix sibling still in contract → not dropped when the other sibling is created
  * - F06: additive-only policy filters the replace-drop but keeps create/enable
+ * - F07: rlsEnabledByTable keyed by schema-qualified name — no cross-schema collision
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -189,7 +190,7 @@ describe('RLS planner diff-wiring', () => {
       annotations: {
         pg: {
           rlsPolicies: [existingPolicy],
-          rlsEnabledByTable: { [TABLE_NAME]: true },
+          rlsEnabledByTable: { [`public.${TABLE_NAME}`]: true },
         },
       },
     };
@@ -415,6 +416,189 @@ describe('RLS planner same-prefix replace', () => {
   });
 });
 
+describe('F07: rlsEnabledByTable cross-schema collision', () => {
+  // Two same-named tables in different schemas must not collide on RLS-enabled state.
+  // analytics.orders has RLS enabled (key: 'analytics.orders').
+  // public.orders does NOT. The planner should still emit ENABLE RLS for public.orders.
+  it('emits ENABLE RLS for a table that lacks RLS even when a same-named table in another schema has it', () => {
+    const policy = new PostgresRlsPolicy({
+      name: 'read_orders_a1b2c3d4',
+      prefix: 'read_orders',
+      tableName: 'orders',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: '(owner_id = current_user_id())',
+      permissive: true,
+    });
+
+    const schema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: {
+          orders: new StorageTable({
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              owner_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        type: {},
+        rlsPolicy: { [policy.name]: policy },
+      },
+    });
+
+    const contract: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:f07-cross-schema-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:f07-cross-schema-test'),
+        namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+
+    // The schema annotation uses schema-qualified keys.
+    // analytics.orders has RLS; public.orders does NOT — no bare 'orders' key.
+    const schemaIr = {
+      tables: {
+        orders: {
+          name: 'orders',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            owner_id: { name: 'owner_id', nativeType: 'int4', nullable: false },
+          },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      annotations: {
+        pg: {
+          rlsPolicies: [],
+          // analytics.orders has RLS; public.orders does NOT
+          rlsEnabledByTable: { 'analytics.orders': true },
+        },
+      },
+    };
+
+    const result = planner.plan({
+      contract,
+      schema: schemaIr,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+
+    const opIds = result.plan.operations.map((op) => op.id);
+    // public.orders must get ENABLE RLS — its key 'public.orders' is absent from the map
+    expect(opIds.some((id) => id.startsWith('rowLevelSecurity.'))).toBe(true);
+  });
+
+  it('does not emit ENABLE RLS when the schema-qualified key shows RLS already enabled', () => {
+    const policy = new PostgresRlsPolicy({
+      name: 'read_orders_a1b2c3d4',
+      prefix: 'read_orders',
+      tableName: 'orders',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      operation: 'select',
+      roles: ['authenticated'],
+      using: '(owner_id = current_user_id())',
+      permissive: true,
+    });
+
+    const schema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: {
+          orders: new StorageTable({
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              owner_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+        type: {},
+        rlsPolicy: { [policy.name]: policy },
+      },
+    });
+
+    const contract: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:f07-cross-schema-test-2'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:f07-cross-schema-test-2'),
+        namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+
+    // public.orders HAS RLS enabled under the schema-qualified key
+    const schemaIr = {
+      tables: {
+        orders: {
+          name: 'orders',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            owner_id: { name: 'owner_id', nativeType: 'int4', nullable: false },
+          },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      annotations: {
+        pg: {
+          rlsPolicies: [],
+          rlsEnabledByTable: { 'public.orders': true },
+        },
+      },
+    };
+
+    const result = planner.plan({
+      contract,
+      schema: schemaIr,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+
+    const opIds = result.plan.operations.map((op) => op.id);
+    // RLS already enabled — should NOT emit ENABLE RLS
+    expect(opIds.some((id) => id.startsWith('rowLevelSecurity.'))).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
@@ -462,6 +646,9 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
 }
 
 function schemaWith(policies: readonly PostgresRlsPolicy[], rlsEnabled: boolean) {
+  // rlsEnabledByTable keys are schema-qualified (${schemaName}.${tableName}).
+  // UNBOUND_NAMESPACE_ID policies resolve to the 'public' DDL schema.
+  const qualifiedKey = `public.${TABLE_NAME}`;
   return {
     tables: {
       [TABLE_NAME]: {
@@ -478,7 +665,7 @@ function schemaWith(policies: readonly PostgresRlsPolicy[], rlsEnabled: boolean)
     annotations: {
       pg: {
         rlsPolicies: policies,
-        ...(rlsEnabled ? { rlsEnabledByTable: { [TABLE_NAME]: true } } : {}),
+        ...(rlsEnabled ? { rlsEnabledByTable: { [qualifiedKey]: true } } : {}),
       },
     },
   };

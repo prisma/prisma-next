@@ -131,7 +131,7 @@ function buildRlsDiffCalls(
     const schemaName = resolveDdlSchemaForNamespaceStorage(contract.storage, policy.namespaceId);
     const tableKey = `${schemaName}.${policy.tableName}`;
 
-    if (!rlsEnabledByTable[policy.tableName] && !rlsEnabledEmitted.has(tableKey)) {
+    if (!rlsEnabledByTable[tableKey] && !rlsEnabledEmitted.has(tableKey)) {
       rlsEnabledEmitted.add(tableKey);
       calls.push(new EnableRowLevelSecurityCall(schemaName, policy.tableName));
     }
