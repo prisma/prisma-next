@@ -37,7 +37,8 @@ export abstract class SqliteMigration extends SqlMigration<SqlitePlanTargetDetai
     this.controlAdapter = stack?.adapter
       ? blindCast<
           SqlControlAdapter<'sqlite'>,
-          'The SQLite descriptor create() returns SqlControlAdapter<sqlite>; typed as wider ControlAdapterInstance at the framework boundary'        >(stack.adapter.create(stack))
+          'The SQLite descriptor create() returns SqlControlAdapter<sqlite>; typed as wider ControlAdapterInstance at the framework boundary'
+        >(stack.adapter.create(stack))
       : undefined;
   }
 

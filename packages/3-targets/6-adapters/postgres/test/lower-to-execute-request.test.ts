@@ -1,7 +1,7 @@
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { jsonb, pgTable, text } from '@prisma-next/target-postgres/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
 import { describe, expect, it } from 'vitest';

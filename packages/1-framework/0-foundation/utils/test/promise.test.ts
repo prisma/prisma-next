@@ -7,6 +7,7 @@ describe('isThenable', () => {
   });
 
   it('returns true for a custom thenable', () => {
+    // biome-ignore lint/suspicious/noThenProperty: intentional thenable fixture for isThenable tests
     const thenable = { then: () => {} };
     expect(isThenable(thenable)).toBe(true);
   });
@@ -20,6 +21,7 @@ describe('isThenable', () => {
   });
 
   it('returns false when then is not a function', () => {
+    // biome-ignore lint/suspicious/noThenProperty: intentional thenable fixture for isThenable tests
     const notAThenable = { then: 'not a function' };
     expect(isThenable(notAThenable)).toBe(false);
   });
