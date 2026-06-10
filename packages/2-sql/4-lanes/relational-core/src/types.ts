@@ -1,6 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ParamSpec } from '@prisma-next/operations';
-import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type {
+  ExtractFieldOutputTypes,
+  SqlStorage,
+  StorageColumn,
+} from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type { ColumnRef, ParamRef } from './ast/types';
 import type { ExecutionContext } from './query-lane-context';
@@ -111,6 +115,55 @@ type FallbackCodecLookup<
   : unknown;
 
 /**
+ * The refined (typeParam-applied) JS output type for a field within a namespace
+ * coordinate, read from the emitter's namespace-nested `FieldOutputTypes` map at
+ * `FieldOutputTypes[NsId][Model][Field]`. This preserves parameterized codec
+ * refinements (e.g. `Vector<N>`, `Char<N>`) that a bare codec-output lookup
+ * would drop. Resolves to `never` when the coordinate is absent from the map.
+ */
+type NamespaceFieldOutput<
+  TContract extends Contract<SqlStorage>,
+  NsId extends string,
+  ModelName extends string,
+  FieldName extends string,
+> =
+  ExtractFieldOutputTypes<TContract> extends infer Outputs
+    ? NsId extends keyof Outputs
+      ? Outputs[NsId] extends infer NamespaceOutputs
+        ? ModelName extends keyof NamespaceOutputs
+          ? NamespaceOutputs[ModelName] extends infer ModelOutputs
+            ? FieldName extends keyof ModelOutputs
+              ? ModelOutputs[FieldName]
+              : never
+            : never
+          : never
+        : never
+      : never
+    : never;
+
+/**
+ * Codec-output fallback for a storage column not backed by a domain model field
+ * in the namespace (e.g. a column with no corresponding field). Resolves the
+ * column's `codecId` against `CodecTypes`; `never` when the column is absent in
+ * the namespace. This is the secondary path — refined model fields resolve via
+ * {@link NamespaceFieldOutput}.
+ */
+type ColumnCodecFallback<
+  TContract extends Contract<SqlStorage>,
+  NsId extends string,
+  TableName extends string,
+  ColumnName extends string,
+  CodecTypes extends Record<string, { readonly output: unknown }>,
+> =
+  NamespaceStorageColumn<TContract, NsId, TableName, ColumnName> extends infer ColumnMeta
+    ? [ColumnMeta] extends [never]
+      ? never
+      : ColumnMeta extends StorageColumn
+        ? FallbackCodecLookup<ColumnMeta, CodecTypes>
+        : never
+    : never;
+
+/**
  * Type-level operation signature.
  * Represents an operation at the type level for use in contract type maps.
  */
@@ -175,13 +228,13 @@ export type OperationsForTypeId<TypeId extends string, Operations extends Operat
  * Resolves the JavaScript output type of a column addressed by an explicit
  * namespace coordinate.
  *
- * Resolution is anchored to the per-namespace contract blocks: the storage
- * column metadata comes from `storage.namespaces[NsId]` and the model/field
- * mapping from `domain.namespaces[NsId]`. The output type is derived from the
- * column's `codecId` via `CodecTypes` — the per-namespace storage column is the
- * source of truth, so a bare table name shared across namespaces resolves to
- * each namespace's own column. A column absent in the namespace resolves to
- * `never`.
+ * The table→model and column→field mapping is resolved per-namespace from
+ * `domain.namespaces[NsId]['models']`, and the refined output type from the
+ * emitter's namespace-nested `FieldOutputTypes[NsId][Model][Field]` — so a bare
+ * table name shared across namespaces resolves to each namespace's own field,
+ * and parameterized codec refinements (e.g. `Vector<N>`) are preserved. A
+ * storage column not backed by a model field in the namespace falls back to a
+ * codec-output lookup; a column absent in the namespace resolves to `never`.
  */
 export type ComputeColumnJsType<
   TContract extends Contract<SqlStorage>,
@@ -190,20 +243,18 @@ export type ComputeColumnJsType<
   ColumnName extends string,
   CodecTypes extends Record<string, { readonly output: unknown }>,
 > =
-  NamespaceStorageColumn<TContract, NsId, TableName, ColumnName> extends infer ColumnMeta
-    ? [ColumnMeta] extends [never]
-      ? never
-      : ColumnMeta extends StorageColumn
-        ? ExtractTableToModel<TContract, NsId, TableName> extends infer ModelName
-          ? [ModelName] extends [never]
-            ? FallbackCodecLookup<ColumnMeta, CodecTypes>
-            : ModelName extends string
-              ? ExtractColumnToField<TContract, NsId, TableName, ColumnName> extends infer FieldName
-                ? [FieldName] extends [never]
-                  ? FallbackCodecLookup<ColumnMeta, CodecTypes>
-                  : FieldName extends string
-                    ? FallbackCodecLookup<ColumnMeta, CodecTypes>
-                    : never
+  ExtractTableToModel<TContract, NsId, TableName> extends infer ModelName
+    ? [ModelName] extends [never]
+      ? ColumnCodecFallback<TContract, NsId, TableName, ColumnName, CodecTypes>
+      : ModelName extends string
+        ? ExtractColumnToField<TContract, NsId, TableName, ColumnName> extends infer FieldName
+          ? [FieldName] extends [never]
+            ? ColumnCodecFallback<TContract, NsId, TableName, ColumnName, CodecTypes>
+            : FieldName extends string
+              ? NamespaceFieldOutput<TContract, NsId, ModelName, FieldName> extends infer Out
+                ? [Out] extends [never]
+                  ? ColumnCodecFallback<TContract, NsId, TableName, ColumnName, CodecTypes>
+                  : Out
                 : never
               : never
           : never
