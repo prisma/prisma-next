@@ -607,7 +607,7 @@ export function parseNamespace(cursor: Cursor): GreenNode | undefined {
  * Parses a composite type declaration (`type Name { … }`). The `type` keyword
  * commits the kind; the members are model-style fields. A missing name yields
  * `Expected a name after "type"` and a missing brace (name present) yields
- * `Expected "{" to open the "type" block`, both via `finishReservedHeader`.
+ * `Expected "{" to open the "type" block`, both via `parseBlock`.
  */
 export function parseCompositeType(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'type')) return undefined;
