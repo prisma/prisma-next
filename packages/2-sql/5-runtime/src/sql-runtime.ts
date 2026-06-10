@@ -76,6 +76,10 @@ export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contrac
   readonly log?: Log;
 }
 
+/**
+ * SQL-family runtime interface. Named `Runtime` (not `SqlRuntime`) by deliberate exception
+ * to avoid a repo-wide rename; see the runtime-target-layer ADR for the recorded decision.
+ */
 export interface Runtime extends RuntimeQueryable {
   connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
