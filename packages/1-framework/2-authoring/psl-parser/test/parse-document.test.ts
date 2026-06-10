@@ -3,6 +3,7 @@ import {
   Cursor,
   parse,
   parseBlockAttribute,
+  parseCompositeType,
   parseEnum,
   parseEnumValue,
   parseField,
@@ -11,7 +12,7 @@ import {
   parseModel,
   parseNamedType,
   parseNamespace,
-  parseTypeDeclaration,
+  parseTypesBlock,
 } from '../src/parse';
 import { AttributeArgListAst, FieldAttributeAst } from '../src/syntax/ast/attributes';
 import {
@@ -168,13 +169,13 @@ describe('parse() well-formed document conformance', () => {
   });
 
   it('reproduces a types block with a named type', () => {
-    const source = 'type {\n  UserId = Int\n}';
+    const source = 'types {\n  UserId = Int\n}';
     const result = parse(source);
 
     expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
       "Document
         TypesBlock
-          Ident "type"
+          Ident "types"
           Whitespace " "
           LBrace "{"
           Newline "\\n"
@@ -196,13 +197,13 @@ describe('parse() well-formed document conformance', () => {
   });
 
   it('reproduces a named-type declaration with an attribute inside a types block', () => {
-    const source = 'type {\n  UserId = Int @db\n}';
+    const source = 'types {\n  UserId = Int @db\n}';
     const result = parse(source);
 
     expect(printTree(result.document.syntax.green)).toMatchInlineSnapshot(`
       "Document
         TypesBlock
-          Ident "type"
+          Ident "types"
           Whitespace " "
           LBrace "{"
           Newline "\\n"
@@ -374,7 +375,7 @@ describe('parse() representative multi-construct schema', () => {
     '  url = env("DATABASE_URL")',
     '}',
     '',
-    'type {',
+    'types {',
     '  UserId = Int @id',
     '}',
     '',
@@ -524,7 +525,7 @@ describe('parse() declaration-level diagnostics', () => {
   });
 
   it('flags a types block nested inside a namespace', () => {
-    const source = 'namespace outer {\ntype {\n}\n}';
+    const source = 'namespace outer {\ntypes {\n}\n}';
     const result = parse(source);
     expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_NAMESPACE_BLOCK');
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -559,7 +560,7 @@ describe('parse() declaration-level diagnostics', () => {
   });
 
   it('flags a malformed types-block member and keeps parsing the valid named type', () => {
-    const source = 'type {\n  123\n  Ok = Int\n}';
+    const source = 'types {\n  123\n  Ok = Int\n}';
     const result = parse(source);
     expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_TYPES_MEMBER');
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -573,7 +574,7 @@ describe('parse() declaration-level diagnostics', () => {
   });
 
   it('parses two top-level types blocks without a uniqueness diagnostic', () => {
-    const source = 'type {\n}\ntype {\n}';
+    const source = 'types {\n}\ntypes {\n}';
     expect(codes(source)).not.toContain('PSL_INVALID_TYPES_MEMBER');
     const decls = Array.from(parse(source).document.declarations());
     expect(decls).toHaveLength(2);
@@ -635,8 +636,12 @@ describe('ordered-alternative parsers are no-ops on non-match', () => {
     expectNoOpReject('model User {', (cursor) => parseNamespace(cursor, false));
   });
 
-  it('parseTypeDeclaration rejects a non-type keyword without consuming', () => {
-    expectNoOpReject('model User {', (cursor) => parseTypeDeclaration(cursor, false));
+  it('parseCompositeType rejects a non-type keyword without consuming', () => {
+    expectNoOpReject('model User {', parseCompositeType);
+  });
+
+  it('parseTypesBlock rejects a non-types keyword without consuming', () => {
+    expectNoOpReject('model User {', (cursor) => parseTypesBlock(cursor, false));
   });
 
   it('parseGenericBlock rejects a reserved keyword so it falls through to recovery', () => {

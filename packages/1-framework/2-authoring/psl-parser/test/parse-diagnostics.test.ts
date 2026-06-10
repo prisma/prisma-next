@@ -129,7 +129,7 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
   });
 
   it('reports a types block nested inside a namespace', () => {
-    const source = 'namespace outer {\ntype {\n}\n}';
+    const source = 'namespace outer {\ntypes {\n}\n}';
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_NAMESPACE_BLOCK');
     expect(message).toBe(
       '`types` blocks must be declared at the document top level, not inside a namespace block',
@@ -137,8 +137,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       namespace outer {
-      type {
-      ~~~~
+      types {
+      ~~~~~
       }
       }
       "
@@ -177,12 +177,12 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
   });
 
   it('reports a malformed types-block member with the offending token', () => {
-    const source = 'type {\n  123\n  Ok = Int\n}';
+    const source = 'types {\n  123\n  Ok = Int\n}';
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_TYPES_MEMBER');
     expect(message).toBe('Invalid types declaration "123"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
-      type {
+      types {
         123
         ~~~
         Ok = Int
@@ -260,12 +260,12 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
   });
 
   it('reports a types-block member missing its "=", anchored on the name', () => {
-    const source = 'type {\n  UserId Int\n}';
+    const source = 'types {\n  UserId Int\n}';
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_TYPES_MEMBER');
     expect(message).toBe('Expected "=" after "UserId"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
-      type {
+      types {
         UserId Int
         ~~~~~~
       }
@@ -428,14 +428,30 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
 
-  it('a bare type keyword yields a types block and reports the missing brace', () => {
+  it('a bare type keyword yields a composite type and reports the missing name', () => {
     const source = 'type';
     const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
-    expect(message).toBe('Expected "{" to open the "type" block');
+    expect(message).toBe('Expected a name after "type"');
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       type
       ~~~~
+      "
+    `);
+    expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(
+      CompositeTypeDeclarationAst,
+    );
+    expect(greenText(result.document.syntax.green)).toBe(source);
+  });
+
+  it('a bare types keyword yields a types block and reports the missing brace', () => {
+    const source = 'types';
+    const { result, message, diagnostic } = diagnosticFor(source, 'PSL_INVALID_DECLARATION');
+    expect(message).toBe('Expected "{" to open the "types" block');
+    expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
+      "
+      types
+           ~
       "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(TypesBlockAst);
