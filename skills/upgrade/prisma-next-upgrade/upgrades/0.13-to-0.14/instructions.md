@@ -34,6 +34,13 @@ until the cutover, so only `enumType`-authored contracts exercise it, and
 `fixtures:check` is byte-identical for every existing contract. No user-side
 action — the examples/ diff is the new feature's demonstration. Incidental
 substrate diff only.
+
+TML-2838: the PGlite-backed example apps (`prisma-next-demo`, `react-router-demo`,
+`supabase`, `bundle-size`, `multi-extension-monorepo`) switched their vitest
+`pool` from `threads` to `forks`. Running PGlite (WebAssembly) across vitest
+worker threads in one process intermittently aborts on Linux (a V8 JIT-page
+race); a process-per-fork avoids it. Test-harness only — no runtime, contract,
+or public-API change. Incidental substrate diff only.
 -->
 
 # 0.13 → 0.14 — User upgrade instructions
