@@ -47,7 +47,7 @@ The base knows nothing about sessions, roles, or Supabase.
 `SupabaseRuntimeImpl` composes the two seams into a session: acquire a connection, bind the role onto it once, hand back an object within which *everything* is bound.
 
 - **Bind at open:** `SELECT set_config($1, $2, false)` for `role` and `request.jwt.claims`. Parameterized — `SET role = $1` is invalid Postgres, and string-built SET would be an injection surface. `is_local = false` makes the GUCs session-scoped on that physical connection: that is what makes the object a session rather than a transaction.
-- **Bound by construction:** the session exposes typed execute (via the protected execute seam), transactions (a plain transaction on the bound connection), and the subclass's raw access. There is no unbound route to the underlying connection, so the bypass class from the v1 design cannot be expressed.
+- **Bound by construction:** the session exposes typed execute (via the protected execute seam), transactions (a plain transaction on the bound connection), and the subclass's raw access. The role-bound `Db` facade exposes no unbound connection-bearing method — the inherited `Runtime.connection()`/`execute()` are unbound and must never be surfaced through the facade. The guarantee is facade-encapsulation, not a type-system constraint on `SupabaseRuntimeImpl` itself.
 - **Reset on release, destroy on failure:** `release()` issues `RESET ALL` before pooling the connection; a failed reset destroys the connection instead. Pool-poisoning protection is owned by the session lifecycle, not by callers.
 - **Per-operation scope at the façade:** the role-bound `Db` opens a session per execute, per ORM operation (the ORM's `acquireRuntimeScope` acquire/release bracketing receives the session through the shim's `connection()` — the ORM's own scoping machinery becomes the enforcement mechanism), and per explicit transaction block. No connection or transaction is held across application logic.
 
@@ -61,7 +61,7 @@ The base knows nothing about sessions, roles, or Supabase.
 
 ## Consequences
 
-- RLS enforcement is binding-by-construction: the security review reduces to "can any path reach the connection without going through the session?" — a structural question, not an audit of call sites.
+- RLS enforcement is binding-by-construction: the security review reduces to "can any path reach the connection without going through the facade's session-bound surface?" — a structural question, not an audit of call sites. The invariant to preserve: `RoleBoundDb` exposes no unbound connection-bearing method.
 - Extension authors get one model: depend on bare-name interfaces, extend `Base` classes, provision queryables from the family seam, bind your semantics onto them.
 - The substrate owns two safety disciplines: connection lifecycle (release/destroy) and session hygiene (reset-or-destroy). Both are testable with a recording fake driver against real runtime objects — no self-mocks.
 - Breaking surface relative to 0.13: `SqlRuntimeImpl`/`createRuntime` gone; the family class renamed to `SqlRuntimeBase` and the target classes to `*RuntimeImpl`; the v1 verbs never ship in a release. Covered by the 0.13→0.14 upgrade declarations.
