@@ -19,7 +19,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
-import { InvalidJwtError, supabase } from '@prisma-next/extension-supabase/runtime';
+import { InvalidJwtError } from '@prisma-next/extension-supabase/runtime';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
@@ -27,11 +27,9 @@ import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
+import { createDb, TEST_JWT_SECRET } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
-
-const TEST_JWT_SECRET = 'supabase-test-secret-that-is-long-enough-for-hs256';
 
 async function signJwt(
   payload: Record<string, unknown>,
@@ -88,11 +86,7 @@ async function runDbInit(connectionString: string, migrationsDir: string): Promi
 
 async function applyRlsFixture(connectionString: string): Promise<void> {
   await withClient(connectionString, async (pg) => {
-    // Roles
-    await pg.query('CREATE ROLE anon NOLOGIN');
-    await pg.query('CREATE ROLE authenticated NOLOGIN');
-    await pg.query('CREATE ROLE service_role NOLOGIN BYPASSRLS');
-    await pg.query('GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role');
+    // Explicit per-table grants for RLS policies (roles created by bootstrapSupabaseShim).
     await pg.query('GRANT SELECT ON public.profile TO anon, authenticated');
     await pg.query('GRANT ALL ON public.profile TO service_role');
     await pg.query('GRANT INSERT ON public.profile TO service_role');
@@ -175,13 +169,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
 
       const recorder = recordingMiddleware();
 
-      const db = await supabase<Contract>({
-        contractJson,
-        url: connectionString,
-        jwtSecret: TEST_JWT_SECRET,
-        middleware: [recorder.middleware],
-        verifyMarker: false,
-      });
+      const db = await createDb(connectionString, { middleware: [recorder.middleware] });
 
       try {
         // --- asUser: sees only user A's profile ---
@@ -256,12 +244,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
         );
       });
 
-      const db = await supabase<Contract>({
-        contractJson,
-        url: connectionString,
-        jwtSecret: TEST_JWT_SECRET,
-        verifyMarker: false,
-      });
+      const db = await createDb(connectionString);
 
       try {
         // service_role can INSERT (BYPASSRLS)
@@ -322,12 +305,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       });
       await runDbInit(connectionString, migrationsDir);
 
-      const db = await supabase<Contract>({
-        contractJson,
-        url: connectionString,
-        jwtSecret: TEST_JWT_SECRET,
-        verifyMarker: false,
-      });
+      const db = await createDb(connectionString);
 
       try {
         const expiredJwt = await signJwt(

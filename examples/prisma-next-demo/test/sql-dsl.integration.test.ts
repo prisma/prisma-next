@@ -6,45 +6,27 @@
  * VP1 of the Runtime pipeline project.
  */
 
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { PostgresRuntime } from '@prisma-next/postgres/runtime';
+import pgvector from '@prisma-next/extension-pgvector/runtime';
+import postgres from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
+import type { Contract } from '../src/prisma/contract.d';
+import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
 import { crossAuthorSimilarity } from '../src/queries/cross-author-similarity';
 import { initTestDatabase } from './utils/control-client';
 
 const context = db.context;
 const { contract } = context;
-const executionStack = db.stack;
-
-async function createTestDriver(connectionString: string) {
-  const stackInstance = instantiateExecutionStack(executionStack);
-  const driver = stackInstance.driver as unknown as SqlDriver<unknown>;
-  if (!driver) {
-    throw new Error('Driver descriptor missing from execution stack');
-  }
-  const pool = new Pool({ connectionString });
-  try {
-    await driver.connect({ kind: 'pgPool', pool });
-  } catch (error) {
-    await pool.end();
-    throw error;
-  }
-  return { stackInstance, driver };
-}
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  const { stackInstance, driver } = await createTestDriver(connectionString);
-  return new PostgresRuntime({
-    context,
-    adapter: stackInstance.adapter,
-    driver,
-  });
+  return postgres<Contract>({
+    contractJson,
+    url: connectionString,
+    extensions: [pgvector],
+  }).connect();
 }
 
 const seededUserIds = {
