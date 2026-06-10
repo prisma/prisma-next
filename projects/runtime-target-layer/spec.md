@@ -14,10 +14,10 @@ Make role-scoped session state (Postgres `SET LOCAL role` / `request.jwt.claims`
 RuntimeCore (framework, abstract)
    └── SqlRuntimeBase (family, abstract)             ← protected: acquire a raw queryable (below middleware,
         │                                               correct lifecycle) + run typed plans against a queryable
-        ├── PostgresRuntimeBase / SqliteRuntimeBase  ← target concretions, constructed by their factories
-        │      └── SupabaseRuntimeBase               ← openRoleSession(binding): a queryable with
+        ├── PostgresRuntimeImpl / SqliteRuntimeImpl  ← target concretions, constructed by their factories
+        │      └── SupabaseRuntimeImpl               ← openRoleSession(binding): a queryable with
         │                                               role + request.jwt.claims session-bound
-        interfaces: SqlRuntime / PostgresRuntime / SqliteRuntime / SupabaseRuntime (the bare names)
+        interfaces: Runtime (family) / PostgresRuntime / SqliteRuntime / SupabaseRuntime (bare names)
 ```
 
 ```ts
@@ -30,20 +30,20 @@ The proof is unchanged and stays the project's acceptance bar: an RLS policy enf
 
 ## The runtime model (decided)
 
-### Layered surfaces: bare names are interfaces, `Base` names are classes
+### Layered surfaces: interfaces are the dependency surface; `Base` marks needs-extension, `Impl` marks concretions
 
-Consumers must depend on interfaces, never concretions (repo interface+factory rule; operator review). The scheme, applied uniformly:
+Consumers must depend on interfaces, never concretions (repo interface+factory rule; operator review). Class suffixes follow the repo conventions: **`Base` indicates a class that needs extension to be useful** (abstract); **`Impl` indicates a concrete implementation** (the existing convention, restored):
 
-| Layer | Interface (what you depend on) | Class (what you extend) |
+| Layer | Interface (what you depend on) | Class |
 |---|---|---|
 | Framework | `RuntimeExecutor` | `RuntimeCore` (abstract) |
-| SQL family | `SqlRuntime` *(today named `Runtime`; see Open Questions)* | `SqlRuntimeBase` (abstract) |
-| Target | `PostgresRuntime`, `SqliteRuntime` | `PostgresRuntimeBase`, `SqliteRuntimeBase` (concrete) |
-| Extension | `SupabaseRuntime` | `SupabaseRuntimeBase` |
+| SQL family | `Runtime` (existing name, kept — see note) | `SqlRuntimeBase` (abstract) |
+| Target | `PostgresRuntime`, `SqliteRuntime` | `PostgresRuntimeImpl`, `SqliteRuntimeImpl` (concrete) |
+| Extension | `SupabaseRuntime` | `SupabaseRuntimeImpl extends PostgresRuntimeImpl` |
 
-- A **bare name** is always a type you can hold a value of. Target interfaces start as empty extensions of the family interface — their value is the *named dependency surface*, so adding target surface later is non-breaking.
-- A **`Base` name** is always a class you extend (or, for targets, that a factory constructs). Factories construct the `Base` class and return the interface; the class never flows to app code as a value.
-- `SupabaseRuntimeBase extends PostgresRuntimeBase`; further extension stays possible by the same rule.
+- **Interfaces carry the bare names** and are the only types app code and tests may depend on. Target interfaces start as empty extensions of the family interface — their value is the *named dependency surface*, so adding target surface later is non-breaking.
+- **`Impl` classes are exported solely as extension seams** (a deliberate refinement of the classic package-private-Impl rule, which cannot hold when `SupabaseRuntimeImpl` in another package must extend `PostgresRuntimeImpl`). Depending on an `Impl` as a type remains forbidden; factories construct `Impl` and return the interface, so a concretion never flows to app code as a value.
+- **Family interface name:** `Runtime` predates this scheme and stays (operator decision) — renaming it to `SqlRuntime` would touch every consumer of `@prisma-next/sql-runtime` for symmetry alone. Recorded as the scheme's one deliberate naming exception; it lives inside the SQL package, so ambiguity is low.
 
 ### The base primitive: provision a queryable, separately from executing against it
 
@@ -56,7 +56,7 @@ The previous protected verbs — `executeWithSessionBootstrap`, `executeTransact
 
 ### The subclass model: session-coupled connections
 
-`SupabaseRuntimeBase` provides `openRoleSession(binding): Promise<RoleSession>` *(names indicative)*:
+`SupabaseRuntimeImpl` provides `openRoleSession(binding): Promise<RoleSession>` *(names indicative)*:
 
 - **Bind once, at open:** acquire a raw connection; issue `SELECT set_config($1, $2, false)` for `role` and `request.jwt.claims` (parameterized — `SET role = $1` is invalid Postgres, and string-built SQL would be injectable). `is_local = false`: the GUCs are **session-scoped on that physical connection**, which is what makes the object a session rather than a transaction.
 - **Everything within the session is bound:** the session exposes the queryable surface (typed executes via the protected execute-against-queryable seam, raw access for the subclass, `transaction(fn)` as a plain transaction on the bound connection — no bespoke role-transaction machinery). There is no unbound path to reach the connection.
@@ -78,7 +78,7 @@ The final-review RLS bypass (ORM mutations/includes running unbound) was patched
 - **Examples and tests consume the application surface:** examples use the target façades (`postgres()`, `sqlite()`, `supabase()`), not direct `new *RuntimeBase(...)`; example tests use the example app's own `db`, not a privately fabricated runtime. The `examples/supabase` app itself adopts `supabase()` as its db (the walking-skeleton contract), with the control-plane flow keeping whatever client it needs.
 - **Build-derived metadata:** the Supabase runtime descriptor's `version` is derived from `package.json` at build time, not hardcoded.
 - **Role names:** the `'anon' | 'authenticated' | 'service_role'` literals remain hardcoded **with a `TODO(TML-2501)`** at the definition site; they migrate to the Supabase extension's contract (roles as first-class IR) when `postgres-rls` lands. Agreed in review.
-- **Hot path unchanged**; **the skeleton stays green throughout**; **upgrade declarations** track every public-surface change (the rename to `SqlRuntimeBase` and the deletion of the v1 verbs extend the existing 0.13→0.14 declarations).
+- **Hot path unchanged**; **the skeleton stays green throughout**; **upgrade declarations** track every public-surface change (the renames to `SqlRuntimeBase`/`*RuntimeImpl` and the deletion of the v1 verbs extend the existing 0.13→0.14 declarations).
 
 ## Non-goals
 
@@ -96,9 +96,9 @@ Single consolidated PR (#792). Within it: every build stage leaves the workspace
 
 Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibration/dod.md)). Project-specific:
 
-- [ ] The layered interface/class scheme ships as specified: bare-name interfaces (`PostgresRuntime`, `SqliteRuntime`, `SupabaseRuntime`, and the family interface), `Base` classes as the only concretions, factories returning interfaces. No `createRuntime`; no `SqlRuntimeImpl`; no `RawSessionConnection`.
+- [ ] The layered interface/class scheme ships as specified: bare-name interfaces (`PostgresRuntime`, `SqliteRuntime`, `SupabaseRuntime`, and the family interface), `Base` classes as the only concretions, factories returning interfaces. No `createRuntime`; no family-level concretion; no `RawSessionConnection`.
 - [ ] `SqlRuntimeBase` exposes the provision-a-queryable seam (raw connection, below middleware, full lifecycle) separately from execute-against-queryable; the v1 verb primitives are gone. Lifecycle unit tests (stickiness, release-on-drain, destroy-on-failure, reset-on-release, pool-poisoning eviction) pass against the session seam.
-- [ ] `SupabaseRuntimeBase.openRoleSession` provides session-coupled connections; `RoleBoundDb` routes **all** paths (execute, ORM scope via `connection()`, transactions) through the session; a test proves ORM mutations and includes are role-bound.
+- [ ] `SupabaseRuntimeImpl.openRoleSession` provides session-coupled connections; `RoleBoundDb` routes **all** paths (execute, ORM scope via `connection()`, transactions) through the session; a test proves ORM mutations and includes are role-bound.
 - [ ] No test mocks our own constructors/modules; extension facade tests run real objects over a recording fake driver.
 - [ ] Examples consume façades; example tests consume the example app's `db`; the `examples/supabase` app's `db` is built on `supabase()`.
 - [ ] **Acceptance (unchanged, the project's point):** `examples/supabase` asserts through the ORM, against a raw-SQL RLS policy: `asUser(jwt)` sees only the owner's rows (reads and writes), `asAnon()` sees none, `asServiceRole()` sees all, and user middleware never observes the binding SQL. Hermetic; no real Supabase; no `postgres-rls`.
@@ -106,9 +106,8 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 
 ## Open Questions
 
-1. **Family interface name.** `Runtime` (exported from `@prisma-next/sql-runtime`) is already the SQL-family interface, despite the generic name. Working position: rename it to `SqlRuntime` as part of the interface/Base scheme so the bare-name rule holds at every layer, with an upgrade-declaration entry; if the churn proves disproportionate mid-implementation, keep `Runtime` and document the exception. Operator may override on doc review.
-2. **Session GUC mechanics.** Working position: bind with `set_config(..., is_local = false)` at session open + mandatory `RESET ALL` on release (destroy on reset failure). Rejected alternative — transaction-local `SET LOCAL` per operation — is recorded in the ADR (it forces a transaction around every statement and is what produced the v1 verb API).
-3. **Exact seam names.** `acquireRawConnection` / `openRoleSession` / `RoleSession` are indicative; implementer may improve within the model (provision ≠ execute; bare-name interfaces; session noun).
+1. **Session GUC mechanics.** Working position: bind with `set_config(..., is_local = false)` at session open + mandatory `RESET ALL` on release (destroy on reset failure). Rejected alternative — transaction-local `SET LOCAL` per operation — is recorded in the ADR (it forces a transaction around every statement and is what produced the v1 verb API).
+2. **Exact seam names.** `acquireRawConnection` / `openRoleSession` / `RoleSession` are indicative; implementer may improve within the model (provision ≠ execute; bare-name interfaces; session noun).
 
 ## References
 

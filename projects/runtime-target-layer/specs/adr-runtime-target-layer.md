@@ -18,16 +18,18 @@ Three structural gaps, then:
 
 ## Decision
 
-### 1. Bare names are interfaces; `Base` names are classes
+### 1. Interfaces are the dependency surface; `Base` marks needs-extension, `Impl` marks concretions
 
-Every layer of the runtime exposes two surfaces: an interface you depend on, and a class you extend. Interfaces carry the bare names; classes carry the `Base` suffix; factories construct `Base` classes and return interfaces, so a concretion never flows into app code as a value.
+Every layer of the runtime exposes two surfaces: an interface you depend on, and a class. Interfaces carry the bare names. Class suffixes follow the repo conventions: `Base` for a class that needs extension to be useful (abstract), `Impl` for a concrete implementation. Factories construct `Impl` classes and return interfaces, so a concretion never flows into app code as a value.
 
 | Layer | Interface | Class |
 |---|---|---|
 | Framework | `RuntimeExecutor` | `RuntimeCore` (abstract) |
-| SQL family | the family interface (today `Runtime`) | `SqlRuntimeBase` (abstract) |
-| Target | `PostgresRuntime`, `SqliteRuntime` | `PostgresRuntimeBase`, `SqliteRuntimeBase` |
-| Extension | `SupabaseRuntime` | `SupabaseRuntimeBase extends PostgresRuntimeBase` |
+| SQL family | `Runtime` (existing name, kept) | `SqlRuntimeBase` (abstract) |
+| Target | `PostgresRuntime`, `SqliteRuntime` | `PostgresRuntimeImpl`, `SqliteRuntimeImpl` |
+| Extension | `SupabaseRuntime` | `SupabaseRuntimeImpl extends PostgresRuntimeImpl` |
+
+Two recorded refinements: **(a)** `Impl` classes are exported solely as extension seams — a deliberate relaxation of the classic package-private-`Impl` rule, which cannot hold when `SupabaseRuntimeImpl` (another package) must extend `PostgresRuntimeImpl`; depending on an `Impl` as a type remains forbidden. **(b)** The family interface keeps its existing name `Runtime` rather than being renamed `SqlRuntime`: the rename would touch every consumer of `@prisma-next/sql-runtime` for naming symmetry alone (operator decision). It is the scheme's one naming exception.
 
 There is no family-level construction path: `createRuntime` is deleted, and each target factory (`postgres()`, `sqlite()`, `supabase()`) constructs its own `Base` class. Target interfaces begin as empty extensions of the family interface; their value is the named dependency surface, which makes later target-specific surface additive rather than breaking.
 
@@ -42,7 +44,7 @@ The base knows nothing about sessions, roles, or Supabase.
 
 ### 3. Subclasses provide session-coupled connections
 
-`SupabaseRuntimeBase` composes the two seams into a session: acquire a connection, bind the role onto it once, hand back an object within which *everything* is bound.
+`SupabaseRuntimeImpl` composes the two seams into a session: acquire a connection, bind the role onto it once, hand back an object within which *everything* is bound.
 
 - **Bind at open:** `SELECT set_config($1, $2, false)` for `role` and `request.jwt.claims`. Parameterized — `SET role = $1` is invalid Postgres, and string-built SET would be an injection surface. `is_local = false` makes the GUCs session-scoped on that physical connection: that is what makes the object a session rather than a transaction.
 - **Bound by construction:** the session exposes typed execute (via the protected execute seam), transactions (a plain transaction on the bound connection), and the subclass's raw access. There is no unbound route to the underlying connection, so the bypass class from the v1 design cannot be expressed.
@@ -62,7 +64,7 @@ The base knows nothing about sessions, roles, or Supabase.
 - RLS enforcement is binding-by-construction: the security review reduces to "can any path reach the connection without going through the session?" — a structural question, not an audit of call sites.
 - Extension authors get one model: depend on bare-name interfaces, extend `Base` classes, provision queryables from the family seam, bind your semantics onto them.
 - The substrate owns two safety disciplines: connection lifecycle (release/destroy) and session hygiene (reset-or-destroy). Both are testable with a recording fake driver against real runtime objects — no self-mocks.
-- Breaking surface relative to 0.13: `SqlRuntimeImpl`/`createRuntime` gone; the family class renamed to `SqlRuntimeBase`; the v1 verbs never ship in a release. Covered by the 0.13→0.14 upgrade declarations.
+- Breaking surface relative to 0.13: `SqlRuntimeImpl`/`createRuntime` gone; the family class renamed to `SqlRuntimeBase` and the target classes to `*RuntimeImpl`; the v1 verbs never ship in a release. Covered by the 0.13→0.14 upgrade declarations.
 
 ## Cross-references
 
