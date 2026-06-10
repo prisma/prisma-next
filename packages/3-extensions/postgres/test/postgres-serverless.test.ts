@@ -112,6 +112,7 @@ describe('postgresServerless', () => {
 
     // After scope exit, the runtime was closed
     expect(closeSpy).toBeDefined();
+    expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
   it('explicit Symbol.asyncDispose invocation calls runtime.close exactly once', async () => {
