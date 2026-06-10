@@ -1,16 +1,22 @@
 import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
+  AuthoringEntityContext,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
+  PslExtensionBlock,
+  PslExtensionBlockParamList,
+  PslExtensionBlockParamRef,
+  PslExtensionBlockParamScalarValue,
 } from '@prisma-next/framework-components/authoring';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
 import { PostgresEnumTypeSchema } from '@prisma-next/sql-contract/validators';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
-import { PostgresRlsPolicy, type PostgresRlsPolicyInput } from './postgres-rls-policy';
+import { PostgresRlsPolicy } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
+import { computeContentHash, normalizePredicate } from './rls/canonicalize';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 
@@ -44,6 +50,77 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
  * enum-specific narrowing through `EntityHelperFunction` is a
  * separable refinement and lives outside this PR.
  */
+/**
+ * The PSL interpreter attaches the enclosing namespace id to the extension
+ * block before calling this factory, so the policy can record its schema
+ * coordinate without the interpreter containing any RLS-specific knowledge.
+ */
+export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
+  readonly namespaceId: string;
+}
+
+function readRefParam(block: PslExtensionBlock, key: string): string | undefined {
+  const param = block.parameters[key];
+  if (param === undefined) return undefined;
+  const p = param as PslExtensionBlockParamRef;
+  return p.kind === 'ref' ? p.identifier : undefined;
+}
+
+function readValueParam(block: PslExtensionBlock, key: string): string | undefined {
+  const param = block.parameters[key];
+  if (param === undefined) return undefined;
+  const p = param as PslExtensionBlockParamScalarValue;
+  return p.kind === 'value' ? p.raw : undefined;
+}
+
+function readListRefParams(block: PslExtensionBlock, key: string): string[] {
+  const param = block.parameters[key];
+  if (param === undefined) return [];
+  const p = param as PslExtensionBlockParamList;
+  if (p.kind !== 'list') return [];
+  return p.items.flatMap((item) => {
+    const ref = item as PslExtensionBlockParamRef;
+    return ref.kind === 'ref' ? [ref.identifier] : [];
+  });
+}
+
+function unwrapQuotedString(raw: string): string {
+  if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
+    return raw.slice(1, -1);
+  }
+  return raw;
+}
+
+function lowerRlsPolicyFromBlock(
+  block: RlsPolicyExtensionBlock,
+  _ctx: AuthoringEntityContext,
+): PostgresRlsPolicy {
+  const prefix = block.name;
+  const targetModelName = readRefParam(block, 'target') ?? '';
+  const tableName = targetModelName.charAt(0).toLowerCase() + targetModelName.slice(1);
+  const roles = [...readListRefParams(block, 'roles')].sort();
+  const using = unwrapQuotedString(readValueParam(block, 'using') ?? '');
+
+  const wireHash = computeContentHash({
+    using: normalizePredicate(using),
+    roles,
+    operation: 'select',
+    permissive: true,
+  });
+  const wireName = `${prefix}_${wireHash}`;
+
+  return new PostgresRlsPolicy({
+    name: wireName,
+    prefix,
+    tableName,
+    namespaceId: block.namespaceId,
+    operation: 'select',
+    roles,
+    using,
+    permissive: true,
+  });
+}
+
 export const postgresAuthoringEntityTypes = {
   enum: {
     kind: 'entity',
@@ -69,7 +146,7 @@ export const postgresAuthoringEntityTypes = {
     validatorSchema: PostgresRlsPolicySchema,
     entrySlotName: 'rlsPolicy',
     output: {
-      factory: (input: PostgresRlsPolicyInput): PostgresRlsPolicy => new PostgresRlsPolicy(input),
+      factory: lowerRlsPolicyFromBlock,
     },
   },
 } as const satisfies AuthoringEntityTypeNamespace;

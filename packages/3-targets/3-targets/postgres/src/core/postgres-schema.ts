@@ -235,6 +235,11 @@ export function postgresCreateNamespace(
     entries: {
       table: input.entries.table,
       type: (enumTypes ?? {}) as Record<string, PostgresEnumTypeInput>,
+      role: (input.entries.extensionEntities?.['role'] ?? {}) as Record<string, PostgresRoleInput>,
+      rlsPolicy: (input.entries.extensionEntities?.['rlsPolicy'] ?? {}) as Record<
+        string,
+        PostgresRlsPolicyInput
+      >,
     },
   };
   if (input.id === UNBOUND_NAMESPACE_ID) {

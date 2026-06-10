@@ -16,7 +16,10 @@ import type {
   AuthoringEntityContext,
   AuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
-import { instantiateAuthoringEntityType } from '@prisma-next/framework-components/authoring';
+import {
+  instantiateAuthoringEntityType,
+  isAuthoringEntityTypeDescriptor,
+} from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
@@ -24,6 +27,7 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import { namespacePslExtensionBlocks } from '@prisma-next/framework-components/psl-ast';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
@@ -121,7 +125,10 @@ export interface InterpretPslDocumentToSqlContractInput {
    * without the factory and falls back to the family
    * `SqlUnboundNamespace` singleton.
    */
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly createNamespace?: (
+    input: SqlNamespaceTablesInput,
+    enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+  ) => Namespace;
 }
 
 function buildComposedExtensionPackRefs(
@@ -297,6 +304,87 @@ function validateNamespaceBlocksForSqlTarget(input: {
       });
     }
   }
+}
+
+/**
+ * Walks the flat `entityTypes` namespace tree in `authoringContributions` and
+ * returns a map from discriminator string to the matching descriptor. The
+ * interpreter uses this to dispatch parsed extension blocks to their factory
+ * without naming any specific discriminator value (generic, by-discriminator).
+ */
+function buildEntityTypesByDiscriminator(
+  contributions: AuthoringContributions | undefined,
+): ReadonlyMap<string, AuthoringEntityTypeDescriptor> {
+  const result = new Map<string, AuthoringEntityTypeDescriptor>();
+  const namespace = contributions?.entityTypes;
+  if (namespace === undefined) return result;
+
+  const walk = (node: Readonly<Record<string, unknown>>): void => {
+    for (const value of Object.values(node)) {
+      if (isAuthoringEntityTypeDescriptor(value)) {
+        result.set(value.discriminator, value);
+      } else if (typeof value === 'object' && value !== null) {
+        walk(
+          blindCast<Readonly<Record<string, unknown>>, 'walking nested entity type namespace'>(
+            value,
+          ),
+        );
+      }
+    }
+  };
+  walk(
+    blindCast<Readonly<Record<string, unknown>>, 'walking root entity type namespace'>(namespace),
+  );
+  return result;
+}
+
+/**
+ * For a single PSL namespace, lowers all extension blocks (parsed by
+ * `namespacePslExtensionBlocks`) into IR entities via the registered
+ * factory for each block's discriminator. Groups results by `entrySlotName`.
+ *
+ * This pass is intentionally generic: no discriminator value is named here.
+ * The factory (registered by the target pack) owns all block-specific logic.
+ *
+ * The `namespaceId` is attached to the block before the factory call so the
+ * factory can record the namespace coordinate without the interpreter
+ * containing any target-specific knowledge about how namespace ids are used.
+ */
+function lowerExtensionBlocksForNamespace(
+  ns: PslNamespace,
+  nsId: string,
+  entityTypesByDiscriminator: ReadonlyMap<string, AuthoringEntityTypeDescriptor>,
+  entityContext: AuthoringEntityContext,
+): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
+  const blocks = namespacePslExtensionBlocks(ns);
+  if (blocks.length === 0) return {};
+
+  const result: Record<string, Record<string, unknown>> = {};
+
+  for (const block of blocks) {
+    const descriptor = entityTypesByDiscriminator.get(block.kind);
+    if (descriptor === undefined || descriptor.entrySlotName === undefined) continue;
+
+    const annotatedBlock = { ...block, namespaceId: nsId };
+    const entity = instantiateAuthoringEntityType(
+      descriptor.discriminator,
+      descriptor,
+      [annotatedBlock],
+      entityContext,
+    );
+    if (entity === undefined) continue;
+
+    const slotName = descriptor.entrySlotName;
+    const slot = result[slotName] ?? {};
+    result[slotName] = slot;
+    const entityRecord = blindCast<
+      Record<string, unknown>,
+      'factory output placed under entry slot'
+    >(slot);
+    entityRecord[block.name] = entity;
+  }
+
+  return result;
 }
 
 interface ProcessEnumDeclarationsInput {
@@ -2108,6 +2196,60 @@ export function interpretPslDocumentToSqlContract(
     });
   }
 
+  // Generic extension-block lowering pass: per named namespace, lower all
+  // parsed extension blocks into IR entities via the registered factory for
+  // each block's discriminator, then collect by entrySlotName. This pass
+  // names no specific discriminator value — all target-specific logic lives
+  // in the factory contributed by the target pack.
+  const entityTypesByDiscriminator = buildEntityTypesByDiscriminator(input.authoringContributions);
+  const extensionEntityContext: AuthoringEntityContext = {
+    family: input.target.familyId,
+    target: input.target.targetId,
+  };
+  const namespaceExtensionEntities = new Map<
+    string,
+    Readonly<Record<string, Readonly<Record<string, unknown>>>>
+  >();
+  for (const ns of input.document.ast.namespaces) {
+    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME) continue;
+    const nsId = resolveNamespaceIdForSqlTarget({
+      bucketName: ns.name,
+      targetId: input.target.targetId,
+    });
+    if (nsId === undefined) continue;
+    const entities = lowerExtensionBlocksForNamespace(
+      ns,
+      nsId,
+      entityTypesByDiscriminator,
+      extensionEntityContext,
+    );
+    if (Object.keys(entities).length > 0) {
+      namespaceExtensionEntities.set(nsId, entities);
+    }
+  }
+
+  // Wrap createNamespace to inject extension entities into each namespace input
+  // so the target factory can route them to the appropriate entry slots.
+  // The optional enumTypes second argument is forwarded unchanged — the wrapper
+  // only enriches the first argument.
+  const createNamespaceWithExtensions =
+    input.createNamespace !== undefined
+      ? (
+          nsInput: SqlNamespaceTablesInput,
+          enumTypes?: Readonly<Record<string, PostgresEnumStorageEntry>>,
+        ) => {
+          const entities = namespaceExtensionEntities.get(nsInput.id);
+          if (entities === undefined) {
+            return input.createNamespace!(nsInput, enumTypes);
+          }
+          const extended: SqlNamespaceTablesInput = {
+            ...nsInput,
+            entries: { ...nsInput.entries, extensionEntities: entities },
+          };
+          return input.createNamespace!(extended, enumTypes);
+        }
+      : undefined;
+
   const contract = buildSqlContractFromDefinition({
     target: input.target,
     ...ifDefined(
@@ -2122,7 +2264,7 @@ export function interpretPslDocumentToSqlContract(
     ...(Object.keys(namespaceEnumStorageTypes).length > 0
       ? { namespaceTypes: namespaceEnumStorageTypes }
       : {}),
-    ...ifDefined('createNamespace', input.createNamespace),
+    ...ifDefined('createNamespace', createNamespaceWithExtensions),
     models: stiColumnModelNodes.map((model) => ({
       ...model,
       ...(modelRelations.has(model.modelName)

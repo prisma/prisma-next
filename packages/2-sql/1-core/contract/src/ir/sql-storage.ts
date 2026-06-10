@@ -23,6 +23,17 @@ export interface SqlNamespaceTablesInput {
   readonly entries: {
     readonly table: Record<string, StorageTable | StorageTableInput>;
     readonly valueSet?: Record<string, StorageValueSet | StorageValueSetInput>;
+    /**
+     * Extension-block-derived entities keyed by entry slot name, then by
+     * entity name. The PSL interpreter populates this generically (one entry
+     * per `entrySlotName` across all loaded extension-block kinds); the
+     * target-supplied `createNamespace` factory reads the slots it owns and
+     * routes them into the target `Namespace` concretion.
+     *
+     * The shape is intentionally `Record<string, unknown>` at the family level
+     * so no target-specific types cross the family boundary.
+     */
+    readonly extensionEntities?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   };
 }
 

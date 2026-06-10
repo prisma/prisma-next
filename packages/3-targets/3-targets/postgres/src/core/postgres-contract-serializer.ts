@@ -149,13 +149,16 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         typeof rawRlsPolicySlot === 'object' &&
         !Array.isArray(rawRlsPolicySlot)
       ) {
-        const rlsPolicyFactory = this.entityTypeRegistry.get('postgres-rls-policy');
+        // Pass raw entries directly — the PostgresSchema constructor already
+        // handles PostgresRlsPolicyInput objects. The rlsPolicy authoring
+        // factory lowers PslExtensionBlock nodes (PSL path), not JSON (this path).
         rlsPolicySlot = Object.fromEntries(
           Object.entries(rawRlsPolicySlot as Record<string, unknown>).map(([name, entry]) => [
             name,
-            blindCast<PostgresRlsPolicy, 'postgres-rls-policy factory returns PostgresRlsPolicy'>(
-              rlsPolicyFactory !== undefined ? rlsPolicyFactory(entry) : entry,
-            ),
+            blindCast<
+              PostgresRlsPolicy,
+              'PostgresSchema constructor accepts PostgresRlsPolicyInput'
+            >(entry),
           ]),
         );
       }
