@@ -301,14 +301,11 @@ function sqliteDefaultToDdlColumnDefault(
  */
 export function tableToDdlParts(
   table: StorageTable,
-  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
 ): { columns: DdlColumn[]; constraints: DdlTableConstraint[] } {
   const columns: DdlColumn[] = Object.entries(table.columns).map(([name, column]) => {
     const inlineAutoincrement = isInlineAutoincrementPrimaryKey(table, name);
-    const typeSql = buildColumnTypeSql(
-      column,
-      storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
-    );
+    const typeSql = buildColumnTypeSql(column, storageTypes);
     if (inlineAutoincrement) {
       // `DdlColumn` has no SQLite-specific autoincrement flag, so the full
       // `PRIMARY KEY AUTOINCREMENT` clause is embedded in the `type` string.

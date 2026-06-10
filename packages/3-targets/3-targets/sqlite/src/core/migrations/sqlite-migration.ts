@@ -3,6 +3,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import { errorSqliteMigrationStackMissing } from '../errors';
 import { CreateTableCall } from './op-factory-call';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
@@ -33,11 +34,11 @@ export abstract class SqliteMigration extends SqlMigration<SqlitePlanTargetDetai
 
   constructor(stack?: ControlStack<'sql', 'sqlite'>) {
     super(stack);
-    // The descriptor `create()` is typed as the wider `ControlAdapterInstance`;
-    // the SQLite descriptor concretely returns a `SqlControlAdapter<'sqlite'>`,
-    // so the cast holds for any SQLite-target stack assembled at runtime.
     this.controlAdapter = stack?.adapter
-      ? (stack.adapter.create(stack) as SqlControlAdapter<'sqlite'>)
+      ? blindCast<
+          SqlControlAdapter<'sqlite'>,
+          'The SQLite descriptor create() returns SqlControlAdapter<sqlite>; typed as wider ControlAdapterInstance at the framework boundary'
+        >(stack.adapter.create(stack))
       : undefined;
   }
 
