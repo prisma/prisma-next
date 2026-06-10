@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   Cursor,
-  type ParseDiagnostic,
   parseArrayLiteral,
   parseAttribute,
   parseAttributeArg,
@@ -23,7 +22,7 @@ import {
 } from '../src/syntax/ast/expressions';
 import type { GreenElement, GreenNode } from '../src/syntax/green';
 import { createSyntaxTree } from '../src/syntax/red';
-import { printTree } from './support';
+import { highlight, printTree } from './support';
 
 function greenText(element: GreenElement): string {
   if (element.type === 'token') return element.text;
@@ -40,8 +39,10 @@ describe('offset tracking', () => {
 
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
-    expect(offendingOffset(cursor, diagnostics[0]!)).toBe(4);
-    expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe('.');
+    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
+      ".c
+      ~"
+    `);
   });
 });
 
@@ -397,10 +398,6 @@ describe('parseTypeAnnotation well-formed', () => {
   });
 });
 
-function offendingOffset(cursor: Cursor, diagnostic: ParseDiagnostic) {
-  return cursor.sourceFile.offsetAt(diagnostic.range.start);
-}
-
 describe('parseTypeAnnotation fault tolerance', () => {
   it('flags triple-dot over-qualification but still yields a subtree that round-trips', () => {
     const source = 'a.b.c';
@@ -411,9 +408,10 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
     expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
-    // range points at the offending second dot
-    expect(offendingOffset(cursor, diagnostics[0]!)).toBe(3);
-    expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe('.');
+    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
+      "a.b.c
+         ~"
+    `);
   });
 
   it('flags double-colon over-qualification but still yields a subtree', () => {
@@ -425,8 +423,10 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
     expect(diagnostics[0]!.message).toBe('Qualified type reference has too many segments');
-    expect(offendingOffset(cursor, diagnostics[0]!)).toBe(3);
-    expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe(':');
+    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
+      "a:b:c
+         ~"
+    `);
   });
 });
 
@@ -440,19 +440,25 @@ describe('parseAttribute fault tolerance', () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
     expect(diagnostics[0]!.message).toBe('Attribute name expected');
-    expect(offendingOffset(cursor, diagnostics[0]!)).toBe(0);
-    expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe('@');
+    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
+      "@
+      ~"
+    `);
   });
 
   it('flags a missing name after a dotted attribute segment', () => {
     const source = '@ns.';
-    const { node, diagnostics } = parse(source, parseAttribute);
+    const { node, diagnostics, cursor } = parse(source, parseAttribute);
 
     expect(node.kind).toBe('FieldAttribute');
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
     expect(diagnostics[0]!.message).toBe('Attribute name expected after "."');
+    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
+      "@ns.
+          ~"
+    `);
   });
 });
 
@@ -532,8 +538,10 @@ describe('argument-position object literal', () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
     expect(diagnostics[0]!.message).toBe('Unterminated object literal');
-    expect(offendingOffset(cursor, diagnostics[0]!)).toBe(0);
-    expect(source[offendingOffset(cursor, diagnostics[0]!)]).toBe('{');
+    expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
+      "{ a: 1
+      ~"
+    `);
   });
 });
 
