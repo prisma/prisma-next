@@ -34,6 +34,17 @@ changes:
 ---
 
 <!--
+TML-2859: SQLite createTable authoring method. The free `createTable` function from
+`@prisma-next/sqlite/migration` is now a protected method on the `SqliteMigration`
+base class. The `createTable` re-export test in `packages/3-extensions/sqlite/` was
+removed (it asserted the free function was exported, which is no longer true). The
+README was updated to reflect the current authoring surface. No extension-author action
+beyond what the `sqlite-create-table-method` entry in the 0.12-to-0.13 instructions
+already covers. Incidental substrate diff only.
+-->
+
+
+<!--
 TML-2785: the sql-orm-client runtime gained M:N correlated include
 reads — `.include()` of an N:M relation resolves child rows through the
 junction table via a correlated subquery. Internal runtime only; no

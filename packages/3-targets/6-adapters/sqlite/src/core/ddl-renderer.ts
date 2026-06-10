@@ -109,6 +109,7 @@ const defaultVisitor: DdlColumnDefaultVisitor<string> = {
     if (node.expression === 'autoincrement()') {
       return '';
     }
+    if (node.expression === 'now()') return "DEFAULT (datetime('now'))";
     return `DEFAULT (${node.expression})`;
   },
 };
