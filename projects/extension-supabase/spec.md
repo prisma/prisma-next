@@ -72,17 +72,17 @@ export async function adminListProfiles() {
 
 Under the hood:
 
+```mermaid
+classDiagram
+  RuntimeCore <|-- SqlRuntime
+  SqlRuntime <|-- PostgresRuntime
+  PostgresRuntime <|-- SupabaseRuntime
 ```
-abstract class RuntimeCore<…>                                              // framework-components (existing, exported)
-   ↑
-class SqlRuntime extends RuntimeCore<…>                                    // sql-runtime (exported via runtime-target-layer project)
-   ↑
-class PostgresRuntime extends SqlRuntime                                   // postgres/runtime (added by runtime-target-layer project)
-   ↑
-class SupabaseRuntime extends PostgresRuntime                              // THIS PROJECT
-                                                                           // overrides execute() to wrap in implicit transaction +
-                                                                           // SET LOCAL role + request.jwt.claims, below user middleware
-```
+
+- `RuntimeCore` — framework-components (existing, exported).
+- `SqlRuntime` — sql-runtime (exported via the runtime-target-layer project).
+- `PostgresRuntime` — postgres/runtime (added by the runtime-target-layer project).
+- `SupabaseRuntime` — **this project**; overrides `execute()` to wrap in an implicit transaction + `SET LOCAL role` + `request.jwt.claims`, below user middleware.
 
 ## Problem
 
@@ -268,15 +268,14 @@ Six properties are load-bearing:
 
 ### Class hierarchy
 
+```mermaid
+classDiagram
+  RuntimeCore <|-- SqlRuntime
+  SqlRuntime <|-- PostgresRuntime
+  PostgresRuntime <|-- SupabaseRuntime
 ```
-abstract class RuntimeCore<…>                                              // framework-components (exists)
-   ↑
-class SqlRuntime extends RuntimeCore<…>                                    // sql-runtime (exported via runtime-target-layer)
-   ↑
-class PostgresRuntime extends SqlRuntime                                   // postgres/runtime (added by runtime-target-layer)
-   ↑
-class SupabaseRuntime extends PostgresRuntime                              // THIS PROJECT
-```
+
+Origins: `RuntimeCore` (framework-components, exists); `SqlRuntime` (sql-runtime, exported via runtime-target-layer); `PostgresRuntime` (postgres/runtime, added by runtime-target-layer); `SupabaseRuntime` (this project).
 
 `SupabaseRuntime`'s additional surface:
 
@@ -391,7 +390,7 @@ This project is the integration layer; it consumes all four sibling projects:
 
 Resulting global sequence (within the Supabase umbrella): **TML-2459 + control-policy → cross-contract-refs ∥ postgres-rls ∥ runtime-target-layer → this project**.
 
-This project lands the integration / launch milestone. Slipping any upstream dependency cascades into this project.
+This project lands the integration / launch. Slipping any upstream dependency cascades into this project.
 
 # Acceptance Criteria
 

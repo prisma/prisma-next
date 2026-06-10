@@ -48,6 +48,33 @@ storage-legitimate concept). A column keeps its `codecId` + `nativeType` and add
 `valueSet` restriction referencing the storage value-set. The value-set is referenced,
 not inlined, so the values live once per plane.
 
+### PSL surface
+
+The codec is a required block attribute and each member's value is assigned with `=`:
+
+```prisma
+enum Role {
+  @@type("pg/text@1")
+  User  = "user"
+  Admin = "admin"
+}
+```
+
+`@@type(<codecId>)` is required — never inferred; a missing one is a validation error.
+Each member's right-hand side is the codec's **JSON-encoded value** (`encodeJson`): the
+literal is `JSON.parse`d and validated with `codec.decodeJson`, reusing the existing
+PSL-extension `value`-parameter validation path (`PSL_EXTENSION_INVALID_VALUE` on a
+non-JSON literal or a value the codec rejects). The value defaults to the member name
+for string-input codecs and is required for others; `=` carries any codec-input type
+(`Active = 1`).
+
+Rejected: **`@map(...)`** — it miscategorizes a first-class domain value as a physical
+storage mapping (its meaning everywhere else in PSL). A **parameterized header**
+(`enum Role("pg/text@1")`) reads well and makes the codec required by grammar, but
+invents a parameterized-block-header construct PSL has nowhere else and that
+extension-contributed blocks cannot reuse — so the codec rides the existing
+`@@`-attribute mechanism instead, with required-ness enforced by validation.
+
 ### Restriction and enforcement are separate jobs
 
 - The column's **`valueSet` property** is the *notional* restriction — read the column
@@ -70,9 +97,37 @@ directional invariant.
 ### Typing and surface
 
 Read/write types are the codec's `Output`/`Input` narrowed to the value-set's values
-(`string` → `'user' | 'admin'`). `db.enums.<Name>` exposes the ordered, literal-typed
+(`string` → `'user' | 'admin'`). `db.enums.<ns>.<Name>` exposes the ordered, literal-typed
 value tuple and member accessors. `ORDER BY` follows declaration order, rendered per
 target from the ordered values.
+
+### Client-side entity accessors live on the `db` facade
+
+Enums are **contract metadata, lane-agnostic** — the same values whether you reach them
+through the sql lane or the orm lane — so the enum accessor map lives on the **`db`
+facade** alongside `transaction` / `prepare` / `raw` / `context`, not under one lane.
+`db.enums` is a **namespace-keyed map projected per target exactly like `db.sql` /
+`db.orm`**: `db.enums.public.Priority.values` on postgres, and `db.enums.Role.values` on
+unbound-namespace targets (sqlite, mongo) via the existing per-facade unbound projection.
+Each namespace exposes only its own enums (`domain.namespaces[ns].enum`).
+
+Why the facade, and why namespace-keyed:
+
+- **Lane-agnostic placement.** Putting enums under `db.orm` (or `db.sql`) buries
+  lane-independent metadata under one lane. The facade is the shared home for things that
+  belong to the contract, not to a query style.
+- **Cross-namespace collision.** A flat map merges every namespace's enums into one
+  record, so the same enum name in two namespaces silently last-write-wins.
+  Namespace-keyed resolution matches the IR (`domain.namespaces[ns].enum`) and keeps
+  same-named enums independent.
+
+**No reserved-name guard needed.** Because enums sit on the facade, not adjacent to models
+in a namespace facet, a domain model named `enums` no longer collides with the accessor —
+the earlier reserved-name rule is gone.
+
+This is the template for future client-side entity-accessor maps over IR-modelled
+entities: build a namespace-keyed map from `domain.namespaces[ns].<entity>`, hang it on
+the facade, and project it per target like `db.sql` / `db.orm`.
 
 ## Alternatives considered
 
@@ -122,12 +177,11 @@ target from the ordered values.
 - **Realization layer** — implement value-set + check at the SQL-family layer
   (MySQL/SQLite inherit) or Postgres-only now? **Working position:** family-layer; the
   structured check is dialect-agnostic.
-- **PSL surface** for declaring an enum's codec and per-member values. **Working
-  position:** an explicit codec annotation on the `enum` block + per-member `@map` for
-  the value; exact syntax settled at slice-plan time.
 - **`db.enums` scope** — local to this project or the first instance of a broader
-  domain-client surface for IR-modelled entities? **Working position:** ship it here,
-  shaped so a later generalization is non-breaking.
+  domain-client surface for IR-modelled entities? **Resolved (2026-06-10):** ship it
+  here as the first namespace-keyed entity-accessor map, shaped so a later generalization
+  is non-breaking; enums live on the `db` facade as a per-target-projected map (see
+  "Client-side entity accessors live on the `db` facade").
 - **Reference-carrier coupling** — the `valueSet`/default refs track TML-2500 / PR #745;
   if that convention shifts before this lands, these refs shift with it. **Working
   position:** conform to the merged M1 carrier; local refs need no `spaceId`.

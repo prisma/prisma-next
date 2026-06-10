@@ -39,9 +39,9 @@ import { db } from '../prisma/db';
  *   4. Typed result row inferred from the SELECT projection, mixing columns from both aliases.
  */
 export async function crossAuthorSimilarity(limit = 10, runtime?: Runtime) {
-  const plan = db.sql.post
+  const plan = db.sql.public.post
     .as('p1')
-    .innerJoin(db.sql.post.as('p2'), (f, fns) => fns.ne(f.p1.userId, f.p2.userId))
+    .innerJoin(db.sql.public.post.as('p2'), (f, fns) => fns.ne(f.p1.userId, f.p2.userId))
     .select((f, fns) => ({
       postAId: f.p1.id,
       postATitle: f.p1.title,

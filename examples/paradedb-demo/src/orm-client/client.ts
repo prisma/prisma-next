@@ -14,5 +14,5 @@ export function createOrmClient(runtime: Runtime) {
     collections: {
       Item: ItemCollection,
     },
-  });
+  }).public;
 }

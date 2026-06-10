@@ -36,9 +36,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:8a712adec92e630ce0aae57af88813b5f28cf05d2b1f74f1a2a198684bd1d3fc'>;
+  StorageHashBase<'sha256:0d0249e4567eafc1e369700b6516fb4cb682a5b5d57f1b44d49a959d13322e43'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:a108e5f9b4a5af51635ffde3849836fee73cd71cd568e1f2daf236c5768bcb07'>;
+  ExecutionHashBase<'sha256:8e2e39df5e42d28f74fa7177b910ed570f3c04c4a41b9812c3d13c18b428507a'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -82,6 +82,18 @@ export type FieldOutputTypes = {
     readonly userId: CodecTypes['pg/int4@1']['output'];
     readonly bio: CodecTypes['pg/text@1']['output'];
   };
+  readonly Project: {
+    readonly tenantId: CodecTypes['pg/int4@1']['output'];
+    readonly id: CodecTypes['pg/int4@1']['output'];
+    readonly name: CodecTypes['pg/text@1']['output'];
+  };
+  readonly ProjectLink: {
+    readonly srcTenantId: CodecTypes['pg/int4@1']['output'];
+    readonly srcId: CodecTypes['pg/int4@1']['output'];
+    readonly dstTenantId: CodecTypes['pg/int4@1']['output'];
+    readonly dstId: CodecTypes['pg/int4@1']['output'];
+  };
+  readonly Role: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
   readonly Tag: { readonly id: Char<36>; readonly name: CodecTypes['pg/text@1']['output'] };
   readonly User: {
     readonly id: CodecTypes['pg/int4@1']['output'];
@@ -89,6 +101,17 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['pg/text@1']['output'];
     readonly invitedById: CodecTypes['pg/int4@1']['output'] | null;
     readonly address: AddressOutput | null;
+  };
+  readonly UserRole: {
+    readonly userId: CodecTypes['pg/int4@1']['output'];
+    readonly roleId: CodecTypes['pg/text@1']['output'];
+    readonly level: CodecTypes['pg/int4@1']['output'];
+  };
+  readonly UserTag: {
+    readonly userId: CodecTypes['pg/int4@1']['output'];
+    readonly tagId: CodecTypes['pg/text@1']['output'];
+    readonly note: CodecTypes['pg/text@1']['output'] | null;
+    readonly createdAt: CodecTypes['pg/text@1']['output'];
   };
 };
 export type FieldInputTypes = {
@@ -114,6 +137,21 @@ export type FieldInputTypes = {
     readonly userId: CodecTypes['pg/int4@1']['input'];
     readonly bio: CodecTypes['pg/text@1']['input'];
   };
+  readonly Project: {
+    readonly tenantId: CodecTypes['pg/int4@1']['input'];
+    readonly id: CodecTypes['pg/int4@1']['input'];
+    readonly name: CodecTypes['pg/text@1']['input'];
+  };
+  readonly ProjectLink: {
+    readonly srcTenantId: CodecTypes['pg/int4@1']['input'];
+    readonly srcId: CodecTypes['pg/int4@1']['input'];
+    readonly dstTenantId: CodecTypes['pg/int4@1']['input'];
+    readonly dstId: CodecTypes['pg/int4@1']['input'];
+  };
+  readonly Role: {
+    readonly id: CodecTypes['sql/char@1']['input'];
+    readonly name: CodecTypes['pg/text@1']['input'];
+  };
   readonly Tag: {
     readonly id: CodecTypes['sql/char@1']['input'];
     readonly name: CodecTypes['pg/text@1']['input'];
@@ -124,6 +162,17 @@ export type FieldInputTypes = {
     readonly email: CodecTypes['pg/text@1']['input'];
     readonly invitedById: CodecTypes['pg/int4@1']['input'] | null;
     readonly address: AddressInput | null;
+  };
+  readonly UserRole: {
+    readonly userId: CodecTypes['pg/int4@1']['input'];
+    readonly roleId: CodecTypes['pg/text@1']['input'];
+    readonly level: CodecTypes['pg/int4@1']['input'];
+  };
+  readonly UserTag: {
+    readonly userId: CodecTypes['pg/int4@1']['input'];
+    readonly tagId: CodecTypes['pg/text@1']['input'];
+    readonly note: CodecTypes['pg/text@1']['input'] | null;
+    readonly createdAt: CodecTypes['pg/text@1']['input'];
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -295,6 +344,78 @@ type ContractBase = Omit<
                   },
                 ];
               };
+              readonly project_links: {
+                columns: {
+                  readonly src_tenant_id: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                  readonly src_id: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                  readonly dst_tenant_id: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                  readonly dst_id: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                };
+                primaryKey: {
+                  readonly columns: readonly ['src_tenant_id', 'src_id', 'dst_tenant_id', 'dst_id'];
+                };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
+              };
+              readonly projects: {
+                columns: {
+                  readonly tenant_id: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                  readonly id: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                  readonly name: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                };
+                primaryKey: { readonly columns: readonly ['tenant_id', 'id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
+              };
+              readonly roles: {
+                columns: {
+                  readonly id: {
+                    readonly nativeType: 'character';
+                    readonly codecId: 'sql/char@1';
+                    readonly nullable: false;
+                    readonly typeParams: { readonly length: 36 };
+                  };
+                  readonly name: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                };
+                primaryKey: { readonly columns: readonly ['id'] };
+                uniques: readonly [{ readonly columns: readonly ['name'] }];
+                indexes: readonly [];
+                foreignKeys: readonly [];
+              };
               readonly tags: {
                 columns: {
                   readonly id: {
@@ -311,6 +432,58 @@ type ContractBase = Omit<
                 };
                 primaryKey: { readonly columns: readonly ['id'] };
                 uniques: readonly [{ readonly columns: readonly ['name'] }];
+                indexes: readonly [];
+                foreignKeys: readonly [];
+              };
+              readonly user_roles: {
+                columns: {
+                  readonly user_id: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                  readonly role_id: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly level: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                };
+                primaryKey: { readonly columns: readonly ['user_id', 'role_id'] };
+                uniques: readonly [];
+                indexes: readonly [];
+                foreignKeys: readonly [];
+              };
+              readonly user_tags: {
+                columns: {
+                  readonly user_id: {
+                    readonly nativeType: 'int4';
+                    readonly codecId: 'pg/int4@1';
+                    readonly nullable: false;
+                  };
+                  readonly tag_id: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                  };
+                  readonly note: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: true;
+                  };
+                  readonly created_at: {
+                    readonly nativeType: 'text';
+                    readonly codecId: 'pg/text@1';
+                    readonly nullable: false;
+                    readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  };
+                };
+                primaryKey: { readonly columns: readonly ['user_id', 'tag_id'] };
+                uniques: readonly [];
                 indexes: readonly [];
                 foreignKeys: readonly [];
               };
@@ -523,6 +696,104 @@ type ContractBase = Omit<
           };
         };
       };
+      readonly Project: {
+        readonly fields: {
+          readonly tenantId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly id: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly name: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+        };
+        readonly relations: {
+          readonly related: {
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Project' };
+            readonly cardinality: 'N:M';
+            readonly on: {
+              readonly localFields: readonly ['tenantId', 'id'];
+              readonly targetFields: readonly ['src_tenant_id', 'src_id'];
+            };
+            readonly through: {
+              readonly table: 'project_links';
+              readonly namespaceId: 'public';
+              readonly parentColumns: readonly ['src_tenant_id', 'src_id'];
+              readonly childColumns: readonly ['dst_tenant_id', 'dst_id'];
+              readonly targetColumns: readonly ['tenant_id', 'id'];
+            };
+          };
+        };
+        readonly storage: {
+          readonly table: 'projects';
+          readonly namespaceId: 'public';
+          readonly fields: {
+            readonly tenantId: { readonly column: 'tenant_id' };
+            readonly id: { readonly column: 'id' };
+            readonly name: { readonly column: 'name' };
+          };
+        };
+      };
+      readonly ProjectLink: {
+        readonly fields: {
+          readonly srcTenantId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly srcId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly dstTenantId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly dstId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'project_links';
+          readonly namespaceId: 'public';
+          readonly fields: {
+            readonly srcTenantId: { readonly column: 'src_tenant_id' };
+            readonly srcId: { readonly column: 'src_id' };
+            readonly dstTenantId: { readonly column: 'dst_tenant_id' };
+            readonly dstId: { readonly column: 'dst_id' };
+          };
+        };
+      };
+      readonly Role: {
+        readonly fields: {
+          readonly id: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'sql/char@1';
+              readonly typeParams: { readonly length: 36 };
+            };
+          };
+          readonly name: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'roles';
+          readonly namespaceId: 'public';
+          readonly fields: {
+            readonly id: { readonly column: 'id' };
+            readonly name: { readonly column: 'name' };
+          };
+        };
+      };
       readonly Tag: {
         readonly fields: {
           readonly id: {
@@ -604,6 +875,36 @@ type ContractBase = Omit<
               readonly targetFields: readonly ['userId'];
             };
           };
+          readonly tags: {
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
+            readonly cardinality: 'N:M';
+            readonly on: {
+              readonly localFields: readonly ['id'];
+              readonly targetFields: readonly ['user_id'];
+            };
+            readonly through: {
+              readonly table: 'user_tags';
+              readonly namespaceId: 'public';
+              readonly parentColumns: readonly ['user_id'];
+              readonly childColumns: readonly ['tag_id'];
+              readonly targetColumns: readonly ['id'];
+            };
+          };
+          readonly roles: {
+            readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Role' };
+            readonly cardinality: 'N:M';
+            readonly on: {
+              readonly localFields: readonly ['id'];
+              readonly targetFields: readonly ['user_id'];
+            };
+            readonly through: {
+              readonly table: 'user_roles';
+              readonly namespaceId: 'public';
+              readonly parentColumns: readonly ['user_id'];
+              readonly childColumns: readonly ['role_id'];
+              readonly targetColumns: readonly ['id'];
+            };
+          };
         };
         readonly storage: {
           readonly table: 'users';
@@ -614,6 +915,63 @@ type ContractBase = Omit<
             readonly email: { readonly column: 'email' };
             readonly invitedById: { readonly column: 'invited_by_id' };
             readonly address: { readonly column: 'address' };
+          };
+        };
+      };
+      readonly UserRole: {
+        readonly fields: {
+          readonly userId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly roleId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly level: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'user_roles';
+          readonly namespaceId: 'public';
+          readonly fields: {
+            readonly userId: { readonly column: 'user_id' };
+            readonly roleId: { readonly column: 'role_id' };
+            readonly level: { readonly column: 'level' };
+          };
+        };
+      };
+      readonly UserTag: {
+        readonly fields: {
+          readonly userId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly tagId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly note: {
+            readonly nullable: true;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly createdAt: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'user_tags';
+          readonly namespaceId: 'public';
+          readonly fields: {
+            readonly userId: { readonly column: 'user_id' };
+            readonly tagId: { readonly column: 'tag_id' };
+            readonly note: { readonly column: 'note' };
+            readonly createdAt: { readonly column: 'created_at' };
           };
         };
       };
@@ -630,6 +988,14 @@ type ContractBase = Omit<
     readonly profiles: { readonly namespace: 'public' & NamespaceId; readonly model: 'Profile' };
     readonly articles: { readonly namespace: 'public' & NamespaceId; readonly model: 'Article' };
     readonly tags: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
+    readonly user_tags: { readonly namespace: 'public' & NamespaceId; readonly model: 'UserTag' };
+    readonly roles: { readonly namespace: 'public' & NamespaceId; readonly model: 'Role' };
+    readonly user_roles: { readonly namespace: 'public' & NamespaceId; readonly model: 'UserRole' };
+    readonly projects: { readonly namespace: 'public' & NamespaceId; readonly model: 'Project' };
+    readonly project_links: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'ProjectLink';
+    };
   };
   readonly domain: {
     readonly namespaces: {
@@ -791,6 +1157,107 @@ type ContractBase = Omit<
               };
             };
           };
+          readonly Project: {
+            readonly fields: {
+              readonly tenantId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly related: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Project';
+                };
+                readonly cardinality: 'N:M';
+                readonly on: {
+                  readonly localFields: readonly ['tenantId', 'id'];
+                  readonly targetFields: readonly ['src_tenant_id', 'src_id'];
+                };
+                readonly through: {
+                  readonly table: 'project_links';
+                  readonly namespaceId: 'public';
+                  readonly parentColumns: readonly ['src_tenant_id', 'src_id'];
+                  readonly childColumns: readonly ['dst_tenant_id', 'dst_id'];
+                  readonly targetColumns: readonly ['tenant_id', 'id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'projects';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly tenantId: { readonly column: 'tenant_id' };
+                readonly id: { readonly column: 'id' };
+                readonly name: { readonly column: 'name' };
+              };
+            };
+          };
+          readonly ProjectLink: {
+            readonly fields: {
+              readonly srcTenantId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly srcId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly dstTenantId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly dstId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'project_links';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly srcTenantId: { readonly column: 'src_tenant_id' };
+                readonly srcId: { readonly column: 'src_id' };
+                readonly dstTenantId: { readonly column: 'dst_tenant_id' };
+                readonly dstId: { readonly column: 'dst_id' };
+              };
+            };
+          };
+          readonly Role: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'roles';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly name: { readonly column: 'name' };
+              };
+            };
+          };
           readonly Tag: {
             readonly fields: {
               readonly id: {
@@ -875,6 +1342,36 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
+              readonly tags: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Tag' };
+                readonly cardinality: 'N:M';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['user_id'];
+                };
+                readonly through: {
+                  readonly table: 'user_tags';
+                  readonly namespaceId: 'public';
+                  readonly parentColumns: readonly ['user_id'];
+                  readonly childColumns: readonly ['tag_id'];
+                  readonly targetColumns: readonly ['id'];
+                };
+              };
+              readonly roles: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Role' };
+                readonly cardinality: 'N:M';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['user_id'];
+                };
+                readonly through: {
+                  readonly table: 'user_roles';
+                  readonly namespaceId: 'public';
+                  readonly parentColumns: readonly ['user_id'];
+                  readonly childColumns: readonly ['role_id'];
+                  readonly targetColumns: readonly ['id'];
+                };
+              };
             };
             readonly storage: {
               readonly table: 'users';
@@ -885,6 +1382,63 @@ type ContractBase = Omit<
                 readonly email: { readonly column: 'email' };
                 readonly invitedById: { readonly column: 'invited_by_id' };
                 readonly address: { readonly column: 'address' };
+              };
+            };
+          };
+          readonly UserRole: {
+            readonly fields: {
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly roleId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly level: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'user_roles';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly userId: { readonly column: 'user_id' };
+                readonly roleId: { readonly column: 'role_id' };
+                readonly level: { readonly column: 'level' };
+              };
+            };
+          };
+          readonly UserTag: {
+            readonly fields: {
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly tagId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly note: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'user_tags';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly userId: { readonly column: 'user_id' };
+                readonly tagId: { readonly column: 'tag_id' };
+                readonly note: { readonly column: 'note' };
+                readonly createdAt: { readonly column: 'created_at' };
               };
             };
           };
@@ -979,6 +1533,10 @@ type ContractBase = Omit<
     readonly executionHash: ExecutionHash;
     readonly mutations: {
       readonly defaults: readonly [
+        {
+          readonly ref: { readonly table: 'roles'; readonly column: 'id' };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
         {
           readonly ref: { readonly table: 'tags'; readonly column: 'id' };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };

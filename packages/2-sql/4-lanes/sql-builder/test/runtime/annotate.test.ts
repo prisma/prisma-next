@@ -46,7 +46,7 @@ const auditAnnotation = defineAnnotation<{ actor: string }>()({
 describe('SelectQuery.annotate', () => {
   it('writes the applied annotation under its namespace on plan.meta.annotations', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .build();
 
@@ -60,7 +60,7 @@ describe('SelectQuery.annotate', () => {
 
   it('round-trips through the typed handle.read accessor', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .build();
 
@@ -68,13 +68,13 @@ describe('SelectQuery.annotate', () => {
   });
 
   it('returns undefined from handle.read on a plan that was never annotated', () => {
-    const plan = db().users.select('id').build();
+    const plan = db().public.users.select('id').build();
     expect(cacheAnnotation.read(plan)).toBeUndefined();
   });
 
   it('multiple annotations under different namespaces coexist', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .annotate(otelAnnotation({ traceId: 't-1' }))
       .build();
@@ -85,7 +85,7 @@ describe('SelectQuery.annotate', () => {
 
   it('multiple annotations passed in a single call coexist', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }), otelAnnotation({ traceId: 't-1' }))
       .build();
 
@@ -95,7 +95,7 @@ describe('SelectQuery.annotate', () => {
 
   it('duplicate namespace last-write-wins', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .annotate(cacheAnnotation({ ttl: 120 }))
       .build();
@@ -104,7 +104,7 @@ describe('SelectQuery.annotate', () => {
   });
 
   it('annotate does not mutate the original builder (immutability)', () => {
-    const base = db().users.select('id');
+    const base = db().public.users.select('id');
     const annotated = base.annotate(cacheAnnotation({ ttl: 60 }));
     const basePlan = base.build();
     const annotatedPlan = annotated.build();
@@ -115,7 +115,7 @@ describe('SelectQuery.annotate', () => {
 
   it('chainable in any position: immediately after .select', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .build();
 
@@ -124,7 +124,7 @@ describe('SelectQuery.annotate', () => {
 
   it('chainable in any position: between .select and .where', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .where((f, fns) => fns.eq(f.id, 1))
       .build();
@@ -134,7 +134,7 @@ describe('SelectQuery.annotate', () => {
 
   it('chainable in any position: after .where, before .limit', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(cacheAnnotation({ ttl: 60 }))
       .limit(10)
@@ -145,12 +145,12 @@ describe('SelectQuery.annotate', () => {
 
   it('annotate does not affect the produced AST shape', () => {
     const baseAst = db()
-      .users.select('id')
+      .public.users.select('id')
       .where((f, fns) => fns.eq(f.id, 1))
       .buildAst();
 
     const annotatedAst = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(otelAnnotation({ traceId: 't-1' }))
@@ -163,7 +163,7 @@ describe('SelectQuery.annotate', () => {
     // The framework `codecs` map under the reserved namespace may still
     // populate `plan.meta.annotations` — this is independent of user
     // annotations. We verify only that no user annotation lands.
-    const plan = db().users.select('id').annotate().build();
+    const plan = db().public.users.select('id').annotate().build();
 
     expect(cacheAnnotation.read(plan)).toBeUndefined();
     expect(otelAnnotation.read(plan)).toBeUndefined();
@@ -174,7 +174,7 @@ describe('SelectQuery.annotate', () => {
   });
 
   it('runtime gate rejects a write-only annotation forced through a cast', () => {
-    const builder = db().users.select('id') as unknown as {
+    const builder = db().public.users.select('id') as unknown as {
       annotate(annotation: unknown): unknown;
     };
     expect(() => builder.annotate(auditAnnotation({ actor: 'system' }))).toThrow(
@@ -189,7 +189,7 @@ describe('SelectQuery.annotate', () => {
 describe('GroupedQuery.annotate', () => {
   it('writes the applied annotation under its namespace on plan.meta.annotations', () => {
     const plan = db()
-      .posts.select('user_id')
+      .public.posts.select('user_id')
       .groupBy('user_id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .build();
@@ -199,7 +199,7 @@ describe('GroupedQuery.annotate', () => {
 
   it('chainable in any position: between .select and .groupBy', () => {
     const plan = db()
-      .posts.select('user_id')
+      .public.posts.select('user_id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .groupBy('user_id')
       .build();
@@ -209,7 +209,7 @@ describe('GroupedQuery.annotate', () => {
 
   it('chainable in any position: after .groupBy, before .having / .orderBy', () => {
     const plan = db()
-      .posts.select('user_id')
+      .public.posts.select('user_id')
       .groupBy('user_id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .orderBy('user_id')
@@ -219,7 +219,7 @@ describe('GroupedQuery.annotate', () => {
   });
 
   it('runtime gate rejects a write-only annotation forced through a cast', () => {
-    const builder = db().posts.select('user_id').groupBy('user_id') as unknown as {
+    const builder = db().public.posts.select('user_id').groupBy('user_id') as unknown as {
       annotate(annotation: unknown): unknown;
     };
     expect(() => builder.annotate(auditAnnotation({ actor: 'system' }))).toThrow(
@@ -231,7 +231,7 @@ describe('GroupedQuery.annotate', () => {
 describe('InsertQuery.annotate', () => {
   it('writes the applied annotation under its namespace on plan.meta.annotations', () => {
     const plan = db()
-      .users.insert([{ name: 'Alice' }])
+      .public.users.insert([{ name: 'Alice' }])
       .annotate(auditAnnotation({ actor: 'system' }))
       .build();
 
@@ -240,7 +240,7 @@ describe('InsertQuery.annotate', () => {
 
   it('accepts both-kind annotations', () => {
     const plan = db()
-      .users.insert([{ name: 'Alice' }])
+      .public.users.insert([{ name: 'Alice' }])
       .annotate(otelAnnotation({ traceId: 't-1' }))
       .build();
 
@@ -249,7 +249,7 @@ describe('InsertQuery.annotate', () => {
 
   it('survives across .returning(...) chaining', () => {
     const plan = db()
-      .users.insert([{ name: 'Alice' }])
+      .public.users.insert([{ name: 'Alice' }])
       .annotate(auditAnnotation({ actor: 'system' }))
       .returning('id', 'name')
       .build();
@@ -258,7 +258,7 @@ describe('InsertQuery.annotate', () => {
   });
 
   it('runtime gate rejects a read-only annotation forced through a cast', () => {
-    const builder = db().users.insert([{ name: 'Alice' }]) as unknown as {
+    const builder = db().public.users.insert([{ name: 'Alice' }]) as unknown as {
       annotate(annotation: unknown): unknown;
     };
     expect(() => builder.annotate(cacheAnnotation({ ttl: 60 }))).toThrow(
@@ -270,7 +270,7 @@ describe('InsertQuery.annotate', () => {
 describe('UpdateQuery.annotate', () => {
   it('writes the applied annotation under its namespace on plan.meta.annotations', () => {
     const plan = db()
-      .users.update({ name: 'Alice' })
+      .public.users.update({ name: 'Alice' })
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(auditAnnotation({ actor: 'system' }))
       .build();
@@ -280,7 +280,7 @@ describe('UpdateQuery.annotate', () => {
 
   it('survives across .where(...) and .returning(...) chaining', () => {
     const plan = db()
-      .users.update({ name: 'Alice' })
+      .public.users.update({ name: 'Alice' })
       .annotate(auditAnnotation({ actor: 'system' }))
       .where((f, fns) => fns.eq(f.id, 1))
       .returning('id', 'name')
@@ -290,7 +290,7 @@ describe('UpdateQuery.annotate', () => {
   });
 
   it('runtime gate rejects a read-only annotation forced through a cast', () => {
-    const builder = db().users.update({ name: 'Alice' }) as unknown as {
+    const builder = db().public.users.update({ name: 'Alice' }) as unknown as {
       annotate(annotation: unknown): unknown;
     };
     expect(() => builder.annotate(cacheAnnotation({ ttl: 60 }))).toThrow(
@@ -302,7 +302,7 @@ describe('UpdateQuery.annotate', () => {
 describe('DeleteQuery.annotate', () => {
   it('writes the applied annotation under its namespace on plan.meta.annotations', () => {
     const plan = db()
-      .users.delete()
+      .public.users.delete()
       .where((f, fns) => fns.eq(f.id, 1))
       .annotate(auditAnnotation({ actor: 'system' }))
       .build();
@@ -312,7 +312,7 @@ describe('DeleteQuery.annotate', () => {
 
   it('survives across .where(...) and .returning(...) chaining', () => {
     const plan = db()
-      .users.delete()
+      .public.users.delete()
       .annotate(auditAnnotation({ actor: 'system' }))
       .where((f, fns) => fns.eq(f.id, 1))
       .returning('id')
@@ -322,7 +322,7 @@ describe('DeleteQuery.annotate', () => {
   });
 
   it('runtime gate rejects a read-only annotation forced through a cast', () => {
-    const builder = db().users.delete() as unknown as {
+    const builder = db().public.users.delete() as unknown as {
       annotate(annotation: unknown): unknown;
     };
     expect(() => builder.annotate(cacheAnnotation({ ttl: 60 }))).toThrow(
@@ -337,7 +337,7 @@ describe('annotate alongside framework-internal codecs metadata', () => {
   // must coexist with that without collision.
   it('coexists with the framework codecs map under its reserved namespace', () => {
     const plan = db()
-      .users.select('id')
+      .public.users.select('id')
       .annotate(cacheAnnotation({ ttl: 60 }))
       .build();
 

@@ -18,6 +18,7 @@ import type {
 
 export interface CollectionInit<TContract extends Contract<SqlStorage>> {
   readonly tableName?: string | undefined;
+  readonly namespaceId: string;
   readonly state?: import('./types').CollectionState | undefined;
   readonly registry?: ReadonlyMap<string, CollectionConstructor<TContract>> | undefined;
   readonly includeRefinementMode?: boolean | undefined;
@@ -83,7 +84,7 @@ export type IsToManyRelation<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   RelName extends string,
-> = RelationCardinality<TContract, ModelName, RelName> extends '1:N' | 'M:N' ? true : false;
+> = RelationCardinality<TContract, ModelName, RelName> extends '1:N' | 'N:M' ? true : false;
 
 export type IncludeRefinementResult<
   TContract extends Contract<SqlStorage>,

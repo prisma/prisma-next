@@ -114,7 +114,7 @@ const StorageTypeInstanceSchema = type
     kind: "'codec-instance'",
     codecId: 'string',
     nativeType: 'string',
-    typeParams: 'Record<string, unknown>',
+    'typeParams?': 'Record<string, unknown>',
   });
 
 /**
@@ -140,7 +140,9 @@ const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
  */
 export const StorageValueSetSchema = type({
   kind: "'value-set'",
-  values: type.string.array().readonly(),
+  values: type('string | number | boolean | null | unknown[] | Record<string, unknown>')
+    .array()
+    .readonly(),
 });
 
 /**
@@ -152,7 +154,7 @@ export const ContractEnumSchema = type({
   codecId: 'string',
   members: type({
     name: 'string',
-    value: 'string',
+    value: 'string | number | boolean | null | unknown[] | Record<string, unknown>',
   })
     .array()
     .readonly(),
@@ -204,6 +206,13 @@ export const ForeignKeySchema = type.declare<ForeignKeyInput>().type({
   index: 'boolean',
 });
 
+export const CheckConstraintSchema = type({
+  '+': 'reject',
+  name: 'string',
+  column: 'string',
+  valueSet: ValueSetRefSchema,
+});
+
 const StorageTableSchema = type({
   '+': 'reject',
   columns: type({ '[string]': StorageColumnSchema }),
@@ -212,6 +221,7 @@ const StorageTableSchema = type({
   indexes: IndexSchema.array().readonly(),
   foreignKeys: ForeignKeySchema.array().readonly(),
   'control?': ControlPolicySchema,
+  'checks?': CheckConstraintSchema.array().readonly(),
 });
 
 /**
@@ -410,16 +420,39 @@ const ModelStorageSchema = type({
   fields: type({ '[string]': ModelStorageFieldSchema }),
 });
 
-const ContractReferenceRelationSchema = type({
+const ContractRelationThroughSchema = type({
+  '+': 'reject',
+  table: 'string',
+  namespaceId: 'string',
+  parentColumns: type.string.array().readonly(),
+  childColumns: type.string.array().readonly(),
+  targetColumns: type.string.array().readonly(),
+});
+
+const ContractRelationOnSchema = type({
+  '+': 'reject',
+  localFields: type.string.array().readonly(),
+  targetFields: type.string.array().readonly(),
+});
+
+const ContractManyToManyRelationSchema = type({
+  '+': 'reject',
+  to: CrossReferenceSchema,
+  cardinality: "'N:M'",
+  on: ContractRelationOnSchema,
+  through: ContractRelationThroughSchema,
+});
+
+const ContractNonJunctionRelationSchema = type({
   '+': 'reject',
   to: CrossReferenceSchema,
   cardinality: "'1:1' | '1:N' | 'N:1'",
-  on: type({
-    '+': 'reject',
-    localFields: type.string.array().readonly(),
-    targetFields: type.string.array().readonly(),
-  }),
+  on: ContractRelationOnSchema,
 });
+
+const ContractReferenceRelationSchema = ContractManyToManyRelationSchema.or(
+  ContractNonJunctionRelationSchema,
+);
 
 const ContractEmbedRelationSchema = type({
   '+': 'reject',
@@ -603,6 +636,9 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
     for (const fk of table.foreignKeys) {
       registerNamedObject('foreign key', fk.name);
     }
+    for (const check of table.checks ?? []) {
+      registerNamedObject('check constraint', check.name);
+    }
 
     for (const [name, kinds] of namedObjects) {
       if (kinds.length > 1) {
@@ -721,6 +757,18 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
         }
       }
     }
+
+    const seenCheckDefinitions = new Set<string>();
+    for (const check of table.checks ?? []) {
+      const signature = JSON.stringify({ column: check.column, valueSet: check.valueSet });
+      if (seenCheckDefinitions.has(signature)) {
+        errors.push(
+          `Namespace "${namespaceId}" table "${tableName}": duplicate check constraint definition on column "${check.column}"`,
+        );
+        continue;
+      }
+      seenCheckDefinitions.add(signature);
+    }
   }
 
   return errors;
@@ -826,6 +874,15 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
             'storage',
           );
         }
+      }
+    }
+
+    for (const check of table.checks ?? []) {
+      if (!columnNames.has(check.column)) {
+        throw new ContractValidationError(
+          `Namespace "${namespaceId}" table "${tableName}" check constraint "${check.name}" references non-existent column "${check.column}"`,
+          'storage',
+        );
       }
     }
 

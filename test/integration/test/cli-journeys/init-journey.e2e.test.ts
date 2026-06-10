@@ -184,8 +184,8 @@ describe.each(
           // equivalent.
           "const email = 'journey-' + Date.now() + '-' + Math.floor(Math.random() * 1e6) + '@example.com';",
           'try {',
-          "  const created = await db.orm.User.create({ email, name: 'Journey User' });",
-          '  const found = await db.orm.User.where((u) => u.email.eq(email)).first();',
+          "  const created = await db.orm.public.User.create({ email, name: 'Journey User' });",
+          '  const found = await db.orm.public.User.where((u) => u.email.eq(email)).first();',
           '  if (found === null || found.id !== created.id || found.email !== email) {',
           "    console.error('runtime CRUD roundtrip failed', { created, found });",
           '    process.exit(1);',

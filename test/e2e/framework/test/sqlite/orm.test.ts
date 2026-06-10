@@ -1,6 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { JsonValue } from '@prisma-next/adapter-sqlite/codec-types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
@@ -13,7 +14,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('findMany', () => {
     it('returns all rows', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.all();
+        const users = await ormClient[UNBOUND_NAMESPACE_ID].User.all();
         expect(users).toHaveLength(4);
 
         expectTypeOf(users[0]!).toEqualTypeOf<{
@@ -27,7 +28,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
     it('with filter', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.where({ id: 1 }).all();
+        const users = await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 1 }).all();
         expect(users).toHaveLength(1);
         expect(users[0]!.name).toBe('Alice');
       });
@@ -35,14 +36,14 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
     it('with ordering', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.orderBy((u) => u.id.desc()).all();
+        const users = await ormClient[UNBOUND_NAMESPACE_ID].User.orderBy((u) => u.id.desc()).all();
         expect(users[0]!.id).toBe(4);
       });
     });
 
     it('with take and skip', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.orderBy((u) => u.id.asc())
+        const users = await ormClient[UNBOUND_NAMESPACE_ID].User.orderBy((u) => u.id.asc())
           .skip(1)
           .take(2)
           .all();
@@ -55,7 +56,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('findFirst', () => {
     it('returns first matching row', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const user = await ormClient.User.where({ id: 1 }).first();
+        const user = await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 1 }).first();
         expect(user).not.toBeNull();
         expect(user!.name).toBe('Alice');
 
@@ -70,7 +71,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
     it('returns null when no match', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const user = await ormClient.User.where({ id: 9999 }).first();
+        const user = await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 9999 }).first();
         expect(user).toBeNull();
       });
     });
@@ -79,7 +80,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('create', () => {
     it('creates a row and returns it', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const user = await ormClient.User.create({
+        const user = await ormClient[UNBOUND_NAMESPACE_ID].User.create({
           id: 200,
           name: 'Created',
           email: 'created@example.com',
@@ -94,7 +95,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           invitedById: number | null;
         }>();
 
-        await ormClient.User.where({ id: 200 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 200 }).deleteCount();
       });
     });
   });
@@ -102,7 +103,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('createAll', () => {
     it('creates multiple rows', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const rows = await ormClient.User.createAll([
+        const rows = await ormClient[UNBOUND_NAMESPACE_ID].User.createAll([
           { id: 500, name: 'Batch1', email: 'batch1@example.com' },
           { id: 501, name: 'Batch2', email: 'batch2@example.com' },
         ]);
@@ -110,8 +111,8 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(rows[0]!.id).toBe(500);
         expect(rows[1]!.id).toBe(501);
 
-        await ormClient.User.where({ id: 500 }).deleteCount();
-        await ormClient.User.where({ id: 501 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 500 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 501 }).deleteCount();
       });
     });
   });
@@ -119,12 +120,12 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('update', () => {
     it('updates and returns updated row', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const updated = await ormClient.User.where({ id: 2 }).update({
+        const updated = await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 2 }).update({
           name: 'Bob Updated',
         });
         expect(updated!.name).toBe('Bob Updated');
 
-        await ormClient.User.where({ id: 2 }).update({ name: 'Bob' });
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 2 }).update({ name: 'Bob' });
       });
     });
   });
@@ -132,15 +133,25 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('updateAll', () => {
     it('updates multiple rows and returns them', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        await ormClient.User.create({ id: 600, name: 'UpdA', email: 'upda@example.com' });
-        await ormClient.User.create({ id: 601, name: 'UpdB', email: 'updb@example.com' });
+        await ormClient[UNBOUND_NAMESPACE_ID].User.create({
+          id: 600,
+          name: 'UpdA',
+          email: 'upda@example.com',
+        });
+        await ormClient[UNBOUND_NAMESPACE_ID].User.create({
+          id: 601,
+          name: 'UpdB',
+          email: 'updb@example.com',
+        });
 
-        const updated = await ormClient.User.where({ id: 600 }).update({ name: 'Updated' });
-        await ormClient.User.where({ id: 601 }).update({ name: 'Updated' });
+        const updated = await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 600 }).update({
+          name: 'Updated',
+        });
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 601 }).update({ name: 'Updated' });
         expect(updated!.name).toBe('Updated');
 
-        await ormClient.User.where({ id: 600 }).deleteCount();
-        await ormClient.User.where({ id: 601 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 600 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 601 }).deleteCount();
       });
     });
   });
@@ -148,12 +159,12 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('delete', () => {
     it('deletes matching rows and returns count', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        await ormClient.User.create({
+        await ormClient[UNBOUND_NAMESPACE_ID].User.create({
           id: 300,
           name: 'ToDelete',
           email: 'delete@example.com',
         });
-        const count = await ormClient.User.where({ id: 300 }).deleteCount();
+        const count = await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 300 }).deleteCount();
         expect(count).toBe(1);
 
         expectTypeOf(count).toBeNumber();
@@ -162,11 +173,23 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
     it('deleteAll returns deleted rows', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        await ormClient.User.create({ id: 700, name: 'DelA', email: 'dela@example.com' });
-        await ormClient.User.create({ id: 701, name: 'DelB', email: 'delb@example.com' });
+        await ormClient[UNBOUND_NAMESPACE_ID].User.create({
+          id: 700,
+          name: 'DelA',
+          email: 'dela@example.com',
+        });
+        await ormClient[UNBOUND_NAMESPACE_ID].User.create({
+          id: 701,
+          name: 'DelB',
+          email: 'delb@example.com',
+        });
 
-        const deletedA = await ormClient.User.where({ id: 700 }).deleteCount();
-        const deletedB = await ormClient.User.where({ id: 701 }).deleteCount();
+        const deletedA = await ormClient[UNBOUND_NAMESPACE_ID].User.where({
+          id: 700,
+        }).deleteCount();
+        const deletedB = await ormClient[UNBOUND_NAMESPACE_ID].User.where({
+          id: 701,
+        }).deleteCount();
         expect(deletedA + deletedB).toBe(2);
       });
     });
@@ -175,7 +198,9 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('include', () => {
     it('loads 1:N relation via json_group_array', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const users = await ormClient.User.where({ id: 1 }).include('posts').all();
+        const users = await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 1 })
+          .include('posts')
+          .all();
         expect(users).toHaveLength(1);
         expect(users[0]!.posts).toHaveLength(2);
       });
@@ -185,7 +210,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('codec round-trip through ORM', () => {
     it('creates and reads typed rows', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        await ormClient.TypedRow.create({
+        await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.create({
           id: 10,
           active: 1,
           createdAt: new Date('2024-03-15T10:30:00.000Z'),
@@ -193,7 +218,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           label: 'test',
         });
 
-        const found = await ormClient.TypedRow.where({ id: 10 }).first();
+        const found = await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.where({ id: 10 }).first();
         expect(found).not.toBeNull();
         expect(found!.id).toBe(10);
         expect(found!.label).toBe('test');
@@ -206,13 +231,13 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           label: string;
         } | null>();
 
-        await ormClient.TypedRow.where({ id: 10 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.where({ id: 10 }).deleteCount();
       });
     });
 
     it('null JSON round-trips correctly', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const created = await ormClient.TypedRow.create({
+        const created = await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.create({
           id: 12,
           active: 1,
           createdAt: new Date('2024-01-01T00:00:00.000Z'),
@@ -220,11 +245,11 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         });
         expect(created.metadata).toBeNull();
 
-        const found = await ormClient.TypedRow.where({ id: 12 }).first();
+        const found = await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.where({ id: 12 }).first();
         expect(found).not.toBeNull();
         expect(found!.metadata).toBeNull();
 
-        await ormClient.TypedRow.where({ id: 12 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.where({ id: 12 }).deleteCount();
       });
     });
   });
@@ -232,7 +257,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('mixed defaults in multi-row insert', () => {
     it('createAll with rows where one provides label explicitly and the other uses DB default', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const rows = await ormClient.Item.createAll([
+        const rows = await ormClient[UNBOUND_NAMESPACE_ID].Item.createAll([
           { id: 900, name: 'Explicit', label: 'custom' },
           { id: 901, name: 'Default' },
         ]);
@@ -240,8 +265,8 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(rows[0]).toMatchObject({ id: 900, name: 'Explicit', label: 'custom' });
         expect(rows[1]).toMatchObject({ id: 901, name: 'Default', label: 'unnamed' });
 
-        await ormClient.Item.where({ id: 900 }).deleteCount();
-        await ormClient.Item.where({ id: 901 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].Item.where({ id: 900 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].Item.where({ id: 901 }).deleteCount();
       });
     });
   });
@@ -249,29 +274,33 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
   describe('upsert', () => {
     it('inserts when row does not exist', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        const result = await ormClient.User.upsert({
+        const result = await ormClient[UNBOUND_NAMESPACE_ID].User.upsert({
           create: { id: 800, name: 'Upserted', email: 'upsert@example.com' },
           update: { name: 'Updated' },
         });
         expect(result.id).toBe(800);
         expect(result.name).toBe('Upserted');
 
-        await ormClient.User.where({ id: 800 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 800 }).deleteCount();
       });
     });
 
     it('updates when row already exists', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
-        await ormClient.User.create({ id: 801, name: 'Original', email: 'orig@example.com' });
+        await ormClient[UNBOUND_NAMESPACE_ID].User.create({
+          id: 801,
+          name: 'Original',
+          email: 'orig@example.com',
+        });
 
-        const result = await ormClient.User.upsert({
+        const result = await ormClient[UNBOUND_NAMESPACE_ID].User.upsert({
           create: { id: 801, name: 'CreateName', email: 'orig@example.com' },
           update: { name: 'UpsertUpdated' },
         });
         expect(result.id).toBe(801);
         expect(result.name).toBe('UpsertUpdated');
 
-        await ormClient.User.where({ id: 801 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 801 }).deleteCount();
       });
     });
   });

@@ -7,15 +7,16 @@ import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Log,
   type Runtime,
 } from '@prisma-next/sql-runtime';
+import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,8 +68,8 @@ async function buildHarness(log: Log): Promise<Harness> {
   if (!driver) throw new Error('SQLite driver missing from execution stack');
   await driver.connect({ kind: 'path', path: dbPath });
 
-  const runtime = createRuntime({ stackInstance, context, driver, log });
-  const db: Db<Contract> = sqlBuilder<Contract>({
+  const runtime = new SqliteRuntimeImpl({ context, adapter: stackInstance.adapter, driver, log });
+  const db = sqlBuilder<Contract>({
     context,
     rawCodecInferer: stack.adapter.rawCodecInferer,
   });
@@ -109,7 +110,9 @@ describe('sqlite runtime verify-marker: missing marker table', {
 
     harness = await buildHarness(log);
 
-    const rows = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+    const rows = await harness.runtime
+      .execute(harness.db[UNBOUND_NAMESPACE_ID].users.select('id').build())
+      .toArray();
 
     expect(rows.map((r) => r.id)).toEqual([1]);
     expect(log.warn).toHaveBeenCalledOnce();

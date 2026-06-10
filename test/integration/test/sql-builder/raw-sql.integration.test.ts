@@ -8,13 +8,13 @@ import {
   instantiateExecutionStack,
   type RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { param } from '@prisma-next/sql-relational-core/expression';
 import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Runtime,
   type SqlMiddleware,
@@ -146,9 +146,9 @@ describe('integration: rawSql expression in typed builder', {
   });
 
   function buildRuntime(middleware?: readonly SqlMiddleware[]): Runtime {
-    return createRuntime({
-      stackInstance,
+    return new PostgresRuntimeImpl({
       context,
+      adapter: stackInstance.adapter,
       driver,
       verifyMarker: false,
       ...(middleware ? { middleware } : {}),
@@ -165,7 +165,7 @@ describe('integration: rawSql expression in typed builder', {
       // fns.raw is RawSqlTag (always present) because BuiltinFunctions declares it
       // concretely; the callback receives AggregateFunctions<QC>.
       const rows = await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .select('doubled', (f, fns) => fns.raw`${f.views} * 2`.returns('pg/int4@1'))
           .orderBy('id')
@@ -182,7 +182,7 @@ describe('integration: rawSql expression in typed builder', {
       const runtime = buildRuntime();
 
       const rows = await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .select('magic', (_f, fns) => fns.raw`42`.returns('pg/int4@1'))
           .orderBy('id')
@@ -218,7 +218,7 @@ describe('integration: rawSql expression in typed builder', {
       // The middleware's beforeExecute should see it via params.entries().
       // fns.raw is RawSqlTag (non-optional) — callable directly as a template tag.
       await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .where((_f, fns) =>
             fns.gt(
@@ -258,7 +258,7 @@ describe('integration: rawSql expression in typed builder', {
       // Two param() calls: param(10) and param(200).
       // The where clause: both params embedded in rawSql expressions, surfaced via gt/lt.
       await runtime.execute(
-        db.posts
+        db.public.posts
           .select('id')
           .where((_f, fns) =>
             fns.and(

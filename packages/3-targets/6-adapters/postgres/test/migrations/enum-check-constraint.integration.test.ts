@@ -1,0 +1,374 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import sqlFamilyPack from '@prisma-next/family-sql/pack';
+import {
+  APP_SPACE_ID,
+  type MigrationOperationPolicy,
+} from '@prisma-next/framework-components/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildBoundContract,
+  enumType,
+  member,
+} from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  controlAdapter,
+  createDriver,
+  createTestDatabase,
+  emptySchema,
+  familyInstance,
+  formatRunnerFailure,
+  frameworkComponents,
+  type PostgresControlDriver,
+  postgresTargetDescriptor,
+  resetDatabase,
+  synthEdges,
+  testTimeout,
+} from './fixtures/runner-fixtures';
+
+const FULL_POLICY: MigrationOperationPolicy = {
+  allowedOperationClasses: ['additive', 'widening', 'destructive'],
+};
+
+// ---------------------------------------------------------------------------
+// Contract factories
+// ---------------------------------------------------------------------------
+
+const pgText = { codecId: 'pg/text@1' as const, nativeType: 'text' };
+
+function buildEnumType(members: { name: string; value: string }[]) {
+  const [first, ...rest] = members;
+  if (!first) throw new Error('enumType requires at least one member');
+  return enumType(
+    'Role',
+    pgText,
+    member(first.name, first.value),
+    ...rest.map((m) => member(m.name, m.value)),
+  );
+}
+
+function makeRoleContract(members: { name: string; value: string }[]): Contract<SqlStorage> {
+  const Role = buildEnumType(members);
+  return buildBoundContract(
+    sqlFamilyPack,
+    postgresPack,
+    { enums: { Role } },
+    ({ field: f, model: m }) => ({
+      models: {
+        User: m('User', {
+          fields: {
+            id: f.text().id(),
+            role: f.namedType(Role),
+          },
+        }),
+      },
+    }),
+  ) as Contract<SqlStorage>;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function verifySchema(
+  driver: PostgresControlDriver,
+  contract: Contract<SqlStorage>,
+): Promise<ReturnType<(typeof familyInstance)['verifySchema']>> {
+  const schema = await familyInstance.introspect({ driver, contract });
+  return familyInstance.verifySchema({
+    contract,
+    schema,
+    strict: false,
+    frameworkComponents,
+  });
+}
+
+async function queryPgConstraint(
+  driver: PostgresControlDriver,
+  tableName: string,
+  constraintName: string,
+): Promise<string | null> {
+  const result = await driver.query<{ consrc: string }>(
+    `SELECT pg_get_constraintdef(c.oid) AS consrc
+     FROM pg_constraint c
+     JOIN pg_class t ON t.oid = c.conrelid
+     JOIN pg_namespace n ON n.oid = t.relnamespace
+     WHERE n.nspname = 'public'
+       AND t.relname = $1
+       AND c.conname = $2
+       AND c.contype = 'c'`,
+    [tableName, constraintName],
+  );
+  return result.rows[0]?.consrc ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe.sequential('enum check-constraint — end-to-end PGlite', () => {
+  let database: Awaited<ReturnType<typeof createTestDatabase>>;
+  let driver: PostgresControlDriver | undefined;
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+  }, testTimeout);
+
+  afterAll(async () => {
+    if (database) {
+      await database.close();
+    }
+  }, testTimeout);
+
+  beforeEach(async () => {
+    driver = await createDriver(database.connectionString);
+    await resetDatabase(driver);
+  }, testTimeout);
+
+  afterEach(async () => {
+    if (driver) {
+      await driver.close();
+      driver = undefined;
+    }
+  });
+
+  it('creates table with CHECK constraint for enum-restricted column', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = makeRoleContract([
+      { name: 'User', value: 'user' },
+      { name: 'Admin', value: 'admin' },
+    ]);
+
+    // Apply the initial migration from an empty schema
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (result.kind !== 'success') {
+      throw new Error(`Planner failed: ${JSON.stringify(result, null, 2)}`);
+    }
+    const executeResult = await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: result.plan.spaceId ?? APP_SPACE_ID,
+          plan: result.plan,
+          migrationEdges: synthEdges(result.plan),
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+    if (!executeResult.ok) {
+      throw new Error(`Runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+    }
+
+    // The check constraint must exist in pg_constraint
+    const constraintDef = await queryPgConstraint(driver!, 'User', 'User_role_check');
+    expect(constraintDef).not.toBeNull();
+    // Postgres may rewrite 'role IN (...)' to 'role = ANY (ARRAY[...])', so assert membership
+    expect(constraintDef).toMatch(/user/);
+    expect(constraintDef).toMatch(/admin/);
+  });
+
+  it('db verify passes after initial migration', { timeout: testTimeout }, async () => {
+    const contract = makeRoleContract([
+      { name: 'User', value: 'user' },
+      { name: 'Admin', value: 'admin' },
+    ]);
+
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (result.kind !== 'success') throw new Error('Planner failed');
+    const executeResult = await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: result.plan.spaceId ?? APP_SPACE_ID,
+          plan: result.plan,
+          migrationEdges: synthEdges(result.plan),
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+    if (!executeResult.ok)
+      throw new Error(`Runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
+
+    const verifyResult = await verifySchema(driver!, contract);
+    expect(verifyResult.ok).toBe(true);
+    expect(verifyResult.schema.issues.filter((i) => i.kind.startsWith('check'))).toHaveLength(0);
+  });
+
+  it('enforces the constraint: permitted value succeeds, non-member value is rejected', {
+    timeout: testTimeout,
+  }, async () => {
+    const contract = makeRoleContract([
+      { name: 'User', value: 'user' },
+      { name: 'Admin', value: 'admin' },
+    ]);
+
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (result.kind !== 'success') throw new Error('Planner failed');
+    await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: result.plan.spaceId ?? APP_SPACE_ID,
+          plan: result.plan,
+          migrationEdges: synthEdges(result.plan),
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+
+    // Permitted value must succeed
+    await expect(
+      driver!.query(`INSERT INTO "User" (id, role) VALUES ('alice', 'user')`),
+    ).resolves.toBeDefined();
+
+    // Non-member value must be rejected by the check constraint
+    await expect(
+      driver!.query(`INSERT INTO "User" (id, role) VALUES ('bob', 'superadmin')`),
+    ).rejects.toThrow();
+  });
+
+  it('re-plans drop+recreate when enum members change, and new value set is enforced', {
+    timeout: testTimeout,
+  }, async () => {
+    // --- v1: ['user', 'admin'] ---
+    const v1Contract = makeRoleContract([
+      { name: 'User', value: 'user' },
+      { name: 'Admin', value: 'admin' },
+    ]);
+
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const v1Result = planner.plan({
+      contract: v1Contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (v1Result.kind !== 'success') throw new Error('v1 planner failed');
+    const v1ExecResult = await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: v1Result.plan.spaceId ?? APP_SPACE_ID,
+          plan: v1Result.plan,
+          migrationEdges: synthEdges(v1Result.plan),
+          driver: driver!,
+          destinationContract: v1Contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+    if (!v1ExecResult.ok)
+      throw new Error(`v1 runner failed:\n${formatRunnerFailure(v1ExecResult.failure)}`);
+
+    // Insert a row with 'user' role before the member change
+    await driver!.query(`INSERT INTO "User" (id, role) VALUES ('alice', 'user')`);
+
+    // --- v2: add 'guest', remove 'admin' → drop+recreate the check ---
+    const v2Contract = makeRoleContract([
+      { name: 'User', value: 'user' },
+      { name: 'Guest', value: 'guest' },
+    ]);
+
+    const v2Schema = await familyInstance.introspect({ driver: driver!, contract: v1Contract });
+    const v2PlanResult = planner.plan({
+      contract: v2Contract,
+      schema: v2Schema,
+      policy: FULL_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (v2PlanResult.kind !== 'success') {
+      throw new Error(`v2 planner failed: ${JSON.stringify(v2PlanResult, null, 2)}`);
+    }
+
+    // The migration plan must include both a drop and an add of the check constraint
+    const opIds = v2PlanResult.plan.operations.map((op) => op.id);
+    expect(opIds).toContain('dropCheckConstraint.User.User_role_check');
+    expect(opIds).toContain('checkConstraint.User.User_role_check');
+    // Drop must precede add
+    expect(opIds.indexOf('dropCheckConstraint.User.User_role_check')).toBeLessThan(
+      opIds.indexOf('checkConstraint.User.User_role_check'),
+    );
+
+    const v2ExecResult = await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: v2PlanResult.plan.spaceId ?? APP_SPACE_ID,
+          plan: v2PlanResult.plan,
+          migrationEdges: synthEdges(v2PlanResult.plan),
+          driver: driver!,
+          destinationContract: v2Contract,
+          policy: FULL_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+    if (!v2ExecResult.ok) {
+      throw new Error(`v2 runner failed:\n${formatRunnerFailure(v2ExecResult.failure)}`);
+    }
+
+    // Verify passes for v2 contract
+    const verifyResult = await verifySchema(driver!, v2Contract);
+    expect(verifyResult.ok).toBe(true);
+    expect(verifyResult.schema.issues.filter((i) => i.kind.startsWith('check'))).toHaveLength(0);
+
+    // New permitted value ('guest') must succeed
+    await expect(
+      driver!.query(`INSERT INTO "User" (id, role) VALUES ('charlie', 'guest')`),
+    ).resolves.toBeDefined();
+
+    // Old member ('admin') must now be rejected
+    await expect(
+      driver!.query(`INSERT INTO "User" (id, role) VALUES ('dave', 'admin')`),
+    ).rejects.toThrow();
+
+    // Previously valid row with 'user' still exists (add-only data path for alice's row)
+    const rows = await driver!.query<{ id: string; role: string }>(`SELECT id, role FROM "User"`);
+    expect(rows.rows.some((r) => r.id === 'alice' && r.role === 'user')).toBe(true);
+  });
+});

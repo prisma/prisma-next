@@ -118,7 +118,8 @@ describe('enumType() — runtime behaviour', () => {
   });
 
   it('.has() returns false for unknown values', () => {
-    expect(Role.has('guest')).toBe(false);
+    const notAMember = 'guest' as 'user' | 'admin';
+    expect(Role.has(notAMember)).toBe(false);
   });
 
   it('.nameOf() returns the name for a valid value', () => {
@@ -127,7 +128,8 @@ describe('enumType() — runtime behaviour', () => {
   });
 
   it('.nameOf() returns undefined for an unknown value', () => {
-    expect(Role.nameOf('guest')).toBeUndefined();
+    const notAMember = 'guest' as 'user' | 'admin';
+    expect(Role.nameOf(notAMember)).toBeUndefined();
   });
 
   it('.ordinalOf() returns the zero-based index', () => {
@@ -136,7 +138,8 @@ describe('enumType() — runtime behaviour', () => {
   });
 
   it('.ordinalOf() returns -1 for an unknown value', () => {
-    expect(Role.ordinalOf('guest')).toBe(-1);
+    const notAMember = 'guest' as 'user' | 'admin';
+    expect(Role.ordinalOf(notAMember)).toBe(-1);
   });
 });
 
@@ -158,6 +161,12 @@ describe('enumType() — well-formedness guards', () => {
   it('throws on duplicate values', () => {
     expect(() => enumType('Dupe', pgText, member('User', 'same'), member('Admin', 'same'))).toThrow(
       /duplicate.*value/i,
+    );
+  });
+
+  it('throws when two members collapse to the same lowered value', () => {
+    expect(() => enumType('Dupe', pgText, member('One', 1), member('TextOne', '1'))).toThrow(
+      /duplicate member value "1"/i,
     );
   });
 });

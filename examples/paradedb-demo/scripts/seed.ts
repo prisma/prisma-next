@@ -61,7 +61,7 @@ async function main() {
 
   try {
     for (const item of items) {
-      await runtime.execute(db.sql.item.insert([item]).build());
+      await runtime.execute(db.sql.public.item.insert([item]).build());
     }
     console.log(`Seeded ${items.length} items`);
   } finally {

@@ -15,10 +15,10 @@ import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expressio
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Runtime,
 } from '@prisma-next/sql-runtime';
+import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 
 export interface SqliteTestContext<TContract extends Contract<SqlStorage>> {
@@ -48,7 +48,7 @@ export async function withSqliteTestRuntime<TContract extends Contract<SqlStorag
     const { runtime, context, rawCodecInferer } = await createSqliteRuntime(contract, dbPath);
 
     try {
-      const db: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
+      const db = sqlBuilder<TContract>({ context, rawCodecInferer });
       const ormClient = orm({
         context,
         runtime: {
@@ -75,7 +75,7 @@ export async function withSqliteTestRuntime<TContract extends Contract<SqlStorag
   }
 }
 
-function createSchema<TContract extends Contract<SqlStorage>>(
+export function createSchema<TContract extends Contract<SqlStorage>>(
   db: DatabaseSync,
   contract: TContract,
 ): void {
@@ -146,7 +146,7 @@ function createSchema<TContract extends Contract<SqlStorage>>(
   `);
 }
 
-function seedData(db: DatabaseSync): void {
+export function seedData(db: DatabaseSync): void {
   db.exec(`
     INSERT INTO users (id, name, email, invited_by_id) VALUES
       (1, 'Alice', 'alice@example.com', NULL),
@@ -194,9 +194,9 @@ async function createSqliteRuntime<TContract extends Contract<SqlStorage>>(
   const driver = stackInstance.driver!;
   await driver.connect({ kind: 'path', path: dbPath });
 
-  const runtime = createRuntime({
-    stackInstance,
+  const runtime = new SqliteRuntimeImpl({
     context,
+    adapter: stackInstance.adapter,
     driver,
   });
 

@@ -15,6 +15,6 @@ import { db } from '../prisma/db';
  * To fix this query, add a .limit() clause or add proper filtering.
  */
 export async function getAllPostsUnbounded() {
-  const plan = db.sql.post.select('id', 'title', 'userId', 'createdAt').build();
+  const plan = db.sql.public.post.select('id', 'title', 'userId', 'createdAt').build();
   return db.runtime().execute(plan);
 }

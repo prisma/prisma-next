@@ -3,10 +3,10 @@ import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('basic lateral join — user with latest post title', () => {
-  const lateral = db.users
+  const lateral = db.public.users
     .lateralJoin('latestPost', (lateral) =>
       lateral
-        .from(db.posts)
+        .from(db.public.posts)
         .select('title')
         .where((f, fns) => fns.eq(f.users.id, f.posts.user_id)),
     )
@@ -20,10 +20,10 @@ test('basic lateral join — user with latest post title', () => {
 });
 
 test('outer lateral join — nullable result columns', () => {
-  const outerLateral = db.users
+  const outerLateral = db.public.users
     .outerLateralJoin('latestPost', (lateral) =>
       lateral
-        .from(db.posts)
+        .from(db.public.posts)
         .select('title')
         .where((f, fns) => fns.eq(f.users.id, f.posts.user_id)),
     )
@@ -39,10 +39,10 @@ test('outer lateral join — nullable result columns', () => {
 });
 
 test('lateral join chained with regular join', () => {
-  const lateralWithJoin = db.users
-    .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  const lateralWithJoin = db.public.users
+    .innerJoin(db.public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .lateralJoin('sub', (lateral) =>
-      lateral.from(db.posts.as('p2')).select((f) => ({ subTitle: f.p2.title })),
+      lateral.from(db.public.posts.as('p2')).select((f) => ({ subTitle: f.p2.title })),
     )
     .select((f) => ({
       userName: f.users.name,
@@ -56,9 +56,9 @@ test('lateral join chained with regular join', () => {
 });
 
 test('lateral subquery using expression select', () => {
-  const lateralExpr = db.users
+  const lateralExpr = db.public.users
     .lateralJoin('computed', (lateral) =>
-      lateral.from(db.posts).select('postTitle', (f) => f.posts.title),
+      lateral.from(db.public.posts).select('postTitle', (f) => f.posts.title),
     )
     .select((f) => ({
       userName: f.users.name,

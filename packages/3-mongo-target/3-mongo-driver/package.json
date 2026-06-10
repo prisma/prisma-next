@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/driver-mongo",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -16,17 +16,17 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/errors": "workspace:0.12.0",
-    "@prisma-next/framework-components": "workspace:0.12.0",
-    "@prisma-next/mongo-lowering": "workspace:0.12.0",
-    "@prisma-next/mongo-wire": "workspace:0.12.0",
-    "@prisma-next/utils": "workspace:0.12.0"
+    "@prisma-next/errors": "workspace:0.13.0",
+    "@prisma-next/framework-components": "workspace:0.13.0",
+    "@prisma-next/mongo-lowering": "workspace:0.13.0",
+    "@prisma-next/mongo-wire": "workspace:0.13.0",
+    "@prisma-next/utils": "workspace:0.13.0"
   },
   "devDependencies": {
     "mongodb": "catalog:",
-    "@prisma-next/test-utils": "workspace:0.12.0",
-    "@prisma-next/tsconfig": "workspace:0.12.0",
-    "@prisma-next/tsdown": "workspace:0.12.0",
+    "@prisma-next/test-utils": "workspace:0.13.0",
+    "@prisma-next/tsconfig": "workspace:0.13.0",
+    "@prisma-next/tsdown": "workspace:0.13.0",
     "mongodb-memory-server": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

@@ -1,7 +1,7 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ForeignKey, SqlModelStorage, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -170,6 +170,65 @@ namespace auth {
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({
       target: { namespaceId: 'auth', tableName: 'user' },
+    });
+  });
+
+  it('lowers the same bare table name in two namespaces with differing columns and a cross-namespace FK', () => {
+    const document = parsePslDocument({
+      schema: `namespace public {
+  model User {
+    id Int @id
+    email String
+    @@map("users")
+  }
+  model Profile {
+    id Int @id
+    userId Int
+    user auth.User @relation(fields: [userId], references: [id])
+    @@map("profile")
+  }
+}
+
+namespace auth {
+  model User {
+    id Int @id
+    token String
+    @@map("users")
+  }
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as SqlStorage;
+    const publicUsers = storage.namespaces['public']?.entries.table['users'];
+    const authUsers = storage.namespaces['auth']?.entries.table['users'];
+    expect(Object.keys(publicUsers?.columns ?? {}).sort()).toEqual(['email', 'id']);
+    expect(Object.keys(authUsers?.columns ?? {}).sort()).toEqual(['id', 'token']);
+
+    const fks: readonly ForeignKey[] =
+      storage.namespaces['public']?.entries.table['profile']?.foreignKeys ?? [];
+    expect(fks.length).toBe(1);
+    expect(fks[0]).toMatchObject({ target: { namespaceId: 'auth', tableName: 'users' } });
+
+    const publicModels = result.value.domain.namespaces['public']?.models as
+      | Record<string, ContractModel<SqlModelStorage>>
+      | undefined;
+    const authModels = result.value.domain.namespaces['auth']?.models as
+      | Record<string, ContractModel<SqlModelStorage>>
+      | undefined;
+    expect(publicModels?.['User']?.storage.table).toBe('users');
+    expect(publicModels?.['User']?.storage.namespaceId).toBe('public');
+    expect(authModels?.['User']?.storage.table).toBe('users');
+    expect(authModels?.['User']?.storage.namespaceId).toBe('auth');
+    expect(publicModels?.['Profile']?.relations?.['user']?.to).toEqual({
+      namespace: 'auth',
+      model: 'User',
     });
   });
 

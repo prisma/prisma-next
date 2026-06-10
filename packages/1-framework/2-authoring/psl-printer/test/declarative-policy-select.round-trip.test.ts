@@ -28,7 +28,10 @@ import {
   assembleAuthoringContributions,
   extractCodecLookup,
 } from '@prisma-next/framework-components/control';
-import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import {
+  namespacePslExtensionBlocks,
+  UNSPECIFIED_PSL_NAMESPACE_ID,
+} from '@prisma-next/framework-components/psl-ast';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { describe, expect, it } from 'vitest';
@@ -131,8 +134,9 @@ policy_select ProfilesSelect {
 
       expect(parsed.diagnostics).toEqual([]);
       const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      expect(ns?.extensionBlocks).toHaveLength(1);
-      const block = ns?.extensionBlocks?.[0];
+      const nsExtBlocks = namespacePslExtensionBlocks(ns!);
+      expect(nsExtBlocks).toHaveLength(1);
+      const block = nsExtBlocks[0];
       expect(block).toMatchObject({
         kind: POLICY_SELECT_DISCRIMINATOR,
         name: 'ProfilesSelect',
@@ -161,7 +165,7 @@ policy_select ProfilesSelect {
 
       expect(parsed.diagnostics).toEqual([]);
       const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      const block = ns?.extensionBlocks?.[0];
+      const block = namespacePslExtensionBlocks(ns!)[0];
       if (!block) throw new Error('expected one extension block');
 
       const factory = getFactory();
@@ -186,7 +190,7 @@ policy_select ProfilesSelect {
         codecLookup,
       });
       const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      const block = ns?.extensionBlocks?.[0];
+      const block = namespacePslExtensionBlocks(ns!)[0];
       if (!block) throw new Error('expected one extension block');
 
       const ir = getFactory()(block, { family: 'fixture', target: 'fixture' });
@@ -222,7 +226,7 @@ policy_select AdminRead {
 
       expect(parsed.diagnostics).toEqual([]);
       const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      const block = ns?.extensionBlocks?.[0];
+      const block = namespacePslExtensionBlocks(ns!)[0];
       if (!block) throw new Error('expected one extension block');
 
       const ir = getFactory()(block, { family: 'fixture', target: 'fixture' });
@@ -308,7 +312,7 @@ policy_select NakedParse {
 
       // The AST is still built (the parse pass succeeds).
       const ns = parsed.ast.namespaces.find((n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID);
-      expect(ns?.extensionBlocks).toHaveLength(1);
+      expect(namespacePslExtensionBlocks(ns!)).toHaveLength(1);
 
       // But validation flags the value parameter as rejected.
       expect(parsed.ok).toBe(false);
@@ -379,11 +383,13 @@ policy_select ProfilesSelect {
       const reParsedNs = reParsed.ast.namespaces.find(
         (n) => n.name === UNSPECIFIED_PSL_NAMESPACE_ID,
       );
-      expect(originalNs?.extensionBlocks).toHaveLength(1);
-      expect(reParsedNs?.extensionBlocks).toHaveLength(1);
+      const originalExtBlocks = namespacePslExtensionBlocks(originalNs!);
+      const reParsedExtBlocks = namespacePslExtensionBlocks(reParsedNs!);
+      expect(originalExtBlocks).toHaveLength(1);
+      expect(reParsedExtBlocks).toHaveLength(1);
 
-      const original = originalNs?.extensionBlocks?.[0];
-      const reParsedBlock = reParsedNs?.extensionBlocks?.[0];
+      const original = originalExtBlocks[0];
+      const reParsedBlock = reParsedExtBlocks[0];
       if (!original || !reParsedBlock) throw new Error('expected one extension block each');
 
       // Semantic equivalence: lower both blocks to their IR and compare. The IR

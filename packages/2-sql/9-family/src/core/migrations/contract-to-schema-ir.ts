@@ -1,7 +1,8 @@
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  type CheckConstraint,
   type ForeignKey,
   type Index,
   isPostgresEnumStorageEntry,
@@ -17,6 +18,7 @@ import {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type {
   SqlAnnotations,
+  SqlCheckConstraintIRInput,
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
@@ -55,24 +57,19 @@ export type NativeTypeExpander = (input: {
 export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
 
 /**
- * Target-supplied callback that computes the schema-qualified annotation-map
- * key for a namespace-scoped enum storage type.
+ * Target-supplied callback that resolves a contract namespace to the live
+ * database schema its enums are stored under.
  *
- * Enum lookups (`readExistingEnumValues`) are namespace/schema-qualified so two
- * namespaces holding an enum with the same TypeScript name (and even the same
- * native type) resolve to distinct live-database types. The *format* of that
- * key — and the namespace → DDL-schema resolution it depends on — is a
- * target-specific concern (Postgres schemas; SQLite/MySQL differ), so the
- * target injects it here as data rather than the family layer importing a
- * concrete `ddlSchemaName`/key implementation. This keeps the family layer
- * target-agnostic (no `@prisma-next/target-*` dependency) while the projection
- * still emits keys that match the target's read side exactly.
+ * The projected enum annotations are nested by schema
+ * (`storageTypes[schema][nativeType]`) so two namespaces holding an enum with
+ * the same native type resolve to distinct live-database types. Mapping a
+ * namespace to its DDL schema is target-specific (Postgres schemas;
+ * SQLite/MySQL differ), so the target injects it here rather than the family
+ * importing a concrete `ddlSchemaName`. This keeps the family layer
+ * target-agnostic while the projection nests under the same schema the
+ * target's read side (`readExistingEnumValues`) looks up.
  */
-export type EnumStorageKeyResolver = (
-  storage: SqlStorage,
-  namespaceId: string,
-  nativeType: string,
-) => string;
+export type EnumNamespaceSchemaResolver = (storage: SqlStorage, namespaceId: string) => string;
 
 function convertColumn(
   name: string,
@@ -152,6 +149,71 @@ function resolveColumnTypeMetadata(
   );
 }
 
+/**
+ * Resolves a `ValueSetRef` to its permitted values from the contract storage.
+ *
+ * Throws when the referenced namespace or value-set is absent — this indicates
+ * the contract was built incorrectly (the check and the value-set must be
+ * co-emitted by the lowering step). Used by `convertCheck` (schema-IR
+ * projection), `verifyCheckConstraints` (verification), and
+ * `checkConstraintPlanCallStrategy` (migration planning) so all three agree on
+ * the resolved values and the error behavior on a missing reference.
+ */
+function allStrings(values: readonly JsonValue[]): values is readonly string[] {
+  return values.every((value) => typeof value === 'string');
+}
+
+export function resolveValueSetValues(
+  ref: { readonly namespaceId: string; readonly name: string },
+  storage: SqlStorage,
+  contextLabel: string,
+): readonly string[] {
+  const ns = storage.namespaces[ref.namespaceId];
+  if (!ns) {
+    throw new Error(
+      `resolveValueSetValues: namespace "${ref.namespaceId}" not found in storage (${contextLabel})`,
+    );
+  }
+  const valueSet = ns.entries.valueSet?.[ref.name];
+  if (!valueSet) {
+    throw new Error(
+      `resolveValueSetValues: value-set "${ref.name}" not found in namespace "${ref.namespaceId}" (${contextLabel})`,
+    );
+  }
+  // Only TEXT enums ship a CHECK-constraint round-trip in this slice. A
+  // non-string value-set is a numeric enum, whose CHECK rendering/verification
+  // is future work; fail loudly rather than emit a wrong numeric-as-text check.
+  const values = valueSet.values;
+  if (!allStrings(values)) {
+    throw new Error(
+      `resolveValueSetValues: value-set "${ref.name}" in namespace "${ref.namespaceId}" has a non-string value; numeric-enum CHECK constraints are not yet supported (${contextLabel})`,
+    );
+  }
+  return values;
+}
+
+/**
+ * Projects a `CheckConstraint` IR into an `SqlCheckConstraintIRInput` by
+ * resolving the permitted values from the storage value-set it references.
+ *
+ * The `CheckConstraint.valueSet` ref points to
+ * `storage.namespaces[namespaceId].entries.valueSet[name]`. The resolved
+ * values are lifted directly from `StorageValueSet.values` so verification
+ * compares value sets, not SQL predicate strings.
+ *
+ * Throws if the referenced namespace or value-set is absent — this
+ * indicates the contract was built incorrectly (the check and the
+ * value-set must be co-emitted by the lowering step).
+ */
+function convertCheck(check: CheckConstraint, storage: SqlStorage): SqlCheckConstraintIRInput {
+  const permittedValues = resolveValueSetValues(check.valueSet, storage, `check "${check.name}"`);
+  return {
+    name: check.name,
+    column: check.column,
+    permittedValues,
+  };
+}
+
 function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
   return {
     columns: unique.columns,
@@ -185,6 +247,7 @@ function convertTable(
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
+  storage: SqlStorage,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
@@ -215,6 +278,11 @@ function convertTable(
     satisfiedIndexColumns.add(key);
   }
 
+  const checks: SqlCheckConstraintIRInput[] | undefined =
+    table.checks && table.checks.length > 0
+      ? table.checks.map((c) => convertCheck(c, storage))
+      : undefined;
+
   return {
     name,
     columns,
@@ -222,6 +290,7 @@ function convertTable(
     foreignKeys: table.foreignKeys.filter((fk) => fk.constraint !== false).map(convertForeignKey),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
+    ...ifDefined('checks', checks),
   };
 }
 
@@ -288,13 +357,13 @@ export interface ContractToSchemaIROptions {
   readonly expandNativeType?: NativeTypeExpander;
   readonly renderDefault?: DefaultRenderer;
   /**
-   * Target-supplied resolver for namespace/schema-qualified enum annotation
-   * keys. When provided (Postgres), every namespace-scoped enum is keyed by the
-   * resolver's output so the projected `storageTypes` map matches the target's
-   * `readExistingEnumValues` lookup. Targets without namespace-qualified enum
-   * storage (SQLite) omit it; enums are absent there.
+   * Target-supplied resolver mapping a namespace to the live database schema
+   * its enums are stored under. When provided (Postgres), namespace-scoped
+   * enums are nested by that schema in `enumTypes` so the projection matches
+   * the target's `readExistingEnumValues` lookup. Targets without
+   * schema-scoped enum storage (SQLite) omit it; enums are absent there.
    */
-  readonly resolveEnumStorageKey?: EnumStorageKeyResolver;
+  readonly resolveEnumNamespaceSchema?: EnumNamespaceSchemaResolver;
 }
 
 /**
@@ -359,6 +428,7 @@ export function contractToSchemaIR(
         storageTypes,
         options.expandNativeType,
         options.renderDefault,
+        storage,
       );
     }
   }
@@ -366,7 +436,7 @@ export function contractToSchemaIR(
   const annotations = deriveAnnotations(
     storage,
     options.annotationNamespace,
-    options.resolveEnumStorageKey,
+    options.resolveEnumNamespaceSchema,
   );
 
   return {
@@ -393,21 +463,26 @@ function normalizeEnumAnnotation(entry: PostgresEnumStorageEntry): StorageTypeIn
 function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
-  resolveEnumStorageKey: EnumStorageKeyResolver | undefined,
+  resolveEnumNamespaceSchema: EnumNamespaceSchemaResolver | undefined,
 ): SqlAnnotations | undefined {
   const storageTypes: Record<string, StorageTypeInstance> = {};
+  const enumTypes: Record<string, Record<string, StorageTypeInstance>> = {};
 
-  // Top-level `storage.types`: codec-typed entries (vector, decimal, …) keyed
-  // by bare `nativeType` (unchanged). Post-S1.B enums live in
-  // `namespaces[*].entries.type`, not here; a defensive top-level enum is still
-  // namespace/schema-qualified via the resolver under the unbound coordinate
-  // so it never collides on a bare name.
+  const addEnum = (namespaceId: string, entry: PostgresEnumStorageEntry): void => {
+    const schemaName = resolveEnumNamespaceSchema
+      ? resolveEnumNamespaceSchema(storage, namespaceId)
+      : 'public';
+    const bySchema = enumTypes[schemaName] ?? {};
+    bySchema[entry.nativeType] = normalizeEnumAnnotation(entry);
+    enumTypes[schemaName] = bySchema;
+  };
+
+  // Top-level `storage.types`: non-enum codec entries (vector, decimal, …) keyed
+  // by bare `nativeType`. Post-S1.B enums live in `namespaces[*].entries.type`;
+  // a defensive top-level enum is nested under the unbound coordinate's schema.
   for (const typeInstance of Object.values((storage.types ?? {}) as ResolvedStorageTypes)) {
     if (isPostgresEnumStorageEntry(typeInstance)) {
-      const key = resolveEnumStorageKey
-        ? resolveEnumStorageKey(storage, UNBOUND_NAMESPACE_ID, typeInstance.nativeType)
-        : typeInstance.nativeType;
-      storageTypes[key] = normalizeEnumAnnotation(typeInstance);
+      addEnum(UNBOUND_NAMESPACE_ID, typeInstance);
       continue;
     }
     if (isStorageTypeInstance(typeInstance)) {
@@ -415,21 +490,22 @@ function deriveAnnotations(
     }
   }
 
-  // Namespace-scoped enums: schema-qualified compound key matching the target's
-  // `readExistingEnumValues` read side, so two namespaces sharing an enum name
-  // (or native type) resolve to distinct live-database types.
+  // Namespace-scoped enums: nested by live schema so two namespaces sharing a
+  // native type resolve to distinct live-database types, matching the target's
+  // `readExistingEnumValues` read side (`enumTypes[schema][nativeType]`).
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
     const nsEnums = ns.entries['type'];
     if (!nsEnums) continue;
     for (const entry of Object.values(nsEnums)) {
       if (!isPostgresEnumStorageEntry(entry)) continue;
-      const key = resolveEnumStorageKey
-        ? resolveEnumStorageKey(storage, namespaceId, entry.nativeType)
-        : entry.nativeType;
-      storageTypes[key] = normalizeEnumAnnotation(entry);
+      addEnum(namespaceId, entry);
     }
   }
 
-  if (Object.keys(storageTypes).length === 0) return undefined;
-  return { [annotationNamespace]: { storageTypes } };
+  const envelope = {
+    ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
+    ...(Object.keys(enumTypes).length > 0 ? { enumTypes } : {}),
+  };
+  if (Object.keys(envelope).length === 0) return undefined;
+  return { [annotationNamespace]: envelope };
 }

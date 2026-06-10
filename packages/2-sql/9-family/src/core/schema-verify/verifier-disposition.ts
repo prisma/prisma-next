@@ -33,6 +33,7 @@ export function classifySqlVerifierIssueKind(kind: SchemaIssue['kind']): Verifie
       return 'declaredMissing';
     case 'type_values_mismatch':
     case 'enum_values_changed':
+    case 'check_mismatch':
       return 'valueDrift';
     case 'type_mismatch':
     case 'nullability_mismatch':
@@ -42,6 +43,10 @@ export function classifySqlVerifierIssueKind(kind: SchemaIssue['kind']): Verifie
     case 'index_mismatch':
     case 'default_mismatch':
       return 'declaredIncompatible';
+    case 'check_missing':
+      return 'declaredMissing';
+    case 'check_removed':
+      return 'extraAuxiliary';
   }
 }
 

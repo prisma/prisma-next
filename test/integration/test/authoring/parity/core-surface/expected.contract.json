@@ -297,13 +297,12 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:cadc11eabcb16466727833e2a55fbff1344368fcb46a8124bb171302c3412644",
+    "storageHash": "sha256:528ad84abab0c8dd497cbc7b64927b290466b64b951bbea7d2365b411675d43b",
     "types": {
       "Email": {
         "codecId": "pg/text@1",
         "kind": "codec-instance",
-        "nativeType": "text",
-        "typeParams": {}
+        "nativeType": "text"
       }
     }
   },

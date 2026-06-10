@@ -18,7 +18,7 @@ import { cacheAnnotation } from '@prisma-next/middleware-cache';
 import { db } from '../prisma/db';
 
 export async function getUsersCached(limit = 10, ttlMs = 60_000) {
-  const plan = db.sql.user
+  const plan = db.sql.public.user
     .select('id', 'email', 'createdAt', 'kind')
     .annotate(cacheAnnotation({ ttl: ttlMs }))
     .limit(limit)

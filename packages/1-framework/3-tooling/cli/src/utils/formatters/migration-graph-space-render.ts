@@ -1,13 +1,14 @@
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import type { GlyphMode } from '../glyph-mode';
-import { buildMigrationGraphLayout } from './migration-graph-layout';
-import { buildMigrationGraphRows } from './migration-graph-rows';
 import {
-  computeMaxDirNameLengthForLayout,
-  computeMaxEdgeTreePrefixWidthForLayout,
-  type MigrationEdgeAnnotation,
-  renderMigrationGraphTree,
-} from './migration-graph-tree-render';
+  computeLabelColumn,
+  computeMaxDirNameWidth,
+  renderMigrationGraphCommand,
+} from './migration-graph-command-render';
+import { buildGrid } from './migration-graph-grid-layout';
+import type { MigrationEdgeAnnotation } from './migration-graph-labels';
+import type { Highlight } from './migration-graph-model';
+import { buildMigrationGraphRows } from './migration-graph-rows';
 import {
   buildEdgeAnnotationsByHashFromListEntries,
   buildRefsByHashFromListEntries,
@@ -32,6 +33,24 @@ export function mergeMigrationEdgeAnnotations(
   return merged;
 }
 
+/**
+ * Translate `migrate --show` per-edge path-highlight annotations into a
+ * {@link Highlight}. With any `pathHighlight` present the result is focus mode
+ * (on-path lifted green, off-path dim); otherwise flat (lane-rotation colour).
+ */
+export function highlightFromEdgeAnnotations(
+  edgeAnnotationsByHash: ReadonlyMap<string, MigrationEdgeAnnotation>,
+): Highlight {
+  const onPath = new Set<string>();
+  let anyPathHighlight = false;
+  for (const [migrationHash, annotation] of edgeAnnotationsByHash) {
+    if (annotation.pathHighlight === undefined) continue;
+    anyPathHighlight = true;
+    if (annotation.pathHighlight === 'on-path') onPath.add(migrationHash);
+  }
+  return anyPathHighlight ? { mode: 'focus', onPath } : { mode: 'flat', onPath: new Set() };
+}
+
 export interface RenderMigrationGraphSpaceTreeInput {
   readonly graph: MigrationGraph;
   readonly migrations: readonly MigrationListEntry[];
@@ -42,14 +61,17 @@ export interface RenderMigrationGraphSpaceTreeInput {
   readonly statusOverlayByHash?: ReadonlyMap<string, MigrationEdgeAnnotation>;
   readonly dbHash?: string;
   readonly styler?: MigrationListStyler;
+  /**
+   * Cross-space override for the gutter→label column (the widest gutter across
+   * sibling space sections, plus the label gap). Named for historical
+   * continuity with the previous renderer's prefix-width input.
+   */
   readonly globalMaxEdgeTreePrefixWidth?: number;
   readonly globalMaxDirNameWidth?: number;
   /**
-   * Whether this render is for the app space. When false, `contractHash` is
-   * not forwarded to `buildMigrationGraphRows` (suppressing the floating
-   * working-contract node) and `isAppSpace: false` is passed to
-   * `renderMigrationGraphTree` (suppressing the `@contract` marker).
-   * Defaults to `true` so single-space callers are unaffected.
+   * Whether this render is for the app space. When false, `contractHash` is not
+   * forwarded to `buildMigrationGraphRows` (suppressing the floating working-
+   * contract node) and the `@contract` marker is suppressed. Defaults to `true`.
    */
   readonly isAppSpace?: boolean;
 }
@@ -59,16 +81,27 @@ export interface ComputeGlobalMaxEdgeTreePrefixWidthInput {
   readonly liveContractHash: string;
 }
 
+function buildGridForInput(input: ComputeGlobalMaxEdgeTreePrefixWidthInput): {
+  readonly grid: ReturnType<typeof buildGrid>;
+  readonly rowModel: ReturnType<typeof buildMigrationGraphRows>;
+} {
+  const rowModel = buildMigrationGraphRows(input.graph, { contractHash: input.liveContractHash });
+  const grid = buildGrid(rowModel, {}, { mode: 'flat', onPath: new Set() });
+  return { grid, rowModel };
+}
+
+/**
+ * The widest gutter→label column across the given space layouts. Cross-space
+ * callers pass this back in so every section's labels share one column.
+ */
 export function computeGlobalMaxEdgeTreePrefixWidth(
   inputs: readonly ComputeGlobalMaxEdgeTreePrefixWidthInput[],
+  glyphMode: GlyphMode = 'unicode',
 ): number {
   let globalMax = 0;
   for (const input of inputs) {
-    const rowModel = buildMigrationGraphRows(input.graph, {
-      contractHash: input.liveContractHash,
-    });
-    const layout = buildMigrationGraphLayout(rowModel);
-    globalMax = Math.max(globalMax, computeMaxEdgeTreePrefixWidthForLayout(layout));
+    const { grid } = buildGridForInput(input);
+    globalMax = Math.max(globalMax, computeLabelColumn(grid, glyphMode));
   }
   return globalMax;
 }
@@ -78,11 +111,8 @@ export function computeGlobalMaxDirNameWidth(
 ): number {
   let globalMax = 0;
   for (const input of inputs) {
-    const rowModel = buildMigrationGraphRows(input.graph, {
-      contractHash: input.liveContractHash,
-    });
-    const layout = buildMigrationGraphLayout(rowModel);
-    globalMax = Math.max(globalMax, computeMaxDirNameLengthForLayout(layout));
+    const { rowModel } = buildGridForInput(input);
+    globalMax = Math.max(globalMax, computeMaxDirNameWidth(rowModel));
   }
   return globalMax;
 }
@@ -92,23 +122,27 @@ function renderMigrationGraphSpaceTreeInternal(input: RenderMigrationGraphSpaceT
   const rowModel = buildMigrationGraphRows(input.graph, {
     ...(appSpace ? { contractHash: input.liveContractHash } : {}),
   });
-  const layout = buildMigrationGraphLayout(rowModel);
   const listOverlay = buildEdgeAnnotationsByHashFromListEntries(input.migrations);
   const edgeAnnotationsByHash =
     input.statusOverlayByHash === undefined
       ? listOverlay
       : mergeMigrationEdgeAnnotations(listOverlay, input.statusOverlayByHash);
-  return renderMigrationGraphTree(layout, {
-    refsByHash: input.refsByHash ?? buildRefsByHashFromListEntries(input.migrations),
+  const highlight = highlightFromEdgeAnnotations(edgeAnnotationsByHash);
+  const grid = buildGrid(rowModel, {}, highlight);
+
+  return renderMigrationGraphCommand({
+    grid,
+    rowModel,
+    colorize: input.colorize,
+    glyphMode: input.glyphMode,
     contractHash: input.liveContractHash,
     isAppSpace: appSpace,
     edgeAnnotationsByHash,
-    colorize: input.colorize,
-    glyphMode: input.glyphMode,
+    refsByHash: input.refsByHash ?? buildRefsByHashFromListEntries(input.migrations),
     ...(input.dbHash !== undefined ? { dbHash: input.dbHash } : {}),
     ...(input.styler !== undefined ? { styler: input.styler } : {}),
     ...(input.globalMaxEdgeTreePrefixWidth !== undefined
-      ? { globalMaxEdgeTreePrefixWidth: input.globalMaxEdgeTreePrefixWidth }
+      ? { globalLabelColumn: input.globalMaxEdgeTreePrefixWidth }
       : {}),
     ...(input.globalMaxDirNameWidth !== undefined
       ? { globalMaxDirNameWidth: input.globalMaxDirNameWidth }
@@ -123,14 +157,20 @@ export function renderMigrationGraphSpaceTree(input: RenderMigrationGraphSpaceTr
 export function renderMigrationGraphSpaceTrees(
   inputs: readonly RenderMigrationGraphSpaceTreeInput[],
 ): readonly string[] {
-  const globalMaxTreePrefix =
-    inputs.length > 1 ? computeGlobalMaxEdgeTreePrefixWidth(inputs) : undefined;
-  const globalMaxDirName = inputs.length > 1 ? computeGlobalMaxDirNameWidth(inputs) : undefined;
+  const globalInputs: ComputeGlobalMaxEdgeTreePrefixWidthInput[] = inputs.map((input) => ({
+    graph: input.graph,
+    liveContractHash: input.liveContractHash,
+  }));
+  const glyphMode = inputs[0]?.glyphMode ?? 'unicode';
+  const globalLabelColumn =
+    inputs.length > 1 ? computeGlobalMaxEdgeTreePrefixWidth(globalInputs, glyphMode) : undefined;
+  const globalMaxDirName =
+    inputs.length > 1 ? computeGlobalMaxDirNameWidth(globalInputs) : undefined;
   return inputs.map((input) =>
     renderMigrationGraphSpaceTreeInternal({
       ...input,
-      ...(globalMaxTreePrefix !== undefined
-        ? { globalMaxEdgeTreePrefixWidth: globalMaxTreePrefix }
+      ...(globalLabelColumn !== undefined
+        ? { globalMaxEdgeTreePrefixWidth: globalLabelColumn }
         : {}),
       ...(globalMaxDirName !== undefined ? { globalMaxDirNameWidth: globalMaxDirName } : {}),
     }),

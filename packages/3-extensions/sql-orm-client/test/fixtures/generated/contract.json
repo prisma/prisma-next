@@ -20,8 +20,28 @@
       "model": "Profile",
       "namespace": "public"
     },
+    "project_links": {
+      "model": "ProjectLink",
+      "namespace": "public"
+    },
+    "projects": {
+      "model": "Project",
+      "namespace": "public"
+    },
+    "roles": {
+      "model": "Role",
+      "namespace": "public"
+    },
     "tags": {
       "model": "Tag",
+      "namespace": "public"
+    },
+    "user_roles": {
+      "model": "UserRole",
+      "namespace": "public"
+    },
+    "user_tags": {
+      "model": "UserTag",
       "namespace": "public"
     },
     "users": {
@@ -283,6 +303,166 @@
               "table": "profiles"
             }
           },
+          "Project": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "tenantId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "related": {
+                "cardinality": "N:M",
+                "on": {
+                  "localFields": [
+                    "tenantId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "src_tenant_id",
+                    "src_id"
+                  ]
+                },
+                "through": {
+                  "childColumns": [
+                    "dst_tenant_id",
+                    "dst_id"
+                  ],
+                  "namespaceId": "public",
+                  "parentColumns": [
+                    "src_tenant_id",
+                    "src_id"
+                  ],
+                  "table": "project_links",
+                  "targetColumns": [
+                    "tenant_id",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Project",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "tenantId": {
+                  "column": "tenant_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "projects"
+            }
+          },
+          "ProjectLink": {
+            "fields": {
+              "dstId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "dstTenantId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "srcId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "srcTenantId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "dstId": {
+                  "column": "dst_id"
+                },
+                "dstTenantId": {
+                  "column": "dst_tenant_id"
+                },
+                "srcId": {
+                  "column": "src_id"
+                },
+                "srcTenantId": {
+                  "column": "src_tenant_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "project_links"
+            }
+          },
+          "Role": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                }
+              },
+              "namespaceId": "public",
+              "table": "roles"
+            }
+          },
           "Tag": {
             "fields": {
               "id": {
@@ -415,6 +595,62 @@
                   "model": "Profile",
                   "namespace": "public"
                 }
+              },
+              "roles": {
+                "cardinality": "N:M",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "user_id"
+                  ]
+                },
+                "through": {
+                  "childColumns": [
+                    "role_id"
+                  ],
+                  "namespaceId": "public",
+                  "parentColumns": [
+                    "user_id"
+                  ],
+                  "table": "user_roles",
+                  "targetColumns": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Role",
+                  "namespace": "public"
+                }
+              },
+              "tags": {
+                "cardinality": "N:M",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "user_id"
+                  ]
+                },
+                "through": {
+                  "childColumns": [
+                    "tag_id"
+                  ],
+                  "namespaceId": "public",
+                  "parentColumns": [
+                    "user_id"
+                  ],
+                  "table": "user_tags",
+                  "targetColumns": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Tag",
+                  "namespace": "public"
+                }
               }
             },
             "storage": {
@@ -437,6 +673,98 @@
               },
               "namespaceId": "public",
               "table": "users"
+            }
+          },
+          "UserRole": {
+            "fields": {
+              "level": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "roleId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "level": {
+                  "column": "level"
+                },
+                "roleId": {
+                  "column": "role_id"
+                },
+                "userId": {
+                  "column": "user_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "user_roles"
+            }
+          },
+          "UserTag": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "note": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "tagId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "note": {
+                  "column": "note"
+                },
+                "tagId": {
+                  "column": "tag_id"
+                },
+                "userId": {
+                  "column": "user_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "user_tags"
             }
           }
         },
@@ -666,6 +994,100 @@
                 }
               ]
             },
+            "project_links": {
+              "columns": {
+                "dst_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "dst_tenant_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "src_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "src_tenant_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "src_tenant_id",
+                  "src_id",
+                  "dst_tenant_id",
+                  "dst_id"
+                ]
+              },
+              "uniques": []
+            },
+            "projects": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "tenant_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "tenant_id",
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "roles": {
+              "columns": {
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "name"
+                  ]
+                }
+              ]
+            },
             "tags": {
               "columns": {
                 "id": {
@@ -696,6 +1118,71 @@
                   ]
                 }
               ]
+            },
+            "user_roles": {
+              "columns": {
+                "level": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "role_id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "user_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "user_id",
+                  "role_id"
+                ]
+              },
+              "uniques": []
+            },
+            "user_tags": {
+              "columns": {
+                "created_at": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "note": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "tag_id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "user_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "user_id",
+                  "tag_id"
+                ]
+              },
+              "uniques": []
             },
             "users": {
               "columns": {
@@ -765,12 +1252,22 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:8a712adec92e630ce0aae57af88813b5f28cf05d2b1f74f1a2a198684bd1d3fc"
+    "storageHash": "sha256:0d0249e4567eafc1e369700b6516fb4cb682a5b5d57f1b44d49a959d13322e43"
   },
   "execution": {
-    "executionHash": "sha256:a108e5f9b4a5af51635ffde3849836fee73cd71cd568e1f2daf236c5768bcb07",
+    "executionHash": "sha256:8e2e39df5e42d28f74fa7177b910ed570f3c04c4a41b9812c3d13c18b428507a",
     "mutations": {
       "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "roles"
+          }
+        },
         {
           "onCreate": {
             "id": "uuidv4",

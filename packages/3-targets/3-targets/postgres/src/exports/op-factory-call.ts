@@ -1,4 +1,5 @@
 export {
+  AddCheckConstraintCall,
   AddColumnCall,
   AddEnumValuesCall,
   AddForeignKeyCall,
@@ -11,6 +12,7 @@ export {
   CreateSchemaCall,
   CreateTableCall,
   DataTransformCall,
+  DropCheckConstraintCall,
   DropColumnCall,
   DropConstraintCall,
   DropDefaultCall,

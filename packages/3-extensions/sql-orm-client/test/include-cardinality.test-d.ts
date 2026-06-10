@@ -22,10 +22,14 @@ type Assert<T extends true> = T;
 const runtime = createMockRuntime();
 const context = {} as ExecutionContext<TestContract>;
 
-const userCollection = new Collection({ runtime, context }, 'User');
-const postCollection = new Collection({ runtime, context }, 'Post');
-const profileCollection = new Collection({ runtime, context }, 'Profile');
-const articleCollection = new Collection({ runtime, context }, 'Article');
+const userCollection = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
+const postCollection = new Collection({ runtime, context }, 'Post', { namespaceId: 'public' });
+const profileCollection = new Collection({ runtime, context }, 'Profile', {
+  namespaceId: 'public',
+});
+const articleCollection = new Collection({ runtime, context }, 'Article', {
+  namespaceId: 'public',
+});
 
 const usersWithPosts = userCollection.include('posts');
 const usersWithProfile = userCollection.include('profile');

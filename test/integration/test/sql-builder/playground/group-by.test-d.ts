@@ -3,8 +3,8 @@ import { expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
 test('basic groupBy with count', () => {
-  const postsPerUser = db.users
-    .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  const postsPerUser = db.public.users
+    .innerJoin(db.public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name')
     .select('postCount', (_f, fns) => fns.count())
     .groupBy('name')
@@ -14,7 +14,7 @@ test('basic groupBy with count', () => {
 });
 
 test('groupBy with select alias', () => {
-  const byAlias = db.users
+  const byAlias = db.public.users
     .select('author', (f) => f.name)
     .select('total', (_f, fns) => fns.count())
     .groupBy('author')
@@ -24,8 +24,8 @@ test('groupBy with select alias', () => {
 });
 
 test('HAVING with aggregate expression', () => {
-  const activeAuthors = db.users
-    .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  const activeAuthors = db.public.users
+    .innerJoin(db.public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name')
     .select('postCount', (f, fns) => fns.count(f.posts.id))
     .groupBy('name')
@@ -36,8 +36,8 @@ test('HAVING with aggregate expression', () => {
 });
 
 test('HAVING referencing a select alias', () => {
-  const havingAlias = db.users
-    .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  const havingAlias = db.public.users
+    .innerJoin(db.public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name')
     .select('postCount', (_f, fns) => fns.count())
     .groupBy('name')
@@ -48,8 +48,8 @@ test('HAVING referencing a select alias', () => {
 });
 
 test('chained groupBy', () => {
-  const multiGroup = db.users
-    .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  const multiGroup = db.public.users
+    .innerJoin(db.public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name', 'title')
     .select('cnt', (_f, fns) => fns.count())
     .groupBy('name')
@@ -62,7 +62,7 @@ test('chained groupBy', () => {
 });
 
 test('groupBy with expression', () => {
-  const byExpr = db.users
+  const byExpr = db.public.users
     .select('email')
     .select('userCount', (_f, fns) => fns.count())
     .groupBy((f) => f.email)
@@ -72,8 +72,8 @@ test('groupBy with expression', () => {
 });
 
 test('ORDER BY aggregate on grouped query', () => {
-  const orderedGroup = db.users
-    .innerJoin(db.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
+  const orderedGroup = db.public.users
+    .innerJoin(db.public.posts, (f, fns) => fns.eq(f.users.id, f.posts.user_id))
     .select('name')
     .select('postCount', (_f, fns) => fns.count())
     .groupBy('name')
@@ -85,9 +85,9 @@ test('ORDER BY aggregate on grouped query', () => {
 });
 
 test('grouped subquery as join source', () => {
-  const withCounts = db.users
+  const withCounts = db.public.users
     .innerJoin(
-      db.posts
+      db.public.posts
         .select('user_id')
         .select('postCount', (_f, fns) => fns.count())
         .groupBy('user_id')
@@ -101,7 +101,7 @@ test('grouped subquery as join source', () => {
 });
 
 test('sum/avg/min/max aggregate functions', () => {
-  const aggregates = db.posts
+  const aggregates = db.public.posts
     .select('totalViews', (f, fns) => fns.sum(f.views))
     .select('avgViews', (f, fns) => fns.avg(f.views))
     .select('minViews', (f, fns) => fns.min(f.views))
@@ -120,7 +120,7 @@ test('sum/avg/min/max aggregate functions', () => {
 });
 
 test('aggregates in select are allowed (fns.count available)', () => {
-  const selectAgg = db.users
+  const selectAgg = db.public.users
     .select('name')
     .select('cnt', (_f, fns) => fns.count())
     .build();
@@ -129,7 +129,7 @@ test('aggregates in select are allowed (fns.count available)', () => {
 });
 
 test('aggregates in WHERE — type error', () => {
-  db.users
+  db.public.users
     .select('name')
     // @ts-expect-error count is not available in where (Functions, not AggregateFunctions)
     .where((_f, fns) => fns.gt(fns.count(), 5))
@@ -137,7 +137,7 @@ test('aggregates in WHERE — type error', () => {
 });
 
 test('HAVING without GROUP BY — type error', () => {
-  db.users
+  db.public.users
     .select('name')
     // @ts-expect-error having only exists on GroupedQuery, not SelectQuery
     .having((_f, fns) => fns.gt(fns.count(), 5))

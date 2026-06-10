@@ -32,7 +32,7 @@ function collectionOf<M extends 'Task' | 'Ticket' | 'Project' | 'Account'>(
   runtime: PgIntegrationRuntime,
   model: M,
 ) {
-  return new Collection({ runtime, context: polyContext }, model);
+  return new Collection({ runtime, context: polyContext }, model, { namespaceId: 'public' });
 }
 
 async function createTasksTable(runtime: PgIntegrationRuntime): Promise<void> {

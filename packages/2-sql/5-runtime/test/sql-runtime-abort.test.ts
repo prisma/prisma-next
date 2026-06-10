@@ -28,9 +28,8 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs, stubAst } from './utils';
+import { createTestRuntime as createRuntime, descriptorsFromCodecs, stubAst } from './utils';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -213,7 +212,7 @@ function projectingExecutionPlan(
   };
 }
 
-describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
+describe('SqlRuntime.execute({ signal }) — abort semantics', () => {
   it('regression — omitting options is bit-for-bit identical to today (no signal supplied)', async () => {
     const { stackInstance, context, driver } = createTestSetup();
     const runtime = createRuntime({

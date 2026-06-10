@@ -7,11 +7,11 @@ describe('integration: subqueries', { timeout: timeouts.databaseOperation }, () 
   it('EXISTS filters to rows with matching subquery', async () => {
     const d = db();
     const rows = await runtime().execute(
-      d.users
+      d.public.users
         .select('id', 'name')
         .where((f, fns) =>
           fns.exists(
-            d.posts.select('id').where((pf, pfns) => pfns.eq(pf.posts.user_id, f.users.id)),
+            d.public.posts.select('id').where((pf, pfns) => pfns.eq(pf.posts.user_id, f.users.id)),
           ),
         )
         .orderBy('id')
@@ -28,14 +28,14 @@ describe('integration: subqueries', { timeout: timeouts.databaseOperation }, () 
     // Parent filters out Bob (id=2), leaving only Alice (id=1)
     const d = db();
     const rows = await runtime().execute(
-      d.users
+      d.public.users
         .select('id', 'name')
         .where((f, fns) =>
           fns.and(
             fns.ne(f.name, 'Bob'),
             fns.in(
               f.id,
-              d.posts.select('user_id').where((pf, pfns) => pfns.gt(pf.views, 50)),
+              d.public.posts.select('user_id').where((pf, pfns) => pfns.gt(pf.views, 50)),
             ),
           ),
         )
@@ -49,9 +49,9 @@ describe('integration: subqueries', { timeout: timeouts.databaseOperation }, () 
 
   it('subquery as join source', async () => {
     const d = db();
-    const sub = d.posts.select('user_id', 'title').as('sub');
+    const sub = d.public.posts.select('user_id', 'title').as('sub');
     const rows = await runtime().execute(
-      d.users
+      d.public.users
         .innerJoin(sub, (f, fns) => fns.eq(f.users.id, f.sub.user_id))
         .select('name', 'title')
         .build(),

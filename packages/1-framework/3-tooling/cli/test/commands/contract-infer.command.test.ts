@@ -5,7 +5,11 @@ import type {
   PslExtensionBlock,
   PslSpan,
 } from '@prisma-next/framework-components/psl-ast';
-import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import {
+  makePslNamespace,
+  makePslNamespaceEntries,
+  UNSPECIFIED_PSL_NAMESPACE_ID,
+} from '@prisma-next/framework-components/psl-ast';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,53 +21,50 @@ const SYNTHETIC_SPAN: PslSpan = {
 };
 
 function buildSyntheticUserAst(): PslDocumentAst {
+  const userModel = {
+    kind: 'model' as const,
+    name: 'User',
+    fields: [
+      {
+        kind: 'field' as const,
+        name: 'id',
+        typeName: 'Int',
+        optional: false,
+        list: false,
+        attributes: [
+          {
+            kind: 'attribute' as const,
+            target: 'field' as const,
+            name: 'id',
+            args: [],
+            span: SYNTHETIC_SPAN,
+          },
+        ],
+        span: SYNTHETIC_SPAN,
+      },
+      {
+        kind: 'field' as const,
+        name: 'email',
+        typeName: 'String',
+        optional: false,
+        list: false,
+        attributes: [],
+        span: SYNTHETIC_SPAN,
+      },
+    ],
+    attributes: [],
+    span: SYNTHETIC_SPAN,
+  };
   return {
     kind: 'document',
     sourceId: 'test',
     namespaces: [
-      {
+      makePslNamespace({
         kind: 'namespace',
         name: UNSPECIFIED_PSL_NAMESPACE_ID,
-        models: [
-          {
-            kind: 'model',
-            name: 'User',
-            fields: [
-              {
-                kind: 'field',
-                name: 'id',
-                typeName: 'Int',
-                optional: false,
-                list: false,
-                attributes: [
-                  {
-                    kind: 'attribute',
-                    target: 'field',
-                    name: 'id',
-                    args: [],
-                    span: SYNTHETIC_SPAN,
-                  },
-                ],
-                span: SYNTHETIC_SPAN,
-              },
-              {
-                kind: 'field',
-                name: 'email',
-                typeName: 'String',
-                optional: false,
-                list: false,
-                attributes: [],
-                span: SYNTHETIC_SPAN,
-              },
-            ],
-            attributes: [],
-            span: SYNTHETIC_SPAN,
-          },
-        ],
-        enums: [],
-        compositeTypes: [],
+        entries: makePslNamespaceEntries([userModel], [], [], []),
         span: SYNTHETIC_SPAN,
-      },
+      }),
     ],
     span: SYNTHETIC_SPAN,
   };
@@ -356,15 +357,12 @@ describe('createContractInferCommand', () => {
       kind: 'document',
       sourceId: 'test',
       namespaces: [
-        {
+        makePslNamespace({
           kind: 'namespace',
           name: UNSPECIFIED_PSL_NAMESPACE_ID,
-          models: [],
-          enums: [],
-          compositeTypes: [],
-          extensionBlocks: [policySelectBlock],
+          entries: makePslNamespaceEntries([], [], [], [policySelectBlock]),
           span: SYNTHETIC_SPAN,
-        },
+        }),
       ],
       span: SYNTHETIC_SPAN,
     };

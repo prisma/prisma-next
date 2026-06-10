@@ -77,6 +77,14 @@ export interface RelationNode {
   readonly fieldName: string;
   readonly toModel: string;
   readonly toTable: string;
+  /**
+   * Namespace coordinate of the related model. When omitted the assembler
+   * resolves the coordinate from the referenced model node's own
+   * `namespaceId`; the field exists so authoring paths that already know the
+   * target namespace can stamp it explicitly — required to disambiguate a
+   * relation to a model whose bare name also exists in another namespace.
+   */
+  readonly toNamespaceId?: string;
   readonly cardinality: '1:1' | '1:N' | 'N:1' | 'N:M';
   /**
    * Contract-space identity of the related model. When present, the

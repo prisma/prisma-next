@@ -46,7 +46,6 @@ const sqlPreserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'entries', 'table', '*'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
-  ['storage', 'types', '*', 'typeParams'],
 ] as const satisfies readonly PathPattern[];
 
 const sqlSortTargets = [
@@ -759,8 +758,8 @@ describe('domain plane', () => {
   });
 });
 
-describe('typeParams preservation', () => {
-  it('preserves empty storage.types[].typeParams when shouldPreserveEmpty hook provided', () => {
+describe('typeParams canonicalization', () => {
+  it('strips empty storage.types[].typeParams even when SQL shouldPreserveEmpty hook is provided', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: { storageHash: 'sha256:stub', types: { MyType: { typeParams: {} } } },
@@ -768,7 +767,7 @@ describe('typeParams preservation', () => {
       { shouldPreserveEmpty: sqlPreserveEmpty },
     );
     const myType = drill(result, 'storage', 'types', 'MyType');
-    expect(myType['typeParams']).toEqual({});
+    expect(myType).not.toHaveProperty('typeParams');
   });
 
   it('strips empty storage.types[].typeParams without shouldPreserveEmpty hook', () => {
@@ -783,6 +782,21 @@ describe('typeParams preservation', () => {
     );
     const myType = drill(result, 'storage', 'types', 'MyType');
     expect(myType).not.toHaveProperty('typeParams');
+  });
+
+  it('preserves non-empty storage.types[].typeParams', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: {
+          storageHash: 'sha256:stub',
+          namespaces: {},
+          types: { MyType: { typeParams: { length: 10 } } },
+        },
+      }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
+    );
+    const myType = drill(result, 'storage', 'types', 'MyType');
+    expect(myType['typeParams']).toEqual({ length: 10 });
   });
 });
 

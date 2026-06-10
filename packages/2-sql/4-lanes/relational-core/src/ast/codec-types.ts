@@ -81,13 +81,15 @@ export interface Codec<
  *
  * Built once at `ExecutionContext` construction time by walking the contract's `storage.tables[].columns[]` and resolving each column through its descriptor's factory. Runtime encode/decode dispatch resolves codecs via `forCodecRef(ref)` — the single dispatch shape for AST-bound codec resolution.
  *
- * `forColumn(table, column)` is retained for build-time helpers that need column-keyed lookup (e.g. projection stamping); runtime dispatch routes through `forCodecRef`.
+ * `forColumn(namespace, table, column)` is retained for build-time helpers that need column-keyed lookup (e.g. projection stamping); runtime dispatch routes through `forCodecRef`.
  */
 export interface ContractCodecRegistry {
   /**
-   * Resolve the codec for `(table, column)`. Returns the per-instance parameterized codec for parameterized columns, the shared codec for non-parameterized columns, or `undefined` if the column is unknown or the codec isn't registered.
+   * Resolve the codec for `(namespace, table, column)`. Returns the per-instance parameterized codec for parameterized columns, the shared codec for non-parameterized columns, or `undefined` if the column is unknown or the codec isn't registered.
+   *
+   * The `namespaceId` coordinate leads and is always supplied — the column is resolved strictly within that namespace, so two same-bare-named tables across namespaces resolve to their own per-namespace codecs.
    */
-  forColumn(table: string, column: string): Codec | undefined;
+  forColumn(namespaceId: string, table: string, column: string): Codec | undefined;
 
   /**
    * Resolve a codec by {@link CodecRef}. The single dispatch shape for AST-bound codec resolution — every codec-bearing AST node carries a `CodecRef` that resolves through this method via the per-`ExecutionContext` `AstCodecResolver`. Two refs with the same `codecId` and structurally equal `typeParams` (regardless of object key order) return the same memoised codec instance. Throws `RUNTIME.CODEC_DESCRIPTOR_MISSING` for unknown `codecId`s and `RUNTIME.TYPE_PARAMS_INVALID` on `paramsSchema` rejection.

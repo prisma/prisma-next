@@ -118,7 +118,7 @@ JSON envelopes hydrate into class instances through the target's `ContractSerial
 
 ### Pack-contributed entity authoring
 
-Target packs contribute new entity kinds (Postgres enums, Postgres schemas, future RLS policies) via the `entities` namespace on `AuthoringContributions`. Each entity descriptor carries a factory `(input, ctx) => IRNode` that constructs the IR-class instance; pack-bag-driven type narrowing surfaces the contributed kind at `helpers.entities.<entityName>(input)` in the TS DSL with full type narrowing on `input`. PSL syntax for the same kind lowers through the same descriptor. The mechanism is the authoring counterpart of the IR's target-extensibility — once the IR admits target-specific kinds, the authoring surface admits them too without hand-edited family-layer construction sites.
+Target packs contribute new entity kinds (Postgres enums, Postgres schemas, future RLS policies) via the `entityTypes` namespace on `AuthoringContributions`. Each entity descriptor carries a factory `(input, ctx) => IRNode` that constructs the IR-class instance; pack-bag-driven type narrowing surfaces the contributed kind at `helpers.entityTypes.<entityName>(input)` in the TS DSL with full type narrowing on `input`. PSL syntax for the same kind lowers through the same descriptor. The mechanism is the authoring counterpart of the IR's target-extensibility — once the IR admits target-specific kinds, the authoring surface admits them too without hand-edited family-layer construction sites.
 
 ### Exception: Classes with Private Properties in Exported Types
 

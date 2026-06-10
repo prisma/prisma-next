@@ -160,7 +160,7 @@ export function createHandler(deps: HandlerDeps) {
       );
     }
 
-    const plan = deps.db.sql.telemetry_event
+    const plan = deps.db.sql.public.telemetry_event
       .insert([
         {
           installationId: parsed.installationId,

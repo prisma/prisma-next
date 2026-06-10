@@ -28,10 +28,10 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
-import { createRuntime, withTransaction } from '../src/sql-runtime';
+import { withTransaction } from '../src/sql-runtime';
 import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs, stubAst } from './utils';
+import { createTestRuntime as createRuntime, descriptorsFromCodecs, stubAst } from './utils';
 
 const runtimeSecretSeed = 'sql-runtime-secret';
 
@@ -242,7 +242,7 @@ function createRawExecutionPlan<Row = Record<string, unknown>>(
   };
 }
 
-describe('createRuntime', () => {
+describe('SqlRuntime', () => {
   it('creates runtime with context and driver', () => {
     const { stackInstance, context, driver } = createTestSetup();
 
@@ -788,6 +788,53 @@ describe('withTransaction', () => {
     await expect(escaped.result.toArray()).rejects.toThrow(
       'Cannot read from a query result after the transaction has ended',
     );
+  });
+
+  it('rejects escaped result with TRANSACTION_CLOSED without consulting the driver', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    let driverBodyEntered = false;
+    driver.__spies.transactionExecute.mockImplementationOnce(async function* () {
+      driverBodyEntered = true;
+      yield { id: 99 };
+    });
+
+    const escaped = await withTransaction(runtime, async (tx) => {
+      return { result: tx.execute(createRawExecutionPlan()) };
+    });
+
+    await expect(escaped.result.toArray()).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_CLOSED',
+    });
+    expect(driverBodyEntered).toBe(false);
+  });
+
+  it('rejects partially-consumed escaped iterator on resume without consulting the driver', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+
+    let driverNextCallCount = 0;
+    driver.__spies.transactionExecute.mockImplementationOnce(async function* () {
+      driverNextCallCount++;
+      yield { id: 1 };
+      driverNextCallCount++;
+      yield { id: 2 };
+    });
+
+    // Escape a partially-consumed iterator: pull the first row inside the transaction, then let it commit.
+    const escapedIterator = await withTransaction(runtime, async (tx) => {
+      const iter = tx.execute(createRawExecutionPlan())[Symbol.asyncIterator]();
+      await iter.next(); // pulls row 1 — driver body entered, driverNextCallCount === 1
+      return iter;
+    });
+
+    const countAfterPartialConsumption = driverNextCallCount;
+
+    // Now the transaction is committed (invalidated). Calling next() must throw TRANSACTION_CLOSED,
+    // not advance into the driver for the second row.
+    await expect(escapedIterator.next()).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_CLOSED',
+    });
+    expect(driverNextCallCount).toBe(countAfterPartialConsumption);
   });
 
   it('sets invalidated flag after commit', async () => {

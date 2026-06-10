@@ -1,14 +1,12 @@
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { createCacheMiddleware } from '@prisma-next/middleware-cache';
-import { budgets, createRuntime, type Runtime, type SqlMiddleware } from '@prisma-next/sql-runtime';
-import { Pool } from 'pg';
-import { context, stack } from './context';
+import postgres from '@prisma-next/postgres/runtime';
+import { budgets, type Runtime, type SqlMiddleware } from '@prisma-next/sql-runtime';
+import { contract } from '../../prisma/contract';
 
 export async function getRuntime(
   databaseUrl: string,
-  middleware: SqlMiddleware[] = [
-    // Cache first: short-circuits annotated reads on a hit before the
-    // budget check fires. Budgets still run on the miss path.
+  middleware: readonly SqlMiddleware[] = [
     createCacheMiddleware({ maxEntries: 1_000 }),
     budgets({
       maxRows: 10_000,
@@ -18,24 +16,11 @@ export async function getRuntime(
     }),
   ],
 ): Promise<Runtime> {
-  const pool = new Pool({ connectionString: databaseUrl });
-
-  const stackInstance = instantiateExecutionStack(stack);
-  const driver = stackInstance.driver;
-  if (!driver) {
-    throw new Error('Driver descriptor missing from execution stack');
-  }
-  try {
-    await driver.connect({ kind: 'pgPool', pool });
-  } catch (error) {
-    await pool.end();
-    throw error;
-  }
-
-  return createRuntime({
-    stackInstance,
-    context,
-    driver,
+  const client = postgres({
+    contract,
+    url: databaseUrl,
     middleware,
+    extensions: [pgvector],
   });
+  return client.connect();
 }

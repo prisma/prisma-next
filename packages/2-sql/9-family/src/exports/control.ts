@@ -17,13 +17,14 @@ export type { SqlControlFamilyInstance } from '../core/control-instance';
 export type {
   ContractToSchemaIROptions,
   DefaultRenderer,
-  EnumStorageKeyResolver,
+  EnumNamespaceSchemaResolver,
   NativeTypeExpander,
 } from '../core/migrations/contract-to-schema-ir';
 // Contract → SchemaIR conversion for offline migration planning
 export {
   contractToSchemaIR,
   detectDestructiveChanges,
+  resolveValueSetValues,
 } from '../core/migrations/contract-to-schema-ir';
 export type { ControlPolicySubject } from '../core/migrations/control-policy';
 export {

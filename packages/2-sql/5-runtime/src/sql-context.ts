@@ -30,18 +30,9 @@ import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
   isPostgresEnumStorageEntry,
   type SqlStorage,
-  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
-
-// Framework `Namespace.tables` is widened to `Record<string, object>` so
-// emitted `contract.d.ts` table literals satisfy it structurally. At
-// runtime, every `SqlStorage` namespace holds `StorageTable` instances —
-// the constructor enforces it. Narrowing per-iteration with a single-step
-// cast (not `as unknown as`) keeps Pattern C walks readable without
-// weakening the substrate type.
-type SqlNamespaceTables = Readonly<Record<string, StorageTable>>;
 
 function documentScopedCodecTypes(
   contract: Contract<SqlStorage>,
@@ -344,7 +335,7 @@ function collectTypeRefSites(
 ): Map<string, Array<{ readonly table: string; readonly column: string }>> {
   const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table as SqlNamespaceTables)) {
+    for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (typeof column.typeRef !== 'string') continue;
         const list = sites.get(column.typeRef);
@@ -387,7 +378,9 @@ function initializeTypeHelpers(
       continue;
     }
 
-    const validatedParams = validateTypeParams(typeParams, descriptor, {
+    // `typeParams` may be absent on the canonical empty form. Forward `{}`
+    // to the descriptor's paramsSchema so it can probe its own optionality.
+    const validatedParams = validateTypeParams(typeParams ?? {}, descriptor, {
       typeName,
     });
 
@@ -404,7 +397,7 @@ function validateColumnTypeParams(
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): void {
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table as SqlNamespaceTables)) {
+    for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeParams) {
           const descriptor = codecDescriptors.get(column.codecId);
@@ -432,10 +425,10 @@ function assertColumnCodecIntegrity(
   storage: SqlStorage,
   codecDescriptors: CodecDescriptorRegistry,
 ): void {
-  for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table as SqlNamespaceTables)) {
+  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const columnName of Object.keys(table.columns)) {
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
         if (!ref) continue;
 
         const descriptor = codecDescriptors.descriptorFor(ref.codecId);
@@ -480,7 +473,22 @@ function assertColumnCodecIntegrity(
           }
         }
 
-        if (!descriptor.isParameterized && ref.typeParams !== undefined) {
+        // An object-typed field's empty state is canonical at every boundary
+        // that compares them: `typeParams: {}` and missing `typeParams` are
+        // equivalent — both mean "no parameters were supplied". A
+        // non-parameterized codec only conflicts with typeParams that carry
+        // at least one key. The PSL interpreter emits `typeParams: {}` for
+        // `@db.X` named types whose body has no parameters; treating that as
+        // a mismatch would reject every such alias against `pg/text@1`
+        // (e.g. the supabase extension's `Uuid` type).
+        const refTypeParams = ref.typeParams;
+        const refHasTypeParamKeys =
+          refTypeParams !== undefined &&
+          refTypeParams !== null &&
+          typeof refTypeParams === 'object' &&
+          !Array.isArray(refTypeParams) &&
+          Object.keys(refTypeParams).length > 0;
+        if (!descriptor.isParameterized && refHasTypeParamKeys) {
           throw runtimeError(
             'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
             `Column '${tableName}.${columnName}' supplies typeParams to non-parameterized codec '${ref.codecId}'. Remove the typeParams or switch to a parameterized codec id.`,
@@ -512,7 +520,7 @@ function assertColumnCodecIntegrity(
  *
  * Contract integrity is enforced upstream by {@link assertColumnCodecIntegrity}: every column must reference a registered `codecId` whose `descriptor.isParameterized` flag matches the presence of `typeParams` (via `codecRefForColumn`). The pre-population walk and `forColumn` therefore make no defensive checks — malformed columns fail fast at `createExecutionContext` construction with `RUNTIME.CODEC_DESCRIPTOR_MISSING` or `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH` rather than being silently skipped here.
  *
- * `forColumn(t, c)` is a thin delegate over `forCodecRef(codecRefForColumn(t, c))`; encode/decode hot paths read the resolver directly via `forCodecRef`. The only `undefined` `forColumn` returns is the legitimate "no such column in the contract" case.
+ * `forColumn(ns, t, c)` is a thin delegate over `forCodecRef(codecRefForColumn(ns, t, c))`; encode/decode hot paths read the resolver directly via `forCodecRef`. The only `undefined` `forColumn` returns is the legitimate "no such column in the contract" case.
  */
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
@@ -526,15 +534,24 @@ function buildContractCodecRegistry(
   const typeRefSites = collectTypeRefSites(contract.storage);
   for (const [typeName, typeInstance] of Object.entries(documentScopedCodecTypes(contract) ?? {})) {
     const enumView = readEnumViewIfApplicable(typeInstance);
+    const instanceTypeParams = enumView
+      ? enumView.typeParams
+      : (typeInstance as StorageTypeInstance).typeParams;
+    const hasParamKeys =
+      instanceTypeParams !== undefined && Object.keys(instanceTypeParams).length > 0;
     const ref: CodecRef = enumView
-      ? {
-          codecId: enumView.codecId,
-          typeParams: enumView.typeParams as unknown as JsonValue,
-        }
-      : {
-          codecId: (typeInstance as StorageTypeInstance).codecId,
-          typeParams: (typeInstance as StorageTypeInstance).typeParams as JsonValue,
-        };
+      ? hasParamKeys
+        ? {
+            codecId: enumView.codecId,
+            typeParams: instanceTypeParams as unknown as JsonValue,
+          }
+        : { codecId: enumView.codecId }
+      : hasParamKeys
+        ? {
+            codecId: (typeInstance as StorageTypeInstance).codecId,
+            typeParams: instanceTypeParams as JsonValue,
+          }
+        : { codecId: (typeInstance as StorageTypeInstance).codecId };
     const key = refKeyOf(ref);
     const sites = typeRefSites.get(typeName) ?? [];
     const existing = usedAtByKey.get(key);
@@ -547,11 +564,11 @@ function buildContractCodecRegistry(
     }
   }
 
-  for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table as SqlNamespaceTables)) {
+  for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeRef !== undefined) continue;
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
         if (!ref) continue;
         const key = refKeyOf(ref);
         const site = { table: tableName, column: columnName };
@@ -579,10 +596,10 @@ function buildContractCodecRegistry(
     };
   });
 
-  for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.entries.table as SqlNamespaceTables)) {
+  for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.entries.table)) {
       for (const columnName of Object.keys(table.columns)) {
-        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        const ref = codecDescriptors.codecRefForColumn(namespaceId, tableName, columnName);
         if (!ref) continue;
         resolver.forCodecRef(ref);
       }
@@ -590,8 +607,8 @@ function buildContractCodecRegistry(
   }
 
   const registry: ContractCodecRegistry = {
-    forColumn(table, column) {
-      const ref = codecDescriptors.codecRefForColumn(table, column);
+    forColumn(namespaceId, table, column) {
+      const ref = codecDescriptors.codecRefForColumn(namespaceId, table, column);
       return ref ? resolver.forCodecRef(ref) : undefined;
     },
     forCodecRef(ref) {

@@ -322,7 +322,7 @@ describe('cross-family middleware proof', () => {
     // A generic interceptor with no familyId. The same instance is registered
     // on both runtimes and short-circuits execution in each. Demonstrates
     // that the intercept hook is family-agnostic by construction: both
-    // SqlRuntimeImpl and MongoRuntimeImpl inherit it from runWithMiddleware
+    // SqlRuntime and MongoRuntimeImpl inherit it from runWithMiddleware
     // via RuntimeCore, so no per-family wiring is needed.
     const { middleware: observer, events } = collectingObserver();
 

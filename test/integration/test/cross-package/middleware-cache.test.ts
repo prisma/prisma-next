@@ -13,6 +13,7 @@ import type {
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
 import { cacheAnnotation, createCacheMiddleware } from '@prisma-next/middleware-cache';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import {
   AndExpr,
@@ -24,7 +25,6 @@ import {
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Runtime,
   type SqlMiddleware,
@@ -194,9 +194,9 @@ describe('integration: middleware-cache against real Postgres', {
   });
 
   function buildRuntime(middleware: SqlMiddleware[]): Runtime {
-    return createRuntime({
-      stackInstance,
+    return new PostgresRuntimeImpl({
       context,
+      adapter: stackInstance.adapter,
       driver,
       middleware,
     });
@@ -209,7 +209,7 @@ describe('integration: middleware-cache against real Postgres', {
       const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
-        db.users
+        db.public.users
           .select('id', 'name')
           .annotate(cacheAnnotation({ ttl: 60_000 }))
           .build();
@@ -238,10 +238,10 @@ describe('integration: middleware-cache against real Postgres', {
 
       driverExecuteSpy.mockClear();
 
-      await runtime.execute(db.users.select('id').build()).toArray();
+      await runtime.execute(db.public.users.select('id').build()).toArray();
       const callsAfterFirst = driverExecuteSpy.mock.calls.length;
 
-      await runtime.execute(db.users.select('id').build()).toArray();
+      await runtime.execute(db.public.users.select('id').build()).toArray();
       // Second un-annotated call hits the driver again.
       expect(driverExecuteSpy.mock.calls.length).toBeGreaterThan(callsAfterFirst);
     });
@@ -252,7 +252,7 @@ describe('integration: middleware-cache against real Postgres', {
       const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
-        db.users
+        db.public.users
           .select('id')
           .annotate(cacheAnnotation({ ttl: 60_000, skip: true }))
           .build();
@@ -279,7 +279,7 @@ describe('integration: middleware-cache against real Postgres', {
       const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
-        db.users
+        db.public.users
           .select('id', 'name')
           .annotate(cacheAnnotation({ ttl: 60_000 }))
           .build();
@@ -317,7 +317,7 @@ describe('integration: middleware-cache against real Postgres', {
 
       const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
       const buildPlan = () =>
-        db.users
+        db.public.users
           .select('id')
           .annotate(cacheAnnotation({ ttl: 60_000 }))
           .build();
@@ -386,7 +386,7 @@ describe('integration: middleware-cache against real Postgres', {
       const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
-        db.users
+        db.public.users
           .select('id')
           .annotate(cacheAnnotation({ ttl: 60_000 }))
           .build();
@@ -435,7 +435,7 @@ describe('integration: middleware-cache against real Postgres', {
       const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
-        db.users
+        db.public.users
           .select('id', 'name')
           .annotate(cacheAnnotation({ ttl: 60_000 }))
           .build();
@@ -461,7 +461,7 @@ describe('integration: middleware-cache against real Postgres', {
       const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
-        db.users
+        db.public.users
           .select('id', 'name')
           .annotate(cacheAnnotation({ ttl: 60_000, key: 'concurrency-test' }))
           .build();
@@ -495,11 +495,11 @@ describe('integration: middleware-cache against real Postgres', {
 
       driverExecuteSpy.mockClear();
 
-      const planA = db.users
+      const planA = db.public.users
         .select('id')
         .annotate(cacheAnnotation({ ttl: 60_000, key: 'parallel-A' }))
         .build();
-      const planB = db.posts
+      const planB = db.public.posts
         .select('id', 'title')
         .annotate(cacheAnnotation({ ttl: 60_000, key: 'parallel-B' }))
         .build();
@@ -517,7 +517,7 @@ describe('integration: middleware-cache against real Postgres', {
       const callsAfterParallel = driverExecuteSpy.mock.calls.length;
       await runtime
         .execute(
-          db.users
+          db.public.users
             .select('id')
             .annotate(cacheAnnotation({ ttl: 60_000, key: 'parallel-A' }))
             .build(),
@@ -525,7 +525,7 @@ describe('integration: middleware-cache against real Postgres', {
         .toArray();
       await runtime
         .execute(
-          db.posts
+          db.public.posts
             .select('id', 'title')
             .annotate(cacheAnnotation({ ttl: 60_000, key: 'parallel-B' }))
             .build(),

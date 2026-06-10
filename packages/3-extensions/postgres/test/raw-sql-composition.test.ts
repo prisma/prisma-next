@@ -1,7 +1,5 @@
 import { postgresRawCodecInferer } from '@prisma-next/adapter-postgres/adapter';
-import type { Contract } from '@prisma-next/contract/types';
 import { createAggregateFunctions, sql } from '@prisma-next/sql-builder/runtime';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyExpression } from '@prisma-next/sql-relational-core/ast';
 import {
   AggregateExpr,
@@ -12,12 +10,13 @@ import {
 import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
+import type { Contract } from './fixtures/namespaced-contract';
 
-// Stub ExecutionContext used across all composition tests. Mirrors the pattern from
-// raw-sql-facade.test.ts. `as unknown as ExecutionContext<...>` is necessary: no real
-// ExecutionContext fixture exists in this package; the builder only reads `contract`,
-// `queryOperations`, and `applyMutationDefaults` at runtime.
-function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
+// Stub ExecutionContext used across all composition tests. The concrete fixture
+// contract gives `sql()` a typed `public` namespace, so the builder surface
+// (`db.public.users`) typechecks directly. The wrapper cast stands in for the
+// fields the builder never reads at runtime (codecs, operations, types).
+function makeStubContext(): ExecutionContext<Contract> {
   return {
     contract: {
       capabilities: {},
@@ -25,24 +24,14 @@ function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
       storage: {
         storageHash: 'sha256:raw-sql-composition-core',
         namespaces: {
-          __unbound__: {
-            id: '__unbound__',
+          public: {
+            id: 'public',
             entries: {
               table: {
                 users: {
                   columns: {
                     id: { codecId: 'pg/int4@1', nullable: false },
                     name: { codecId: 'pg/text@1', nullable: false },
-                    score: { codecId: 'pg/int4@1', nullable: true },
-                  },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
-                },
-                events: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nullable: false },
-                    createdAt: { codecId: 'pg/timestamptz@1', nullable: false },
                     score: { codecId: 'pg/int4@1', nullable: true },
                   },
                   uniques: [],
@@ -57,7 +46,7 @@ function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
     },
     queryOperations: { entries: () => ({}) },
     applyMutationDefaults: () => [],
-  } as unknown as ExecutionContext<Contract<SqlStorage>>;
+  } as unknown as ExecutionContext<Contract>;
 }
 
 // `createAggregateFunctions` returns a generic `Functions<QC>` whose `rawSql` field
@@ -72,28 +61,11 @@ function rawSqlOf(fns: unknown, tag: ReturnType<typeof createRawSql>): typeof ta
 describe('rawSql composition with the typed builder', () => {
   it('aliased single-column select emits a RawExpr in the projection list', () => {
     const adapter = postgresRawCodecInferer;
-    const tag = createRawSql(adapter);
     const ctx = makeStubContext();
-    // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
-    // the narrow structural subset that this test exercises so TypeScript can typecheck
-    // the call site without requiring the full contract-typed DB surface.
-    const db = sql({ context: ctx, rawCodecInferer: adapter }) as unknown as {
-      users: {
-        select: (
-          alias: string,
-          cb: (
-            f: Record<
-              string,
-              { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
-            >,
-            fns: { raw: typeof tag },
-          ) => { buildAst(): AnyExpression; returnType: unknown },
-        ) => { buildAst(): import('@prisma-next/sql-relational-core/ast').SelectAst };
-      };
-    };
+    const db = sql({ context: ctx, rawCodecInferer: adapter });
 
     let capturedAst: AnyExpression | undefined;
-    db.users
+    db.public.users
       .select('greeting', (_f, fns) => {
         const expr = fns.raw`'hello'`.returns('pg/text@1');
         capturedAst = expr.buildAst();
@@ -156,27 +128,10 @@ describe('rawSql composition with the typed builder', () => {
     const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const ctx = makeStubContext();
-    // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
-    // the narrow structural subset that this test exercises.
-    const db = sql({ context: ctx, rawCodecInferer: adapter }) as unknown as {
-      users: {
-        select: (
-          cb: (
-            f: Record<
-              string,
-              { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
-            >,
-            fns: { raw: typeof tag },
-          ) => Record<
-            string,
-            { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
-          >,
-        ) => { buildAst(): import('@prisma-next/sql-relational-core/ast').SelectAst };
-      };
-    };
+    const db = sql({ context: ctx, rawCodecInferer: adapter });
 
     const capturedAsts: AnyExpression[] = [];
-    db.users
+    db.public.users
       .select((_f, fns) => {
         const rawSql = rawSqlOf(fns, tag);
         const rawExpr = rawSql`coalesce(score, 0)`.returns('pg/int4@1');

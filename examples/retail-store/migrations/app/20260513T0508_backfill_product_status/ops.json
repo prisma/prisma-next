@@ -12,6 +12,7 @@
           "collection": "products",
           "validator": {
             "$jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -36,23 +37,20 @@
                   }
                 },
                 "image": {
+                  "additionalProperties": false,
                   "bsonType": "object",
                   "properties": {
                     "url": {
                       "bsonType": "string"
                     }
                   },
-                  "required": [
-                    "url"
-                  ]
-                },
-                "primaryCategory": {
-                  "bsonType": "string"
+                  "required": ["url"]
                 },
                 "name": {
                   "bsonType": "string"
                 },
                 "price": {
+                  "additionalProperties": false,
                   "bsonType": "object",
                   "properties": {
                     "amount": {
@@ -62,10 +60,10 @@
                       "bsonType": "string"
                     }
                   },
-                  "required": [
-                    "amount",
-                    "currency"
-                  ]
+                  "required": ["amount", "currency"]
+                },
+                "primaryCategory": {
+                  "bsonType": "string"
                 },
                 "status": {
                   "bsonType": "string"
@@ -81,9 +79,9 @@
                 "code",
                 "description",
                 "image",
-                "primaryCategory",
                 "name",
                 "price",
+                "primaryCategory",
                 "status",
                 "subCategory"
               ]
@@ -126,7 +124,7 @@
           },
           "meta": {
             "target": "mongo",
-            "storageHash": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65",
+            "storageHash": "sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c",
             "lane": "mongo-pipeline"
           }
         },
@@ -157,7 +155,7 @@
         },
         "meta": {
           "target": "mongo",
-          "storageHash": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65",
+          "storageHash": "sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c",
           "lane": "mongo-raw"
         }
       }
@@ -187,7 +185,7 @@
           },
           "meta": {
             "target": "mongo",
-            "storageHash": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65",
+            "storageHash": "sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c",
             "lane": "mongo-pipeline"
           }
         },

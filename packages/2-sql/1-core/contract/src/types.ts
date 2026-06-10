@@ -11,6 +11,7 @@ export interface SqlControlDriverInstance<T extends string = string>
 }
 
 export { buildSqlNamespace, buildSqlNamespaceMap } from './ir/build-sql-namespace';
+export { CheckConstraint, type CheckConstraintInput } from './ir/check-constraint';
 export {
   ForeignKey,
   type ForeignKeyInput,

@@ -1,6 +1,5 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
-import { enumStorageCompoundKey } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -60,6 +59,31 @@ describe('PostgresControlAdapter', () => {
       });
     });
 
+    it('issues introspection queries sequentially on the single connection', async () => {
+      const adapter = new PostgresControlAdapter();
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
+        familyId: 'sql',
+        targetId: 'postgres',
+        query: async <Row = Record<string, unknown>>(sql: string) => {
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await Promise.resolve();
+          inFlight--;
+          if (sql.includes('version()')) {
+            return { rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[] };
+          }
+          return { rows: [] as unknown as Row[] };
+        },
+        close: async () => {},
+      };
+
+      await adapter.introspect(mockDriver);
+
+      expect(maxInFlight).toBe(1);
+    });
+
     it('introspects enum storage types', async () => {
       const adapter = new PostgresControlAdapter();
       const mockDriver: SqlControlDriverInstance<'postgres'> = {
@@ -94,11 +118,13 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(result.annotations?.['pg']).toMatchObject({
-        storageTypes: {
-          [enumStorageCompoundKey('public', 'role')]: {
-            codecId: 'pg/enum@1',
-            nativeType: 'role',
-            typeParams: { values: ['USER', 'ADMIN'] },
+        enumTypes: {
+          public: {
+            role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'role',
+              typeParams: { values: ['USER', 'ADMIN'] },
+            },
           },
         },
       });

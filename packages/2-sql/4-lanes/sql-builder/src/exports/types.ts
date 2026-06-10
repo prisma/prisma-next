@@ -3,6 +3,7 @@ export type { ResolveRow } from '../resolve';
 export type { GatedMethod, QueryContext, Scope, ScopeField, Subquery } from '../scope';
 export type {
   Db,
+  Namespace,
   TableInAnyNamespace,
   TableNamesAcrossNamespaces,
   TableProxyContract,

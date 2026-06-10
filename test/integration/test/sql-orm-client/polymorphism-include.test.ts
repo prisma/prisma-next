@@ -20,12 +20,13 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
 // `select` / `orderBy` mirror the real `Collection` API idiom
 // (`.select('id', 'name').orderBy((row) => row.id.asc())`) so the asserted
 // shape is intentional and stable when new model fields are added.
-interface ScalarFilter {
-  eq(value: unknown): unknown;
-  gte(value: unknown): unknown;
-}
 interface OrderBy {
   asc(): unknown;
+  desc(): unknown;
+}
+interface ScalarFilter extends OrderBy {
+  eq(value: unknown): unknown;
+  gte(value: unknown): unknown;
 }
 interface RefinementRow {
   id: OrderBy;
@@ -183,13 +184,37 @@ function buildMtiIncludeContract(): TestContract {
 function createAccountCollection(runtime: PgIntegrationRuntime): PolyIncludeParent {
   const contract = buildStiIncludeContract();
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'Account' as never) as unknown as PolyIncludeParent;
+  return new Collection({ runtime, context }, 'Account' as never, {
+    namespaceId: 'public',
+  }) as unknown as PolyIncludeParent;
 }
 
 function createProjectCollection(runtime: PgIntegrationRuntime): PolyIncludeParent {
   const contract = buildMtiIncludeContract();
   const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
-  return new Collection({ runtime, context }, 'Project' as never) as unknown as PolyIncludeParent;
+  return new Collection({ runtime, context }, 'Project' as never, {
+    namespaceId: 'public',
+  }) as unknown as PolyIncludeParent;
+}
+
+// Root-level Task collection over the MTI poly contract, exposing the
+// `.variant(...).orderBy(...)` surface this file exercises. `priority` lives
+// on the joined `features` table, so ordering by it proves the variant-aware
+// orderBy resolves the MTI variant column against the variant table.
+interface RootTaskCollection {
+  variant(name: string): {
+    orderBy(selector: (row: TaskRefinementRow) => unknown): {
+      all(): { toArray(): Promise<Record<string, unknown>[]> };
+    };
+  };
+}
+
+function createTaskCollection(runtime: PgIntegrationRuntime): RootTaskCollection {
+  const contract = buildMtiIncludeContract();
+  const context = { ...getTestContext(), contract } as ExecutionContext<TestContract>;
+  return new Collection({ runtime, context }, 'Task' as never, {
+    namespaceId: 'public',
+  }) as unknown as RootTaskCollection;
 }
 
 async function setupStiIncludeSchema(runtime: PgIntegrationRuntime): Promise<void> {
@@ -464,6 +489,74 @@ describe('integration/polymorphism-include', () => {
             tasks: [
               { id: 3, title: 'Dark mode', type: 'feature', priority: 1 },
               { id: 4, title: 'Export PDF', type: 'feature', priority: 3 },
+            ],
+          },
+          { id: 2, name: 'Empty', tasks: [] },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'a root MTI variant-narrowed orderBy sorts by the variant table column',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        await setupMtiIncludeSchema(runtime);
+        await seedMtiIncludeData(runtime);
+
+        const tasks = createTaskCollection(runtime);
+        // `priority` lives on the joined `features` table, not the base
+        // `tasks` table. Ordering a root Feature-narrowed collection by it
+        // confirms the orderBy selector names the variant column against the
+        // joined variant table. Default selection (no `.select(...)`) keeps the
+        // assertion on the natural Feature row shape; seed has Feature id=3
+        // (priority 1) and id=4 (priority 3), so `priority.desc()` yields 4
+        // before 3.
+        const rows = await tasks
+          .variant('Feature')
+          .orderBy((task) => task.priority.desc())
+          .all()
+          .toArray();
+
+        expect(rows).toEqual([
+          { id: 4, title: 'Export PDF', type: 'feature', priority: 3, projectId: 1 },
+          { id: 3, title: 'Dark mode', type: 'feature', priority: 1, projectId: 1 },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'an MTI variant-specific orderBy on a poly include refinement sorts by the variant table column',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        await setupMtiIncludeSchema(runtime);
+        await seedMtiIncludeData(runtime);
+
+        const projects = createProjectCollection(runtime);
+        // Mirror of the root case inside an include refinement: the refined
+        // child collection is narrowed to Feature and ordered by the MTI
+        // variant column `priority` (joined from `features`). Default selection
+        // on the child keeps the natural Feature row shape; the two Feature
+        // tasks come back ordered priority-descending (id 4 before id 3).
+        const rows = await projects
+          .select('id', 'name')
+          .orderBy((project) => project.id.asc())
+          .include('tasks', (tasks) =>
+            tasks.variant('Feature').orderBy((task) => task.priority.desc()),
+          )
+          .all()
+          .toArray();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Roadmap',
+            tasks: [
+              { id: 4, title: 'Export PDF', type: 'feature', priority: 3, projectId: 1 },
+              { id: 3, title: 'Dark mode', type: 'feature', priority: 1, projectId: 1 },
             ],
           },
           { id: 2, name: 'Empty', tasks: [] },

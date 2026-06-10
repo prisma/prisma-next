@@ -59,18 +59,26 @@ export function dispatchCollectionRows<Row>(options: {
   state: CollectionState;
   tableName: string;
   modelName: string;
+  namespaceId: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, modelName } = options;
-  const polyInfo = resolvePolymorphismInfo(contract, modelName);
+  const { contract, runtime, state, tableName, modelName, namespaceId } = options;
+  const polyInfo = resolvePolymorphismInfo(contract, namespaceId, modelName);
 
   if (state.includes.length === 0) {
-    const compiled = compileSelect(contract, tableName, state, modelName);
+    const compiled = compileSelect(contract, namespaceId, tableName, state, modelName);
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
     const mapper = polyInfo
       ? (rawRow: Record<string, unknown>) =>
-          mapPolymorphicRow(contract, modelName, polyInfo, rawRow, state.variantName) as Row
+          mapPolymorphicRow(
+            contract,
+            namespaceId,
+            modelName,
+            polyInfo,
+            rawRow,
+            state.variantName,
+          ) as Row
       : (rawRow: Record<string, unknown>) =>
-          mapStorageRowToModelFields(contract, modelName, rawRow) as Row;
+          mapStorageRowToModelFields(contract, namespaceId, modelName, rawRow) as Row;
     return mapResultRows(source, mapper);
   }
 
@@ -86,16 +94,20 @@ function dispatchWithIncludes<Row>(options: {
   state: CollectionState;
   tableName: string;
   modelName: string;
+  namespaceId: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, modelName } = options;
+  const { contract, runtime, state, tableName, modelName, namespaceId } = options;
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
-      const parentJoinColumns = state.includes.map((include) => include.localColumn);
+      const parentJoinColumns = state.includes.flatMap((include) =>
+        include.through !== undefined ? include.through.parentLocalColumns : [include.localColumn],
+      );
       const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
         augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
       const compiled = compileSelectWithIncludes(
         contract,
+        namespaceId,
         tableName,
         {
           ...state,
@@ -112,11 +124,11 @@ function dispatchWithIncludes<Row>(options: {
         return;
       }
 
-      const polyInfo = resolvePolymorphismInfo(contract, modelName);
+      const polyInfo = resolvePolymorphismInfo(contract, namespaceId, modelName);
       const parentRows = parentRowsRaw.map((row) => {
         const mapped = polyInfo
-          ? mapPolymorphicRow(contract, modelName, polyInfo, row, state.variantName)
-          : mapStorageRowToModelFields(contract, modelName, row);
+          ? mapPolymorphicRow(contract, namespaceId, modelName, polyInfo, row, state.variantName)
+          : mapStorageRowToModelFields(contract, namespaceId, modelName, row);
         return { raw: row, mapped } as RowEnvelope;
       });
 
@@ -130,7 +142,13 @@ function dispatchWithIncludes<Row>(options: {
         }
 
         if (hiddenParentColumns.length > 0) {
-          stripHiddenMappedFields(contract, modelName, parent.mapped, hiddenParentColumns);
+          stripHiddenMappedFields(
+            contract,
+            namespaceId,
+            modelName,
+            parent.mapped,
+            hiddenParentColumns,
+          );
         }
       }
 
@@ -170,24 +188,39 @@ export function reloadMutationRowsByIdentities<Row>(options: {
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   tableName: string;
   modelName: string;
+  namespaceId: string;
   identityRows: readonly Record<string, unknown>[];
   selectedFields: readonly string[] | undefined;
   includes: readonly IncludeExpr[];
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, tableName, modelName, identityRows, selectedFields, includes } =
-    options;
+  const {
+    contract,
+    runtime,
+    tableName,
+    modelName,
+    namespaceId,
+    identityRows,
+    selectedFields,
+    includes,
+  } = options;
   if (identityRows.length === 0) {
     return emptyResult<Row>();
   }
 
-  const identityColumns = resolveRowIdentityColumns(contract, tableName);
+  const identityColumns = resolveRowIdentityColumns(contract, namespaceId, tableName);
   if (identityColumns.length === 0) {
     throw new Error(
       `Cannot load includes for the mutation result on model "${modelName}": table "${tableName}" has no primary key or unique constraint to key the include read-back on.`,
     );
   }
 
-  const identityFilter = buildIdentityInFilter(contract, tableName, identityColumns, identityRows);
+  const identityFilter = buildIdentityInFilter(
+    contract,
+    namespaceId,
+    tableName,
+    identityColumns,
+    identityRows,
+  );
   if (!identityFilter) {
     return emptyResult<Row>();
   }
@@ -203,6 +236,7 @@ export function reloadMutationRowsByIdentities<Row>(options: {
     },
     tableName,
     modelName,
+    namespaceId,
   });
 }
 
@@ -215,6 +249,7 @@ function emptyResult<Row>(): AsyncIterableResult<Row> {
 // the `IN` list (or the composite-key `OR` of equality tuples) directly.
 function buildIdentityInFilter(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   tableName: string,
   identityColumns: readonly string[],
   identityRows: readonly Record<string, unknown>[],
@@ -230,6 +265,7 @@ function buildIdentityInFilter(
     return bindWhereExpr(
       contract,
       BinaryExpr.in(ColumnRef.of(tableName, singleColumn), ListExpression.fromValues(values)),
+      namespaceId,
     );
   }
 
@@ -243,7 +279,7 @@ function buildIdentityInFilter(
       ),
     ),
   );
-  return bindWhereExpr(contract, OrExpr.of(tuples));
+  return bindWhereExpr(contract, OrExpr.of(tuples), namespaceId);
 }
 
 /**
@@ -281,18 +317,28 @@ function decodeIncludePayload(
     return decodeCombineIncludePayload(contract, include, include.combine, raw);
   }
   const rawChildren = parseIncludedRows(raw);
-  const polyInfo = resolvePolymorphismInfo(contract, include.relatedModelName);
+  const polyInfo = resolvePolymorphismInfo(
+    contract,
+    include.relatedNamespaceId,
+    include.relatedModelName,
+  );
   const mapChildRow = polyInfo
     ? (childRow: Record<string, unknown>) =>
         mapPolymorphicRow(
           contract,
+          include.relatedNamespaceId,
           include.relatedModelName,
           polyInfo,
           childRow,
           include.nested.variantName,
         )
     : (childRow: Record<string, unknown>) =>
-        mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
+        mapStorageRowToModelFields(
+          contract,
+          include.relatedNamespaceId,
+          include.relatedModelName,
+          childRow,
+        );
   const mappedChildren = rawChildren.map((childRow) => {
     const mapped = mapChildRow(childRow);
     // Source each nested-include payload from the RAW child row: it always

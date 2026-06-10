@@ -17,6 +17,7 @@ interface DispatchMutationRowsOptions<Row> {
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
   readonly modelName: string;
+  readonly namespaceId: string;
   readonly includes: readonly IncludeExpr[];
   readonly selectedFields: readonly string[] | undefined;
   readonly hiddenColumns: readonly string[];
@@ -32,6 +33,7 @@ export function dispatchMutationRows<Row>(
     compiled,
     tableName,
     modelName,
+    namespaceId,
     includes,
     selectedFields,
     hiddenColumns,
@@ -42,9 +44,9 @@ export function dispatchMutationRows<Row>(
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
 
     return mapResultRows(source, (rawRow) => {
-      const mapped = mapStorageRowToModelFields(contract, modelName, rawRow);
+      const mapped = mapStorageRowToModelFields(contract, namespaceId, modelName, rawRow);
       if (hiddenColumns.length > 0) {
-        stripHiddenMappedFields(contract, modelName, mapped, hiddenColumns);
+        stripHiddenMappedFields(contract, namespaceId, modelName, mapped, hiddenColumns);
       }
       return mapRow(mapped);
     });
@@ -65,6 +67,7 @@ export function dispatchMutationRows<Row>(
       runtime,
       tableName,
       modelName,
+      namespaceId,
       identityRows,
       selectedFields,
       includes,
@@ -80,6 +83,7 @@ interface DispatchSplitMutationRowsOptions<Row> {
   readonly plans: ReadonlyArray<SqlQueryPlan<Record<string, unknown>>>;
   readonly tableName: string;
   readonly modelName: string;
+  readonly namespaceId: string;
   readonly includes: readonly IncludeExpr[];
   readonly selectedFields: readonly string[] | undefined;
   readonly hiddenColumns: readonly string[];
@@ -95,6 +99,7 @@ export function dispatchSplitMutationRows<Row>(
     plans,
     tableName,
     modelName,
+    namespaceId,
     includes,
     selectedFields,
     hiddenColumns,
@@ -114,6 +119,7 @@ export function dispatchSplitMutationRows<Row>(
         runtime,
         tableName,
         modelName,
+        namespaceId,
         identityRows,
         selectedFields,
         includes,
@@ -123,9 +129,9 @@ export function dispatchSplitMutationRows<Row>(
 
     for (const plan of plans) {
       for await (const rawRow of executeQueryPlan<Record<string, unknown>>(runtime, plan)) {
-        const mapped = mapStorageRowToModelFields(contract, modelName, rawRow);
+        const mapped = mapStorageRowToModelFields(contract, namespaceId, modelName, rawRow);
         if (hiddenColumns.length > 0) {
-          stripHiddenMappedFields(contract, modelName, mapped, hiddenColumns);
+          stripHiddenMappedFields(contract, namespaceId, modelName, mapped, hiddenColumns);
         }
         yield mapRow(mapped);
       }
@@ -141,6 +147,7 @@ interface ExecuteSingleMutationOptions<Row> {
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
   readonly modelName: string;
+  readonly namespaceId: string;
   readonly includes: readonly IncludeExpr[];
   readonly selectedFields: readonly string[] | undefined;
   readonly hiddenColumns: readonly string[];
@@ -157,6 +164,7 @@ export async function executeMutationReturningSingleRow<Row>(
     compiled,
     tableName,
     modelName,
+    namespaceId,
     includes,
     selectedFields,
     hiddenColumns,
@@ -171,9 +179,9 @@ export async function executeMutationReturningSingleRow<Row>(
       return null;
     }
 
-    const mapped = mapStorageRowToModelFields(contract, modelName, first);
+    const mapped = mapStorageRowToModelFields(contract, namespaceId, modelName, first);
     if (hiddenColumns.length > 0) {
-      stripHiddenMappedFields(contract, modelName, mapped, hiddenColumns);
+      stripHiddenMappedFields(contract, namespaceId, modelName, mapped, hiddenColumns);
     }
     return mapRow(mapped);
   }
@@ -190,6 +198,7 @@ export async function executeMutationReturningSingleRow<Row>(
     runtime,
     tableName,
     modelName,
+    namespaceId,
     identityRows,
     selectedFields,
     includes,

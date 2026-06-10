@@ -7,6 +7,7 @@ import {
   instantiateExecutionStack,
   type RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
+import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import {
   AndExpr,
@@ -18,7 +19,6 @@ import {
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   createExecutionContext,
-  createRuntime,
   createSqlExecutionStack,
   type Log,
   type Runtime,
@@ -159,9 +159,9 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
   });
 
   function buildRuntime(middleware: SqlMiddleware[], log?: Log): Runtime {
-    return createRuntime({
-      stackInstance,
+    return new PostgresRuntimeImpl({
       context,
+      adapter: stackInstance.adapter,
       driver,
       middleware,
       ...(log ? { log } : {}),
@@ -183,7 +183,7 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
     });
 
     const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-    const rows = await runtime.execute(db.users.select('id').build()).toArray();
+    const rows = await runtime.execute(db.public.users.select('id').build()).toArray();
 
     expect(rows.map((r) => r.id)).toEqual([1]);
     expect(debug).toHaveBeenCalledWith({
@@ -216,7 +216,7 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
     });
 
     const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-    const rows = await runtime.execute(db.users.select('id', 'name').build()).toArray();
+    const rows = await runtime.execute(db.public.users.select('id', 'name').build()).toArray();
 
     expect(rows.map((r) => r.id).sort()).toEqual([2, 3]);
     expect(debug).toHaveBeenCalledTimes(2);

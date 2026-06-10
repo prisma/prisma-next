@@ -1,8 +1,11 @@
 import type {
   ContractField,
+  ContractManyToManyRelation,
   ContractModel,
   ContractValueObject,
   CrossReference,
+  JsonValue,
+  ValueSetRef,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
@@ -148,6 +151,21 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
       );
     }
 
+    if (relObj['cardinality'] === 'N:M') {
+      const { through } = blindCast<
+        ContractManyToManyRelation,
+        'contract JSON schema-validated before serialization; cardinality N:M check above confirms the junction variant carries through'
+      >(relObj);
+      const table = serializeValue(through.table);
+      const namespaceId = serializeValue(through.namespaceId);
+      const parentColumns = through.parentColumns.map((c) => serializeValue(c)).join(', ');
+      const childColumns = through.childColumns.map((c) => serializeValue(c)).join(', ');
+      const targetColumns = through.targetColumns.map((c) => serializeValue(c)).join(', ');
+      parts.push(
+        `readonly through: { readonly table: ${table}; readonly namespaceId: ${namespaceId}; readonly parentColumns: readonly [${parentColumns}]; readonly childColumns: readonly [${childColumns}]; readonly targetColumns: readonly [${targetColumns}] }`,
+      );
+    }
+
     if (parts.length > 0) {
       relationEntries.push(`readonly ${serializeObjectKey(relName)}: { ${parts.join('; ')} }`);
     }
@@ -277,15 +295,52 @@ export type FieldTypeParamsResolver = (
   model: ContractModel,
 ) => Record<string, unknown> | undefined;
 
+/**
+ * Resolves a domain field's `valueSet` ref to the member values of the referenced enum.
+ * Returns `undefined` when the ref cannot be resolved to a domain enum, so the emit path
+ * falls back to the codec channel.
+ */
+export type EnumValuesResolver = (ref: ValueSetRef) => readonly JsonValue[] | undefined;
+
+function renderEnumMemberLiteral(value: JsonValue): string | undefined {
+  if (value === null) return 'null';
+  if (typeof value === 'string') return serializeValue(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return undefined;
+}
+
+function renderEnumValueUnion(values: readonly JsonValue[]): string | undefined {
+  if (values.length === 0) return undefined;
+  const literals: string[] = [];
+  for (const value of values) {
+    const literal = renderEnumMemberLiteral(value);
+    if (literal === undefined) return undefined;
+    literals.push(literal);
+  }
+  const union = literals.join(' | ');
+  return isSafeTypeExpression(union) ? union : undefined;
+}
+
 export function resolveFieldType(
   field: ContractField,
   codecLookup?: CodecLookup,
   resolvedTypeParams?: Record<string, unknown>,
+  resolveEnumValues?: EnumValuesResolver,
 ): ResolvedFieldType {
   const { type } = field;
 
   switch (type.kind) {
     case 'scalar': {
+      if (field.valueSet?.entityKind === 'enum' && resolveEnumValues) {
+        const values = resolveEnumValues(field.valueSet);
+        const union = values ? renderEnumValueUnion(values) : undefined;
+        if (union !== undefined) {
+          return {
+            output: applyModifiers(union, field),
+            input: applyModifiers(union, field),
+          };
+        }
+      }
       let outputResolved: string | undefined;
       const inlineTypeParams =
         type.typeParams && Object.keys(type.typeParams).length > 0 ? type.typeParams : undefined;
@@ -343,6 +398,7 @@ export function generateBothFieldTypesMaps(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
+  resolveEnumValues?: EnumValuesResolver,
 ): ResolvedFieldType {
   if (!models || Object.keys(models).length === 0) {
     return { output: 'Record<string, never>', input: 'Record<string, never>' };
@@ -363,7 +419,7 @@ export function generateBothFieldTypesMaps(
           : undefined;
       const resolvedTypeParams =
         inlineTypeParams ?? resolveFieldTypeParams?.(modelName, fieldName, model);
-      const resolved = resolveFieldType(field, codecLookup, resolvedTypeParams);
+      const resolved = resolveFieldType(field, codecLookup, resolvedTypeParams, resolveEnumValues);
       const key = `readonly ${serializeObjectKey(fieldName)}`;
       outputFieldEntries.push(`${key}: ${resolved.output}`);
       inputFieldEntries.push(`${key}: ${resolved.input}`);
@@ -391,16 +447,20 @@ export function generateFieldOutputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
+  resolveEnumValues?: EnumValuesResolver,
 ): string {
-  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams).output;
+  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams, resolveEnumValues)
+    .output;
 }
 
 export function generateFieldInputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
   resolveFieldTypeParams?: FieldTypeParamsResolver,
+  resolveEnumValues?: EnumValuesResolver,
 ): string {
-  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams).input;
+  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams, resolveEnumValues)
+    .input;
 }
 
 export function generateValueObjectType(

@@ -17,6 +17,7 @@ export interface RowEnvelope {
 
 export function stripHiddenMappedFields(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   mapped: Record<string, unknown>,
   hiddenColumns: readonly string[],
@@ -25,7 +26,7 @@ export function stripHiddenMappedFields(
     return;
   }
 
-  const columnToField = getColumnToFieldMap(contract, modelName);
+  const columnToField = getColumnToFieldMap(contract, namespaceId, modelName);
   for (const hiddenColumn of hiddenColumns) {
     const fieldName = columnToField[hiddenColumn] ?? hiddenColumn;
     delete mapped[fieldName];
@@ -34,21 +35,23 @@ export function stripHiddenMappedFields(
 
 export function createRowEnvelope(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   raw: Record<string, unknown>,
 ): RowEnvelope {
   return {
     raw,
-    mapped: mapStorageRowToModelFields(contract, modelName, raw),
+    mapped: mapStorageRowToModelFields(contract, namespaceId, modelName, raw),
   };
 }
 
 export function mapStorageRowToModelFields(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
-  const columnToField = getColumnToFieldMap(contract, modelName);
+  const columnToField = getColumnToFieldMap(contract, namespaceId, modelName);
   if (Object.keys(columnToField).length === 0) {
     return { ...row };
   }
@@ -64,11 +67,12 @@ const mergedColumnToFieldCache = new WeakMap<object, Map<string, Record<string, 
 
 function getMergedColumnToFieldMap(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   baseModelName: string,
   variantModelName: string,
   variantTable: string | undefined,
 ): Record<string, string> {
-  const cacheKey = `${baseModelName}:${variantModelName}:${variantTable ?? ''}`;
+  const cacheKey = `${namespaceId}:${baseModelName}:${variantModelName}:${variantTable ?? ''}`;
   let perContract = mergedColumnToFieldCache.get(contract);
   if (!perContract) {
     perContract = new Map();
@@ -77,8 +81,8 @@ function getMergedColumnToFieldMap(
   const cached = perContract.get(cacheKey);
   if (cached) return cached;
 
-  const baseMap = getCompleteColumnToFieldMap(contract, baseModelName);
-  const variantMap = getCompleteColumnToFieldMap(contract, variantModelName);
+  const baseMap = getCompleteColumnToFieldMap(contract, namespaceId, baseModelName);
+  const variantMap = getCompleteColumnToFieldMap(contract, namespaceId, variantModelName);
 
   const merged: Record<string, string> = { ...baseMap };
   for (const [col, field] of Object.entries(variantMap)) {
@@ -95,6 +99,7 @@ function getMergedColumnToFieldMap(
 
 export function mapPolymorphicRow(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   baseModelName: string,
   polyInfo: PolymorphismInfo,
   row: Record<string, unknown>,
@@ -105,7 +110,7 @@ export function mapPolymorphicRow(
     : polyInfo.variantsByValue.get(row[polyInfo.discriminatorColumn] as string);
 
   if (!variant) {
-    const baseMap = getCompleteColumnToFieldMap(contract, baseModelName);
+    const baseMap = getCompleteColumnToFieldMap(contract, namespaceId, baseModelName);
     const mapped: Record<string, unknown> = {};
     for (const [col, val] of Object.entries(row)) {
       const field = baseMap[col];
@@ -117,7 +122,13 @@ export function mapPolymorphicRow(
   }
 
   const mtiTable = variant.strategy === 'mti' ? variant.table : undefined;
-  const mergedMap = getMergedColumnToFieldMap(contract, baseModelName, variant.modelName, mtiTable);
+  const mergedMap = getMergedColumnToFieldMap(
+    contract,
+    namespaceId,
+    baseModelName,
+    variant.modelName,
+    mtiTable,
+  );
   const mapped: Record<string, unknown> = {};
   for (const [col, val] of Object.entries(row)) {
     const field = mergedMap[col];
@@ -130,10 +141,11 @@ export function mapPolymorphicRow(
 
 export function mapModelDataToStorageRow(
   contract: Contract<SqlStorage>,
+  namespaceId: string,
   modelName: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
-  const fieldToColumn = getFieldToColumnMap(contract, modelName);
+  const fieldToColumn = getFieldToColumnMap(contract, namespaceId, modelName);
   const mapped: Record<string, unknown> = {};
   for (const [fieldName, value] of Object.entries(row)) {
     if (value === undefined) {

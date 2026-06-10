@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { resolveStorageTable } from '@prisma-next/sql-contract/resolve-storage-table';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
@@ -22,11 +23,23 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 
-export function bindWhereExpr(contract: Contract<SqlStorage>, expr: AnyExpression): AnyExpression {
-  return bindWhereExprNode(contract, expr);
+function namespaceCoordinateForSource(source: AnyFromSource): string | undefined {
+  return source.kind === 'table-source' ? source.namespaceId : undefined;
 }
 
-function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression): AnyExpression {
+export function bindWhereExpr(
+  contract: Contract<SqlStorage>,
+  expr: AnyExpression,
+  namespaceId?: string,
+): AnyExpression {
+  return bindWhereExprNode(contract, expr, namespaceId);
+}
+
+function bindWhereExprNode(
+  contract: Contract<SqlStorage>,
+  expr: AnyExpression,
+  namespaceId?: string,
+): AnyExpression {
   return expr.accept<AnyExpression>({
     columnRef(expr) {
       return bindExpression(contract, expr);
@@ -68,13 +81,17 @@ function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression):
       const left = bindExpression(contract, expr.left);
       const bindingColumn = left.kind === 'column-ref' ? (left as ColumnRef) : undefined;
 
-      return new BinaryExpr(expr.op, left, bindComparable(contract, expr.right, bindingColumn));
+      return new BinaryExpr(
+        expr.op,
+        left,
+        bindComparable(contract, expr.right, bindingColumn, namespaceId),
+      );
     },
     and(expr) {
-      return AndExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part)));
+      return AndExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part, namespaceId)));
     },
     or(expr) {
-      return OrExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part)));
+      return OrExpr.of(expr.exprs.map((part) => bindWhereExprNode(contract, part, namespaceId)));
     },
     exists(expr) {
       return expr.notExists
@@ -87,7 +104,7 @@ function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression):
         : NullCheckExpr.isNotNull(bindExpression(contract, expr.expr));
     },
     not(expr) {
-      return new NotExpr(bindWhereExprNode(contract, expr.expr));
+      return new NotExpr(bindWhereExprNode(contract, expr.expr, namespaceId));
     },
     rawExpr(expr) {
       return expr;
@@ -99,6 +116,7 @@ function bindComparable(
   contract: Contract<SqlStorage>,
   comparable: AnyExpression,
   bindingColumn: ColumnRef | undefined,
+  namespaceId?: string,
 ): AnyExpression {
   if (comparable.kind === 'param-ref' || bindingColumn === undefined) {
     return comparable.kind === 'param-ref'
@@ -109,13 +127,15 @@ function bindComparable(
   }
 
   if (comparable.kind === 'literal') {
-    return createParamRef(contract, bindingColumn, comparable.value);
+    return createParamRef(contract, bindingColumn, comparable.value, namespaceId);
   }
 
   if (comparable.kind === 'list') {
     return ListExpression.of(
       comparable.values.map((value) =>
-        value.kind === 'literal' ? createParamRef(contract, bindingColumn, value.value) : value,
+        value.kind === 'literal'
+          ? createParamRef(contract, bindingColumn, value.value, namespaceId)
+          : value,
       ),
     );
   }
@@ -127,14 +147,22 @@ function createParamRef(
   contract: Contract<SqlStorage>,
   columnRef: ColumnRef,
   value: unknown,
+  namespaceId?: string,
 ): ParamRef {
-  const tableInAnyNs = Object.values(contract.storage.namespaces).find(
-    (ns) => ns.entries.table[columnRef.table] !== undefined,
-  )?.entries.table[columnRef.table];
-  if (!tableInAnyNs?.columns[columnRef.column]) {
+  // `resolveStorageTable` resolves the column's owning namespace directly when
+  // the coordinate is supplied, and otherwise by scanning storage — failing
+  // fast when a bare table name is ambiguous across namespaces rather than
+  // silently first-matching.
+  const resolved = resolveStorageTable(contract.storage, columnRef.table, namespaceId);
+  if (resolved === undefined || !resolved.table.columns[columnRef.column]) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
-  const codec = codecRefForStorageColumn(contract.storage, columnRef.table, columnRef.column);
+  const codec = codecRefForStorageColumn(
+    contract.storage,
+    resolved.namespaceId,
+    columnRef.table,
+    columnRef.column,
+  );
   return ParamRef.of(value, codec ? { codec } : undefined);
 }
 
@@ -157,10 +185,11 @@ function bindOrderByItem(contract: Contract<SqlStorage>, orderItem: OrderByItem)
 }
 
 function bindJoin(contract: Contract<SqlStorage>, join: JoinAst): JoinAst {
+  const namespaceId = namespaceCoordinateForSource(join.source);
   return new JoinAst(
     join.joinType,
     bindFromSource(contract, join.source),
-    join.on.kind === 'eq-col-join-on' ? join.on : bindWhereExprNode(contract, join.on),
+    join.on.kind === 'eq-col-join-on' ? join.on : bindWhereExprNode(contract, join.on, namespaceId),
     join.lateral,
   );
 }
@@ -178,6 +207,7 @@ function bindFromSource(contract: Contract<SqlStorage>, source: AnyFromSource): 
 }
 
 function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAst {
+  const namespaceId = namespaceCoordinateForSource(ast.from);
   return new SelectAst({
     from: bindFromSource(contract, ast.from),
     joins: ast.joins?.map((join) => bindJoin(contract, join)),
@@ -189,12 +219,12 @@ function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAs
           projection.codec,
         ),
     ),
-    where: ast.where ? bindWhereExprNode(contract, ast.where) : undefined,
+    where: ast.where ? bindWhereExprNode(contract, ast.where, namespaceId) : undefined,
     orderBy: ast.orderBy?.map((orderItem) => bindOrderByItem(contract, orderItem)),
     distinct: ast.distinct,
     distinctOn: ast.distinctOn?.map((expr) => bindExpression(contract, expr)),
     groupBy: ast.groupBy?.map((expr) => bindExpression(contract, expr)),
-    having: ast.having ? bindWhereExprNode(contract, ast.having) : undefined,
+    having: ast.having ? bindWhereExprNode(contract, ast.having, namespaceId) : undefined,
     limit: ast.limit,
     offset: ast.offset,
     selectAllIntent: ast.selectAllIntent,

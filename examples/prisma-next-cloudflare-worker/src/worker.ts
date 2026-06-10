@@ -20,7 +20,10 @@ export default {
     if (url.pathname === '/sql/users') {
       const limit = parseLimit(url.searchParams.get('limit'), 10);
       const rows = await runtime.execute(
-        db.sql.user.select('id', 'email', 'displayName', 'kind', 'createdAt').limit(limit).build(),
+        db.sql.public.user
+          .select('id', 'email', 'displayName', 'kind', 'createdAt')
+          .limit(limit)
+          .build(),
       );
       return Response.json({ ok: true, route: 'sql/users', count: rows.length, rows });
     }
@@ -54,7 +57,7 @@ export default {
       }
       const result = await withTransaction(runtime, async (tx) => {
         await tx.execute(
-          db.sql.post
+          db.sql.public.post
             .insert([
               {
                 title: `Post written in tx for ${userId}`,
@@ -65,7 +68,7 @@ export default {
             .build(),
         );
         await tx.execute(
-          db.sql.user
+          db.sql.public.user
             .update({ displayName: newDisplayName })
             .where((f, fns) => fns.eq(f.id, userId))
             .build(),
@@ -79,7 +82,7 @@ export default {
       try {
         await withTransaction(runtime, async (tx) => {
           await tx.execute(
-            db.sql.user
+            db.sql.public.user
               .update({ displayName: 'rolled-back-write' })
               .where((f, fns) => fns.eq(f.email, 'alice@example.com'))
               .build(),
@@ -121,7 +124,7 @@ export default {
         // `break` only fetches one batch and closes. With cursor disabled
         // the driver buffers all 10_000 rows before the first yield.
         const iter = runtime.execute(
-          db.sql.post
+          db.sql.public.post
             .select('id', 'title')
             .orderBy((f) => f.createdAt, { direction: 'asc' })
             .limit(10_000)

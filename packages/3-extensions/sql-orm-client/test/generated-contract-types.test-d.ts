@@ -182,11 +182,11 @@ type StateOf<TCollection> =
 
 const runtime = createMockRuntime();
 const context = {} as unknown as ExecutionContext<GeneratedLikeContract>;
-const collection = new PostCollection({ runtime, context }, 'Post');
+const collection = new PostCollection({ runtime, context }, 'Post', { namespaceId: 'public' });
 collection.forUser('user_001');
 
-const userCollection = new Collection({ runtime, context }, 'User');
-const postCollection = new Collection({ runtime, context }, 'Post');
+const userCollection = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });
+const postCollection = new Collection({ runtime, context }, 'Post', { namespaceId: 'public' });
 
 type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;

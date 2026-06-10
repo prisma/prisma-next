@@ -142,8 +142,8 @@ export default class M extends Migration {
     return [
       addColumn('public', 'user', { name: 'name', typeSql: 'text', defaultSql: null, nullable: true }),
       this.dataTransform(endContract, 'backfill-user-name', {
-        check: () => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1),
-        run: () => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),
+        check: () => db.public.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1),
+        run: () => db.public.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),
       }),
       setNotNull('public', 'user', 'name'),
     ];

@@ -5,7 +5,7 @@ import { db } from '../prisma/db';
  * Order all cafes by spherical distance to a query point and return the
  * closest `limit` rows, projecting the distance as a `meters` field.
  *
- * Stays on the SQL builder (not the ORM `db.orm.Cafe` collection)
+ * Stays on the SQL builder (not the ORM `db.orm.public.Cafe` collection)
  * because the result row needs an arbitrary computed column
  * (`distanceSphere(location, point) AS meters`) alongside the model
  * fields. The ORM collection surface exposes the predicate (`.lte`),
@@ -24,7 +24,7 @@ import { db } from '../prisma/db';
  *   LIMIT $limit
  */
 export function findCafesNearPoint(point: Geometry, limit: number) {
-  const plan = db.sql.cafe
+  const plan = db.sql.public.cafe
     .select('id', 'name')
     .select('meters', (f, fns) => fns.distanceSphere(f.location, point))
     .orderBy((f, fns) => fns.distanceSphere(f.location, point), { direction: 'asc' })

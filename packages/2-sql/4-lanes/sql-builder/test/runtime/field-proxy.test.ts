@@ -92,7 +92,11 @@ describe('createFieldProxy', () => {
         },
       },
     });
-    const scope = tableToScope('post_alias', table, { storage, tableName: 'Post' });
+    const scope = tableToScope('post_alias', table, {
+      storage,
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      tableName: 'Post',
+    });
     expect(scope.namespaces['post_alias']?.['embedding']?.codec).toEqual({
       codecId: 'pgvector/vector@1',
       typeParams: { length: 1536 },

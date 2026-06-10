@@ -15,23 +15,31 @@ allowBuilds:
 blockExoticSubdeps: true
 
 catalog:
-  '@prisma/dev': 0.24.8
+  '@prisma/dev': 0.24.12
   '@types/node': 25.9.1
   '@types/pg': 8.20.0
   arktype: ^2.2.0
   gray-matter: ^4.0.3
   mongodb: ^7.2.0
-  mongodb-memory-server: 11.1.0
+  mongodb-memory-server: 11.2.0
   pg: 8.21.0
   tsdown: 0.22.1
   tsx: ^4.22.4
   typescript: 5.9.3
-  vite: 8.0.15
-  vitest: 4.1.7
+  vite: 8.0.16
+  vitest: 4.1.8
 
 cleanupUnusedCatalogs: true
 
 minimumReleaseAge: 1440
+
+# First-party Prisma packages: the release-age cooldown defends against
+# compromised third-party releases, so we exempt @prisma/dev (and its
+# @prisma/streams-local dependency) to adopt fixes promptly — e.g. the
+# WAL-teardown crash fix completed in @prisma/dev 0.24.12.
+minimumReleaseAgeExclude:
+  - '@prisma/dev'
+  - '@prisma/streams-local'
 
 trustPolicy: no-downgrade
 

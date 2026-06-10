@@ -16,6 +16,7 @@ export type {
   PslSpan,
 } from '../shared/psl-extension-block';
 
+import { blindCast } from '@prisma-next/utils/casts';
 import type { CodecLookup } from '../shared/codec-types';
 import type { AuthoringPslBlockDescriptorNamespace } from '../shared/framework-authoring';
 import type { PslDiagnosticCode, PslExtensionBlock, PslSpan } from '../shared/psl-extension-block';
@@ -153,6 +154,11 @@ export interface PslEnum {
   readonly span: PslSpan;
 }
 
+/**
+ * A reusable group of fields embedded in a model (a `type Name { … }` block) —
+ * e.g. a MongoDB embedded document or a Postgres composite type. Unlike
+ * {@link PslModel} it has no storage or identity of its own.
+ */
 export interface PslCompositeType {
   readonly kind: 'compositeType';
   readonly name: string;
@@ -195,37 +201,133 @@ export interface PslTypesBlock {
  */
 export const UNSPECIFIED_PSL_NAMESPACE_ID = '__unspecified__';
 
+/** A value in {@link PslNamespace.entries}: a built-in entity node or an extension-contributed {@link PslExtensionBlock}. */
+export type PslNamespaceEntry = PslModel | PslEnum | PslCompositeType | PslExtensionBlock;
+
 /**
- * A named namespace block from a PSL document, or the parser's synthesised
- * `__unspecified__` bucket for declarations that appear outside any
- * `namespace { … }` block. Multiple `namespace foo { … }` blocks for the
- * same name across one or more files reopen-merge into a single entry;
+ * A namespace block, or the parser's synthesised `__unspecified__` bucket for
+ * declarations outside any `namespace { … }`. Same-name blocks reopen-merge;
  * `span` points at the first opening.
+ *
+ * Entities are stored canonically (ADR 224) in `entries[kind][name]`, where
+ * `kind` is the PSL keyword for built-ins or the block discriminator for
+ * extension kinds, e.g. `entries['policy_select']['ReadPosts']`.
  */
 export interface PslNamespace {
   readonly kind: 'namespace';
   readonly name: string;
+  /** Canonical store: a frozen container of frozen per-kind maps. The accessors below derive from it. */
+  readonly entries: Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>>;
+  /** Built-in models, from `entries['model']`. Extension kinds: {@link namespacePslExtensionBlocks}. */
   readonly models: readonly PslModel[];
+  /** Built-in enums, from `entries['enum']`. */
   readonly enums: readonly PslEnum[];
+  /** Built-in composite types, from `entries['compositeType']`. */
   readonly compositeTypes: readonly PslCompositeType[];
-  /**
-   * Extension-contributed top-level blocks parsed inside this namespace.
-   * These are the parsed AST nodes produced by the generic framework parser
-   * when it encounters a keyword claimed by a registered
-   * {@link AuthoringPslBlockDescriptorNamespace} entry.
-   *
-   * Absent when no extension blocks appear in this namespace. Order matches
-   * source order within the namespace; extension-contributed and built-in
-   * blocks live in their own slots, so a namespace mixing `model X { … }` and
-   * `policy_select Y { … }` keeps the model in `models` and the policy in
-   * `extensionBlocks`.
-   *
-   * Contrast with {@link ParsePslDocumentInput.pslBlockDescriptors}: that
-   * field holds the registry of declarative descriptors that teach the parser
-   * which keywords to accept; this field holds the resulting parsed nodes.
-   */
-  readonly extensionBlocks?: readonly PslExtensionBlock[];
   readonly span: PslSpan;
+}
+
+/**
+ * Stores `entries`; exposes `models`/`enums`/`compositeTypes` as getters over
+ * it. The getters are prototype members (non-enumerable), so spreading or
+ * `JSON.stringify`-ing a namespace copies only `entries`, never a duplicate view.
+ */
+class PslNamespaceNode implements PslNamespace {
+  readonly kind = 'namespace' as const;
+  readonly name: string;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>>;
+  readonly span: PslSpan;
+
+  constructor(init: {
+    readonly name: string;
+    readonly entries: Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>>;
+    readonly span: PslSpan;
+  }) {
+    this.name = init.name;
+    this.entries = init.entries;
+    this.span = init.span;
+    Object.freeze(this);
+  }
+
+  get models(): readonly PslModel[] {
+    return blindCast<readonly PslModel[], 'entries[model] holds only PslModel by construction'>(
+      Object.values(this.entries['model'] ?? {}),
+    );
+  }
+
+  get enums(): readonly PslEnum[] {
+    return blindCast<readonly PslEnum[], 'entries[enum] holds only PslEnum by construction'>(
+      Object.values(this.entries['enum'] ?? {}),
+    );
+  }
+
+  get compositeTypes(): readonly PslCompositeType[] {
+    return blindCast<
+      readonly PslCompositeType[],
+      'entries[compositeType] holds only PslCompositeType by construction'
+    >(Object.values(this.entries['compositeType'] ?? {}));
+  }
+}
+
+/** Constructs a {@link PslNamespace}. Use this, never a namespace literal — the accessors must derive from `entries`. */
+export function makePslNamespace(init: {
+  readonly kind: 'namespace';
+  readonly name: string;
+  readonly entries: Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>>;
+  readonly span: PslSpan;
+}): PslNamespace {
+  return new PslNamespaceNode(init);
+}
+
+/**
+ * Builds the frozen `entries[kind][name]` container from per-kind arrays.
+ * Built-ins key on their PSL keyword; extension blocks key on their `kind`
+ * discriminator. Call this rather than hand-building the literal.
+ */
+export function makePslNamespaceEntries(
+  models: readonly PslModel[],
+  enums: readonly PslEnum[],
+  compositeTypes: readonly PslCompositeType[],
+  extensionBlocks: readonly PslExtensionBlock[],
+): Readonly<Record<string, Readonly<Record<string, PslNamespaceEntry>>>> {
+  const container: Record<string, Readonly<Record<string, PslNamespaceEntry>>> = {};
+
+  if (models.length > 0) {
+    const map: Record<string, PslModel> = {};
+    for (const m of models) {
+      map[m.name] = m;
+    }
+    container['model'] = Object.freeze(map);
+  }
+
+  if (enums.length > 0) {
+    const map: Record<string, PslEnum> = {};
+    for (const e of enums) {
+      map[e.name] = e;
+    }
+    container['enum'] = Object.freeze(map);
+  }
+
+  if (compositeTypes.length > 0) {
+    const map: Record<string, PslCompositeType> = {};
+    for (const ct of compositeTypes) {
+      map[ct.name] = ct;
+    }
+    container['compositeType'] = Object.freeze(map);
+  }
+
+  for (const block of extensionBlocks) {
+    const existing = container[block.kind];
+    const newMap: Record<string, PslExtensionBlock> = existing
+      ? blindCast<Record<string, PslExtensionBlock>, 'kind map holds only PslExtensionBlock'>({
+          ...existing,
+        })
+      : {};
+    newMap[block.name] = block;
+    container[block.kind] = Object.freeze(newMap);
+  }
+
+  return Object.freeze(container);
 }
 
 export interface PslDocumentAst {
@@ -241,21 +343,72 @@ export interface PslDocumentAst {
  * for consumers that don't (yet) need namespace-awareness.
  */
 export function flatPslModels(ast: PslDocumentAst): readonly PslModel[] {
-  return ast.namespaces.flatMap((ns) => ns.models);
+  return ast.namespaces.flatMap((ns) =>
+    blindCast<PslModel[], 'model kind map contains only PslModel by construction'>(
+      Object.values(ns.entries['model'] ?? {}),
+    ),
+  );
 }
 
 /**
  * Returns all enums from every namespace in document order.
  */
 export function flatPslEnums(ast: PslDocumentAst): readonly PslEnum[] {
-  return ast.namespaces.flatMap((ns) => ns.enums);
+  return ast.namespaces.flatMap((ns) =>
+    blindCast<PslEnum[], 'enum kind map contains only PslEnum by construction'>(
+      Object.values(ns.entries['enum'] ?? {}),
+    ),
+  );
 }
 
 /**
  * Returns all composite types from every namespace in document order.
  */
 export function flatPslCompositeTypes(ast: PslDocumentAst): readonly PslCompositeType[] {
-  return ast.namespaces.flatMap((ns) => ns.compositeTypes);
+  return ast.namespaces.flatMap((ns) =>
+    blindCast<
+      PslCompositeType[],
+      'compositeType kind map contains only PslCompositeType by construction'
+    >(Object.values(ns.entries['compositeType'] ?? {})),
+  );
+}
+
+/**
+ * The set of `entries` kind keys that the framework parser reserves for
+ * built-in PSL entity kinds. Any own-enumerable key on `PslNamespace.entries`
+ * that is **not** in this set was contributed by an extension-block descriptor.
+ *
+ * Built-in keys match the PSL keyword used on each block type:
+ * `'model'`, `'enum'`, `'compositeType'`.
+ */
+export const BUILTIN_PSL_KIND_KEYS: ReadonlySet<string> = new Set([
+  'model',
+  'enum',
+  'compositeType',
+]);
+
+/**
+ * Returns all extension-contributed blocks in the given namespace, in
+ * insertion order (the order the parser encountered them in the source).
+ *
+ * Reads from `namespace.entries`, skipping the three built-in kind keys
+ * (`'model'`, `'enum'`, `'compositeType'`). All remaining kind maps contain
+ * only `PslExtensionBlock` nodes by construction (see `makePslNamespaceEntries`).
+ */
+export function namespacePslExtensionBlocks(ns: PslNamespace): readonly PslExtensionBlock[] {
+  const result: PslExtensionBlock[] = [];
+  for (const [kindKey, kindMap] of Object.entries(ns.entries)) {
+    if (BUILTIN_PSL_KIND_KEYS.has(kindKey)) continue;
+    for (const entry of Object.values(kindMap)) {
+      result.push(
+        blindCast<
+          PslExtensionBlock,
+          'non-builtin kind maps contain only PslExtensionBlock by construction'
+        >(entry),
+      );
+    }
+  }
+  return result;
 }
 
 export interface ParsePslDocumentInput {
@@ -271,8 +424,9 @@ export interface ParsePslDocumentInput {
    * blocks are registered and any unknown keyword yields
    * `PSL_UNSUPPORTED_TOP_LEVEL_BLOCK`.
    *
-   * Contrast with {@link PslNamespace.extensionBlocks}: that field holds the
-   * parsed block nodes in a namespace; this field holds the registry of
+   * Contrast with the parsed block nodes themselves, which live in
+   * {@link PslNamespace.entries} under their discriminator key (read them with
+   * {@link namespacePslExtensionBlocks}); this field holds the registry of
    * descriptors that teach the parser how to read those blocks.
    */
   readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;

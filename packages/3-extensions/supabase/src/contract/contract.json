@@ -440,19 +440,17 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:13b530a9c9fb26912d97f8a05dea26634242de75fb4af6b29337e4e7c7712876",
+    "storageHash": "sha256:a92ac18f82eb73f747fa9512351caec3e42df1a1a897bce787966af84371638c",
     "types": {
       "Timestamptz": {
         "codecId": "pg/timestamptz@1",
         "kind": "codec-instance",
-        "nativeType": "timestamptz",
-        "typeParams": {}
+        "nativeType": "timestamptz"
       },
       "Uuid": {
         "codecId": "pg/text@1",
         "kind": "codec-instance",
-        "nativeType": "uuid",
-        "typeParams": {}
+        "nativeType": "uuid"
       }
     }
   },

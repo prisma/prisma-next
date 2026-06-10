@@ -1,4 +1,4 @@
-import { bold, cyan, cyanBright, dim, green, yellow } from 'colorette';
+import { bold, createColors, cyan, cyanBright, dim, green, yellow } from 'colorette';
 import { describe, expect, it } from 'vitest';
 import {
   IDENTITY_MIGRATION_LIST_STYLER,
@@ -162,7 +162,11 @@ describe('renderMigrationListWithStyle', () => {
     expect(styled).toContain(green('production'));
     expect(styled).toContain(green('db'));
     expect(styled).toContain(dim('1 migration(s) on disk'));
-    expect(styled).toContain('│⟲');
+    // The graph gutter is drawn by the corner renderer, which forces colour and
+    // tints each lane-0 glyph white (lane N → colour N+1). The self-edge row is
+    // a white │ rail + white ⟲ self-loop marker.
+    const forced = createColors({ useColor: true });
+    expect(styled).toContain(`${forced.white('│')}${forced.white('⟲')}`);
     expect(styled).toContain('1 ops');
   });
 

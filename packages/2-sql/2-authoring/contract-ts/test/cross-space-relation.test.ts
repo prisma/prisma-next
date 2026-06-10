@@ -294,11 +294,7 @@ describe('F-relfk: cross-space belongsTo().sql({ fk }) produces a cross-space FK
     const fks = profileTable?.foreignKeys ?? [];
     expect(fks).toHaveLength(1);
     // The relation-derived FK must carry the cross-space spaceId.
-    // Cast to Record<string, unknown> for access to the optional `spaceId` field
-    // (the ForeignKeyReference class uses a `declare` field which some TS paths
-    // narrow away — runtime access is safe, the field is present when cross-space).
-    const fkTarget = fks[0]!.target as unknown as Record<string, unknown>;
-    expect(fkTarget['spaceId']).toBe('supabase');
+    expect(fks[0]!.target.spaceId).toBe('supabase');
     expect(fks[0]!.onDelete).toBe('cascade');
   });
 });

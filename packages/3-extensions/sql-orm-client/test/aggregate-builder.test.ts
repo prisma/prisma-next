@@ -6,7 +6,7 @@ describe('aggregate-builder', () => {
   const contract = getTestContract();
 
   it('createAggregateBuilder() maps numeric field selectors to storage columns', () => {
-    const aggregate = createAggregateBuilder(contract, 'Post');
+    const aggregate = createAggregateBuilder(contract, 'public', 'Post');
     const numericField = 'views' as never;
 
     expect(aggregate.count()).toEqual({
@@ -36,7 +36,7 @@ describe('aggregate-builder', () => {
   });
 
   it('createAggregateBuilder() falls back to field name without mapping', () => {
-    const aggregate = createAggregateBuilder(contract, 'UnknownModel' as never);
+    const aggregate = createAggregateBuilder(contract, 'public', 'UnknownModel' as never);
     const numericField = 'custom_metric' as never;
 
     expect(aggregate.sum(numericField)).toEqual({

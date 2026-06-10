@@ -7,17 +7,17 @@ describe('collection-column-mapping', () => {
   const contract = getTestContract();
 
   it('resolveFieldToColumn() resolves known fields and falls back for unknown fields', () => {
-    expect(resolveFieldToColumn(contract, 'Post', 'userId')).toBe('user_id');
-    expect(resolveFieldToColumn(contract, 'Post', 'customField')).toBe('customField');
+    expect(resolveFieldToColumn(contract, 'public', 'Post', 'userId')).toBe('user_id');
+    expect(resolveFieldToColumn(contract, 'public', 'Post', 'customField')).toBe('customField');
   });
 
   it('mapFieldsToColumns() maps arrays by model mapping when available', () => {
-    expect(mapFieldsToColumns(contract, 'Post', ['id', 'userId', 'views'])).toEqual([
+    expect(mapFieldsToColumns(contract, 'public', 'Post', ['id', 'userId', 'views'])).toEqual([
       'id',
       'user_id',
       'views',
     ]);
-    expect(mapFieldsToColumns(contract, 'UnknownModel', ['id', 'customField'])).toEqual([
+    expect(mapFieldsToColumns(contract, 'public', 'UnknownModel', ['id', 'customField'])).toEqual([
       'id',
       'customField',
     ]);
@@ -25,7 +25,7 @@ describe('collection-column-mapping', () => {
 
   it('mapCursorValuesToColumns() skips undefined values and maps field names to columns', () => {
     expect(
-      mapCursorValuesToColumns(contract, 'Post', {
+      mapCursorValuesToColumns(contract, 'public', 'Post', {
         id: 1,
         userId: 2,
         views: undefined,
@@ -38,7 +38,7 @@ describe('collection-column-mapping', () => {
 
   it('mapCursorValuesToColumns() falls back when model or field mapping is missing', () => {
     expect(
-      mapCursorValuesToColumns(contract, 'UnknownModel', {
+      mapCursorValuesToColumns(contract, 'public', 'UnknownModel', {
         custom: 1,
       }),
     ).toEqual({
@@ -46,7 +46,7 @@ describe('collection-column-mapping', () => {
     });
 
     expect(
-      mapCursorValuesToColumns(contract, 'Post', {
+      mapCursorValuesToColumns(contract, 'public', 'Post', {
         unknownField: 2,
       }),
     ).toEqual({

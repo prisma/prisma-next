@@ -165,8 +165,11 @@ describe('builder integration', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
 
-    const db = sql<typeof contract>({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-    const plan = db.user.select('id', 'email').build();
+    const db = sql<typeof contract>({
+      context,
+      rawCodecInferer: { inferCodec: () => 'pg/text' },
+    });
+    const plan = db.public.user.select('id', 'email').build();
 
     // Runtime checks
     expect(plan.ast).toBeInstanceOf(SelectAst);
@@ -204,8 +207,11 @@ describe('builder integration', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
 
-    const db = sql<typeof contract>({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
-    const _plan = db.user.select('id', 'email', 'createdAt').build();
+    const db = sql<typeof contract>({
+      context,
+      rawCodecInferer: { inferCodec: () => 'pg/text' },
+    });
+    const _plan = db.public.user.select('id', 'email', 'createdAt').build();
 
     type Row = ResultType<typeof _plan>;
 

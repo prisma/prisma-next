@@ -1,0 +1,541 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  type ExecutionStackInstance,
+  instantiateExecutionStack,
+  type RuntimeDriverInstance,
+  type RuntimeExtensionInstance,
+} from '@prisma-next/framework-components/execution';
+import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
+import { SelectAst as SelectAstCtor, TableSource } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
+import type {
+  SqlMiddleware,
+  SqlRuntimeAdapterDescriptor,
+  SqlRuntimeAdapterInstance,
+  SqlRuntimeTargetDescriptor,
+} from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createSqlExecutionStack,
+  withTransaction,
+} from '@prisma-next/sql-runtime';
+import { applicationDomainOf } from '@prisma-next/test-utils';
+import { describe, expect, it, vi } from 'vitest';
+import type { SupabaseRoleBinding } from '../src/runtime/supabase-runtime';
+import { SupabaseRuntimeImpl } from '../src/runtime/supabase-runtime';
+
+const testContract: Contract<SqlStorage> = {
+  targetFamily: 'sql',
+  target: 'postgres',
+  profileHash: profileHash('sha256:supabase-runtime-test'),
+  domain: applicationDomainOf({ models: {} }),
+  roots: {},
+  storage: new SqlStorage({
+    storageHash: coreHash('sha256:supabase-runtime-test'),
+    namespaces: { __unbound__: SqlUnboundNamespace.instance },
+  }),
+  extensionPacks: {},
+  capabilities: {},
+  meta: {},
+};
+
+interface RecordingTransaction {
+  readonly id: symbol;
+  readonly queryCalls: Array<{ sql: string; params: readonly unknown[] | undefined }>;
+  execute: ReturnType<typeof vi.fn>;
+  executePrepared: ReturnType<typeof vi.fn>;
+  query: ReturnType<typeof vi.fn>;
+  commit: ReturnType<typeof vi.fn>;
+  rollback: ReturnType<typeof vi.fn>;
+}
+
+interface RecordingConnection {
+  readonly id: symbol;
+  readonly queryCalls: Array<{ sql: string; params: readonly unknown[] | undefined }>;
+  readonly beginTransactionSpy: ReturnType<typeof vi.fn>;
+  execute: ReturnType<typeof vi.fn>;
+  executePrepared: ReturnType<typeof vi.fn>;
+  query: ReturnType<typeof vi.fn>;
+  release: ReturnType<typeof vi.fn>;
+  destroy: ReturnType<typeof vi.fn>;
+  beginTransaction(): Promise<RecordingTransaction>;
+  readonly transaction: RecordingTransaction;
+}
+
+interface RecordingDriver {
+  readonly acquireConnectionSpy: ReturnType<typeof vi.fn>;
+  execute: ReturnType<typeof vi.fn>;
+  executePrepared: ReturnType<typeof vi.fn>;
+  query: ReturnType<typeof vi.fn>;
+  connect: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+  acquireConnection(): Promise<RecordingConnection>;
+  readonly connection: RecordingConnection;
+}
+
+function createRecordingDriver(
+  executeRows: readonly Record<string, unknown>[] = [{ id: 1 }],
+): RecordingDriver {
+  const txId = Symbol('transaction');
+  const connId = Symbol('connection');
+  const txQueryCalls: Array<{ sql: string; params: readonly unknown[] | undefined }> = [];
+  const connQueryCalls: Array<{ sql: string; params: readonly unknown[] | undefined }> = [];
+
+  const transaction: RecordingTransaction = {
+    id: txId,
+    get queryCalls() {
+      return txQueryCalls;
+    },
+    execute: vi.fn().mockImplementation(async function* (_req: SqlExecuteRequest) {
+      for (const row of executeRows) yield row;
+    }),
+    executePrepared: vi.fn().mockImplementation(async function* () {}),
+    query: vi.fn().mockImplementation(async (sql: string, params?: readonly unknown[]) => {
+      txQueryCalls.push({ sql, params });
+      return { rows: [], rowCount: 0 };
+    }),
+    commit: vi.fn().mockResolvedValue(undefined),
+    rollback: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const beginTransactionSpy = vi.fn().mockResolvedValue(transaction);
+  const connection: RecordingConnection = {
+    id: connId,
+    get queryCalls() {
+      return connQueryCalls;
+    },
+    beginTransactionSpy,
+    get transaction() {
+      return transaction;
+    },
+    execute: vi.fn().mockImplementation(async function* (_req: SqlExecuteRequest) {
+      for (const row of executeRows) yield row;
+    }),
+    executePrepared: vi.fn().mockImplementation(async function* () {}),
+    query: vi.fn().mockImplementation(async (sql: string, params?: readonly unknown[]) => {
+      connQueryCalls.push({ sql, params });
+      return { rows: [], rowCount: 0 };
+    }),
+    release: vi.fn().mockResolvedValue(undefined),
+    destroy: vi.fn().mockResolvedValue(undefined),
+    beginTransaction: () => beginTransactionSpy(),
+  };
+
+  const acquireConnectionSpy = vi.fn().mockResolvedValue(connection);
+  const driver: RecordingDriver = {
+    acquireConnectionSpy,
+    get connection() {
+      return connection;
+    },
+    execute: vi.fn().mockImplementation(async function* () {}),
+    executePrepared: vi.fn().mockImplementation(async function* () {}),
+    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+    connect: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    acquireConnection: () => acquireConnectionSpy(),
+  };
+  return driver;
+}
+
+function createStubAdapter() {
+  const codec: Codec<string> = {
+    id: 'pg/int4@1',
+    targetTypes: ['int4'],
+    encode: (v: number) => v,
+    decode: (w: number) => w,
+  } as unknown as Codec<string>;
+  const codecs = [codec];
+
+  return {
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    __codecs: codecs,
+    profile: {
+      id: 'test-profile',
+      target: 'postgres',
+      capabilities: {},
+      readMarker: async () => ({ kind: 'absent' as const }),
+    },
+    lower(ast: Parameters<SqlRuntimeAdapterInstance<'postgres'>['lower']>[0]) {
+      const params = [...new Set(ast.collectParamRefs())].map((ref) =>
+        ref.kind === 'prepared-param-ref'
+          ? { kind: 'bind' as const, name: ref.name }
+          : { kind: 'literal' as const, value: ref.value },
+      );
+      return Object.freeze({ sql: JSON.stringify(ast), params });
+    },
+  };
+}
+
+function createTestAdapterDescriptor(
+  adapter: ReturnType<typeof createStubAdapter>,
+): SqlRuntimeAdapterDescriptor<'postgres'> {
+  return {
+    kind: 'adapter',
+    rawCodecInferer: { inferCodec: () => 'pg/text' },
+    id: 'test-adapter',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    codecs: () => [],
+    create() {
+      return Object.assign(
+        { familyId: 'sql' as const, targetId: 'postgres' as const },
+        adapter,
+      ) as SqlRuntimeAdapterInstance<'postgres'>;
+    },
+  };
+}
+
+function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
+  return {
+    kind: 'target',
+    id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    codecs: () => [],
+    create() {
+      return { familyId: 'sql' as const, targetId: 'postgres' as const };
+    },
+  };
+}
+
+function createTestSetup(options?: { middleware?: readonly SqlMiddleware[] }) {
+  const adapter = createStubAdapter();
+  const driver = createRecordingDriver();
+  const targetDescriptor = createTestTargetDescriptor();
+  const adapterDescriptor = createTestAdapterDescriptor(adapter);
+
+  const stack = createSqlExecutionStack({
+    target: targetDescriptor,
+    adapter: adapterDescriptor,
+    extensionPacks: [],
+  });
+
+  type SqlTestStackInstance = ExecutionStackInstance<
+    'sql',
+    'postgres',
+    SqlRuntimeAdapterInstance<'postgres'>,
+    RuntimeDriverInstance<'sql', 'postgres'>,
+    RuntimeExtensionInstance<'sql', 'postgres'>
+  >;
+  const stackInstance = instantiateExecutionStack(stack) as unknown as SqlTestStackInstance;
+
+  const context = createExecutionContext({
+    contract: testContract,
+    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+  });
+
+  const runtimeOptions: ConstructorParameters<typeof SupabaseRuntimeImpl>[0] = {
+    context,
+    adapter: stackInstance.adapter,
+    driver: driver as unknown as SqlDriver,
+    verifyMarker: false,
+    middleware: options?.middleware ?? [],
+  };
+
+  const runtime = new SupabaseRuntimeImpl(runtimeOptions);
+  return { runtime, driver };
+}
+
+function stubPlan(): SqlExecutionPlan<Record<string, unknown>> {
+  return {
+    sql: 'select 1',
+    params: [],
+    ast: SelectAstCtor.from(TableSource.named('stub')),
+    meta: {
+      target: testContract.target,
+      targetFamily: testContract.targetFamily,
+      storageHash: testContract.storage.storageHash,
+      lane: 'raw',
+    },
+  };
+}
+
+describe('SupabaseRuntimeImpl', () => {
+  describe('openRoleSession — bind-once', () => {
+    it('issues exactly two set_config(…,false) calls before any typed execute', async () => {
+      const { runtime, driver } = createTestSetup();
+      const binding: SupabaseRoleBinding = { role: 'authenticated', claims: { sub: 'u1' } };
+
+      const session = await runtime.openRoleSession(binding);
+      await session.execute(stubPlan()).toArray();
+      await session.release();
+
+      const setConfigCalls = driver.connection.queryCalls.filter((c) =>
+        c.sql.startsWith('SELECT set_config'),
+      );
+      expect(setConfigCalls).toEqual([
+        { sql: 'SELECT set_config($1, $2, false)', params: ['role', 'authenticated'] },
+        {
+          sql: 'SELECT set_config($1, $2, false)',
+          params: ['request.jwt.claims', JSON.stringify({ sub: 'u1' })],
+        },
+      ]);
+    });
+
+    it('set_config and the typed execute land on the same connection', async () => {
+      const { runtime, driver } = createTestSetup();
+      const queriedOnConn: symbol[] = [];
+      const executedOnConn: symbol[] = [];
+
+      driver.connection.query = vi
+        .fn()
+        .mockImplementation(async (sql: string, params?: readonly unknown[]) => {
+          if (sql.startsWith('SELECT set_config')) {
+            queriedOnConn.push(driver.connection.id);
+          }
+          driver.connection.queryCalls.push({ sql, params });
+          return { rows: [], rowCount: 0 };
+        });
+
+      driver.connection.execute = vi.fn().mockImplementation(async function* () {
+        executedOnConn.push(driver.connection.id);
+        yield { id: 1 };
+      });
+
+      const session = await runtime.openRoleSession({ role: 'anon' });
+      await session.execute(stubPlan()).toArray();
+      await session.release();
+
+      expect(queriedOnConn).toHaveLength(2);
+      expect(executedOnConn).toHaveLength(1);
+      expect(queriedOnConn[0]).toBe(executedOnConn[0]);
+    });
+
+    it('claims default to {} when not provided', async () => {
+      const { runtime, driver } = createTestSetup();
+
+      const session = await runtime.openRoleSession({ role: 'anon' });
+      await session.execute(stubPlan()).toArray();
+      await session.release();
+
+      const claimsCall = driver.connection.queryCalls.find(
+        (c) => (c.params as string[])?.[0] === 'request.jwt.claims',
+      );
+      expect(claimsCall?.params).toEqual(['request.jwt.claims', '{}']);
+    });
+
+    it('empty claims serializes as {}', async () => {
+      const { runtime, driver } = createTestSetup();
+
+      const session = await runtime.openRoleSession({ role: 'anon', claims: {} });
+      await session.execute(stubPlan()).toArray();
+      await session.release();
+
+      const claimsCall = driver.connection.queryCalls.find(
+        (c) => (c.params as string[])?.[0] === 'request.jwt.claims',
+      );
+      expect(claimsCall?.params).toEqual(['request.jwt.claims', '{}']);
+    });
+  });
+
+  describe('openRoleSession — below-middleware', () => {
+    it('registered middleware sees typed executes, not set_config calls', async () => {
+      const observedSqls: string[] = [];
+      const observer: SqlMiddleware = {
+        name: 'sql-observer',
+        familyId: 'sql',
+        beforeExecute(exec) {
+          observedSqls.push(exec.sql);
+        },
+      };
+      const { runtime } = createTestSetup({ middleware: [observer] });
+
+      const session = await runtime.openRoleSession({ role: 'anon' });
+      await session.execute(stubPlan()).toArray();
+      await session.release();
+
+      // Middleware sees exactly one SQL — the typed execute — not the set_config calls
+      expect(observedSqls).toHaveLength(1);
+      expect(observedSqls[0]).not.toContain('set_config');
+    });
+  });
+
+  describe('openRoleSession — stickiness', () => {
+    it('multiple executes on the same session use the same connection', async () => {
+      const { runtime, driver } = createTestSetup();
+      const session = await runtime.openRoleSession({ role: 'authenticated' });
+
+      await session.execute(stubPlan()).toArray();
+      await session.execute(stubPlan()).toArray();
+      await session.release();
+
+      // acquireConnection called once, not per-execute
+      expect(driver.acquireConnectionSpy).toHaveBeenCalledOnce();
+    });
+
+    it('transaction() uses the same connection as the session', async () => {
+      const { runtime, driver } = createTestSetup();
+      const session = await runtime.openRoleSession({ role: 'authenticated' });
+
+      const tx = await session.transaction();
+      await tx.commit();
+      await session.release();
+
+      expect(driver.connection.beginTransactionSpy).toHaveBeenCalledOnce();
+      expect(driver.acquireConnectionSpy).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('openRoleSession — release', () => {
+    it('release() sends RESET ALL then releases the connection to the pool', async () => {
+      const { runtime, driver } = createTestSetup();
+      const resetCalls: string[] = [];
+
+      driver.connection.query = vi
+        .fn()
+        .mockImplementation(async (sql: string, params?: readonly unknown[]) => {
+          driver.connection.queryCalls.push({ sql, params });
+          if (sql === 'RESET ALL') {
+            resetCalls.push(sql);
+          }
+          return { rows: [], rowCount: 0 };
+        });
+
+      const session = await runtime.openRoleSession({ role: 'anon' });
+      await session.release();
+
+      expect(resetCalls).toHaveLength(1);
+      expect(driver.connection.release).toHaveBeenCalledOnce();
+      expect(driver.connection.destroy).not.toHaveBeenCalled();
+    });
+
+    it('when RESET ALL fails, destroys the connection instead of releasing', async () => {
+      const { runtime, driver } = createTestSetup();
+      const resetError = new Error('RESET ALL failed');
+
+      driver.connection.query = vi
+        .fn()
+        .mockImplementation(async (sql: string, params?: readonly unknown[]) => {
+          driver.connection.queryCalls.push({ sql, params });
+          if (sql === 'RESET ALL') {
+            throw resetError;
+          }
+          return { rows: [], rowCount: 0 };
+        });
+
+      const session = await runtime.openRoleSession({ role: 'anon' });
+      await session.release();
+
+      expect(driver.connection.destroy).toHaveBeenCalledOnce();
+      expect(driver.connection.release).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('openRoleSession — bind-failure', () => {
+    it('destroys the connection and rethrows when set_config fails', async () => {
+      const { runtime, driver } = createTestSetup();
+      const bindError = new Error('set_config denied');
+      let callCount = 0;
+
+      driver.connection.query = vi.fn().mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          throw bindError;
+        }
+        return { rows: [], rowCount: 0 };
+      });
+
+      await expect(runtime.openRoleSession({ role: 'anon' })).rejects.toBe(bindError);
+      expect(driver.connection.destroy).toHaveBeenCalledOnce();
+      expect(driver.connection.release).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('executeWithRole — stream cleanup', () => {
+    it('releases the session after the stream drains', async () => {
+      const { runtime, driver } = createTestSetup();
+
+      await runtime.executeWithRole(stubPlan(), { role: 'anon' }).toArray();
+
+      // RESET ALL sent, then release called
+      const resetCall = driver.connection.queryCalls.find((c) => c.sql === 'RESET ALL');
+      expect(resetCall).toBeDefined();
+      expect(driver.connection.release).toHaveBeenCalledOnce();
+      expect(driver.connection.destroy).not.toHaveBeenCalled();
+    });
+
+    it('destroys the session on mid-stream error', async () => {
+      const { runtime, driver } = createTestSetup();
+      const streamError = new Error('mid-stream failure');
+
+      driver.connection.execute = vi.fn().mockReturnValue({
+        [Symbol.asyncIterator]() {
+          return {
+            next(): Promise<IteratorResult<unknown>> {
+              return Promise.reject(streamError);
+            },
+          };
+        },
+      });
+
+      await expect(runtime.executeWithRole(stubPlan(), { role: 'anon' }).toArray()).rejects.toBe(
+        streamError,
+      );
+
+      expect(driver.connection.destroy).toHaveBeenCalledOnce();
+      expect(driver.connection.release).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('session transaction — commit and rollback', () => {
+    it('commits when the session transaction is committed', async () => {
+      const { runtime, driver } = createTestSetup();
+      const session = await runtime.openRoleSession({ role: 'authenticated' });
+
+      const tx = await session.transaction();
+      await tx.commit();
+      await session.release();
+
+      expect(driver.connection.transaction.commit).toHaveBeenCalledOnce();
+      expect(driver.connection.transaction.rollback).not.toHaveBeenCalled();
+    });
+
+    it('rolls back when the session transaction is rolled back', async () => {
+      const { runtime, driver } = createTestSetup();
+      const session = await runtime.openRoleSession({ role: 'authenticated' });
+
+      const tx = await session.transaction();
+      await tx.rollback();
+      await session.release();
+
+      expect(driver.connection.transaction.rollback).toHaveBeenCalledOnce();
+      expect(driver.connection.transaction.commit).not.toHaveBeenCalled();
+    });
+
+    it('withTransaction over openRoleSession commits on success', async () => {
+      const { runtime, driver } = createTestSetup();
+
+      await withTransaction(
+        { connection: () => runtime.openRoleSession({ role: 'anon' }) },
+        async () => {
+          return undefined;
+        },
+      );
+
+      expect(driver.connection.transaction.commit).toHaveBeenCalledOnce();
+      expect(driver.connection.transaction.rollback).not.toHaveBeenCalled();
+    });
+
+    it('withTransaction over openRoleSession rolls back on callback throw', async () => {
+      const { runtime, driver } = createTestSetup();
+      const err = new Error('callback failed');
+
+      await expect(
+        withTransaction(
+          { connection: () => runtime.openRoleSession({ role: 'anon' }) },
+          async () => {
+            throw err;
+          },
+        ),
+      ).rejects.toBe(err);
+
+      expect(driver.connection.transaction.rollback).toHaveBeenCalledOnce();
+      expect(driver.connection.transaction.commit).not.toHaveBeenCalled();
+    });
+  });
+});

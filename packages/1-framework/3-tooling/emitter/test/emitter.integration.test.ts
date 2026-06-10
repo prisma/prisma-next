@@ -231,4 +231,99 @@ describe('emitter integration', () => {
     },
     timeouts.typeScriptCompilation,
   );
+
+  it(
+    'emits the enum value union into FieldOutputTypes/FieldInputTypes for an enum-backed field',
+    async () => {
+      // Emit-then-consume proof. A real consumer reads the EMITTED contract.d.ts,
+      // not `typeof contract`: the in-memory authoring handle's literal tuples are
+      // erased by emission. This drives the full emit pipeline (the same path
+      // `generate-contract-dts.ts` wires the enum resolver through) and asserts the
+      // emitted typemap text carries the member-value union for a field that only
+      // declares a `valueSet` ref — its codec output is bare `string`.
+      const ir = createTestContract({
+        models: {
+          Post: {
+            storage: {
+              table: 'post',
+              fields: {
+                priority: { column: 'priority' },
+                title: { column: 'title' },
+              },
+            },
+            fields: {
+              priority: {
+                type: { kind: 'scalar', codecId: 'pg/text@1' },
+                nullable: false,
+                valueSet: {
+                  plane: 'domain',
+                  entityKind: 'enum',
+                  namespaceId: '__unbound__',
+                  name: 'Priority',
+                },
+              },
+              title: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+            },
+            relations: {},
+          },
+        },
+        enum: {
+          Priority: {
+            codecId: 'pg/text@1',
+            members: [
+              { name: 'Low', value: 'low' },
+              { name: 'High', value: 'high' },
+              { name: 'Urgent', value: 'urgent' },
+            ],
+          },
+        },
+        storage: {
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: {
+                table: {
+                  post: {
+                    columns: {
+                      priority: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                      title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                    },
+                    primaryKey: { columns: ['title'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
+                  },
+                },
+              },
+            },
+          },
+        },
+        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+      });
+
+      const result = await emit(
+        ir,
+        { codecTypeImports: [], extensionIds: ['postgres', 'pg'] },
+        mockSqlHook,
+      );
+
+      const outputMap = result.contractDts.slice(
+        result.contractDts.indexOf('export type FieldOutputTypes'),
+        result.contractDts.indexOf('export type FieldInputTypes'),
+      );
+      const inputMap = result.contractDts.slice(
+        result.contractDts.indexOf('export type FieldInputTypes'),
+        result.contractDts.indexOf('export type TypeMaps'),
+      );
+
+      expect(outputMap).toContain("readonly priority: 'low' | 'high' | 'urgent'");
+      expect(outputMap).not.toContain("readonly priority: CodecTypes['pg/text@1']['output']");
+      // The non-enum field stays on the codec output channel.
+      expect(outputMap).toContain("readonly title: CodecTypes['pg/text@1']['output']");
+
+      expect(inputMap).toContain("readonly priority: 'low' | 'high' | 'urgent'");
+      expect(inputMap).not.toContain("readonly priority: CodecTypes['pg/text@1']['input']");
+    },
+    timeouts.typeScriptCompilation,
+  );
 });

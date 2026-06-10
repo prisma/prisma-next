@@ -16,8 +16,7 @@
  *        verifier's `external` policy (`declaredMissing` → fail) is satisfied.
  *      - Extra columns / tables in the live DB are suppressed by `external`
  *        policy.
- *   4. The app's `public.profile` round-trip (insert + read) works on the
- *      stock `@prisma-next/postgres/runtime`.
+ *   4. The `auth.users` table is reachable via a raw pg client after `db init`.
  *
  * How the supabase extension space participates:
  *   The supabase pack declares `contractSpace` (contract + headRef, no migrations).
@@ -52,8 +51,7 @@ import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import contractJson from '../src/contract.json' with { type: 'json' };
-import { insertAndReadProfile } from '../src/handlers';
-import { db } from '../src/prisma/db';
+import { createDb } from '../src/prisma/db';
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
 // Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
@@ -76,7 +74,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
   }, timeouts.spinUpPpgDev);
 
   it(
-    'db init emits no DDL for auth/storage; verifier passes; public.profile round-trip succeeds',
+    'db init emits no DDL for auth/storage; verifier passes; auth.users table reachable via raw pg',
     async () => {
       const { connectionString } = database;
 
@@ -216,24 +214,9 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         await client.close();
       }
 
-      // Step 5 — public.profile insert + read-back via the app's handler.
-      //
-      // The `db` client connects via `db.connect({ url })`, which wires the
-      // stock postgres runtime. The handler inserts a Profile and reads it back.
-      const runtime = await db.connect({ url: connectionString });
-      try {
-        const rows = await insertAndReadProfile(runtime, 'alice');
-        expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ username: 'alice' });
-        expect(typeof rows[0]?.id).toBe('string');
-      } finally {
-        await db.close();
-      }
-
-      // Step 6 (bonus) — raw read from the seeded auth.users table.
+      // Step 5 (bonus) — raw read from the seeded auth.users table.
       //
       // Proves the external table is reachable via a raw pg Client.
-      // The typed `db.sql.auth.users` surface waits for `explicit-namespace-dsl`.
       await withClient(connectionString, async (client) => {
         const result = await client.query<{ table_name: string }>(
           `SELECT table_name
@@ -244,9 +227,124 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         expect(result.rows[0]?.table_name).toBe('users');
       });
     },
-    // The test does seed + materialise + dbInit (plan + apply) + dbVerify + connect
-    // runtime + insert + read — substantially more than just spinning up the DB.
+    // The test does seed + materialise + dbInit (plan + apply) + dbVerify + raw read
+    // — substantially more than just spinning up the DB.
     // 4× the spin-up budget gives cold CI workers headroom.
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'cross-schema FK from public.profile.userId to auth.users.id cascades on auth.users delete',
+    async () => {
+      const { connectionString } = database;
+
+      // Seed external schemas + tables.
+      await withClient(connectionString, async (client) => {
+        await bootstrapSupabaseShim(client);
+      });
+
+      // Materialise the supabase extension space on disk so dbInit can read it.
+      const space = supabasePack.contractSpace;
+      if (!space) {
+        throw new Error('supabasePack must declare a contractSpace');
+      }
+      await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+        contract: space.contractJson,
+        contractDts: '// supabase extension contract space\n',
+        headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
+      });
+
+      // dbInit apply — creates public.profile with the cross-schema FK.
+      const client = createControlClient({
+        family: sql,
+        target: postgres,
+        adapter: postgresAdapter,
+        driver: postgresDriver,
+        extensionPacks: [supabasePack],
+      });
+      try {
+        await client.connect(connectionString);
+        const applyResult = await client.dbInit({
+          contract: contractJson,
+          mode: 'apply',
+          migrationsDir,
+        });
+        if (!applyResult.ok) {
+          throw new Error(`dbInit apply failed: ${applyResult.failure.summary}`);
+        }
+      } finally {
+        await client.close();
+      }
+
+      // Grant roles access to the WAL schema created by dbInit (PGlite single-connection
+      // accommodation: role-bound sessions share the connection with the WAL drain query).
+      await withClient(connectionString, async (pg) => {
+        await pg.query(
+          'GRANT USAGE ON SCHEMA _prisma_dev_wal TO anon, authenticated, service_role',
+        );
+        await pg.query(
+          'GRANT ALL ON ALL TABLES IN SCHEMA _prisma_dev_wal TO anon, authenticated, service_role',
+        );
+        await pg.query(
+          'GRANT ALL ON ALL SEQUENCES IN SCHEMA _prisma_dev_wal TO anon, authenticated, service_role',
+        );
+        await pg.query(
+          'GRANT EXECUTE ON FUNCTION _prisma_dev_wal.capture_event() TO anon, authenticated, service_role',
+        );
+      });
+
+      // Exercise the cascade.
+      //
+      // auth.users is foreign — non-navigable per Option B, no ORM surface.
+      // We touch it via raw SQL only.
+      // public.profile is ours — we use the ORM runtime to make the
+      // cross-space boundary visible in the test.
+      const userId = crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      // Insert the auth.users row via raw SQL (auth.* is foreign, no ORM surface).
+      await withClient(connectionString, async (pg) => {
+        await pg.query(
+          'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3)',
+          [userId, 'bob@example.com', now],
+        );
+      });
+
+      // Use the ORM for public.profile operations.
+      const appDb = await createDb(connectionString);
+      try {
+        const sr = appDb.asServiceRole();
+
+        // Insert a profile row via the ORM.
+        await sr.execute(sr.sql.public.profile.insert([{ username: 'bob', userId }]).build());
+
+        // Count profiles for this user before the cascade delete.
+        const beforeRows = await sr.execute(
+          sr.sql.public.profile
+            .select('id')
+            .where((f, fns) => fns.eq(f.userId, userId))
+            .build(),
+        );
+        expect(beforeRows).toHaveLength(1);
+
+        // Delete the auth.users row via raw SQL — the cross-space FK ON DELETE CASCADE
+        // fires and removes the public.profile row.
+        await withClient(connectionString, async (pg) => {
+          await pg.query('DELETE FROM auth.users WHERE id = $1', [userId]);
+        });
+
+        // Count profiles for this user after the cascade delete — must be zero.
+        const afterRows = await sr.execute(
+          sr.sql.public.profile
+            .select('id')
+            .where((f, fns) => fns.eq(f.userId, userId))
+            .build(),
+        );
+        expect(afterRows).toHaveLength(0);
+      } finally {
+        await appDb.close();
+      }
+    },
     timeouts.spinUpPpgDev * 4,
   );
 });

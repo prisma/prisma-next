@@ -21,6 +21,12 @@ In addition to the canonical project-spec / slice-spec templates, this repo expe
 - **Adapter-impact section** for any spec that affects target adapters (`packages/3-targets/**`). Names which adapters are affected (postgres / sqlite / mongo / etc.).
 - **ADR pointer** for any architectural shift. Either link an existing ADR or commit to authoring one as part of the project's close-out.
 
+## Grounding illustrative snippets before execution
+
+Specs legitimately carry illustrative code (PSL grammar, IR type shapes) while shaping. Before a slice executor treats any snippet as fact, they must re-verify it against shipped code — not re-read the spec sketch.
+
+TML-2500 hit this four times in M3b: a PSL snippet used a model name that the shipped extension had renamed; the spec assumed a native-type auto-propagation that doesn't exist; a field attribute was written in field syntax when it is only valid inside a `types {}` block; and a doc update copied a discriminator field name from the spec's illustrative IR shape when the shipped IR uses presence-based discrimination on an optional field instead. The fix every time was "read the code, not the spec sketch." A doc author has the same obligation: re-verify each snippet before it bakes into a long-lived document.
+
 ## When this file changes
 
 Append when a new required section emerges from a retro (a spec consistently missed a piece of context, and the team agreed a section header should prompt for it). For new edge-case patterns, new scope traps, or new DoR/DoD items: edit the matching file under [`drive/calibration/`](../calibration/) — never duplicate calibration here.
