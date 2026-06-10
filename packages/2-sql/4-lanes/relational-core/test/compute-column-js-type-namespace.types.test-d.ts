@@ -1,17 +1,32 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, TypeMaps, TypeMapsPhantomKey } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { ComputeColumnJsType } from '../src/types';
 
 /**
  * Two namespaces declare the SAME bare table name `users`, each with a
- * namespace-UNIQUE column: `public.users` has `email` (text), `auth.users` has
- * `token` (int). `ComputeColumnJsType` is given an explicit namespace
- * coordinate and must resolve each column to its OWN namespace's JS type — and
- * resolve to `never` for a column that exists only in the other namespace. A
- * flat cross-namespace resolver would collapse `users` to the per-namespace
- * column intersection and reach neither unique column.
+ * namespace-UNIQUE column: `public.users` has `email` (text) and a
+ * parameterized `embedding` (vector), `auth.users` has `token` (int).
+ *
+ * `ComputeColumnJsType` is given an explicit namespace coordinate and must:
+ *  - resolve each column to its OWN namespace's field type;
+ *  - return the REFINED output (`FixtureVector<3>`) for the parameterized
+ *    column, not the bare codec output (`readonly number[]`) — i.e. read the
+ *    emitter's namespace-nested `FieldOutputTypes[ns][model][field]` map;
+ *  - resolve to `never` for a column that exists only in the other namespace.
+ *
+ * A flat cross-namespace resolver would collapse `users` to the per-namespace
+ * column intersection and reach neither unique column, and a codec-base
+ * resolver would degrade the parameterized column to `readonly number[]`.
  */
+
+// Stands in for an emitter-applied codec refinement (e.g. pgvector's
+// `Vector<N>`); deliberately DISTINCT from the bare codec output
+// `readonly number[]` so the assertions prove the refined map is read.
+type FixtureVector<N extends number> = {
+  readonly __dimension: N;
+  readonly values: readonly number[];
+};
 
 type Col<Codec extends string> = {
   readonly nativeType: string;
@@ -22,12 +37,14 @@ type Col<Codec extends string> = {
 type FixtureCodecTypes = {
   readonly 'core/int4': { readonly output: number };
   readonly 'core/text': { readonly output: string };
+  readonly 'core/vector': { readonly output: readonly number[] };
 };
 
 type PublicUsersTable = {
   readonly columns: {
     readonly id: Col<'core/int4'>;
     readonly email: Col<'core/text'>;
+    readonly embedding: Col<'core/vector'>;
   };
   readonly uniques: readonly [];
   readonly indexes: readonly [];
@@ -53,6 +70,7 @@ type PublicUserModel = {
   readonly fields: {
     readonly id: ScalarField<'core/int4'>;
     readonly email: ScalarField<'core/text'>;
+    readonly embedding: ScalarField<'core/vector'>;
   };
   readonly relations: Record<string, never>;
   readonly storage: {
@@ -60,6 +78,7 @@ type PublicUserModel = {
     readonly fields: {
       readonly id: { readonly column: 'id' };
       readonly email: { readonly column: 'email' };
+      readonly embedding: { readonly column: 'embedding' };
     };
   };
 };
@@ -79,7 +98,49 @@ type AuthUserModel = {
   };
 };
 
-interface TwoNamespaceContract extends Omit<Contract<SqlStorage>, 'storage' | 'domain'> {
+// Namespace-nested output/input maps, as the emitter now emits them. The
+// `public.User.embedding` entry carries the refined `FixtureVector<3>` — the
+// codec output for `core/vector` is the unrefined `readonly number[]`.
+type FixtureFieldOutputTypes = {
+  readonly public: {
+    readonly User: {
+      readonly id: number;
+      readonly email: string;
+      readonly embedding: FixtureVector<3>;
+    };
+  };
+  readonly auth: {
+    readonly User: {
+      readonly id: number;
+      readonly token: number;
+    };
+  };
+};
+
+type FixtureFieldInputTypes = {
+  readonly public: {
+    readonly User: {
+      readonly id: number;
+      readonly email: string;
+      readonly embedding: readonly number[];
+    };
+  };
+  readonly auth: {
+    readonly User: {
+      readonly id: number;
+      readonly token: number;
+    };
+  };
+};
+
+type FixtureTypeMaps = TypeMaps<
+  FixtureCodecTypes,
+  Record<string, never>,
+  FixtureFieldOutputTypes,
+  FixtureFieldInputTypes
+>;
+
+type TwoNamespaceContract = Omit<Contract<SqlStorage>, 'storage' | 'domain'> & {
   readonly storage: {
     readonly storageHash: StorageHashBase<'sha256:two-namespace-resolver-fixture'>;
     readonly namespaces: {
@@ -107,12 +168,20 @@ interface TwoNamespaceContract extends Omit<Contract<SqlStorage>, 'storage' | 'd
       readonly auth: { readonly models: { readonly User: AuthUserModel } };
     };
   };
-}
+} & {
+  readonly [K in TypeMapsPhantomKey]?: FixtureTypeMaps;
+};
 
 test('public coordinate resolves its own unique column `email`', () => {
   expectTypeOf<
     ComputeColumnJsType<TwoNamespaceContract, 'public', 'users', 'email', FixtureCodecTypes>
   >().toEqualTypeOf<string>();
+});
+
+test('public coordinate keeps the parameterized `embedding` refined per namespace', () => {
+  expectTypeOf<
+    ComputeColumnJsType<TwoNamespaceContract, 'public', 'users', 'embedding', FixtureCodecTypes>
+  >().toEqualTypeOf<FixtureVector<3>>();
 });
 
 test('auth coordinate resolves its own unique column `token`', () => {
