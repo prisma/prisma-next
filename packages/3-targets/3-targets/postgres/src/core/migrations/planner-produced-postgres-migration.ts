@@ -24,7 +24,7 @@
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   MigrationPlanWithAuthoringSurface,
   OpFactoryCall,
@@ -42,7 +42,7 @@ export class TypeScriptRenderablePostgresMigration
   readonly #calls: readonly OpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #spaceId: string;
-  readonly #lowerer: ExecutableStatementLowerer | undefined;
+  readonly #lowerer: ExecuteRequestLowerer | undefined;
   #operationsCache:
     | readonly (
         | SqlMigrationPlanOperation<PostgresPlanTargetDetails>
@@ -54,7 +54,7 @@ export class TypeScriptRenderablePostgresMigration
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
-    lowerer?: ExecutableStatementLowerer,
+    lowerer?: ExecuteRequestLowerer,
   ) {
     super();
     this.#calls = calls;

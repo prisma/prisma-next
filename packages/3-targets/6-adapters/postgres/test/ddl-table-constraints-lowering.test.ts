@@ -37,7 +37,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toBe(
       'CREATE TABLE "public"."post_tags" (\n' +
@@ -60,7 +60,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain('CONSTRAINT "pk_items" PRIMARY KEY ("a", "b")');
   });
@@ -82,7 +82,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(
       'CONSTRAINT "fk_orders_user" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE',
@@ -105,7 +105,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain('CONSTRAINT "MyPK" PRIMARY KEY ("id")');
     expect(lowered.sql).toContain('REFERENCES "app"."users" ("id")');
@@ -118,7 +118,7 @@ describe('PostgresCreateTable with table-level constraints', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toBe('CREATE TABLE "simple" (\n  "id" text NOT NULL PRIMARY KEY\n)');
   });

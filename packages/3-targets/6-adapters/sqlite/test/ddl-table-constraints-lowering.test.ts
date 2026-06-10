@@ -35,7 +35,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
     });
 
     const adapter = new SqliteControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, {
+    const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
 
@@ -60,7 +60,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
     });
 
     const adapter = new SqliteControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, {
+    const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
 
@@ -84,7 +84,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
     });
 
     const adapter = new SqliteControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, {
+    const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
 
@@ -100,7 +100,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
     });
 
     const adapter = new SqliteControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, {
+    const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
 
@@ -125,7 +125,7 @@ describe('SqliteCreateTable with table-level constraints', () => {
     });
 
     const adapter = new SqliteControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, {
+    const lowered = await adapter.lowerToExecuteRequest(ast, {
       contract: {} as SqliteContract,
     });
 

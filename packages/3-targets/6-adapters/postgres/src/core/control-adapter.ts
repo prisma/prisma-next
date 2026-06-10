@@ -26,12 +26,12 @@ import type {
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
-  ExecutableStatement,
   FunctionColumnDefault,
   LiteralColumnDefault,
   LoweredStatement,
   LowererContext,
   MarkerReadResult,
+  SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -168,7 +168,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   lower(ast: AnyQueryAst | PostgresDdlNode, context: LowererContext<unknown>): LoweredStatement {
     if (isDdlNode(ast)) {
       throw new Error(
-        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecutableStatement().',
+        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
       );
     }
     return renderLoweredSql(ast, context.contract as PostgresContract, this.codecLookup);
@@ -181,12 +181,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * placeholders; wire values go in `params`. Does NOT call `this.lower()` —
    * independent implementation.
    */
-  async lowerToExecutableStatement(
+  async lowerToExecuteRequest(
     ast: AnyQueryAst | PostgresDdlNode,
     context?: LowererContext<unknown>,
-  ): Promise<ExecutableStatement> {
+  ): Promise<SqlExecuteRequest> {
     if (isDdlNode(ast)) {
-      return pgRenderDdlExecutableStatement(
+      return pgRenderDdlExecuteRequest(
         blindCast<PostgresDdlNode, 'isDdlNode guard'>(ast),
         this.codecLookup,
       );
@@ -1405,7 +1405,7 @@ function extractQuotedLiterals(listBody: string): readonly string[] | undefined 
   const values = [...listBody.matchAll(pattern)].map((m) => (m[1] ?? '').replace(/''/g, "'"));
   return values.length > 0 ? values : undefined;
 // ---------------------------------------------------------------------------
-// pgRenderDdlExecutableStatement — independent DDL walker for lowerToExecutableStatement
+// pgRenderDdlExecuteRequest — independent DDL walker for lowerToExecuteRequest
 // ---------------------------------------------------------------------------
 
 function pgIsTextLikeNativeType(nativeType: string): boolean {
@@ -1428,7 +1428,7 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
   if (typeof wire === 'number') {
     if (!Number.isFinite(wire)) {
       throw new Error(
-        `pgRenderDdlExecutableStatement: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+        `pgRenderDdlExecuteRequest: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
       );
     }
     return String(wire);
@@ -1437,7 +1437,7 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
   if (wire instanceof Date) {
     if (Number.isNaN(wire.getTime())) {
       throw new Error(
-        `pgRenderDdlExecutableStatement: invalid Date value cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+        `pgRenderDdlExecuteRequest: invalid Date value cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
       );
     }
     const quoted = `'${escapeLiteral(wire.toISOString())}'`;
@@ -1458,7 +1458,7 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
     return `${quoted}::${nativeType}`;
   }
   throw new Error(
-    `pgRenderDdlExecutableStatement: unexpected wire type "${typeof wire}" for native type "${nativeType}"`,
+    `pgRenderDdlExecuteRequest: unexpected wire type "${typeof wire}" for native type "${nativeType}"`,
   );
 }
 
@@ -1533,7 +1533,7 @@ function pgRenderDdlConstraint(constraint: DdlTableConstraint): string {
 async function pgRenderCreateTable(
   node: PostgresCreateTable,
   codecLookup: CodecLookup,
-): Promise<ExecutableStatement> {
+): Promise<SqlExecuteRequest> {
   const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
   const tableRef = node.schema
     ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`
@@ -1550,7 +1550,7 @@ async function pgRenderCreateTable(
   };
 }
 
-function pgRenderCreateSchema(node: PostgresCreateSchema): ExecutableStatement {
+function pgRenderCreateSchema(node: PostgresCreateSchema): SqlExecuteRequest {
   const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
   return {
     sql: `CREATE SCHEMA ${ifNotExists}${quoteIdentifier(node.schema)}`,
@@ -1558,10 +1558,10 @@ function pgRenderCreateSchema(node: PostgresCreateSchema): ExecutableStatement {
   };
 }
 
-async function pgRenderDdlExecutableStatement(
+async function pgRenderDdlExecuteRequest(
   ast: PostgresDdlNode,
   codecLookup: CodecLookup,
-): Promise<ExecutableStatement> {
+): Promise<SqlExecuteRequest> {
   if (ast.kind === 'create-table') {
     return pgRenderCreateTable(blindCast<PostgresCreateTable, 'kind guard'>(ast), codecLookup);
   }

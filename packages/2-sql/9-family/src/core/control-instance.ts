@@ -35,8 +35,8 @@ import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-cont
 import type {
   AnyQueryAst,
   DdlNode,
-  ExecutableStatement,
   LowererContext,
+  SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
@@ -243,7 +243,7 @@ export interface SqlControlFamilyInstance
   lowerAst(
     ast: AnyQueryAst | DdlNode,
     context: LowererContext<unknown>,
-  ): Promise<ExecutableStatement>;
+  ): Promise<SqlExecuteRequest>;
 
   /**
    * Inserts the initial marker row for `space` (upsert on `space`).
@@ -710,7 +710,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const controlAdapter = getControlAdapter();
       const lowererContext = { contract };
       for (const query of controlAdapter.bootstrapSignMarkerQueries()) {
-        const lowered = await controlAdapter.lowerToExecutableStatement(query, lowererContext);
+        const lowered = await controlAdapter.lowerToExecuteRequest(query, lowererContext);
         await driver.query(lowered.sql, lowered.params);
       }
 
@@ -863,8 +863,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     lowerAst(
       ast: AnyQueryAst | DdlNode,
       context: LowererContext<unknown>,
-    ): Promise<ExecutableStatement> {
-      return getControlAdapter().lowerToExecutableStatement(ast, context);
+    ): Promise<SqlExecuteRequest> {
+      return getControlAdapter().lowerToExecuteRequest(ast, context);
     },
 
     bootstrapControlTableQueries(): readonly DdlNode[] {

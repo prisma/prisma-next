@@ -15,9 +15,9 @@ import type {
 import type {
   AnyQueryAst,
   DdlNode,
-  ExecutableStatement,
   LoweredStatement,
   LowererContext,
+  SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
@@ -39,11 +39,11 @@ export interface Lowerer {
  * `CreateSchemaCall.toOp` accept it to produce executable DDL statements
  * with literal defaults encoded through their codec.
  */
-export interface ExecutableStatementLowerer extends Lowerer {
-  lowerToExecutableStatement(
+export interface ExecuteRequestLowerer extends Lowerer {
+  lowerToExecuteRequest(
     ast: AnyQueryAst | DdlNode,
     context?: LowererContext<unknown>,
-  ): Promise<ExecutableStatement>;
+  ): Promise<SqlExecuteRequest>;
 }
 
 /**
@@ -54,7 +54,7 @@ export interface ExecutableStatementLowerer extends Lowerer {
  */
 export interface SqlControlAdapter<TTarget extends string = string>
   extends ControlAdapterInstance<'sql', TTarget>,
-    ExecutableStatementLowerer {
+    ExecuteRequestLowerer {
   /**
    * Reads the contract marker for `space` from the database, returning
    * `null` if no marker row exists for that space (or if the marker

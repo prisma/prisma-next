@@ -1,3 +1,11 @@
+/**
+ * A fully lowered SQL statement ready for a driver to execute: SQL text plus
+ * driver-ready (codec-encoded) parameter values. The output of the control
+ * adapter's `lowerToExecuteRequest`, handed to a driver via `SqlQueryable.query`
+ * or `execute`. Inline-substituted positions (e.g. DDL `DEFAULT`
+ * clauses) carry no param; `params` holds the wire values for the `$N`/`?`
+ * positions, in order.
+ */
 export interface SqlExecuteRequest {
   readonly sql: string;
   readonly params?: readonly unknown[];

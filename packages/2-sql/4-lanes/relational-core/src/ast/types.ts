@@ -1986,20 +1986,3 @@ export interface LoweredStatement {
   readonly params: readonly LoweredParam[];
   readonly annotations?: Record<string, unknown>;
 }
-
-/**
- * Fully lowered SQL payload ready for direct driver execution.
- *
- * Produced by `SqlControlAdapter.lowerToExecutableStatement`. All literal
- * values that required inline substitution (e.g. DDL `DEFAULT` clauses where
- * the dialect grammar forbids parameters) have been encoded by their column's
- * codec and substituted back into `sql`; `params` holds only the
- * codec-encoded wire values for parameterizable positions, in placeholder
- * order.
- */
-export interface ExecutableStatement {
-  /** Fully lowered SQL — all inline literals materialized. */
-  readonly sql: string;
-  /** Codec-encoded wire values for parameterizable `$N` positions; driver-ready. */
-  readonly params: readonly unknown[];
-}

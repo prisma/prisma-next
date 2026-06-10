@@ -1,6 +1,6 @@
 import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import type { ExecutableStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -13,9 +13,9 @@ const postgresControlLowererContext = { contract: {} as PostgresContract };
 
 export async function executeLoweredStatement(
   client: Client,
-  statement: ExecutableStatement,
+  statement: SqlExecuteRequest,
 ): Promise<void> {
-  if (statement.params.length > 0) {
+  if (statement.params && statement.params.length > 0) {
     await client.query(statement.sql, [...statement.params]);
     return;
   }
@@ -26,7 +26,7 @@ export async function bootstrapPostgresSignMarkerTables(client: Client): Promise
   for (const query of buildSignMarkerBootstrapQueries()) {
     await executeLoweredStatement(
       client,
-      await postgresControlAdapter.lowerToExecutableStatement(
+      await postgresControlAdapter.lowerToExecuteRequest(
         query as PostgresDdlNode,
         postgresControlLowererContext,
       ),
@@ -41,7 +41,7 @@ export async function bootstrapPostgresControlSchema(client: Client): Promise<vo
   }
   await executeLoweredStatement(
     client,
-    await postgresControlAdapter.lowerToExecutableStatement(
+    await postgresControlAdapter.lowerToExecuteRequest(
       schemaQuery as PostgresDdlNode,
       postgresControlLowererContext,
     ),
@@ -52,7 +52,7 @@ export async function bootstrapPostgresControlTables(client: Client): Promise<vo
   for (const query of buildControlTableBootstrapQueries()) {
     await executeLoweredStatement(
       client,
-      await postgresControlAdapter.lowerToExecutableStatement(
+      await postgresControlAdapter.lowerToExecuteRequest(
         query as PostgresDdlNode,
         postgresControlLowererContext,
       ),

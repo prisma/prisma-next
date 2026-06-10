@@ -1,5 +1,5 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   MigrationPlanOperation,
   OpFactoryCall,
@@ -21,12 +21,12 @@ function assertSqliteOp(op: MigrationPlanOperation, callFactoryName: string): as
 
 export function renderOps(
   calls: readonly OpFactoryCall[],
-  lowerer?: ExecutableStatementLowerer,
+  lowerer?: ExecuteRequestLowerer,
 ): (Op | Promise<Op>)[] {
   return calls.map((c) => {
     const opOrPromise = blindCast<
-      { toOp(lowerer?: ExecutableStatementLowerer): Op | Promise<Op> },
-      'SQLite OpFactoryCall.toOp accepts an optional ExecutableStatementLowerer; the framework interface omits it because not all targets need a lowerer — the SQLite target overrides with this extended signature'
+      { toOp(lowerer?: ExecuteRequestLowerer): Op | Promise<Op> },
+      'SQLite OpFactoryCall.toOp accepts an optional ExecuteRequestLowerer; the framework interface omits it because not all targets need a lowerer — the SQLite target overrides with this extended signature'
     >(c).toOp(lowerer);
     if (isThenable(opOrPromise)) {
       return opOrPromise.then((op) => {

@@ -1,4 +1,4 @@
-import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import { describe, expect, it } from 'vitest';
 import {
@@ -16,10 +16,10 @@ import type {
   SqliteTableSpec,
 } from '../../src/core/migrations/operations/shared';
 
-function stubLowerer(sql: string): ExecutableStatementLowerer {
+function stubLowerer(sql: string): ExecuteRequestLowerer {
   return {
     lower: () => Object.freeze({ sql, params: Object.freeze([]) }),
-    lowerToExecutableStatement: async () => Object.freeze({ sql, params: Object.freeze([]) }),
+    lowerToExecuteRequest: async () => Object.freeze({ sql, params: Object.freeze([]) }),
   };
 }
 
@@ -71,7 +71,7 @@ describe('CreateTableCall', () => {
 
   it('passes columns and constraints to the lowerer', async () => {
     const received: unknown[] = [];
-    const capturingLowerer: ExecutableStatementLowerer = {
+    const capturingLowerer: ExecuteRequestLowerer = {
       lower: (ast) => {
         received.push(ast);
         return Object.freeze({
@@ -79,7 +79,7 @@ describe('CreateTableCall', () => {
           params: Object.freeze([]),
         });
       },
-      lowerToExecutableStatement: async (ast) => {
+      lowerToExecuteRequest: async (ast) => {
         received.push(ast);
         return Object.freeze({
           sql: 'CREATE TABLE "user" (\n  "id" INTEGER PRIMARY KEY AUTOINCREMENT\n)',

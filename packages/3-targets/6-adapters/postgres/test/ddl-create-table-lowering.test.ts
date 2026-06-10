@@ -17,7 +17,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toBe(
       'CREATE TABLE IF NOT EXISTS "prisma_contract"."marker" (\n  "space" text NOT NULL PRIMARY KEY,\n  "core_hash" text NOT NULL\n)',
@@ -40,7 +40,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"a" text DEFAULT 'x'`);
     expect(lowered.sql).toContain('"b" int DEFAULT 7');
@@ -59,7 +59,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"name" text DEFAULT 'O''Reilly'`);
   });
@@ -71,7 +71,7 @@ describe('PostgresCreateTable DDL lowering', () => {
     });
 
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
 
     expect(lowered.sql).toContain(`"meta" jsonb DEFAULT '{"a":"x''y"}'::jsonb`);
   });
@@ -92,7 +92,7 @@ describe('PostgresCreateTable DDL lowering', () => {
       ],
     });
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain(`"id" uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid`);
     expect(lowered.sql).toContain(
       `"window" tstzrange DEFAULT '[2024-01-01,2024-12-31)'::tstzrange`,
@@ -117,7 +117,7 @@ describe('PostgresCreateTable DDL lowering', () => {
       ],
     });
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain(`"a_text" text DEFAULT 'hello'`);
     expect(lowered.sql).toContain(`"a_varchar" varchar(50) DEFAULT 'hello'`);
     expect(lowered.sql).toContain(`"a_character_varying" character varying(255) DEFAULT 'hello'`);
@@ -142,7 +142,7 @@ describe('PostgresCreateTable DDL lowering', () => {
       ],
     });
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain('"a_int" int DEFAULT 42');
     expect(lowered.sql).toContain('"a_float" float8 DEFAULT 3.14');
     expect(lowered.sql).toContain('"a_bool" boolean DEFAULT true');
@@ -159,7 +159,7 @@ describe('PostgresCreateTable DDL lowering', () => {
       ],
     });
     const adapter = new PostgresControlAdapter();
-    const lowered = await adapter.lowerToExecutableStatement(ast, { contract: {} as PostgresContract });
+    const lowered = await adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract });
     expect(lowered.sql).toContain('"id" uuid DEFAULT (gen_random_uuid())');
     expect(lowered.sql).toContain(`"meta" jsonb DEFAULT (jsonb_build_object('k', 1))`);
     expect(lowered.sql).not.toContain('::');

@@ -1,5 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -13,9 +13,9 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
 
-const stubLowerer: ExecutableStatementLowerer = {
+const stubLowerer: ExecuteRequestLowerer = {
   lower: () => ({ sql: '', params: [] }),
-  lowerToExecutableStatement: async () => ({ sql: '', params: [] }),
+  lowerToExecuteRequest: async () => ({ sql: '', params: [] }),
 };
 
 function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {

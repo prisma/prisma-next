@@ -13,12 +13,12 @@ import type {
   DdlColumn,
   DdlNode,
   DdlTableConstraint,
-  ExecutableStatement,
   FunctionColumnDefault,
   LiteralColumnDefault,
   LoweredStatement,
   LowererContext,
   MarkerReadResult,
+  SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -157,7 +157,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   lower(ast: AnyQueryAst | SqliteDdlNode, context: LowererContext<unknown>): LoweredStatement {
     if (isDdlNode(ast)) {
       throw new Error(
-        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecutableStatement().',
+        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
       );
     }
     return renderLoweredSql(ast, context.contract as SqliteContract);
@@ -170,12 +170,12 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    * query ASTs, params are kept as `?` placeholders; wire values go in
    * `params`. Does NOT call `this.lower()` — independent implementation.
    */
-  async lowerToExecutableStatement(
+  async lowerToExecuteRequest(
     ast: AnyQueryAst | SqliteDdlNode,
     context?: LowererContext<unknown>,
-  ): Promise<ExecutableStatement> {
+  ): Promise<SqlExecuteRequest> {
     if (isDdlNode(ast)) {
-      return sqliteRenderDdlExecutableStatement(
+      return sqliteRenderDdlExecuteRequest(
         blindCast<SqliteDdlNode, 'isDdlNode guard'>(ast),
         this.codecLookup,
       );
@@ -640,7 +640,7 @@ function mapSqliteReferentialAction(rule: string): SqlReferentialAction | undefi
 }
 
 // ---------------------------------------------------------------------------
-// sqliteRenderDdlExecutableStatement — independent DDL walker for lowerToExecutableStatement
+// sqliteRenderDdlExecuteRequest — independent DDL walker for lowerToExecuteRequest
 // ---------------------------------------------------------------------------
 
 function sqliteInlineLiteral(wire: unknown): string {
@@ -649,7 +649,7 @@ function sqliteInlineLiteral(wire: unknown): string {
   if (typeof wire === 'number') {
     if (!Number.isFinite(wire)) {
       throw new Error(
-        `sqliteRenderDdlExecutableStatement: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal`,
+        `sqliteRenderDdlExecuteRequest: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal`,
       );
     }
     return String(wire);
@@ -658,7 +658,7 @@ function sqliteInlineLiteral(wire: unknown): string {
   if (wire instanceof Date) {
     if (Number.isNaN(wire.getTime())) {
       throw new Error(
-        'sqliteRenderDdlExecutableStatement: invalid Date value cannot be emitted as a DEFAULT literal',
+        'sqliteRenderDdlExecuteRequest: invalid Date value cannot be emitted as a DEFAULT literal',
       );
     }
     return `'${escapeLiteral(wire.toISOString())}'`;
@@ -671,7 +671,7 @@ function sqliteInlineLiteral(wire: unknown): string {
     return `X'${hex}'`;
   }
   if (typeof wire === 'object') return `'${escapeLiteral(JSON.stringify(wire))}'`;
-  throw new Error(`sqliteRenderDdlExecutableStatement: unexpected wire type "${typeof wire}"`);
+  throw new Error(`sqliteRenderDdlExecuteRequest: unexpected wire type "${typeof wire}"`);
 }
 
 async function sqliteRenderDdlColumnDefault(
@@ -743,10 +743,10 @@ function sqliteRenderDdlConstraint(constraint: DdlTableConstraint): string {
   return `UNIQUE (${cols})`;
 }
 
-async function sqliteRenderDdlExecutableStatement(
+async function sqliteRenderDdlExecuteRequest(
   ast: SqliteDdlNode,
   codecLookup: CodecLookup,
-): Promise<ExecutableStatement> {
+): Promise<SqlExecuteRequest> {
   const node = blindCast<SqliteCreateTable, 'SQLite DDL only has create-table'>(ast);
   const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
   const tableRef = quoteIdentifier(node.table);

@@ -1,5 +1,5 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { ExecutableStatementLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
   MigrationPlanWithAuthoringSurface,
   OpFactoryCall,
@@ -25,7 +25,7 @@ export class TypeScriptRenderableSqliteMigration
   readonly #meta: MigrationMeta;
   readonly #destination: SqliteMigrationDestinationInfo;
   readonly #spaceId: string;
-  readonly #lowerer: ExecutableStatementLowerer | undefined;
+  readonly #lowerer: ExecuteRequestLowerer | undefined;
   #operationsCache: readonly (Op | Promise<Op>)[] | undefined;
 
   constructor(
@@ -33,7 +33,7 @@ export class TypeScriptRenderableSqliteMigration
     meta: MigrationMeta,
     spaceId: string,
     destination?: SqliteMigrationDestinationInfo,
-    lowerer?: ExecutableStatementLowerer,
+    lowerer?: ExecuteRequestLowerer,
   ) {
     super();
     this.#calls = calls;

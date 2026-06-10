@@ -14,9 +14,8 @@ describe('Postgres marker table DDL lowering', () => {
     if (!markerTable) {
       throw new Error('expected marker table bootstrap query');
     }
-    return (
-      await adapter.lowerToExecutableStatement(markerTable as PostgresDdlNode, lowererContext)
-    ).sql;
+    return (await adapter.lowerToExecuteRequest(markerTable as PostgresDdlNode, lowererContext))
+      .sql;
   }
 
   test('declares the invariants column as text[] not null default empty array', async () => {

@@ -16,7 +16,7 @@ import {
   buildSynthMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ExecutableStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-postgres/contract-free';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
@@ -172,7 +172,7 @@ export async function bootstrapPostgresControlSchema(driver: PostgresControlDriv
   const postgresSchemaQuery = schemaQuery as unknown as PostgresDdlNode;
   await executeStatement(
     driver,
-    await postgresControlAdapter.lowerToExecutableStatement(
+    await postgresControlAdapter.lowerToExecuteRequest(
       postgresSchemaQuery,
       postgresControlLowererContext,
     ),
@@ -184,7 +184,7 @@ export async function bootstrapPostgresControlTables(driver: PostgresControlDriv
     const postgresQuery = query as unknown as PostgresDdlNode;
     await executeStatement(
       driver,
-      await postgresControlAdapter.lowerToExecutableStatement(
+      await postgresControlAdapter.lowerToExecuteRequest(
         postgresQuery,
         postgresControlLowererContext,
       ),
@@ -194,9 +194,9 @@ export async function bootstrapPostgresControlTables(driver: PostgresControlDriv
 
 export async function executeStatement(
   driver: PostgresControlDriver,
-  statement: ExecutableStatement,
+  statement: SqlExecuteRequest,
 ): Promise<void> {
-  if (statement.params.length > 0) {
+  if (statement.params && statement.params.length > 0) {
     await driver.query(statement.sql, statement.params);
     return;
   }

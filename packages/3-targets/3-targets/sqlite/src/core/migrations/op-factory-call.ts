@@ -14,7 +14,7 @@ import type {
   MigrationOperationClass,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
-import type { ExecutableStatementLowerer, Lowerer } from '@prisma-next/family-sql/control-adapter';
+import type { ExecuteRequestLowerer, Lowerer } from '@prisma-next/family-sql/control-adapter';
 import type { OpFactoryCall as FrameworkOpFactoryCall } from '@prisma-next/framework-components/control';
 import type {
   AnyDdlColumnDefault,
@@ -139,7 +139,7 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
     this.freeze();
   }
 
-  async toOp(lowerer?: ExecutableStatementLowerer): Promise<Op> {
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
       throw new Error(
         `CreateTableCall.toOp: a DDL lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
@@ -150,7 +150,7 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
       columns: this.columns,
       ...ifDefined('constraints', this.constraints),
     });
-    const statement = await lowerer.lowerToExecutableStatement(ddlNode);
+    const statement = await lowerer.lowerToExecuteRequest(ddlNode);
     const tableName = this.tableName;
     const escapedName = escapeLiteral(tableName);
     return {
@@ -169,7 +169,7 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
         {
           description: `create table "${tableName}"`,
           sql: statement.sql,
-          params: statement.params,
+          params: statement.params ?? [],
         },
       ],
       postcheck: [

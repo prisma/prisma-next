@@ -25,13 +25,13 @@ const transformingLookup: CodecLookup = {
   get: (id) => (id === 'test/transform@1' ? transformingCodec : undefined),
 };
 
-describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaults', () => {
+describe('SqliteControlAdapter.lowerToExecuteRequest — DDL literal defaults', () => {
   it('inlines a string default with single-quoting (no cast suffix)', async () => {
     const ast = new SqliteCreateTable({
       table: 't',
       columns: [col('name', 'TEXT', { default: lit('hello') })],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain(`"name" TEXT DEFAULT 'hello'`);
     expect(result.sql).not.toContain('::');
     expect(result.params).toEqual([]);
@@ -43,7 +43,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
       table: 'events',
       columns: [col('created_at', 'TEXT', { default: lit(date) })],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain(`"created_at" TEXT DEFAULT '2025-06-01T00:00:00.000Z'`);
     expect(result.sql).not.toContain('::');
     expect(result.params).toEqual([]);
@@ -54,7 +54,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
       table: 'counters',
       columns: [col('n', 'INTEGER', { default: lit(9007199254740991) })],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain('"n" INTEGER DEFAULT 9007199254740991');
     expect(result.params).toEqual([]);
   });
@@ -67,7 +67,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
         col('disabled', 'INTEGER', { default: lit(false) }),
       ],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain('"active" INTEGER DEFAULT 1');
     expect(result.sql).toContain('"disabled" INTEGER DEFAULT 0');
     expect(result.params).toEqual([]);
@@ -78,7 +78,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
       table: 't',
       columns: [col('meta', 'TEXT', { default: lit({ key: 'val' }) })],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain(`"meta" TEXT DEFAULT '{"key":"val"}'`);
     expect(result.sql).not.toContain('::');
     expect(result.params).toEqual([]);
@@ -89,7 +89,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
       table: 't',
       columns: [col('opt', 'TEXT', { default: lit(null) })],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain('"opt" TEXT DEFAULT NULL');
     expect(result.params).toEqual([]);
   });
@@ -102,7 +102,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
         col('id', 'INTEGER', { default: fn('autoincrement()') }),
       ],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain(`"ts" TEXT DEFAULT (datetime('now'))`);
     expect(result.sql).toContain('"id" INTEGER');
     expect(result.sql).not.toContain('autoincrement');
@@ -113,7 +113,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
       table: 't',
       columns: [col('created_at', 'TEXT', { default: fn('now()') })],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     // SQLite has no now(); the contract canonicalizes CURRENT_TIMESTAMP to
     // now(), which must map back to a valid SQLite expression at apply time.
     expect(result.sql).toContain(`"created_at" TEXT DEFAULT (datetime('now'))`);
@@ -126,20 +126,20 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — DDL literal defaul
       table: 't',
       columns: [col('name', 'TEXT', { default: lit("O'Brien") })],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain(`"name" TEXT DEFAULT 'O''Brien'`);
     expect(result.params).toEqual([]);
   });
 });
 
-describe('SqliteControlAdapter.lowerToExecutableStatement — guards', () => {
+describe('SqliteControlAdapter.lowerToExecuteRequest — guards', () => {
   it('throws when a numeric literal default is non-finite (NaN / ±Infinity)', async () => {
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       const ast = new SqliteCreateTable({
         table: 'defaults',
         columns: [col('x', 'INTEGER', { default: lit(value) })],
       });
-      await expect(adapter.lowerToExecutableStatement(ast, ctx)).rejects.toThrow(
+      await expect(adapter.lowerToExecuteRequest(ast, ctx)).rejects.toThrow(
         /non-finite number wire value/,
       );
     }
@@ -150,11 +150,11 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — guards', () => {
       table: 'defaults',
       columns: [col('x', 'TEXT', { default: lit(new Date('not-a-date')) })],
     });
-    await expect(adapter.lowerToExecutableStatement(ast, ctx)).rejects.toThrow(/invalid Date/);
+    await expect(adapter.lowerToExecuteRequest(ast, ctx)).rejects.toThrow(/invalid Date/);
   });
 });
 
-describe('SqliteControlAdapter.lowerToExecutableStatement — codec routing + DDL shape', () => {
+describe('SqliteControlAdapter.lowerToExecuteRequest — codec routing + DDL shape', () => {
   it('routes a codec-bearing literal default through codec.encode (not raw type-branching)', async () => {
     const codecAdapter = new SqliteControlAdapter(transformingLookup);
     const ast = new SqliteCreateTable({
@@ -166,7 +166,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — codec routing + DD
         }),
       ],
     });
-    const result = await codecAdapter.lowerToExecutableStatement(ast, ctx);
+    const result = await codecAdapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toContain(`DEFAULT 'ENC:PLAINTEXT'`);
     expect(result.sql).not.toContain('plaintext');
   });
@@ -177,7 +177,7 @@ describe('SqliteControlAdapter.lowerToExecutableStatement — codec routing + DD
       ifNotExists: true,
       columns: [col('space', 'TEXT', { notNull: true, primaryKey: true })],
     });
-    const result = await adapter.lowerToExecutableStatement(ast, ctx);
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
     expect(result.sql).toBe(
       'CREATE TABLE IF NOT EXISTS "_prisma_marker" (\n  "space" TEXT NOT NULL PRIMARY KEY\n)',
     );

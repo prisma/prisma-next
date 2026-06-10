@@ -20,7 +20,7 @@ import {
   buildSynthMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ExecutableStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-sqlite/contract-free';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
@@ -198,19 +198,16 @@ export async function bootstrapSqliteControlTables(driver: SqliteControlDriver):
     const sqliteQuery = query as unknown as SqliteDdlNode;
     await executeStatement(
       driver,
-      await sqliteControlAdapter.lowerToExecutableStatement(
-        sqliteQuery,
-        sqliteControlLowererContext,
-      ),
+      await sqliteControlAdapter.lowerToExecuteRequest(sqliteQuery, sqliteControlLowererContext),
     );
   }
 }
 
 export async function executeStatement(
   driver: SqliteControlDriver,
-  statement: ExecutableStatement,
+  statement: SqlExecuteRequest,
 ): Promise<void> {
-  if (statement.params.length > 0) {
+  if (statement.params && statement.params.length > 0) {
     await driver.query(statement.sql, statement.params);
     return;
   }

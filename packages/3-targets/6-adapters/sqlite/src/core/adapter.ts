@@ -87,7 +87,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   ): SqliteLoweredStatement {
     if (isDdlNode(ast)) {
       throw new Error(
-        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecutableStatement().',
+        'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
       );
     }
     return renderLoweredSql(ast, context.contract);

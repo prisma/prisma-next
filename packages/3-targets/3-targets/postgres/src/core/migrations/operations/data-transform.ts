@@ -62,7 +62,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ExecutableStatement } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresPlanTargetDetails } from '../planner-target-details';
@@ -114,7 +114,7 @@ export function dataTransform<TContract extends Contract<SqlStorage>>(
         {
           description: `Check ${name} has work to do`,
           sql: `SELECT EXISTS (${checkPlan.sql}) AS ok`,
-          params: checkPlan.params,
+          params: checkPlan.params ?? [],
         },
       ]
     : [];
@@ -122,7 +122,7 @@ export function dataTransform<TContract extends Contract<SqlStorage>>(
   const execute: readonly SqlMigrationPlanOperationStep[] = runPlans.map((plan) => ({
     description: `Run ${name}`,
     sql: plan.sql,
-    params: plan.params,
+    params: plan.params ?? [],
   }));
 
   const postcheck: readonly SqlMigrationPlanOperationStep[] = checkPlan
@@ -130,7 +130,7 @@ export function dataTransform<TContract extends Contract<SqlStorage>>(
         {
           description: `Verify ${name} resolved all violations`,
           sql: `SELECT NOT EXISTS (${checkPlan.sql}) AS ok`,
-          params: checkPlan.params,
+          params: checkPlan.params ?? [],
         },
       ]
     : [];
@@ -152,7 +152,7 @@ function invokeAndLower(
   contract: Contract<SqlStorage>,
   adapter: SqlControlAdapter<'postgres'>,
   name: string,
-): ExecutableStatement {
+): SqlExecuteRequest {
   const result = closure();
   const plan = isBuildable(result) ? result.build() : result;
   assertContractMatches(plan, contract, name);
