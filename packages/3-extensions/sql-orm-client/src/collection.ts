@@ -111,6 +111,7 @@ import {
   type NumericFieldNames,
   type RelatedModelName,
   type RelationNames,
+  type RelationTargetNamespace,
   type ResolvedCreateInput,
   type RuntimeQueryable,
   type ShorthandWhereFilter,
@@ -418,14 +419,11 @@ export class Collection<
    * ```
    */
   include<
-    RelName extends RelationNames<TContract, ModelName>,
-    RelatedName extends RelatedModelName<TContract, ModelName, RelName> & string = RelatedModelName<
-      TContract,
-      ModelName,
-      RelName
-    > &
-      string,
-    IsToMany extends boolean = IsToManyRelation<TContract, ModelName, RelName>,
+    RelName extends RelationNames<TContract, ModelName, State['nsId']>,
+    RelatedName extends RelatedModelName<TContract, ModelName, RelName, State['nsId']> &
+      string = RelatedModelName<TContract, ModelName, RelName, State['nsId']> & string,
+    TargetNs extends string = RelationTargetNamespace<TContract, ModelName, RelName, State['nsId']>,
+    IsToMany extends boolean = IsToManyRelation<TContract, ModelName, RelName, State['nsId']>,
     RefinedResult extends IncludeRefinementResult<
       TContract,
       RelatedName,
@@ -433,7 +431,7 @@ export class Collection<
     > = IncludeRefinementCollection<
       TContract,
       RelatedName,
-      SimplifyDeep<InferRootRow<TContract, RelatedName>>,
+      SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
       CollectionTypeState,
       IsToMany
     >,
@@ -443,7 +441,7 @@ export class Collection<
       collection: IncludeRefinementCollection<
         TContract,
         RelatedName,
-        SimplifyDeep<InferRootRow<TContract, RelatedName>>,
+        SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
         DefaultCollectionTypeState,
         IsToMany
       >,
@@ -457,8 +455,9 @@ export class Collection<
           TContract,
           ModelName,
           K,
-          SimplifyDeep<InferRootRow<TContract, RelatedName>>,
-          RefinedResult
+          SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
+          RefinedResult,
+          State['nsId']
         >;
       }
     >,
@@ -478,7 +477,7 @@ export class Collection<
     if (refineFn) {
       const nestedCollection = this.#createCollection<
         RelatedName,
-        SimplifyDeep<InferRootRow<TContract, RelatedName>>,
+        SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
         DefaultCollectionTypeState
       >(relation.relatedModelName as RelatedName, {
         tableName: relation.relatedTableName,
@@ -490,7 +489,7 @@ export class Collection<
         nestedCollection as unknown as IncludeRefinementCollection<
           TContract,
           RelatedName,
-          SimplifyDeep<InferRootRow<TContract, RelatedName>>,
+          SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
           DefaultCollectionTypeState,
           IsToMany
         >,
@@ -541,8 +540,9 @@ export class Collection<
             TContract,
             ModelName,
             K,
-            SimplifyDeep<InferRootRow<TContract, RelatedName>>,
-            RefinedResult
+            SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
+            RefinedResult,
+            State['nsId']
           >;
         }
       >,
@@ -1890,7 +1890,9 @@ export class Collection<
    * ```
    */
   async updateCount(
-    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    data: State['hasWhere'] extends true
+      ? Partial<DefaultModelRow<TContract, ModelName, State['nsId']>>
+      : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<number> {
     const mappedData = mapModelDataToStorageRow(
