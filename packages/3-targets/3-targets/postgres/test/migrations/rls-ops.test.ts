@@ -11,6 +11,49 @@ import {
 } from '../../src/core/migrations/operations/rls';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 
+describe('renderCreatePolicySql role-name validation', () => {
+  function policyWithRoles(roles: string[]): PostgresRlsPolicy {
+    return new PostgresRlsPolicy({
+      name: 'p_ab12cd34',
+      prefix: 'p',
+      tableName: 'profiles',
+      namespaceId: 'public',
+      operation: 'select',
+      roles,
+      using: '(true)',
+      permissive: true,
+    });
+  }
+
+  it('renders a plain SQL identifier role without error', () => {
+    const op = createRlsPolicy('public', 'profiles', policyWithRoles(['app_user']));
+    expect(op.execute[0]?.sql).toContain('TO app_user');
+  });
+
+  it('renders multiple valid role names', () => {
+    const op = createRlsPolicy('public', 'profiles', policyWithRoles(['app_user', 'read_only']));
+    expect(op.execute[0]?.sql).toContain('TO app_user, read_only');
+  });
+
+  it('rejects a role name containing a double-quote', () => {
+    expect(() => createRlsPolicy('public', 'profiles', policyWithRoles(['a"b']))).toThrow(
+      /invalid role name/i,
+    );
+  });
+
+  it('rejects a role name containing a space', () => {
+    expect(() => createRlsPolicy('public', 'profiles', policyWithRoles(['my role']))).toThrow(
+      /invalid role name/i,
+    );
+  });
+
+  it('rejects a role name containing a semicolon', () => {
+    expect(() =>
+      createRlsPolicy('public', 'profiles', policyWithRoles(['role;DROP TABLE'])),
+    ).toThrow(/invalid role name/i);
+  });
+});
+
 const basePolicy = new PostgresRlsPolicy({
   name: 'read_own_profiles_ab12cd34',
   prefix: 'read_own_profiles',

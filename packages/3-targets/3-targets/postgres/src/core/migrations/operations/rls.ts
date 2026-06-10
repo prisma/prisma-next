@@ -37,6 +37,17 @@ function rlsEnabledCheck(schemaName: string, tableName: string, enabled: boolean
 )`;
 }
 
+const PLAIN_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
+
+function validateRoleName(role: string): string {
+  if (!PLAIN_IDENTIFIER.test(role)) {
+    throw new Error(
+      `Invalid role name ${JSON.stringify(role)}: role names must be plain SQL identifiers matching ^[A-Za-z_][A-Za-z0-9_$]*$`,
+    );
+  }
+  return role;
+}
+
 function renderCreatePolicySql(
   schemaName: string,
   tableName: string,
@@ -44,7 +55,7 @@ function renderCreatePolicySql(
 ): string {
   const permissiveness = policy.permissive ? 'PERMISSIVE' : 'RESTRICTIVE';
   const command = OPERATION_SQL[policy.operation];
-  const roles = policy.roles.map((r) => quoteIdentifier(r).replace(/^"|"$/g, '')).join(', ');
+  const roles = policy.roles.map(validateRoleName).join(', ');
   let sql = `CREATE POLICY ${quoteIdentifier(policy.name)} ON ${qualifyTableName(schemaName, tableName)} AS ${permissiveness} FOR ${command} TO ${roles}`;
   if (policy.using !== undefined) {
     sql += ` USING (${policy.using})`;
