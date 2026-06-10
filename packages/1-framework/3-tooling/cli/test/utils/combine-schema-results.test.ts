@@ -1,4 +1,7 @@
-import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
+import type {
+  SchemaDiffIssue,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { combineSchemaResults } from '../../src/utils/combine-schema-results';
 
@@ -7,6 +10,7 @@ function makeResult(overrides: {
   ok: boolean;
   summary: string;
   fail?: number;
+  extensionIssues?: readonly SchemaDiffIssue[];
 }): VerifyDatabaseSchemaResult {
   const fail = overrides.fail ?? (overrides.ok ? 0 : 1);
   const result: VerifyDatabaseSchemaResult = {
@@ -16,6 +20,7 @@ function makeResult(overrides: {
     target: { expected: 'postgres' },
     schema: {
       issues: [],
+      extensionIssues: overrides.extensionIssues ?? [],
       root: {
         status: overrides.ok ? 'pass' : 'fail',
         kind: 'space',
@@ -185,5 +190,53 @@ describe('combineSchemaResults', () => {
       ok: false,
       code: 'PN-RUN-3010',
     });
+  });
+
+  it('concatenates extensionIssues from all members into the combined result', () => {
+    const appIssue: SchemaDiffIssue = {
+      coordinate: {
+        plane: 'storage',
+        entityKind: 'rlsPolicy',
+        namespaceId: 'public',
+        entityName: 'policy_app_abc',
+      },
+      outcome: 'missing',
+      message: "missing: rlsPolicy 'policy_app_abc' in namespace 'public'",
+    };
+    const extIssue: SchemaDiffIssue = {
+      coordinate: {
+        plane: 'storage',
+        entityKind: 'rlsPolicy',
+        namespaceId: 'public',
+        entityName: 'policy_cipher_def',
+      },
+      outcome: 'extra',
+      message: "extra: rlsPolicy 'policy_cipher_def' in namespace 'public'",
+    };
+
+    const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
+      [
+        'app',
+        makeResult({
+          spaceId: 'app',
+          ok: true,
+          summary: 'Database schema satisfies contract',
+          extensionIssues: [appIssue],
+        }),
+      ],
+      [
+        'cipher',
+        makeResult({
+          spaceId: 'cipher',
+          ok: true,
+          summary: 'Schema matches contract',
+          extensionIssues: [extIssue],
+        }),
+      ],
+    ]);
+
+    const combined = combineSchemaResults(perSpace, 'app', false);
+
+    expect(combined.schema.extensionIssues).toEqual([appIssue, extIssue]);
   });
 });

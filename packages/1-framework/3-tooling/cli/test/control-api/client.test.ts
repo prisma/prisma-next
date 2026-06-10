@@ -84,6 +84,7 @@ function createMockComponents() {
       target: { expected: 'postgres' },
       schema: {
         issues: [],
+        extensionIssues: [],
         root: {
           status: 'pass' as const,
           kind: 'root',
@@ -294,6 +295,7 @@ describe('ControlClient progress emission', () => {
         target: { expected: 'postgres' },
         schema: {
           issues: [],
+          extensionIssues: [],
           root: {
             status: 'fail' as const,
             kind: 'root',

@@ -409,6 +409,7 @@ describe('formatSchemaVerifyOutput', () => {
           message: 'Table "post" is missing from database',
         },
       ],
+      extensionIssues: [],
       root: createVerificationNode(),
       counts: {
         pass: 3,
@@ -616,6 +617,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
+        extensionIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -673,6 +675,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
+        extensionIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -720,6 +723,7 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
+        extensionIssues: [],
         root: {
           status: 'pass',
           kind: 'schema',
@@ -774,6 +778,7 @@ describe('formatSchemaVerifyJson', () => {
             message: 'Table "post" is missing',
           },
         ],
+        extensionIssues: [],
         root: {
           status: 'fail',
           kind: 'schema',
