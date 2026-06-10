@@ -38,7 +38,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       model User {
-                 ~"
+                 ~
+      "
     `);
     expect(result.document).toBeInstanceOf(DocumentAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -54,7 +55,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       oops
-      ~~~~"
+      ~~~~
+      "
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
@@ -66,7 +68,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       model {
-      ~~~~~"
+      ~~~~~
+      "
     `);
     const decls = Array.from(result.document.declarations());
     expect(decls).toHaveLength(1);
@@ -84,7 +87,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       §
-      ~"
+      ~
+      "
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
@@ -98,7 +102,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       namespace inner {
-      ~~~~~~~~~"
+      ~~~~~~~~~
+      "
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
@@ -112,7 +117,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       namespace __unspecified__ {
-      ~~~~~~~~~"
+      ~~~~~~~~~
+      "
     `);
   });
 
@@ -125,7 +131,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       type {
-      ~~~~"
+      ~~~~
+      "
     `);
   });
 
@@ -136,7 +143,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
         123
-        ~~~"
+        ~~~
+      "
     `);
     expect(greenText(result.document.syntax.green)).toBe(source);
   });
@@ -148,7 +156,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
         123
-        ~~~"
+        ~~~
+      "
     `);
   });
 
@@ -159,7 +168,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
         123
-        ~~~"
+        ~~~
+      "
     `);
   });
 
@@ -173,7 +183,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
         123
-        ~~~"
+        ~~~
+      "
     `);
   });
 
@@ -187,7 +198,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
         provider "x"
-        ~~~~~~~~"
+        ~~~~~~~~
+      "
     `);
     const decl = Array.from(result.document.declarations())[0];
     expect(decl).toBeInstanceOf(BlockDeclarationAst);
@@ -209,7 +221,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
         provider
-        ~~~~~~~~"
+        ~~~~~~~~
+      "
     `);
     const decl = Array.from(result.document.declarations())[0];
     expect(decl).toBeInstanceOf(BlockDeclarationAst);
@@ -228,7 +241,8 @@ describe('parse() syntactic diagnostics carry parsePslDocument-parity messages',
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
         UserId Int
-        ~~~~~~"
+        ~~~~~~
+      "
     `);
     const decl = Array.from(result.document.declarations())[0];
     expect(decl).toBeInstanceOf(TypesBlockAst);
@@ -249,7 +263,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       model {
-      ~~~~~"
+      ~~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -262,7 +277,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       model User
-      ~~~~~"
+      ~~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -275,7 +291,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       model
-      ~~~~~"
+      ~~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(ModelDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -288,7 +305,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       enum {
-      ~~~~"
+      ~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -301,7 +319,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       enum Color
-      ~~~~"
+      ~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -314,7 +333,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       enum
-      ~~~~"
+      ~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(EnumDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -327,7 +347,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       namespace {
-      ~~~~~~~~~"
+      ~~~~~~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(NamespaceDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -340,7 +361,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       namespace outer
-      ~~~~~~~~~"
+      ~~~~~~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(NamespaceDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -353,7 +375,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       namespace
-      ~~~~~~~~~"
+      ~~~~~~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(NamespaceDeclarationAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -366,7 +389,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       type Address
-      ~~~~"
+      ~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(
       CompositeTypeDeclarationAst,
@@ -381,7 +405,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       type
-      ~~~~"
+      ~~~~
+      "
     `);
     expect(Array.from(result.document.declarations())[0]).toBeInstanceOf(TypesBlockAst);
     expect(greenText(result.document.syntax.green)).toBe(source);
@@ -408,7 +433,8 @@ describe('parse() commits reserved declaration keywords on the keyword alone', (
     expect(highlight(result.sourceFile, diagnostic.range)).toMatchInlineSnapshot(`
       "
       datasource
-      ~~~~~~~~~~"
+      ~~~~~~~~~~
+      "
     `);
     expect(result.diagnostics.map((d) => d.code)).not.toContain('PSL_INVALID_DECLARATION');
     expect(greenText(result.document.syntax.green)).toBe(source);

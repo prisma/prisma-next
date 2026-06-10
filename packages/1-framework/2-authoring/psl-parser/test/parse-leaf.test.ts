@@ -42,7 +42,8 @@ describe('offset tracking', () => {
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       .c
-      ~"
+      ~
+      "
     `);
   });
 });
@@ -412,7 +413,8 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       a.b.c
-         ~"
+         ~
+      "
     `);
   });
 
@@ -428,7 +430,8 @@ describe('parseTypeAnnotation fault tolerance', () => {
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       a:b:c
-         ~"
+         ~
+      "
     `);
   });
 });
@@ -446,7 +449,8 @@ describe('parseAttribute fault tolerance', () => {
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       @
-      ~"
+      ~
+      "
     `);
   });
 
@@ -462,7 +466,8 @@ describe('parseAttribute fault tolerance', () => {
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       @ns.
-          ~"
+          ~
+      "
     `);
   });
 });
@@ -546,7 +551,8 @@ describe('argument-position object literal', () => {
     expect(highlight(cursor.sourceFile, diagnostics[0]!.range)).toMatchInlineSnapshot(`
       "
       { a: 1
-      ~"
+      ~
+      "
     `);
   });
 });

@@ -51,5 +51,7 @@ export function highlight(sourceFile: SourceFile, range: Range): string {
   // Lead with a newline so Vitest's inline-snapshot serializer puts the
   // opening quote on its own line, keeping the source line and `~` underline
   // at the same indentation (otherwise the quote shifts the first line right).
-  return `\n${rendered.join('\n')}`;
+  // Trail with a newline too so the closing quote sits on its own line,
+  // mirroring the opening quote (the underline line no longer ends in `~"`).
+  return `\n${rendered.join('\n')}\n`;
 }
