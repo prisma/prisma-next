@@ -86,12 +86,8 @@ export class Cursor {
   }
 
   /**
-   * The absolute span of the significant token `lookahead` positions ahead of
-   * the cursor (trivia skipped), captured eagerly so it stays valid after the
-   * cursor advances. `mark(0)` is the next significant token; `mark(1)` is the
-   * one after it. The offset accumulates the length of every intervening token,
-   * trivia included, so the span lines up with the source exactly as the
-   * matching {@link peekToken} would read it.
+   * Span of the significant token `lookahead` positions ahead (`mark(0)` = the next,
+   * `mark(1)` = the one after), captured eagerly so it stays valid after the cursor advances.
    */
   mark(lookahead = 0): DiagnosticMark {
     let rawIndex = 0;
@@ -114,10 +110,9 @@ export class Cursor {
   }
 
   /**
-   * A zero-width mark at the offset immediately after the last consumed
-   * significant token, before any trailing trivia. Used to anchor a
-   * "something was expected here" diagnostic just past what was actually
-   * parsed (e.g. the `{` missing after a declaration's name).
+   * Zero-width mark just past the last consumed significant token (before any trailing
+   * trivia) — anchors an "expected here" diagnostic at the spot, e.g. the `{` missing
+   * after a declaration's name.
    */
   markAfterLastToken(): DiagnosticMark {
     return { offset: this.#offset, length: 0 };
@@ -511,15 +506,8 @@ function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
 }
 
 /**
- * Parses a reserved block declaration whose keyword the cursor is positioned on.
- * Reads the keyword off the cursor, commits the declaration kind, then completes
- * the header. When `nameRequired`, a name is parsed greedily if the next token
- * is an identifier and a missing name yields `Expected a name after "<kw>"`
- * (keyword-anchored); when not, no name is ever parsed (the `types` block).
- * Reports the first missing piece only — a missing name suppresses the brace
- * diagnostic — and anchors the missing brace just past the last consumed token.
- * When the brace is present the body is parsed; otherwise the cursor recovers to
- * the next sync point.
+ * Reports only the first missing piece — a missing name suppresses the missing-brace
+ * diagnostic. `nameRequired` is false only for the `types` block, which never has a name.
  */
 function parseBlock(
   cursor: Cursor,
@@ -530,7 +518,7 @@ function parseBlock(
   const keyword = cursor.peekToken().text;
   const keywordMark = cursor.mark();
   cursor.startNode(kind);
-  cursor.bump(); // keyword
+  cursor.bump();
   const hasName = nameRequired && cursor.peekKind() === 'Ident';
   if (hasName) {
     parseIdentifier(cursor);
@@ -563,17 +551,12 @@ export function parseEnum(cursor: Cursor): GreenNode | undefined {
 }
 
 /**
- * Matches any unreserved leading `Ident` as a generic block declaration: `kw {`
- * (anonymous), `kw Ident {` (named), or — when no opening brace follows — a
- * malformed custom declaration. Excluding the reserved keywords (`model`/`enum`/
- * `namespace`/`type`/`types`) keeps a malformed reserved block (e.g. `model {` with no
- * name) routed to its dedicated parser. The keyword set for generic blocks is
- * open (extension-contributed), so a bare identifier with no brace (e.g. `oops`)
- * is treated as a custom declaration the author has not finished — committing a
- * `BlockDeclaration` and reporting a missing-brace `PSL_INVALID_DECLARATION`
- * anchored after the name — rather than as unsupported content. A non-identifier
- * leading token is not a plausible declaration name and falls through to
- * `parseUnsupportedTopLevel`.
+ * Excluding the reserved keywords keeps a malformed reserved block (e.g. `model {` with
+ * no name) routed to its dedicated parser. The generic keyword set is open
+ * (extension-contributed), so a bare identifier with no brace (e.g. `oops`) is read as an
+ * unfinished custom declaration — a committed `BlockDeclaration` + missing-brace diagnostic
+ * — not unsupported content. A non-identifier lead can't be a declaration name, so it falls
+ * through to `parseUnsupportedTopLevel`.
  */
 export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
   if (cursor.peekKind() !== 'Ident') return undefined;
@@ -581,7 +564,7 @@ export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
   if (RESERVED_BLOCK_KEYWORDS.has(keyword)) return undefined;
   const hasName = cursor.peekKind(1) === 'Ident' && cursor.peekKind(2) === 'LBrace';
   cursor.startNode('BlockDeclaration');
-  cursor.bump(); // keyword
+  cursor.bump();
   if (hasName) {
     parseIdentifier(cursor);
   }
@@ -603,24 +586,12 @@ export function parseNamespace(cursor: Cursor): GreenNode | undefined {
   return parseBlock(cursor, 'Namespace', true, (inner) => parseDeclaration(inner, true));
 }
 
-/**
- * Parses a composite type declaration (`type Name { … }`). The `type` keyword
- * commits the kind; the members are model-style fields. A missing name yields
- * `Expected a name after "type"` and a missing brace (name present) yields
- * `Expected "{" to open the "type" block`, both via `parseBlock`.
- */
 export function parseCompositeType(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'type')) return undefined;
   return parseBlock(cursor, 'CompositeTypeDeclaration', true, parseModelMember);
 }
 
-/**
- * Parses a `types { … }` block (plural keyword, no name). The keyword commits
- * the kind; members are named-type declarations (`Name = Type`). A `types` block
- * is only valid at the document top level — nested in a namespace it is flagged
- * `PSL_INVALID_NAMESPACE_BLOCK` while still committing the node. A missing brace
- * yields `Expected "{" to open the "types" block`, anchored after the keyword.
- */
+/** `types` (plural) is the no-name types block; the singular `type` is the composite type above. */
 export function parseTypesBlock(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'types')) return undefined;
   return parseBlock(cursor, 'TypesBlock', false, parseNamedTypeMember);
