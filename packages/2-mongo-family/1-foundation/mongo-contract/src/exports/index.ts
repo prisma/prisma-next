@@ -25,6 +25,8 @@ export type {
   MongoStorageShape,
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,
+  MongoUnboundFieldInputTypes,
+  MongoUnboundFieldOutputTypes,
   MongoWildcardProjection,
   RootModelName,
 } from '../contract-types';

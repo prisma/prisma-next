@@ -6,6 +6,8 @@ import type {
   InferModelRow,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
+  MongoUnboundFieldInputTypes,
+  MongoUnboundFieldOutputTypes,
 } from '../src/contract-types';
 import type { MongoCollection } from '../src/ir/mongo-collection';
 import type { MongoCollectionOptionsAuthoringInput } from '../src/ir/mongo-collection-options';
@@ -204,6 +206,54 @@ test('MongoTypeMaps with single param compiles', () => {
   expectTypeOf<TM['codecTypes']>().toEqualTypeOf<TestCodecTypes>();
   expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
   expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
+});
+
+// The emitter nests `FieldOutputTypes`/`FieldInputTypes` by namespace id; Mongo
+// is structurally single-namespace, so its refined per-model map lives under
+// `__unbound__`. A refined (e.g. parameterized) field type carried in the map
+// must survive resolution verbatim, and a pre-nesting flat map must still read.
+type RefinedAge = number & { readonly __unit: 'years' };
+
+type MinimalContractWithFieldTypes<TFieldTypes extends Record<string, Record<string, unknown>>> =
+  MongoContractWithTypeMaps<
+    {
+      readonly target: 'mongo';
+      readonly targetFamily: 'mongo';
+      readonly profileHash: ProfileHashBase<'sha256:test'>;
+      readonly capabilities: Record<string, never>;
+      readonly extensionPacks: Record<string, never>;
+      readonly meta: Record<string, never>;
+      readonly roots: Record<string, never>;
+      readonly domain: {
+        readonly namespaces: Record<string, { readonly models: Record<string, never> }>;
+      };
+      readonly storage: {
+        readonly namespaces: Record<
+          string,
+          { readonly id: string; readonly entries: { readonly collection: Record<string, never> } }
+        >;
+        readonly storageHash: StorageHashBase<'sha256:s'>;
+      };
+    },
+    MongoTypeMaps<TestCodecTypes, TFieldTypes, TFieldTypes>
+  >;
+
+type NestedFieldTypes = { readonly __unbound__: { readonly User: { readonly age: RefinedAge } } };
+type FlatFieldTypes = { readonly User: { readonly age: RefinedAge } };
+
+test('MongoUnboundFieldOutputTypes reads the per-model map under the unbound namespace', () => {
+  type Resolved = MongoUnboundFieldOutputTypes<MinimalContractWithFieldTypes<NestedFieldTypes>>;
+  expectTypeOf<Resolved>().toEqualTypeOf<{ readonly User: { readonly age: RefinedAge } }>();
+});
+
+test('MongoUnboundFieldInputTypes reads the per-model map under the unbound namespace', () => {
+  type Resolved = MongoUnboundFieldInputTypes<MinimalContractWithFieldTypes<NestedFieldTypes>>;
+  expectTypeOf<Resolved>().toEqualTypeOf<{ readonly User: { readonly age: RefinedAge } }>();
+});
+
+test('MongoUnboundFieldOutputTypes reads a flat (pre-nesting) map as-is', () => {
+  type Resolved = MongoUnboundFieldOutputTypes<MinimalContractWithFieldTypes<FlatFieldTypes>>;
+  expectTypeOf<Resolved>().toEqualTypeOf<FlatFieldTypes>();
 });
 
 test('Mongo index and collection option input types stay specific', () => {

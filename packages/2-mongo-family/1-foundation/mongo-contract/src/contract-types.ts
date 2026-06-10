@@ -2,12 +2,11 @@ import type {
   Contract,
   ContractField,
   ContractModel,
-  ContractModelDefinitions,
   ContractValueObject,
   ContractValueObjectDefinitions,
   StorageBase,
 } from '@prisma-next/contract/types';
-import type { Namespace } from '@prisma-next/framework-components/ir';
+import type { Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
@@ -78,14 +77,21 @@ export type MongoContract<
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
 > = Contract<S, M>;
 
-/** Model map inferred from a {@link MongoContract} (domain.namespaces union). */
-export type MongoModelsMap<TContract extends MongoContract> = ContractModelDefinitions<TContract>;
+/**
+ * Model map for the contract's sole (unbound) domain namespace. Mongo is
+ * structurally single-namespace, so its models live under
+ * {@link UNBOUND_NAMESPACE_ID} rather than in a flat cross-namespace union.
+ * Every Mongo type that needs the model map reads it through here, so none
+ * indexes the contract's namespaces directly.
+ */
+export type MongoModelsMap<TContract extends MongoContract> =
+  TContract['domain']['namespaces'][typeof UNBOUND_NAMESPACE_ID]['models'];
 
 export type RootModelName<
   TContract extends MongoContract,
   RootName extends keyof TContract['roots'] & string,
 > = TContract['roots'][RootName] extends { readonly model: infer M extends string }
-  ? M & keyof import('@prisma-next/contract/types').ContractModelDefinitions<TContract>
+  ? M & keyof MongoModelsMap<TContract>
   : never;
 
 export type MongoTypeMaps<
@@ -134,6 +140,25 @@ export type ExtractMongoFieldInputTypes<T> =
       ? F
       : Record<string, never>
     : Record<string, never>;
+
+/**
+ * The per-model field-output map at the contract's unbound namespace. The
+ * framework emitter nests `FieldOutputTypes` by namespace id
+ * (`{ [ns]: { [model]: { [field]: <refined> } } }`); Mongo is structurally
+ * single-namespace, so its refined rows resolve the per-model map under
+ * {@link UNBOUND_NAMESPACE_ID}. A pre-nesting (flat, model-keyed) map is read
+ * as-is, so a refined row never silently degrades to the codec fallback.
+ */
+export type MongoUnboundFieldOutputTypes<T> =
+  ExtractMongoFieldOutputTypes<T> extends Record<typeof UNBOUND_NAMESPACE_ID, infer Inner>
+    ? Inner
+    : ExtractMongoFieldOutputTypes<T>;
+
+/** Input-side counterpart of {@link MongoUnboundFieldOutputTypes}. */
+export type MongoUnboundFieldInputTypes<T> =
+  ExtractMongoFieldInputTypes<T> extends Record<typeof UNBOUND_NAMESPACE_ID, infer Inner>
+    ? Inner
+    : ExtractMongoFieldInputTypes<T>;
 
 type ExtractValueObjects<TContract extends Contract> = ContractValueObjectDefinitions<TContract>;
 
@@ -187,11 +212,8 @@ type InferFieldType<
 
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof ContractModelDefinitions<TContract>,
-  TFields extends Record<
-    string,
-    ContractField
-  > = ContractModelDefinitions<TContract>[ModelName]['fields'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
+  TFields extends Record<string, ContractField> = MongoModelsMap<TContract>[ModelName]['fields'],
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
   TValueObjects extends Record<string, ContractValueObject> = ExtractValueObjects<TContract>,
 > = {
