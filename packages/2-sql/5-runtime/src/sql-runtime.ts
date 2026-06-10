@@ -19,6 +19,7 @@ import type {
   LoweredStatement,
   PreparedExecuteRequest,
   SqlCodecCallContext,
+  SqlConnection,
   SqlDriver,
   SqlQueryable,
   SqlTransaction,
@@ -64,17 +65,6 @@ import type { ExecutionContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export type Log = RuntimeLog;
-
-/**
- * Narrow view of a raw transaction exposed to the `executeWithSessionBootstrap` bootstrap closure.
- * Provides only `query()` — no lifecycle methods leak to the caller.
- */
-export interface RawSessionConnection {
-  query(
-    sql: string,
-    params?: readonly unknown[],
-  ): Promise<{ readonly rows: ReadonlyArray<Record<string, unknown>> }>;
-}
 
 export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
@@ -314,196 +304,14 @@ export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contra
     );
   }
 
-  protected executeWithSessionBootstrap<Row>(
-    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
-    bootstrap: (conn: RawSessionConnection) => Promise<void>,
-    options?: RuntimeExecuteOptions,
-  ): AsyncIterableResult<Row> {
-    const self = this;
-    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
-      const conn = await self.driver.acquireConnection();
-      let connectionDisposed = false;
-      const destroyConnection = async (reason: unknown): Promise<void> => {
-        if (connectionDisposed) return;
-        connectionDisposed = true;
-        await conn.destroy(reason).catch(() => undefined);
-      };
-
-      const tx = await conn.beginTransaction();
-
-      try {
-        try {
-          const view: RawSessionConnection = {
-            query: (sql, params) => tx.query(sql, params),
-          };
-          await bootstrap(view);
-          yield* self.executeAgainstQueryable<Row>(plan, tx, { ...options, scope: 'transaction' });
-        } catch (error) {
-          try {
-            await tx.rollback();
-          } catch (rollbackError) {
-            await destroyConnection(rollbackError);
-            const wrapped = runtimeError(
-              'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
-              'Transaction rollback failed',
-              { rollbackError },
-            );
-            wrapped.cause = error;
-            throw wrapped;
-          }
-          throw error;
-        }
-
-        try {
-          await tx.commit();
-        } catch (commitError) {
-          try {
-            await tx.rollback();
-          } catch {
-            await destroyConnection(commitError);
-          }
-          const wrapped = runtimeError(
-            'RUNTIME.TRANSACTION_COMMIT_FAILED',
-            'Transaction commit failed',
-            { commitError },
-          );
-          wrapped.cause = commitError;
-          throw wrapped;
-        }
-      } finally {
-        if (!connectionDisposed) {
-          await conn.release();
-        }
-      }
-    };
-    return new AsyncIterableResult(generator());
-  }
-
   /**
-   * Opens a transaction, runs `bootstrap` against a `RawSessionConnection`
-   * (below middleware, same as `executeWithSessionBootstrap`), then invokes
-   * `fn` with a `TransactionContext` whose `execute` calls route through the
-   * middleware chain on the same transaction. Commits on success, rolls back
-   * on error — identical lifecycle discipline to `executeWithSessionBootstrap`.
+   * Returns the raw driver connection. The connection is a `SqlQueryable` — SQL
+   * issued on it runs below the middleware/codec/telemetry pipeline. It carries
+   * its own lifecycle (`release`/`destroy`/`beginTransaction`); the caller owns
+   * disposal.
    */
-  protected async executeTransactionWithBootstrap<R>(
-    bootstrap: (conn: RawSessionConnection) => Promise<void>,
-    fn: (tx: TransactionContext) => PromiseLike<R>,
-  ): Promise<R> {
-    const conn = await this.driver.acquireConnection();
-    let connectionDisposed = false;
-    const destroyConnection = async (reason: unknown): Promise<void> => {
-      if (connectionDisposed) return;
-      connectionDisposed = true;
-      await conn.destroy(reason).catch(() => undefined);
-    };
-
-    const driverTx = await conn.beginTransaction();
-    let invalidated = false;
-
-    const view: RawSessionConnection = {
-      query: (sql, params) => driverTx.query(sql, params),
-    };
-
-    const self = this;
-    async function* guardedStream<Row>(
-      inner: AsyncIterable<Row>,
-    ): AsyncGenerator<Row, void, unknown> {
-      if (invalidated) {
-        throw transactionClosedError();
-      }
-      for await (const row of inner) {
-        yield row;
-        if (invalidated) {
-          throw transactionClosedError();
-        }
-      }
-    }
-    const txContext: TransactionContext = {
-      get invalidated() {
-        return invalidated;
-      },
-      execute<Row>(
-        plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
-        options?: RuntimeExecuteOptions,
-      ): AsyncIterableResult<Row> {
-        if (invalidated) {
-          throw transactionClosedError();
-        }
-        return new AsyncIterableResult(
-          guardedStream(
-            self.executeAgainstQueryable<Row>(plan, driverTx, {
-              ...options,
-              scope: 'transaction',
-            }),
-          ),
-        );
-      },
-      executePrepared<Params, Row>(
-        ps: PreparedStatement<Params, Row>,
-        params: Params,
-        options?: RuntimeExecuteOptions,
-      ): AsyncIterableResult<Row> {
-        if (invalidated) {
-          throw transactionClosedError();
-        }
-        return new AsyncIterableResult(
-          guardedStream(
-            self.executePreparedAgainstQueryable<Params, Row>(
-              ps as PreparedStatementImpl<Params, Row>,
-              params as Record<string, unknown>,
-              driverTx,
-              { ...options, scope: 'transaction' },
-            ),
-          ),
-        );
-      },
-    };
-
-    try {
-      try {
-        await bootstrap(view);
-        const result = await fn(txContext);
-        invalidated = true;
-        try {
-          await driverTx.commit();
-        } catch (commitError) {
-          try {
-            await driverTx.rollback();
-          } catch {
-            await destroyConnection(commitError);
-          }
-          const wrapped = runtimeError(
-            'RUNTIME.TRANSACTION_COMMIT_FAILED',
-            'Transaction commit failed',
-            { commitError },
-          );
-          wrapped.cause = commitError;
-          throw wrapped;
-        }
-        return result;
-      } catch (error) {
-        if (!invalidated) {
-          try {
-            await driverTx.rollback();
-          } catch (rollbackError) {
-            await destroyConnection(rollbackError);
-            const wrapped = runtimeError(
-              'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
-              'Transaction rollback failed',
-              { rollbackError },
-            );
-            wrapped.cause = error;
-            throw wrapped;
-          }
-        }
-        throw error;
-      }
-    } finally {
-      if (!connectionDisposed) {
-        await conn.release();
-      }
-    }
+  protected acquireRawConnection(): Promise<SqlConnection> {
+    return this.driver.acquireConnection();
   }
 
   private async *streamRows<Row>(
@@ -566,7 +374,12 @@ export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contra
     }
   }
 
-  private executeAgainstQueryable<Row>(
+  /**
+   * Execute a plan against a caller-supplied queryable, running the full
+   * middleware/codec/telemetry pipeline. Use `acquireRawConnection` to obtain a
+   * queryable that subclasses can bind typed plans to.
+   */
+  protected executeAgainstQueryable<Row>(
     plan: SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>,
     queryable: SqlQueryable,
     options?: RuntimeExecuteOptions,
@@ -707,7 +520,11 @@ export abstract class SqlRuntime<TContract extends Contract<SqlStorage> = Contra
     return new PreparedStatementImpl<ParamsFromDeclaration<D, CT>, Row>(internals);
   }
 
-  private executePreparedAgainstQueryable<P, Row>(
+  /**
+   * Execute a prepared statement against a caller-supplied queryable, running
+   * the full middleware/codec/telemetry pipeline.
+   */
+  protected executePreparedAgainstQueryable<P, Row>(
     ps: PreparedStatementImpl<P, Row>,
     userParams: Record<string, unknown>,
     queryable: SqlQueryable,
