@@ -439,9 +439,8 @@ describe('postgres', () => {
     };
 
     it('exposes enums per namespace and resolves same-named enums independently', () => {
-      mocks.deserializeContract.mockReturnValue(twoNamespaceDomain);
       const db = postgres<TwoNsContract>({
-        contractJson: {},
+        contract: twoNamespaceDomain,
         url: 'postgres://localhost:5432/db',
       });
 
@@ -452,14 +451,13 @@ describe('postgres', () => {
     });
 
     it('builds the enums surface eagerly, without a runtime', () => {
-      mocks.deserializeContract.mockReturnValue(twoNamespaceDomain);
       const db = postgres<TwoNsContract>({
-        contractJson: {},
+        contract: twoNamespaceDomain,
         url: 'postgres://localhost:5432/db',
       });
 
       expect(db.enums.public.Role.values).toEqual(['user', 'admin']);
-      expect(mocks.createRuntime).not.toHaveBeenCalled();
+      expect(poolConnectSpy()).not.toHaveBeenCalled();
     });
   });
 });

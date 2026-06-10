@@ -2,7 +2,7 @@ import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { createCacheMiddleware } from '@prisma-next/middleware-cache';
 import postgres from '@prisma-next/postgres/runtime';
 import { budgets, type Runtime, type SqlMiddleware } from '@prisma-next/sql-runtime';
-import { validatedContract } from './context';
+import { contract } from '../../prisma/contract';
 
 export async function getRuntime(
   databaseUrl: string,
@@ -17,7 +17,7 @@ export async function getRuntime(
   ],
 ): Promise<Runtime> {
   const client = postgres({
-    contract: validatedContract,
+    contract,
     url: databaseUrl,
     middleware,
     extensions: [pgvector],
