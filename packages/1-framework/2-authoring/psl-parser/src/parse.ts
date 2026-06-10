@@ -477,12 +477,33 @@ function keywordIs(cursor: Cursor, keyword: string): boolean {
  * child node.
  */
 function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
+  const name = cursor.peekKind(1) === 'Ident' ? cursor.peekToken(1).text : '';
+  if (insideNamespace && keywordIs(cursor, 'namespace')) {
+    cursor.diagnostic(
+      'PSL_INVALID_NAMESPACE_BLOCK',
+      `Recursive "namespace ${name}" block is not allowed; namespace blocks may not nest`,
+      cursor.mark(),
+    );
+  } else if (insideNamespace && keywordIs(cursor, 'types')) {
+    cursor.diagnostic(
+      'PSL_INVALID_NAMESPACE_BLOCK',
+      '`types` blocks must be declared at the document top level, not inside a namespace block',
+      cursor.mark(),
+    );
+  } else if (keywordIs(cursor, 'namespace') && name === UNSPECIFIED_PSL_NAMESPACE_ID) {
+    cursor.diagnostic(
+      'PSL_INVALID_NAMESPACE_BLOCK',
+      `Namespace name "${UNSPECIFIED_PSL_NAMESPACE_ID}" is reserved for the parser-synthesised bucket for top-level declarations`,
+      cursor.mark(1),
+    );
+  }
+
   const node =
     parseModel(cursor) ??
     parseEnum(cursor) ??
-    parseNamespace(cursor, insideNamespace) ??
+    parseNamespace(cursor) ??
     parseCompositeType(cursor) ??
-    parseTypesBlock(cursor, insideNamespace) ??
+    parseTypesBlock(cursor) ??
     parseGenericBlock(cursor);
   if (!node) {
     parseUnsupportedTopLevel(cursor);
@@ -490,70 +511,55 @@ function parseDeclaration(cursor: Cursor, insideNamespace: boolean): void {
 }
 
 /**
- * After a reserved declaration keyword has committed, completes the header: it
- * parses the block body when the opening brace is present, otherwise emits a
- * single keyword-anchored `PSL_INVALID_DECLARATION` and recovers to the next
- * sync point. The diagnostic reports the first missing piece — a missing name
- * takes precedence over a missing brace — so at most one is emitted per
- * malformed header.
+ * Parses a reserved block declaration whose keyword the cursor is positioned on.
+ * Reads the keyword off the cursor, commits the declaration kind, then completes
+ * the header. When `nameRequired`, a name is parsed greedily if the next token
+ * is an identifier and a missing name yields `Expected a name after "<kw>"`
+ * (keyword-anchored); when not, no name is ever parsed (the `types` block).
+ * Reports the first missing piece only — a missing name suppresses the brace
+ * diagnostic — and anchors the missing brace just past the last consumed token.
+ * When the brace is present the body is parsed; otherwise the cursor recovers to
+ * the next sync point.
  */
-function finishReservedHeader(
+function parseBlock(
   cursor: Cursor,
-  keyword: string,
-  keywordMark: DiagnosticMark,
-  hasName: boolean,
-  parseBody: () => void,
-): void {
-  const hasBrace = cursor.peekKind() === 'LBrace';
-  if (!hasName) {
+  kind: SyntaxKind,
+  nameRequired: boolean,
+  parseMember: MemberParser,
+): GreenNode {
+  const keyword = cursor.peekToken().text;
+  const keywordMark = cursor.mark();
+  cursor.startNode(kind);
+  cursor.bump(); // keyword
+  const hasName = nameRequired && cursor.peekKind() === 'Ident';
+  if (hasName) {
+    parseIdentifier(cursor);
+  }
+  if (nameRequired && !hasName) {
     cursor.diagnostic('PSL_INVALID_DECLARATION', `Expected a name after "${keyword}"`, keywordMark);
-  } else if (!hasBrace) {
+  } else if (cursor.peekKind() !== 'LBrace') {
     cursor.diagnostic(
       'PSL_INVALID_DECLARATION',
       `Expected "{" to open the "${keyword}" block`,
       cursor.markAfterLastToken(),
     );
   }
-  if (hasBrace) {
-    parseBody();
+  if (cursor.peekKind() === 'LBrace') {
+    parseBlockBody(cursor, parseMember);
   } else {
     cursor.recoverToSyncPoint();
   }
-}
-
-/**
- * Parses a reserved block declaration (`model`/`enum`, or the composite-type
- * branch of `type`) whose keyword has already been matched. The keyword commits
- * the declaration kind: an optional name is parsed when present, then the header
- * is completed by `finishReservedHeader`, which flags a missing name or brace.
- */
-function parseReservedBlock(
-  cursor: Cursor,
-  keyword: string,
-  kind: SyntaxKind,
-  parseMember: MemberParser,
-): GreenNode {
-  const keywordMark = cursor.mark();
-  cursor.startNode(kind);
-  cursor.bump(); // keyword
-  const hasName = cursor.peekKind() === 'Ident';
-  if (hasName) {
-    parseIdentifier(cursor);
-  }
-  finishReservedHeader(cursor, keyword, keywordMark, hasName, () =>
-    parseBlockBody(cursor, parseMember),
-  );
   return cursor.finishNode();
 }
 
 export function parseModel(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'model')) return undefined;
-  return parseReservedBlock(cursor, 'model', 'ModelDeclaration', parseModelMember);
+  return parseBlock(cursor, 'ModelDeclaration', true, parseModelMember);
 }
 
 export function parseEnum(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'enum')) return undefined;
-  return parseReservedBlock(cursor, 'enum', 'EnumDeclaration', parseEnumMember);
+  return parseBlock(cursor, 'EnumDeclaration', true, parseEnumMember);
 }
 
 /**
@@ -592,34 +598,9 @@ export function parseGenericBlock(cursor: Cursor): GreenNode | undefined {
   return cursor.finishNode();
 }
 
-export function parseNamespace(cursor: Cursor, insideNamespace: boolean): GreenNode | undefined {
+export function parseNamespace(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'namespace')) return undefined;
-  const keywordMark = cursor.mark();
-  cursor.startNode('Namespace');
-  cursor.bump(); // namespace
-  const hasName = cursor.peekKind() === 'Ident';
-  const name = hasName ? cursor.peekToken().text : '';
-  const nameMark = cursor.mark();
-  if (hasName) {
-    parseIdentifier(cursor);
-  }
-  if (insideNamespace) {
-    cursor.diagnostic(
-      'PSL_INVALID_NAMESPACE_BLOCK',
-      `Recursive "namespace ${name}" block is not allowed; namespace blocks may not nest`,
-      keywordMark,
-    );
-  } else if (name === UNSPECIFIED_PSL_NAMESPACE_ID) {
-    cursor.diagnostic(
-      'PSL_INVALID_NAMESPACE_BLOCK',
-      `Namespace name "${UNSPECIFIED_PSL_NAMESPACE_ID}" is reserved for the parser-synthesised bucket for top-level declarations`,
-      nameMark,
-    );
-  }
-  finishReservedHeader(cursor, 'namespace', keywordMark, hasName, () =>
-    parseBlockBody(cursor, (inner) => parseDeclaration(inner, true)),
-  );
-  return cursor.finishNode();
+  return parseBlock(cursor, 'Namespace', true, (inner) => parseDeclaration(inner, true));
 }
 
 /**
@@ -630,7 +611,7 @@ export function parseNamespace(cursor: Cursor, insideNamespace: boolean): GreenN
  */
 export function parseCompositeType(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'type')) return undefined;
-  return parseReservedBlock(cursor, 'type', 'CompositeTypeDeclaration', parseModelMember);
+  return parseBlock(cursor, 'CompositeTypeDeclaration', true, parseModelMember);
 }
 
 /**
@@ -640,29 +621,9 @@ export function parseCompositeType(cursor: Cursor): GreenNode | undefined {
  * `PSL_INVALID_NAMESPACE_BLOCK` while still committing the node. A missing brace
  * yields `Expected "{" to open the "types" block`, anchored after the keyword.
  */
-export function parseTypesBlock(cursor: Cursor, insideNamespace: boolean): GreenNode | undefined {
+export function parseTypesBlock(cursor: Cursor): GreenNode | undefined {
   if (!keywordIs(cursor, 'types')) return undefined;
-  const keywordMark = cursor.mark();
-  cursor.startNode('TypesBlock');
-  if (insideNamespace) {
-    cursor.diagnostic(
-      'PSL_INVALID_NAMESPACE_BLOCK',
-      '`types` blocks must be declared at the document top level, not inside a namespace block',
-      keywordMark,
-    );
-  }
-  cursor.bump(); // types
-  if (cursor.peekKind() === 'LBrace') {
-    parseBlockBody(cursor, parseNamedTypeMember);
-  } else {
-    cursor.diagnostic(
-      'PSL_INVALID_DECLARATION',
-      'Expected "{" to open the "types" block',
-      cursor.markAfterLastToken(),
-    );
-    cursor.recoverToSyncPoint();
-  }
-  return cursor.finishNode();
+  return parseBlock(cursor, 'TypesBlock', false, parseNamedTypeMember);
 }
 
 /**
