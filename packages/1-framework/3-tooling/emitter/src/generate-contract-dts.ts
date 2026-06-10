@@ -1,4 +1,9 @@
-import type { Contract, ContractModel, ContractValueObject } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ContractEnum,
+  ContractModel,
+  ContractValueObject,
+} from '@prisma-next/contract/types';
 import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
@@ -19,8 +24,21 @@ import {
   generateValueObjectsDescriptorType,
   generateValueObjectTypeAliases,
   serializeExecutionType,
+  serializeObjectKey,
   serializeValue,
 } from './domain-type-generation';
+
+function generateEnumBlockType(enums: Record<string, ContractEnum>): string {
+  const entries = Object.entries(enums).map(([name, entry]) => {
+    const memberTupleItems = entry.members.map(
+      (m) =>
+        `{ readonly name: ${serializeValue(m.name)}; readonly value: ${serializeValue(m.value)} }`,
+    );
+    const membersType = `readonly [${memberTupleItems.join(', ')}]`;
+    return `readonly ${serializeObjectKey(name)}: { readonly codecId: ${serializeValue(entry.codecId)}; readonly members: ${membersType} }`;
+  });
+  return `{ ${entries.join('; ')} }`;
+}
 
 export function generateContractDts(
   contract: Contract,
@@ -105,34 +123,44 @@ export function generateContractDts(
   const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects, codecLookup);
   const valueObjectsDescriptor = generateValueObjectsDescriptorType(valueObjects);
 
-  // Per-namespace models and value objects types for the domain.namespaces section of ContractBase.
-  const perNamespaceTypes: Array<readonly [string, string, string | undefined]> =
-    namespaceEntries.map(([nsId, ns]) => {
-      const nsModels = blindCast<
-        Record<string, ContractModel>,
-        'ns.models is a ContractModel record in the emitted IR'
-      >(ns.models);
-      const nsModelsType = generateModelsType(nsModels, (name, model) =>
-        emitter.generateModelStorageType(name, model),
-      );
-      const nsValueObjects = blindCast<
-        Record<string, ContractValueObject> | undefined,
-        'ns.valueObjects is an optional ContractValueObject record in the emitted IR'
-      >(ns.valueObjects);
-      const nsValueObjectsDescriptor =
-        nsValueObjects !== undefined && Object.keys(nsValueObjects).length > 0
-          ? generateValueObjectsDescriptorType(nsValueObjects)
-          : undefined;
-      return [nsId, nsModelsType, nsValueObjectsDescriptor] as const;
-    });
+  // Per-namespace models, value objects, and enum types for the domain.namespaces section.
+  const perNamespaceTypes: Array<
+    readonly [string, string, string | undefined, string | undefined]
+  > = namespaceEntries.map(([nsId, ns]) => {
+    const nsModels = blindCast<
+      Record<string, ContractModel>,
+      'ns.models is a ContractModel record in the emitted IR'
+    >(ns.models);
+    const nsModelsType = generateModelsType(nsModels, (name, model) =>
+      emitter.generateModelStorageType(name, model),
+    );
+    const nsValueObjects = blindCast<
+      Record<string, ContractValueObject> | undefined,
+      'ns.valueObjects is an optional ContractValueObject record in the emitted IR'
+    >(ns.valueObjects);
+    const nsValueObjectsDescriptor =
+      nsValueObjects !== undefined && Object.keys(nsValueObjects).length > 0
+        ? generateValueObjectsDescriptorType(nsValueObjects)
+        : undefined;
+    const nsEnums = blindCast<
+      Record<string, ContractEnum> | undefined,
+      'ns.enum is an optional ContractEnum record in the emitted IR'
+    >(ns.enum);
+    const nsEnumBlock =
+      nsEnums !== undefined && Object.keys(nsEnums).length > 0
+        ? generateEnumBlockType(nsEnums)
+        : undefined;
+    return [nsId, nsModelsType, nsValueObjectsDescriptor, nsEnumBlock] as const;
+  });
 
   const domainNamespacesType = perNamespaceTypes
-    .map(([nsId, nsModelsType, nsValueObjectsDescriptor]) => {
+    .map(([nsId, nsModelsType, nsValueObjectsDescriptor, nsEnumBlock]) => {
       const voLine =
         nsValueObjectsDescriptor !== undefined
           ? `\n        readonly valueObjects: ${nsValueObjectsDescriptor};`
           : '';
-      return `      readonly ${nsId}: {\n        readonly models: ${nsModelsType};${voLine}\n      }`;
+      const enumLine = nsEnumBlock !== undefined ? `\n        readonly enum: ${nsEnumBlock};` : '';
+      return `      readonly ${nsId}: {\n        readonly models: ${nsModelsType};${voLine}${enumLine}\n      }`;
     })
     .join(';\n');
 

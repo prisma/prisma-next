@@ -15,17 +15,14 @@
  */
 import 'dotenv/config';
 
-import { blindCast } from '@prisma-next/utils/casts';
 import { loadAppConfig } from '../src/app-config';
 import { createOrmClient } from '../src/orm-client/client';
 import { db } from '../src/prisma/db';
-import { getPriorityEnumFromEmit } from '../src/queries/get-posts-by-priority';
 
-function priorityValue(name: string): 'low' | 'high' | 'urgent' {
-  return blindCast<
-    'low' | 'high' | 'urgent',
-    'EnumAccessor.members returns JsonValue; the emitted contract type does not carry literal enum types in domain.namespaces'
-  >(getPriorityEnumFromEmit().members[name]);
+type PriorityMemberName = keyof (typeof db.enums.public.Priority)['members'];
+
+function priorityValue(name: PriorityMemberName): 'low' | 'high' | 'urgent' {
+  return db.enums.public.Priority.members[name];
 }
 
 async function main() {

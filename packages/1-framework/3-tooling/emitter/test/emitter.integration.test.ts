@@ -326,4 +326,153 @@ describe('emitter integration', () => {
     },
     timeouts.typeScriptCompilation,
   );
+
+  it(
+    'emits the domain enum block with literal member tuples in the namespace type',
+    async () => {
+      const ir = createTestContract({
+        models: {},
+        enum: {
+          Priority: {
+            codecId: 'pg/text@1',
+            members: [
+              { name: 'Low', value: 'low' },
+              { name: 'High', value: 'high' },
+              { name: 'Urgent', value: 'urgent' },
+            ],
+          },
+        },
+        storage: {
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: { table: {} },
+            },
+          },
+        },
+        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+      });
+
+      const result = await emit(
+        ir,
+        { codecTypeImports: [], extensionIds: ['postgres', 'pg'] },
+        mockSqlHook,
+      );
+
+      expect(result.contractDts).toContain("readonly codecId: 'pg/text@1'");
+      expect(result.contractDts).toContain("readonly name: 'Low'");
+      expect(result.contractDts).toContain("readonly value: 'low'");
+      expect(result.contractDts).toContain("readonly name: 'High'");
+      expect(result.contractDts).toContain("readonly value: 'high'");
+      expect(result.contractDts).toContain("readonly name: 'Urgent'");
+      expect(result.contractDts).toContain("readonly value: 'urgent'");
+      expect(result.contractDts).toContain('readonly enum:');
+      expect(result.contractDts).toContain('readonly Priority:');
+      expect(result.contractDts).toContain('readonly members: readonly [');
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'emits integer member values as bare number literals',
+    async () => {
+      const ir = createTestContract({
+        models: {},
+        enum: {
+          Severity: {
+            codecId: 'pg/int4@1',
+            members: [
+              { name: 'Low', value: 1 },
+              { name: 'High', value: 10 },
+            ],
+          },
+        },
+        storage: {
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: { table: {} },
+            },
+          },
+        },
+        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+      });
+
+      const result = await emit(
+        ir,
+        { codecTypeImports: [], extensionIds: ['postgres', 'pg'] },
+        mockSqlHook,
+      );
+
+      expect(result.contractDts).toContain('readonly value: 1');
+      expect(result.contractDts).toContain('readonly value: 10');
+      expect(result.contractDts).not.toContain("readonly value: '1'");
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'quotes enum entry names in the enum block when the name is not a valid TS identifier',
+    async () => {
+      const ir = createTestContract({
+        models: {},
+        enum: {
+          'in-progress-status': {
+            codecId: 'pg/text@1',
+            members: [{ name: 'Active', value: 'active' }],
+          },
+          Done: {
+            codecId: 'pg/text@1',
+            members: [{ name: 'Complete', value: 'complete' }],
+          },
+        },
+        storage: {
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: { table: {} },
+            },
+          },
+        },
+        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+      });
+
+      const result = await emit(
+        ir,
+        { codecTypeImports: [], extensionIds: ['postgres', 'pg'] },
+        mockSqlHook,
+      );
+
+      expect(result.contractDts).toContain("readonly 'in-progress-status':");
+      expect(result.contractDts).toContain('readonly Done:');
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'omits the enum member entirely for namespaces without enums',
+    async () => {
+      const ir = createTestContract({
+        models: {},
+        storage: {
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: { table: {} },
+            },
+          },
+        },
+        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+      });
+
+      const result = await emit(
+        ir,
+        { codecTypeImports: [], extensionIds: ['postgres', 'pg'] },
+        mockSqlHook,
+      );
+
+      expect(result.contractDts).not.toContain('readonly enum:');
+    },
+    timeouts.typeScriptCompilation,
+  );
 });

@@ -64,3 +64,16 @@ test('emitted contract: db.sql.public.post INSERT rejects values outside the uni
     { id: 'b', title: 'bad', userId: 'u', priority: 'nope' },
   ]);
 });
+
+test('emitted contract: db.enums.public.Priority yields literal types through the emitted contract.d.ts', () => {
+  type MemberHigh = (typeof db.enums.public.Priority)['members']['High'];
+  type Values = (typeof db.enums.public.Priority)['values'];
+
+  expectTypeOf<MemberHigh>().toEqualTypeOf<'high'>();
+  expectTypeOf<MemberHigh>().not.toEqualTypeOf<string>();
+
+  expectTypeOf<Values[0]>().toEqualTypeOf<'low'>();
+  expectTypeOf<Values[1]>().toEqualTypeOf<'high'>();
+  expectTypeOf<Values[2]>().toEqualTypeOf<'urgent'>();
+  expectTypeOf<Values[0]>().not.toEqualTypeOf<string>();
+});

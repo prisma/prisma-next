@@ -4,7 +4,6 @@ import { sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
 import type { Runtime, SqlMiddleware } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it, vi } from 'vitest';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
 import { createOrmClient } from '../src/orm-client/client';
@@ -35,14 +34,12 @@ import { ormClientUpsertUser } from '../src/orm-client/upsert-user';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { db } from '../src/prisma/db';
-import { getPriorityEnumFromEmit } from '../src/queries/get-posts-by-priority';
 import { initTestDatabase } from './utils/control-client';
 
-function priorityValue(name: string): 'low' | 'high' | 'urgent' {
-  return blindCast<
-    'low' | 'high' | 'urgent',
-    'EnumAccessor.members returns JsonValue; the emitted contract type does not carry literal enum types in domain.namespaces'
-  >(getPriorityEnumFromEmit().members[name]);
+type PriorityMemberName = keyof (typeof db.enums.public.Priority)['members'];
+
+function priorityValue(name: PriorityMemberName): 'low' | 'high' | 'urgent' {
+  return db.enums.public.Priority.members[name];
 }
 
 const context = db.context;
