@@ -3,7 +3,7 @@ import { defineContract, enumType, member, rel } from '@prisma-next/postgres/con
 
 const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 
-export const Priority = enumType(
+const Priority = enumType(
   'Priority',
   pgText,
   member('Low', 'low'),

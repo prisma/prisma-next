@@ -1,6 +1,5 @@
 import type { EnumAccessor } from '@prisma-next/contract/enum-accessor';
 import { blindCast } from '@prisma-next/utils/casts';
-import { Priority } from '../../prisma/contract';
 import { db } from '../prisma/db';
 
 export function getPriorityEnumFromEmit(): EnumAccessor {
@@ -25,11 +24,11 @@ export async function getPostsByPriority(limit = 10) {
   return db.runtime().execute(plan);
 }
 
-export async function getPostsByPriorityMember(
-  priorityMember: keyof typeof Priority.members,
-  limit = 10,
-) {
-  const value = Priority.members[priorityMember];
+export async function getPostsByPriorityMember(priorityMember: string, limit = 10) {
+  const value = blindCast<
+    'low' | 'high' | 'urgent',
+    'EnumAccessor.members returns JsonValue; the emitted contract type does not carry literal enum types in domain.namespaces, so the cast is required here'
+  >(getPriorityEnumFromEmit().members[priorityMember]);
   const plan = db.sql.public.post
     .select('id', 'title', 'priority')
     .where((cols, ops) => ops.eq(cols.priority, value))
