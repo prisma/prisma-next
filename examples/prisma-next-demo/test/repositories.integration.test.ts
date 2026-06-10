@@ -1,4 +1,3 @@
-import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { createCacheMiddleware } from '@prisma-next/middleware-cache';
 import postgres from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -41,11 +40,7 @@ const context = db.context;
 const { contract } = context;
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  return postgres<Contract>({
-    contractJson,
-    url: connectionString,
-    extensions: [pgvector],
-  }).connect();
+  return db.connect({ url: connectionString });
 }
 
 async function getRuntimeWithMiddleware(
@@ -56,7 +51,7 @@ async function getRuntimeWithMiddleware(
     contractJson,
     url: connectionString,
     middleware,
-    extensions: [pgvector],
+    extensions: db.stack.extensionPacks,
   });
   const runtime = await client.connect();
   const driver = (runtime as unknown as { driver: SqlDriver<unknown> }).driver;
